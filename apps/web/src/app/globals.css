@@ -101,3 +101,20 @@ body {
 .pb-safe { padding-bottom: calc(var(--safe-area-bottom) + 4.5rem); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Container query */
+.@container { container-type: inline-size; }
+
+/* Sticky sidebar wrapper — sticky 적용은 내부 div에 */
+.detail-sidebar {
+  position: relative;
+}
+@media (min-width: 1024px) {
+  .detail-sidebar > .sidebar-sticky {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100dvh - 3rem);
+    overflow-y: auto;
+  }
+  .detail-sidebar > .sidebar-sticky::-webkit-scrollbar { display: none; }
+}

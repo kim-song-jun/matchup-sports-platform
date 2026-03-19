@@ -342,9 +342,10 @@ export default function VenueDetailPage() {
         </div>
 
         {/* Right sidebar */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0">
+        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+          <div className="sidebar-sticky space-y-3">
           {/* Upcoming team matches at this venue */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 sticky top-4 mb-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <Trophy size={16} className="text-blue-500" />
               이 구장 예정 경기
@@ -399,6 +400,7 @@ export default function VenueDetailPage() {
             >
               이 구장에서 경기 만들기
             </Link>
+          </div>
           </div>
         </div>
       </div>

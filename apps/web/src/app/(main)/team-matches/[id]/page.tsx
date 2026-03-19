@@ -286,7 +286,8 @@ export default function TeamMatchDetailPage() {
           </div>
 
           {/* 오른쪽: CTA + 신청 목록 */}
-          <div className="mt-4 lg:mt-0 space-y-4">
+          <div className="mt-4 lg:mt-0 detail-sidebar">
+            <div className="sidebar-sticky space-y-3">
             {/* CTA 버튼 영역 */}
             <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-3">
               {isRecruiting && !isHost && (
@@ -390,6 +391,7 @@ export default function TeamMatchDetailPage() {
                 <p className="text-[14px] text-gray-500">아직 신청한 팀이 없어요</p>
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

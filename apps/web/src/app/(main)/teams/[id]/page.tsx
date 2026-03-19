@@ -302,9 +302,10 @@ export default function TeamDetailPage() {
         </div>
 
         {/* Right sidebar */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0">
+        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+          <div className="sidebar-sticky space-y-3">
           {/* CTA */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 sticky top-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             {team.isRecruiting ? (
               <div className="text-center mb-4">
                 <span className="inline-block rounded-full bg-green-50 px-3 py-1 text-[13px] font-semibold text-green-600 mb-2">팀원 모집중</span>
@@ -327,7 +328,7 @@ export default function TeamDetailPage() {
 
           {/* 용병 모집 중 카드 */}
           {hasMercenaryPost && (
-            <Link href="/mercenary" className="block mt-3">
+            <Link href="/mercenary" className="block">
               <div className="rounded-2xl bg-orange-50 border border-orange-100 p-4 transition-all hover:shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100">
@@ -344,7 +345,7 @@ export default function TeamDetailPage() {
           )}
 
           {/* Owner */}
-          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">운영자</h3>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-[14px] font-bold text-blue-500">
@@ -360,6 +361,7 @@ export default function TeamDetailPage() {
                 )}
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>

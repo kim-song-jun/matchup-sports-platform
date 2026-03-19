@@ -120,9 +120,10 @@ export default function ListingDetailPage() {
         </div>
 
         {/* Right: seller + CTA */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0">
+        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+          <div className="sidebar-sticky space-y-3">
           {/* Seller */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">판매자</h3>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-500">
@@ -139,7 +140,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Safety notice */}
-          <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4 mb-3">
+          <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
             <div className="flex items-start gap-2">
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
@@ -150,7 +151,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* CTA */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 lg:sticky lg:top-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             {!isAuthenticated ? (
               <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white">
                 로그인 후 구매하기
@@ -166,6 +167,7 @@ export default function ListingDetailPage() {
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

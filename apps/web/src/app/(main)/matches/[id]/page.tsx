@@ -169,9 +169,10 @@ export default function MatchDetailPage() {
         </div>
 
         {/* Right sidebar: participants + action */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0">
+        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+          <div className="sidebar-sticky space-y-3">
           {/* Action button */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 lg:sticky lg:top-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-[13px] text-gray-500">참가 현황</span>
@@ -234,7 +235,7 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Participants */}
-          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
@@ -260,6 +261,7 @@ export default function MatchDetailPage() {
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </div>
       </div>

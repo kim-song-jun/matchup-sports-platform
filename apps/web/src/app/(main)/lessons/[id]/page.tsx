@@ -158,57 +158,63 @@ export default function LessonDetailPage() {
           </div>
         </div>
 
-        {/* Right CTA */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0">
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 lg:sticky lg:top-4">
-            <p className="text-[24px] font-black text-gray-900 text-center mb-3">{formatCurrency(lesson.fee)}</p>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[13px] text-gray-500">참가 현황</span>
-              <span className="text-[13px] font-semibold text-blue-500">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
-            </div>
-            <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-              <div className="h-full rounded-full bg-blue-400 transition-all duration-700" style={{ width: `${filledPercent}%` }} />
-            </div>
-            {!isAuthenticated ? (
-              <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white">로그인 후 신청하기</Link>
-            ) : (
+        {/* Right CTA — sidebar-sticky로 전체 오른쪽 컬럼이 sticky */}
+        <div className="detail-sidebar px-5 lg:px-0 mt-4 lg:mt-0">
+          <div className="sidebar-sticky space-y-3">
+            <div className="rounded-2xl bg-white border border-gray-100 p-5">
+              <p className="text-[24px] font-black text-gray-900 text-center mb-3">{formatCurrency(lesson.fee)}</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[13px] text-gray-500">참가 현황</span>
+                <span className="text-[13px] font-semibold text-blue-500">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
+                <div className="h-full rounded-full bg-blue-400 transition-all duration-700" style={{ width: `${filledPercent}%` }} />
+              </div>
+              {!isAuthenticated ? (
+                <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white active:bg-gray-800 transition-colors">로그인 후 신청하기</Link>
+              ) : (
+                <button
+                  onClick={() => lesson.fee > 0 ? setShowCheckout(true) : null}
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+                >
+                  수강 신청하기 {lesson.fee > 0 ? `· ${formatCurrency(lesson.fee)}` : ''}
+                </button>
+              )}
+
               <button
-                onClick={() => lesson.fee > 0 ? setShowCheckout(true) : null}
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+                onClick={() => {
+                  const startDate = new Date(lesson.lessonDate);
+                  const [sh, sm] = lesson.startTime.split(':');
+                  startDate.setHours(+sh, +sm);
+                  const [eh, em] = lesson.endTime.split(':');
+                  const endDate = new Date(lesson.lessonDate);
+                  endDate.setHours(+eh, +em);
+                  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+                  const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(lesson.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(lesson.venueName || '')}&details=${encodeURIComponent(lesson.description || '')}`;
+                  window.open(url, '_blank');
+                }}
+                className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
               >
-                수강 신청하기 {lesson.fee > 0 ? `· ${formatCurrency(lesson.fee)}` : ''}
+                <Calendar size={14} />
+                캘린더에 추가
               </button>
-            )}
 
-            {/* 캘린더 추가 */}
-            <button
-              onClick={() => {
-                const startDate = new Date(lesson.lessonDate);
-                const [sh, sm] = lesson.startTime.split(':');
-                startDate.setHours(+sh, +sm);
-                const [eh, em] = lesson.endTime.split(':');
-                const endDate = new Date(lesson.lessonDate);
-                endDate.setHours(+eh, +em);
-                const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-                const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(lesson.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(lesson.venueName || '')}&details=${encodeURIComponent(lesson.description || '')}`;
-                window.open(url, '_blank');
-              }}
-              className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Calendar size={14} />
-              캘린더에 추가
-            </button>
-
-            <div className="mt-3 space-y-1.5 text-[12px] text-gray-400">
-              <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 24시간 내 환불 가능</p>
-              <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 코치 직접 피드백</p>
+              <div className="mt-3 space-y-1.5 text-[12px] text-gray-400">
+                <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 24시간 내 환불 가능</p>
+                <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 코치 직접 피드백</p>
+              </div>
             </div>
-          </div>
-          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-4">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">등록자</h3>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
-              <p className="text-[14px] font-semibold text-gray-900">{lesson.host?.nickname}</p>
+
+            {/* 등록자 — CTA와 같은 sticky 그룹 안에 */}
+            <div className="rounded-2xl bg-white border border-gray-100 p-4">
+              <h3 className="text-[14px] font-semibold text-gray-900 mb-3">등록자</h3>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
+                <div>
+                  <p className="text-[14px] font-semibold text-gray-900">{lesson.host?.nickname}</p>
+                  <p className="text-[12px] text-gray-400">호스트</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

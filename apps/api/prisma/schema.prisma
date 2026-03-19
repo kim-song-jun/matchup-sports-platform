@@ -1,0 +1,463 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum SportType {
+  futsal
+  basketball
+  badminton
+  ice_hockey
+  figure_skating
+  short_track
+}
+
+enum VenueType {
+  futsal_court
+  basketball_court
+  badminton_court
+  ice_rink
+  gymnasium
+}
+
+enum MatchStatus {
+  recruiting
+  full
+  in_progress
+  completed
+  cancelled
+}
+
+enum ParticipantStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  refunded
+  partial_refunded
+  failed
+}
+
+enum PaymentMethod {
+  card
+  toss_pay
+  naver_pay
+  kakao_pay
+  transfer
+}
+
+enum OAuthProvider {
+  kakao
+  naver
+  apple
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum NotificationType {
+  match_created
+  player_joined
+  player_left
+  team_announced
+  match_reminder
+  match_completed
+  review_pending
+  level_changed
+  payment_confirmed
+  payment_refunded
+  marketplace_order
+  marketplace_message
+}
+
+enum ListingStatus {
+  active
+  sold
+  reserved
+  expired
+  deleted
+}
+
+enum ListingType {
+  sell
+  rent
+  group_buy
+}
+
+enum ItemCondition {
+  new
+  like_new
+  good
+  fair
+  poor
+}
+
+enum OrderStatus {
+  pending
+  paid
+  escrow_held
+  shipped
+  delivered
+  completed
+  disputed
+  refunded
+  cancelled
+}
+
+// ─── Models ──────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(uuid())
+  email           String?  @unique
+  nickname        String   @unique
+  profileImageUrl String?  @map("profile_image_url")
+  phone           String?
+  gender          Gender?
+  birthYear       Int?     @map("birth_year")
+  bio             String?
+  sportTypes      SportType[] @map("sport_types")
+  locationLat     Float?   @map("location_lat")
+  locationLng     Float?   @map("location_lng")
+  locationCity    String?  @map("location_city")
+  locationDistrict String? @map("location_district")
+  mannerScore     Float    @default(3.0) @map("manner_score")
+  totalMatches    Int      @default(0) @map("total_matches")
+
+  // OAuth
+  oauthProvider   OAuthProvider @map("oauth_provider")
+  oauthId         String   @map("oauth_id")
+
+  // FCM
+  fcmToken        String?  @map("fcm_token")
+
+  // Timestamps
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  // Relations
+  sportProfiles       UserSportProfile[]
+  hostedMatches       Match[]              @relation("HostedMatches")
+  matchParticipations MatchParticipant[]
+  reviews             Review[]             @relation("ReviewAuthor")
+  receivedReviews     Review[]             @relation("ReviewTarget")
+  payments            Payment[]
+  notifications       Notification[]
+  venueReviews        VenueReview[]
+  listings            MarketplaceListing[] @relation("ListingSeller")
+  orders              MarketplaceOrder[]   @relation("OrderBuyer")
+  soldOrders          MarketplaceOrder[]   @relation("OrderSeller")
+  marketplaceReviews  MarketplaceReview[]  @relation("MarketplaceReviewAuthor")
+  receivedMarketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewTarget")
+
+  @@unique([oauthProvider, oauthId])
+  @@index([locationCity, locationDistrict])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model UserSportProfile {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  sportType          SportType @map("sport_type")
+  level              Int       @default(1)
+  eloRating          Int       @default(1000) @map("elo_rating")
+  preferredPositions String[]  @map("preferred_positions")
+  matchCount         Int       @default(0) @map("match_count")
+  winCount           Int       @default(0) @map("win_count")
+  mvpCount           Int       @default(0) @map("mvp_count")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sportType])
+  @@map("user_sport_profiles")
+}
+
+model Venue {
+  id             String    @id @default(uuid())
+  name           String
+  type           VenueType
+  sportTypes     SportType[] @map("sport_types")
+  address        String
+  addressDetail  String?   @map("address_detail")
+  lat            Float
+  lng            Float
+  city           String
+  district       String
+  phone          String?
+  description    String?
+  imageUrls      String[]  @map("image_urls")
+  facilities     String[]
+  operatingHours Json      @map("operating_hours")
+  pricePerHour   Int?      @map("price_per_hour")
+  rating         Float     @default(0)
+  reviewCount    Int       @default(0) @map("review_count")
+
+  // Ice rink specific
+  iceQualityAvg  Float?    @map("ice_quality_avg")
+  rinkSubType    String?   @map("rink_sub_type") // full_rink, half_rink
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  matches      Match[]
+  venueReviews VenueReview[]
+
+  @@index([city, district])
+  @@index([type])
+  @@map("venues")
+}
+
+model VenueReview {
+  id             String   @id @default(uuid())
+  venueId        String   @map("venue_id")
+  userId         String   @map("user_id")
+  rating         Float
+  facilityRating Float    @map("facility_rating")
+  accessRating   Float    @map("access_rating")
+  costRating     Float    @map("cost_rating")
+  iceQuality     Float?   @map("ice_quality")
+  comment        String?
+  imageUrls      String[] @map("image_urls")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, userId])
+  @@map("venue_reviews")
+}
+
+model Match {
+  id            String      @id @default(uuid())
+  hostId        String      @map("host_id")
+  sportType     SportType   @map("sport_type")
+  title         String
+  description   String?
+  venueId       String      @map("venue_id")
+  matchDate     DateTime    @map("match_date") @db.Date
+  startTime     String      @map("start_time") // HH:mm
+  endTime       String      @map("end_time")   // HH:mm
+  maxPlayers    Int         @map("max_players")
+  currentPlayers Int        @default(0) @map("current_players")
+  fee           Int         @default(0)
+  levelMin      Int         @default(1) @map("level_min")
+  levelMax      Int         @default(5) @map("level_max")
+  gender        String      @default("any") // any, male, female
+  status        MatchStatus @default(recruiting)
+  teamConfig    Json?       @map("team_config")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  host         User               @relation("HostedMatches", fields: [hostId], references: [id])
+  venue        Venue              @relation(fields: [venueId], references: [id])
+  participants MatchParticipant[]
+  teams        Team[]
+  reviews      Review[]
+
+  @@index([sportType, status])
+  @@index([matchDate])
+  @@index([venueId])
+  @@map("matches")
+}
+
+model MatchParticipant {
+  id            String            @id @default(uuid())
+  matchId       String            @map("match_id")
+  userId        String            @map("user_id")
+  teamId        String?           @map("team_id")
+  status        ParticipantStatus @default(pending)
+  paymentStatus PaymentStatus     @default(pending) @map("payment_status")
+  joinedAt      DateTime          @default(now()) @map("joined_at")
+
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id])
+  team    Team?  @relation(fields: [teamId], references: [id])
+  payment Payment?
+
+  @@unique([matchId, userId])
+  @@map("match_participants")
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  matchId   String   @map("match_id")
+  name      String
+  color     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  match        Match              @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  participants MatchParticipant[]
+
+  @@map("teams")
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  matchId      String   @map("match_id")
+  authorId     String   @map("author_id")
+  targetId     String   @map("target_id")
+  skillRating  Float    @map("skill_rating")
+  mannerRating Float    @map("manner_rating")
+  comment      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  match  Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  author User  @relation("ReviewAuthor", fields: [authorId], references: [id])
+  target User  @relation("ReviewTarget", fields: [targetId], references: [id])
+
+  @@unique([matchId, authorId, targetId])
+  @@map("reviews")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  participantId   String        @unique @map("participant_id")
+  amount          Int
+  method          PaymentMethod?
+  status          PaymentStatus @default(pending)
+  pgProvider      String?       @map("pg_provider") // toss
+  pgTid           String?       @map("pg_tid")
+  paymentKey      String?       @unique @map("payment_key")
+  orderId         String        @unique @map("order_id")
+  receiptUrl      String?       @map("receipt_url")
+  cardNumber      String?       @map("card_number") // masked
+  refundAmount    Int?          @map("refund_amount")
+  refundReason    String?       @map("refund_reason")
+  paidAt          DateTime?     @map("paid_at")
+  refundedAt      DateTime?     @map("refunded_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  user        User             @relation(fields: [userId], references: [id])
+  participant MatchParticipant @relation(fields: [participantId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ─── Marketplace ─────────────────────────────────────────
+
+model MarketplaceListing {
+  id           String        @id @default(uuid())
+  sellerId     String        @map("seller_id")
+  title        String
+  description  String
+  sportType    SportType     @map("sport_type")
+  category     String
+  condition    ItemCondition
+  price        Int
+  listingType  ListingType   @default(sell) @map("listing_type")
+  status       ListingStatus @default(active)
+  imageUrls    String[]      @map("image_urls")
+  locationCity String?       @map("location_city")
+  locationDistrict String?   @map("location_district")
+  viewCount    Int           @default(0) @map("view_count")
+  likeCount    Int           @default(0) @map("like_count")
+
+  // Rental fields
+  rentalPricePerDay Int?     @map("rental_price_per_day")
+  rentalDeposit     Int?     @map("rental_deposit")
+
+  // Group buy fields
+  groupBuyTarget    Int?     @map("group_buy_target")
+  groupBuyDeadline  DateTime? @map("group_buy_deadline")
+  groupBuyCurrent   Int?     @default(0) @map("group_buy_current")
+
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  expiresAt    DateTime?    @map("expires_at")
+
+  seller  User               @relation("ListingSeller", fields: [sellerId], references: [id])
+  orders  MarketplaceOrder[]
+
+  @@index([sportType, category])
+  @@index([status])
+  @@index([locationCity])
+  @@map("marketplace_listings")
+}
+
+model MarketplaceOrder {
+  id          String      @id @default(uuid())
+  listingId   String      @map("listing_id")
+  buyerId     String      @map("buyer_id")
+  sellerId    String      @map("seller_id")
+  amount      Int
+  commission  Int         @default(0)
+  status      OrderStatus @default(pending)
+  paymentKey  String?     @unique @map("payment_key")
+  orderId     String      @unique @map("order_id")
+
+  // Rental
+  rentalStartDate DateTime? @map("rental_start_date")
+  rentalEndDate   DateTime? @map("rental_end_date")
+
+  paidAt      DateTime?   @map("paid_at")
+  shippedAt   DateTime?   @map("shipped_at")
+  deliveredAt DateTime?   @map("delivered_at")
+  completedAt DateTime?   @map("completed_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id])
+  buyer   User               @relation("OrderBuyer", fields: [buyerId], references: [id])
+  seller  User               @relation("OrderSeller", fields: [sellerId], references: [id])
+  review  MarketplaceReview?
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("marketplace_orders")
+}
+
+model MarketplaceReview {
+  id                String   @id @default(uuid())
+  orderId           String   @unique @map("order_id")
+  authorId          String   @map("author_id")
+  targetId          String   @map("target_id")
+  rating            Float
+  conditionAccuracy Float    @map("condition_accuracy")
+  communication     Float
+  deliverySpeed     Float    @map("delivery_speed")
+  comment           String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  order  MarketplaceOrder @relation(fields: [orderId], references: [id])
+  author User             @relation("MarketplaceReviewAuthor", fields: [authorId], references: [id])
+  target User             @relation("MarketplaceReviewTarget", fields: [targetId], references: [id])
+
+  @@map("marketplace_reviews")
+}

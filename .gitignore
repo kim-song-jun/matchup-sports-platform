@@ -1,0 +1,33 @@
+node_modules/
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Docker
+postgres_data/
+redis_data/
+
+# Prisma
+apps/api/prisma/migrations/
+
+# Capacitor
+apps/web/ios/
+apps/web/android/
+
+# Build
+out/
+build/
+coverage/

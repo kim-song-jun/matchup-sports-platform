@@ -1,0 +1,87 @@
+import { Controller, Get, Post, Patch, Param, Query, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { AdminService } from './admin.service';
+
+@ApiTags('관리자')
+@Controller('admin')
+export class AdminController {
+  constructor(private readonly adminService: AdminService) {}
+
+  @Get('stats')
+  @ApiOperation({ summary: '대시보드 통계' })
+  async getStats() {
+    return this.adminService.getDashboardStats();
+  }
+
+  @Get('users')
+  @ApiOperation({ summary: '사용자 목록' })
+  async getUsers(@Query('search') search?: string, @Query('cursor') cursor?: string) {
+    return this.adminService.getUsers({ search, cursor });
+  }
+
+  @Get('matches')
+  @ApiOperation({ summary: '매치 목록 (전체)' })
+  async getMatches(@Query('status') status?: string, @Query('cursor') cursor?: string) {
+    return this.adminService.getMatches({ status, cursor });
+  }
+
+  @Patch('matches/:id/status')
+  @ApiOperation({ summary: '매치 상태 변경' })
+  async updateMatchStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.adminService.updateMatchStatus(id, status);
+  }
+
+  @Get('lessons')
+  @ApiOperation({ summary: '강좌 목록 (전체)' })
+  async getLessons() {
+    return this.adminService.getLessons();
+  }
+
+  @Post('lessons')
+  @ApiOperation({ summary: '강좌 생성 (관리자)' })
+  async createLesson(@Body() body: Record<string, unknown>) {
+    return this.adminService.createLesson(body);
+  }
+
+  @Patch('lessons/:id/status')
+  @ApiOperation({ summary: '강좌 상태 변경' })
+  async updateLessonStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.adminService.updateLessonStatus(id, status);
+  }
+
+  @Get('teams')
+  @ApiOperation({ summary: '팀 목록' })
+  async getTeams() {
+    return this.adminService.getTeams();
+  }
+
+  @Post('teams')
+  @ApiOperation({ summary: '팀 생성 (관리자)' })
+  async createTeam(@Body() body: Record<string, unknown>) {
+    return this.adminService.createTeam(body);
+  }
+
+  @Get('venues')
+  @ApiOperation({ summary: '시설 목록 (전체)' })
+  async getVenues() {
+    return this.adminService.getVenues();
+  }
+
+  @Post('venues')
+  @ApiOperation({ summary: '시설 등록 (관리자)' })
+  async createVenue(@Body() body: Record<string, unknown>) {
+    return this.adminService.createVenue(body);
+  }
+
+  @Patch('venues/:id')
+  @ApiOperation({ summary: '시설 수정 (관리자)' })
+  async updateVenue(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.adminService.updateVenue(id, body);
+  }
+
+  @Get('payments')
+  @ApiOperation({ summary: '결제 목록 (전체)' })
+  async getPayments() {
+    return this.adminService.getPayments();
+  }
+}

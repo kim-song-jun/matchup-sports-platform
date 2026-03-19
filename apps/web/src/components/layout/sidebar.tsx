@@ -2,18 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Bell, Users, Building2, Swords } from 'lucide-react';
+import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Bell, Users, Building2, Swords, MessageCircle, UserPlus, Award } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useChatStore } from '@/stores/chat-store';
 
 const navItems = [
   { href: '/home', icon: Home, label: '홈' },
   { href: '/matches', icon: Search, label: '매치 찾기' },
   { href: '/team-matches', icon: Swords, label: '팀 매칭' },
+  { href: '/chat', icon: MessageCircle, label: '채팅' },
   { href: '/lessons', icon: GraduationCap, label: '강좌' },
   { href: '/marketplace', icon: ShoppingBag, label: '장터' },
   { href: '/teams', icon: Users, label: '팀·클럽' },
+  { href: '/mercenary', icon: UserPlus, label: '용병' },
   { href: '/venues', icon: Building2, label: '시설' },
   { href: '/notifications', icon: Bell, label: '알림' },
+  { href: '/badges', icon: Award, label: '뱃지' },
   { href: '/profile', icon: User, label: '마이페이지' },
 ] as const;
 
@@ -21,6 +25,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const totalUnread = useChatStore((s) => s.getTotalUnreadCount());
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[260px] flex-col border-r border-gray-100 bg-white">
@@ -46,6 +51,7 @@ export function Sidebar() {
         <div className="space-y-0.5">
           {navItems.map(({ href, icon: Icon, label }) => {
             const isActive = pathname.startsWith(href);
+            const showBadge = href === '/chat' && totalUnread > 0;
             return (
               <Link key={href} href={href}
                 className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-[14px] font-medium transition-all ${
@@ -53,7 +59,14 @@ export function Sidebar() {
                     ? 'bg-gray-900 text-white'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}>
-                <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
+                <div className="relative">
+                  <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold text-white">
+                      {totalUnread}
+                    </span>
+                  )}
+                </div>
                 {label}
               </Link>
             );

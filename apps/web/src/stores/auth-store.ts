@@ -1,11 +1,29 @@
 import { create } from 'zustand';
 
+interface SportProfile {
+  id: string;
+  sportType: string;
+  level: number;
+  eloRating: number;
+  preferredPositions: string[];
+  matchCount: number;
+  winCount: number;
+  mvpCount: number;
+}
+
 interface User {
   id: string;
   nickname: string;
   email: string | null;
   profileImageUrl: string | null;
   mannerScore: number;
+  totalMatches: number;
+  bio?: string;
+  gender?: string;
+  locationCity?: string;
+  locationDistrict?: string;
+  sportProfiles?: SportProfile[];
+  [key: string]: unknown;
 }
 
 interface AuthState {

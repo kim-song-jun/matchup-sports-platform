@@ -1,0 +1,267 @@
+'use client';
+
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  ArrowLeft, Trophy, Shield, CheckCircle2, Hash,
+} from 'lucide-react';
+
+// Mock match data
+const mockMatch = {
+  id: 'tm-001',
+  title: '서울 FC vs 강남 유나이티드',
+  homeTeam: { name: '서울 FC', logo: null },
+  awayTeam: { name: '강남 유나이티드', logo: null },
+  quarterCount: 4,
+  hasReferee: true,
+  refereeSchedule: [
+    { quarter: 1, teamName: '서울 FC' },
+    { quarter: 2, teamName: '강남 유나이티드' },
+    { quarter: 3, teamName: '서울 FC' },
+    { quarter: 4, teamName: '강남 유나이티드' },
+  ],
+};
+
+interface QuarterScore {
+  home: string;
+  away: string;
+}
+
+export default function ScoreInputPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+
+  const [scores, setScores] = useState<QuarterScore[]>(
+    Array.from({ length: mockMatch.quarterCount }, () => ({ home: '', away: '' })),
+  );
+  const [submitted, setSubmitted] = useState(false);
+
+  function updateScore(quarterIdx: number, team: 'home' | 'away', value: string) {
+    // Only allow non-negative integers
+    const cleaned = value.replace(/[^0-9]/g, '');
+    setScores((prev) =>
+      prev.map((s, i) => (i === quarterIdx ? { ...s, [team]: cleaned } : s)),
+    );
+  }
+
+  const homeTotal = scores.reduce((sum, s) => sum + (parseInt(s.home) || 0), 0);
+  const awayTotal = scores.reduce((sum, s) => sum + (parseInt(s.away) || 0), 0);
+
+  const allFilled = scores.every((s) => s.home !== '' && s.away !== '');
+
+  function handleSubmit() {
+    if (!allFilled) return;
+    setSubmitted(true);
+    // In real implementation, this would call an API
+  }
+
+  return (
+    <div className="pt-[var(--safe-area-top)] animate-fade-in">
+      {/* Header */}
+      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+        <button
+          onClick={() => router.back()}
+          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-[18px] font-bold text-gray-900">스코어 입력</h1>
+      </header>
+
+      <div className="px-5 lg:px-0 lg:max-w-2xl lg:mx-auto">
+        {/* Match header with team names */}
+        <div className="rounded-2xl bg-gray-900 p-5 mb-4">
+          <div className="flex items-center justify-between">
+            {/* Home team */}
+            <div className="flex-1 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/10 mx-auto mb-2">
+                <span className="text-[20px] font-bold text-white">
+                  {mockMatch.homeTeam.name.charAt(0)}
+                </span>
+              </div>
+              <p className="text-[14px] font-semibold text-white">{mockMatch.homeTeam.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">홈</p>
+            </div>
+
+            {/* Score display */}
+            <div className="px-4">
+              <div className="flex items-center gap-3">
+                <span className="text-[36px] font-bold text-white">{homeTotal}</span>
+                <span className="text-[20px] text-gray-500">:</span>
+                <span className="text-[36px] font-bold text-white">{awayTotal}</span>
+              </div>
+              <p className="text-center text-[11px] text-gray-500 mt-1">
+                {homeTotal > awayTotal ? '홈 승' : homeTotal < awayTotal ? '원정 승' : '무승부'}
+              </p>
+            </div>
+
+            {/* Away team */}
+            <div className="flex-1 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/10 mx-auto mb-2">
+                <span className="text-[20px] font-bold text-white">
+                  {mockMatch.awayTeam.name.charAt(0)}
+                </span>
+              </div>
+              <p className="text-[14px] font-semibold text-white">{mockMatch.awayTeam.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">원정</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quarter-by-quarter scores */}
+        <div className="space-y-3 mb-4">
+          {scores.map((score, idx) => {
+            const ref = mockMatch.refereeSchedule?.[idx];
+            const quarterHome = parseInt(score.home) || 0;
+            const quarterAway = parseInt(score.away) || 0;
+
+            return (
+              <div key={idx} className="rounded-2xl bg-white border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+                      <Hash size={14} />
+                    </div>
+                    <span className="text-[14px] font-semibold text-gray-900">
+                      {idx + 1}쿼터
+                    </span>
+                  </div>
+                  {score.home !== '' && score.away !== '' && (
+                    <span className="text-[12px] text-gray-400">
+                      {quarterHome} : {quarterAway}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Home score */}
+                  <div className="flex-1">
+                    <label className="text-[11px] text-gray-400 mb-1 block text-center">
+                      {mockMatch.homeTeam.name}
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={score.home}
+                      onChange={(e) => updateScore(idx, 'home', e.target.value)}
+                      placeholder="0"
+                      disabled={submitted}
+                      className="w-full rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
+                    />
+                  </div>
+
+                  <span className="text-[18px] font-bold text-gray-300 mt-5">:</span>
+
+                  {/* Away score */}
+                  <div className="flex-1">
+                    <label className="text-[11px] text-gray-400 mb-1 block text-center">
+                      {mockMatch.awayTeam.name}
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={score.away}
+                      onChange={(e) => updateScore(idx, 'away', e.target.value)}
+                      placeholder="0"
+                      disabled={submitted}
+                      className="w-full rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Referee assignment */}
+                {ref && (
+                  <div className="mt-3 flex items-center gap-1.5 text-[12px] text-gray-400">
+                    <Shield size={12} className="text-gray-300" />
+                    <span>심판: {ref.teamName}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Running total summary */}
+        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-4">
+          <h3 className="text-[14px] font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Trophy size={16} className="text-amber-500" />
+            쿼터별 누적 점수
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="py-2 px-2 text-left font-semibold text-gray-500">팀</th>
+                  {scores.map((_, idx) => (
+                    <th key={idx} className="py-2 px-2 text-center font-semibold text-gray-500">
+                      Q{idx + 1}
+                    </th>
+                  ))}
+                  <th className="py-2 px-2 text-center font-semibold text-gray-900">합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-50">
+                  <td className="py-2.5 px-2 font-medium text-gray-900">
+                    {mockMatch.homeTeam.name}
+                  </td>
+                  {scores.map((s, idx) => (
+                    <td key={idx} className="py-2.5 px-2 text-center text-gray-700">
+                      {s.home || '-'}
+                    </td>
+                  ))}
+                  <td className="py-2.5 px-2 text-center font-bold text-blue-500">{homeTotal}</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-2 font-medium text-gray-900">
+                    {mockMatch.awayTeam.name}
+                  </td>
+                  {scores.map((s, idx) => (
+                    <td key={idx} className="py-2.5 px-2 text-center text-gray-700">
+                      {s.away || '-'}
+                    </td>
+                  ))}
+                  <td className="py-2.5 px-2 text-center font-bold text-blue-500">{awayTotal}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Submit */}
+        {!submitted ? (
+          <div className="mb-8">
+            <button
+              onClick={handleSubmit}
+              disabled={!allFilled}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Trophy size={18} />
+              경기 완료
+            </button>
+            {!allFilled && (
+              <p className="text-center text-[12px] text-gray-400 mt-2">
+                모든 쿼터의 점수를 입력해주세요
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-green-50 border border-green-100 p-5 mb-8 text-center">
+            <CheckCircle2 size={32} className="mx-auto text-green-500 mb-2" />
+            <p className="text-[16px] font-bold text-green-700">스코어가 기록되었습니다</p>
+            <p className="text-[13px] text-green-500 mt-1">
+              최종 스코어: {mockMatch.homeTeam.name} {homeTotal} : {awayTotal} {mockMatch.awayTeam.name}
+            </p>
+            <button
+              onClick={() => router.push(`/team-matches/${id}`)}
+              className="mt-4 rounded-xl bg-green-500 px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-green-600 transition-colors"
+            >
+              매치 상세로 돌아가기
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

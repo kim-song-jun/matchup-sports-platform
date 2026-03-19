@@ -2,16 +2,44 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, ExternalLink, Star, Calendar, Clock, Instagram, Youtube, Image } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, ExternalLink, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { BadgeDisplay } from '@/components/ui/badge-display';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
   ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
+
+// Mock trust score data
+const mockTrustScore = {
+  infoAccuracy: 96,
+  mannerScore: 4.6,
+  lateRate: 3,
+  noShowRate: 0,
+  record: { total: 42, wins: 28, draws: 6, losses: 8 },
+};
+
+// Mock badges
+const mockBadges = [
+  { id: 'badge-1', type: 'manner_player', name: '매너 플레이어', description: '매너 점수 4.5+' },
+  { id: 'badge-2', type: 'punctual', name: '시간 약속왕', description: '지각률 0%' },
+  { id: 'badge-4', type: 'honest_team', name: '정직한 팀', description: '정보 일치도 95%+' },
+  { id: 'badge-5', type: 'newcomer', name: '신규 팀', description: '팀 등록 완료' },
+];
+
+// Mock recent match results
+const mockRecentMatches = [
+  { id: 'rm-1', opponent: '성수 유나이티드', date: '2026-03-15', myScore: 3, opponentScore: 1, result: 'win' as const },
+  { id: 'rm-2', opponent: '마포 킥커즈', date: '2026-03-08', myScore: 2, opponentScore: 2, result: 'draw' as const },
+  { id: 'rm-3', opponent: '강남 FC', date: '2026-03-01', myScore: 1, opponentScore: 3, result: 'loss' as const },
+  { id: 'rm-4', opponent: '잠실 레인저스', date: '2026-02-22', myScore: 4, opponentScore: 0, result: 'win' as const },
+];
+
+const hasMercenaryPost = true;
 
 export default function TeamDetailPage() {
   const params = useParams();
@@ -61,7 +89,7 @@ export default function TeamDetailPage() {
       </header>
 
       <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
-        <Link href="/teams" className="hover:text-gray-600">팀·클럽</Link>
+        <Link href="/teams" className="hover:text-gray-600">팀&middot;클럽</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{team.name}</span>
       </div>
@@ -95,6 +123,12 @@ export default function TeamDetailPage() {
                 {team.isRecruiting && (
                   <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-semibold text-green-600">모집중</span>
                 )}
+                {hasMercenaryPost && (
+                  <Link href="/mercenary" className="rounded-full bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-600 flex items-center gap-1">
+                    <UserPlus size={10} />
+                    용병 모집 중
+                  </Link>
+                )}
               </div>
               <div className="flex items-center gap-2 text-[13px] text-gray-400">
                 {SportIcon && <SportIcon size={14} />}
@@ -104,9 +138,104 @@ export default function TeamDetailPage() {
                 <span className="text-gray-200">|</span>
                 <span>{team.memberCount}명</span>
               </div>
+
+              {/* Badge display */}
+              <div className="mt-3">
+                <BadgeDisplay badges={mockBadges} size="md" />
+              </div>
+
               {team.description && (
                 <p className="mt-4 text-[14px] text-gray-600 leading-relaxed whitespace-pre-line">{team.description}</p>
               )}
+            </div>
+          </div>
+
+          {/* 신뢰도 점수 */}
+          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
+            <h3 className="text-[16px] font-bold text-gray-900 mb-4">신뢰도</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <TrustItem
+                icon={<CheckCircle size={16} />}
+                label="정보 일치도"
+                value={`${mockTrustScore.infoAccuracy}%`}
+                color={mockTrustScore.infoAccuracy >= 90 ? 'text-green-500' : 'text-gray-500'}
+              />
+              <TrustItem
+                icon={<Star size={16} />}
+                label="매너 점수"
+                value={`${mockTrustScore.mannerScore}/5`}
+                color={mockTrustScore.mannerScore >= 4.0 ? 'text-amber-500' : 'text-gray-500'}
+              />
+              <TrustItem
+                icon={<Clock size={16} />}
+                label="지각률"
+                value={`${mockTrustScore.lateRate}%`}
+                color={mockTrustScore.lateRate <= 5 ? 'text-blue-500' : 'text-red-500'}
+              />
+              <TrustItem
+                icon={<AlertCircle size={16} />}
+                label="노쇼율"
+                value={`${mockTrustScore.noShowRate}%`}
+                color={mockTrustScore.noShowRate <= 2 ? 'text-green-500' : 'text-red-500'}
+              />
+            </div>
+            {/* 전적 */}
+            <div className="mt-4 rounded-xl bg-gray-50 p-3.5">
+              <div className="flex items-center gap-1.5 text-gray-400 mb-2">
+                <Trophy size={14} />
+                <span className="text-[12px] font-medium">전적</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[18px] font-bold text-gray-900">{mockTrustScore.record.total}전</span>
+                <div className="flex items-center gap-2 text-[14px]">
+                  <span className="font-semibold text-blue-500">{mockTrustScore.record.wins}승</span>
+                  <span className="font-semibold text-gray-400">{mockTrustScore.record.draws}무</span>
+                  <span className="font-semibold text-red-400">{mockTrustScore.record.losses}패</span>
+                </div>
+                <div className="ml-auto">
+                  <span className="text-[13px] font-semibold text-gray-600">
+                    승률 {((mockTrustScore.record.wins / mockTrustScore.record.total) * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 최근 경기 결과 */}
+          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[16px] font-bold text-gray-900">최근 경기</h3>
+              <Link href="/team-matches" className="text-[13px] text-blue-500 font-medium">전체보기</Link>
+            </div>
+            <div className="space-y-2">
+              {mockRecentMatches.map((match) => {
+                const d = new Date(match.date);
+                const resultStyle = {
+                  win: { label: '승', className: 'bg-blue-50 text-blue-500' },
+                  draw: { label: '무', className: 'bg-gray-100 text-gray-500' },
+                  loss: { label: '패', className: 'bg-red-50 text-red-500' },
+                };
+                const rs = resultStyle[match.result];
+
+                return (
+                  <div key={match.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3.5 py-3">
+                    <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold ${rs.className}`}>
+                      {rs.label}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-medium text-gray-900 truncate">vs {match.opponent}</p>
+                      <p className="text-[12px] text-gray-400">
+                        {d.getMonth() + 1}/{d.getDate()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[16px] font-bold text-gray-900">
+                        {match.myScore} : {match.opponentScore}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -196,6 +325,24 @@ export default function TeamDetailPage() {
             )}
           </div>
 
+          {/* 용병 모집 중 카드 */}
+          {hasMercenaryPost && (
+            <Link href="/mercenary" className="block mt-3">
+              <div className="rounded-2xl bg-orange-50 border border-orange-100 p-4 transition-all hover:shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100">
+                    <UserPlus size={18} className="text-orange-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[14px] font-semibold text-gray-900">용병 모집 중</p>
+                    <p className="text-[12px] text-orange-600 mt-0.5">다음 경기에 함께할 용병을 찾고 있어요</p>
+                  </div>
+                  <ChevronRight size={16} className="text-orange-400" />
+                </div>
+              </div>
+            </Link>
+          )}
+
           {/* Owner */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-4">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">운영자</h3>
@@ -230,6 +377,18 @@ function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string
         <span className="text-[12px]">{label}</span>
       </div>
       <p className="text-[14px] font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+
+function TrustItem({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
+  return (
+    <div className="rounded-xl bg-gray-50 p-3">
+      <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+        {icon}
+        <span className="text-[12px]">{label}</span>
+      </div>
+      <p className={`text-[16px] font-bold ${color}`}>{value}</p>
     </div>
   );
 }

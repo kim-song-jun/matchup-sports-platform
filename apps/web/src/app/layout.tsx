@@ -8,13 +8,15 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 };
 
+export const dynamic = 'force-dynamic';
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#FF6B35',
+  themeColor: '#3182F6',
 };
 
 export default function RootLayout({

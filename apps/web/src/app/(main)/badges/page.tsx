@@ -1,0 +1,271 @@
+'use client';
+
+import { useState } from 'react';
+import { ArrowLeft, Star, Clock, Shield, CheckCircle, Sparkles, Trophy, Flame, Heart, Lock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
+interface BadgeInfo {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  requirement: string;
+  icon: typeof Star;
+  color: string;
+  bg: string;
+  earned: boolean;
+  earnedAt?: string;
+  progress?: string;
+}
+
+const allBadges: BadgeInfo[] = [
+  {
+    id: 'badge-1',
+    type: 'manner_player',
+    name: '매너 플레이어',
+    description: '상대방을 존중하며 경기하는 선수',
+    requirement: '매너 점수 4.5 이상',
+    icon: Star,
+    color: 'text-amber-500',
+    bg: 'bg-amber-50',
+    earned: true,
+    earnedAt: '2026-02-15',
+  },
+  {
+    id: 'badge-2',
+    type: 'punctual',
+    name: '시간 약속왕',
+    description: '항상 정시에 도착하는 시간 약속의 달인',
+    requirement: '지각률 0%',
+    icon: Clock,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50',
+    earned: true,
+    earnedAt: '2026-01-20',
+  },
+  {
+    id: 'badge-3',
+    type: 'referee_hero',
+    name: '심판 영웅',
+    description: '공정한 경기를 위해 심판을 자청하는 영웅',
+    requirement: '심판 5회 이상',
+    icon: Shield,
+    color: 'text-purple-500',
+    bg: 'bg-purple-50',
+    earned: false,
+    progress: '3/5',
+  },
+  {
+    id: 'badge-4',
+    type: 'honest_team',
+    name: '정직한 팀',
+    description: '등록한 팀 정보와 실제가 일치하는 믿을 수 있는 팀',
+    requirement: '정보 일치도 95% 이상',
+    icon: CheckCircle,
+    color: 'text-green-500',
+    bg: 'bg-green-50',
+    earned: true,
+    earnedAt: '2026-03-01',
+  },
+  {
+    id: 'badge-5',
+    type: 'newcomer',
+    name: '신규 팀',
+    description: '플랫폼에 새롭게 합류한 팀',
+    requirement: '팀 등록 완료',
+    icon: Sparkles,
+    color: 'text-pink-500',
+    bg: 'bg-pink-50',
+    earned: true,
+    earnedAt: '2025-12-01',
+  },
+  {
+    id: 'badge-6',
+    type: 'veteran',
+    name: '베테란',
+    description: '풍부한 경험을 가진 베테랑 선수/팀',
+    requirement: '50경기 이상',
+    icon: Trophy,
+    color: 'text-orange-500',
+    bg: 'bg-orange-50',
+    earned: false,
+    progress: '32/50',
+  },
+  {
+    id: 'badge-7',
+    type: 'winning_streak',
+    name: '연승 행진',
+    description: '멈출 수 없는 승리의 행진',
+    requirement: '5연승 이상',
+    icon: Flame,
+    color: 'text-red-500',
+    bg: 'bg-red-50',
+    earned: false,
+    progress: '2/5',
+  },
+  {
+    id: 'badge-8',
+    type: 'fair_play',
+    name: '페어플레이',
+    description: '분쟁 없는 깨끗한 경기를 이어가는 스포츠맨',
+    requirement: '무분쟁 20경기 이상',
+    icon: Heart,
+    color: 'text-rose-500',
+    bg: 'bg-rose-50',
+    earned: true,
+    earnedAt: '2026-02-28',
+  },
+];
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getDate().toString().padStart(2, '0')}`;
+}
+
+export default function BadgesPage() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
+
+  const earnedBadges = allBadges.filter((b) => b.earned);
+  const displayBadges = activeTab === 'my' ? earnedBadges : allBadges;
+
+  return (
+    <div className="pt-[var(--safe-area-top)] animate-fade-in">
+      {/* Header */}
+      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+        <button
+          onClick={() => router.back()}
+          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors lg:hidden"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-[22px] font-bold text-gray-900">뱃지</h1>
+      </header>
+
+      {/* Summary */}
+      <div className="px-5 lg:px-0 mb-4">
+        <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 text-white">
+          <p className="text-[13px] text-blue-100">획득한 뱃지</p>
+          <div className="flex items-end gap-1 mt-1">
+            <span className="text-[32px] font-black leading-none">{earnedBadges.length}</span>
+            <span className="text-[14px] text-blue-200 mb-0.5">/ {allBadges.length}</span>
+          </div>
+          <div className="mt-3 flex gap-1.5">
+            {earnedBadges.map((badge) => {
+              const Icon = badge.icon;
+              return (
+                <div
+                  key={badge.id}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm"
+                >
+                  <Icon size={14} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-5 lg:px-0 mb-4 flex gap-2">
+        <button
+          onClick={() => setActiveTab('my')}
+          className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+            activeTab === 'my'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+          }`}
+        >
+          내 뱃지 ({earnedBadges.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+            activeTab === 'all'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+          }`}
+        >
+          전체 뱃지 ({allBadges.length})
+        </button>
+      </div>
+
+      {/* Badge grid */}
+      <div className="px-5 lg:px-0">
+        <div className="space-y-3">
+          {displayBadges.map((badge) => {
+            const Icon = badge.icon;
+
+            return (
+              <div
+                key={badge.id}
+                className={`rounded-2xl border p-4 transition-all ${
+                  badge.earned
+                    ? 'bg-white border-gray-100'
+                    : 'bg-gray-50/50 border-gray-100/60'
+                }`}
+              >
+                <div className="flex items-start gap-3.5">
+                  <div
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all ${
+                      badge.earned ? `${badge.bg} ${badge.color}` : 'bg-gray-100 text-gray-300'
+                    }`}
+                  >
+                    {badge.earned ? <Icon size={22} /> : <Lock size={18} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3
+                        className={`text-[15px] font-semibold ${
+                          badge.earned ? 'text-gray-900' : 'text-gray-400'
+                        }`}
+                      >
+                        {badge.name}
+                      </h3>
+                      {badge.earned && (
+                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-600">
+                          획득
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-[13px] mt-0.5 ${badge.earned ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {badge.description}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-[12px] text-gray-400">
+                        {badge.requirement}
+                      </span>
+                      {badge.earned && badge.earnedAt ? (
+                        <span className="text-[11px] text-gray-400">
+                          {formatDate(badge.earnedAt)} 획득
+                        </span>
+                      ) : badge.progress ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 rounded-full bg-gray-200 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-blue-400 transition-all"
+                              style={{
+                                width: `${(parseInt(badge.progress.split('/')[0]) / parseInt(badge.progress.split('/')[1])) * 100}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="text-[11px] font-medium text-gray-500">
+                            {badge.progress}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-gray-300">미달성</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="h-6" />
+    </div>
+  );
+}

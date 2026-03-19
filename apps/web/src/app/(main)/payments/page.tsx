@@ -1,57 +1,148 @@
 'use client';
 
-import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock, RotateCcw, Wallet, ShoppingBag, Trophy, GraduationCap, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/auth-store';
 import Link from 'next/link';
+
+const tabs = [
+  { id: 'all', label: '전체' },
+  { id: 'match', label: '매치' },
+  { id: 'lesson', label: '강좌' },
+  { id: 'market', label: '장터' },
+];
 
 const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; color: string }> = {
   completed: { label: '결제 완료', icon: CheckCircle, color: 'text-green-600 bg-green-50' },
   pending: { label: '대기중', icon: Clock, color: 'text-amber-500 bg-amber-50' },
-  refunded: { label: '환불됨', icon: XCircle, color: 'text-red-500 bg-red-50' },
+  refunded: { label: '환불됨', icon: RotateCcw, color: 'text-red-500 bg-red-50' },
   failed: { label: '실패', icon: XCircle, color: 'text-gray-500 bg-gray-100' },
 };
 
-function formatCurrency(n: number) { return new Intl.NumberFormat('ko-KR').format(n) + '원'; }
-function formatDate(d: string) { return new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }); }
+const methodConfig: Record<string, { label: string; icon: typeof CreditCard }> = {
+  card: { label: '카드', icon: CreditCard },
+  tosspay: { label: '토스페이', icon: Wallet },
+  naverpay: { label: '네이버페이', icon: Wallet },
+  kakaopay: { label: '카카오페이', icon: Wallet },
+};
+
+const typeConfig: Record<string, { label: string; icon: typeof Trophy; color: string }> = {
+  match: { label: '매치', icon: Trophy, color: 'bg-blue-50 text-blue-500' },
+  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-purple-50 text-purple-500' },
+  market: { label: '장터', icon: ShoppingBag, color: 'bg-emerald-50 text-emerald-500' },
+};
+
+const mockPayments = [
+  {
+    id: 'pay_mock_001',
+    type: 'match',
+    name: '풋살 친선 매치',
+    amount: 14500,
+    status: 'completed',
+    method: 'card',
+    createdAt: '2026-03-20T10:30:00',
+  },
+  {
+    id: 'pay_mock_002',
+    type: 'match',
+    name: '농구 3:3 매치',
+    amount: 20000,
+    status: 'refunded',
+    method: 'tosspay',
+    createdAt: '2026-03-15T14:20:00',
+  },
+  {
+    id: 'pay_mock_003',
+    type: 'lesson',
+    name: '배드민턴 초급 강좌',
+    amount: 35000,
+    status: 'completed',
+    method: 'kakaopay',
+    createdAt: '2026-03-12T09:00:00',
+  },
+  {
+    id: 'pay_mock_004',
+    type: 'match',
+    name: '풋살 리그전',
+    amount: 18000,
+    status: 'pending',
+    method: 'naverpay',
+    createdAt: '2026-03-19T16:45:00',
+  },
+  {
+    id: 'pay_mock_005',
+    type: 'market',
+    name: '축구화 나이키 팬텀',
+    amount: 85000,
+    status: 'completed',
+    method: 'card',
+    createdAt: '2026-03-10T11:30:00',
+  },
+  {
+    id: 'pay_mock_006',
+    type: 'lesson',
+    name: '아이스하키 입문반',
+    amount: 60000,
+    status: 'failed',
+    method: 'card',
+    createdAt: '2026-03-08T13:15:00',
+  },
+];
+
+function formatCurrency(n: number) {
+  return new Intl.NumberFormat('ko-KR').format(n) + '원';
+}
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const [activeTab, setActiveTab] = useState('all');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['payments'],
-    queryFn: async () => {
-      const res = await api.get('/payments/me');
-      return (res as any).data;
-    },
-    enabled: isAuthenticated,
-  });
-
-  const payments = Array.isArray(data) ? data : [];
+  const filtered = activeTab === 'all'
+    ? mockPayments
+    : mockPayments.filter((p) => p.type === activeTab);
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
+      {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+          <ArrowLeft size={20} className="text-gray-700" />
+        </button>
         <h1 className="text-[16px] font-semibold text-gray-900">결제 내역</h1>
       </header>
       <div className="hidden lg:block mb-6">
         <h2 className="text-[24px] font-bold text-gray-900">결제 내역</h2>
+        <p className="text-[14px] text-gray-400 mt-1">매치, 강좌, 장터 결제 내역을 확인하세요</p>
       </div>
 
       <div className="px-5 lg:px-0">
-        {!isAuthenticated ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
-            <CreditCard size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">로그인 후 확인할 수 있어요</p>
-            <Link href="/login" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
-          </div>
-        ) : isLoading ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 animate-pulse rounded-2xl bg-gray-50" />)}</div>
-        ) : payments.length === 0 ? (
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1 mb-5 rounded-xl bg-gray-100 p-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${
+                activeTab === tab.id
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Payment List */}
+        {filtered.length === 0 ? (
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
             <CreditCard size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">결제 내역이 없어요</p>
@@ -59,22 +150,47 @@ export default function PaymentsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {payments.map((p: any) => {
+            {filtered.map((p) => {
               const s = statusConfig[p.status] || statusConfig.pending;
+              const m = methodConfig[p.method] || methodConfig.card;
+              const t = typeConfig[p.type] || typeConfig.match;
               const StatusIcon = s.icon;
+              const MethodIcon = m.icon;
+              const TypeIcon = t.icon;
               return (
-                <div key={p.id} className="rounded-2xl bg-white border border-gray-100 p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${s.color}`}>
-                      <StatusIcon size={18} />
+                <Link
+                  key={p.id}
+                  href={`/payments/${p.id}`}
+                  className="block rounded-2xl bg-white border border-gray-100 p-4 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${t.color} shrink-0`}>
+                        <TypeIcon size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-[14px] font-semibold text-gray-900 truncate">{p.name}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${s.color}`}>
+                            {s.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[12px] text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <MethodIcon size={12} />
+                            {m.label}
+                          </span>
+                          <span>·</span>
+                          <span>{formatDate(p.createdAt)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[14px] font-medium text-gray-900">{formatCurrency(p.amount)}</p>
-                      <p className="text-[12px] text-gray-400">{formatDate(p.createdAt)}</p>
+                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                      <span className="text-[15px] font-bold text-gray-900">{formatCurrency(p.amount)}</span>
+                      <ChevronRight size={16} className="text-gray-300" />
                     </div>
                   </div>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${s.color}`}>{s.label}</span>
-                </div>
+                </Link>
               );
             })}
           </div>

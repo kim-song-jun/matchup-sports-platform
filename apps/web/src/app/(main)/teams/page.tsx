@@ -62,7 +62,7 @@ export default function TeamsPage() {
                       <div className="flex items-center gap-2 mb-0.5">
                         <h3 className="text-[17px] font-bold text-gray-900">{team.name}</h3>
                         {team.isRecruiting && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-500">모집중</span>
+                          <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-600">모집중</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-[13px] text-gray-400">

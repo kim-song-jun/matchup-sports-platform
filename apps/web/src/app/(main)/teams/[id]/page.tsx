@@ -93,7 +93,7 @@ export default function TeamDetailPage() {
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-[22px] font-bold text-gray-900">{team.name}</h2>
                 {team.isRecruiting && (
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-500">모집중</span>
+                  <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-[11px] font-semibold text-green-600">모집중</span>
                 )}
               </div>
               <div className="flex items-center gap-2 text-[13px] text-gray-400">
@@ -127,13 +127,13 @@ export default function TeamDetailPage() {
               <h3 className="text-[16px] font-bold text-gray-900 mb-4">SNS & 링크</h3>
               <div className="grid grid-cols-2 gap-2">
                 {team.instagramUrl && (
-                  <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gradient-to-r from-purple-500 to-pink-500 text-white" />
+                  <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gray-800 text-white" />
                 )}
                 {team.youtubeUrl && (
-                  <SnsButton href={team.youtubeUrl} icon={<Youtube size={16} />} label="YouTube" color="bg-red-500 text-white" />
+                  <SnsButton href={team.youtubeUrl} icon={<Youtube size={16} />} label="YouTube" color="bg-gray-800 text-white" />
                 )}
                 {team.kakaoOpenChat && (
-                  <SnsButton href={team.kakaoOpenChat} icon={<MessageCircle size={16} />} label="오픈채팅" color="bg-amber-400 text-gray-900" />
+                  <SnsButton href={team.kakaoOpenChat} icon={<MessageCircle size={16} />} label="오픈채팅" color="bg-gray-700 text-white" />
                 )}
                 {team.websiteUrl && (
                   <SnsButton href={team.websiteUrl} icon={<Globe size={16} />} label="웹사이트" color="bg-gray-700 text-white" />
@@ -178,7 +178,7 @@ export default function TeamDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-4 sticky top-4">
             {team.isRecruiting ? (
               <div className="text-center mb-4">
-                <span className="inline-block rounded-full bg-emerald-50 px-3 py-1 text-[13px] font-semibold text-emerald-500 mb-2">팀원 모집중</span>
+                <span className="inline-block rounded-full bg-green-50 px-3 py-1 text-[13px] font-semibold text-green-600 mb-2">팀원 모집중</span>
                 <p className="text-[13px] text-gray-400">아래 버튼으로 연락해보세요</p>
               </div>
             ) : (

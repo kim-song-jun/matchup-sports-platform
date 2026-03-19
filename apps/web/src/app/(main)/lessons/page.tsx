@@ -25,9 +25,9 @@ const typeLabel: Record<string, string> = {
 };
 
 const typeColor: Record<string, string> = {
-  group_lesson: 'bg-violet-50 text-violet-500',
-  practice_match: 'bg-emerald-50 text-emerald-500',
-  free_practice: 'bg-amber-50 text-amber-500',
+  group_lesson: 'bg-blue-50 text-blue-500',
+  practice_match: 'bg-gray-100 text-gray-700',
+  free_practice: 'bg-gray-100 text-gray-700',
   clinic: 'bg-blue-50 text-blue-500',
 };
 
@@ -142,7 +142,7 @@ export default function LessonsPage() {
                   </div>
 
                   <div className="mt-3 h-[3px] rounded-full bg-gray-100 overflow-hidden">
-                    <div className="h-full rounded-full bg-violet-400 transition-all" style={{ width: `${filledPercent}%` }} />
+                    <div className="h-full rounded-full bg-blue-400 transition-all" style={{ width: `${filledPercent}%` }} />
                   </div>
                 </Link>
               );

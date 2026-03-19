@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -85,6 +87,9 @@ export default function ProfilePage() {
         )}
       </div>
 
+      {/* 다가오는 일정 */}
+      {isAuthenticated && <UpcomingSchedule />}
+
       <div className="mt-5 h-2 bg-gray-50 lg:hidden" />
 
       <div className="px-5 lg:px-0 py-2 lg:mt-4">
@@ -127,6 +132,59 @@ export default function ProfilePage() {
       <div className="h-6" />
 
       {showEditModal && <EditProfileModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} />}
+    </div>
+  );
+}
+
+function UpcomingSchedule() {
+  const { data } = useQuery({
+    queryKey: ['my-matches'],
+    queryFn: async () => {
+      const res = await api.get('/users/me/matches', { params: { limit: 5 } });
+      return (res as any).data;
+    },
+  });
+
+  const matches = data?.items ?? [];
+  const upcoming = matches.filter((m: any) => new Date(m.matchDate) >= new Date()).slice(0, 3);
+
+  return (
+    <div className="mt-4 px-5 lg:px-0">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[16px] font-bold text-gray-900">다가오는 일정</h3>
+        <Link href="/matches" className="text-[13px] text-blue-500 font-medium">전체보기</Link>
+      </div>
+      {upcoming.length === 0 ? (
+        <div className="rounded-2xl bg-white border border-gray-100 p-6 text-center">
+          <Calendar size={24} className="mx-auto text-gray-300 mb-2" />
+          <p className="text-[14px] text-gray-500">예정된 일정이 없어요</p>
+          <p className="text-[12px] text-gray-400 mt-0.5">매치나 강좌에 참가해보세요</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {upcoming.map((m: any) => {
+            const d = new Date(m.matchDate);
+            const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+            return (
+              <Link key={m.id} href={`/matches/${m.id}`}>
+                <div className="rounded-xl bg-white border border-gray-100 p-3.5 flex items-center gap-3 hover:shadow-sm transition-all">
+                  <div className="flex flex-col items-center justify-center h-12 w-12 rounded-xl bg-blue-50 text-blue-500 shrink-0">
+                    <span className="text-[11px] font-semibold">{d.getMonth() + 1}월</span>
+                    <span className="text-[16px] font-black leading-none">{d.getDate()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-medium text-gray-900 truncate">{m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
+                    <div className="flex items-center gap-2 text-[12px] text-gray-500 mt-0.5">
+                      <span className="flex items-center gap-0.5"><Clock size={11} /> {m.startTime}</span>
+                      <span>({weekdays[d.getDay()]})</span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

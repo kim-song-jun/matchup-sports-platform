@@ -15,11 +15,11 @@ export default function AdminDashboardPage() {
 
   const cards = [
     { label: '총 사용자', value: stats?.totalUsers ?? '-', icon: Users, color: 'text-blue-500 bg-blue-50', trend: stats?.todayNewUsers ? `+${stats.todayNewUsers} 오늘` : undefined },
-    { label: '총 매치', value: stats?.totalMatches ?? '-', icon: Trophy, color: 'text-emerald-500 bg-emerald-50', trend: stats?.todayMatches ? `+${stats.todayMatches} 오늘` : undefined },
-    { label: '총 강좌', value: stats?.totalLessons ?? '-', icon: GraduationCap, color: 'text-violet-500 bg-violet-50' },
-    { label: '등록 팀', value: stats?.totalTeams ?? '-', icon: Zap, color: 'text-amber-500 bg-amber-50' },
-    { label: '등록 시설', value: stats?.totalVenues ?? '-', icon: Building2, color: 'text-indigo-500 bg-indigo-50' },
-    { label: '장터 매물', value: stats?.activeListings ?? '-', icon: ShoppingBag, color: 'text-pink-500 bg-pink-50' },
+    { label: '총 매치', value: stats?.totalMatches ?? '-', icon: Trophy, color: 'text-blue-500 bg-blue-50', trend: stats?.todayMatches ? `+${stats.todayMatches} 오늘` : undefined },
+    { label: '총 강좌', value: stats?.totalLessons ?? '-', icon: GraduationCap, color: 'text-blue-500 bg-blue-50' },
+    { label: '등록 팀', value: stats?.totalTeams ?? '-', icon: Zap, color: 'text-blue-500 bg-blue-50' },
+    { label: '등록 시설', value: stats?.totalVenues ?? '-', icon: Building2, color: 'text-blue-500 bg-blue-50' },
+    { label: '장터 매물', value: stats?.activeListings ?? '-', icon: ShoppingBag, color: 'text-blue-500 bg-blue-50' },
   ];
 
   return (
@@ -38,7 +38,7 @@ export default function AdminDashboardPage() {
                 <card.icon size={20} />
               </div>
               {card.trend && (
-                <span className="flex items-center gap-0.5 text-[12px] font-medium text-emerald-500">
+                <span className="flex items-center gap-0.5 text-[12px] font-medium text-blue-500">
                   <TrendingUp size={12} />
                   {card.trend}
                 </span>
@@ -57,10 +57,10 @@ export default function AdminDashboardPage() {
         <h2 className="text-[16px] font-bold text-gray-900 mb-4">빠른 작업</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: '매치 관리', href: '/admin/matches', icon: Trophy, color: 'bg-emerald-50 text-emerald-500' },
+            { label: '매치 관리', href: '/admin/matches', icon: Trophy, color: 'bg-blue-50 text-blue-500' },
             { label: '사용자 관리', href: '/admin/users', icon: Users, color: 'bg-blue-50 text-blue-500' },
-            { label: '강좌 등록', href: '/admin/lessons', icon: GraduationCap, color: 'bg-violet-50 text-violet-500' },
-            { label: '시설 관리', href: '/admin/venues', icon: Building2, color: 'bg-indigo-50 text-indigo-500' },
+            { label: '강좌 등록', href: '/admin/lessons', icon: GraduationCap, color: 'bg-blue-50 text-blue-500' },
+            { label: '시설 관리', href: '/admin/venues', icon: Building2, color: 'bg-blue-50 text-blue-500' },
           ].map((action) => (
             <a key={action.label} href={action.href}
               className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 p-4 hover:bg-gray-50 transition-colors">

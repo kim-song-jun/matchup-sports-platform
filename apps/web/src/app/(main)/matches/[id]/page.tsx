@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight } from 'lucide-react';
@@ -9,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { api } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CheckoutModal } from '@/components/payment/checkout-modal';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -34,6 +36,7 @@ export default function MatchDetailPage() {
   const queryClient = useQueryClient();
   const matchId = params.id as string;
   const { data: match, isLoading } = useMatch(matchId);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const joinMutation = useMutation({
     mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<any>,
@@ -202,13 +205,32 @@ export default function MatchDetailPage() {
               </button>
             ) : (
               <button
-                onClick={() => joinMutation.mutate()}
+                onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
                 disabled={joinMutation.isPending}
                 className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {joinMutation.isPending ? '처리중...' : `참가하기 · ${formatCurrency(match.fee)}`}
               </button>
             )}
+
+            {/* 캘린더 추가 */}
+            <button
+              onClick={() => {
+                const startDate = new Date(match.matchDate);
+                const [sh, sm] = match.startTime.split(':');
+                startDate.setHours(+sh, +sm);
+                const [eh, em] = match.endTime.split(':');
+                const endDate = new Date(match.matchDate);
+                endDate.setHours(+eh, +em);
+                const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+                const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(match.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(match.venue?.name || '')}&details=${encodeURIComponent(match.description || '')}`;
+                window.open(url, '_blank');
+              }}
+              className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Calendar size={14} />
+              캘린더에 추가
+            </button>
           </div>
 
           {/* Participants */}
@@ -231,7 +253,7 @@ export default function MatchDetailPage() {
                     </p>
                   </div>
                   <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
-                    p.status === 'confirmed' ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500'
+                    p.status === 'confirmed' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
                   }`}>
                     {p.status === 'confirmed' ? '확정' : '대기'}
                   </span>
@@ -243,6 +265,25 @@ export default function MatchDetailPage() {
       </div>
 
       <div className="h-8" />
+
+      {/* 결제 모달 */}
+      {showCheckout && match && (
+        <CheckoutModal
+          isOpen={showCheckout}
+          onClose={() => setShowCheckout(false)}
+          amount={match.fee}
+          itemName={match.title}
+          orderId={`match-${matchId}-${Date.now()}`}
+          onSuccess={() => {
+            joinMutation.mutate();
+            setShowCheckout(false);
+          }}
+          onError={() => {
+            toast('error', '결제에 실패했습니다');
+            setShowCheckout(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -257,8 +298,8 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   return (
     <div className="rounded-xl bg-white border border-gray-100 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-gray-400">{icon}</span>
-        <span className="text-[12px] text-gray-400">{label}</span>
+        <span className="text-gray-500">{icon}</span>
+        <span className="text-[12px] text-gray-500">{label}</span>
       </div>
       <p className={`text-[15px] font-semibold ${highlight ? 'text-red-500' : 'text-gray-900'}`}>{value}</p>
       {sub && <p className={`text-[12px] mt-0.5 ${highlight ? 'text-red-400' : 'text-gray-400'}`}>{sub}</p>}

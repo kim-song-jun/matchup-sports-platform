@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import Link from 'next/link';
 
 const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; color: string }> = {
-  completed: { label: '결제 완료', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50' },
+  completed: { label: '결제 완료', icon: CheckCircle, color: 'text-green-600 bg-green-50' },
   pending: { label: '대기중', icon: Clock, color: 'text-amber-500 bg-amber-50' },
   refunded: { label: '환불됨', icon: XCircle, color: 'text-red-500 bg-red-50' },
   failed: { label: '실패', icon: XCircle, color: 'text-gray-500 bg-gray-100' },

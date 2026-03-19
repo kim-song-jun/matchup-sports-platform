@@ -55,7 +55,7 @@ export default function AdminTeamsPage() {
                 <td className="px-5 py-3.5 text-[13px] text-gray-600">Lv.{t.level}</td>
                 <td className="px-5 py-3.5 text-[13px] text-gray-600">{t.city} {t.district}</td>
                 <td className="px-5 py-3.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.isRecruiting ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.isRecruiting ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
                     {t.isRecruiting ? '모집중' : '마감'}
                   </span>
                 </td>

@@ -11,8 +11,8 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 const sportLabel: Record<string, string> = { futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키' };
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
 const conditionColor: Record<string, string> = {
-  new: 'bg-emerald-50 text-emerald-600', like_new: 'bg-blue-50 text-blue-600',
-  good: 'bg-gray-100 text-gray-600', fair: 'bg-amber-50 text-amber-600', poor: 'bg-red-50 text-red-600',
+  new: 'bg-blue-50 text-blue-600', like_new: 'bg-blue-50 text-blue-600',
+  good: 'bg-gray-100 text-gray-600', fair: 'bg-gray-100 text-gray-600', poor: 'bg-red-50 text-red-600',
 };
 
 function formatCurrency(n: number) { return new Intl.NumberFormat('ko-KR').format(n) + '원'; }
@@ -87,7 +87,7 @@ export default function ListingDetailPage() {
               </span>
               <span className="text-[12px] text-gray-400">{sportLabel[listing.sportType]}</span>
               {listing.listingType === 'rent' && (
-                <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-600">대여</span>
+                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-600">대여</span>
               )}
             </div>
             <h1 className="text-[22px] font-bold text-gray-900">{listing.title}</h1>
@@ -109,9 +109,9 @@ export default function ListingDetailPage() {
 
           {/* Rental info */}
           {listing.listingType === 'rent' && (
-            <div className="rounded-2xl bg-violet-50 border border-violet-100 p-5 mb-4">
-              <h3 className="text-[15px] font-semibold text-violet-800 mb-2">대여 정보</h3>
-              <div className="space-y-1 text-[14px] text-violet-700">
+            <div className="rounded-2xl bg-blue-50 border border-blue-100 p-5 mb-4">
+              <h3 className="text-[15px] font-semibold text-blue-800 mb-2">대여 정보</h3>
+              <div className="space-y-1 text-[14px] text-blue-700">
                 <p>일일 대여비: {formatCurrency(listing.rentalPricePerDay || 0)}</p>
                 <p>보증금: {formatCurrency(listing.rentalDeposit || 0)}</p>
               </div>

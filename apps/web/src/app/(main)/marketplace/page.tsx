@@ -15,10 +15,10 @@ const conditionLabel: Record<string, string> = {
 };
 
 const conditionStyle: Record<string, string> = {
-  new: 'text-emerald-600 bg-emerald-50',
+  new: 'text-blue-600 bg-blue-50',
   like_new: 'text-blue-600 bg-blue-50',
   good: 'text-gray-600 bg-gray-100',
-  fair: 'text-amber-600 bg-amber-50',
+  fair: 'text-gray-600 bg-gray-100',
   poor: 'text-red-600 bg-red-50',
 };
 
@@ -99,7 +99,7 @@ export default function MarketplacePage() {
                             {conditionLabel[item.condition]}
                           </span>
                           {item.listingType === 'rent' && (
-                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-violet-600 bg-violet-50">대여</span>
+                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 bg-blue-50">대여</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2.5 text-gray-400 text-[11px]">

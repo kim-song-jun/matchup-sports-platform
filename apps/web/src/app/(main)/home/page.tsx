@@ -7,12 +7,12 @@ import { ChevronRight, MapPin, Calendar, Users, Clock } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 
 const sports = [
-  { type: 'futsal', label: '풋살', color: 'text-emerald-500 bg-emerald-50' },
-  { type: 'basketball', label: '농구', color: 'text-amber-500 bg-amber-50' },
+  { type: 'futsal', label: '풋살', color: 'text-blue-500 bg-blue-50' },
+  { type: 'basketball', label: '농구', color: 'text-blue-500 bg-blue-50' },
   { type: 'badminton', label: '배드민턴', color: 'text-blue-500 bg-blue-50' },
-  { type: 'ice_hockey', label: '하키', color: 'text-indigo-500 bg-indigo-50' },
-  { type: 'figure_skating', label: '피겨', color: 'text-pink-500 bg-pink-50' },
-  { type: 'short_track', label: '쇼트트랙', color: 'text-red-500 bg-red-50' },
+  { type: 'ice_hockey', label: '하키', color: 'text-blue-500 bg-blue-50' },
+  { type: 'figure_skating', label: '피겨', color: 'text-blue-500 bg-blue-50' },
+  { type: 'short_track', label: '쇼트트랙', color: 'text-blue-500 bg-blue-50' },
 ];
 
 const sportLabel: Record<string, string> = {

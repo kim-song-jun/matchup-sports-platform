@@ -10,6 +10,10 @@ import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { HealthModule } from './health/health.module';
+import { LessonsModule } from './lessons/lessons.module';
+import { AdminModule } from './admin/admin.module';
+import { TeamsModule } from './teams/teams.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -28,6 +32,10 @@ import configuration from './config/configuration';
     NotificationsModule,
     MarketplaceModule,
     RealtimeModule,
+    HealthModule,
+    LessonsModule,
+    AdminModule,
+    TeamsModule,
   ],
 })
 export class AppModule {}

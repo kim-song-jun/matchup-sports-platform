@@ -162,6 +162,8 @@ model User {
   soldOrders          MarketplaceOrder[]   @relation("OrderSeller")
   marketplaceReviews  MarketplaceReview[]  @relation("MarketplaceReviewAuthor")
   receivedMarketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewTarget")
+  hostedLessons       Lesson[]             @relation("LessonHost")
+  ownedTeams          SportTeam[]          @relation("TeamOwner")
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -460,4 +462,88 @@ model MarketplaceReview {
   target User             @relation("MarketplaceReviewTarget", fields: [targetId], references: [id])
 
   @@map("marketplace_reviews")
+}
+
+// ─── Lessons / 강좌 ─────────────────────────────────────
+
+enum LessonType {
+  group_lesson    // 그룹 레슨 (코치 진행)
+  practice_match  // 연습 경기
+  free_practice   // 자유 연습 (코트/링크 대여)
+  clinic          // 클리닉/워크숍
+}
+
+enum LessonStatus {
+  open
+  closed
+  cancelled
+  completed
+}
+
+model Lesson {
+  id            String       @id @default(uuid())
+  hostId        String       @map("host_id")
+  sportType     SportType    @map("sport_type")
+  type          LessonType
+  title         String
+  description   String?
+  venueId       String?      @map("venue_id")
+  venueName     String?      @map("venue_name") // 직접 입력
+  lessonDate    DateTime     @map("lesson_date") @db.Date
+  startTime     String       @map("start_time")
+  endTime       String       @map("end_time")
+  maxParticipants Int        @map("max_participants")
+  currentParticipants Int    @default(0) @map("current_participants")
+  fee           Int          @default(0)
+  levelMin      Int          @default(1) @map("level_min")
+  levelMax      Int          @default(5) @map("level_max")
+  status        LessonStatus @default(open)
+  imageUrls     String[]     @map("image_urls")
+
+  // Coach info
+  coachName     String?      @map("coach_name")
+  coachBio      String?      @map("coach_bio")
+  coachImageUrl String?      @map("coach_image_url")
+
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  host          User         @relation("LessonHost", fields: [hostId], references: [id])
+
+  @@index([sportType, status])
+  @@index([lessonDate])
+  @@map("lessons")
+}
+
+// ─── 팀/클럽 홍보 ───────────────────────────────────────
+
+model SportTeam {
+  id            String    @id @default(uuid())
+  ownerId       String    @map("owner_id")
+  name          String
+  sportType     SportType @map("sport_type")
+  description   String?
+  logoUrl       String?   @map("logo_url")
+  coverImageUrl String?   @map("cover_image_url")
+  city          String?
+  district      String?
+  memberCount   Int       @default(1) @map("member_count")
+  level         Int       @default(3) // 팀 평균 레벨
+  isRecruiting  Boolean   @default(true) @map("is_recruiting")
+  contactInfo   String?   @map("contact_info") // 연락처/오픈카톡
+
+  // SNS & 홍보
+  instagramUrl  String?   @map("instagram_url")
+  youtubeUrl    String?   @map("youtube_url")
+  shortsUrl     String?   @map("shorts_url") // 홍보 영상 (shorts/reels)
+  kakaoOpenChat String?   @map("kakao_open_chat")
+  websiteUrl    String?   @map("website_url")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  owner         User      @relation("TeamOwner", fields: [ownerId], references: [id])
+
+  @@index([sportType])
+  @@map("sport_teams")
 }

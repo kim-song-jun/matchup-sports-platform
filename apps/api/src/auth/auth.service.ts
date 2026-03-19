@@ -15,16 +15,63 @@ export class AuthService {
 
   async oauthLogin(provider: string, code: string, redirectUri?: string) {
     // TODO: 실제 OAuth 검증 및 사용자 정보 조회
-    // 현재는 구조만 작성
-
-    // 1. OAuth 제공자에서 토큰 발급
-    // 2. 토큰으로 사용자 정보 조회
-    // 3. DB에서 사용자 찾거나 생성
-    // 4. JWT 토큰 발급
-
     throw new UnauthorizedException(
-      `OAuth ${provider} login not yet implemented`,
+      `OAuth ${provider} login not yet implemented. Use /api/v1/auth/dev-login for testing.`,
     );
+  }
+
+  /**
+   * 개발 전용 로그인 — 닉네임으로 바로 로그인/가입
+   * 프로덕션에서는 비활성화 해야 함
+   */
+  async devLogin(nickname: string) {
+    // 기존 사용자 찾기
+    let user = await this.prisma.user.findFirst({
+      where: { nickname, deletedAt: null },
+    });
+
+    // 없으면 새로 생성
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          nickname,
+          oauthProvider: 'kakao',
+          oauthId: `dev_${nickname}_${Date.now()}`,
+          sportTypes: ['futsal', 'basketball'],
+          mannerScore: 3.5,
+          locationCity: '서울',
+          locationDistrict: '마포구',
+        },
+      });
+
+      // 기본 종목 프로필 생성
+      await this.prisma.userSportProfile.createMany({
+        data: [
+          {
+            userId: user.id,
+            sportType: 'futsal',
+            level: 3,
+            eloRating: 1200,
+            preferredPositions: ['MF', 'FW'],
+          },
+          {
+            userId: user.id,
+            sportType: 'basketball',
+            level: 2,
+            eloRating: 1000,
+            preferredPositions: ['SG', 'SF'],
+          },
+        ],
+      });
+    }
+
+    const tokens = this.generateTokens(user.id);
+    const fullUser = await this.usersService.findById(user.id);
+
+    return {
+      ...tokens,
+      user: fullUser,
+    };
   }
 
   async refreshToken(refreshToken: string) {

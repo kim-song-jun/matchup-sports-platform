@@ -14,6 +14,7 @@ import { HealthModule } from './health/health.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { AdminModule } from './admin/admin.module';
 import { TeamsModule } from './teams/teams.module';
+import { TeamMatchesModule } from './team-matches/team-matches.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -36,6 +37,7 @@ import configuration from './config/configuration';
     LessonsModule,
     AdminModule,
     TeamsModule,
+    TeamMatchesModule,
   ],
 })
 export class AppModule {}

@@ -544,6 +544,212 @@ model SportTeam {
 
   owner         User      @relation("TeamOwner", fields: [ownerId], references: [id])
 
+  teamMatches         TeamMatch[]         @relation("TeamMatchHost")
+  teamApplications    TeamMatchApplication[] @relation("TeamAppApplicant")
+
   @@index([sportType])
   @@map("sport_teams")
+}
+
+// ─── 팀 매칭 시스템 ─────────────────────────────────────
+
+enum TeamMatchStatus {
+  recruiting      // 모집중
+  applied         // 신청됨
+  approved        // 승인됨
+  rejected        // 거절됨
+  scheduled       // 경기예정
+  checking_in     // 도착확인중
+  in_progress     // 경기중
+  completed       // 경기완료
+  cancelled       // 취소
+  late            // 지각
+  no_show         // 노쇼
+  disputed        // 분쟁검토중
+}
+
+enum MatchStyle {
+  friendly        // 친선전
+  competitive     // 실전형
+  manner_focused  // 매너 위주
+}
+
+enum ParticipationType {
+  team            // 팀 참여
+  guest           // 게스트 참여
+  regular         // 정기 참여
+  mercenary       // 용병
+}
+
+model TeamMatch {
+  id              String          @id @default(uuid())
+  hostTeamId      String          @map("host_team_id")
+  sportType       SportType       @map("sport_type")
+
+  // 경기 정보
+  title           String
+  description     String?
+  matchDate       DateTime        @map("match_date") @db.Date
+  startTime       String          @map("start_time")
+  endTime         String          @map("end_time")
+  totalMinutes    Int             @default(120) @map("total_minutes")
+  quarterCount    Int             @default(4) @map("quarter_count") // 2,4,6,8,10
+
+  // 구장 정보
+  venueName       String          @map("venue_name")
+  venueAddress    String          @map("venue_address")
+  venueInfo       Json?           @map("venue_info") // 실내/외, 주차, 샤워실 등
+
+  // 비용
+  totalFee        Int             @default(0) @map("total_fee")
+  opponentFee     Int             @default(0) @map("opponent_fee")
+  paymentDeadline String?         @map("payment_deadline")
+  cancellationPolicy String?      @map("cancellation_policy")
+
+  // 매칭 조건
+  requiredLevel   Int?            @map("required_level")
+  hasProPlayers   Boolean         @default(false) @map("has_pro_players")
+  allowMercenary  Boolean         @default(true) @map("allow_mercenary")
+  matchStyle      MatchStyle      @default(friendly) @map("match_style")
+  hasReferee      Boolean         @default(false) @map("has_referee")
+  notes           String?
+
+  // 상태
+  status          TeamMatchStatus @default(recruiting)
+  guestTeamId     String?         @map("guest_team_id") // 승인된 상대 팀
+
+  // 심판 배정 (JSON: 쿼터별 담당팀)
+  refereeSchedule Json?           @map("referee_schedule")
+
+  // 경기 결과
+  scoreHome       Json?           @map("score_home") // 쿼터별 점수
+  scoreAway       Json?           @map("score_away")
+  resultHome      String?         @map("result_home") // win/draw/lose
+  resultAway      String?         @map("result_away")
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  hostTeam        SportTeam       @relation("TeamMatchHost", fields: [hostTeamId], references: [id])
+  applications    TeamMatchApplication[]
+  arrivalChecks   ArrivalCheck[]
+  evaluations     MatchEvaluation[]
+
+  @@index([sportType, status])
+  @@index([matchDate])
+  @@map("team_matches")
+}
+
+model TeamMatchApplication {
+  id              String          @id @default(uuid())
+  teamMatchId     String          @map("team_match_id")
+  applicantTeamId String          @map("applicant_team_id")
+  status          String          @default("pending") // pending, approved, rejected, withdrawn
+
+  // 상호 확인 체크 (2단계)
+  confirmedInfo   Boolean         @default(false) @map("confirmed_info") // 상대 팀 정보 확인
+  confirmedLevel  Boolean         @default(false) @map("confirmed_level") // 수준 차이 인지
+  proPlayerCheck  Boolean?        @map("pro_player_check") // 선수 출신 유무 확인
+  mercenaryCheck  Boolean?        @map("mercenary_check") // 용병 여부 확인
+
+  message         String?         // 신청 메시지
+  participationType ParticipationType @default(team) @map("participation_type")
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  teamMatch       TeamMatch       @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+  applicantTeam   SportTeam       @relation("TeamAppApplicant", fields: [applicantTeamId], references: [id])
+
+  @@unique([teamMatchId, applicantTeamId])
+  @@map("team_match_applications")
+}
+
+model ArrivalCheck {
+  id              String    @id @default(uuid())
+  teamMatchId     String    @map("team_match_id")
+  teamId          String    @map("team_id")
+  isHome          Boolean   @map("is_home") // 홈팀 여부
+
+  // 도착 인증
+  arrivedAt       DateTime? @map("arrived_at")
+  lat             Float?    // GPS 위도
+  lng             Float?    // GPS 경도
+  photoUrl        String?   @map("photo_url") // 현장 사진
+
+  // 상대팀 확인
+  opponentStatus  String?   @map("opponent_status") // normal, late, no_show
+  opponentNote    String?   @map("opponent_note")
+
+  // 경기 완료 확인
+  gameCompleted   Boolean?  @map("game_completed")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  teamMatch       TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+
+  @@unique([teamMatchId, teamId])
+  @@map("arrival_checks")
+}
+
+model MatchEvaluation {
+  id                String   @id @default(uuid())
+  teamMatchId       String   @map("team_match_id")
+  evaluatorTeamId   String   @map("evaluator_team_id")
+  evaluatedTeamId   String   @map("evaluated_team_id")
+
+  // 6항목 평가 (1-5)
+  levelAccuracy     Int      @map("level_accuracy")     // 수준 사전설명 일치
+  infoAccuracy      Int      @map("info_accuracy")      // 선수출신/용병 고지 일치
+  mannerRating      Int      @map("manner_rating")      // 매너
+  punctuality       Int      @map("punctuality")        // 시간 약속
+  paymentClarity    Int      @map("payment_clarity")    // 비용 정산
+  cooperation       Int      @map("cooperation")        // 경기 운영 협조
+
+  comment           String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  teamMatch         TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+
+  @@unique([teamMatchId, evaluatorTeamId])
+  @@map("match_evaluations")
+}
+
+model TeamTrustScore {
+  id              String    @id @default(uuid())
+  teamId          String    @unique @map("team_id")
+
+  // 실력 관련
+  selfLevel       Int       @default(3) @map("self_level") // 자기기입
+  peerLevel       Float?    @map("peer_level")   // 상대평가 누적 평균
+
+  // 신뢰 관련
+  infoAccuracy    Float     @default(100) @map("info_accuracy") // 정보 일치도 %
+  mannerScore     Float     @default(3.0) @map("manner_score")
+  lateRate        Float     @default(0) @map("late_rate")       // 지각률 %
+  noShowRate      Float     @default(0) @map("no_show_rate")    // 노쇼율 %
+  cancelRate      Float     @default(0) @map("cancel_rate")     // 취소율 %
+
+  // 통계
+  totalMatches    Int       @default(0) @map("total_matches")
+  totalWins       Int       @default(0) @map("total_wins")
+  totalDraws      Int       @default(0) @map("total_draws")
+  totalLosses     Int       @default(0) @map("total_losses")
+  refereeTimes    Int       @default(0) @map("referee_times") // 심판 봉사 횟수
+
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("team_trust_scores")
+}
+
+model Badge {
+  id              String   @id @default(uuid())
+  teamId          String   @map("team_id")
+  type            String   // manner_player, punctual, referee_hero, honest_team, newcomer
+  name            String
+  description     String?
+  earnedAt        DateTime @default(now()) @map("earned_at")
+
+  @@index([teamId])
+  @@map("badges")
 }

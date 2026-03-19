@@ -1,0 +1,442 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react';
+import { useCreateTeamMatch } from '@/hooks/use-api';
+
+const STEPS = ['종목', '구장/일시', '경기조건', '비용/규정', '확인'];
+
+const sportOptions = [
+  { value: 'soccer', label: '축구' },
+  { value: 'futsal', label: '풋살' },
+];
+
+const quarterOptions = [2, 4, 6, 8, 10];
+
+const matchStyleOptions = [
+  { value: 'friendly', label: '친선', desc: '즐겁게 경기' },
+  { value: 'competitive', label: '경쟁', desc: '승부 중심' },
+  { value: 'manner_focused', label: '매너 중시', desc: '매너 우선' },
+];
+
+const levelOptions = [
+  { value: 'beginner', label: '입문' },
+  { value: 'lower', label: '하' },
+  { value: 'middle', label: '중' },
+  { value: 'upper', label: '상' },
+  { value: 'pro', label: '프로' },
+];
+
+interface FormData {
+  title: string;
+  sportType: string;
+  matchDate: string;
+  startTime: string;
+  endTime: string;
+  totalMinutes: string;
+  quarterCount: number;
+  venueName: string;
+  venueAddress: string;
+  totalFee: string;
+  opponentFee: string;
+  requiredLevel: string;
+  hasProPlayers: boolean;
+  allowMercenary: boolean;
+  matchStyle: string;
+  hasReferee: boolean;
+  notes: string;
+}
+
+const initialForm: FormData = {
+  title: '',
+  sportType: '',
+  matchDate: '',
+  startTime: '',
+  endTime: '',
+  totalMinutes: '',
+  quarterCount: 4,
+  venueName: '',
+  venueAddress: '',
+  totalFee: '',
+  opponentFee: '',
+  requiredLevel: 'middle',
+  hasProPlayers: false,
+  allowMercenary: false,
+  matchStyle: 'friendly',
+  hasReferee: false,
+  notes: '',
+};
+
+export default function NewTeamMatchPage() {
+  const router = useRouter();
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState<FormData>(initialForm);
+  const createMutation = useCreateTeamMatch();
+
+  function update<K extends keyof FormData>(key: K, value: FormData[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function canProceed(): boolean {
+    switch (step) {
+      case 0: return !!form.sportType && !!form.title;
+      case 1: return !!form.matchDate && !!form.startTime && !!form.endTime && !!form.venueName;
+      case 2: return !!form.requiredLevel && !!form.matchStyle;
+      case 3: return !!form.totalFee;
+      case 4: return true;
+      default: return false;
+    }
+  }
+
+  function handleSubmit() {
+    const payload = {
+      ...form,
+      totalFee: Number(form.totalFee),
+      opponentFee: form.opponentFee ? Number(form.opponentFee) : undefined,
+      totalMinutes: form.totalMinutes ? Number(form.totalMinutes) : undefined,
+    };
+    createMutation.mutate(payload, {
+      onSuccess: () => router.push('/team-matches'),
+    });
+  }
+
+  const formatCurrency = (n: string) =>
+    n ? new Intl.NumberFormat('ko-KR').format(Number(n)) + '원' : '';
+
+  return (
+    <div className="pt-[var(--safe-area-top)] animate-fade-in">
+      {/* Header */}
+      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+        <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-[18px] font-bold text-gray-900">모집글 작성</h1>
+      </header>
+
+      {/* Progress */}
+      <div className="px-5 lg:px-0 mb-6">
+        <div className="flex items-center gap-1 mb-2">
+          {STEPS.map((s, i) => (
+            <div key={s} className="flex items-center gap-1 flex-1">
+              <div className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-[14px] font-semibold text-gray-900">{STEPS[step]}</p>
+          <p className="text-[12px] text-gray-400">{step + 1} / {STEPS.length}</p>
+        </div>
+      </div>
+
+      <div className="px-5 lg:px-0">
+        {/* Step 0: 종목 */}
+        {step === 0 && (
+          <div className="space-y-5 animate-fade-in">
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-2 block">종목 선택</label>
+              <div className="grid grid-cols-2 gap-2">
+                {sportOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => update('sportType', opt.value)}
+                    className={`rounded-xl border-2 px-4 py-4 text-[15px] font-semibold text-center transition-all ${
+                      form.sportType === opt.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">모집글 제목</label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => update('title', e.target.value)}
+                placeholder="예: 일요일 오전 친선경기 모집합니다"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: 구장/일시 */}
+        {step === 1 && (
+          <div className="space-y-5 animate-fade-in">
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">경기 날짜</label>
+              <input
+                type="date"
+                value={form.matchDate}
+                onChange={(e) => update('matchDate', e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">시작 시간</label>
+                <input
+                  type="time"
+                  value={form.startTime}
+                  onChange={(e) => update('startTime', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">종료 시간</label>
+                <input
+                  type="time"
+                  value={form.endTime}
+                  onChange={(e) => update('endTime', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">총 경기 시간 (분, 선택)</label>
+              <input
+                type="number"
+                value={form.totalMinutes}
+                onChange={(e) => update('totalMinutes', e.target.value)}
+                placeholder="예: 120"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">쿼터 수</label>
+              <div className="flex gap-2">
+                {quarterOptions.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => update('quarterCount', q)}
+                    className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+                      form.quarterCount === q
+                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                    }`}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">구장명</label>
+              <input
+                type="text"
+                value={form.venueName}
+                onChange={(e) => update('venueName', e.target.value)}
+                placeholder="예: 난지천 풋살장"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">구장 주소 (선택)</label>
+              <input
+                type="text"
+                value={form.venueAddress}
+                onChange={(e) => update('venueAddress', e.target.value)}
+                placeholder="예: 서울시 마포구 상암동 481-6"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: 경기조건 */}
+        {step === 2 && (
+          <div className="space-y-5 animate-fade-in">
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-2 block">요구 레벨</label>
+              <div className="flex gap-2 flex-wrap">
+                {levelOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => update('requiredLevel', opt.value)}
+                    className={`rounded-xl border-2 px-5 py-3 text-[14px] font-semibold transition-all ${
+                      form.requiredLevel === opt.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-2 block">경기 스타일</label>
+              <div className="space-y-2">
+                {matchStyleOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => update('matchStyle', opt.value)}
+                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                      form.matchStyle === opt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <p className={`text-[14px] font-semibold ${form.matchStyle === opt.value ? 'text-blue-600' : 'text-gray-900'}`}>
+                      {opt.label}
+                    </p>
+                    <p className="text-[12px] text-gray-400 mt-0.5">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <ToggleField
+                label="프로 선수 포함 여부"
+                checked={form.hasProPlayers}
+                onChange={(v) => update('hasProPlayers', v)}
+              />
+              <ToggleField
+                label="용병 허용"
+                checked={form.allowMercenary}
+                onChange={(v) => update('allowMercenary', v)}
+              />
+              <ToggleField
+                label="심판 배정"
+                checked={form.hasReferee}
+                onChange={(v) => update('hasReferee', v)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: 비용/규정 */}
+        {step === 3 && (
+          <div className="space-y-5 animate-fade-in">
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">총 비용 (원)</label>
+              <input
+                type="number"
+                value={form.totalFee}
+                onChange={(e) => update('totalFee', e.target.value)}
+                placeholder="예: 200000"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+              {form.totalFee && (
+                <p className="text-[12px] text-gray-400 mt-1">{formatCurrency(form.totalFee)}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+              <input
+                type="number"
+                value={form.opponentFee}
+                onChange={(e) => update('opponentFee', e.target.value)}
+                placeholder="비워두면 총 비용의 절반"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+              {form.opponentFee && (
+                <p className="text-[12px] text-gray-400 mt-1">{formatCurrency(form.opponentFee)}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">추가 안내 (선택)</label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => update('notes', e.target.value)}
+                placeholder="유니폼 색상, 주차 안내, 기타 규정 등"
+                rows={4}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: 확인 */}
+        {step === 4 && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="rounded-2xl bg-white border border-gray-100 p-5">
+              <h3 className="text-[16px] font-bold text-gray-900 mb-4">모집글 요약</h3>
+
+              <div className="space-y-3">
+                <SummaryRow label="제목" value={form.title} />
+                <SummaryRow label="종목" value={sportOptions.find((o) => o.value === form.sportType)?.label ?? ''} />
+                <SummaryRow label="날짜" value={form.matchDate} />
+                <SummaryRow label="시간" value={`${form.startTime} ~ ${form.endTime}`} />
+                <SummaryRow label="쿼터" value={`${form.quarterCount}쿼터`} />
+                <SummaryRow label="구장" value={form.venueName} />
+                {form.venueAddress && <SummaryRow label="주소" value={form.venueAddress} />}
+                <SummaryRow label="총 비용" value={formatCurrency(form.totalFee)} />
+                {form.opponentFee && <SummaryRow label="상대팀 부담" value={formatCurrency(form.opponentFee)} />}
+                <SummaryRow label="요구 레벨" value={levelOptions.find((o) => o.value === form.requiredLevel)?.label ?? ''} />
+                <SummaryRow label="경기 스타일" value={matchStyleOptions.find((o) => o.value === form.matchStyle)?.label ?? ''} />
+                <SummaryRow label="프로 선수" value={form.hasProPlayers ? '포함' : '미포함'} />
+                <SummaryRow label="용병" value={form.allowMercenary ? '허용' : '불가'} />
+                <SummaryRow label="심판" value={form.hasReferee ? '있음' : '없음'} />
+                {form.notes && <SummaryRow label="추가 안내" value={form.notes} />}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom CTA */}
+      <div className="px-5 lg:px-0 mt-6 mb-8">
+        {step < STEPS.length - 1 ? (
+          <button
+            onClick={() => setStep(step + 1)}
+            disabled={!canProceed()}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            다음
+            <ArrowRight size={16} />
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={createMutation.isPending}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+          >
+            <Check size={16} />
+            {createMutation.isPending ? '등록 중...' : '모집글 등록'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3.5 cursor-pointer">
+      <span className="text-[14px] font-medium text-gray-800">{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : ''}`}
+        />
+      </button>
+    </label>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-1">
+      <span className="text-[13px] text-gray-400 shrink-0">{label}</span>
+      <span className="text-[14px] font-medium text-gray-900 text-right">{value}</span>
+    </div>
+  );
+}

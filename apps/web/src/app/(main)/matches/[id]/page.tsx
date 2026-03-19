@@ -171,7 +171,7 @@ export default function MatchDetailPage() {
         {/* Right sidebar: participants + action */}
         <div className="px-5 lg:px-0 mt-4 lg:mt-0">
           {/* Action button */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 sticky top-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4 lg:sticky lg:top-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-[13px] text-gray-500">참가 현황</span>

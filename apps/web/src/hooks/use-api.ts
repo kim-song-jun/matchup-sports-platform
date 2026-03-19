@@ -93,6 +93,104 @@ export function useListings(params?: Record<string, string>) {
   });
 }
 
+// ── Team Matches ──
+export function useTeamMatches(params?: Record<string, string>) {
+  return useQuery({
+    queryKey: ['team-matches', params],
+    queryFn: async () => {
+      const res = await api.get('/team-matches', { params });
+      return (res as any).data;
+    },
+  });
+}
+
+export function useTeamMatch(id: string) {
+  return useQuery({
+    queryKey: ['team-match', id],
+    queryFn: async () => {
+      const res = await api.get(`/team-matches/${id}`);
+      return (res as any).data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useTeamMatchRefereeSchedule(id: string) {
+  return useQuery({
+    queryKey: ['team-match-referee', id],
+    queryFn: async () => {
+      const res = await api.get(`/team-matches/${id}/referee-schedule`);
+      return (res as any).data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateTeamMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await api.post('/team-matches', data);
+      return (res as any).data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-matches'] });
+    },
+  });
+}
+
+export function useApplyTeamMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await api.post(`/team-matches/${id}/apply`, data);
+      return (res as any).data;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+    },
+  });
+}
+
+export function useRespondTeamMatchApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, applicationId, action }: { id: string; applicationId: string; action: 'approve' | 'reject' }) => {
+      const res = await api.patch(`/team-matches/${id}/applications/${applicationId}`, { action });
+      return (res as any).data;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+    },
+  });
+}
+
+export function useSubmitTeamMatchEvaluation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await api.post(`/team-matches/${id}/evaluate`, data);
+      return (res as any).data;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+    },
+  });
+}
+
+export function useTeamMatchArrival() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/team-matches/${id}/arrival`);
+      return (res as any).data;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+    },
+  });
+}
+
 // ── Notifications ──
 export function useNotifications() {
   const { isAuthenticated } = useAuthStore();

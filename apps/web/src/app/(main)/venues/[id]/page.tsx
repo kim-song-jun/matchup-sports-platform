@@ -126,12 +126,19 @@ export default function VenueDetailPage() {
                     <p className="text-[15px] text-gray-900 mt-0.5">{venue.address}</p>
                   </div>
                 </div>
-                {venue.operatingHours && (
+                {venue.operatingHours && typeof venue.operatingHours === 'object' && (
                   <div className="flex items-start gap-3">
-                    <Clock size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                    <Clock size={18} className="text-gray-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-[13px] text-gray-400">운영 시간</p>
-                      <p className="text-[15px] text-gray-900 mt-0.5">{venue.operatingHours}</p>
+                      <div className="mt-1 space-y-0.5">
+                        {Object.entries(venue.operatingHours as Record<string, { open: string; close: string }>).map(([day, hours]) => (
+                          <div key={day} className="flex items-center gap-2 text-[13px]">
+                            <span className="w-8 text-gray-500 font-medium">{day}</span>
+                            <span className="text-gray-700">{hours.open} ~ {hours.close}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npx prisma:*)",
+      "Bash(npx nest:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(curl -s http://localhost:8100/api/v1/matches)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d[''''data''''][''''items''''][0][''''id'''']\\)\")",
+      "Bash(ls -la apps/web/src/app/\\\\\\(main\\\\\\)/matches/)",
+      "Bash(ls -la /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/teams/)",
+      "Bash(ls /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/teams/[id]/)",
+      "Bash(curl -s http://localhost:8100/api/v1/teams)",
+      "Bash(curl -s http://localhost:8100/api/v1/lessons)",
+      "Bash(git add:*)",
+      "Bash(rm -f .git/index.lock)",
+      "Bash(git commit:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(git push:*)",
+      "Bash(grep -n \"operatingHours\" /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/venues/[id]/page.tsx)",
+      "Bash(ls /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/team-matches/)",
+      "Bash(ls /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/team-matches/[id]/)"
+    ]
+  }
+}

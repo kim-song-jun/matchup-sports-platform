@@ -150,7 +150,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* CTA */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 sticky top-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4 lg:sticky lg:top-4">
             {!isAuthenticated ? (
               <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white">
                 로그인 후 구매하기

@@ -87,6 +87,16 @@ body {
 .dark .from-violet-500 { --tw-gradient-from: #3182F6 !important; }
 .dark .to-blue-600 { --tw-gradient-to: #1B64DA !important; }
 
+/* Semantic color overrides for badges/status */
+.dark .bg-green-50 { background-color: #0D2818 !important; }
+.dark .bg-amber-50 { background-color: #2A1F0A !important; }
+.dark .bg-red-50 { background-color: #2A0F0F !important; }
+.dark .bg-purple-50 { background-color: #1F0D2A !important; }
+.dark .bg-pink-50 { background-color: #2A0D1F !important; }
+.dark .text-green-600 { color: #34C759 !important; }
+.dark .text-amber-600 { color: #FF9500 !important; }
+.dark .text-red-500 { color: #FF3B30 !important; }
+
 * { -webkit-tap-highlight-color: transparent; }
 .pb-safe { padding-bottom: calc(var(--safe-area-bottom) + 4.5rem); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }

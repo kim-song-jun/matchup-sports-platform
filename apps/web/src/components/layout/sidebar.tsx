@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Bell, Users, Building2 } from 'lucide-react';
+import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Bell, Users, Building2, Swords } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 
 const navItems = [
   { href: '/home', icon: Home, label: '홈' },
   { href: '/matches', icon: Search, label: '매치 찾기' },
+  { href: '/team-matches', icon: Swords, label: '팀 매칭' },
   { href: '/lessons', icon: GraduationCap, label: '강좌' },
   { href: '/marketplace', icon: ShoppingBag, label: '장터' },
   { href: '/teams', icon: Users, label: '팀·클럽' },

@@ -532,6 +532,172 @@ async function main() {
   });
   console.log('  ✅ 2 sport teams created');
 
+  // ── Team Matching ──
+  const existingTeams = await prisma.sportTeam.findMany();
+
+  const teamMatches = await Promise.all([
+    prisma.teamMatch.create({
+      data: {
+        hostTeamId: existingTeams[0].id,
+        sportType: existingTeams[0].sportType,
+        title: '잠실 아이스베어스 vs 도전팀 모집',
+        description: '친선전입니다. 레벨 3~5 팀 모집합니다.',
+        matchDate: nextSat,
+        startTime: '18:00',
+        endTime: '20:00',
+        totalMinutes: 120,
+        quarterCount: 4,
+        venueName: '잠실 아이스링크',
+        venueAddress: '서울 송파구 올림픽로 25',
+        venueInfo: { indoor: true, parking: true, shower: true },
+        totalFee: 400000,
+        opponentFee: 200000,
+        paymentDeadline: '경기 3일 전까지',
+        cancellationPolicy: '경기 2일 전까지 무료 취소',
+        requiredLevel: 3,
+        hasProPlayers: false,
+        allowMercenary: true,
+        matchStyle: 'friendly',
+        hasReferee: true,
+        notes: '장비 풀장착 필수입니다.',
+        status: 'recruiting',
+      },
+    }),
+    prisma.teamMatch.create({
+      data: {
+        hostTeamId: existingTeams[1].id,
+        sportType: existingTeams[1].sportType,
+        title: 'FC 마포 주말 풋살 대전',
+        description: '매너 위주 풋살 경기. 초보 팀도 환영!',
+        matchDate: nextSun,
+        startTime: '14:00',
+        endTime: '16:00',
+        totalMinutes: 120,
+        quarterCount: 4,
+        venueName: '마포 풋살파크',
+        venueAddress: '서울 마포구 월드컵북로 396',
+        venueInfo: { indoor: true, parking: true, shower: true },
+        totalFee: 240000,
+        opponentFee: 120000,
+        paymentDeadline: '경기 2일 전까지',
+        cancellationPolicy: '경기 1일 전까지 무료 취소',
+        requiredLevel: 2,
+        hasProPlayers: false,
+        allowMercenary: true,
+        matchStyle: 'manner_focused',
+        hasReferee: false,
+        notes: '풋살화 필수. 실내화 불가.',
+        status: 'recruiting',
+      },
+    }),
+    prisma.teamMatch.create({
+      data: {
+        hostTeamId: existingTeams[0].id,
+        sportType: existingTeams[0].sportType,
+        title: '아이스베어스 정기전 상대 모집',
+        description: '실전형 경기. 레벨 4 이상 팀 우대.',
+        matchDate: dayAfter,
+        startTime: '20:00',
+        endTime: '22:00',
+        totalMinutes: 120,
+        quarterCount: 6,
+        venueName: '잠실 아이스링크',
+        venueAddress: '서울 송파구 올림픽로 25',
+        venueInfo: { indoor: true, parking: true, shower: true },
+        totalFee: 500000,
+        opponentFee: 250000,
+        requiredLevel: 4,
+        hasProPlayers: true,
+        allowMercenary: false,
+        matchStyle: 'competitive',
+        hasReferee: true,
+        notes: '선수 출신 1명 포함. 사전 고지합니다.',
+        status: 'recruiting',
+      },
+    }),
+  ]);
+  console.log(`  ✅ ${teamMatches.length} team matches created`);
+
+  // ── Team Match Applications ──
+  await prisma.teamMatchApplication.createMany({
+    data: [
+      {
+        teamMatchId: teamMatches[0].id,
+        applicantTeamId: existingTeams[1].id,
+        status: 'pending',
+        confirmedInfo: true,
+        confirmedLevel: true,
+        proPlayerCheck: false,
+        mercenaryCheck: true,
+        message: 'FC 마포입니다. 풋살팀이지만 아이스하키도 합니다!',
+        participationType: 'team',
+      },
+      {
+        teamMatchId: teamMatches[1].id,
+        applicantTeamId: existingTeams[0].id,
+        status: 'approved',
+        confirmedInfo: true,
+        confirmedLevel: true,
+        proPlayerCheck: false,
+        mercenaryCheck: false,
+        message: '잠실 아이스베어스입니다. 매너 경기 기대합니다.',
+        participationType: 'team',
+      },
+    ],
+  });
+  console.log('  ✅ 2 team match applications created');
+
+  // ── Team Trust Scores ──
+  await Promise.all(
+    existingTeams.slice(0, 2).map((team) =>
+      prisma.teamTrustScore.upsert({
+        where: { teamId: team.id },
+        update: {},
+        create: {
+          teamId: team.id,
+          selfLevel: team.level,
+          peerLevel: team.level - 0.2,
+          infoAccuracy: 95,
+          mannerScore: 4.3,
+          lateRate: 2,
+          noShowRate: 0,
+          cancelRate: 5,
+          totalMatches: 12,
+          totalWins: 7,
+          totalDraws: 2,
+          totalLosses: 3,
+          refereeTimes: 3,
+        },
+      }),
+    ),
+  );
+  console.log('  ✅ 2 team trust scores created');
+
+  // ── Badges ──
+  await prisma.badge.createMany({
+    data: [
+      {
+        teamId: existingTeams[0].id,
+        type: 'manner_player',
+        name: '매너 플레이어',
+        description: '상대팀 매너 평가 4.5 이상 달성',
+      },
+      {
+        teamId: existingTeams[0].id,
+        type: 'punctual',
+        name: '시간 약속왕',
+        description: '지각률 0% 달성 (10경기 이상)',
+      },
+      {
+        teamId: existingTeams[1].id,
+        type: 'newcomer',
+        name: '신규 팀',
+        description: '플랫폼 가입 후 첫 경기 완료',
+      },
+    ],
+  });
+  console.log('  ✅ 3 badges created');
+
   console.log('\n🎉 Seed complete!');
 }
 

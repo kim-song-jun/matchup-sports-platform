@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Video, Image, BookOpen } from 'lucide-react';
@@ -7,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { CheckoutModal } from '@/components/payment/checkout-modal';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -50,6 +52,7 @@ export default function LessonDetailPage() {
   if (isLoading) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 rounded-2xl" /><div className="h-32 bg-gray-100 rounded-2xl" /></div></div>;
   if (!lesson) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20"><p className="text-gray-500">강좌를 찾을 수 없습니다</p><Link href="/lessons" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link></div>;
 
+  const [showCheckout, setShowCheckout] = useState(false);
   const SportIcon = SportIconMap[lesson.sportType];
   const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
 
@@ -157,7 +160,7 @@ export default function LessonDetailPage() {
 
         {/* Right CTA */}
         <div className="px-5 lg:px-0 mt-4 lg:mt-0">
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 sticky top-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4 lg:sticky lg:top-4">
             <p className="text-[24px] font-black text-gray-900 text-center mb-3">{formatCurrency(lesson.fee)}</p>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[13px] text-gray-500">참가 현황</span>
@@ -169,8 +172,33 @@ export default function LessonDetailPage() {
             {!isAuthenticated ? (
               <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white">로그인 후 신청하기</Link>
             ) : (
-              <button className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">수강 신청하기</button>
+              <button
+                onClick={() => lesson.fee > 0 ? setShowCheckout(true) : null}
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+              >
+                수강 신청하기 {lesson.fee > 0 ? `· ${formatCurrency(lesson.fee)}` : ''}
+              </button>
             )}
+
+            {/* 캘린더 추가 */}
+            <button
+              onClick={() => {
+                const startDate = new Date(lesson.lessonDate);
+                const [sh, sm] = lesson.startTime.split(':');
+                startDate.setHours(+sh, +sm);
+                const [eh, em] = lesson.endTime.split(':');
+                const endDate = new Date(lesson.lessonDate);
+                endDate.setHours(+eh, +em);
+                const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+                const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(lesson.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(lesson.venueName || '')}&details=${encodeURIComponent(lesson.description || '')}`;
+                window.open(url, '_blank');
+              }}
+              className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Calendar size={14} />
+              캘린더에 추가
+            </button>
+
             <div className="mt-3 space-y-1.5 text-[12px] text-gray-400">
               <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 24시간 내 환불 가능</p>
               <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 코치 직접 피드백</p>
@@ -186,6 +214,23 @@ export default function LessonDetailPage() {
         </div>
       </div>
       <div className="h-8" />
+
+      {/* 결제 모달 */}
+      {showCheckout && lesson && (
+        <CheckoutModal
+          isOpen={showCheckout}
+          onClose={() => setShowCheckout(false)}
+          amount={lesson.fee}
+          itemName={lesson.title}
+          orderId={`lesson-${lessonId}-${Date.now()}`}
+          onSuccess={() => {
+            setShowCheckout(false);
+          }}
+          onError={() => {
+            setShowCheckout(false);
+          }}
+        />
+      )}
     </div>
   );
 }

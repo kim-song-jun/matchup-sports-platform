@@ -71,7 +71,7 @@ export default function ListingDetailPage() {
         <span className="text-gray-700 truncate">{listing.title}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6">
+      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
         {/* Left: product info */}
         <div className="px-5 lg:px-0">
           {/* Image placeholder */}

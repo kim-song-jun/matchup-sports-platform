@@ -193,14 +193,14 @@ export default function MercenaryPage() {
             <p className="text-[13px] text-gray-400 mt-1">직접 용병을 모집해보세요</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
             {filtered.map((post) => {
               const isApplied = appliedIds.has(post.id);
 
               return (
                 <div
                   key={post.id}
-                  className="rounded-2xl bg-white border border-gray-100 p-4 transition-all hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)]"
+                  className="rounded-2xl bg-white border border-gray-100 p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -229,19 +229,19 @@ export default function MercenaryPage() {
 
                   <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <Calendar size={13} className="text-gray-300" />
+                      <Calendar size={15} className="text-blue-400" />
                       <span>{formatMatchDate(post.matchDate)} {post.startTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <MapPin size={13} className="text-gray-300" />
+                      <MapPin size={15} className="text-blue-400" />
                       <span className="truncate">{post.venue}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <Shield size={13} className="text-gray-300" />
+                      <Shield size={15} className="text-blue-400" />
                       <span>Lv.{post.levelRequired} {levelLabel[post.levelRequired]} 이상</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px]">
-                      <DollarSign size={13} className="text-gray-300" />
+                      <DollarSign size={15} className="text-blue-400" />
                       <span className={`font-semibold ${post.fee === 0 ? 'text-green-600' : 'text-gray-800'}`}>
                         {formatFee(post.fee)}
                       </span>

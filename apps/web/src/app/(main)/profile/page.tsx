@@ -27,7 +27,8 @@ export default function ProfilePage() {
         <h1 className="text-[22px] font-bold text-gray-900">마이페이지</h1>
       </header>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 lg:px-0 lg:grid lg:grid-cols-[1fr_340px] lg:gap-8">
+        <div>
         {isAuthenticated && user ? (
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
             <div className="flex items-start justify-between">
@@ -85,10 +86,17 @@ export default function ProfilePage() {
             <Link href="/login" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
           </div>
         )}
-      </div>
+        {/* 다가오는 일정 — mobile only */}
+        <div className="lg:hidden">
+          {isAuthenticated && <UpcomingSchedule />}
+        </div>
+        </div>
 
-      {/* 다가오는 일정 */}
-      {isAuthenticated && <UpcomingSchedule />}
+        {/* 다가오는 일정 — desktop only, appears as right column */}
+        <div className="hidden lg:block">
+          {isAuthenticated && <UpcomingSchedule />}
+        </div>
+      </div>
 
       <div className="mt-5 h-2 bg-gray-50 lg:hidden" />
 
@@ -149,7 +157,7 @@ function UpcomingSchedule() {
   const upcoming = matches.filter((m: any) => new Date(m.matchDate) >= new Date()).slice(0, 3);
 
   return (
-    <div className="mt-4 px-5 lg:px-0">
+    <div className="mt-4 lg:mt-0 px-5 lg:px-0">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-[16px] font-bold text-gray-900">다가오는 일정</h3>
         <Link href="/matches" className="text-[13px] text-blue-500 font-medium">전체보기</Link>

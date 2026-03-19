@@ -99,7 +99,7 @@ export default function MatchesPage() {
             <p className="text-[13px] text-gray-400 mt-1">다른 종목을 선택하거나 직접 매치를 만들어보세요</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
             {matches.map((match: any) => {
               const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
               const isAlmostFull = filledPercent >= 70;
@@ -107,7 +107,7 @@ export default function MatchesPage() {
 
               return (
                 <Link key={match.id} href={`/matches/${match.id}`}>
-                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
+                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         {SportIcon && (
@@ -127,15 +127,15 @@ export default function MatchesPage() {
 
                     <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Calendar size={13} className="text-gray-300" />
+                        <Calendar size={15} className="text-blue-400" />
                         <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <MapPin size={13} className="text-gray-300" />
+                        <MapPin size={15} className="text-blue-400" />
                         <span className="truncate">{match.venue?.name}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Users size={13} className="text-gray-300" />
+                        <Users size={15} className="text-blue-400" />
                         <span className={isAlmostFull ? 'text-red-500 font-medium' : ''}>{match.currentPlayers}/{match.maxPlayers}명</span>
                       </div>
                       <div className="text-[13px]">

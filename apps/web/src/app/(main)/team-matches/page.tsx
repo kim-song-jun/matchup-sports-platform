@@ -101,7 +101,7 @@ export default function TeamMatchesPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
             {matches.map((match: any) => {
               const statusMap: Record<string, { label: string; className: string }> = {
                 recruiting: { label: '모집중', className: 'bg-blue-50 text-blue-500' },
@@ -113,7 +113,7 @@ export default function TeamMatchesPage() {
 
               return (
                 <Link key={match.id} href={`/team-matches/${match.id}`}>
-                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
+                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -140,21 +140,21 @@ export default function TeamMatchesPage() {
 
                     <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Calendar size={13} className="text-gray-300" />
+                        <Calendar size={15} className="text-blue-400" />
                         <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <MapPin size={13} className="text-gray-300" />
+                        <MapPin size={15} className="text-blue-400" />
                         <span className="truncate">{match.venueName}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Trophy size={13} className="text-gray-300" />
+                        <Trophy size={15} className="text-blue-400" />
                         <span>{match.quarterCount}쿼터</span>
                         <span className="text-gray-200">·</span>
                         <span>{levelLabel[match.requiredLevel] ?? match.requiredLevel}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px]">
-                        <DollarSign size={13} className="text-gray-300" />
+                        <DollarSign size={15} className="text-blue-400" />
                         <span className="font-semibold text-gray-800">
                           {formatCurrency(match.opponentFee ?? match.totalFee)}
                         </span>

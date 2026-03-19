@@ -125,7 +125,7 @@ export default function VenuesPage() {
               const SportIcon = primarySport ? SportIconMap[primarySport] : null;
               return (
                 <Link key={venue.id} href={`/venues/${venue.id}`}>
-                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)]">
+                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200">
                     <div className="flex gap-4">
                       <div className="flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
                         {SportIcon ? <SportIcon size={32} /> : <MapPin size={32} />}
@@ -141,7 +141,7 @@ export default function VenuesPage() {
 
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                            <MapPin size={13} className="text-gray-300 shrink-0" />
+                            <MapPin size={15} className="text-blue-400 shrink-0" />
                             <span className="truncate">{venue.address}</span>
                           </div>
                           <div className="flex items-center gap-3">

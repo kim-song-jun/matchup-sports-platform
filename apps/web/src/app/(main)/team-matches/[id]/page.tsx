@@ -116,7 +116,7 @@ export default function TeamMatchDetailPage() {
       </header>
 
       <div className="px-5 lg:px-0">
-        <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6">
+        <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
           {/* 왼쪽: 경기 정보 */}
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
@@ -189,7 +189,7 @@ export default function TeamMatchDetailPage() {
             {/* 경기 조건 */}
             <div className="rounded-2xl bg-white border border-gray-100 p-5">
               <h2 className="text-[16px] font-bold text-gray-900 mb-4">경기 조건</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 lg:gap-5">
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
                   <p className="text-[12px] text-gray-400 mb-0.5">요구 레벨</p>
                   <p className="text-[14px] font-semibold text-gray-900">

@@ -52,7 +52,7 @@ export default function TeamsPage() {
             {teams.map((team: any) => {
               const SportIcon = SportIconMap[team.sportType];
               return (
-                <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+                <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
                   <div className="flex items-start gap-4">
                     {/* Team logo */}
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gray-900 text-white text-[18px] font-black">

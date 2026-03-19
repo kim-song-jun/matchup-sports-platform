@@ -108,7 +108,7 @@ export default function MatchDetailPage() {
         <span className="text-gray-700">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6">
+      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
         {/* Left: match info */}
         <div className="px-5 lg:px-0">
           {/* Title card */}
@@ -138,7 +138,7 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Info grid */}
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 lg:gap-5">
             <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatMatchDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
             <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name} sub={match.venue?.address?.slice(0, 20)} />
             <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={isAlmostFull ? '마감 임박' : '모집중'} highlight={isAlmostFull} />
@@ -298,7 +298,7 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   return (
     <div className="rounded-xl bg-white border border-gray-100 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-gray-500">{icon}</span>
+        <span className="text-blue-400">{icon}</span>
         <span className="text-[12px] text-gray-500">{label}</span>
       </div>
       <p className={`text-[15px] font-semibold ${highlight ? 'text-red-500' : 'text-gray-900'}`}>{value}</p>

@@ -159,7 +159,7 @@ export default function VenueDetailPage() {
         <span className="text-gray-700">{venue.name}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6">
+      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
         {/* Left: Venue info */}
         <div className="px-5 lg:px-0">
           {/* Map Placeholder */}

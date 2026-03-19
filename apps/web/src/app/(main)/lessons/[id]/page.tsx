@@ -66,7 +66,7 @@ export default function LessonDetailPage() {
         <Link href="/lessons" className="hover:text-gray-600">강좌</Link><ChevronRight size={14} /><span className="text-gray-700">{lesson.title}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-6">
+      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
         <div className="px-5 lg:px-0">
           {/* 커버 */}
           <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 h-44 lg:h-56 flex items-center justify-center mb-4 overflow-hidden">
@@ -105,7 +105,7 @@ export default function LessonDetailPage() {
           )}
 
           {/* 일정 */}
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-3 lg:gap-5">
             <InfoCard icon={<Calendar size={16} />} label="일시" value={formatDate(lesson.lessonDate)} sub={`${lesson.startTime} ~ ${lesson.endTime}`} />
             <InfoCard icon={<MapPin size={16} />} label="장소" value={lesson.venueName || '장소 미정'} />
             <InfoCard icon={<Users size={16} />} label="인원" value={`${lesson.currentParticipants}/${lesson.maxParticipants}명`} sub={`${levelLabel[lesson.levelMin]}~${levelLabel[lesson.levelMax]}`} />

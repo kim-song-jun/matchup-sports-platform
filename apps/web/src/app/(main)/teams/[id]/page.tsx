@@ -94,7 +94,7 @@ export default function TeamDetailPage() {
         <span className="text-gray-700">{team.name}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6">
+      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
         {/* Left */}
         <div className="px-5 lg:px-0">
           {/* Cover + Team header */}
@@ -153,7 +153,7 @@ export default function TeamDetailPage() {
           {/* 신뢰도 점수 */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
             <h3 className="text-[16px] font-bold text-gray-900 mb-4">신뢰도</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <TrustItem
                 icon={<CheckCircle size={16} />}
                 label="정보 일치도"
@@ -242,7 +242,7 @@ export default function TeamDetailPage() {
           {/* 활동 정보 */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
             <h3 className="text-[16px] font-bold text-gray-900 mb-4">활동 정보</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <InfoItem icon={<MapPin size={16} />} label="활동 지역" value={`${team.city || ''} ${team.district || ''}`} />
               <InfoItem icon={<Calendar size={16} />} label="정기 활동" value="매주 토요일" />
               <InfoItem icon={<Clock size={16} />} label="활동 시간" value="18:00 ~ 20:00" />

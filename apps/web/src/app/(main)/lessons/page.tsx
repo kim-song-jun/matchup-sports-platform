@@ -101,7 +101,7 @@ export default function LessonsPage() {
               const SportIcon = SportIconMap[lesson.sportType];
               const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
               return (
-                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white border border-gray-100 p-4 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white border border-gray-100 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2.5">
                       {SportIcon && (
@@ -125,15 +125,15 @@ export default function LessonsPage() {
 
                   <div className="grid grid-cols-2 gap-y-1 text-[13px] text-gray-500">
                     <div className="flex items-center gap-1.5">
-                      <Calendar size={13} className="text-gray-300" />
+                      <Calendar size={15} className="text-blue-400" />
                       {formatDate(lesson.lessonDate)} {lesson.startTime}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <MapPin size={13} className="text-gray-300" />
+                      <MapPin size={15} className="text-blue-400" />
                       <span className="truncate">{lesson.venueName || '장소 미정'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Users size={13} className="text-gray-300" />
+                      <Users size={15} className="text-blue-400" />
                       {lesson.currentParticipants}/{lesson.maxParticipants}명
                     </div>
                     <div className="text-[14px] font-semibold text-gray-800">

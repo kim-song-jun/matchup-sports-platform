@@ -14,7 +14,7 @@ export default function MainLayout({
       <div className="hidden lg:block">
         <Sidebar />
         <main className="pl-[260px] min-h-dvh">
-          <div className="max-w-[720px] mx-auto px-6 py-8">
+          <div className="max-w-[960px] mx-auto px-8 py-10">
             {children}
           </div>
         </main>

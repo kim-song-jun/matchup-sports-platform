@@ -42,6 +42,7 @@ export default function LessonDetailPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const lessonId = params.id as string;
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const { data: lesson, isLoading } = useQuery({
     queryKey: ['lesson', lessonId],
@@ -52,7 +53,6 @@ export default function LessonDetailPage() {
   if (isLoading) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 rounded-2xl" /><div className="h-32 bg-gray-100 rounded-2xl" /></div></div>;
   if (!lesson) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20"><p className="text-gray-500">강좌를 찾을 수 없습니다</p><Link href="/lessons" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link></div>;
 
-  const [showCheckout, setShowCheckout] = useState(false);
   const SportIcon = SportIconMap[lesson.sportType];
   const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
 

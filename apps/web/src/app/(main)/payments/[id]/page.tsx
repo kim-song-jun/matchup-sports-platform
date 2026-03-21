@@ -118,9 +118,11 @@ export default function PaymentDetailPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">결제 상세</h1>
       </header>
       <div className="hidden lg:block mb-6">
-        <button onClick={() => router.back()} className="flex items-center gap-1 text-[14px] text-gray-400 hover:text-gray-600 mb-2 transition-colors">
-          <ArrowLeft size={16} /> 결제 내역
-        </button>
+        <div className="flex items-center gap-2 text-[13px] text-gray-400 mb-4">
+          <Link href="/payments" className="hover:text-gray-600 transition-colors">결제 내역</Link>
+          <ChevronRight size={14} />
+          <span className="text-gray-700">상세</span>
+        </div>
         <h2 className="text-[24px] font-bold text-gray-900">결제 상세</h2>
       </div>
 

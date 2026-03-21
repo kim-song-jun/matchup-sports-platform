@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useToast } from '@/components/ui/toast';
 import {
   Wallet,
   TrendingUp,
@@ -56,6 +57,7 @@ function formatCurrency(n: number) {
 }
 
 export default function AdminSettlementsPage() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
 
@@ -87,7 +89,7 @@ export default function AdminSettlementsPage() {
           <h1 className="text-[24px] font-bold text-gray-900">정산 관리</h1>
           <p className="text-[14px] text-gray-400 mt-1">거래 정산 현황을 관리하세요</p>
         </div>
-        <button className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 transition-colors">
+        <button onClick={() => toast('info', '내보내기 기능을 준비 중입니다')} className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 transition-colors">
           <Download size={16} />
           내보내기
         </button>
@@ -135,7 +137,7 @@ export default function AdminSettlementsPage() {
         <div className="flex items-center gap-3 mb-4 rounded-2xl bg-blue-50 border border-blue-100 px-5 py-3">
           <CheckCircle size={18} className="text-blue-500" />
           <span className="text-[14px] font-medium text-blue-700">{selectedRows.length}건 선택됨</span>
-          <button className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-600 transition-colors">
+          <button onClick={() => { toast('success', '선택된 항목의 정산이 처리되었습니다'); setSelectedRows([]); }} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-600 transition-colors">
             <Wallet size={16} />
             정산 처리
           </button>

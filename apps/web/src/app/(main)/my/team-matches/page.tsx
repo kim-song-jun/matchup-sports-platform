@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus } from 'lucide-react';
 
 const mockTeamMatches = [
   {
@@ -61,9 +61,18 @@ export default function MyTeamMatchesPage() {
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">내 팀 매칭 모집글</h1>
       </header>
-      <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">내 팀 매칭 모집글</h2>
-        <p className="text-[14px] text-gray-400 mt-1">팀 매칭 모집 현황을 관리하세요</p>
+      <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
+        <div>
+          <h2 className="text-[24px] font-bold text-gray-900">내 팀 매칭 모집글</h2>
+          <p className="text-[14px] text-gray-400 mt-1">팀 매칭 모집 현황을 관리하세요</p>
+        </div>
+        <Link
+          href="/team-matches/new"
+          className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 active:scale-[0.98] transition-all"
+        >
+          <Plus size={16} />
+          모집글 작성
+        </Link>
       </div>
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
@@ -127,6 +136,14 @@ export default function MyTeamMatchesPage() {
           );
         })}
       </div>
+
+      {/* Mobile FAB */}
+      <Link
+        href="/team-matches/new"
+        className="lg:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:scale-95 transition-all"
+      >
+        <Plus size={24} />
+      </Link>
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">

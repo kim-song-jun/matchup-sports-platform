@@ -105,9 +105,16 @@ export default function TeamMatchDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
+      {/* Desktop breadcrumb */}
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6 px-5 lg:px-0 pt-4">
+        <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
+        <ChevronRight size={14} />
+        <span className="text-gray-700">상세</span>
+      </div>
+
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors">
+      <header className="px-5 lg:px-0 lg:pt-0 pt-4 pb-3 flex items-center gap-3">
+        <button onClick={() => router.back()} className="lg:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-[18px] font-bold text-gray-900 truncate flex-1">{match.title}</h1>

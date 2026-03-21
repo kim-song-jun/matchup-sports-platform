@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { useMatch } from '@/hooks/use-api';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -40,10 +41,49 @@ export default function EditMatchPage() {
   const params = useParams();
   const { toast } = useToast();
   const matchId = params.id as string;
+  const { data: apiMatch } = useMatch(matchId);
 
-  const initialData = mockMatchData[matchId] || mockMatchData['match-1'];
+  // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
+  const fallbackData = mockMatchData[matchId] || mockMatchData['match-1'];
+  const initialData = apiMatch
+    ? {
+        sportType: apiMatch.sportType || fallbackData.sportType,
+        title: apiMatch.title || fallbackData.title,
+        description: apiMatch.description || fallbackData.description,
+        venue: apiMatch.venue?.name || fallbackData.venue,
+        matchDate: apiMatch.matchDate || fallbackData.matchDate,
+        startTime: apiMatch.startTime || fallbackData.startTime,
+        endTime: apiMatch.endTime || fallbackData.endTime,
+        maxPlayers: apiMatch.maxPlayers || fallbackData.maxPlayers,
+        fee: apiMatch.fee ?? fallbackData.fee,
+        levelMin: apiMatch.levelMin || fallbackData.levelMin,
+        levelMax: apiMatch.levelMax || fallbackData.levelMax,
+        gender: apiMatch.gender || fallbackData.gender,
+      }
+    : fallbackData;
+
   const [form, setForm] = useState(initialData);
   const [isSaving, setIsSaving] = useState(false);
+
+  // API 데이터가 로드되면 폼 업데이트
+  useEffect(() => {
+    if (apiMatch) {
+      setForm({
+        sportType: apiMatch.sportType || fallbackData.sportType,
+        title: apiMatch.title || fallbackData.title,
+        description: apiMatch.description || fallbackData.description,
+        venue: apiMatch.venue?.name || fallbackData.venue,
+        matchDate: apiMatch.matchDate || fallbackData.matchDate,
+        startTime: apiMatch.startTime || fallbackData.startTime,
+        endTime: apiMatch.endTime || fallbackData.endTime,
+        maxPlayers: apiMatch.maxPlayers || fallbackData.maxPlayers,
+        fee: apiMatch.fee ?? fallbackData.fee,
+        levelMin: apiMatch.levelMin || fallbackData.levelMin,
+        levelMax: apiMatch.levelMax || fallbackData.levelMax,
+        gender: apiMatch.gender || fallbackData.gender,
+      });
+    }
+  }, [apiMatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
     if (!form.title) return toast('error', '제목을 입력해주세요');

@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useListing } from '@/hooks/use-api';
 
@@ -20,6 +22,8 @@ export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { toast } = useToast();
+  const [liked, setLiked] = useState(false);
   const listingId = params.id as string;
 
   const { data: listing, isLoading } = useListing(listingId);
@@ -52,8 +56,25 @@ export default function ListingDetailPage() {
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
         <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5"><ArrowLeft size={20} className="text-gray-700" /></button>
         <div className="flex gap-2">
-          <button className="rounded-lg p-1.5"><Share2 size={18} className="text-gray-500" /></button>
-          <button className="rounded-lg p-1.5"><Heart size={18} className="text-gray-500" /></button>
+          <button
+            onClick={async () => {
+              if (navigator.share) {
+                await navigator.share({ title: listing?.title, url: window.location.href });
+              } else {
+                await navigator.clipboard.writeText(window.location.href);
+                toast('success', '링크가 복사되었습니다');
+              }
+            }}
+            className="rounded-lg p-1.5"
+          >
+            <Share2 size={18} className="text-gray-500" />
+          </button>
+          <button
+            onClick={() => setLiked(!liked)}
+            className="rounded-lg p-1.5"
+          >
+            <Heart size={18} className={liked ? 'text-red-500' : 'text-gray-500'} fill={liked ? 'currentColor' : 'none'} />
+          </button>
         </div>
       </header>
 
@@ -150,10 +171,19 @@ export default function ListingDetailPage() {
               </Link>
             ) : (
               <div className="space-y-2">
-                <button className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">
+                <button
+                  onClick={() => router.push('/payments/checkout')}
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+                >
                   {listing.listingType === 'rent' ? '대여 신청하기' : '구매하기'}
                 </button>
-                <button className="w-full rounded-xl border border-gray-200 py-3.5 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                <button
+                  onClick={() => {
+                    toast('success', '판매자에게 채팅을 시작합니다');
+                    router.push('/chat');
+                  }}
+                  className="w-full rounded-xl border border-gray-200 py-3.5 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                >
                   <MessageCircle size={18} />
                   채팅하기
                 </button>

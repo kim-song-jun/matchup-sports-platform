@@ -99,7 +99,17 @@ export default function MatchDetailPage() {
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h1>
-        <button className="rounded-lg p-1.5 hover:bg-gray-100 transition-colors">
+        <button
+          onClick={async () => {
+            if (navigator.share) {
+              await navigator.share({ title: match.title, url: window.location.href });
+            } else {
+              await navigator.clipboard.writeText(window.location.href);
+              toast('success', '링크가 복사되었습니다');
+            }
+          }}
+          className="rounded-lg p-1.5 hover:bg-gray-100 transition-colors"
+        >
           <Share2 size={18} className="text-gray-500" />
         </button>
       </header>

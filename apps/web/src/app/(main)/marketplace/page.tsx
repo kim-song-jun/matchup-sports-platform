@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Heart, Eye, Package } from 'lucide-react';
 import { useListings } from '@/hooks/use-api';
@@ -27,9 +28,24 @@ function formatCurrency(n: number) {
   return new Intl.NumberFormat('ko-KR').format(n) + '원';
 }
 
+const categoryFilters: { label: string; match: (item: MarketplaceListing) => boolean }[] = [
+  { label: '전체', match: () => true },
+  { label: '풋살화', match: (item) => item.sportType === 'futsal' },
+  { label: '하키장비', match: (item) => item.sportType === 'ice_hockey' },
+  { label: '농구화', match: (item) => item.sportType === 'basketball' },
+  { label: '라켓', match: (item) => item.sportType === 'badminton' },
+  { label: '유니폼', match: (item) => item.title?.toLowerCase().includes('유니폼') },
+  { label: '보호장비', match: (item) => item.title?.toLowerCase().includes('보호') || item.title?.toLowerCase().includes('장갑') },
+];
+
 export default function MarketplacePage() {
+  const [activeCategory, setActiveCategory] = useState('전체');
   const { data, isLoading } = useListings();
-  const listings = data?.items ?? [];
+  const allListings = data?.items ?? [];
+  const activeCategoryFilter = categoryFilters.find((c) => c.label === activeCategory);
+  const listings = activeCategoryFilter && activeCategory !== '전체'
+    ? allListings.filter(activeCategoryFilter.match)
+    : allListings;
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -43,14 +59,17 @@ export default function MarketplacePage() {
 
       {/* 카테고리 칩 */}
       <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {['전체', '풋살화', '하키장비', '농구화', '라켓', '유니폼', '보호장비'].map((cat, i) => (
+        {categoryFilters.map((cat) => (
           <button
-            key={cat}
+            key={cat.label}
+            onClick={() => setActiveCategory(cat.label)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
-              i === 0 ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+              activeCategory === cat.label
+                ? 'bg-gray-900 text-white'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
             }`}
           >
-            {cat}
+            {cat.label}
           </button>
         ))}
       </div>

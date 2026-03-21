@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Search, MapPin, Star, Clock, SlidersHorizontal } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useToast } from '@/components/ui/toast';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 
@@ -25,6 +26,8 @@ const cities = ['전체', '서울', '경기', '인천', '부산', '대구', '대
 export default function VenuesPage() {
   const [activeSport, setActiveSport] = useState('');
   const [activeCity, setActiveCity] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
 
   const queryParams: Record<string, string> = {};
   if (activeSport) queryParams.sportType = activeSport;
@@ -32,7 +35,13 @@ export default function VenuesPage() {
 
   const { data, isLoading } = useVenues(Object.keys(queryParams).length > 0 ? queryParams : undefined);
 
-  const venues = data?.items ?? [];
+  const allVenues = data?.items ?? [];
+  const venues = searchQuery
+    ? allVenues.filter((v: Venue) =>
+        v.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        v.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allVenues;
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
@@ -49,10 +58,15 @@ export default function VenuesPage() {
             <input
               type="text"
               placeholder="시설명, 지역 검색"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all"
             />
           </div>
-          <button className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 active:bg-gray-100 transition-colors">
+          <button
+            onClick={() => toast('info', '상세 필터 기능을 준비 중입니다')}
+            className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 active:bg-gray-100 transition-colors"
+          >
             <SlidersHorizontal size={18} />
           </button>
         </div>

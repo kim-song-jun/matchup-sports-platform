@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock, RotateCcw, Wallet, ShoppingBag, Trophy, GraduationCap, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { usePayments } from '@/hooks/use-api';
 
 const tabs = [
   { id: 'all', label: '전체' },
@@ -104,10 +105,25 @@ function formatDate(d: string) {
 export default function PaymentsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
+  const { data: apiPayments } = usePayments();
+
+  // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
+  // API Payment 타입과 목업 타입이 다르므로 공통 형태로 변환
+  const payments = apiPayments
+    ? apiPayments.map((p) => ({
+        id: p.id,
+        type: 'match' as string,
+        name: p.orderId || '결제',
+        amount: p.amount,
+        status: p.status,
+        method: p.method || 'card',
+        createdAt: p.createdAt,
+      }))
+    : mockPayments;
 
   const filtered = activeTab === 'all'
-    ? mockPayments
-    : mockPayments.filter((p) => p.type === activeTab);
+    ? payments
+    : payments.filter((p) => p.type === activeTab);
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">

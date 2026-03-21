@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, ExternalLink, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
-import { useTeam } from '@/hooks/use-api';
+import { useTeam, useTeamBadges } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/toast';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -13,7 +14,7 @@ const sportLabel: Record<string, string> = {
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
-// Mock trust score data
+// Mock trust score data (폴백 — API 연동 시 교체 필요)
 const mockTrustScore = {
   infoAccuracy: 96,
   mannerScore: 4.6,
@@ -22,7 +23,7 @@ const mockTrustScore = {
   record: { total: 42, wins: 28, draws: 6, losses: 8 },
 };
 
-// Mock badges
+// Mock badges (폴백 — API 데이터가 없을 때 사용)
 const mockBadges = [
   { id: 'badge-1', type: 'manner_player', name: '매너 플레이어', description: '매너 점수 4.5+' },
   { id: 'badge-2', type: 'punctual', name: '시간 약속왕', description: '지각률 0%' },
@@ -30,7 +31,7 @@ const mockBadges = [
   { id: 'badge-5', type: 'newcomer', name: '신규 팀', description: '팀 등록 완료' },
 ];
 
-// Mock recent match results
+// Mock recent match results (폴백 — API 연동 시 교체 필요)
 const mockRecentMatches = [
   { id: 'rm-1', opponent: '성수 유나이티드', date: '2026-03-15', myScore: 3, opponentScore: 1, result: 'win' as const },
   { id: 'rm-2', opponent: '마포 킥커즈', date: '2026-03-08', myScore: 2, opponentScore: 2, result: 'draw' as const },
@@ -45,7 +46,12 @@ export default function TeamDetailPage() {
   const router = useRouter();
   const teamId = params.id as string;
 
+  const { toast } = useToast();
   const { data: team, isLoading } = useTeam(teamId);
+  const { data: apiBadges } = useTeamBadges(teamId);
+
+  // API 뱃지가 있으면 사용, 없으면 목업 폴백
+  const teamBadges = apiBadges || mockBadges;
 
   if (isLoading) {
     return (
@@ -77,7 +83,19 @@ export default function TeamDetailPage() {
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
         <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1 ml-3">{team.name}</h1>
-        <button className="rounded-lg p-1.5"><Share2 size={18} className="text-gray-500" /></button>
+        <button
+          onClick={async () => {
+            if (navigator.share) {
+              await navigator.share({ title: team.name, url: window.location.href });
+            } else {
+              await navigator.clipboard.writeText(window.location.href);
+              toast('success', '링크가 복사되었습니다');
+            }
+          }}
+          className="rounded-lg p-1.5"
+        >
+          <Share2 size={18} className="text-gray-500" />
+        </button>
       </header>
 
       <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
@@ -133,7 +151,7 @@ export default function TeamDetailPage() {
 
               {/* Badge display */}
               <div className="mt-3">
-                <BadgeDisplay badges={mockBadges} size="md" />
+                <BadgeDisplay badges={teamBadges} size="md" />
               </div>
 
               {team.description && (

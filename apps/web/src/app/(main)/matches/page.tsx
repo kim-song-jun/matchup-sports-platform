@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, Calendar, MapPin, Users } from 'lucide-react';
 import { useMatches } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import type { Match } from '@/types/api';
 
@@ -33,9 +34,17 @@ function formatCurrency(n: number) {
 
 export default function MatchesPage() {
   const [activeSport, setActiveSport] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
   const params = activeSport ? { sportType: activeSport } : undefined;
   const { data, isLoading } = useMatches(params);
-  const matches = data?.items ?? [];
+  const allMatches = data?.items ?? [];
+  const matches = searchQuery
+    ? allMatches.filter((m: Match) =>
+        m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.venue?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allMatches;
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -51,10 +60,15 @@ export default function MatchesPage() {
             <input
               type="text"
               placeholder="지역, 시설명 검색"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all"
             />
           </div>
-          <button className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 active:bg-gray-100 transition-colors">
+          <button
+            onClick={() => toast('info', '상세 필터 기능을 준비 중입니다')}
+            className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 active:bg-gray-100 transition-colors"
+          >
             <SlidersHorizontal size={18} />
           </button>
         </div>

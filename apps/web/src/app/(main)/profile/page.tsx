@@ -102,15 +102,15 @@ export default function ProfilePage() {
 
       <div className="px-5 lg:px-0 py-2 lg:mt-4">
         {[
-          { label: '매치 히스토리', icon: History, href: '/matches', count: 3 },
-          { label: '내가 만든 매치', icon: Swords, href: '/my/matches', count: 2 },
-          { label: '내 팀 매칭 모집글', icon: Users, href: '/my/team-matches', count: 2 },
-          { label: '내 팀', icon: Users, href: '/my/teams', count: 2 },
-          { label: '내 강좌', icon: BookOpen, href: '/my/lessons', count: 2 },
-          { label: '내 장터 매물', icon: ShoppingBag, href: '/my/listings', count: 3 },
-          { label: '내 용병 모집', icon: UserCheck, href: '/my/mercenary', count: 1 },
+          { label: '매치 히스토리', icon: History, href: '/matches', count: null },
+          { label: '내가 만든 매치', icon: Swords, href: '/my/matches', count: null },
+          { label: '내 팀 매칭 모집글', icon: Users, href: '/my/team-matches', count: null },
+          { label: '내 팀', icon: Users, href: '/my/teams', count: null },
+          { label: '내 강좌', icon: BookOpen, href: '/my/lessons', count: null },
+          { label: '내 장터 매물', icon: ShoppingBag, href: '/my/listings', count: null },
+          { label: '내 용병 모집', icon: UserCheck, href: '/my/mercenary', count: null },
           { label: '내 평가', icon: Star, href: '/reviews', count: null },
-          { label: '받은 평가', icon: MessageSquare, href: '/my/reviews-received', count: 5 },
+          { label: '받은 평가', icon: MessageSquare, href: '/my/reviews-received', count: null },
           { label: '결제 내역', icon: CreditCard, href: '/payments', count: null },
         ].map((item) => (
           <Link key={item.label} href={item.href}>

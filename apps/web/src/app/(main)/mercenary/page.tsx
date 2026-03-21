@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, UserPlus, Search, Shield, Star, DollarSign } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { useMercenaryPosts } from '@/hooks/use-api';
 
 const sportFilters = [
   { key: '', label: '전체' },
@@ -139,13 +141,20 @@ function formatFee(fee: number): string {
 export default function MercenaryPage() {
   const [activeSport, setActiveSport] = useState('');
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+  const { data: apiData } = useMercenaryPosts();
+
+  // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
+  // API MercenaryPost 타입과 로컬 인터페이스가 다를 수 있으므로 any로 캐스팅
+  const posts: MercenaryPost[] = (apiData?.items as unknown as MercenaryPost[]) ?? mockPosts;
 
   const filtered = activeSport
-    ? mockPosts.filter((p) => p.sportType === activeSport)
-    : mockPosts;
+    ? posts.filter((p) => p.sportType === activeSport)
+    : posts;
 
   function handleApply(id: string) {
     setAppliedIds((prev) => new Set(prev).add(id));
+    toast('success', '용병 신청이 완료되었습니다');
   }
 
   return (

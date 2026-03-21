@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Star, Clock, Shield, CheckCircle, Sparkles, Trophy, Flame, Heart, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAllBadgeTypes } from '@/hooks/use-api';
 
 interface BadgeInfo {
   id: string;
@@ -122,12 +123,48 @@ function formatDate(dateStr: string): string {
   return `${d.getFullYear()}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getDate().toString().padStart(2, '0')}`;
 }
 
+// 아이콘/색상 매핑 (API에서 제공하지 않는 UI 메타데이터)
+const badgeVisualConfig: Record<string, { icon: typeof Star; color: string; bg: string }> = {
+  manner_player: { icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
+  punctual: { icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
+  referee_hero: { icon: Shield, color: 'text-blue-500', bg: 'bg-blue-50' },
+  honest_team: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50' },
+  newcomer: { icon: Sparkles, color: 'text-gray-500', bg: 'bg-gray-100' },
+  veteran: { icon: Trophy, color: 'text-orange-500', bg: 'bg-orange-50' },
+  winning_streak: { icon: Flame, color: 'text-red-500', bg: 'bg-red-50' },
+  fair_play: { icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50' },
+};
+
+const defaultVisual = { icon: Star, color: 'text-gray-500', bg: 'bg-gray-100' };
+
 export default function BadgesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
+  const { data: apiBadges } = useAllBadgeTypes();
 
-  const earnedBadges = allBadges.filter((b) => b.earned);
-  const displayBadges = activeTab === 'my' ? earnedBadges : allBadges;
+  // API 뱃지가 있으면 로컬 UI 메타데이터와 병합, 없으면 목업 폴백
+  const badges: BadgeInfo[] = apiBadges
+    ? apiBadges.map((ab) => {
+        const visual = badgeVisualConfig[ab.type] || defaultVisual;
+        const local = allBadges.find((lb) => lb.type === ab.type);
+        return {
+          id: ab.id,
+          type: ab.type,
+          name: ab.name || local?.name || ab.type,
+          description: ab.description || local?.description || '',
+          requirement: local?.requirement || '',
+          icon: visual.icon,
+          color: visual.color,
+          bg: visual.bg,
+          earned: (ab as unknown as Record<string, unknown>).earned as boolean ?? local?.earned ?? false,
+          earnedAt: (ab as unknown as Record<string, unknown>).earnedAt as string | undefined ?? local?.earnedAt,
+          progress: local?.progress,
+        };
+      })
+    : allBadges;
+
+  const earnedBadges = badges.filter((b) => b.earned);
+  const displayBadges = activeTab === 'my' ? earnedBadges : badges;
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">

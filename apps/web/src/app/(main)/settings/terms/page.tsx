@@ -1,0 +1,90 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
+
+export default function TermsPage() {
+  const router = useRouter();
+
+  return (
+    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+      {/* Header */}
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5 hover:bg-gray-100">
+          <ArrowLeft size={20} className="text-gray-700" />
+        </button>
+        <h1 className="text-[16px] font-semibold text-gray-900">이용약관</h1>
+      </header>
+      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-400">
+        <button onClick={() => router.push('/settings')} className="hover:text-gray-600">설정</button>
+        <ChevronRight size={14} />
+        <span className="text-gray-900 font-medium">이용약관</span>
+      </div>
+
+      <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-8">
+        <Section title="제1장 서비스 이용약관">
+          <p>
+            본 약관은 MatchUp(이하 &quot;회사&quot;)이 제공하는 스포츠 매칭 플랫폼 서비스(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 규정합니다. 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있으며, 회사는 관련 법령에 따라 약관의 내용을 변경할 수 있습니다.
+          </p>
+          <p>
+            서비스 이용자는 본 약관을 충분히 읽고 이해한 후 동의하여야 합니다. 서비스에 가입하거나 이용을 시작하는 경우, 본 약관에 동의한 것으로 간주됩니다. 이용자는 약관 변경 시 변경된 내용을 확인할 의무가 있으며, 변경된 약관에 동의하지 않는 경우 서비스 이용을 중단하고 탈퇴할 수 있습니다.
+          </p>
+          <p>
+            회사는 이용자에게 매치 생성 및 참여, 팀 구성, 채팅, 결제 등의 서비스를 제공합니다. 서비스의 구체적인 내용, 이용 방법, 제한 사항 등은 관련 법령 및 회사 정책에 따라 달라질 수 있으며, 이용자는 서비스 내 공지사항을 통해 이를 확인할 수 있습니다.
+          </p>
+        </Section>
+
+        <Section title="제2장 개인정보 수집 및 이용">
+          <p>
+            회사는 서비스 제공을 위해 이용자의 개인정보를 수집하며, 수집하는 개인정보의 항목은 회원가입 시 필수 정보(이메일, 닉네임, 비밀번호)와 선택 정보(전화번호, 프로필 사진, 위치 정보)로 구분됩니다. 수집된 개인정보는 서비스 제공, 이용자 식별, 불량 이용 방지 등의 목적으로만 활용됩니다.
+          </p>
+          <p>
+            회사는 이용자의 개인정보를 본인의 동의 없이 제3자에게 제공하지 않습니다. 다만 관련 법령에 의한 수사기관의 요청이 있는 경우, 이용자의 생명이나 안전에 긴급한 위험이 있는 경우 등 예외적인 상황에서는 개인정보를 제공할 수 있습니다. 이용자는 언제든지 자신의 개인정보에 대한 열람, 수정, 삭제를 요청할 수 있습니다.
+          </p>
+          <p>
+            회사는 개인정보의 안전한 보관을 위해 기술적, 관리적 보호 조치를 시행하고 있으며, 개인정보 처리 시스템에 대한 접근 권한을 엄격히 관리합니다. 개인정보의 보유 기간은 서비스 이용 기간 동안이며, 회원 탈퇴 시 관련 법령에서 정한 기간을 제외하고 즉시 파기합니다.
+          </p>
+        </Section>
+
+        <Section title="제3장 결제 및 환불 규정">
+          <p>
+            서비스 내 유료 기능(매치 참가비, 구장 예약, 장터 거래 등)에 대한 결제는 토스페이먼츠를 통해 처리됩니다. 이용자는 신용카드, 체크카드, 간편결제(카카오페이, 네이버페이, 토스페이 등) 등의 결제 수단을 사용할 수 있습니다. 결제 금액 및 수수료는 각 서비스 이용 시 사전에 명시됩니다.
+          </p>
+          <p>
+            매치 참가비 환불은 매치 시작 24시간 전까지 전액 환불이 가능하며, 매치 시작 12시간 전까지는 50% 환불, 그 이후에는 환불이 불가합니다. 구장 예약 환불은 예약 취소 정책에 따르며, 구장 운영자의 환불 규정이 적용될 수 있습니다. 장터 거래의 경우, 상품 수령 후 3일 이내에 하자가 발견된 경우 환불을 요청할 수 있습니다.
+          </p>
+          <p>
+            환불 처리 기간은 결제 수단에 따라 다르며, 신용카드의 경우 취소 후 3~7 영업일, 계좌이체의 경우 취소 후 2~3 영업일이 소요됩니다. 부당한 환불 요청이나 서비스 악용이 확인된 경우, 회사는 환불을 거부하거나 서비스 이용을 제한할 수 있습니다.
+          </p>
+        </Section>
+
+        <Section title="제4장 분쟁 해결">
+          <p>
+            서비스 이용과 관련하여 회사와 이용자 사이에 분쟁이 발생한 경우, 쌍방은 원만한 해결을 위해 성실히 협의합니다. 협의가 이루어지지 않는 경우, 관련 법령 및 상관례에 따라 분쟁을 해결합니다. 회사는 이용자의 불만 및 피해 구제를 위해 고객센터를 운영하며, 접수된 불만 사항은 영업일 기준 3일 이내에 처리합니다.
+          </p>
+          <p>
+            매치 진행 중 발생하는 이용자 간 분쟁(노쇼, 비매너 행위, 경기 중 사고 등)에 대해 회사는 중재를 제공할 수 있으나, 최종 책임은 해당 이용자에게 있습니다. 회사는 이용자 간 분쟁을 최소화하기 위해 매너 평가 시스템, 신고 기능, 이용 제한 조치 등을 운영합니다.
+          </p>
+          <p>
+            본 약관에 명시되지 않은 사항은 관련 법령 또는 상관례에 따르며, 서비스와 관련된 소송의 관할 법원은 민사소송법에 따른 관할 법원으로 합니다. 본 약관은 대한민국 법령에 따라 해석됩니다.
+          </p>
+        </Section>
+
+        <div className="text-center py-4 border-t border-gray-100">
+          <p className="text-[13px] text-gray-400">최종 수정일: 2026년 1월 1일</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-white border border-gray-100 p-5">
+      <h3 className="text-[16px] font-bold text-gray-900 mb-4">{title}</h3>
+      <div className="space-y-3 text-[14px] leading-relaxed text-gray-600">
+        {children}
+      </div>
+    </div>
+  );
+}

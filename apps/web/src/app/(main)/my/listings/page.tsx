@@ -1,0 +1,195 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart } from 'lucide-react';
+
+const mockMyListings = [
+  {
+    id: 'listing-1',
+    title: '나이키 팬텀 GX 풋살화 265',
+    sportType: 'futsal',
+    category: '축구화/풋살화',
+    condition: 'like_new',
+    price: 85000,
+    status: 'on_sale',
+    viewCount: 42,
+    likeCount: 5,
+    createdAt: '2026-03-15',
+    imageUrl: null,
+  },
+  {
+    id: 'listing-2',
+    title: 'CCM 아이스하키 스틱 (좌)',
+    sportType: 'ice_hockey',
+    category: '하키장비',
+    condition: 'good',
+    price: 120000,
+    status: 'reserved',
+    viewCount: 28,
+    likeCount: 3,
+    createdAt: '2026-03-10',
+    imageUrl: null,
+  },
+  {
+    id: 'listing-3',
+    title: '요넥스 배드민턴 라켓 아스트록스',
+    sportType: 'badminton',
+    category: '라켓',
+    condition: 'new',
+    price: 150000,
+    status: 'sold',
+    viewCount: 65,
+    likeCount: 8,
+    createdAt: '2026-03-05',
+    imageUrl: null,
+  },
+];
+
+const conditionLabel: Record<string, string> = {
+  new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자',
+};
+
+const statusConfig: Record<string, { text: string; style: string }> = {
+  on_sale: { text: '판매중', style: 'bg-blue-50 text-blue-600' },
+  reserved: { text: '예약중', style: 'bg-amber-50 text-amber-600' },
+  sold: { text: '판매완료', style: 'bg-gray-100 text-gray-500' },
+};
+
+const statusOptions = [
+  { value: 'on_sale', label: '판매중' },
+  { value: 'reserved', label: '예약중' },
+  { value: 'sold', label: '판매완료' },
+];
+
+function formatCurrency(n: number) {
+  return new Intl.NumberFormat('ko-KR').format(n) + '원';
+}
+
+export default function MyListingsPage() {
+  const router = useRouter();
+  const [listings, setListings] = useState(mockMyListings);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    setListings(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+    setStatusDropdown(null);
+  };
+
+  const handleDelete = (id: string) => {
+    setListings(prev => prev.filter(l => l.id !== id));
+    setDeleteTarget(null);
+  };
+
+  return (
+    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+          <ArrowLeft size={20} className="text-gray-700" />
+        </button>
+        <h1 className="text-[16px] font-semibold text-gray-900">내 장터 매물</h1>
+      </header>
+      <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
+        <h2 className="text-[24px] font-bold text-gray-900">내 장터 매물</h2>
+        <p className="text-[14px] text-gray-400 mt-1">등록한 매물을 관리하세요</p>
+      </div>
+
+      <div className="px-5 lg:px-0 space-y-3 pb-8">
+        {listings.length === 0 ? (
+          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+            <Package size={32} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-[15px] font-medium text-gray-600">등록한 매물이 없어요</p>
+            <Link href="/marketplace/new" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">매물 등록</Link>
+          </div>
+        ) : (
+          listings.map((listing) => {
+            const st = statusConfig[listing.status] || statusConfig.on_sale;
+            return (
+              <div key={listing.id} className="rounded-2xl bg-white border border-gray-100 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                    <Package size={24} className="text-gray-300" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${st.style}`}>{st.text}</span>
+                      <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">{conditionLabel[listing.condition]}</span>
+                    </div>
+                    <Link href={`/marketplace/${listing.id}`}>
+                      <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors truncate">{listing.title}</h3>
+                    </Link>
+                    <p className="text-[15px] font-bold text-gray-900 mt-0.5">{formatCurrency(listing.price)}</p>
+                    <div className="flex items-center gap-3 mt-1 text-[12px] text-gray-400">
+                      <span className="flex items-center gap-0.5"><Eye size={12} />{listing.viewCount}</span>
+                      <span className="flex items-center gap-0.5"><Heart size={12} />{listing.likeCount}</span>
+                      <span>{listing.createdAt}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <Link
+                    href={`/marketplace/${listing.id}/edit`}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <Pencil size={14} />
+                    수정
+                  </Link>
+                  <div className="relative">
+                    <button
+                      onClick={() => setStatusDropdown(statusDropdown === listing.id ? null : listing.id)}
+                      className="flex items-center gap-1.5 rounded-xl bg-blue-50 px-4 py-2.5 text-[13px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                    >
+                      상태변경
+                      <ChevronDown size={14} />
+                    </button>
+                    {statusDropdown === listing.id && (
+                      <div className="absolute top-full mt-1 left-0 bg-white rounded-xl border border-gray-200 shadow-lg z-10 overflow-hidden min-w-[120px]">
+                        {statusOptions.map((opt) => (
+                          <button
+                            key={opt.value}
+                            onClick={() => handleStatusChange(listing.id, opt.value)}
+                            className={`w-full text-left px-4 py-2.5 text-[13px] font-medium hover:bg-gray-50 transition-colors ${
+                              listing.status === opt.value ? 'text-blue-500 bg-blue-50' : 'text-gray-700'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setDeleteTarget(listing.id)}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-4 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                    삭제
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+              <AlertTriangle size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-[17px] font-bold text-gray-900 text-center">매물을 삭제하시겠어요?</h3>
+            <p className="text-[14px] text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700">돌아가기</button>
+              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white">삭제하기</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

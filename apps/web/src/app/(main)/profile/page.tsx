@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
@@ -102,11 +102,16 @@ export default function ProfilePage() {
 
       <div className="px-5 lg:px-0 py-2 lg:mt-4">
         {[
-          { label: '매치 히스토리', icon: History, href: '/matches' },
-          { label: '내 평가', icon: Star, href: '/reviews' },
-          { label: '결제 내역', icon: CreditCard, href: '/payments' },
-          { label: '내 장터', icon: ShoppingBag, href: '/marketplace' },
-          { label: '내 팀', icon: Users, href: '/teams' },
+          { label: '매치 히스토리', icon: History, href: '/matches', count: 3 },
+          { label: '내가 만든 매치', icon: Swords, href: '/my/matches', count: 2 },
+          { label: '내 팀 매칭 모집글', icon: Users, href: '/my/team-matches', count: 2 },
+          { label: '내 팀', icon: Users, href: '/my/teams', count: 2 },
+          { label: '내 강좌', icon: BookOpen, href: '/my/lessons', count: 2 },
+          { label: '내 장터 매물', icon: ShoppingBag, href: '/my/listings', count: 3 },
+          { label: '내 용병 모집', icon: UserCheck, href: '/my/mercenary', count: 1 },
+          { label: '내 평가', icon: Star, href: '/reviews', count: null },
+          { label: '받은 평가', icon: MessageSquare, href: '/my/reviews-received', count: 5 },
+          { label: '결제 내역', icon: CreditCard, href: '/payments', count: null },
         ].map((item) => (
           <Link key={item.label} href={item.href}>
             <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
@@ -114,7 +119,14 @@ export default function ProfilePage() {
                 <item.icon size={20} className="text-gray-400" />
                 <span className="text-[15px] font-medium text-gray-800">{item.label}</span>
               </div>
-              <ChevronRight size={18} className="text-gray-300" />
+              <div className="flex items-center gap-2">
+                {item.count !== null && item.count !== undefined && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[11px] font-bold text-white">
+                    {item.count}
+                  </span>
+                )}
+                <ChevronRight size={18} className="text-gray-300" />
+              </div>
             </div>
           </Link>
         ))}

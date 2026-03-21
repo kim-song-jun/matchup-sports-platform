@@ -25,12 +25,12 @@ export default function SettingsPage() {
         {/* 계정 */}
         <SettingsSection title="계정">
           <SettingsLink icon={User} label="프로필 수정" desc="닉네임, 프로필 사진 변경" href="/profile" />
-          <SettingsLink icon={Shield} label="개인정보 관리" desc="비밀번호 변경, 계정 보안" href="#" />
+          <SettingsLink icon={Shield} label="개인정보 관리" desc="비밀번호 변경, 계정 보안" href="/settings/account" />
         </SettingsSection>
 
         {/* 알림 */}
         <SettingsSection title="알림">
-          <SettingsLink icon={Bell} label="알림 설정" desc="매치, 채팅, 마케팅 알림" href="#" />
+          <SettingsLink icon={Bell} label="알림 설정" desc="매치, 채팅, 마케팅 알림" href="/settings/notifications" />
         </SettingsSection>
 
         {/* 테마 */}
@@ -62,14 +62,30 @@ export default function SettingsPage() {
 
         {/* 언어 */}
         <SettingsSection title="기타">
-          <SettingsLink icon={Globe} label="언어 설정" desc="한국어" href="#" />
+          <div className="flex items-center gap-3.5 px-4 py-3.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+              <Globe size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-medium text-gray-900">언어 설정</p>
+              <p className="text-[13px] text-gray-400 mt-0.5">한국어</p>
+            </div>
+          </div>
         </SettingsSection>
 
         {/* 정보 */}
         <SettingsSection title="정보">
-          <SettingsLink icon={FileText} label="이용약관" href="#" />
-          <SettingsLink icon={Shield} label="개인정보 처리방침" href="#" />
-          <SettingsLink icon={Info} label="앱 정보" desc="MatchUp v1.0.0" href="#" />
+          <SettingsLink icon={FileText} label="이용약관" href="/settings/terms" />
+          <SettingsLink icon={Shield} label="개인정보 처리방침" href="/settings/privacy" />
+          <div className="flex items-center gap-3.5 px-4 py-3.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+              <Info size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-medium text-gray-900">앱 정보</p>
+              <p className="text-[13px] text-gray-400 mt-0.5">MatchUp v1.0.0</p>
+            </div>
+          </div>
         </SettingsSection>
 
         {/* 로그아웃 */}

@@ -3,10 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useListing } from '@/hooks/use-api';
 
 const sportLabel: Record<string, string> = { futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키' };
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
@@ -23,14 +22,7 @@ export default function ListingDetailPage() {
   const { isAuthenticated } = useAuthStore();
   const listingId = params.id as string;
 
-  const { data: listing, isLoading } = useQuery({
-    queryKey: ['listing', listingId],
-    queryFn: async () => {
-      const res = await api.get(`/marketplace/listings/${listingId}`);
-      return (res as any).data;
-    },
-    enabled: !!listingId,
-  });
+  const { data: listing, isLoading } = useListing(listingId);
 
   if (isLoading) {
     return (

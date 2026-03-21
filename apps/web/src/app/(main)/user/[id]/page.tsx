@@ -3,9 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Star, Trophy, Users, Shield, Calendar, TrendingUp } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useUserProfile } from '@/hooks/use-api';
+import type { SportProfile } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -25,14 +25,7 @@ export default function UserProfilePage() {
   const router = useRouter();
   const userId = params.id as string;
 
-  const { data: user, isLoading } = useQuery({
-    queryKey: ['user', userId],
-    queryFn: async () => {
-      const res = await api.get(`/users/${userId}`);
-      return (res as any).data;
-    },
-    enabled: !!userId,
-  });
+  const { data: user, isLoading } = useUserProfile(userId);
 
   if (isLoading) {
     return (
@@ -133,7 +126,7 @@ export default function UserProfilePage() {
               종목별 프로필
             </h3>
             <div className="space-y-3">
-              {sportProfiles.map((profile: any) => {
+              {sportProfiles.map((profile: SportProfile) => {
                 const SportIcon = SportIconMap[profile.sportType];
                 return (
                   <div key={profile.sportType} className="rounded-xl bg-gray-50 p-3.5">

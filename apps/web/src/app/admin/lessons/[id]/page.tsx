@@ -3,10 +3,12 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { ChevronRight, Calendar, MapPin, Users, CreditCard, User, GraduationCap, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useLesson } from '@/hooks/use-api';
+import type { LessonParticipant } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -41,14 +43,7 @@ export default function AdminLessonDetailPage() {
   const lessonId = params.id as string;
   const [statusChanging, setStatusChanging] = useState(false);
 
-  const { data: lesson, isLoading } = useQuery({
-    queryKey: ['admin', 'lesson', lessonId],
-    queryFn: async () => {
-      const res = await api.get(`/lessons/${lessonId}`);
-      return (res as any).data;
-    },
-    enabled: !!lessonId,
-  });
+  const { data: lesson, isLoading } = useLesson(lessonId);
 
   const statusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
@@ -187,7 +182,7 @@ export default function AdminLessonDetailPage() {
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">참가자 ({lesson.currentParticipants || 0}명)</h3>
             {lesson.participants && lesson.participants.length > 0 ? (
               <div className="space-y-2">
-                {lesson.participants.map((p: any) => (
+                {lesson.participants.map((p: LessonParticipant) => (
                   <div key={p.id || p.userId} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[12px] font-bold text-blue-500">

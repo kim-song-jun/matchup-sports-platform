@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { Users, MapPin, MessageCircle, Plus } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useTeams } from '@/hooks/use-api';
+import type { SportTeam } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -13,15 +13,9 @@ const sportLabel: Record<string, string> = {
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
 export default function TeamsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['teams'],
-    queryFn: async () => {
-      const res = await api.get('/teams');
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useTeams();
 
-  const teams = data?.items ?? data ?? [];
+  const teams = data?.items ?? [];
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
@@ -49,7 +43,7 @@ export default function TeamsPage() {
           </div>
         ) : (
           <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {teams.map((team: any) => {
+            {teams.map((team: SportTeam) => {
               const SportIcon = SportIconMap[team.sportType];
               return (
                 <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">

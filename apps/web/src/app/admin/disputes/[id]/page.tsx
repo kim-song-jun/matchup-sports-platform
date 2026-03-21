@@ -302,7 +302,7 @@ export default function AdminDisputeDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">첨부 자료</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {dispute.photos.map((photo: any) => (
+              {dispute.photos.map((photo: { id: string; description: string }) => (
                 <div key={photo.id} className="rounded-xl bg-gray-100 border border-gray-200 p-4 flex flex-col items-center justify-center min-h-[100px]">
                   <Camera size={24} className="text-gray-400 mb-2" />
                   <p className="text-[11px] text-gray-500 text-center">{photo.description}</p>

@@ -58,8 +58,9 @@ export default function CreateListingPage() {
       await api.post('/marketplace/listings', form);
       toast('success', '매물이 등록되었습니다!');
       router.push('/marketplace');
-    } catch (err: any) {
-      toast('error', err?.response?.data?.message || '등록에 실패했습니다');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '등록에 실패했습니다');
     } finally {
       setIsSubmitting(false);
     }

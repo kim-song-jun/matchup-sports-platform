@@ -14,6 +14,7 @@ import {
   useTeamMatchArrival,
 } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
+import type { TeamMatchApplication } from '@/types/api';
 
 const levelLabel: Record<string, string> = {
   beginner: '입문', lower: '하', middle: '중', upper: '상', pro: '프로',
@@ -193,13 +194,13 @@ export default function TeamMatchDetailPage() {
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
                   <p className="text-[12px] text-gray-400 mb-0.5">요구 레벨</p>
                   <p className="text-[14px] font-semibold text-gray-900">
-                    {levelLabel[match.requiredLevel] ?? match.requiredLevel}
+                    {match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한 없음'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
                   <p className="text-[12px] text-gray-400 mb-0.5">경기 스타일</p>
                   <p className="text-[14px] font-semibold text-gray-900">
-                    {matchStyleLabel[match.matchStyle] ?? match.matchStyle}
+                    {match.matchStyle ? matchStyleLabel[match.matchStyle] ?? match.matchStyle : '미정'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
@@ -245,7 +246,7 @@ export default function TeamMatchDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {refereeSchedule.map((item: any, idx: number) => (
+                      {refereeSchedule.map((item: { quarter: number; teamName: string }, idx: number) => (
                         <tr key={idx} className="border-b border-gray-50 last:border-0">
                           <td className="py-2.5 px-3 font-medium text-gray-900">{item.quarter}쿼터</td>
                           <td className="py-2.5 px-3 text-gray-700">{item.teamName}</td>
@@ -275,7 +276,7 @@ export default function TeamMatchDetailPage() {
                         </div>
                       )}
                       {match.hostTeam.matchCount != null && (
-                        <span className="text-[12px] text-gray-400">{match.hostTeam.matchCount}경기</span>
+                        <span className="text-[12px] text-gray-400">{String(match.hostTeam.matchCount)}경기</span>
                       )}
                     </div>
                   </div>
@@ -295,7 +296,7 @@ export default function TeamMatchDetailPage() {
                   onClick={() => setShowApplyModal(true)}
                   className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
-                  경기 신청하기
+                  <span className="flex items-center justify-center gap-2">경기 신청하기</span>
                 </button>
               )}
 
@@ -334,7 +335,7 @@ export default function TeamMatchDetailPage() {
                   <span className="ml-auto text-[13px] font-normal text-gray-400">{applications.length}팀</span>
                 </h2>
                 <div className="space-y-3">
-                  {applications.map((app: any) => {
+                  {applications.map((app: TeamMatchApplication) => {
                     const appStatusMap: Record<string, { label: string; className: string }> = {
                       pending: { label: '대기중', className: 'bg-amber-50 text-amber-600' },
                       approved: { label: '승인', className: 'bg-green-50 text-green-600' },
@@ -443,7 +444,12 @@ export default function TeamMatchDetailPage() {
                 disabled={!confirmed || applyMutation.isPending}
                 className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {applyMutation.isPending ? '신청중...' : '신청하기'}
+                {applyMutation.isPending ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      처리 중...
+                    </span>
+                  ) : '신청하기'}
               </button>
             </div>
           </div>

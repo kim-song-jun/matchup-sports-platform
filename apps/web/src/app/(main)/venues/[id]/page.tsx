@@ -8,7 +8,8 @@ import {
   Calendar, Check, Share2, PenLine, Trophy, DollarSign,
 } from 'lucide-react';
 import { MapPlaceholder } from '@/components/ui/map-placeholder';
-import { ReviewForm } from '@/components/venue/review-form';
+import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
+import { useVenue } from '@/hooks/use-api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -43,6 +44,7 @@ function getDefaultFacilityColor() {
 const mockVenue = {
   id: 'venue-001',
   name: '서울숲 풋살파크',
+  type: 'futsal_court',
   sportType: 'futsal',
   sportTypes: ['futsal'],
   rating: 4.3,
@@ -62,21 +64,21 @@ const mockVenue = {
     {
       id: 'r1',
       rating: 5,
-      content: '잔디 상태 최고입니다! 주차도 넉넉하고 샤워실도 깨끗해요.',
+      comment: '잔디 상태 최고입니다! 주차도 넉넉하고 샤워실도 깨끗해요.',
       user: { nickname: '풋살왕김씨' },
       createdAt: '2026-03-10',
     },
     {
       id: 'r2',
       rating: 4,
-      content: '위치가 좋고 시설이 깔끔해요. 다만 주말 저녁 예약이 힘듭니다.',
+      comment: '위치가 좋고 시설이 깔끔해요. 다만 주말 저녁 예약이 힘듭니다.',
       user: { nickname: '공차는민수' },
       createdAt: '2026-03-05',
     },
     {
       id: 'r3',
       rating: 4,
-      content: '가격 대비 만족스러운 시설입니다. 야간 조명이 밝아서 좋아요.',
+      comment: '가격 대비 만족스러운 시설입니다. 야간 조명이 밝아서 좋아요.',
       user: { nickname: '풋살러이준' },
       createdAt: '2026-02-28',
     },
@@ -128,12 +130,13 @@ export default function VenueDetailPage() {
   const venueId = params.id as string;
   const [showReviewForm, setShowReviewForm] = useState(false);
 
-  // Using mock data
-  const venue = mockVenue;
+  // Use API hook with mock data fallback
+  const { data: apiVenue } = useVenue(venueId);
+  const venue = (apiVenue || mockVenue) as typeof mockVenue;
 
   const operatingHours = venue.operatingHours as Record<string, { open: string; close: string }> | null;
 
-  function handleReviewSubmit(data: any) {
+  function handleReviewSubmit(data: ReviewData) {
     // In real implementation, this would call an API
     console.log('Review submitted:', data);
     setShowReviewForm(false);
@@ -165,8 +168,8 @@ export default function VenueDetailPage() {
           {/* Map Placeholder */}
           <div className="mb-4">
             <MapPlaceholder
-              lat={venue.lat}
-              lng={venue.lng}
+              lat={venue.lat ?? 37.5665}
+              lng={venue.lng ?? 126.978}
               address={venue.address}
               name={venue.name}
               height={220}
@@ -176,7 +179,7 @@ export default function VenueDetailPage() {
           {/* Title card */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5 mb-3">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[12px] font-medium text-blue-500">{sportLabel[venue.sportType]}</span>
+              <span className="text-[12px] font-medium text-blue-500">{sportLabel[venue.sportType || venue.type] || venue.type}</span>
               {venue.rating > 0 && (
                 <div className="flex items-center gap-1 text-[13px]">
                   <Star size={13} className="text-amber-400" fill="currentColor" />
@@ -294,7 +297,7 @@ export default function VenueDetailPage() {
                 </div>
               </div>
               <div className="space-y-4">
-                {venue.reviews.slice(0, 5).map((review: any) => (
+                {venue.reviews.slice(0, 5).map((review: { id: string; rating: number; comment: string; user: { nickname: string }; createdAt: string }) => (
                   <div key={review.id} className="border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">
@@ -313,7 +316,7 @@ export default function VenueDetailPage() {
                       </div>
                       <span className="text-[11px] text-gray-300 ml-auto">{review.createdAt}</span>
                     </div>
-                    <p className="text-[14px] text-gray-600 leading-relaxed">{review.content}</p>
+                    <p className="text-[14px] text-gray-600 leading-relaxed">{review.comment}</p>
                   </div>
                 ))}
               </div>

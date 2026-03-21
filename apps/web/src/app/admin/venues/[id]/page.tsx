@@ -96,7 +96,7 @@ export default function AdminVenueEditPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const updateField = (key: string, value: any) => {
+  const updateField = (key: string, value: string | number | boolean | string[]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
   };

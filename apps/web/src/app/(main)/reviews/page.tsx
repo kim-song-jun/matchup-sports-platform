@@ -2,12 +2,15 @@
 
 import { ArrowLeft, Star, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePendingReviews } from '@/hooks/use-api';
+import type { PendingReview } from '@/types/api';
+import type { QueryClient } from '@tanstack/react-query';
 
 export default function ReviewsPage() {
   const router = useRouter();
@@ -15,14 +18,7 @@ export default function ReviewsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: pending, isLoading } = useQuery({
-    queryKey: ['reviews', 'pending'],
-    queryFn: async () => {
-      const res = await api.get('/reviews/pending');
-      return (res as any).data;
-    },
-    enabled: isAuthenticated,
-  });
+  const { data: pending, isLoading } = usePendingReviews();
 
   const pendingReviews = Array.isArray(pending) ? pending : [];
 
@@ -54,7 +50,7 @@ export default function ReviewsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {pendingReviews.map((review: any, idx: number) => (
+            {pendingReviews.map((review: PendingReview, idx: number) => (
               <ReviewCard key={idx} review={review} toast={toast} queryClient={queryClient} />
             ))}
           </div>
@@ -65,7 +61,7 @@ export default function ReviewsPage() {
   );
 }
 
-function ReviewCard({ review, toast, queryClient }: { review: any; toast: any; queryClient: any }) {
+function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toast: (type: 'success' | 'error' | 'info', message: string) => void; queryClient: QueryClient }) {
   const [skillRating, setSkillRating] = useState(3);
   const [mannerRating, setMannerRating] = useState(3);
   const [comment, setComment] = useState('');
@@ -78,7 +74,7 @@ function ReviewCard({ review, toast, queryClient }: { review: any; toast: any; q
       skillRating,
       mannerRating,
       comment: comment || undefined,
-    }) as Promise<any>,
+    }) as Promise<unknown>,
     onSuccess: () => {
       toast('success', '평가가 제출되었습니다');
       queryClient.invalidateQueries({ queryKey: ['reviews'] });

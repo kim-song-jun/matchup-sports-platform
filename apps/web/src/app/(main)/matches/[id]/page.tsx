@@ -8,6 +8,7 @@ import { useMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import type { MatchParticipant } from '@/types/api';
 import { api } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckoutModal } from '@/components/payment/checkout-modal';
@@ -39,24 +40,26 @@ export default function MatchDetailPage() {
   const [showCheckout, setShowCheckout] = useState(false);
 
   const joinMutation = useMutation({
-    mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<any>,
+    mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<unknown>,
     onSuccess: () => {
       toast('success', '매치에 참가했습니다!');
       queryClient.invalidateQueries({ queryKey: ['match', matchId] });
     },
-    onError: (err: any) => {
-      toast('error', err?.response?.data?.message || '참가에 실패했습니다');
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '참가에 실패했습니다');
     },
   });
 
   const leaveMutation = useMutation({
-    mutationFn: () => api.delete(`/matches/${matchId}/leave`) as Promise<any>,
+    mutationFn: () => api.delete(`/matches/${matchId}/leave`) as Promise<unknown>,
     onSuccess: () => {
       toast('info', '매치에서 탈퇴했습니다');
       queryClient.invalidateQueries({ queryKey: ['match', matchId] });
     },
-    onError: (err: any) => {
-      toast('error', err?.response?.data?.message || '탈퇴에 실패했습니다');
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '탈퇴에 실패했습니다');
     },
   });
 
@@ -85,7 +88,7 @@ export default function MatchDetailPage() {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
   const isAlmostFull = filledPercent >= 70;
   const isHost = user?.id === match.hostId;
-  const isParticipant = match.participants?.some((p: any) => p.userId === user?.id);
+  const isParticipant = match.participants?.some((p: MatchParticipant) => p.userId === user?.id);
   const isFull = match.currentPlayers >= match.maxPlayers;
 
   return (
@@ -140,7 +143,7 @@ export default function MatchDetailPage() {
           {/* Info grid */}
           <div className="mt-3 grid grid-cols-2 gap-3 lg:gap-5">
             <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatMatchDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
-            <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name} sub={match.venue?.address?.slice(0, 20)} />
+            <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
             <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={isAlmostFull ? '마감 임박' : '모집중'} highlight={isAlmostFull} />
             <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatCurrency(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
           </div>
@@ -156,10 +159,10 @@ export default function MatchDetailPage() {
                 <div>
                   <p className="text-[14px] font-medium text-gray-800">{match.venue.name}</p>
                   <p className="text-[12px] text-gray-400 mt-0.5">{match.venue.address}</p>
-                  {match.venue.rating > 0 && (
+                  {(match.venue.rating ?? 0) > 0 && (
                     <div className="flex items-center gap-1 mt-1">
                       <Star size={12} className="text-amber-400" fill="currentColor" />
-                      <span className="text-[12px] text-gray-600">{match.venue.rating.toFixed(1)}</span>
+                      <span className="text-[12px] text-gray-600">{(match.venue.rating ?? 0).toFixed(1)}</span>
                     </div>
                   )}
                 </div>
@@ -198,7 +201,12 @@ export default function MatchDetailPage() {
                 disabled={leaveMutation.isPending}
                 className="w-full rounded-xl border-2 border-red-100 bg-red-50 py-3.5 text-[15px] font-semibold text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
               >
-                {leaveMutation.isPending ? '처리중...' : '참가 취소하기'}
+                {leaveMutation.isPending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                    처리 중...
+                  </span>
+                ) : '참가 취소하기'}
               </button>
             ) : isFull ? (
               <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-400 cursor-not-allowed">
@@ -210,7 +218,14 @@ export default function MatchDetailPage() {
                 disabled={joinMutation.isPending}
                 className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
               >
-                {joinMutation.isPending ? '처리중...' : `참가하기 · ${formatCurrency(match.fee)}`}
+                {joinMutation.isPending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    처리 중...
+                  </span>
+                ) : (
+                  `참가하기 · ${formatCurrency(match.fee)}`
+                )}
               </button>
             )}
 
@@ -240,7 +255,7 @@ export default function MatchDetailPage() {
               참가자 ({match.participants?.length || 0})
             </h3>
             <div className="space-y-2.5">
-              {match.participants?.map((p: any) => (
+              {match.participants?.map((p: MatchParticipant) => (
                 <div key={p.id} className="flex items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[13px] font-bold text-gray-500">
                     {p.user?.nickname?.charAt(0)}

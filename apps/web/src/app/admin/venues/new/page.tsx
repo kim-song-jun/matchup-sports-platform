@@ -62,7 +62,7 @@ export default function AdminVenueNewPage() {
     },
   });
 
-  const updateField = (key: string, value: any) => {
+  const updateField = (key: string, value: string | number | boolean | string[]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 

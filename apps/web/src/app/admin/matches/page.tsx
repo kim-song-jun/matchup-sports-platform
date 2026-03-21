@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useAdminMatches } from '@/hooks/use-api';
+import type { Match } from '@/types/api';
 
 const statusLabel: Record<string, string> = {
   recruiting: '모집중', full: '마감', in_progress: '진행중', completed: '완료', cancelled: '취소',
@@ -20,13 +20,7 @@ function formatDate(d: string) {
 }
 
 export default function AdminMatchesPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'matches'],
-    queryFn: async () => {
-      const res = await api.get('/admin/matches');
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useAdminMatches();
 
   const matches = data?.items ?? [];
 
@@ -56,7 +50,7 @@ export default function AdminMatchesPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}><td colSpan={6} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
               ))
-            ) : matches.map((m: any) => (
+            ) : matches.map((m: Match) => (
               <tr key={m.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/matches/${m.id}`}>
                 <td className="px-5 py-3.5">
                   <p className="text-[14px] font-medium text-gray-900 truncate max-w-[200px]">{m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>

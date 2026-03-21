@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronRight, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useVenues } from '@/hooks/use-api';
+import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
@@ -51,8 +52,9 @@ export default function CreateMatchPage() {
       await api.post('/matches', form);
       toast('success', '매치가 생성되었습니다!');
       router.push('/matches');
-    } catch (err: any) {
-      toast('error', err?.response?.data?.message || '생성에 실패했습니다');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '생성에 실패했습니다');
     } finally {
       setIsSubmitting(false);
     }
@@ -167,7 +169,7 @@ export default function CreateMatchPage() {
             <Field label="시설 선택" required>
               {Array.isArray(venues) && venues.length > 0 ? (
                 <div className="space-y-2">
-                  {venues.map((v: any) => (
+                  {venues.map((v: Venue) => (
                     <button key={v.id} onClick={() => setForm({ ...form, venueId: v.id })}
                       className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
                         form.venueId === v.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-200'

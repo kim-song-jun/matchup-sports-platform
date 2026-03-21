@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import { ProgressBar } from '@/components/layout/progress-bar';
 
 export const metadata: Metadata = {
   title: 'MatchUp - 스포츠 매칭 플랫폼',
@@ -27,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="min-h-dvh bg-background">
+        <ProgressBar />
         <Providers>{children}</Providers>
       </body>
     </html>

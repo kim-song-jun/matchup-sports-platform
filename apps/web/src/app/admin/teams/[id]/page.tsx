@@ -104,9 +104,9 @@ export default function AdminTeamDetailPage() {
     );
   };
 
-  const wins = team.recentMatches.filter((m: any) => m.result === 'win').length;
-  const draws = team.recentMatches.filter((m: any) => m.result === 'draw').length;
-  const losses = team.recentMatches.filter((m: any) => m.result === 'loss').length;
+  const wins = team.recentMatches.filter((m: { result: string }) => m.result === 'win').length;
+  const draws = team.recentMatches.filter((m: { result: string }) => m.result === 'draw').length;
+  const losses = team.recentMatches.filter((m: { result: string }) => m.result === 'loss').length;
 
   const inputClass =
     'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white transition-all';
@@ -206,7 +206,7 @@ export default function AdminTeamDetailPage() {
               멤버 ({team.members.length}명)
             </h3>
             <div className="space-y-2">
-              {team.members.map((m: any) => (
+              {team.members.map((m: { id: string; nickname: string; role: string; mannerScore: number; joinedAt?: string }) => (
                 <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[12px] font-bold text-blue-500">
@@ -235,7 +235,7 @@ export default function AdminTeamDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">최근 매치</h3>
             <div className="space-y-2">
-              {team.recentMatches.map((m: any) => (
+              {team.recentMatches.map((m: { id: string; date: string; opponent: string; result: string; score: string }) => (
                 <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 text-[12px] text-gray-400">

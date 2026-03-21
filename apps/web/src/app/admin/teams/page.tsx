@@ -1,16 +1,13 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { Users, Plus } from 'lucide-react';
+import { useAdminTeams } from '@/hooks/use-api';
+import type { SportTeam } from '@/types/api';
 
 const sportLabel: Record<string, string> = { futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키' };
 
 export default function AdminTeamsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'teams'],
-    queryFn: async () => { const res = await api.get('/admin/teams'); return (res as any).data; },
-  });
+  const { data, isLoading } = useAdminTeams();
 
   const teams = Array.isArray(data) ? data : [];
 
@@ -42,7 +39,7 @@ export default function AdminTeamsPage() {
           <tbody className="divide-y divide-gray-50">
             {isLoading ? Array.from({length:2}).map((_,i) => (
               <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
-            )) : teams.map((t: any) => (
+            )) : teams.map((t: SportTeam) => (
               <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">

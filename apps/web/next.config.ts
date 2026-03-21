@@ -5,6 +5,10 @@ const isCapacitorBuild = process.env.CAPACITOR_BUILD === 'true';
 const nextConfig: NextConfig = {
   // Capacitor 빌드 시에만 정적 출력
   ...(isCapacitorBuild && { output: 'export' }),
+  experimental: {
+    // 빠른 페이지 전환을 위한 prefetch 최적화
+    optimisticClientCache: true,
+  },
   images: {
     unoptimized: true,
   },

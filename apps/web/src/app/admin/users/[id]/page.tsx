@@ -2,10 +2,10 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { ChevronRight, Star, Trophy, Calendar, MapPin, Shield, AlertTriangle, Ban, User } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useUserProfile } from '@/hooks/use-api';
+import type { SportProfile } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -17,14 +17,7 @@ export default function AdminUserDetailPage() {
   const params = useParams();
   const userId = params.id as string;
 
-  const { data: user, isLoading } = useQuery({
-    queryKey: ['admin', 'user', userId],
-    queryFn: async () => {
-      const res = await api.get(`/users/${userId}`);
-      return (res as any).data;
-    },
-    enabled: !!userId,
-  });
+  const { data: user, isLoading } = useUserProfile(userId);
 
   if (isLoading) {
     return (
@@ -96,7 +89,7 @@ export default function AdminUserDetailPage() {
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">종목별 프로필</h3>
             {user.sportProfiles && user.sportProfiles.length > 0 ? (
               <div className="space-y-2">
-                {user.sportProfiles.map((sp: any) => {
+                {user.sportProfiles.map((sp: SportProfile) => {
                   const SportIcon = SportIconMap[sp.sportType];
                   return (
                     <div key={sp.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">

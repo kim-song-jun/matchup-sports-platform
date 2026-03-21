@@ -3,10 +3,12 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { ArrowLeft, ChevronRight, Calendar, MapPin, Users, CreditCard, Star, Trophy, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useMatch } from '@/hooks/use-api';
+import type { MatchParticipant } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -51,14 +53,7 @@ export default function AdminMatchDetailPage() {
   const matchId = params.id as string;
   const [statusChanging, setStatusChanging] = useState(false);
 
-  const { data: match, isLoading } = useQuery({
-    queryKey: ['admin', 'match', matchId],
-    queryFn: async () => {
-      const res = await api.get(`/matches/${matchId}`);
-      return (res as any).data;
-    },
-    enabled: !!matchId,
-  });
+  const { data: match, isLoading } = useMatch(matchId);
 
   const statusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
@@ -198,7 +193,7 @@ export default function AdminMatchDetailPage() {
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">참가자 ({match.participants?.length || 0}명)</h3>
             {match.participants && match.participants.length > 0 ? (
               <div className="space-y-2">
-                {match.participants.map((p: any) => (
+                {match.participants.map((p: MatchParticipant) => (
                   <div key={p.id || p.userId} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[12px] font-bold text-blue-500">

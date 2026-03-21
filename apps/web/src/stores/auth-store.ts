@@ -18,11 +18,17 @@ interface User {
   profileImageUrl: string | null;
   mannerScore: number;
   totalMatches: number;
-  bio?: string;
-  gender?: string;
-  locationCity?: string;
-  locationDistrict?: string;
+  bio?: string | null;
+  gender?: string | null;
+  locationCity?: string | null;
+  locationDistrict?: string | null;
   sportProfiles?: SportProfile[];
+  createdAt?: string;
+  lastLoginAt?: string;
+  city?: string | null;
+  district?: string | null;
+  teamCount?: number;
+  oauthProvider?: string;
   [key: string]: unknown;
 }
 

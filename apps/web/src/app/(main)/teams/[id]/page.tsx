@@ -3,10 +3,9 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, ExternalLink, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
+import { useTeam } from '@/hooks/use-api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -46,14 +45,7 @@ export default function TeamDetailPage() {
   const router = useRouter();
   const teamId = params.id as string;
 
-  const { data: team, isLoading } = useQuery({
-    queryKey: ['team', teamId],
-    queryFn: async () => {
-      const res = await api.get(`/teams/${teamId}`);
-      return (res as any).data;
-    },
-    enabled: !!teamId,
-  });
+  const { data: team, isLoading } = useTeam(teamId);
 
   if (isLoading) {
     return (

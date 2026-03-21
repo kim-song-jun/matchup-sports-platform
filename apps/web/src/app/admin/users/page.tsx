@@ -1,20 +1,14 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { Star, Search } from 'lucide-react';
 import { useState } from 'react';
+import { useAdminUsers } from '@/hooks/use-api';
+import type { UserProfile } from '@/types/api';
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'users', search],
-    queryFn: async () => {
-      const res = await api.get('/admin/users', { params: search ? { search } : {} });
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useAdminUsers(search ? { search } : undefined);
 
   const users = data?.items ?? [];
 
@@ -55,7 +49,7 @@ export default function AdminUsersPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}><td colSpan={6} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
               ))
-            ) : users.map((u: any) => (
+            ) : users.map((u: UserProfile) => (
               <tr key={u.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/users/${u.id}`}>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
@@ -83,7 +77,7 @@ export default function AdminUsersPage() {
                   </div>
                 </td>
                 <td className="px-5 py-3.5 text-[13px] text-gray-600">{u.locationCity || '-'}</td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-400">{new Date(u.createdAt).toLocaleDateString('ko-KR')}</td>
+                <td className="px-5 py-3.5 text-[13px] text-gray-400">{u.createdAt ? new Date(u.createdAt).toLocaleDateString('ko-KR') : '-'}</td>
               </tr>
             ))}
           </tbody>

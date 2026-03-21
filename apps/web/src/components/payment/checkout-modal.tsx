@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { CreditCard, Wallet, Loader2, CheckCircle } from 'lucide-react';
+import type { ApiResponse, CheckoutResult } from '@/types/api';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -43,12 +44,13 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
         method: selectedMethod,
         itemName,
       });
-      const paymentKey = (res as any).data?.paymentKey;
+      const paymentKey = (res as unknown as ApiResponse<CheckoutResult>).data?.paymentKey;
       toast('success', '결제가 완료되었습니다');
       onSuccess(paymentKey);
       onClose();
-    } catch (err: any) {
-      const message = err?.response?.data?.message || '결제 처리 중 오류가 발생했습니다';
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const message = axiosErr?.response?.data?.message || '결제 처리 중 오류가 발생했습니다';
       toast('error', message);
       onError(message);
     } finally {

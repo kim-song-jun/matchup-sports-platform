@@ -10,7 +10,7 @@ interface ReviewFormProps {
   onCancel: () => void;
 }
 
-interface ReviewData {
+export interface ReviewData {
   overallRating: number;
   facilityRating: number;
   accessRating: number;

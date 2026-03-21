@@ -5,6 +5,7 @@ import { useMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ChevronRight, MapPin, Calendar, Users, Clock } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import type { Match } from '@/types/api';
 
 const sports = [
   { type: 'futsal', label: '풋살', color: 'text-blue-500 bg-blue-50' },
@@ -107,7 +108,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {matches.map((match: any) => (
+            {matches.map((match: Match) => (
               <MatchCard key={match.id} match={match} />
             ))}
           </div>
@@ -119,7 +120,7 @@ export default function HomePage() {
   );
 }
 
-function MatchCard({ match }: { match: any }) {
+function MatchCard({ match }: { match: Match }) {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
   const isAlmostFull = filledPercent >= 70;
   const SportIcon = SportIconMap[match.sportType];

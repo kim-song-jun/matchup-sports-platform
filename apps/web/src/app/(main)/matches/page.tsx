@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Search, SlidersHorizontal, Calendar, MapPin, Users } from 'lucide-react';
 import { useMatches } from '@/hooks/use-api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import type { Match } from '@/types/api';
 
 const sportFilters = [
   { key: '', label: '전체' },
@@ -100,7 +101,7 @@ export default function MatchesPage() {
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {matches.map((match: any) => {
+            {matches.map((match: Match) => {
               const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
               const isAlmostFull = filledPercent >= 70;
               const SportIcon = SportIconMap[match.sportType];

@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { GraduationCap, Swords, Dumbbell, Calendar, MapPin, Users } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useLessons } from '@/hooks/use-api';
+import type { Lesson } from '@/types/api';
 
 const typeFilters = [
   { key: '', label: '전체' },
@@ -46,13 +46,7 @@ export default function LessonsPage() {
   const params: Record<string, string> = {};
   if (activeType) params.type = activeType;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['lessons', params],
-    queryFn: async () => {
-      const res = await api.get('/lessons', { params });
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useLessons(Object.keys(params).length > 0 ? params : undefined);
 
   const lessons = data?.items ?? [];
 
@@ -97,7 +91,7 @@ export default function LessonsPage() {
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {lessons.map((lesson: any) => {
+            {lessons.map((lesson: Lesson) => {
               const SportIcon = SportIconMap[lesson.sportType];
               const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
               return (

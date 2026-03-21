@@ -97,7 +97,34 @@ body {
 .dark .text-amber-600 { color: #FF9500 !important; }
 .dark .text-red-500 { color: #FF3B30 !important; }
 
-* { -webkit-tap-highlight-color: transparent; }
+/* Global touch responsiveness */
+a, button, [role="button"], [tabindex="0"] {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.04);
+  touch-action: manipulation;
+}
+
+/* Cards and list items — subtle press effect */
+.touch-card {
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+.touch-card:active {
+  transform: scale(0.98);
+}
+@media (hover: hover) {
+  .touch-card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+}
+
+/* Buttons — instant feedback */
+button:not(:disabled):active, a:active {
+  transition-duration: 0.05s !important;
+}
+
+/* Smooth content appearance */
+[data-loaded] { animation: fade-in 0.2s ease-out; }
+
 .pb-safe { padding-bottom: calc(var(--safe-area-bottom) + 4.5rem); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

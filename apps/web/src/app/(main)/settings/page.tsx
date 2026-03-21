@@ -104,7 +104,7 @@ function SettingsSection({ title, children }: { title: string; children: React.R
   );
 }
 
-function SettingsLink({ icon: Icon, label, desc, href }: { icon: any; label: string; desc?: string; href: string }) {
+function SettingsLink({ icon: Icon, label, desc, href }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; desc?: string; href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-gray-50 transition-colors">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500">

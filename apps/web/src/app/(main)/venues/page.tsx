@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Search, MapPin, Star, Clock, SlidersHorizontal } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { useVenues } from '@/hooks/use-api';
+import type { Venue } from '@/types/api';
 
 const sportFilters = [
   { key: '', label: '전체' },
@@ -30,15 +30,9 @@ export default function VenuesPage() {
   if (activeSport) queryParams.sportType = activeSport;
   if (activeCity) queryParams.city = activeCity;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['venues', activeSport, activeCity],
-    queryFn: async () => {
-      const res = await api.get('/venues', { params: queryParams });
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useVenues(Object.keys(queryParams).length > 0 ? queryParams : undefined);
 
-  const venues = data?.items ?? data ?? [];
+  const venues = data?.items ?? [];
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
@@ -120,7 +114,7 @@ export default function VenuesPage() {
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {venues.map((venue: any) => {
+            {venues.map((venue: Venue) => {
               const primarySport = venue.sportTypes?.[0];
               const SportIcon = primarySport ? SportIconMap[primarySport] : null;
               return (

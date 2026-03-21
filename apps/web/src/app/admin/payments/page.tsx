@@ -1,8 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { CreditCard } from 'lucide-react';
+import { useAdminPayments } from '@/hooks/use-api';
+import type { Payment } from '@/types/api';
 
 const statusLabel: Record<string, string> = {
   completed: '결제완료', pending: '대기', refunded: '환불', failed: '실패',
@@ -26,13 +26,7 @@ function formatDate(d: string) {
 }
 
 export default function AdminPaymentsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'payments'],
-    queryFn: async () => {
-      const res = await api.get('/admin/payments');
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useAdminPayments();
 
   const payments = data?.items ?? [];
 
@@ -71,7 +65,7 @@ export default function AdminPaymentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {payments.map((p: any) => (
+                {payments.map((p: Payment) => (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
@@ -93,7 +87,7 @@ export default function AdminPaymentsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-[13px] text-gray-600">
-                      {methodLabel[p.method] || p.method || '-'}
+                      {p.method ? methodLabel[p.method] || p.method : '-'}
                     </td>
                     <td className="px-5 py-3.5 text-[13px] text-gray-500">
                       {p.createdAt ? formatDate(p.createdAt) : '-'}

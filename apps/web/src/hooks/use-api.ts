@@ -3,6 +3,49 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Match,
+  Venue,
+  VenueScheduleSlot,
+  Lesson,
+  MarketplaceListing,
+  UserProfile,
+  SportTeam,
+  TeamMatch,
+  Payment,
+  AdminStats,
+  ChatRoom,
+  ChatMessage,
+  MercenaryPost,
+  Badge,
+  Dispute,
+  Settlement,
+  SettlementSummary,
+  PendingReview,
+  Notification,
+  CreateTeamInput,
+  CreateLessonInput,
+  CreateListingInput,
+  CreateVenueReviewInput,
+  PreparePaymentInput,
+  ConfirmPaymentInput,
+  RefundPaymentInput,
+  CreateTeamMatchInput,
+  ApplyTeamMatchInput,
+  TeamMatchEvaluationInput,
+  SendMessageInput,
+  CreateMercenaryPostInput,
+  ApplyMercenaryInput,
+  UpdateStatusInput,
+} from '@/types/api';
+
+// Helper: the axios response interceptor returns `response.data` (the ApiResponse),
+// so `api.get(...)` resolves to `ApiResponse<T>`. We cast accordingly.
+function extractData<T>(res: unknown): T {
+  return (res as ApiResponse<T>).data;
+}
 
 // ── Auth ──
 export function useDevLogin() {
@@ -12,13 +55,11 @@ export function useDevLogin() {
   return useMutation({
     mutationFn: async (nickname: string) => {
       const res = await api.post('/auth/dev-login', { nickname });
-      return res as unknown as {
-        data: { accessToken: string; refreshToken: string; user: any };
-      };
+      return extractData<{ accessToken: string; refreshToken: string; user: UserProfile }>(res);
     },
-    onSuccess: (res) => {
-      const { accessToken, refreshToken, user } = res.data;
-      login(accessToken, refreshToken, user);
+    onSuccess: (data) => {
+      const { accessToken, refreshToken, user } = data;
+      login(accessToken, refreshToken, user as never);
       queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
@@ -26,11 +67,11 @@ export function useDevLogin() {
 
 export function useMe() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery({
+  return useQuery<UserProfile>({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await api.get('/auth/me');
-      return (res as any).data;
+      return extractData<UserProfile>(res);
     },
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
@@ -39,33 +80,33 @@ export function useMe() {
 
 // ── Matches ──
 export function useMatches(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<Match>>({
     queryKey: ['matches', params],
     queryFn: async () => {
       const res = await api.get('/matches', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<Match>>(res);
     },
   });
 }
 
 export function useRecommendedMatches() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery({
+  return useQuery<Match[]>({
     queryKey: ['matches', 'recommended'],
     queryFn: async () => {
       const res = await api.get('/matches/recommended');
-      return (res as any).data;
+      return extractData<Match[]>(res);
     },
     enabled: isAuthenticated,
   });
 }
 
 export function useMatch(id: string) {
-  return useQuery({
+  return useQuery<Match>({
     queryKey: ['match', id],
     queryFn: async () => {
       const res = await api.get(`/matches/${id}`);
-      return (res as any).data;
+      return extractData<Match>(res);
     },
     enabled: !!id,
   });
@@ -73,21 +114,21 @@ export function useMatch(id: string) {
 
 // ── Teams ──
 export function useTeams(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<SportTeam>>({
     queryKey: ['teams', params],
     queryFn: async () => {
       const res = await api.get('/teams', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<SportTeam>>(res);
     },
   });
 }
 
 export function useTeam(id: string) {
-  return useQuery({
+  return useQuery<SportTeam>({
     queryKey: ['team', id],
     queryFn: async () => {
       const res = await api.get(`/teams/${id}`);
-      return (res as any).data;
+      return extractData<SportTeam>(res);
     },
     enabled: !!id,
   });
@@ -96,9 +137,9 @@ export function useTeam(id: string) {
 export function useCreateTeam() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateTeamInput) => {
       const res = await api.post('/teams', data);
-      return (res as any).data;
+      return extractData<SportTeam>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
@@ -108,21 +149,21 @@ export function useCreateTeam() {
 
 // ── Lessons ──
 export function useLessons(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<Lesson>>({
     queryKey: ['lessons', params],
     queryFn: async () => {
       const res = await api.get('/lessons', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<Lesson>>(res);
     },
   });
 }
 
 export function useLesson(id: string) {
-  return useQuery({
+  return useQuery<Lesson>({
     queryKey: ['lesson', id],
     queryFn: async () => {
       const res = await api.get(`/lessons/${id}`);
-      return (res as any).data;
+      return extractData<Lesson>(res);
     },
     enabled: !!id,
   });
@@ -131,9 +172,9 @@ export function useLesson(id: string) {
 export function useCreateLesson() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateLessonInput) => {
       const res = await api.post('/lessons', data);
-      return (res as any).data;
+      return extractData<Lesson>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lessons'] });
@@ -143,32 +184,32 @@ export function useCreateLesson() {
 
 // ── Venues ──
 export function useVenues(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<Venue>>({
     queryKey: ['venues', params],
     queryFn: async () => {
       const res = await api.get('/venues', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<Venue>>(res);
     },
   });
 }
 
 export function useVenue(id: string) {
-  return useQuery({
+  return useQuery<Venue>({
     queryKey: ['venue', id],
     queryFn: async () => {
       const res = await api.get(`/venues/${id}`);
-      return (res as any).data;
+      return extractData<Venue>(res);
     },
     enabled: !!id,
   });
 }
 
 export function useVenueSchedule(id: string) {
-  return useQuery({
+  return useQuery<VenueScheduleSlot[]>({
     queryKey: ['venue', id, 'schedule'],
     queryFn: async () => {
       const res = await api.get(`/venues/${id}/schedule`);
-      return (res as any).data;
+      return extractData<VenueScheduleSlot[]>(res);
     },
     enabled: !!id,
   });
@@ -177,9 +218,9 @@ export function useVenueSchedule(id: string) {
 export function useCreateVenueReview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: CreateVenueReviewInput }) => {
       const res = await api.post(`/venues/${id}/reviews`, data);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['venue', id] });
@@ -189,21 +230,21 @@ export function useCreateVenueReview() {
 
 // ── Marketplace ──
 export function useListings(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<MarketplaceListing>>({
     queryKey: ['listings', params],
     queryFn: async () => {
       const res = await api.get('/marketplace/listings', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<MarketplaceListing>>(res);
     },
   });
 }
 
 export function useListing(id: string) {
-  return useQuery({
+  return useQuery<MarketplaceListing>({
     queryKey: ['listing', id],
     queryFn: async () => {
       const res = await api.get(`/marketplace/listings/${id}`);
-      return (res as any).data;
+      return extractData<MarketplaceListing>(res);
     },
     enabled: !!id,
   });
@@ -212,9 +253,9 @@ export function useListing(id: string) {
 export function useCreateListing() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateListingInput) => {
       const res = await api.post('/marketplace/listings', data);
-      return (res as any).data;
+      return extractData<MarketplaceListing>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listings'] });
@@ -225,9 +266,9 @@ export function useCreateListing() {
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
       const res = await api.post(`/marketplace/listings/${id}/order`, data);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['listing', id] });
@@ -238,22 +279,22 @@ export function useCreateOrder() {
 // ── Payments ──
 export function usePayments() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery({
+  return useQuery<Payment[]>({
     queryKey: ['payments'],
     queryFn: async () => {
       const res = await api.get('/payments/me');
-      return (res as any).data;
+      return extractData<Payment[]>(res);
     },
     enabled: isAuthenticated,
   });
 }
 
 export function usePayment(id: string) {
-  return useQuery({
+  return useQuery<Payment>({
     queryKey: ['payment', id],
     queryFn: async () => {
       const res = await api.get(`/payments/${id}`);
-      return (res as any).data;
+      return extractData<Payment>(res);
     },
     enabled: !!id,
   });
@@ -262,9 +303,9 @@ export function usePayment(id: string) {
 export function usePreparePayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: PreparePaymentInput) => {
       const res = await api.post('/payments/prepare', data);
-      return (res as any).data;
+      return extractData<Payment>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -275,9 +316,9 @@ export function usePreparePayment() {
 export function useConfirmPayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: ConfirmPaymentInput) => {
       const res = await api.post('/payments/confirm', data);
-      return (res as any).data;
+      return extractData<Payment>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -288,9 +329,9 @@ export function useConfirmPayment() {
 export function useRefundPayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: RefundPaymentInput }) => {
       const res = await api.post(`/payments/${id}/refund`, data);
-      return (res as any).data;
+      return extractData<Payment>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -301,21 +342,21 @@ export function useRefundPayment() {
 
 // ── Team Matches ──
 export function useTeamMatches(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<TeamMatch>>({
     queryKey: ['team-matches', params],
     queryFn: async () => {
       const res = await api.get('/team-matches', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<TeamMatch>>(res);
     },
   });
 }
 
 export function useTeamMatch(id: string) {
-  return useQuery({
+  return useQuery<TeamMatch>({
     queryKey: ['team-match', id],
     queryFn: async () => {
       const res = await api.get(`/team-matches/${id}`);
-      return (res as any).data;
+      return extractData<TeamMatch>(res);
     },
     enabled: !!id,
   });
@@ -326,7 +367,7 @@ export function useTeamMatchRefereeSchedule(id: string) {
     queryKey: ['team-match-referee', id],
     queryFn: async () => {
       const res = await api.get(`/team-matches/${id}/referee-schedule`);
-      return (res as any).data;
+      return extractData<Array<{ quarter: number; teamName: string }>>(res);
     },
     enabled: !!id,
   });
@@ -335,9 +376,9 @@ export function useTeamMatchRefereeSchedule(id: string) {
 export function useCreateTeamMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateTeamMatchInput) => {
       const res = await api.post('/team-matches', data);
-      return (res as any).data;
+      return extractData<TeamMatch>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-matches'] });
@@ -348,9 +389,9 @@ export function useCreateTeamMatch() {
 export function useApplyTeamMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: ApplyTeamMatchInput }) => {
       const res = await api.post(`/team-matches/${id}/apply`, data);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['team-match', id] });
@@ -363,7 +404,7 @@ export function useRespondTeamMatchApplication() {
   return useMutation({
     mutationFn: async ({ id, applicationId, action }: { id: string; applicationId: string; action: 'approve' | 'reject' }) => {
       const res = await api.patch(`/team-matches/${id}/applications/${applicationId}`, { action });
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['team-match', id] });
@@ -374,9 +415,9 @@ export function useRespondTeamMatchApplication() {
 export function useSubmitTeamMatchEvaluation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: TeamMatchEvaluationInput }) => {
       const res = await api.post(`/team-matches/${id}/evaluate`, data);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['team-match', id] });
@@ -389,7 +430,7 @@ export function useTeamMatchArrival() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await api.post(`/team-matches/${id}/arrival`);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['team-match', id] });
@@ -398,83 +439,83 @@ export function useTeamMatchArrival() {
 }
 
 // ── Admin ──
-export function useAdminUsers() {
-  return useQuery({
-    queryKey: ['admin', 'users'],
+export function useAdminUsers(params?: Record<string, string>) {
+  return useQuery<PaginatedResponse<UserProfile>>({
+    queryKey: ['admin', 'users', params],
     queryFn: async () => {
-      const res = await api.get('/admin/users');
-      return (res as any).data;
+      const res = await api.get('/admin/users', { params });
+      return extractData<PaginatedResponse<UserProfile>>(res);
     },
   });
 }
 
 export function useAdminUser(id: string) {
-  return useQuery({
+  return useQuery<UserProfile>({
     queryKey: ['admin', 'user', id],
     queryFn: async () => {
       const res = await api.get(`/admin/users/${id}`);
-      return (res as any).data;
+      return extractData<UserProfile>(res);
     },
     enabled: !!id,
   });
 }
 
 export function useAdminMatches() {
-  return useQuery({
+  return useQuery<PaginatedResponse<Match>>({
     queryKey: ['admin', 'matches'],
     queryFn: async () => {
       const res = await api.get('/admin/matches');
-      return (res as any).data;
+      return extractData<PaginatedResponse<Match>>(res);
     },
   });
 }
 
 export function useAdminLessons() {
-  return useQuery({
+  return useQuery<Lesson[]>({
     queryKey: ['admin', 'lessons'],
     queryFn: async () => {
       const res = await api.get('/admin/lessons');
-      return (res as any).data;
+      return extractData<Lesson[]>(res);
     },
   });
 }
 
 export function useAdminTeams() {
-  return useQuery({
+  return useQuery<SportTeam[]>({
     queryKey: ['admin', 'teams'],
     queryFn: async () => {
       const res = await api.get('/admin/teams');
-      return (res as any).data;
+      return extractData<SportTeam[]>(res);
     },
   });
 }
 
 export function useAdminVenues() {
-  return useQuery({
+  return useQuery<Venue[]>({
     queryKey: ['admin', 'venues'],
     queryFn: async () => {
       const res = await api.get('/admin/venues');
-      return (res as any).data;
+      return extractData<Venue[]>(res);
     },
   });
 }
 
 export function useAdminPayments() {
-  return useQuery({
+  return useQuery<PaginatedResponse<Payment>>({
     queryKey: ['admin', 'payments'],
     queryFn: async () => {
       const res = await api.get('/admin/payments');
-      return (res as any).data;
+      return extractData<PaginatedResponse<Payment>>(res);
     },
   });
 }
 
 export function useAdminStats() {
-  return useQuery({
+  return useQuery<AdminStats>({
     queryKey: ['admin', 'stats'],
     queryFn: async () => {
       const res = await api.get('/admin/stats');
-      return (res as any).data;
+      return extractData<AdminStats>(res);
     },
   });
 }
@@ -482,9 +523,9 @@ export function useAdminStats() {
 export function useUpdateMatchStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateStatusInput }) => {
       const res = await api.patch(`/admin/matches/${id}/status`, data);
-      return (res as any).data;
+      return extractData<Match>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'matches'] });
@@ -495,9 +536,9 @@ export function useUpdateMatchStatus() {
 export function useUpdateLessonStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateStatusInput }) => {
       const res = await api.patch(`/admin/lessons/${id}/status`, data);
-      return (res as any).data;
+      return extractData<Lesson>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'lessons'] });
@@ -508,22 +549,22 @@ export function useUpdateLessonStatus() {
 // ── Chat ──
 export function useChatRooms() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery({
+  return useQuery<ChatRoom[]>({
     queryKey: ['chat', 'rooms'],
     queryFn: async () => {
       const res = await api.get('/chat/rooms');
-      return (res as any).data;
+      return extractData<ChatRoom[]>(res);
     },
     enabled: isAuthenticated,
   });
 }
 
 export function useChatMessages(roomId: string) {
-  return useQuery({
+  return useQuery<ChatMessage[]>({
     queryKey: ['chat', 'messages', roomId],
     queryFn: async () => {
       const res = await api.get(`/chat/rooms/${roomId}`);
-      return (res as any).data;
+      return extractData<ChatMessage[]>(res);
     },
     enabled: !!roomId,
   });
@@ -532,9 +573,9 @@ export function useChatMessages(roomId: string) {
 export function useSendMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ roomId, data }: { roomId: string; data: any }) => {
+    mutationFn: async ({ roomId, data }: { roomId: string; data: SendMessageInput }) => {
       const res = await api.post(`/chat/rooms/${roomId}/messages`, data);
-      return (res as any).data;
+      return extractData<ChatMessage>(res);
     },
     onSuccess: (_, { roomId }) => {
       queryClient.invalidateQueries({ queryKey: ['chat', 'messages', roomId] });
@@ -544,11 +585,11 @@ export function useSendMessage() {
 
 // ── Mercenary ──
 export function useMercenaryPosts(params?: Record<string, string>) {
-  return useQuery({
+  return useQuery<PaginatedResponse<MercenaryPost>>({
     queryKey: ['mercenary', params],
     queryFn: async () => {
       const res = await api.get('/mercenary', { params });
-      return (res as any).data;
+      return extractData<PaginatedResponse<MercenaryPost>>(res);
     },
   });
 }
@@ -556,9 +597,9 @@ export function useMercenaryPosts(params?: Record<string, string>) {
 export function useCreateMercenaryPost() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CreateMercenaryPostInput) => {
       const res = await api.post('/mercenary', data);
-      return (res as any).data;
+      return extractData<MercenaryPost>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mercenary'] });
@@ -569,9 +610,9 @@ export function useCreateMercenaryPost() {
 export function useApplyMercenary() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: ApplyMercenaryInput }) => {
       const res = await api.post(`/mercenary/${id}/apply`, data);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mercenary'] });
@@ -581,43 +622,43 @@ export function useApplyMercenary() {
 
 // ── Badges ──
 export function useTeamBadges(teamId: string) {
-  return useQuery({
+  return useQuery<Badge[]>({
     queryKey: ['badges', 'team', teamId],
     queryFn: async () => {
       const res = await api.get(`/badges/team/${teamId}`);
-      return (res as any).data;
+      return extractData<Badge[]>(res);
     },
     enabled: !!teamId,
   });
 }
 
 export function useAllBadgeTypes() {
-  return useQuery({
+  return useQuery<Badge[]>({
     queryKey: ['badges'],
     queryFn: async () => {
       const res = await api.get('/badges');
-      return (res as any).data;
+      return extractData<Badge[]>(res);
     },
   });
 }
 
 // ── Disputes ──
 export function useAdminDisputes() {
-  return useQuery({
+  return useQuery<Dispute[]>({
     queryKey: ['admin', 'disputes'],
     queryFn: async () => {
       const res = await api.get('/admin/disputes');
-      return (res as any).data;
+      return extractData<Dispute[]>(res);
     },
   });
 }
 
 export function useAdminDispute(id: string) {
-  return useQuery({
+  return useQuery<Dispute>({
     queryKey: ['admin', 'dispute', id],
     queryFn: async () => {
       const res = await api.get(`/admin/disputes/${id}`);
-      return (res as any).data;
+      return extractData<Dispute>(res);
     },
     enabled: !!id,
   });
@@ -626,9 +667,9 @@ export function useAdminDispute(id: string) {
 export function useUpdateDisputeStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateStatusInput }) => {
       const res = await api.patch(`/admin/disputes/${id}/status`, data);
-      return (res as any).data;
+      return extractData<Dispute>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'disputes'] });
@@ -638,21 +679,21 @@ export function useUpdateDisputeStatus() {
 
 // ── Settlements ──
 export function useAdminSettlements() {
-  return useQuery({
+  return useQuery<Settlement[]>({
     queryKey: ['admin', 'settlements'],
     queryFn: async () => {
       const res = await api.get('/admin/settlements');
-      return (res as any).data;
+      return extractData<Settlement[]>(res);
     },
   });
 }
 
 export function useSettlementsSummary() {
-  return useQuery({
+  return useQuery<SettlementSummary>({
     queryKey: ['admin', 'settlements', 'summary'],
     queryFn: async () => {
       const res = await api.get('/admin/settlements/summary');
-      return (res as any).data;
+      return extractData<SettlementSummary>(res);
     },
   });
 }
@@ -660,9 +701,9 @@ export function useSettlementsSummary() {
 export function useProcessSettlement() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
       const res = await api.patch(`/admin/settlements/${id}/process`, data);
-      return (res as any).data;
+      return extractData<Settlement>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'settlements'] });
@@ -674,9 +715,9 @@ export function useProcessSettlement() {
 export function useCreateReview() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { matchId: string; targetId: string; skillRating: number; mannerRating: number; comment?: string }) => {
       const res = await api.post('/reviews', data);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
@@ -686,11 +727,11 @@ export function useCreateReview() {
 
 export function usePendingReviews() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery({
+  return useQuery<PendingReview[]>({
     queryKey: ['reviews', 'pending'],
     queryFn: async () => {
       const res = await api.get('/reviews/pending');
-      return (res as any).data;
+      return extractData<PendingReview[]>(res);
     },
     enabled: isAuthenticated,
   });
@@ -699,11 +740,11 @@ export function usePendingReviews() {
 // ── Notifications ──
 export function useNotifications() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery({
+  return useQuery<Notification[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await api.get('/notifications');
-      return (res as any).data;
+      return extractData<Notification[]>(res);
     },
     enabled: isAuthenticated,
   });
@@ -714,10 +755,33 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await api.patch(`/notifications/${id}/read`);
-      return (res as any).data;
+      return extractData<{ id: string }>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+// ── User profile (public) ──
+export function useUserProfile(id: string) {
+  return useQuery<UserProfile>({
+    queryKey: ['user', id],
+    queryFn: async () => {
+      const res = await api.get(`/users/${id}`);
+      return extractData<UserProfile>(res);
+    },
+    enabled: !!id,
+  });
+}
+
+// ── My matches ──
+export function useMyMatches(params?: Record<string, string>) {
+  return useQuery<PaginatedResponse<Match>>({
+    queryKey: ['my-matches', params],
+    queryFn: async () => {
+      const res = await api.get('/users/me/matches', { params });
+      return extractData<PaginatedResponse<Match>>(res);
     },
   });
 }

@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useQueryClient } from '@tanstack/react-query';
+import type { ApiResponse, UserProfile } from '@/types/api';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -20,23 +21,24 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
 
   const [form, setForm] = useState({
     nickname: user?.nickname || '',
-    bio: (user as any)?.bio || '',
-    phone: (user as any)?.phone || '',
-    locationCity: (user as any)?.locationCity || '',
-    locationDistrict: (user as any)?.locationDistrict || '',
+    bio: user?.bio || '',
+    phone: (user?.['phone'] as string) || '',
+    locationCity: user?.locationCity || '',
+    locationDistrict: user?.locationDistrict || '',
   });
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
       const res = await api.patch('/users/me', form);
-      const updated = (res as any).data;
-      setUser(updated);
+      const updated = (res as unknown as ApiResponse<UserProfile>).data;
+      setUser(updated as never);
       queryClient.invalidateQueries({ queryKey: ['me'] });
       toast('success', '프로필이 수정되었습니다');
       onClose();
-    } catch (err: any) {
-      toast('error', err?.response?.data?.message || '수정에 실패했습니다');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '수정에 실패했습니다');
     } finally {
       setIsSubmitting(false);
     }

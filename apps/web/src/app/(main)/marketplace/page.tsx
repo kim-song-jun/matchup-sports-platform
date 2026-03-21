@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Plus, Heart, Eye, Package } from 'lucide-react';
 import { useListings } from '@/hooks/use-api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import type { MarketplaceListing } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -70,7 +71,7 @@ export default function MarketplacePage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {listings.map((item: any) => {
+            {listings.map((item: MarketplaceListing) => {
               const SportIcon = SportIconMap[item.sportType];
               return (
                 <Link key={item.id} href={`/marketplace/${item.id}`} className="block py-4 first:pt-0 last:pb-0">

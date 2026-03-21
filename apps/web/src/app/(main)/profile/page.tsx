@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { EditProfileModal } from '@/components/profile/edit-profile-modal';
+import { useMyMatches } from '@/hooks/use-api';
+import type { SportProfile, Match } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -38,7 +38,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <h2 className="text-[17px] font-bold text-gray-900">{user.nickname}</h2>
-                  {(user as any)?.bio && <p className="text-[13px] text-gray-500 mt-0.5">{(user as any).bio}</p>}
+                  {user.bio && <p className="text-[13px] text-gray-500 mt-0.5">{user.bio}</p>}
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex items-center gap-0.5 text-[13px] text-amber-500">
                       <Star size={13} fill="currentColor" />
@@ -56,7 +56,7 @@ export default function ProfilePage() {
 
             {user.sportProfiles && user.sportProfiles.length > 0 && (
               <div className="mt-4 space-y-2">
-                {user.sportProfiles.map((sp: any) => {
+                {user.sportProfiles.map((sp: SportProfile) => {
                   const SportIcon = SportIconMap[sp.sportType];
                   return (
                     <div key={sp.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3.5 py-2.5">
@@ -145,16 +145,10 @@ export default function ProfilePage() {
 }
 
 function UpcomingSchedule() {
-  const { data } = useQuery({
-    queryKey: ['my-matches'],
-    queryFn: async () => {
-      const res = await api.get('/users/me/matches', { params: { limit: 5 } });
-      return (res as any).data;
-    },
-  });
+  const { data } = useMyMatches({ limit: '5' });
 
   const matches = data?.items ?? [];
-  const upcoming = matches.filter((m: any) => new Date(m.matchDate) >= new Date()).slice(0, 3);
+  const upcoming = matches.filter((m: Match) => new Date(m.matchDate) >= new Date()).slice(0, 3);
 
   return (
     <div className="mt-4 lg:mt-0 px-5 lg:px-0">
@@ -170,7 +164,7 @@ function UpcomingSchedule() {
         </div>
       ) : (
         <div className="space-y-2">
-          {upcoming.map((m: any) => {
+          {upcoming.map((m: Match) => {
             const d = new Date(m.matchDate);
             const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
             return (

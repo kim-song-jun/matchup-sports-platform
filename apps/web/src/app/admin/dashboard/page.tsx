@@ -1,17 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { Users, Trophy, GraduationCap, Building2, ShoppingBag, TrendingUp, UserPlus, Zap } from 'lucide-react';
+import { useAdminStats } from '@/hooks/use-api';
 
 export default function AdminDashboardPage() {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ['admin', 'stats'],
-    queryFn: async () => {
-      const res = await api.get('/admin/stats');
-      return (res as any).data;
-    },
-  });
+  const { data: stats, isLoading } = useAdminStats();
 
   const cards = [
     { label: '총 사용자', value: stats?.totalUsers ?? '-', icon: Users, color: 'text-blue-500 bg-blue-50', trend: stats?.todayNewUsers ? `+${stats.todayNewUsers} 오늘` : undefined },

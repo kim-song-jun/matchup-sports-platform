@@ -1,8 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { GraduationCap } from 'lucide-react';
+import { useAdminLessons } from '@/hooks/use-api';
+import type { Lesson } from '@/types/api';
 
 const typeLabel: Record<string, string> = { group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉' };
 const statusLabel: Record<string, string> = { open: '진행중', closed: '마감', completed: '완료', cancelled: '취소' };
@@ -12,10 +12,7 @@ function formatDate(d: string) { return new Date(d).toLocaleDateString('ko-KR', 
 function formatCurrency(n: number) { return n === 0 ? '무료' : new Intl.NumberFormat('ko-KR').format(n) + '원'; }
 
 export default function AdminLessonsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'lessons'],
-    queryFn: async () => { const res = await api.get('/admin/lessons'); return (res as any).data; },
-  });
+  const { data, isLoading } = useAdminLessons();
 
   const lessons = Array.isArray(data) ? data : [];
 
@@ -47,7 +44,7 @@ export default function AdminLessonsPage() {
           <tbody className="divide-y divide-gray-50">
             {isLoading ? Array.from({length:3}).map((_,i) => (
               <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
-            )) : lessons.map((l: any) => (
+            )) : lessons.map((l: Lesson) => (
               <tr key={l.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/lessons/${l.id}`}>
                 <td className="px-5 py-3.5">
                   <p className="text-[14px] font-medium text-gray-900 truncate max-w-[200px]">{l.title}</p>

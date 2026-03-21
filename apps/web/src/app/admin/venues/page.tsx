@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Search, MapPin, Star, Plus, Building2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useAdminVenues } from '@/hooks/use-api';
+import type { Venue } from '@/types/api';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -19,17 +19,11 @@ const venueTypeLabel: Record<string, string> = {
 export default function AdminVenuesPage() {
   const [search, setSearch] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin-venues', search],
-    queryFn: async () => {
-      const res = await api.get('/admin/venues');
-      return (res as any).data;
-    },
-  });
+  const { data, isLoading } = useAdminVenues();
 
   const venues = Array.isArray(data) ? data : [];
   const filtered = search
-    ? venues.filter((v: any) => v.name.toLowerCase().includes(search.toLowerCase()))
+    ? venues.filter((v: Venue) => v.name.toLowerCase().includes(search.toLowerCase()))
     : venues;
 
   return (
@@ -69,7 +63,7 @@ export default function AdminVenuesPage() {
           <tbody className="divide-y divide-gray-50">
             {isLoading ? Array.from({ length: 4 }).map((_, i) => (
               <tr key={i}><td colSpan={6} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
-            )) : filtered.map((v: any) => (
+            )) : filtered.map((v: Venue) => (
               <tr key={v.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/venues/${v.id}`}>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">

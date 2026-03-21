@@ -93,10 +93,10 @@ export default function NewTeamMatchPage() {
     const payload = {
       ...form,
       totalFee: Number(form.totalFee),
-      opponentFee: form.opponentFee ? Number(form.opponentFee) : undefined,
-      totalMinutes: form.totalMinutes ? Number(form.totalMinutes) : undefined,
-    };
-    createMutation.mutate(payload, {
+      opponentFee: form.opponentFee ? Number(form.opponentFee) : 0,
+      totalMinutes: form.totalMinutes ? Number(form.totalMinutes) : 120,
+    } as Record<string, unknown>;
+    createMutation.mutate(payload as never, {
       onSuccess: () => router.push('/team-matches'),
     });
   }

@@ -20,7 +20,14 @@
       "Bash(git push:*)",
       "Bash(grep -n \"operatingHours\" /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/venues/[id]/page.tsx)",
       "Bash(ls /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/team-matches/)",
-      "Bash(ls /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/team-matches/[id]/)"
+      "Bash(ls /Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/apps/web/src/app/\\\\\\(main\\\\\\)/team-matches/[id]/)",
+      "Bash(npx skills:*)",
+      "Read(//Users/kimsungjun/.claude/skills/**)",
+      "Read(//Users/kimsungjun/.agents/skills/**)",
+      "Bash(find ~/.claude/skills/scoutqa-test -name *.md -o -name *.txt)",
+      "Bash(find ~/.claude/skills/webapp-testing -name *.md -o -name *.txt)",
+      "Bash(find ~/.claude/skills/qa-web-test -name *.md -o -name *.txt)",
+      "Bash(find ~/.claude/skills/website-quality-check -name *.md -o -name *.txt)"
     ]
   }
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, Users, DollarSign, Trophy, Plus, Search } from 'lucide-react';
 import { useTeamMatches } from '@/hooks/use-api';
+import type { TeamMatch } from '@/types/api';
 
 const sportFilters = [
   { key: '', label: '전체' },
@@ -102,7 +103,7 @@ export default function TeamMatchesPage() {
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {matches.map((match: any) => {
+            {matches.map((match: TeamMatch) => {
               const statusMap: Record<string, { label: string; className: string }> = {
                 recruiting: { label: '모집중', className: 'bg-blue-50 text-blue-500' },
                 matched: { label: '매칭완료', className: 'bg-green-50 text-green-600' },
@@ -151,7 +152,7 @@ export default function TeamMatchesPage() {
                         <Trophy size={15} className="text-gray-400" />
                         <span>{match.quarterCount}쿼터</span>
                         <span className="text-gray-200">·</span>
-                        <span>{levelLabel[match.requiredLevel] ?? match.requiredLevel}</span>
+                        <span>{match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한없음'}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px]">
                         <DollarSign size={15} className="text-gray-400" />
@@ -164,7 +165,7 @@ export default function TeamMatchesPage() {
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-[12px] text-gray-400">
                         <Users size={12} />
-                        <span>신청 {match.applicationCount ?? 0}팀</span>
+                        <span>신청 {String(match.applicationCount ?? 0)}팀</span>
                       </div>
                       {match.hostTeam && (
                         <span className="text-[12px] text-gray-400">

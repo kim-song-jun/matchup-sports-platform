@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Users, Plus } from 'lucide-react';
 import { useAdminTeams } from '@/hooks/use-api';
 import type { SportTeam } from '@/types/api';
@@ -18,9 +19,9 @@ export default function AdminTeamsPage() {
           <h1 className="text-[24px] font-bold text-gray-900">팀 관리</h1>
           <p className="text-[14px] text-gray-400 mt-1">등록된 팀과 클럽을 관리하세요</p>
         </div>
-        <button className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600">
+        <Link href="/teams/new" className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600">
           <Plus size={16} /> 팀 등록
-        </button>
+        </Link>
       </div>
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">

@@ -17,5 +17,8 @@
   },
   "devDependencies": {
     "turbo": "^2.8.19"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
   }
 }

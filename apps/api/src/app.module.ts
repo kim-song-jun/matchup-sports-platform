@@ -15,6 +15,11 @@ import { LessonsModule } from './lessons/lessons.module';
 import { AdminModule } from './admin/admin.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
+import { DisputesModule } from './disputes/disputes.module';
+import { SettlementsModule } from './settlements/settlements.module';
+import { ChatModule } from './chat/chat.module';
+import { MercenaryModule } from './mercenary/mercenary.module';
+import { BadgesModule } from './badges/badges.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -38,6 +43,11 @@ import configuration from './config/configuration';
     AdminModule,
     TeamsModule,
     TeamMatchesModule,
+    DisputesModule,
+    SettlementsModule,
+    ChatModule,
+    MercenaryModule,
+    BadgesModule,
   ],
 })
 export class AppModule {}

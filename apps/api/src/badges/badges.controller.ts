@@ -1,0 +1,30 @@
+import { Controller, Get, Post, Param, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { BadgesService } from './badges.service';
+
+@ApiTags('뱃지')
+@Controller('badges')
+export class BadgesController {
+  constructor(private readonly badgesService: BadgesService) {}
+
+  @Get()
+  @ApiOperation({ summary: '뱃지 타입 목록' })
+  async getBadgeTypes() {
+    return this.badgesService.getBadgeTypes();
+  }
+
+  @Get('team/:teamId')
+  @ApiOperation({ summary: '팀 뱃지 조회' })
+  async getTeamBadges(@Param('teamId') teamId: string) {
+    return this.badgesService.getTeamBadges(teamId);
+  }
+
+  @Post('team/:teamId')
+  @ApiOperation({ summary: '팀 뱃지 부여 (관리자)' })
+  async awardBadge(
+    @Param('teamId') teamId: string,
+    @Body() body: { type: string; name: string; description?: string },
+  ) {
+    return this.badgesService.awardBadge(teamId, body);
+  }
+}

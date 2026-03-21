@@ -8,8 +8,8 @@ const statusLabel: Record<string, string> = {
   completed: '결제완료', pending: '대기', refunded: '환불', failed: '실패',
 };
 const statusColor: Record<string, string> = {
-  completed: 'bg-emerald-50 text-emerald-600',
-  pending: 'bg-amber-50 text-amber-600',
+  completed: 'bg-green-50 text-green-500',
+  pending: 'bg-gray-100 text-gray-500',
   refunded: 'bg-red-50 text-red-500',
   failed: 'bg-gray-100 text-gray-400',
 };

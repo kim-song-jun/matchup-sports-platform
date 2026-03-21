@@ -82,17 +82,17 @@ const typeLabel: Record<DisputeType, string> = {
 const typeColor: Record<DisputeType, string> = {
   no_show: 'bg-red-50 text-red-600',
   late: 'bg-amber-50 text-amber-600',
-  level_mismatch: 'bg-indigo-50 text-indigo-600',
-  misconduct: 'bg-orange-50 text-orange-600',
+  level_mismatch: 'bg-gray-100 text-gray-600',
+  misconduct: 'bg-red-50 text-red-500',
 };
 
 const statusLabel: Record<DisputeStatus, string> = {
   pending: '대기중', investigating: '조사중', resolved: '해결됨', dismissed: '기각됨',
 };
 const statusColor: Record<DisputeStatus, string> = {
-  pending: 'bg-amber-50 text-amber-600',
-  investigating: 'bg-blue-50 text-blue-600',
-  resolved: 'bg-emerald-50 text-emerald-600',
+  pending: 'bg-gray-100 text-gray-600',
+  investigating: 'bg-blue-50 text-blue-500',
+  resolved: 'bg-green-50 text-green-500',
   dismissed: 'bg-gray-100 text-gray-500',
 };
 
@@ -129,7 +129,7 @@ export default function AdminDisputesPage() {
         </div>
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-[12px] font-semibold text-amber-600">
+            <span className="flex items-center gap-1.5 rounded-full bg-gray-100 border border-gray-200 px-3 py-1.5 text-[12px] font-semibold text-gray-600">
               <Clock size={14} />
               대기 {pendingCount}건
             </span>

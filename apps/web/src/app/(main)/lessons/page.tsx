@@ -125,15 +125,15 @@ export default function LessonsPage() {
 
                   <div className="grid grid-cols-2 gap-y-1 text-[13px] text-gray-500">
                     <div className="flex items-center gap-1.5">
-                      <Calendar size={15} className="text-blue-400" />
+                      <Calendar size={15} className="text-gray-400" />
                       {formatDate(lesson.lessonDate)} {lesson.startTime}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <MapPin size={15} className="text-blue-400" />
+                      <MapPin size={15} className="text-gray-400" />
                       <span className="truncate">{lesson.venueName || '장소 미정'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Users size={15} className="text-blue-400" />
+                      <Users size={15} className="text-gray-400" />
                       {lesson.currentParticipants}/{lesson.maxParticipants}명
                     </div>
                     <div className="text-[14px] font-semibold text-gray-800">
@@ -142,7 +142,7 @@ export default function LessonsPage() {
                   </div>
 
                   <div className="mt-3 h-[3px] rounded-full bg-gray-100 overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-400 transition-all" style={{ width: `${filledPercent}%` }} />
+                    <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${filledPercent}%` }} />
                   </div>
                 </Link>
               );

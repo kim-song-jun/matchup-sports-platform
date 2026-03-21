@@ -17,9 +17,9 @@ const statusLabel: Record<string, string> = {
   recruiting: '모집중', full: '마감', in_progress: '진행중', completed: '완료', cancelled: '취소',
 };
 const statusColor: Record<string, string> = {
-  recruiting: 'bg-emerald-50 text-emerald-600',
-  full: 'bg-amber-50 text-amber-600',
-  in_progress: 'bg-blue-50 text-blue-600',
+  recruiting: 'bg-blue-50 text-blue-500',
+  full: 'bg-gray-100 text-gray-500',
+  in_progress: 'bg-blue-50 text-blue-500',
   completed: 'bg-gray-100 text-gray-500',
   cancelled: 'bg-red-50 text-red-500',
 };
@@ -29,8 +29,8 @@ const paymentStatusLabel: Record<string, string> = {
   completed: '결제완료', pending: '대기', refunded: '환불', failed: '실패',
 };
 const paymentStatusColor: Record<string, string> = {
-  completed: 'bg-emerald-50 text-emerald-600',
-  pending: 'bg-amber-50 text-amber-600',
+  completed: 'bg-green-50 text-green-500',
+  pending: 'bg-gray-100 text-gray-500',
   refunded: 'bg-red-50 text-red-500',
   failed: 'bg-gray-100 text-gray-400',
 };
@@ -245,7 +245,7 @@ export default function AdminMatchDetailPage() {
                 ))}
               </select>
               {statusMutation.isSuccess && (
-                <p className="flex items-center gap-1 text-[12px] text-emerald-500 mt-1.5">
+                <p className="flex items-center gap-1 text-[12px] text-green-500 mt-1.5">
                   <CheckCircle size={12} />
                   상태가 변경되었습니다
                 </p>

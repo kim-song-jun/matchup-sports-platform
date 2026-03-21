@@ -8,9 +8,9 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  recruiting: 'bg-emerald-50 text-emerald-600',
-  full: 'bg-amber-50 text-amber-600',
-  in_progress: 'bg-blue-50 text-blue-600',
+  recruiting: 'bg-blue-50 text-blue-500',
+  full: 'bg-gray-100 text-gray-500',
+  in_progress: 'bg-blue-50 text-blue-500',
   completed: 'bg-gray-100 text-gray-500',
   cancelled: 'bg-red-50 text-red-500',
 };

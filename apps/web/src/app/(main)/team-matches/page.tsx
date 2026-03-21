@@ -140,21 +140,21 @@ export default function TeamMatchesPage() {
 
                     <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Calendar size={15} className="text-blue-400" />
+                        <Calendar size={15} className="text-gray-400" />
                         <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <MapPin size={15} className="text-blue-400" />
+                        <MapPin size={15} className="text-gray-400" />
                         <span className="truncate">{match.venueName}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Trophy size={15} className="text-blue-400" />
+                        <Trophy size={15} className="text-gray-400" />
                         <span>{match.quarterCount}쿼터</span>
                         <span className="text-gray-200">·</span>
                         <span>{levelLabel[match.requiredLevel] ?? match.requiredLevel}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px]">
-                        <DollarSign size={15} className="text-blue-400" />
+                        <DollarSign size={15} className="text-gray-400" />
                         <span className="font-semibold text-gray-800">
                           {formatCurrency(match.opponentFee ?? match.totalFee)}
                         </span>

@@ -150,15 +150,15 @@ function MatchCard({ match }: { match: any }) {
         {/* Details */}
         <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
           <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-            <Calendar size={15} className="text-blue-400 shrink-0" />
+            <Calendar size={15} className="text-gray-400 shrink-0" />
             <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-            <MapPin size={15} className="text-blue-400 shrink-0" />
+            <MapPin size={15} className="text-gray-400 shrink-0" />
             <span className="truncate">{match.venue?.name}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-            <Users size={15} className="text-blue-400 shrink-0" />
+            <Users size={15} className="text-gray-400 shrink-0" />
             <span className={isAlmostFull ? 'text-red-500 font-medium' : ''}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
@@ -174,7 +174,7 @@ function MatchCard({ match }: { match: any }) {
         <div className="mt-3 h-[3px] rounded-full bg-gray-100 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
-              isAlmostFull ? 'bg-red-400' : 'bg-blue-400'
+              isAlmostFull ? 'bg-red-500' : 'bg-blue-500'
             }`}
             style={{ width: `${filledPercent}%` }}
           />

@@ -131,7 +131,7 @@ export default function AdminUserDetailPage() {
                 <p className="text-[12px] text-gray-400 mt-0.5">총 경기</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-emerald-500">{user.winCount || 0}</p>
+                <p className="text-[24px] font-bold text-green-500">{user.winCount || 0}</p>
                 <p className="text-[12px] text-gray-400 mt-0.5">승리</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3.5 text-center">

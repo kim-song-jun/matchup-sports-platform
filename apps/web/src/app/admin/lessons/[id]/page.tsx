@@ -16,15 +16,15 @@ const typeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
 };
 const typeColor: Record<string, string> = {
-  group_lesson: 'bg-violet-50 text-violet-600', practice_match: 'bg-emerald-50 text-emerald-600',
-  free_practice: 'bg-amber-50 text-amber-600', clinic: 'bg-blue-50 text-blue-600',
+  group_lesson: 'bg-blue-50 text-blue-500', practice_match: 'bg-gray-100 text-gray-700',
+  free_practice: 'bg-gray-100 text-gray-700', clinic: 'bg-blue-50 text-blue-500',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
 const statusLabel: Record<string, string> = { open: '진행중', closed: '마감', completed: '완료', cancelled: '취소' };
 const statusColor: Record<string, string> = {
-  open: 'bg-emerald-50 text-emerald-600', closed: 'bg-gray-100 text-gray-500',
-  completed: 'bg-blue-50 text-blue-600', cancelled: 'bg-red-50 text-red-500',
+  open: 'bg-blue-50 text-blue-500', closed: 'bg-gray-100 text-gray-500',
+  completed: 'bg-green-50 text-green-500', cancelled: 'bg-red-50 text-red-500',
 };
 const statusOptions = ['open', 'closed', 'completed', 'cancelled'];
 
@@ -152,7 +152,7 @@ export default function AdminLessonDetailPage() {
                 </div>
                 <p className="text-[15px] font-semibold text-gray-900">{lesson.currentParticipants}/{lesson.maxParticipants}명</p>
                 <div className="mt-2 h-[3px] rounded-full bg-gray-200 overflow-hidden">
-                  <div className="h-full rounded-full bg-violet-400" style={{ width: `${filledPercent}%` }} />
+                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${filledPercent}%` }} />
                 </div>
               </div>
               <div className="rounded-xl bg-gray-50 p-3.5">
@@ -171,7 +171,7 @@ export default function AdminLessonDetailPage() {
             <div className="rounded-2xl bg-white border border-gray-100 p-5">
               <h3 className="text-[14px] font-semibold text-gray-900 mb-3">코치 정보</h3>
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-50 text-violet-500">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-500">
                   <User size={22} />
                 </div>
                 <div>
@@ -229,8 +229,8 @@ export default function AdminLessonDetailPage() {
                 ))}
               </select>
               {statusMutation.isSuccess && (
-                <p className="flex items-center gap-1 text-[12px] text-emerald-500 mt-1.5">
-                  <CheckCircle size={12} />
+                <p className="flex items-center gap-1 text-[12px] text-green-500 mt-1.5">
+                  <CheckCircle size={12} className="text-green-500" />
                   상태가 변경되었습니다
                 </p>
               )}

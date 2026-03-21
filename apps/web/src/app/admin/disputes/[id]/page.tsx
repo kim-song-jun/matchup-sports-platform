@@ -110,23 +110,23 @@ const typeLabel: Record<string, string> = {
 const typeColor: Record<string, string> = {
   no_show: 'bg-red-50 text-red-600',
   late: 'bg-amber-50 text-amber-600',
-  level_mismatch: 'bg-indigo-50 text-indigo-600',
-  misconduct: 'bg-orange-50 text-orange-600',
+  level_mismatch: 'bg-gray-100 text-gray-600',
+  misconduct: 'bg-red-50 text-red-500',
 };
 const statusLabel: Record<string, string> = {
   pending: '대기중', investigating: '조사중', resolved: '해결됨', dismissed: '기각됨',
 };
 const statusColor: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-600',
-  investigating: 'bg-blue-50 text-blue-600',
-  resolved: 'bg-emerald-50 text-emerald-600',
+  pending: 'bg-gray-100 text-gray-600',
+  investigating: 'bg-blue-50 text-blue-500',
+  resolved: 'bg-green-50 text-green-500',
   dismissed: 'bg-gray-100 text-gray-500',
 };
 
 const timelineIconColor: Record<string, string> = {
   info: 'bg-blue-50 text-blue-500',
   warning: 'bg-amber-50 text-amber-500',
-  success: 'bg-emerald-50 text-emerald-500',
+  success: 'bg-green-50 text-green-500',
   error: 'bg-red-50 text-red-500',
 };
 
@@ -263,7 +263,7 @@ export default function AdminDisputeDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">도착 체크 데이터</h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className={`rounded-xl p-3.5 ${dispute.arrivalCheck.reporterCheckedIn ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+              <div className={`rounded-xl p-3.5 ${dispute.arrivalCheck.reporterCheckedIn ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
                 <p className="text-[12px] font-semibold text-gray-500 mb-1">신고팀</p>
                 <p className="text-[14px] font-semibold text-gray-900">
                   {dispute.arrivalCheck.reporterCheckedIn ? 'O 체크인 완료' : 'X 미체크인'}
@@ -272,7 +272,7 @@ export default function AdminDisputeDetailPage() {
                   <p className="text-[12px] text-gray-500 mt-0.5">도착: {dispute.arrivalCheck.reporterArrival}</p>
                 )}
               </div>
-              <div className={`rounded-xl p-3.5 ${dispute.arrivalCheck.reportedCheckedIn ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+              <div className={`rounded-xl p-3.5 ${dispute.arrivalCheck.reportedCheckedIn ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
                 <p className="text-[12px] font-semibold text-gray-500 mb-1">피신고팀</p>
                 <p className="text-[14px] font-semibold text-gray-900">
                   {dispute.arrivalCheck.reportedCheckedIn ? 'O 체크인 완료' : 'X 미체크인'}
@@ -359,12 +359,12 @@ export default function AdminDisputeDetailPage() {
               <button
                 onClick={() => setShowResolveModal(true)}
                 disabled={currentStatus === 'resolved'}
-                className="w-full flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                className="w-full flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-left hover:bg-green-100 transition-colors disabled:opacity-50"
               >
-                <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+                <CheckCircle size={18} className="text-green-500 shrink-0" />
                 <div>
-                  <p className="text-[14px] font-medium text-emerald-700">해결 처리</p>
-                  <p className="text-[11px] text-emerald-500">분쟁을 해결 완료로 처리합니다</p>
+                  <p className="text-[14px] font-medium text-green-700">해결 처리</p>
+                  <p className="text-[11px] text-green-500">분쟁을 해결 완료로 처리합니다</p>
                 </div>
               </button>
 
@@ -429,8 +429,8 @@ export default function AdminDisputeDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
-                <CheckCircle size={20} className="text-emerald-500" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
+                <CheckCircle size={20} className="text-green-500" />
               </div>
               <div>
                 <h3 className="text-[16px] font-bold text-gray-900">해결 처리</h3>
@@ -451,7 +451,7 @@ export default function AdminDisputeDetailPage() {
               <button
                 onClick={() => handleAction('resolve')}
                 disabled={processing}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-500 py-2.5 text-[14px] font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-green-500 py-2.5 text-[14px] font-semibold text-white hover:bg-green-600 transition-colors disabled:opacity-50"
               >
                 {processing ? <Loader2 size={14} className="animate-spin" /> : null}
                 {processing ? '처리 중...' : '해결 처리'}

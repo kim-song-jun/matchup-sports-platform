@@ -73,7 +73,7 @@ export default function AdminVenuesPage() {
               <tr key={v.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/venues/${v.id}`}>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
                       <Building2 size={16} />
                     </div>
                     <p className="text-[14px] font-medium text-gray-900">{v.name}</p>

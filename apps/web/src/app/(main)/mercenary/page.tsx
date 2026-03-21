@@ -229,19 +229,19 @@ export default function MercenaryPage() {
 
                   <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <Calendar size={15} className="text-blue-400" />
+                      <Calendar size={15} className="text-gray-400" />
                       <span>{formatMatchDate(post.matchDate)} {post.startTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <MapPin size={15} className="text-blue-400" />
+                      <MapPin size={15} className="text-gray-400" />
                       <span className="truncate">{post.venue}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <Shield size={15} className="text-blue-400" />
+                      <Shield size={15} className="text-gray-400" />
                       <span>Lv.{post.levelRequired} {levelLabel[post.levelRequired]} 이상</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[13px]">
-                      <DollarSign size={15} className="text-blue-400" />
+                      <DollarSign size={15} className="text-gray-400" />
                       <span className={`font-semibold ${post.fee === 0 ? 'text-green-600' : 'text-gray-800'}`}>
                         {formatFee(post.fee)}
                       </span>

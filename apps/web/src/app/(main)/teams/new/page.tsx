@@ -10,10 +10,10 @@ import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 
 const sports = [
-  { type: 'futsal', label: '풋살', color: 'bg-emerald-50 text-emerald-500 border-emerald-200' },
-  { type: 'basketball', label: '농구', color: 'bg-amber-50 text-amber-500 border-amber-200' },
-  { type: 'badminton', label: '배드민턴', color: 'bg-blue-50 text-blue-500 border-blue-200' },
-  { type: 'ice_hockey', label: '아이스하키', color: 'bg-indigo-50 text-indigo-500 border-indigo-200' },
+  { type: 'futsal', label: '풋살', color: 'bg-blue-50 text-blue-500 border-gray-200' },
+  { type: 'basketball', label: '농구', color: 'bg-blue-50 text-blue-500 border-gray-200' },
+  { type: 'badminton', label: '배드민턴', color: 'bg-blue-50 text-blue-500 border-gray-200' },
+  { type: 'ice_hockey', label: '아이스하키', color: 'bg-blue-50 text-blue-500 border-gray-200' },
 ];
 
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
@@ -178,7 +178,7 @@ export default function CreateTeamPage() {
               onClick={() => setForm({ ...form, isRecruiting: true })}
               className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                 form.isRecruiting
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-600'
+                  ? 'border-blue-500 bg-blue-50 text-blue-500'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
               }`}
             >

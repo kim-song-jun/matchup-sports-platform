@@ -21,13 +21,13 @@ const tabs = [
 
 const typeLabel: Record<string, { text: string; color: string }> = {
   match: { text: '매치', color: 'bg-blue-50 text-blue-500' },
-  lesson: { text: '강좌', color: 'bg-purple-50 text-purple-500' },
-  market: { text: '장터', color: 'bg-emerald-50 text-emerald-500' },
+  lesson: { text: '강좌', color: 'bg-gray-100 text-gray-600' },
+  market: { text: '장터', color: 'bg-gray-100 text-gray-600' },
 };
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: '대기', color: 'bg-amber-50 text-amber-600' },
-  completed: { label: '완료', color: 'bg-green-50 text-green-600' },
+  pending: { label: '대기', color: 'bg-gray-100 text-gray-600' },
+  completed: { label: '완료', color: 'bg-green-50 text-green-500' },
   refunded: { label: '환불', color: 'bg-red-50 text-red-500' },
 };
 
@@ -46,8 +46,8 @@ const mockSettlements = [
 
 const summaryCards = [
   { label: '총 거래액', value: '865,000원', icon: TrendingUp, color: 'text-blue-500 bg-blue-50', trend: '+12.5%' },
-  { label: '수수료 수입', value: '86,500원', icon: ArrowUpRight, color: 'text-emerald-500 bg-emerald-50', trend: '+8.3%' },
-  { label: '정산 대기금', value: '396,000원', icon: Clock, color: 'text-amber-500 bg-amber-50', trend: null },
+  { label: '수수료 수입', value: '86,500원', icon: ArrowUpRight, color: 'text-blue-500 bg-blue-50', trend: '+8.3%' },
+  { label: '정산 대기금', value: '396,000원', icon: Clock, color: 'text-gray-500 bg-gray-100', trend: null },
   { label: '환불 총액', value: '135,000원', icon: ArrowDownRight, color: 'text-red-500 bg-red-50', trend: '-2.1%' },
 ];
 
@@ -102,7 +102,7 @@ export default function AdminSettlementsPage() {
                 <card.icon size={20} />
               </div>
               {card.trend && (
-                <span className={`text-[12px] font-medium ${card.trend.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>
+                <span className={`text-[12px] font-medium ${card.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
                   {card.trend}
                 </span>
               )}

@@ -37,7 +37,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const icons = {
-    success: <CheckCircle size={18} className="text-emerald-500" />,
+    success: <CheckCircle size={18} className="text-green-500" />,
     error: <XCircle size={18} className="text-red-500" />,
     info: <Info size={18} className="text-blue-500" />,
   };

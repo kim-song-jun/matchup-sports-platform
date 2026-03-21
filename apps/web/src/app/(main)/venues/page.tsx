@@ -89,7 +89,7 @@ export default function VenuesPage() {
             onClick={() => setActiveCity(c === '전체' ? '' : c)}
             className={`shrink-0 rounded-lg px-3 py-1.5 text-[12px] font-medium transition-all ${
               (activeCity === '' && c === '전체') || activeCity === c
-                ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                ? 'bg-blue-50 text-blue-500 border border-blue-200'
                 : 'bg-white text-gray-500 border border-gray-100 active:bg-gray-50'
             }`}
           >
@@ -141,7 +141,7 @@ export default function VenuesPage() {
 
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                            <MapPin size={15} className="text-blue-400 shrink-0" />
+                            <MapPin size={15} className="text-gray-400 shrink-0" />
                             <span className="truncate">{venue.address}</span>
                           </div>
                           <div className="flex items-center gap-3">

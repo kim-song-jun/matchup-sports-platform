@@ -164,7 +164,7 @@ export default function AdminVenueEditPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-500">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
             <Building2 size={20} />
           </div>
           <div>
@@ -365,7 +365,7 @@ export default function AdminVenueEditPage() {
         </div>
 
         {saved && (
-          <p className="text-[13px] text-emerald-500 text-center">시설 정보가 성공적으로 저장되었습니다.</p>
+          <p className="text-[13px] text-green-500 text-center">시설 정보가 성공적으로 저장되었습니다.</p>
         )}
       </div>
 

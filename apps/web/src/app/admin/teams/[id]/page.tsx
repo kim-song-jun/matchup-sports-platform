@@ -41,22 +41,22 @@ const mockTeams: Record<string, any> = {
 };
 
 const badgeLabels: Record<string, { label: string; color: string }> = {
-  fair_play: { label: '페어플레이', color: 'bg-emerald-50 text-emerald-600' },
-  top_activity: { label: '활발한 활동', color: 'bg-blue-50 text-blue-600' },
-  verified: { label: '인증 완료', color: 'bg-indigo-50 text-indigo-600' },
-  mvp: { label: 'MVP', color: 'bg-amber-50 text-amber-600' },
-  champion: { label: '챔피언', color: 'bg-purple-50 text-purple-600' },
+  fair_play: { label: '페어플레이', color: 'bg-gray-100 text-gray-600' },
+  top_activity: { label: '활발한 활동', color: 'bg-gray-100 text-gray-600' },
+  verified: { label: '인증 완료', color: 'bg-blue-50 text-blue-500' },
+  mvp: { label: 'MVP', color: 'bg-gray-100 text-gray-600' },
+  champion: { label: '챔피언', color: 'bg-gray-100 text-gray-600' },
 };
 
 const roleLabel: Record<string, string> = {
   owner: '운영자', manager: '매니저', member: '멤버',
 };
 const roleColor: Record<string, string> = {
-  owner: 'bg-blue-50 text-blue-600', manager: 'bg-indigo-50 text-indigo-600', member: 'bg-gray-100 text-gray-500',
+  owner: 'bg-blue-50 text-blue-500', manager: 'bg-gray-100 text-gray-600', member: 'bg-gray-100 text-gray-500',
 };
 
 const resultColor: Record<string, string> = {
-  win: 'text-emerald-600 bg-emerald-50', draw: 'text-amber-600 bg-amber-50', loss: 'text-red-500 bg-red-50',
+  win: 'text-green-500 bg-green-50', draw: 'text-gray-600 bg-gray-100', loss: 'text-red-500 bg-red-50',
 };
 const resultLabel: Record<string, string> = { win: '승', draw: '무', loss: '패' };
 
@@ -151,7 +151,7 @@ export default function AdminTeamDetailPage() {
               {suspended ? (
                 <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-[12px] font-semibold text-red-500">정지됨</span>
               ) : team.isRecruiting ? (
-                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-600">모집중</span>
+                <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[12px] font-semibold text-blue-500">모집중</span>
               ) : (
                 <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[12px] font-semibold text-gray-500">마감</span>
               )}
@@ -186,11 +186,11 @@ export default function AdminTeamDetailPage() {
                 <p className="text-[12px] text-gray-400 mt-0.5">신뢰도</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-emerald-500">{wins}</p>
+                <p className="text-[24px] font-bold text-green-500">{wins}</p>
                 <p className="text-[12px] text-gray-400 mt-0.5">승</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-amber-500">{draws}</p>
+                <p className="text-[24px] font-bold text-gray-500">{draws}</p>
                 <p className="text-[12px] text-gray-400 mt-0.5">무</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3.5 text-center">
@@ -313,12 +313,12 @@ export default function AdminTeamDetailPage() {
 
               <button
                 onClick={() => setShowBadgeModal(true)}
-                className="w-full flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-left hover:bg-indigo-100 transition-colors"
+                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100 transition-colors"
               >
-                <Award size={18} className="text-indigo-500 shrink-0" />
+                <Award size={18} className="text-blue-500 shrink-0" />
                 <div>
-                  <p className="text-[14px] font-medium text-indigo-700">배지 관리</p>
-                  <p className="text-[11px] text-indigo-500">팀 배지를 추가/제거합니다</p>
+                  <p className="text-[14px] font-medium text-blue-700">배지 관리</p>
+                  <p className="text-[11px] text-blue-500">팀 배지를 추가/제거합니다</p>
                 </div>
               </button>
 

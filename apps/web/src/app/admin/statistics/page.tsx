@@ -18,11 +18,11 @@ const monthlyMatches = [
 
 const sportDistribution = [
   { sport: '풋살', count: 482, color: 'bg-blue-500' },
-  { sport: '농구', count: 318, color: 'bg-indigo-500' },
-  { sport: '배드민턴', count: 245, color: 'bg-emerald-500' },
-  { sport: '아이스하키', count: 89, color: 'bg-cyan-500' },
-  { sport: '피겨스케이팅', count: 52, color: 'bg-purple-500' },
-  { sport: '쇼트트랙', count: 31, color: 'bg-pink-500' },
+  { sport: '농구', count: 318, color: 'bg-blue-500' },
+  { sport: '배드민턴', count: 245, color: 'bg-blue-500' },
+  { sport: '아이스하키', count: 89, color: 'bg-gray-200' },
+  { sport: '피겨스케이팅', count: 52, color: 'bg-gray-200' },
+  { sport: '쇼트트랙', count: 31, color: 'bg-gray-200' },
 ];
 
 const revenueTrend = [
@@ -89,7 +89,7 @@ export default function AdminStatisticsPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Users size={20} />
             </div>
-            <span className="flex items-center gap-0.5 text-[12px] font-medium text-emerald-500">
+            <span className="flex items-center gap-0.5 text-[12px] font-medium text-green-500">
               <TrendingUp size={12} />
               +{userGrowth.growthRate}%
             </span>
@@ -100,7 +100,7 @@ export default function AdminStatisticsPage() {
 
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <UserPlus size={20} />
             </div>
           </div>
@@ -110,7 +110,7 @@ export default function AdminStatisticsPage() {
 
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Trophy size={20} />
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function AdminStatisticsPage() {
 
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
               <Users size={20} />
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function AdminStatisticsPage() {
         {/* Revenue trend bar chart */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <DollarSign size={16} className="text-emerald-500" />
+            <DollarSign size={16} className="text-blue-500" />
             <h3 className="text-[15px] font-bold text-gray-900">매출 추이</h3>
           </div>
           <div className="flex items-end gap-3 h-[200px]">
@@ -166,7 +166,7 @@ export default function AdminStatisticsPage() {
                 <div key={r.month} className="flex-1 flex flex-col items-center justify-end h-full">
                   <span className="text-[11px] font-semibold text-gray-700 mb-1">{formatCurrency(r.revenue)}</span>
                   <div
-                    className="w-full rounded-t-lg bg-emerald-500 transition-all duration-500 min-h-[4px]"
+                    className="w-full rounded-t-lg bg-blue-500 transition-all duration-500 min-h-[4px]"
                     style={{ height: `${heightPercent}%` }}
                   />
                   <span className="text-[11px] text-gray-400 mt-2">{r.month}</span>
@@ -181,7 +181,7 @@ export default function AdminStatisticsPage() {
         {/* Sport distribution horizontal bars */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Trophy size={16} className="text-indigo-500" />
+            <Trophy size={16} className="text-blue-500" />
             <h3 className="text-[15px] font-bold text-gray-900">종목별 매치 분포</h3>
           </div>
           <div className="space-y-3">
@@ -208,7 +208,7 @@ export default function AdminStatisticsPage() {
         {/* Top venues table */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Building2 size={16} className="text-amber-500" />
+            <Building2 size={16} className="text-gray-500" />
             <h3 className="text-[15px] font-bold text-gray-900">인기 시설 TOP 5</h3>
           </div>
           <div className="overflow-x-auto">

@@ -14,7 +14,7 @@ const sportLabel: Record<string, string> = {
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
 function getMannerLabel(score: number) {
-  if (score >= 4.5) return { text: '최고', color: 'text-emerald-500 bg-emerald-50' };
+  if (score >= 4.5) return { text: '최고', color: 'text-green-500 bg-green-50' };
   if (score >= 3.5) return { text: '좋음', color: 'text-blue-500 bg-blue-50' };
   if (score >= 2.5) return { text: '보통', color: 'text-gray-500 bg-gray-100' };
   return { text: '주의', color: 'text-red-500 bg-red-50' };
@@ -111,14 +111,14 @@ export default function UserProfilePage() {
           </div>
           <div className="rounded-xl bg-white border border-gray-100 p-3.5 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Trophy size={16} className="text-blue-400" />
+              <Trophy size={16} className="text-gray-400" />
             </div>
             <p className="text-[18px] font-bold text-gray-900">{user.totalMatches || 0}</p>
             <p className="text-[12px] text-gray-400">매치 참여</p>
           </div>
           <div className="rounded-xl bg-white border border-gray-100 p-3.5 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Users size={16} className="text-emerald-400" />
+              <Users size={16} className="text-gray-400" />
             </div>
             <p className="text-[18px] font-bold text-gray-900">{user.teamCount || 0}</p>
             <p className="text-[12px] text-gray-400">소속 팀</p>
@@ -153,7 +153,7 @@ export default function UserProfilePage() {
                     {/* Level bar */}
                     <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-400 transition-all duration-500"
+                        className="h-full rounded-full bg-blue-500 transition-all duration-500"
                         style={{ width: `${(profile.level / 5) * 100}%` }}
                       />
                     </div>
@@ -179,7 +179,7 @@ export default function UserProfilePage() {
               <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    (user.mannerScore || 0) >= 3.5 ? 'bg-emerald-400' : (user.mannerScore || 0) >= 2.5 ? 'bg-amber-400' : 'bg-red-400'
+                    (user.mannerScore || 0) >= 3.5 ? 'bg-green-500' : (user.mannerScore || 0) >= 2.5 ? 'bg-gray-400' : 'bg-red-500'
                   }`}
                   style={{ width: `${((user.mannerScore || 0) / 5) * 100}%` }}
                 />

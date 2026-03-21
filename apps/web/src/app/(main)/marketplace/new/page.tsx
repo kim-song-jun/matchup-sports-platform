@@ -207,7 +207,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'rent' })}
               className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                 form.listingType === 'rent'
-                  ? 'border-violet-500 bg-violet-50 text-violet-600'
+                  ? 'border-blue-500 bg-blue-50 text-blue-600'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
               }`}
             >

@@ -18,8 +18,8 @@ const typeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
 };
 const typeColor: Record<string, string> = {
-  group_lesson: 'bg-blue-50 text-blue-600', practice_match: 'bg-gray-100 text-gray-700',
-  free_practice: 'bg-gray-100 text-gray-700', clinic: 'bg-blue-50 text-blue-600',
+  group_lesson: 'bg-blue-50 text-blue-500', practice_match: 'bg-gray-100 text-gray-700',
+  free_practice: 'bg-gray-100 text-gray-700', clinic: 'bg-blue-50 text-blue-500',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
@@ -91,7 +91,7 @@ export default function LessonDetailPage() {
             <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
               <h3 className="text-[16px] font-bold text-gray-900 mb-4">코치 소개</h3>
               <div className="flex items-start gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500"><User size={28} /></div>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500"><User size={28} /></div>
                 <div>
                   <p className="text-[17px] font-bold text-gray-900">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-[13px] text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
@@ -141,7 +141,7 @@ export default function LessonDetailPage() {
               '전문 코치의 피드백을 받고 싶은 분',
             ].map((text, i) => (
               <div key={i} className="flex items-center gap-2 text-[14px] text-gray-600 py-1">
-                <CheckCircle size={16} className="text-blue-400 shrink-0" />{text}
+                <CheckCircle size={16} className="text-blue-500 shrink-0" />{text}
               </div>
             ))}
           </div>
@@ -168,7 +168,7 @@ export default function LessonDetailPage() {
                 <span className="text-[13px] font-semibold text-blue-500">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
               </div>
               <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-                <div className="h-full rounded-full bg-blue-400 transition-all duration-700" style={{ width: `${filledPercent}%` }} />
+                <div className="h-full rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${filledPercent}%` }} />
               </div>
               {!isAuthenticated ? (
                 <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white active:bg-gray-800 transition-colors">로그인 후 신청하기</Link>

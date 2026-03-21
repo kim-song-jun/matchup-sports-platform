@@ -28,8 +28,8 @@ const methodConfig: Record<string, { label: string; icon: typeof CreditCard }> =
 
 const typeConfig: Record<string, { label: string; icon: typeof Trophy; color: string }> = {
   match: { label: '매치', icon: Trophy, color: 'bg-blue-50 text-blue-500' },
-  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-purple-50 text-purple-500' },
-  market: { label: '장터', icon: ShoppingBag, color: 'bg-emerald-50 text-emerald-500' },
+  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-blue-50 text-blue-500' },
+  market: { label: '장터', icon: ShoppingBag, color: 'bg-gray-100 text-gray-600' },
 };
 
 const mockPayments = [

@@ -181,7 +181,7 @@ export default function MatchDetailPage() {
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-              <div className={`h-full rounded-full transition-all duration-700 ${isAlmostFull ? 'bg-red-400' : 'bg-blue-400'}`} style={{ width: `${filledPercent}%` }} />
+              <div className={`h-full rounded-full transition-all duration-700 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${filledPercent}%` }} />
             </div>
 
             {!isAuthenticated ? (
@@ -254,7 +254,7 @@ export default function MatchDetailPage() {
                     </p>
                   </div>
                   <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
-                    p.status === 'confirmed' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'
+                    p.status === 'confirmed' ? 'bg-green-50 text-green-500' : 'bg-gray-100 text-gray-500'
                   }`}>
                     {p.status === 'confirmed' ? '확정' : '대기'}
                   </span>
@@ -300,7 +300,7 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   return (
     <div className="rounded-xl bg-white border border-gray-100 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-blue-400">{icon}</span>
+        <span className="text-gray-400">{icon}</span>
         <span className="text-[12px] text-gray-500">{label}</span>
       </div>
       <p className={`text-[15px] font-semibold ${highlight ? 'text-red-500' : 'text-gray-900'}`}>{value}</p>

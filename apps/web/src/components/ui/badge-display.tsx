@@ -17,11 +17,11 @@ interface BadgeDisplayProps {
 }
 
 const badgeConfig: Record<string, { icon: typeof Star; color: string; bg: string }> = {
-  manner_player: { icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
-  punctual: { icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
-  referee_hero: { icon: Shield, color: 'text-purple-500', bg: 'bg-purple-50' },
-  honest_team: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50' },
-  newcomer: { icon: Sparkles, color: 'text-pink-500', bg: 'bg-pink-50' },
+  manner_player: { icon: Star, color: 'text-gray-600', bg: 'bg-gray-100' },
+  punctual: { icon: Clock, color: 'text-gray-600', bg: 'bg-gray-100' },
+  referee_hero: { icon: Shield, color: 'text-gray-600', bg: 'bg-gray-100' },
+  honest_team: { icon: CheckCircle, color: 'text-gray-600', bg: 'bg-gray-100' },
+  newcomer: { icon: Sparkles, color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
 export function BadgeDisplay({ badges, size = 'sm' }: BadgeDisplayProps) {

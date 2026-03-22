@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Trophy, GraduationCap, Building2, ShieldCheck, ArrowLeft, Zap, CreditCard, Wallet, AlertTriangle, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, GraduationCap, Building2, ShieldCheck, ArrowLeft, Zap, CreditCard, Wallet, AlertTriangle, BarChart3, Swords, UserPlus, Star } from 'lucide-react';
 
 const adminNav = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: '대시보드' },
@@ -10,6 +10,9 @@ const adminNav = [
   { href: '/admin/users', icon: Users, label: '사용자 관리' },
   { href: '/admin/lessons', icon: GraduationCap, label: '강좌 관리' },
   { href: '/admin/teams', icon: Zap, label: '팀 관리' },
+  { href: '/admin/team-matches', icon: Swords, label: '팀 매칭' },
+  { href: '/admin/mercenary', icon: UserPlus, label: '용병' },
+  { href: '/admin/reviews', icon: Star, label: '평가' },
   { href: '/admin/venues', icon: Building2, label: '시설 관리' },
   { href: '/admin/payments', icon: CreditCard, label: '결제 관리' },
   { href: '/admin/settlements', icon: Wallet, label: '정산 관리' },

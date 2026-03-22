@@ -35,16 +35,29 @@ function formatCurrency(n: number) {
 export default function MatchesPage() {
   const [activeSport, setActiveSport] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [dateFilter, setDateFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'latest' | 'deadline'>('latest');
   const { toast } = useToast();
   const params = activeSport ? { sportType: activeSport } : undefined;
   const { data, isLoading } = useMatches(params);
   const allMatches = data?.items ?? [];
-  const matches = searchQuery
+  let matches = searchQuery
     ? allMatches.filter((m: Match) =>
         m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.venue?.name?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : allMatches;
+  if (dateFilter) {
+    matches = matches.filter((m: Match) => m.matchDate?.startsWith(dateFilter));
+  }
+  if (sortBy === 'deadline') {
+    matches = [...matches].sort((a: Match, b: Match) => {
+      const fa = a.currentPlayers / a.maxPlayers;
+      const fb = b.currentPlayers / b.maxPlayers;
+      return fb - fa;
+    });
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -66,8 +79,8 @@ export default function MatchesPage() {
             />
           </div>
           <button
-            onClick={() => toast('info', '상세 필터 기능을 준비 중입니다')}
-            className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 active:bg-gray-100 transition-colors"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${showFilters ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-500 active:bg-gray-100'}`}
           >
             <SlidersHorizontal size={18} />
           </button>
@@ -90,6 +103,40 @@ export default function MatchesPage() {
           </button>
         ))}
       </div>
+
+      {/* 상세 필터 패널 */}
+      {showFilters && (
+        <div className="px-5 lg:px-0 mb-4">
+          <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 space-y-3">
+            <div>
+              <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">날짜</label>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">정렬</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSortBy('latest')}
+                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${sortBy === 'latest' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                >
+                  최신순
+                </button>
+                <button
+                  onClick={() => setSortBy('deadline')}
+                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${sortBy === 'deadline' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                >
+                  마감임박
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!isLoading && matches.length > 0 && (
         <div className="px-5 lg:px-0 mb-3">

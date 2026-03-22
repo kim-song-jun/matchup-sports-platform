@@ -75,6 +75,22 @@ export default function ProfilePage() {
                 })}
               </div>
             )}
+
+            {/* 활동 통계 */}
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-gray-50 p-3 text-center">
+                <p className="text-[18px] font-bold text-gray-900">{user.totalMatches || 0}</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">총 경기</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center">
+                <p className="text-[18px] font-bold text-amber-500">{user.mannerScore?.toFixed(1) || '0'}</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">매너 점수</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center">
+                <p className="text-[18px] font-bold text-blue-500">{user.sportProfiles?.length || 0}개</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">뱃지</p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl bg-white border border-gray-100 p-6 text-center">

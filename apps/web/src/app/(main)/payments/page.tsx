@@ -105,6 +105,8 @@ function formatDate(d: string) {
 export default function PaymentsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const { data: apiPayments } = usePayments();
 
   // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
@@ -121,9 +123,14 @@ export default function PaymentsPage() {
       }))
     : mockPayments;
 
-  const filtered = activeTab === 'all'
+  const tabFiltered = activeTab === 'all'
     ? payments
     : payments.filter((p) => p.type === activeTab);
+  const filtered = tabFiltered.filter((p) => {
+    if (dateFrom && p.createdAt < dateFrom) return false;
+    if (dateTo && p.createdAt > dateTo + 'T23:59:59') return false;
+    return true;
+  });
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
@@ -140,6 +147,23 @@ export default function PaymentsPage() {
       </div>
 
       <div className="px-5 lg:px-0">
+        {/* 기간 필터 */}
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+          <span className="text-[13px] text-gray-400">~</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+          />
+        </div>
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 mb-5 rounded-xl bg-gray-100 p-1 overflow-x-auto">
           {tabs.map((tab) => (

@@ -43,9 +43,21 @@ function formatCurrency(n: number) {
 
 export default function TeamMatchesPage() {
   const [activeSport, setActiveSport] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [levelFilter, setLevelFilter] = useState('');
   const params = activeSport ? { sportType: activeSport } : undefined;
   const { data, isLoading } = useTeamMatches(params);
-  const matches = data?.items ?? [];
+  const allMatches = data?.items ?? [];
+  let matches = dateFilter
+    ? allMatches.filter((m: TeamMatch) => m.matchDate?.startsWith(dateFilter))
+    : allMatches;
+  if (levelFilter) {
+    const [min, max] = levelFilter.split('-').map(Number);
+    matches = matches.filter((m: TeamMatch) => {
+      const lvl = parseInt(String(m.requiredLevel || '0'), 10);
+      return lvl >= min && lvl <= max;
+    });
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
@@ -68,6 +80,34 @@ export default function TeamMatchesPage() {
             onClick={() => setActiveSport(f.key)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeSport === f.key
+                ? 'bg-gray-900 text-white'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 필터 행 */}
+      <div className="px-5 lg:px-0 mb-4 flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+        />
+        {[
+          { key: '', label: '전체' },
+          { key: '1-2', label: 'Lv.1-2' },
+          { key: '3-4', label: 'Lv.3-4' },
+          { key: '5-5', label: 'Lv.5' },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setLevelFilter(f.key)}
+            className={`shrink-0 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${
+              levelFilter === f.key
                 ? 'bg-gray-900 text-white'
                 : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
             }`}

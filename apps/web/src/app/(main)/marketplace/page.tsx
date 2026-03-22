@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Heart, Eye, Package } from 'lucide-react';
+import { Plus, Heart, Eye, Package, Search } from 'lucide-react';
 import { useListings } from '@/hooks/use-api';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import type { MarketplaceListing } from '@/types/api';
@@ -40,12 +40,19 @@ const categoryFilters: { label: string; match: (item: MarketplaceListing) => boo
 
 export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState('전체');
+  const [searchQuery, setSearchQuery] = useState('');
   const { data, isLoading } = useListings();
   const allListings = data?.items ?? [];
   const activeCategoryFilter = categoryFilters.find((c) => c.label === activeCategory);
-  const listings = activeCategoryFilter && activeCategory !== '전체'
+  const categoryFiltered = activeCategoryFilter && activeCategory !== '전체'
     ? allListings.filter(activeCategoryFilter.match)
     : allListings;
+  const listings = searchQuery
+    ? categoryFiltered.filter((item: MarketplaceListing) =>
+        item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        sportLabel[item.sportType]?.includes(searchQuery)
+      )
+    : categoryFiltered;
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -56,6 +63,20 @@ export default function MarketplacePage() {
           글쓰기
         </Link>
       </header>
+
+      {/* 검색 바 */}
+      <div className="px-5 lg:px-0 mb-3">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="상품명, 종목 검색"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+          />
+        </div>
+      </div>
 
       {/* 카테고리 칩 */}
       <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">

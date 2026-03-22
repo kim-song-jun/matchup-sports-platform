@@ -1,0 +1,25 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN pnpm install --frozen-lockfile
+
+COPY apps/web/ apps/web/
+COPY packages/shared/ packages/shared/
+
+WORKDIR /app/apps/web
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./.next/static
+COPY --from=builder /app/apps/web/public ./public
+
+EXPOSE 3000
+ENV PORT 3000
+CMD ["node", "server.js"]

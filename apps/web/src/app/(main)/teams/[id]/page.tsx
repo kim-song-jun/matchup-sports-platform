@@ -7,6 +7,7 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
 import { useTeam, useTeamBadges } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
+import { useAuthStore } from '@/stores/auth-store';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -47,6 +48,7 @@ export default function TeamDetailPage() {
   const teamId = params.id as string;
 
   const { toast } = useToast();
+  const { isAuthenticated } = useAuthStore();
   const { data: team, isLoading } = useTeam(teamId);
   const { data: apiBadges } = useTeamBadges(teamId);
 
@@ -314,6 +316,25 @@ export default function TeamDetailPage() {
         {/* Right sidebar */}
         <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
+          {/* 팀 참여 신청 */}
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
+            {isAuthenticated ? (
+              <button
+                onClick={() => toast('success', '팀 참여 신청이 완료되었습니다')}
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+              >
+                팀 참여 신청
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white hover:bg-gray-800 transition-colors"
+              >
+                로그인 후 신청하기
+              </Link>
+            )}
+          </div>
+
           {/* CTA */}
           <div className="rounded-2xl bg-white border border-gray-100 p-4">
             {team.isRecruiting ? (

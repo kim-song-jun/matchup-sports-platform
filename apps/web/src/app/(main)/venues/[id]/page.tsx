@@ -403,6 +403,16 @@ export default function VenueDetailPage() {
             >
               이 구장에서 경기 만들기
             </Link>
+
+            {venue.phone && (
+              <a
+                href={`tel:${venue.phone}`}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-2"
+              >
+                <Phone size={14} />
+                전화 문의
+              </a>
+            )}
           </div>
           </div>
         </div>

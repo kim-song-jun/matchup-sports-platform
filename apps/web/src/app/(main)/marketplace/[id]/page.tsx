@@ -150,6 +150,14 @@ export default function ListingDetailPage() {
                 </div>
               </div>
             </div>
+            <div className="mt-3 pt-3 border-t border-gray-50 text-right">
+              <button
+                onClick={() => toast('info', '신고가 접수되었습니다')}
+                className="text-[12px] text-gray-400 hover:text-red-500 transition-colors"
+              >
+                신고하기
+              </button>
+            </div>
           </div>
 
           {/* Safety notice */}

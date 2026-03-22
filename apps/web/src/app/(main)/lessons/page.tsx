@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { GraduationCap, Swords, Dumbbell, Calendar, MapPin, Users } from 'lucide-react';
+import { GraduationCap, Swords, Dumbbell, Calendar, MapPin, Users, Plus, Search } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLessons } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/toast';
 import type { Lesson } from '@/types/api';
 
 const typeFilters = [
@@ -43,19 +44,51 @@ function formatCurrency(n: number) {
 
 export default function LessonsPage() {
   const [activeType, setActiveType] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
   const params: Record<string, string> = {};
   if (activeType) params.type = activeType;
 
   const { data, isLoading } = useLessons(Object.keys(params).length > 0 ? params : undefined);
 
-  const lessons = data?.items ?? [];
+  const allLessons = data?.items ?? [];
+  const lessons = searchQuery
+    ? allLessons.filter((lesson: Lesson) =>
+        lesson.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lesson.coachName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lesson.venueName?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allLessons;
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900">강좌</h1>
-        <p className="text-[13px] text-gray-400 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
+      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-[22px] font-bold text-gray-900">강좌</h1>
+          <p className="text-[13px] text-gray-400 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
+        </div>
+        <button
+          onClick={() => toast('info', '강좌 등록 기능을 준비 중입니다')}
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+        >
+          <Plus size={16} strokeWidth={2.5} />
+          강좌 등록
+        </button>
       </header>
+
+      {/* 검색 바 */}
+      <div className="px-5 lg:px-0 mb-3">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="강좌명, 코치, 장소 검색"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+          />
+        </div>
+      </div>
 
       {/* Type filter */}
       <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">

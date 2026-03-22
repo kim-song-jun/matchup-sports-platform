@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, MapPin, Pencil, Trash2, AlertTriangle, UserCheck } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const mockMercenaryPosts = [
   {
@@ -42,11 +44,18 @@ function formatCurrency(n: number) {
 
 export default function MyMercenaryPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [posts, setPosts] = useState(mockMercenaryPosts);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/mercenary/${id}`);
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p));
+      toast('success', '모집글이 취소되었습니다');
+    } catch {
+      toast('error', '취소에 실패했습니다');
+    }
     setDeleteTarget(null);
   };
 

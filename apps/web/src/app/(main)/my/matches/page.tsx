@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, Users, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const mockMyMatches = [
   {
@@ -65,11 +67,18 @@ function formatCurrency(n: number) {
 
 export default function MyMatchesPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [matches, setMatches] = useState(mockMyMatches);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    setMatches(prev => prev.map(m => m.id === id ? { ...m, status: 'cancelled' } : m));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.patch(`/matches/${id}`, { status: 'cancelled' });
+      setMatches(prev => prev.map(m => m.id === id ? { ...m, status: 'cancelled' } : m));
+      toast('success', '매치가 취소되었습니다');
+    } catch {
+      toast('error', '취소에 실패했습니다');
+    }
     setDeleteTarget(null);
   };
 

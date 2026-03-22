@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const mockTeamMatches = [
   {
@@ -45,11 +47,18 @@ const statusLabel: Record<string, { text: string; style: string }> = {
 
 export default function MyTeamMatchesPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [posts, setPosts] = useState(mockTeamMatches);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p));
+      toast('success', '모집글이 취소되었습니다');
+    } catch {
+      toast('error', '취소에 실패했습니다');
+    }
     setDeleteTarget(null);
   };
 

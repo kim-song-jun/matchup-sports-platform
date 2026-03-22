@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -57,19 +58,29 @@ export default function EditListingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (form.price <= 0) return toast('error', '가격을 입력해주세요');
     setIsSaving(true);
-    setTimeout(() => {
-      toast('success', '수정되었습니다');
-      router.back();
-    }, 500);
+    try {
+      await api.patch(`/marketplace/listings/${listingId}`, form);
+      toast('success', '매물이 수정되었습니다');
+      router.push(`/marketplace/${listingId}`);
+    } catch {
+      toast('error', '수정에 실패했습니다');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
-    toast('success', '매물이 삭제되었습니다');
-    router.push('/my/listings');
+  const handleDelete = async () => {
+    try {
+      await api.delete(`/marketplace/listings/${listingId}`);
+      toast('success', '매물이 삭제되었습니다');
+      router.push('/my/listings');
+    } catch {
+      toast('error', '삭제에 실패했습니다');
+    }
   };
 
   return (

@@ -6,6 +6,8 @@ import {
   ArrowLeft, MapPin, Calendar, Clock, CheckCircle2, Camera,
   Loader2, Navigation, AlertTriangle, Radio,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 type GpsStatus = 'searching' | 'in_range' | 'out_of_range';
 type ArrivalStatus = 'pending' | 'arrived' | 'late';
@@ -32,6 +34,7 @@ const timelineData = [
 export default function ArrivalCheckPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const id = params.id as string;
 
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('searching');
@@ -78,19 +81,25 @@ export default function ArrivalCheckPage() {
     return () => clearInterval(interval);
   }, []);
 
-  function handleArrivalConfirm() {
-    setMyArrival('arrived');
-    setTimeline((prev) =>
-      prev.map((item) =>
-        item.team === mockMatch.awayTeam.name
-          ? {
-              ...item,
-              status: 'arrived' as ArrivalStatus,
-              time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-            }
-          : item,
-      ),
-    );
+  async function handleArrivalConfirm() {
+    try {
+      await api.post(`/team-matches/${id}/check-in`);
+      setMyArrival('arrived');
+      setTimeline((prev) =>
+        prev.map((item) =>
+          item.team === mockMatch.awayTeam.name
+            ? {
+                ...item,
+                status: 'arrived' as ArrivalStatus,
+                time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+              }
+            : item,
+        ),
+      );
+      toast('success', '도착 인증이 완료되었습니다');
+    } catch {
+      toast('error', '도착 인증에 실패했습니다');
+    }
   }
 
   function handlePhotoCapture() {

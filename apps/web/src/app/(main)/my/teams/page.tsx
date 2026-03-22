@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog, Star, Trophy } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const mockMyTeams = [
   {
@@ -41,11 +43,18 @@ const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중�
 
 export default function MyTeamsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [teams, setTeams] = useState(mockMyTeams);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    setTeams(prev => prev.filter(t => t.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/teams/${id}`);
+      setTeams(prev => prev.filter(t => t.id !== id));
+      toast('success', '팀이 삭제되었습니다');
+    } catch {
+      toast('error', '삭제에 실패했습니다');
+    }
     setDeleteTarget(null);
   };
 

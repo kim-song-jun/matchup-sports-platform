@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Calendar, MapPin, UserPlus, Search, Shield, Star, DollarSign } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useMercenaryPosts } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 
 const sportFilters = [
   { key: '', label: '전체' },
@@ -152,9 +153,14 @@ export default function MercenaryPage() {
     ? posts.filter((p) => p.sportType === activeSport)
     : posts;
 
-  function handleApply(id: string) {
-    setAppliedIds((prev) => new Set(prev).add(id));
-    toast('success', '용병 신청이 완료되었습니다');
+  async function handleApply(id: string) {
+    try {
+      await api.post(`/mercenary/${id}/apply`);
+      setAppliedIds((prev) => new Set(prev).add(id));
+      toast('success', '용병 신청이 완료되었습니다');
+    } catch {
+      toast('error', '신청에 실패했습니다');
+    }
   }
 
   return (

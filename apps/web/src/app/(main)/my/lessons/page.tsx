@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const mockMyLessons = [
   {
@@ -44,11 +46,18 @@ function formatCurrency(n: number) {
 
 export default function MyLessonsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [lessons, setLessons] = useState(mockMyLessons);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleDelete = (id: string) => {
-    setLessons(prev => prev.map(l => l.id === id ? { ...l, status: 'cancelled' } : l));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.patch(`/lessons/${id}`, { status: 'cancelled' });
+      setLessons(prev => prev.map(l => l.id === id ? { ...l, status: 'cancelled' } : l));
+      toast('success', '강좌가 취소되었습니다');
+    } catch {
+      toast('error', '취소에 실패했습니다');
+    }
     setDeleteTarget(null);
   };
 

@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 export default function AccountPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [nickname, setNickname] = useState('축구왕김선수');
   const [email, setEmail] = useState('player@example.com');
   const [phone, setPhone] = useState('010-1234-5678');
@@ -92,7 +95,17 @@ export default function AccountPage() {
         </div>
 
         {/* 저장 버튼 */}
-        <button className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-[15px] font-semibold hover:bg-blue-600 active:bg-blue-700 transition-colors">
+        <button
+          onClick={async () => {
+            try {
+              await api.patch('/users/me', { nickname, email, phone });
+              toast('success', '변경사항이 저장되었습니다');
+            } catch {
+              toast('error', '저장에 실패했습니다');
+            }
+          }}
+          className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-[15px] font-semibold hover:bg-blue-600 active:bg-blue-700 transition-colors"
+        >
           변경사항 저장
         </button>
 

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const positionOptions = [
   { value: 'GK', label: '골키퍼 (GK)' },
@@ -54,6 +56,7 @@ const initialForm: FormData = {
 
 export default function NewMercenaryPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [form, setForm] = useState<FormData>(initialForm);
   const [submitted, setSubmitted] = useState(false);
 
@@ -68,12 +71,18 @@ export default function NewMercenaryPage() {
     !!form.venue &&
     !!form.position;
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!canSubmit) return;
-    setSubmitted(true);
-    setTimeout(() => {
-      router.push('/mercenary');
-    }, 1500);
+    try {
+      await api.post('/mercenary', form);
+      toast('success', '용병 모집글이 등록되었습니다');
+      setSubmitted(true);
+      setTimeout(() => {
+        router.push('/mercenary');
+      }, 1500);
+    } catch {
+      toast('error', '등록에 실패했습니다');
+    }
   }
 
   const formatCurrency = (n: string) =>

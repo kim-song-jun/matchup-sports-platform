@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useMatch } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -88,11 +89,15 @@ export default function EditMatchPage() {
   const handleSave = async () => {
     if (!form.title) return toast('error', '제목을 입력해주세요');
     setIsSaving(true);
-    // Mock save
-    setTimeout(() => {
-      toast('success', '수정되었습니다');
-      router.back();
-    }, 500);
+    try {
+      await api.patch(`/matches/${matchId}`, form);
+      toast('success', '매치가 수정되었습니다');
+      router.push(`/matches/${matchId}`);
+    } catch {
+      toast('error', '수정에 실패했습니다');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

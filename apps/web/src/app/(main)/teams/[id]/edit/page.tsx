@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -43,18 +44,28 @@ export default function EditTeamPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name) return toast('error', '팀 이름을 입력해주세요');
     setIsSaving(true);
-    setTimeout(() => {
-      toast('success', '수정되었습니다');
-      router.back();
-    }, 500);
+    try {
+      await api.patch(`/teams/${teamId}`, form);
+      toast('success', '팀이 수정되었습니다');
+      router.push(`/teams/${teamId}`);
+    } catch {
+      toast('error', '수정에 실패했습니다');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = () => {
-    toast('success', '팀이 삭제되었습니다');
-    router.push('/my/teams');
+  const handleDelete = async () => {
+    try {
+      await api.delete(`/teams/${teamId}`);
+      toast('success', '팀이 삭제되었습니다');
+      router.push('/my/teams');
+    } catch {
+      toast('error', '삭제에 실패했습니다');
+    }
   };
 
   return (

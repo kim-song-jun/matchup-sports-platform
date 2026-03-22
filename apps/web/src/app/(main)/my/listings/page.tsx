@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const mockMyListings = [
   {
@@ -69,17 +71,30 @@ function formatCurrency(n: number) {
 
 export default function MyListingsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [listings, setListings] = useState(mockMyListings);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
 
-  const handleStatusChange = (id: string, newStatus: string) => {
-    setListings(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      await api.patch(`/marketplace/listings/${id}`, { status: newStatus });
+      setListings(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+      toast('success', '상태가 변경되었습니다');
+    } catch {
+      toast('error', '변경에 실패했습니다');
+    }
     setStatusDropdown(null);
   };
 
-  const handleDelete = (id: string) => {
-    setListings(prev => prev.filter(l => l.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await api.delete(`/marketplace/listings/${id}`);
+      setListings(prev => prev.filter(l => l.id !== id));
+      toast('success', '매물이 삭제되었습니다');
+    } catch {
+      toast('error', '삭제에 실패했습니다');
+    }
     setDeleteTarget(null);
   };
 

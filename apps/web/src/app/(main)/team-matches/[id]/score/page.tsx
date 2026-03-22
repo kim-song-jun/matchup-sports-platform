@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Trophy, Shield, CheckCircle2, Hash,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 // Mock match data
 const mockMatch = {
@@ -30,6 +32,7 @@ interface QuarterScore {
 export default function ScoreInputPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const id = params.id as string;
 
   const [scores, setScores] = useState<QuarterScore[]>(
@@ -50,10 +53,15 @@ export default function ScoreInputPage() {
 
   const allFilled = scores.every((s) => s.home !== '' && s.away !== '');
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!allFilled) return;
-    setSubmitted(true);
-    // In real implementation, this would call an API
+    try {
+      await api.post(`/team-matches/${id}/result`, { scoreHome: homeTotal, scoreAway: awayTotal, quarters: scores });
+      setSubmitted(true);
+      toast('success', '스코어가 기록되었습니다');
+    } catch {
+      toast('error', '스코어 기록에 실패했습니다');
+    }
   }
 
   return (

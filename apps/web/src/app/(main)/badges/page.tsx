@@ -188,11 +188,11 @@ export default function BadgesPage() {
             <span className="text-[14px] text-blue-200 mb-0.5">/ {allBadges.length}</span>
           </div>
           <div className="mt-3 flex gap-1.5">
-            {earnedBadges.map((badge) => {
+            {earnedBadges.map((badge, idx) => {
               const Icon = badge.icon;
               return (
                 <div
-                  key={badge.id}
+                  key={badge.id || `earned-${idx}`}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm"
                 >
                   <Icon size={14} />
@@ -230,12 +230,12 @@ export default function BadgesPage() {
       {/* Badge grid */}
       <div className="px-5 lg:px-0">
         <div className="space-y-3">
-          {displayBadges.map((badge) => {
+          {displayBadges.map((badge, idx) => {
             const Icon = badge.icon;
 
             return (
               <div
-                key={badge.id}
+                key={badge.id || `badge-${idx}`}
                 className={`rounded-2xl border p-4 transition-all ${
                   badge.earned
                     ? 'bg-white border-gray-100'

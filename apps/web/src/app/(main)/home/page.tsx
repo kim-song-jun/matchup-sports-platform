@@ -8,6 +8,7 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import type { Match } from '@/types/api';
 
 const sports = [
+  { type: 'soccer', label: '축구', color: 'text-blue-500 bg-blue-50' },
   { type: 'futsal', label: '풋살', color: 'text-blue-500 bg-blue-50' },
   { type: 'basketball', label: '농구', color: 'text-blue-500 bg-blue-50' },
   { type: 'badminton', label: '배드민턴', color: 'text-blue-500 bg-blue-50' },
@@ -17,7 +18,7 @@ const sports = [
 ];
 
 const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
+  soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
   ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };

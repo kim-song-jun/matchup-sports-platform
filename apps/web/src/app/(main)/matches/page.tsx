@@ -10,6 +10,7 @@ import type { Match } from '@/types/api';
 
 const sportFilters = [
   { key: '', label: '전체' },
+  { key: 'soccer', label: '축구' },
   { key: 'futsal', label: '풋살' },
   { key: 'basketball', label: '농구' },
   { key: 'badminton', label: '배드민턴' },
@@ -17,7 +18,7 @@ const sportFilters = [
 ];
 
 const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
+  soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
   ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };

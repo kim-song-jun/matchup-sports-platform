@@ -27,7 +27,7 @@ export default function ProfilePage() {
         <h1 className="text-[22px] font-bold text-gray-900">마이페이지</h1>
       </header>
 
-      <div className="px-5 lg:px-0 lg:grid lg:grid-cols-[1fr_340px] lg:gap-8">
+      <div className={`px-5 lg:px-0 ${isAuthenticated ? 'lg:grid lg:grid-cols-[1fr_340px] lg:gap-8' : ''}`}>
         <div>
         {isAuthenticated && user ? (
           <div className="rounded-2xl bg-white border border-gray-100 p-5">

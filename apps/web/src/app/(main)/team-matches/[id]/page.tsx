@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Calendar, Clock, MapPin, Trophy, DollarSign,
   Users, Shield, CheckCircle2, XCircle, AlertCircle, Star,
-  ChevronRight, MapPinCheck, ClipboardCheck,
+  ChevronRight, MapPinCheck, ClipboardCheck, Pencil,
 } from 'lucide-react';
 import {
   useTeamMatch, useTeamMatchRefereeSchedule,
@@ -364,7 +364,16 @@ export default function TeamMatchDetailPage() {
               )}
 
               {isHost && isRecruiting && (
-                <p className="text-center text-[13px] text-gray-400">내가 작성한 모집글이에요</p>
+                <>
+                  <Link
+                    href={`/team-matches/${id}/edit`}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50 py-3.5 text-[14px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <Pencil size={16} />
+                    모집글 수정
+                  </Link>
+                  <p className="text-center text-[13px] text-gray-400">내가 작성한 모집글이에요</p>
+                </>
               )}
             </div>
 

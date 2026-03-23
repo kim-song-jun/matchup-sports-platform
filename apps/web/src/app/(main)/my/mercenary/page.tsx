@@ -110,10 +110,13 @@ export default function MyMercenaryPage() {
 
             {post.status === 'open' && (
               <div className="mt-3 flex gap-2">
-                <button className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+                <Link
+                  href={`/mercenary/${post.id}/edit`}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+                >
                   <Pencil size={14} />
                   수정
-                </button>
+                </Link>
                 <button
                   onClick={() => setDeleteTarget(post.id)}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-100 transition-colors"

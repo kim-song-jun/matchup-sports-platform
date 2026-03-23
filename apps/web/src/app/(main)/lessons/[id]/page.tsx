@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Video, Image, BookOpen } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Video, Image, BookOpen, Pencil } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { CheckoutModal } from '@/components/payment/checkout-modal';
@@ -39,12 +39,14 @@ const sampleCurriculum = [
 export default function LessonDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const lessonId = params.id as string;
   const [showCheckout, setShowCheckout] = useState(false);
   const [isEnrolling, setIsEnrolling] = useState(false);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
+
+  const isHost = user?.id === lesson?.hostId;
 
   if (isLoading) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 rounded-2xl" /><div className="h-32 bg-gray-100 rounded-2xl" /></div></div>;
   if (!lesson) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20"><p className="text-gray-500">강좌를 찾을 수 없습니다</p><Link href="/lessons" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link></div>;
@@ -226,6 +228,16 @@ export default function LessonDetailPage() {
                 </div>
               </div>
             </div>
+
+            {isHost && (
+              <Link
+                href={`/lessons/${lessonId}/edit`}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-white border border-gray-100 p-4 text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Pencil size={16} />
+                강좌 수정
+              </Link>
+            )}
           </div>
         </div>
       </div>

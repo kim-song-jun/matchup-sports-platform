@@ -125,13 +125,13 @@ export default function MyTeamMatchesPage() {
                     신청현황
                     <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[11px] font-bold text-white">{post.applicants}</span>
                   </Link>
-                  <button
-                    onClick={() => router.push(`/team-matches/${post.id}`)}
+                  <Link
+                    href={`/team-matches/${post.id}/edit`}
                     className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 px-4 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     <Pencil size={14} />
                     수정
-                  </button>
+                  </Link>
                   <button
                     onClick={() => setDeleteTarget(post.id)}
                     className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-4 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-100 transition-colors"

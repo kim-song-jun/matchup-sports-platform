@@ -118,7 +118,7 @@ export default function MyLessonsPage() {
             {lesson.status === 'active' && (
               <div className="mt-3 flex gap-2">
                 <Link
-                  href={`/lessons/${lesson.id}`}
+                  href={`/lessons/${lesson.id}/edit`}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   <Pencil size={14} />

@@ -80,11 +80,12 @@ export function SoccerIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M12 2L14 7H10L12 2Z" stroke="currentColor" strokeWidth="1" />
-      <path d="M22 12L17 14V10L22 12Z" stroke="currentColor" strokeWidth="1" />
-      <path d="M2 12L7 10V14L2 12Z" stroke="currentColor" strokeWidth="1" />
-      <path d="M12 22L10 17H14L12 22Z" stroke="currentColor" strokeWidth="1" />
-      <polygon points="12,8 14.5,10 13.5,13 10.5,13 9.5,10" stroke="currentColor" strokeWidth="1.2" fill="none" />
+      <polygon points="12,7 15,9.5 14,13 10,13 9,9.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+      <line x1="12" y1="2" x2="12" y2="7" stroke="currentColor" strokeWidth="0.8" />
+      <line x1="22" y1="12" x2="15" y2="9.5" stroke="currentColor" strokeWidth="0.8" />
+      <line x1="19" y1="19" x2="14" y2="13" stroke="currentColor" strokeWidth="0.8" />
+      <line x1="5" y1="19" x2="10" y2="13" stroke="currentColor" strokeWidth="0.8" />
+      <line x1="2" y1="12" x2="9" y2="9.5" stroke="currentColor" strokeWidth="0.8" />
     </svg>
   );
 }

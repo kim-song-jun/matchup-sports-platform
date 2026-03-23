@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -37,6 +38,12 @@ export default function HomePage() {
   const { user, isAuthenticated } = useAuthStore();
   const { data: matchData, isLoading } = useMatches();
   const matches = matchData?.items ?? [];
+  const [bannerIndex, setBannerIndex] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setBannerIndex(i => (i + 1) % 3), 5000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -66,6 +73,33 @@ export default function HomePage() {
         </h2>
         <p className="text-[14px] text-gray-400 mt-1">AI가 최적의 매치를 추천해드려요</p>
       </div>
+
+      {/* 프로모션 배너 */}
+      <section className="mt-3 px-5 lg:px-0">
+        <div className="relative overflow-hidden rounded-2xl">
+          {/* Banner slides - auto-rotate */}
+          {[
+            { bg: 'from-blue-500 to-blue-600', title: '팀 매칭 오픈!', desc: '실력등급(S~D)으로 딱 맞는 상대를 찾아보세요', cta: '팀 매칭 →', href: '/team-matches' },
+            { bg: 'from-gray-800 to-gray-900', title: '첫 매치 참가비 무료', desc: '지금 가입하고 첫 매치를 무료로 즐기세요', cta: '매치 찾기 →', href: '/matches' },
+            { bg: 'from-green-500 to-green-600', title: '용병 모집 중', desc: '팀에 빈 자리가 있나요? 용병을 구해보세요', cta: '용병 찾기 →', href: '/mercenary' },
+          ].filter((_, i) => i === bannerIndex).map((banner) => (
+            <Link key={banner.href} href={banner.href}>
+              <div className={`bg-gradient-to-r ${banner.bg} p-6 lg:p-8 text-white`}>
+                <p className="text-[12px] font-medium text-white/60 uppercase tracking-wider">EVENT</p>
+                <h3 className="text-[20px] lg:text-[24px] font-bold mt-1">{banner.title}</h3>
+                <p className="text-[14px] text-white/80 mt-1">{banner.desc}</p>
+                <span className="inline-block mt-3 text-[13px] font-semibold text-white/90 border border-white/30 rounded-lg px-4 py-1.5 hover:bg-white/10 transition-colors">{banner.cta}</span>
+              </div>
+            </Link>
+          ))}
+          {/* Dots indicator */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {[0, 1, 2].map(i => (
+              <button key={i} onClick={() => setBannerIndex(i)} className={`h-1.5 rounded-full transition-all ${bannerIndex === i ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`} />
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* 종목 선택 */}
       <section className="mt-5 lg:mt-0 px-5 lg:px-0">

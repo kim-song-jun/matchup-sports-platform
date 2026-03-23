@@ -243,7 +243,7 @@ export default function MercenaryPage() {
                     </div>
                     <div className="flex items-center gap-1 text-[12px] text-amber-500 shrink-0">
                       <Star size={12} fill="currentColor" />
-                      <span className="font-semibold">{post.mannerScore.toFixed(1)}</span>
+                      <span className="font-semibold">{(post.mannerScore ?? 0).toFixed(1)}</span>
                     </div>
                   </div>
 

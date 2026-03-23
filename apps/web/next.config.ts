@@ -2,13 +2,11 @@ import type { NextConfig } from 'next';
 
 const isCapacitorBuild = process.env.CAPACITOR_BUILD === 'true';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const nextConfig: NextConfig = {
-  // Capacitor 빌드 시에만 정적 출력
-  ...(isCapacitorBuild && { output: 'export' }),
-  experimental: {
-    // 빠른 페이지 전환을 위한 prefetch 최적화
-    optimisticClientCache: true,
-  },
+  // 프로덕션: standalone, Capacitor: export
+  output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
   images: {
     unoptimized: true,
   },
@@ -17,7 +15,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8100/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8100'}/api/:path*`,
       },
     ];
   },

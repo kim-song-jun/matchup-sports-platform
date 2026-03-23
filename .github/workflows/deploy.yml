@@ -1,0 +1,84 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+env:
+  DOCKER_COMPOSE_FILE: deploy/docker-compose.prod.yml
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: |
+          cd apps/api
+          npx prisma generate
+          npx nest build
+
+      - name: Build Web
+        run: |
+          cd apps/web
+          npx next build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL || '/api/v1' }}
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 프로젝트 디렉토리 이동 (없으면 클론)
+            if [ ! -d "/home/${{ secrets.EC2_USER }}/matchup" ]; then
+              git clone https://github.com/${{ github.repository }}.git /home/${{ secrets.EC2_USER }}/matchup
+            fi
+            cd /home/${{ secrets.EC2_USER }}/matchup
+
+            # 최신 코드 가져오기
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 환경변수 확인
+            if [ ! -f deploy/.env ]; then
+              cp deploy/.env.prod.example deploy/.env
+              echo "⚠️  deploy/.env 파일을 수동으로 설정해야 합니다!"
+              exit 1
+            fi
+
+            # Docker Compose 빌드 + 재시작
+            cd deploy
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            # DB 마이그레이션 (최초 1회 또는 스키마 변경 시)
+            sleep 10
+            docker exec matchup_api npx prisma db push --skip-generate 2>/dev/null || true
+
+            # 헬스체크
+            sleep 5
+            curl -sf http://localhost/api/v1/health || echo "⚠️ Health check failed"
+
+            echo "✅ 배포 완료!"

@@ -7,6 +7,8 @@ import {
   ChevronRight, X, Plus, Loader2, Trash2, AlertTriangle,
   Building2, Save,
 } from 'lucide-react';
+import { api } from '@/lib/api';
+import { useToast } from '@/components/ui/toast';
 
 const sportOptions = [
   { value: 'futsal', label: '풋살' },
@@ -90,6 +92,7 @@ export default function AdminVenueEditPage() {
     weekendClose: venueData.operatingHours.weekend.close,
   });
 
+  const { toast } = useToast();
   const [facilityInput, setFacilityInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -134,19 +137,44 @@ export default function AdminVenueEditPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    // Simulate PATCH /admin/venues/:id
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    setSaved(true);
+    try {
+      await api.patch(`/admin/venues/${venueId}`, {
+        name: form.name,
+        type: form.type,
+        sportTypes: form.sportTypes,
+        address: form.address,
+        city: form.city,
+        district: form.district,
+        phone: form.phone,
+        description: form.description,
+        facilities: form.facilities,
+        pricePerHour: Number(form.pricePerHour),
+        operatingHours: {
+          weekday: { open: form.weekdayOpen, close: form.weekdayClose },
+          weekend: { open: form.weekendOpen, close: form.weekendClose },
+        },
+      });
+      setSaved(true);
+      toast('success', '시설 정보가 저장되었습니다');
+    } catch {
+      toast('error', '저장에 실패했습니다. 다시 시도해주세요');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
     setDeleting(true);
-    // Simulate DELETE /admin/venues/:id
-    await new Promise((r) => setTimeout(r, 600));
-    setDeleting(false);
-    setShowDeleteModal(false);
-    router.push('/admin/venues');
+    try {
+      await api.delete(`/admin/venues/${venueId}`);
+      toast('success', '시설이 삭제되었습니다');
+      setShowDeleteModal(false);
+      router.push('/admin/venues');
+    } catch {
+      toast('error', '삭제에 실패했습니다. 다시 시도해주세요');
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   const inputClass =

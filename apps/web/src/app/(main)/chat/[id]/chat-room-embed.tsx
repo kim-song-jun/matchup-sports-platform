@@ -4,8 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Send, ChevronDown, ChevronUp,
   Calendar, MapPin, DollarSign, Info,
+  MoreVertical, Flag, Ban, LogOut,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/stores/chat-store';
+import { useToast } from '@/components/ui/toast';
 import type { ChatMessage } from '@/stores/chat-store';
 
 function formatTime(dateStr: string): string {
@@ -75,6 +79,8 @@ export default function ChatRoomEmbed({
     chatRooms, getChatMessages, sendMessage, markAsRead,
     currentUserId, currentTeamId,
   } = useChatStore();
+  const { toast } = useToast();
+  const router = useRouter();
 
   const room = chatRooms.find((r) => r.id === chatRoomId);
   const messages = getChatMessages(chatRoomId);
@@ -82,13 +88,26 @@ export default function ChatRoomEmbed({
 
   const [input, setInput] = useState('');
   const [showMatchInfo, setShowMatchInfo] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetail, setReportDetail] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const opponentName = room
     ? room.homeTeamId === currentTeamId
       ? room.awayTeamName
       : room.homeTeamName
+    : '';
+
+  const opponentTeamId = room
+    ? room.homeTeamId === currentTeamId
+      ? room.awayTeamId
+      : room.homeTeamId
     : '';
 
   // Mark as read on mount / room change
@@ -103,10 +122,27 @@ export default function ChatRoomEmbed({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, chatRoomId]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
+
   // Reset input on room switch
   useEffect(() => {
     setInput('');
     setShowMatchInfo(false);
+    setShowMenu(false);
+    setShowReportModal(false);
+    setShowBlockModal(false);
+    setShowLeaveModal(false);
   }, [chatRoomId]);
 
   function handleSend() {
@@ -126,6 +162,25 @@ export default function ChatRoomEmbed({
       e.preventDefault();
       handleSend();
     }
+  }
+
+  function handleReport() {
+    if (!reportReason) return;
+    setShowReportModal(false);
+    setReportReason('');
+    setReportDetail('');
+    toast('success', '신고가 접수되었습니다');
+  }
+
+  function handleBlock() {
+    setShowBlockModal(false);
+    toast('success', '차단되었습니다');
+  }
+
+  function handleLeave() {
+    setShowLeaveModal(false);
+    toast('info', '채팅방을 나갔습니다');
+    router.push('/chat');
   }
 
   if (!room) {
@@ -158,9 +213,12 @@ export default function ChatRoomEmbed({
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <h1 className="text-[16px] font-bold text-gray-900 truncate">
+            <Link
+              href={`/teams/${opponentTeamId}`}
+              className="text-[16px] font-bold text-gray-900 truncate block hover:text-blue-500 transition-colors"
+            >
               {opponentName}
-            </h1>
+            </Link>
             <p className="text-[11px] text-gray-400 truncate">
               {room.matchTitle}
             </p>
@@ -171,6 +229,40 @@ export default function ChatRoomEmbed({
           >
             {showMatchInfo ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
+          {/* More menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 transition-colors"
+            >
+              <MoreVertical size={18} />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-white border border-gray-100 shadow-lg py-1 z-50 animate-fade-in">
+                <button
+                  onClick={() => { setShowMenu(false); setShowReportModal(true); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Flag size={14} className="text-gray-400" />
+                  신고하기
+                </button>
+                <button
+                  onClick={() => { setShowMenu(false); setShowBlockModal(true); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Ban size={14} className="text-gray-400" />
+                  차단하기
+                </button>
+                <button
+                  onClick={() => { setShowMenu(false); setShowLeaveModal(true); }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] text-red-500 hover:bg-gray-50 transition-colors"
+                >
+                  <LogOut size={14} className="text-red-400" />
+                  나가기
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Collapsible Match Info */}
@@ -307,6 +399,121 @@ export default function ChatRoomEmbed({
           </button>
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 mx-4 animate-fade-in">
+            <h3 className="text-[16px] font-bold text-gray-900 mb-4">신고하기</h3>
+            <div className="space-y-2 mb-4">
+              {['욕설/비매너', '허위정보', '스팸', '기타'].map((reason) => (
+                <label
+                  key={reason}
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all ${
+                    reportReason === reason
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="reportReason"
+                    value={reason}
+                    checked={reportReason === reason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    className="accent-blue-500"
+                  />
+                  <span className="text-[14px] text-gray-700">{reason}</span>
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={reportDetail}
+              onChange={(e) => setReportDetail(e.target.value)}
+              placeholder="상세 내용을 입력하세요 (선택)"
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white transition-all resize-none mb-4"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetail(''); }}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleReport}
+                disabled={!reportReason}
+                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                신고하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Block Modal */}
+      {showBlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 mx-4 animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+                <Ban size={20} className="text-red-500" />
+              </div>
+              <h3 className="text-[16px] font-bold text-gray-900">차단하기</h3>
+            </div>
+            <p className="text-[14px] text-gray-600 mb-6">
+              이 팀을 차단하시겠어요? 차단하면 채팅이 비활성화됩니다.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowBlockModal(false)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleBlock}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors"
+              >
+                차단하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 mx-4 animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                <LogOut size={20} className="text-gray-500" />
+              </div>
+              <h3 className="text-[16px] font-bold text-gray-900">채팅방 나가기</h3>
+            </div>
+            <p className="text-[14px] text-gray-600 mb-6">
+              채팅방을 나가시겠어요? 대화 내용은 삭제됩니다.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleLeave}
+                className="flex-1 rounded-xl bg-gray-900 py-2.5 text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors"
+              >
+                나가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

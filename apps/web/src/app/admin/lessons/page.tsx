@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, Pencil } from 'lucide-react';
 import { useAdminLessons } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/toast';
 import type { Lesson } from '@/types/api';
 
 const typeLabel: Record<string, string> = { group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉' };
@@ -14,6 +15,7 @@ function formatCurrency(n: number) { return n === 0 ? '무료' : new Intl.Number
 
 export default function AdminLessonsPage() {
   const { data, isLoading } = useAdminLessons();
+  const { toast } = useToast();
 
   const lessons = Array.isArray(data) ? data : [];
 
@@ -40,11 +42,12 @@ export default function AdminLessonsPage() {
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">수강료</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">상태</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">등록자</th>
+              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? Array.from({length:3}).map((_,i) => (
-              <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+              <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
             )) : lessons.map((l: Lesson) => (
               <tr key={l.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/lessons/${l.id}`}>
                 <td className="px-5 py-3.5">
@@ -59,6 +62,15 @@ export default function AdminLessonsPage() {
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor[l.status] || 'bg-gray-100'}`}>{statusLabel[l.status] || l.status}</span>
                 </td>
                 <td className="px-5 py-3.5 text-[13px] text-gray-600">{l.host?.nickname}</td>
+                <td className="px-5 py-3.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toast('info', '강좌 수정 페이지 준비 중입니다'); }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-500 transition-colors"
+                  >
+                    <Pencil size={12} />
+                    수정
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Users, Plus } from 'lucide-react';
+import { Users, Plus, Pencil } from 'lucide-react';
 import { useAdminTeams } from '@/hooks/use-api';
 import type { SportTeam } from '@/types/api';
 
@@ -35,11 +35,12 @@ export default function AdminTeamsPage() {
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">지역</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">모집</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">운영자</th>
+              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? Array.from({length:2}).map((_,i) => (
-              <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+              <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
             )) : teams.map((t: SportTeam) => (
               <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-5 py-3.5">
@@ -58,6 +59,15 @@ export default function AdminTeamsPage() {
                   </span>
                 </td>
                 <td className="px-5 py-3.5 text-[13px] text-gray-600">{t.owner?.nickname}</td>
+                <td className="px-5 py-3.5">
+                  <Link
+                    href={`/teams/${t.id}/edit`}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-500 transition-colors"
+                  >
+                    <Pencil size={12} />
+                    수정
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

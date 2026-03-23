@@ -5,8 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, ChevronRight, MapPin, Star, Clock, Phone, Users,
-  Calendar, Check, Share2, PenLine, Trophy, DollarSign,
+  Calendar, Check, Share2, PenLine, Trophy, DollarSign, MessageSquareOff,
 } from 'lucide-react';
+import type { Venue } from '@/types/api';
 import { MapPlaceholder } from '@/components/ui/map-placeholder';
 import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
 import { useVenue } from '@/hooks/use-api';
@@ -132,8 +133,15 @@ export default function VenueDetailPage() {
 
   // Use API hook with mock data fallback
   const { data: apiVenue } = useVenue(venueId);
-  const venue = (apiVenue || mockVenue) as typeof mockVenue;
+  const venue = (apiVenue || mockVenue) as Venue & { sportType?: string; reviews?: Array<{ id: string; rating: number; comment: string | null; createdAt: string; user?: { id?: string; nickname: string; profileImageUrl?: string | null } }> };
 
+  const venueRating = venue.rating ?? 0;
+  const venueReviewCount = venue.reviewCount ?? 0;
+  const venueFacilities = venue.facilities ?? [];
+  const venueReviews = venue.reviews ?? [];
+  const venuePhone = venue.phone || null;
+  const venueDescription = venue.description || null;
+  const venuePricePerHour = venue.pricePerHour ?? null;
   const operatingHours = venue.operatingHours as Record<string, { open: string; close: string }> | null;
 
   function handleReviewSubmit(data: ReviewData) {
@@ -179,21 +187,17 @@ export default function VenueDetailPage() {
           {/* Title card */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5 mb-3">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[12px] font-medium text-blue-500">{sportLabel[venue.sportType || venue.type] || venue.type}</span>
-              {venue.rating > 0 && (
-                <div className="flex items-center gap-1 text-[13px]">
-                  <Star size={13} className="text-amber-400" fill="currentColor" />
-                  <span className="font-medium text-gray-700">{venue.rating.toFixed(1)}</span>
-                  {venue.reviewCount > 0 && (
-                    <span className="text-gray-400">({venue.reviewCount})</span>
-                  )}
-                </div>
-              )}
+              <span className="text-[12px] font-medium text-blue-500">{sportLabel[venue.sportType || venue.sportTypes?.[0] || venue.type] || venue.type}</span>
+              <div className="flex items-center gap-1 text-[13px]">
+                <Star size={13} className="text-amber-400" fill="currentColor" />
+                <span className="font-medium text-gray-700">{venueRating.toFixed(1)}</span>
+                <span className="text-gray-400">({venueReviewCount})</span>
+              </div>
             </div>
             <h2 className="text-[22px] font-bold text-gray-900">{venue.name}</h2>
 
-            {venue.description && (
-              <p className="mt-3 text-[14px] text-gray-600 leading-relaxed">{venue.description}</p>
+            {venueDescription && (
+              <p className="mt-3 text-[14px] text-gray-600 leading-relaxed">{venueDescription}</p>
             )}
           </div>
 
@@ -211,64 +215,71 @@ export default function VenueDetailPage() {
                 </div>
 
                 {/* Operating Hours - nicely formatted */}
-                {operatingHours && (
-                  <div className="flex items-start gap-3">
-                    <Clock size={18} className="text-gray-400 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-[13px] text-gray-400 mb-2">운영 시간</p>
+                <div className="flex items-start gap-3">
+                  <Clock size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-[13px] text-gray-400 mb-2">운영 시간</p>
+                    {operatingHours && Object.keys(operatingHours).length > 0 ? (
                       <div className="space-y-1.5">
                         {Object.entries(operatingHours).map(([day, hours]) => {
                           const label = dayLabels[day] || day;
+                          const isClosed = (hours as { open: string; close: string; closed?: boolean }).closed;
                           return (
                             <div
                               key={day}
                               className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
                             >
                               <span className="text-[13px] font-medium text-gray-700">{label}</span>
-                              <span className="text-[13px] text-gray-600">{hours.open} ~ {hours.close}</span>
+                              <span className="text-[13px] text-gray-600">
+                                {isClosed ? '휴무' : `${hours.open || '00:00'} ~ ${hours.close || '00:00'}`}
+                              </span>
                             </div>
                           );
                         })}
                       </div>
-                    </div>
+                    ) : (
+                      <p className="text-[13px] text-gray-400">운영 시간 정보 없음</p>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Price */}
-                {venue.pricePerHour && (
-                  <div className="flex items-start gap-3">
-                    <DollarSign size={18} className="text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-[13px] text-gray-400">이용 요금</p>
-                      <p className="text-[15px] text-gray-900 mt-0.5">
-                        시간당 {new Intl.NumberFormat('ko-KR').format(venue.pricePerHour)}원
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <DollarSign size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[13px] text-gray-400">이용 요금</p>
+                    <p className="text-[15px] text-gray-900 mt-0.5">
+                      {venuePricePerHour
+                        ? `시간당 ${new Intl.NumberFormat('ko-KR').format(venuePricePerHour)}원`
+                        : '요금 정보 없음'}
+                    </p>
                   </div>
-                )}
+                </div>
 
                 {/* Phone */}
-                {venue.phone && (
-                  <div className="flex items-start gap-3">
-                    <Phone size={18} className="text-gray-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-[13px] text-gray-400">전화번호</p>
-                      <a href={`tel:${venue.phone}`} className="text-[15px] text-blue-500 mt-0.5 block">
-                        {venue.phone}
+                <div className="flex items-start gap-3">
+                  <Phone size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[13px] text-gray-400">전화번호</p>
+                    {venuePhone ? (
+                      <a href={`tel:${venuePhone}`} className="text-[15px] text-blue-500 mt-0.5 block">
+                        {venuePhone}
                       </a>
-                    </div>
+                    ) : (
+                      <p className="text-[15px] text-gray-400 mt-0.5">전화번호 없음</p>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Facilities - colored tags */}
-          {venue.facilities && venue.facilities.length > 0 && (
-            <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
-              <h3 className="text-[14px] font-semibold text-gray-900 mb-3">시설 정보</h3>
+          <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">시설 정보</h3>
+            {venueFacilities.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {venue.facilities.map((facility: string) => {
+                {venueFacilities.map((facility: string) => {
                   const color = facilityColors[facility] || getDefaultFacilityColor();
                   return (
                     <span
@@ -281,47 +292,54 @@ export default function VenueDetailPage() {
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-[13px] text-gray-400">등록된 시설 정보가 없습니다</p>
+            )}
+          </div>
 
           {/* Reviews */}
-          {venue.reviews && venue.reviews.length > 0 && (
-            <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[14px] font-semibold text-gray-900">
-                  리뷰 ({venue.reviews.length})
-                </h3>
-                <div className="flex items-center gap-1 text-[13px]">
-                  <Star size={13} className="text-amber-400" fill="currentColor" />
-                  <span className="font-semibold text-gray-700">{venue.rating.toFixed(1)}</span>
-                </div>
+          <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[14px] font-semibold text-gray-900">
+                리뷰 ({venueReviews.length})
+              </h3>
+              <div className="flex items-center gap-1 text-[13px]">
+                <Star size={13} className="text-amber-400" fill="currentColor" />
+                <span className="font-semibold text-gray-700">{venueRating.toFixed(1)}</span>
               </div>
+            </div>
+            {venueReviews.length > 0 ? (
               <div className="space-y-4">
-                {venue.reviews.slice(0, 5).map((review: { id: string; rating: number; comment: string; user: { nickname: string }; createdAt: string }) => (
+                {venueReviews.slice(0, 5).map((review) => (
                   <div key={review.id} className="border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">
-                        {review.user?.nickname?.charAt(0)}
+                        {review.user?.nickname?.charAt(0) || '?'}
                       </div>
-                      <span className="text-[13px] font-medium text-gray-700">{review.user?.nickname}</span>
+                      <span className="text-[13px] font-medium text-gray-700">{review.user?.nickname || '익명'}</span>
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star
                             key={i}
                             size={11}
-                            className={i < review.rating ? 'text-amber-400' : 'text-gray-200'}
-                            fill={i < review.rating ? 'currentColor' : 'none'}
+                            className={i < (review.rating ?? 0) ? 'text-amber-400' : 'text-gray-200'}
+                            fill={i < (review.rating ?? 0) ? 'currentColor' : 'none'}
                           />
                         ))}
                       </div>
                       <span className="text-[11px] text-gray-300 ml-auto">{review.createdAt}</span>
                     </div>
-                    <p className="text-[14px] text-gray-600 leading-relaxed">{review.comment}</p>
+                    <p className="text-[14px] text-gray-600 leading-relaxed">{review.comment || ''}</p>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-xl bg-gray-50 p-6 text-center">
+                <MessageSquareOff size={24} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-[13px] text-gray-400">아직 리뷰가 없습니다</p>
+              </div>
+            )}
+          </div>
 
           {/* Review Form Toggle */}
           <div className="mb-3">
@@ -336,7 +354,7 @@ export default function VenueDetailPage() {
             ) : (
               <ReviewForm
                 venueId={venueId}
-                venueType={venue.sportType === 'ice_hockey' ? 'ice_rink' : 'field'}
+                venueType={(venue.sportType || venue.sportTypes?.[0]) === 'ice_hockey' ? 'ice_rink' : 'field'}
                 onSubmit={handleReviewSubmit}
                 onCancel={() => setShowReviewForm(false)}
               />
@@ -404,9 +422,9 @@ export default function VenueDetailPage() {
               이 구장에서 경기 만들기
             </Link>
 
-            {venue.phone && (
+            {venuePhone && (
               <a
-                href={`tel:${venue.phone}`}
+                href={`tel:${venuePhone}`}
                 className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-2"
               >
                 <Phone size={14} />

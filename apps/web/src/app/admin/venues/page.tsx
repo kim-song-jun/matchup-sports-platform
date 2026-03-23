@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, MapPin, Star, Plus, Building2 } from 'lucide-react';
+import { Search, MapPin, Star, Plus, Building2, Pencil } from 'lucide-react';
 import { useAdminVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 
@@ -58,13 +58,14 @@ export default function AdminVenuesPage() {
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">주소</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">평점</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">시간당</th>
+              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? Array.from({ length: 4 }).map((_, i) => (
-              <tr key={i}><td colSpan={6} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+              <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
             )) : filtered.map((v: Venue) => (
-              <tr key={v.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/venues/${v.id}`}>
+              <tr key={v.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/venues/${v.id}`}>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
@@ -93,6 +94,16 @@ export default function AdminVenuesPage() {
                 </td>
                 <td className="px-5 py-3.5 text-[13px] text-gray-800 font-medium">
                   {v.pricePerHour ? `${new Intl.NumberFormat('ko-KR').format(v.pricePerHour)}원` : '-'}
+                </td>
+                <td className="px-5 py-3.5">
+                  <Link
+                    href={`/admin/venues/${v.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-500 transition-colors"
+                  >
+                    <Pencil size={12} />
+                    수정
+                  </Link>
                 </td>
               </tr>
             ))}

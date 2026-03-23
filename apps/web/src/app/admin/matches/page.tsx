@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { Pencil } from 'lucide-react';
 import { useAdminMatches } from '@/hooks/use-api';
 import type { Match } from '@/types/api';
 
@@ -43,12 +45,13 @@ export default function AdminMatchesPage() {
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">인원</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">상태</th>
               <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">호스트</th>
+              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}><td colSpan={6} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+                <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
               ))
             ) : matches.map((m: Match) => (
               <tr key={m.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/matches/${m.id}`}>
@@ -65,6 +68,16 @@ export default function AdminMatchesPage() {
                   </span>
                 </td>
                 <td className="px-5 py-3.5 text-[13px] text-gray-600">{m.host?.nickname}</td>
+                <td className="px-5 py-3.5">
+                  <Link
+                    href={`/matches/${m.id}/edit`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-500 transition-colors"
+                  >
+                    <Pencil size={12} />
+                    수정
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>

@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useListing } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 
 const sportLabel: Record<string, string> = { futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키' };
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
@@ -21,9 +22,10 @@ function formatCurrency(n: number) { return new Intl.NumberFormat('ko-KR').forma
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { toast } = useToast();
   const [liked, setLiked] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const listingId = params.id as string;
 
   const { data: listing, isLoading } = useListing(listingId);
@@ -195,6 +197,16 @@ export default function ListingDetailPage() {
                   <MessageCircle size={18} />
                   채팅하기
                 </button>
+                {user?.id === listing?.sellerId && (
+                  <div className="flex gap-2 mt-2">
+                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600">
+                      <Pencil size={14} /> 수정
+                    </Link>
+                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-[13px] font-medium text-red-500">
+                      <Trash2 size={14} /> 삭제
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -202,6 +214,42 @@ export default function ListingDetailPage() {
         </div>
       </div>
       <div className="h-8" />
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+              <AlertTriangle size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-[17px] font-bold text-gray-900 text-center">매물을 삭제하시겠어요?</h3>
+            <p className="text-[14px] text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700"
+              >
+                돌아가기
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await api.delete(`/marketplace/listings/${listingId}`);
+                    toast('success', '매물이 삭제되었습니다');
+                    router.push('/marketplace');
+                  } catch {
+                    toast('error', '삭제에 실패했습니다');
+                  }
+                  setShowDeleteConfirm(false);
+                }}
+                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white"
+              >
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

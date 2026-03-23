@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil } from 'lucide-react';
 import { useMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
@@ -237,6 +237,13 @@ export default function MatchDetailPage() {
                   `참가하기 · ${formatCurrency(match.fee)}`
                 )}
               </button>
+            )}
+
+            {user?.id === match.hostId && (
+              <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-2">
+                <Pencil size={14} />
+                매치 수정
+              </Link>
             )}
 
             {/* 캘린더 추가 */}

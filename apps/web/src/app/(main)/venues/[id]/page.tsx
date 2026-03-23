@@ -146,7 +146,6 @@ export default function VenueDetailPage() {
 
   function handleReviewSubmit(data: ReviewData) {
     // In real implementation, this would call an API
-    console.log('Review submitted:', data);
     setShowReviewForm(false);
   }
 

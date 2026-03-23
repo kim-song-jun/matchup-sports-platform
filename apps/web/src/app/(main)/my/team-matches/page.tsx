@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 
 const mockTeamMatches = [
@@ -48,8 +49,18 @@ const statusLabel: Record<string, { text: string; style: string }> = {
 export default function MyTeamMatchesPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuthStore();
   const [posts, setPosts] = useState(mockTeamMatches);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
+        <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
+        <Link href="/login" className="mt-4 inline-block rounded-lg bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+      </div>
+    );
+  }
 
   const handleDelete = async (id: string) => {
     try {

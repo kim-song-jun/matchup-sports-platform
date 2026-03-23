@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { ChevronRight, MapPin, Calendar, Users, Clock } from 'lucide-react';
+import { ChevronRight, MapPin, Calendar, Users, Clock, Swords, MessageCircle, Building2, UserPlus, Award, Bell, Settings } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import type { Match } from '@/types/api';
 
@@ -83,6 +83,14 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Desktop: 팀 매칭 프로모 카드 */}
+      <section className="hidden lg:block mt-6">
+        <Link href="/team-matches" className="block rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 p-5 text-white hover:from-blue-600 hover:to-blue-700 transition-all">
+          <h3 className="text-[16px] font-bold">⚽ 팀 매칭</h3>
+          <p className="text-[13px] text-white/70 mt-1">우리 팀 상대를 찾고 있나요? 실력등급(S~D)으로 딱 맞는 상대를 매칭하세요</p>
+        </Link>
+      </section>
+
       <div className="mt-6 h-2 bg-gray-50 lg:hidden" />
 
       {/* 모집 중인 매치 */}
@@ -113,6 +121,29 @@ export default function HomePage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* 모바일 빠른 메뉴 — 사이드바에만 있는 기능들 */}
+      <section className="lg:hidden mt-5 px-5">
+        <div className="h-2 bg-gray-50 -mx-5 mb-5" />
+        <h2 className="text-[17px] font-bold text-gray-900 mb-3">더 많은 기능</h2>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { href: '/team-matches', icon: Swords, label: '팀 매칭' },
+            { href: '/teams', icon: Users, label: '팀·클럽' },
+            { href: '/chat', icon: MessageCircle, label: '채팅' },
+            { href: '/venues', icon: Building2, label: '시설' },
+            { href: '/mercenary', icon: UserPlus, label: '용병' },
+            { href: '/badges', icon: Award, label: '뱃지' },
+            { href: '/notifications', icon: Bell, label: '알림' },
+            { href: '/settings', icon: Settings, label: '설정' },
+          ].map(item => (
+            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 transition-colors">
+              <item.icon size={22} className="text-gray-500" />
+              <span className="text-[11px] text-gray-600 font-medium">{item.label}</span>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <div className="h-8" />

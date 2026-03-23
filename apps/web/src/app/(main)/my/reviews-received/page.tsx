@@ -1,7 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, Star, User } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth-store';
 
 const mockReviewsReceived = [
   {
@@ -63,6 +65,16 @@ function StarRating({ rating }: { rating: number }) {
 
 export default function ReviewsReceivedPage() {
   const router = useRouter();
+  const { isAuthenticated } = useAuthStore();
+
+  if (!isAuthenticated) {
+    return (
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
+        <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
+        <Link href="/login" className="mt-4 inline-block rounded-lg bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+      </div>
+    );
+  }
 
   const avgScore = mockReviewsReceived.reduce((sum, r) => sum + r.rating, 0) / mockReviewsReceived.length;
   const ratingDistribution = [5, 4, 3, 2, 1].map((r) => ({

@@ -74,59 +74,49 @@ export default function HomePage() {
         <p className="text-[14px] text-gray-400 mt-1">AI가 최적의 매치를 추천해드려요</p>
       </div>
 
-      {/* 프로모션 배너 */}
-      <section className="mt-3 px-5 lg:px-0">
-        <div className="relative overflow-hidden rounded-2xl">
-          {/* Banner slides - auto-rotate */}
+      {/* 종목 선택 + 배너 */}
+      <section className="mt-4 px-5 lg:px-0">
+        {/* 종목 아이콘 */}
+        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-3">
+          {sports.map((sport) => {
+            const Icon = SportIconMap[sport.type];
+            return (
+              <Link key={sport.type} href={`/matches?sport=${sport.type}`} className="flex flex-col items-center gap-1.5 shrink-0">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-transform active:scale-90 ${sport.color}`}>
+                  {Icon && <Icon size={22} />}
+                </div>
+                <span className="text-[10px] font-medium text-gray-500">{sport.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* 프로모션 배너 */}
+        <div className="relative overflow-hidden rounded-2xl mt-3">
           {[
             { bg: 'from-blue-500 to-blue-600', title: '팀 매칭 오픈!', desc: '실력등급(S~D)으로 딱 맞는 상대를 찾아보세요', cta: '팀 매칭 →', href: '/team-matches' },
             { bg: 'from-gray-800 to-gray-900', title: '첫 매치 참가비 무료', desc: '지금 가입하고 첫 매치를 무료로 즐기세요', cta: '매치 찾기 →', href: '/matches' },
             { bg: 'from-green-500 to-green-600', title: '용병 모집 중', desc: '팀에 빈 자리가 있나요? 용병을 구해보세요', cta: '용병 찾기 →', href: '/mercenary' },
           ].filter((_, i) => i === bannerIndex).map((banner) => (
             <Link key={banner.href} href={banner.href}>
-              <div className={`bg-gradient-to-r ${banner.bg} p-6 lg:p-8 text-white`}>
-                <p className="text-[12px] font-medium text-white/60 uppercase tracking-wider">EVENT</p>
-                <h3 className="text-[20px] lg:text-[24px] font-bold mt-1">{banner.title}</h3>
-                <p className="text-[14px] text-white/80 mt-1">{banner.desc}</p>
-                <span className="inline-block mt-3 text-[13px] font-semibold text-white/90 border border-white/30 rounded-lg px-4 py-1.5 hover:bg-white/10 transition-colors">{banner.cta}</span>
+              <div className={`bg-gradient-to-r ${banner.bg} px-5 py-4 lg:px-6 lg:py-5 text-white flex items-center justify-between`}>
+                <div>
+                  <h3 className="text-[16px] lg:text-[18px] font-bold">{banner.title}</h3>
+                  <p className="text-[12px] lg:text-[13px] text-white/70 mt-0.5">{banner.desc}</p>
+                </div>
+                <span className="shrink-0 text-[12px] font-semibold text-white/80 border border-white/30 rounded-lg px-3 py-1.5 hover:bg-white/10 transition-colors hidden sm:block">{banner.cta}</span>
               </div>
             </Link>
           ))}
-          {/* Dots indicator */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
             {[0, 1, 2].map(i => (
-              <button key={i} onClick={() => setBannerIndex(i)} className={`h-1.5 rounded-full transition-all ${bannerIndex === i ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`} />
+              <button key={i} onClick={() => setBannerIndex(i)} className={`h-1 rounded-full transition-all ${bannerIndex === i ? 'w-3 bg-white' : 'w-1 bg-white/40'}`} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* 종목 선택 */}
-      <section className="mt-5 lg:mt-0 px-5 lg:px-0">
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-          {sports.map((sport) => {
-            const Icon = SportIconMap[sport.type];
-            return (
-              <Link key={sport.type} href={`/matches?sport=${sport.type}`} className="flex flex-col items-center gap-2 shrink-0">
-                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-transform active:scale-90 ${sport.color}`}>
-                  {Icon && <Icon size={26} />}
-                </div>
-                <span className="text-[11px] font-medium text-gray-600">{sport.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Desktop: 팀 매칭 프로모 카드 */}
-      <section className="hidden lg:block mt-6">
-        <Link href="/team-matches" className="block rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 p-5 text-white hover:from-blue-600 hover:to-blue-700 transition-all">
-          <h3 className="text-[16px] font-bold">⚽ 팀 매칭</h3>
-          <p className="text-[13px] text-white/70 mt-1">우리 팀 상대를 찾고 있나요? 실력등급(S~D)으로 딱 맞는 상대를 매칭하세요</p>
-        </Link>
-      </section>
-
-      <div className="mt-6 h-2 bg-gray-50 lg:hidden" />
+      <div className="mt-4 h-[1px] bg-gray-100 lg:hidden mx-5" />
 
       {/* 모집 중인 매치 */}
       <section className="mt-5 px-5 lg:px-0 lg:mt-6">

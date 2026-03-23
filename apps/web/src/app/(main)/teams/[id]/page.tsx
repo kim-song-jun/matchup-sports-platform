@@ -8,6 +8,7 @@ import { BadgeDisplay } from '@/components/ui/badge-display';
 import { useTeam, useTeamBadges } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
+import { getGradeInfo } from '@/lib/skill-grades';
 
 const sportLabel: Record<string, string> = {
   futsal: '풋살', basketball: '농구', badminton: '배드민턴',
@@ -142,14 +143,32 @@ export default function TeamDetailPage() {
                   </Link>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[13px] text-gray-400">
+              <div className="flex items-center gap-2 text-[13px] text-gray-400 flex-wrap">
                 {SportIcon && <SportIcon size={14} />}
                 <span>{sportLabel[team.sportType]}</span>
                 <span className="text-gray-200">|</span>
-                <span>평균 Lv.{team.level} {levelLabel[team.level]}</span>
+                {team.skillGrade ? (() => {
+                  const grade = getGradeInfo(team.skillGrade);
+                  return (
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-bold ${grade.color}`}>
+                      {grade.label}등급
+                    </span>
+                  );
+                })() : (
+                  <span>Lv.{team.level} {levelLabel[team.level]}</span>
+                )}
                 <span className="text-gray-200">|</span>
                 <span>{team.memberCount}명</span>
+                {team.proPlayerCount != null && team.proPlayerCount > 0 && (
+                  <>
+                    <span className="text-gray-200">|</span>
+                    <span>선출 {team.proPlayerCount}명</span>
+                  </>
+                )}
               </div>
+              {team.uniformColor && (
+                <p className="text-[12px] text-gray-400 mt-1">유니폼: {team.uniformColor}</p>
+              )}
 
               {/* Badge display */}
               <div className="mt-3">

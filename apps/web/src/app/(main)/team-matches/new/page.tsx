@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react';
 import { useCreateTeamMatch } from '@/hooks/use-api';
+import { SKILL_GRADES, MATCH_TYPES, getGradeInfo } from '@/lib/skill-grades';
+import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 
 const STEPS = ['종목', '구장/일시', '경기조건', '비용/규정', '확인'];
 
@@ -20,13 +22,7 @@ const matchStyleOptions = [
   { value: 'manner_focused', label: '매너 중시', desc: '매너 우선' },
 ];
 
-const levelOptions = [
-  { value: 'beginner', label: '입문' },
-  { value: 'lower', label: '하' },
-  { value: 'middle', label: '중' },
-  { value: 'upper', label: '상' },
-  { value: 'pro', label: '프로' },
-];
+const gameFormatOptions = ['11:11', '8:8', '6:6', '5:5'] as const;
 
 interface FormData {
   title: string;
@@ -46,6 +42,12 @@ interface FormData {
   matchStyle: string;
   hasReferee: boolean;
   notes: string;
+  skillGrade: SkillGrade;
+  proPlayerCount: number;
+  gameFormat: string;
+  matchType: MatchType;
+  uniformColor: string;
+  isFreeInvitation: boolean;
 }
 
 const initialForm: FormData = {
@@ -66,6 +68,12 @@ const initialForm: FormData = {
   matchStyle: 'friendly',
   hasReferee: false,
   notes: '',
+  skillGrade: 'B',
+  proPlayerCount: 0,
+  gameFormat: '11:11',
+  matchType: 'invitation',
+  uniformColor: '',
+  isFreeInvitation: false,
 };
 
 export default function NewTeamMatchPage() {
@@ -82,7 +90,7 @@ export default function NewTeamMatchPage() {
     switch (step) {
       case 0: return !!form.sportType && !!form.title;
       case 1: return !!form.matchDate && !!form.startTime && !!form.endTime && !!form.venueName;
-      case 2: return !!form.requiredLevel && !!form.matchStyle;
+      case 2: return !!form.skillGrade && !!form.matchStyle;
       case 3: return !!form.totalFee;
       case 4: return true;
       default: return false;
@@ -93,7 +101,7 @@ export default function NewTeamMatchPage() {
     const payload = {
       ...form,
       totalFee: Number(form.totalFee),
-      opponentFee: form.opponentFee ? Number(form.opponentFee) : 0,
+      opponentFee: form.isFreeInvitation ? 0 : (form.opponentFee ? Number(form.opponentFee) : 0),
       totalMinutes: form.totalMinutes ? Number(form.totalMinutes) : 120,
     } as Record<string, unknown>;
     createMutation.mutate(payload as never, {
@@ -256,25 +264,97 @@ export default function NewTeamMatchPage() {
         {/* Step 2: 경기조건 */}
         {step === 2 && (
           <div className="space-y-5 animate-fade-in">
+            {/* 실력등급 S~D */}
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-2 block">요구 레벨</label>
-              <div className="flex gap-2 flex-wrap">
-                {levelOptions.map((opt) => (
+              <label className="text-[13px] font-medium text-gray-700 mb-2 block">실력등급</label>
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {SKILL_GRADES.map((g) => (
                   <button
-                    key={opt.value}
-                    onClick={() => update('requiredLevel', opt.value)}
-                    className={`rounded-xl border-2 px-5 py-3 text-[14px] font-semibold transition-all ${
-                      form.requiredLevel === opt.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-600'
-                        : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                    key={g.grade}
+                    onClick={() => update('skillGrade', g.grade as SkillGrade)}
+                    className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-all ${
+                      form.skillGrade === g.grade
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-100 hover:border-gray-200'
                     }`}
                   >
-                    {opt.label}
+                    <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-blue-600' : 'text-gray-900'}`}>
+                      {g.label}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{g.desc}</p>
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* 선출선수(명) */}
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">선출선수 (명)</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={form.proPlayerCount}
+                onChange={(e) => update('proPlayerCount', Math.min(10, Math.max(0, Number(e.target.value))))}
+                placeholder="0"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+              <p className="text-[12px] text-gray-400 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
+            </div>
+
+            {/* 경기방식 */}
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-2 block">경기방식</label>
+              <div className="flex gap-2">
+                {gameFormatOptions.map((fmt) => (
+                  <button
+                    key={fmt}
+                    onClick={() => update('gameFormat', fmt)}
+                    className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+                      form.gameFormat === fmt
+                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                    }`}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 매치 유형 */}
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-2 block">매치 유형</label>
+              <div className="space-y-2">
+                {MATCH_TYPES.map((mt) => (
+                  <label
+                    key={mt.value}
+                    className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-all ${
+                      form.matchType === mt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="matchType"
+                      value={mt.value}
+                      checked={form.matchType === mt.value}
+                      onChange={() => update('matchType', mt.value as MatchType)}
+                      className="h-4 w-4 text-blue-500 border-gray-300 focus:ring-blue-500"
+                    />
+                    <div>
+                      <p className={`text-[14px] font-semibold ${form.matchType === mt.value ? 'text-blue-600' : 'text-gray-900'}`}>
+                        {mt.label}
+                      </p>
+                      <p className="text-[12px] text-gray-400 mt-0.5">{mt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 경기 스타일 */}
             <div>
               <label className="text-[13px] font-medium text-gray-700 mb-2 block">경기 스타일</label>
               <div className="space-y-2">
@@ -297,11 +377,27 @@ export default function NewTeamMatchPage() {
               </div>
             </div>
 
+            {/* 유니폼 색상 */}
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">유니폼 색상</label>
+              <input
+                type="text"
+                value={form.uniformColor}
+                onChange={(e) => update('uniformColor', e.target.value)}
+                placeholder="예: 빨강 상의 + 검정 하의"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              />
+            </div>
+
+            {/* 토글 필드들 */}
             <div className="space-y-3">
               <ToggleField
-                label="프로 선수 포함 여부"
-                checked={form.hasProPlayers}
-                onChange={(v) => update('hasProPlayers', v)}
+                label="무료초청 (상대팀 비용 0원)"
+                checked={form.isFreeInvitation}
+                onChange={(v) => {
+                  update('isFreeInvitation', v);
+                  if (v) update('opponentFee', '0');
+                }}
               />
               <ToggleField
                 label="용병 허용"
@@ -376,10 +472,17 @@ export default function NewTeamMatchPage() {
                 <SummaryRow label="구장" value={form.venueName} />
                 {form.venueAddress && <SummaryRow label="주소" value={form.venueAddress} />}
                 <SummaryRow label="총 비용" value={formatCurrency(form.totalFee)} />
-                {form.opponentFee && <SummaryRow label="상대팀 부담" value={formatCurrency(form.opponentFee)} />}
-                <SummaryRow label="요구 레벨" value={levelOptions.find((o) => o.value === form.requiredLevel)?.label ?? ''} />
+                {form.isFreeInvitation ? (
+                  <SummaryRow label="상대팀 부담" value="무료초청 (0원)" />
+                ) : (
+                  form.opponentFee && <SummaryRow label="상대팀 부담" value={formatCurrency(form.opponentFee)} />
+                )}
+                <SummaryRow label="실력등급" value={`${getGradeInfo(form.skillGrade).label} - ${getGradeInfo(form.skillGrade).desc}`} />
+                <SummaryRow label="선출선수" value={`${form.proPlayerCount}명`} />
+                <SummaryRow label="경기방식" value={form.gameFormat} />
+                <SummaryRow label="매치 유형" value={MATCH_TYPES.find((mt) => mt.value === form.matchType)?.label ?? ''} />
                 <SummaryRow label="경기 스타일" value={matchStyleOptions.find((o) => o.value === form.matchStyle)?.label ?? ''} />
-                <SummaryRow label="프로 선수" value={form.hasProPlayers ? '포함' : '미포함'} />
+                {form.uniformColor && <SummaryRow label="유니폼 색상" value={form.uniformColor} />}
                 <SummaryRow label="용병" value={form.allowMercenary ? '허용' : '불가'} />
                 <SummaryRow label="심판" value={form.hasReferee ? '있음' : '없음'} />
                 {form.notes && <SummaryRow label="추가 안내" value={form.notes} />}

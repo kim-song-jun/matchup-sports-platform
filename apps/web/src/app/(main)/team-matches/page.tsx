@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, Users, DollarSign, Trophy, Plus, Search } from 'lucide-react';
 import { useTeamMatches } from '@/hooks/use-api';
+import { getGradeInfo } from '@/lib/skill-grades';
 import type { TeamMatch } from '@/types/api';
 
 const sportFilters = [
@@ -172,6 +173,11 @@ export default function TeamMatchesPage() {
                               </span>
                             </>
                           )}
+                          {match.isFreeInvitation && (
+                            <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-600 ml-1">
+                              무료초청
+                            </span>
+                          )}
                         </div>
                         <h3 className="text-[15px] font-semibold text-gray-900 truncate">
                           {match.title}
@@ -192,7 +198,22 @@ export default function TeamMatchesPage() {
                         <Trophy size={15} className="text-gray-400" />
                         <span>{match.quarterCount}쿼터</span>
                         <span className="text-gray-200">·</span>
-                        <span>{match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한없음'}</span>
+                        {match.skillGrade ? (() => {
+                          const grade = getGradeInfo(match.skillGrade);
+                          return (
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${grade.color}`}>
+                              {grade.label}
+                            </span>
+                          );
+                        })() : (
+                          <span>{match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한없음'}</span>
+                        )}
+                        {match.gameFormat && (
+                          <>
+                            <span className="text-gray-200">·</span>
+                            <span>{match.gameFormat}</span>
+                          </>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 text-[13px]">
                         <DollarSign size={15} className="text-gray-400" />

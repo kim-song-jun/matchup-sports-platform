@@ -179,6 +179,9 @@ export interface SportTeam {
   district: string | null;
   memberCount: number;
   level: number;
+  skillGrade?: string;
+  proPlayerCount?: number;
+  uniformColor?: string;
   isRecruiting: boolean;
   contactInfo?: string;
   coverImageUrl?: string;
@@ -213,6 +216,12 @@ export interface TeamMatch {
   opponentFee: number;
   requiredLevel?: number;
   hasProPlayers?: boolean;
+  proPlayerCount?: number;
+  skillGrade?: string;
+  gameFormat?: string;
+  matchType?: string;
+  uniformColor?: string;
+  isFreeInvitation?: boolean;
   allowMercenary?: boolean;
   matchStyle?: string;
   hasReferee?: boolean;

@@ -8,6 +8,8 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { SKILL_GRADES } from '@/lib/skill-grades';
+import type { SkillGrade } from '@/lib/skill-grades';
 
 const sports = [
   { type: 'futsal', label: '풋살', color: 'bg-blue-50 text-blue-500 border-gray-200' },
@@ -34,6 +36,9 @@ export default function CreateTeamPage() {
     district: '',
     contactInfo: '',
     level: 3,
+    skillGrade: 'B' as SkillGrade,
+    proPlayerCount: 0,
+    uniformColor: '',
     isRecruiting: true,
     snsLinks: { instagram: '', youtube: '', kakaotalk: '' },
     shortsUrl: '',
@@ -150,25 +155,51 @@ export default function CreateTeamPage() {
           </Field>
         </div>
 
-        {/* 레벨 */}
-        <Field label="팀 레벨">
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((l) => (
+        {/* 실력등급 S~D */}
+        <Field label="팀 실력등급">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            {SKILL_GRADES.map((g) => (
               <button
-                key={l}
+                key={g.grade}
                 type="button"
-                onClick={() => setForm({ ...form, level: l })}
-                className={`flex-1 rounded-xl border-2 py-2.5 text-center transition-all ${
-                  form.level === l
-                    ? 'border-blue-500 bg-blue-50 text-blue-600'
-                    : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                onClick={() => setForm({ ...form, skillGrade: g.grade as SkillGrade })}
+                className={`shrink-0 rounded-xl border-2 px-3.5 py-2.5 text-center transition-all ${
+                  form.skillGrade === g.grade
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
-                <p className="text-[14px] font-semibold">{levelLabel[l]}</p>
-                <p className="text-[11px] text-gray-400">Lv.{l}</p>
+                <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-blue-600' : 'text-gray-900'}`}>
+                  {g.label}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{g.desc}</p>
               </button>
             ))}
           </div>
+        </Field>
+
+        {/* 선출선수 */}
+        <Field label="선출선수 (명)">
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={form.proPlayerCount}
+            onChange={(e) => setForm({ ...form, proPlayerCount: Math.min(10, Math.max(0, Number(e.target.value))) })}
+            placeholder="0"
+            className="input-field"
+          />
+          <p className="text-[12px] text-gray-400 mt-1">팀 내 선출 출신 선수 수 (0~10명)</p>
+        </Field>
+
+        {/* 유니폼 색상 */}
+        <Field label="유니폼 색상">
+          <input
+            value={form.uniformColor}
+            onChange={(e) => setForm({ ...form, uniformColor: e.target.value })}
+            placeholder="예: 빨강 상의 + 검정 하의"
+            className="input-field"
+          />
         </Field>
 
         {/* 모집 여부 */}

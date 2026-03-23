@@ -14,6 +14,7 @@ import {
   useTeamMatchArrival,
 } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
+import { getGradeInfo, MATCH_TYPES } from '@/lib/skill-grades';
 import type { TeamMatchApplication } from '@/types/api';
 
 const levelLabel: Record<string, string> = {
@@ -197,11 +198,43 @@ export default function TeamMatchDetailPage() {
             {/* 경기 조건 */}
             <div className="rounded-2xl bg-white border border-gray-100 p-5">
               <h2 className="text-[16px] font-bold text-gray-900 mb-4">경기 조건</h2>
+
+              {/* 실력등급 배지 + 무료초청 태그 */}
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                {match.skillGrade && (() => {
+                  const grade = getGradeInfo(match.skillGrade);
+                  return (
+                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[13px] font-bold ${grade.color}`}>
+                      {grade.label}등급
+                    </span>
+                  );
+                })()}
+                {match.isFreeInvitation && (
+                  <span className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-[12px] font-semibold text-green-600">
+                    무료초청
+                  </span>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3 lg:gap-5">
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">요구 레벨</p>
+                  <p className="text-[12px] text-gray-400 mb-0.5">실력등급</p>
                   <p className="text-[14px] font-semibold text-gray-900">
-                    {match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한 없음'}
+                    {match.skillGrade ? `${getGradeInfo(match.skillGrade).label} - ${getGradeInfo(match.skillGrade).desc}` : (match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한 없음')}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-gray-50 px-3.5 py-3">
+                  <p className="text-[12px] text-gray-400 mb-0.5">선출선수</p>
+                  <p className="text-[14px] font-semibold text-gray-900">{match.proPlayerCount != null ? `${match.proPlayerCount}명` : (match.hasProPlayers ? '있음' : '없음')}</p>
+                </div>
+                <div className="rounded-xl bg-gray-50 px-3.5 py-3">
+                  <p className="text-[12px] text-gray-400 mb-0.5">경기방식</p>
+                  <p className="text-[14px] font-semibold text-gray-900">{match.gameFormat || '-'}</p>
+                </div>
+                <div className="rounded-xl bg-gray-50 px-3.5 py-3">
+                  <p className="text-[12px] text-gray-400 mb-0.5">매치 유형</p>
+                  <p className="text-[14px] font-semibold text-gray-900">
+                    {match.matchType ? (MATCH_TYPES.find(mt => mt.value === match.matchType)?.label ?? match.matchType) : '-'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
@@ -211,9 +244,17 @@ export default function TeamMatchDetailPage() {
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">프로 선수 포함</p>
-                  <p className="text-[14px] font-semibold text-gray-900">{match.hasProPlayers ? '있음' : '없음'}</p>
+                  <p className="text-[12px] text-gray-400 mb-0.5">종목</p>
+                  <p className="text-[14px] font-semibold text-gray-900">
+                    {sportLabel[match.sportType] ?? match.sportType}
+                  </p>
                 </div>
+                {match.uniformColor && (
+                  <div className="rounded-xl bg-gray-50 px-3.5 py-3">
+                    <p className="text-[12px] text-gray-400 mb-0.5">유니폼 색상</p>
+                    <p className="text-[14px] font-semibold text-gray-900">{match.uniformColor}</p>
+                  </div>
+                )}
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
                   <p className="text-[12px] text-gray-400 mb-0.5">용병 허용</p>
                   <p className="text-[14px] font-semibold text-gray-900">{match.allowMercenary ? '허용' : '불가'}</p>
@@ -221,12 +262,6 @@ export default function TeamMatchDetailPage() {
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
                   <p className="text-[12px] text-gray-400 mb-0.5">심판 유무</p>
                   <p className="text-[14px] font-semibold text-gray-900">{match.hasReferee ? '있음' : '없음'}</p>
-                </div>
-                <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">종목</p>
-                  <p className="text-[14px] font-semibold text-gray-900">
-                    {sportLabel[match.sportType] ?? match.sportType}
-                  </p>
                 </div>
               </div>
               {match.notes && (

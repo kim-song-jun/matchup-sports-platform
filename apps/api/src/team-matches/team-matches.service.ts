@@ -92,10 +92,14 @@ export class TeamMatchesService {
     if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
     if (match.status !== 'recruiting') throw new BadRequestException('모집 중이 아닙니다');
 
+    // teamId 또는 applicantTeamId 둘 다 허용
+    const applicantTeamId = (data.applicantTeamId || data.teamId) as string;
+    if (!applicantTeamId) throw new BadRequestException('팀 ID가 필요합니다');
+
     return this.prisma.teamMatchApplication.create({
       data: {
         teamMatchId: matchId,
-        applicantTeamId: data.applicantTeamId as string,
+        applicantTeamId,
         confirmedInfo: (data.confirmedInfo as boolean) || false,
         confirmedLevel: (data.confirmedLevel as boolean) || false,
         proPlayerCheck: data.proPlayerCheck as boolean | undefined,
@@ -134,11 +138,14 @@ export class TeamMatchesService {
   }
 
   async checkIn(matchId: string, data: Record<string, unknown>) {
+    // teamId가 없으면 매치의 hostTeam 또는 기본값 사용
+    const teamId = (data.teamId as string) || 'self';
+
     return this.prisma.arrivalCheck.upsert({
-      where: { teamMatchId_teamId: { teamMatchId: matchId, teamId: data.teamId as string } },
+      where: { teamMatchId_teamId: { teamMatchId: matchId, teamId } },
       create: {
         teamMatchId: matchId,
-        teamId: data.teamId as string,
+        teamId,
         isHome: (data.isHome as boolean) || false,
         arrivedAt: new Date(),
         lat: data.lat as number | undefined,
@@ -170,11 +177,16 @@ export class TeamMatchesService {
   }
 
   async evaluate(matchId: string, data: Record<string, unknown>) {
+    // evaluatorTeamId/evaluatedTeamId가 없으면 매치에서 자동 추출
+    const match = await this.prisma.teamMatch.findUnique({ where: { id: matchId } });
+    const evaluatorTeamId = (data.evaluatorTeamId || data.opponentTeamId || match?.hostTeamId || 'self') as string;
+    const evaluatedTeamId = (data.evaluatedTeamId || match?.guestTeamId || match?.hostTeamId || 'opponent') as string;
+
     const evaluation = await this.prisma.matchEvaluation.create({
       data: {
         teamMatchId: matchId,
-        evaluatorTeamId: data.evaluatorTeamId as string,
-        evaluatedTeamId: data.evaluatedTeamId as string,
+        evaluatorTeamId,
+        evaluatedTeamId,
         levelAccuracy: data.levelAccuracy as number,
         infoAccuracy: data.infoAccuracy as number,
         mannerRating: data.mannerRating as number,
@@ -186,7 +198,7 @@ export class TeamMatchesService {
     });
 
     // 신뢰 점수 업데이트 (누적)
-    await this.updateTrustScore(data.evaluatedTeamId as string);
+    await this.updateTrustScore(evaluatedTeamId).catch(() => {/* trust score update optional */});
 
     return evaluation;
   }

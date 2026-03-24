@@ -103,11 +103,11 @@ export default function EditLessonPage() {
     setIsSubmitting(true);
     try {
       await api.patch(`/lessons/${lessonId}`, form);
-      toast('success', '강좌가 수정되었습니다');
+      toast('success', '강좌 정보가 저장되었어요');
       router.push(`/lessons/${lessonId}`);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '강좌 수정에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }
@@ -117,11 +117,11 @@ export default function EditLessonPage() {
     setIsDeleting(true);
     try {
       await api.delete(`/lessons/${lessonId}`);
-      toast('success', '강좌가 삭제되었습니다');
+      toast('success', '강좌가 삭제되었어요');
       router.push('/my/lessons');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '강좌 삭제에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '강좌 삭제에 실패했어요. 다시 시도해주세요');
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
@@ -418,7 +418,7 @@ export default function EditLessonPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">강좌를 삭제하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없습니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}

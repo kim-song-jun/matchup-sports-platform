@@ -45,7 +45,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
         itemName,
       });
       const paymentKey = (res as unknown as ApiResponse<CheckoutResult>).data?.paymentKey;
-      toast('success', '결제가 완료되었습니다');
+      toast('success', '결제가 완료되었어요');
       onSuccess(paymentKey);
       onClose();
     } catch (err: unknown) {

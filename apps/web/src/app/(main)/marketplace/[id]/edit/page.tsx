@@ -64,10 +64,10 @@ export default function EditListingPage() {
     setIsSaving(true);
     try {
       await api.patch(`/marketplace/listings/${listingId}`, form);
-      toast('success', '매물이 수정되었습니다');
+      toast('success', '매물 정보가 저장되었어요');
       router.push(`/marketplace/${listingId}`);
     } catch {
-      toast('error', '수정에 실패했습니다');
+      toast('error', '수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSaving(false);
     }
@@ -76,10 +76,10 @@ export default function EditListingPage() {
   const handleDelete = async () => {
     try {
       await api.delete(`/marketplace/listings/${listingId}`);
-      toast('success', '매물이 삭제되었습니다');
+      toast('success', '매물이 삭제되었어요');
       router.push('/my/listings');
     } catch {
-      toast('error', '삭제에 실패했습니다');
+      toast('error', '삭제하지 못했어요. 다시 시도해주세요');
     }
   };
 

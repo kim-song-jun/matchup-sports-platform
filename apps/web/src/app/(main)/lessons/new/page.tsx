@@ -86,11 +86,11 @@ export default function CreateLessonPage() {
     setIsSubmitting(true);
     try {
       await api.post('/lessons', form);
-      toast('success', '강좌가 등록되었습니다!');
+      toast('success', '강좌가 등록되었어요!');
       router.push('/lessons');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '강좌 등록에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '강좌 등록에 실패했어요. 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }

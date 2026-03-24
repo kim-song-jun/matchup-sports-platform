@@ -109,9 +109,9 @@ export default function MyListingsPage() {
     try {
       await api.patch(`/marketplace/listings/${id}`, { status: newStatus });
       setListings(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
-      toast('success', '상태가 변경되었습니다');
+      toast('success', '상태가 변경되었어요');
     } catch {
-      toast('error', '변경에 실패했습니다');
+      toast('error', '변경에 실패했어요. 다시 시도해주세요');
     }
     setStatusDropdown(null);
   };
@@ -120,9 +120,9 @@ export default function MyListingsPage() {
     try {
       await api.delete(`/marketplace/listings/${id}`);
       setListings(prev => prev.filter(l => l.id !== id));
-      toast('success', '매물이 삭제되었습니다');
+      toast('success', '매물이 삭제되었어요');
     } catch {
-      toast('error', '삭제에 실패했습니다');
+      toast('error', '삭제하지 못했어요. 다시 시도해주세요');
     }
     setDeleteTarget(null);
   };
@@ -136,7 +136,7 @@ export default function MyListingsPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">내 장터 매물</h1>
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">내 장터 매물</h2>
+        <h2 className="text-[22px] font-bold text-gray-900">내 장터 매물</h2>
         <p className="text-[14px] text-gray-400 mt-1">등록한 매물을 관리하세요</p>
       </div>
 

@@ -49,10 +49,10 @@ export default function EditTeamPage() {
     setIsSaving(true);
     try {
       await api.patch(`/teams/${teamId}`, form);
-      toast('success', '팀이 수정되었습니다');
+      toast('success', '팀 정보가 저장되었어요');
       router.push(`/teams/${teamId}`);
     } catch {
-      toast('error', '수정에 실패했습니다');
+      toast('error', '수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSaving(false);
     }
@@ -61,10 +61,10 @@ export default function EditTeamPage() {
   const handleDelete = async () => {
     try {
       await api.delete(`/teams/${teamId}`);
-      toast('success', '팀이 삭제되었습니다');
+      toast('success', '팀이 삭제되었어요');
       router.push('/my/teams');
     } catch {
-      toast('error', '삭제에 실패했습니다');
+      toast('error', '삭제하지 못했어요. 다시 시도해주세요');
     }
   };
 
@@ -223,7 +223,7 @@ export default function EditTeamPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">팀을 삭제하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">팀 삭제 시 모든 데이터가 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">팀 삭제 시 모든 데이터가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
               <button onClick={handleDelete} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>

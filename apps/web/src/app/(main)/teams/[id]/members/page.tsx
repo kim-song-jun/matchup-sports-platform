@@ -35,18 +35,18 @@ export default function TeamMembersPage() {
   const handleRoleChange = (memberId: string, newRole: string) => {
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
     setMenuOpen(null);
-    toast('success', '역할이 변경되었습니다');
+    toast('success', '역할이 변경되었어요');
   };
 
   const handleKick = (id: string) => {
     setMembers(prev => prev.filter(m => m.id !== id));
     setKickTarget(null);
-    toast('success', '멤버가 추방되었습니다');
+    toast('success', '멤버가 추방되었어요');
   };
 
   const handleInvite = () => {
     if (!inviteNickname.trim()) return toast('error', '닉네임을 입력해주세요');
-    toast('success', `${inviteNickname}님에게 초대를 보냈습니다`);
+    toast('success', `${inviteNickname}님에게 초대를 보냈어요`);
     setInviteNickname('');
     setShowInviteModal(false);
   };
@@ -181,7 +181,7 @@ export default function TeamMembersPage() {
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors mb-4"
             />
             <div className="flex gap-3">
-              <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">취소</button>
+              <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
               <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors">초대하기</button>
             </div>
           </div>

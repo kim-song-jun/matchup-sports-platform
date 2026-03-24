@@ -142,7 +142,7 @@ export default function PaymentsPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">결제 내역</h1>
       </header>
       <div className="hidden lg:block mb-6">
-        <h2 className="text-[24px] font-bold text-gray-900">결제 내역</h2>
+        <h2 className="text-[22px] font-bold text-gray-900">결제 내역</h2>
         <p className="text-[14px] text-gray-400 mt-1">매치, 강좌, 장터 결제 내역을 확인하세요</p>
       </div>
 
@@ -236,7 +236,7 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
-      <div className="h-8" />
+      <div className="h-6" />
     </div>
   );
 }

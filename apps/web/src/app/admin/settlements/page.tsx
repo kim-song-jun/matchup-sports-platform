@@ -70,10 +70,10 @@ export default function AdminSettlementsPage() {
       for (const id of selectedRows) {
         await api.patch(`/admin/settlements/${id}/process`, { action: 'process' });
       }
-      toast('success', `${selectedRows.length}건의 정산이 처리되었습니다`);
+      toast('success', `${selectedRows.length}건의 정산이 처리되었어요`);
       setSelectedRows([]);
     } catch {
-      toast('error', '정산 처리에 실패했습니다');
+      toast('error', '정산 처리에 실패했어요. 다시 시도해주세요');
     } finally {
       setIsProcessing(false);
     }
@@ -256,7 +256,7 @@ export default function AdminSettlementsPage() {
         {filtered.length === 0 && (
           <div className="p-16 text-center">
             <Wallet size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">해당 상태의 정산 내역이 없습니다</p>
+            <p className="text-[15px] font-medium text-gray-600">해당 상태의 정산 내역이 없어요</p>
           </div>
         )}
       </div>

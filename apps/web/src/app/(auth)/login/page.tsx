@@ -30,7 +30,7 @@ export default function LoginPage() {
         <div className="mb-10 text-center">
           <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">MatchUp</h1>
           <p className="mt-2 text-[15px] text-gray-500 leading-relaxed">
-            나에게 딱 맞는 운동 메이트를<br />AI가 찾아드려요
+            같이 운동할 사람, 찾고 계셨죠?<br />AI가 딱 맞는 메이트를 찾아드려요
           </p>
         </div>
 

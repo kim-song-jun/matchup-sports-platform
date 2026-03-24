@@ -112,7 +112,8 @@ export default function AdminVenuesPage() {
               <tr>
                 <td colSpan={7} className="px-5 py-12 text-center">
                   <Building2 size={24} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-[14px] text-gray-400">등록된 시설이 없습니다</p>
+                  <p className="text-[14px] text-gray-400">등록된 시설이 없어요</p>
+                  <p className="text-[12px] text-gray-300 mt-1">시설을 등록해서 사용자들이 찾을 수 있게 해보세요</p>
                 </td>
               </tr>
             )}

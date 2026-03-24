@@ -91,10 +91,10 @@ export default function EditMatchPage() {
     setIsSaving(true);
     try {
       await api.patch(`/matches/${matchId}`, form);
-      toast('success', '매치가 수정되었습니다');
+      toast('success', '매치 정보가 저장되었어요');
       router.push(`/matches/${matchId}`);
     } catch {
-      toast('error', '수정에 실패했습니다');
+      toast('error', '수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSaving(false);
     }

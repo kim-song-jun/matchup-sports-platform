@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
               <tr>
                 <td colSpan={6} className="px-5 py-12 text-center">
                   <Users size={24} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-[14px] text-gray-400">등록된 사용자가 없습니다</p>
+                  <p className="text-[14px] text-gray-400">아직 등록된 사용자가 없습니다</p>
                 </td>
               </tr>
             )}

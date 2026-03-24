@@ -96,9 +96,9 @@ export default function ArrivalCheckPage() {
             : item,
         ),
       );
-      toast('success', '도착 인증이 완료되었습니다');
+      toast('success', '도착 인증 완료!');
     } catch {
-      toast('error', '도착 인증에 실패했습니다');
+      toast('error', '도착 인증에 실패했어요. 다시 시도해주세요');
     }
   }
 

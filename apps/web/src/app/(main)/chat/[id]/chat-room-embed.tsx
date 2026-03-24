@@ -169,17 +169,17 @@ export default function ChatRoomEmbed({
     setShowReportModal(false);
     setReportReason('');
     setReportDetail('');
-    toast('success', '신고가 접수되었습니다');
+    toast('success', '신고가 접수되었어요. 운영팀이 검토할게요');
   }
 
   function handleBlock() {
     setShowBlockModal(false);
-    toast('success', '차단되었습니다');
+    toast('success', '차단되었어요');
   }
 
   function handleLeave() {
     setShowLeaveModal(false);
-    toast('info', '채팅방을 나갔습니다');
+    toast('info', '채팅방을 나갔어요');
     router.push('/chat');
   }
 

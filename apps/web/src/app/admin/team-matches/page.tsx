@@ -188,7 +188,7 @@ export default function AdminTeamMatchesPage() {
                 <tr>
                   <td colSpan={8} className="px-5 py-12 text-center">
                     <Swords size={24} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-[14px] text-gray-400">검색 조건에 맞는 팀 매칭이 없습니다</p>
+                    <p className="text-[14px] text-gray-400">검색 조건에 맞는 팀 매칭이 없어요</p>
                   </td>
                 </tr>
               )}

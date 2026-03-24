@@ -83,9 +83,9 @@ export default function MyTeamMatchesPage() {
     try {
       await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
       setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p));
-      toast('success', '모집글이 취소되었습니다');
+      toast('success', '모집글이 취소되었어요');
     } catch {
-      toast('error', '취소에 실패했습니다');
+      toast('error', '취소하지 못했어요. 다시 시도해주세요');
     }
     setDeleteTarget(null);
   };
@@ -100,7 +100,7 @@ export default function MyTeamMatchesPage() {
       </header>
       <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
         <div>
-          <h2 className="text-[24px] font-bold text-gray-900">내 팀 매칭 모집글</h2>
+          <h2 className="text-[22px] font-bold text-gray-900">내 팀 매칭 모집글</h2>
           <p className="text-[14px] text-gray-400 mt-1">팀 매칭 모집 현황을 관리하세요</p>
         </div>
         <Link
@@ -204,7 +204,7 @@ export default function MyTeamMatchesPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">모집글을 취소하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송됩니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
               <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">취소하기</button>

@@ -80,9 +80,9 @@ export default function MyTeamsPage() {
     try {
       await api.delete(`/teams/${id}`);
       setTeams(prev => prev.filter(t => t.id !== id));
-      toast('success', '팀이 삭제되었습니다');
+      toast('success', '팀이 삭제되었어요');
     } catch {
-      toast('error', '삭제에 실패했습니다');
+      toast('error', '삭제하지 못했어요. 다시 시도해주세요');
     }
     setDeleteTarget(null);
   };
@@ -96,7 +96,7 @@ export default function MyTeamsPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">내 팀</h1>
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">내 팀</h2>
+        <h2 className="text-[22px] font-bold text-gray-900">내 팀</h2>
         <p className="text-[14px] text-gray-400 mt-1">내가 운영하는 팀을 관리하세요</p>
       </div>
 
@@ -191,7 +191,7 @@ export default function MyTeamsPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">팀을 삭제하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">팀을 삭제하면 모든 멤버에게 알림이 발송됩니다. 이 작업은 되돌릴 수 없습니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">팀을 삭제하면 모든 멤버에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
               <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>

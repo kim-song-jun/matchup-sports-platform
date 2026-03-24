@@ -56,11 +56,11 @@ export default function CreateListingPage() {
     setIsSubmitting(true);
     try {
       await api.post('/marketplace/listings', form);
-      toast('success', '매물이 등록되었습니다!');
+      toast('success', '매물이 등록되었어요!');
       router.push('/marketplace');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '등록에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '등록에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }

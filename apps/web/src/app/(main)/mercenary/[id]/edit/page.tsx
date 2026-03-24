@@ -104,11 +104,11 @@ export default function EditMercenaryPage() {
     setIsSubmitting(true);
     try {
       await api.patch(`/mercenary/${id}`, form);
-      toast('success', '용병 모집글이 수정되었습니다');
+      toast('success', '용병 모집글이 수정되었어요');
       router.push('/my/mercenary');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '수정에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,11 +118,11 @@ export default function EditMercenaryPage() {
     setIsDeleting(true);
     try {
       await api.delete(`/mercenary/${id}`);
-      toast('success', '용병 모집글이 삭제되었습니다');
+      toast('success', '용병 모집글이 삭제되었어요');
       router.push('/my/mercenary');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '삭제에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '삭제하지 못했어요. 다시 시도해주세요');
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
@@ -312,7 +312,7 @@ export default function EditMercenaryPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">모집글을 삭제하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없습니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}

@@ -152,7 +152,7 @@ export default function LessonDetailPage() {
                 <div key={i} className="aspect-square rounded-xl bg-gray-50 flex items-center justify-center text-gray-300"><Image size={20} /></div>
               ))}
             </div>
-            <p className="text-[12px] text-gray-400 mt-3 text-center">아직 등록된 사진이 없습니다</p>
+            <p className="text-[12px] text-gray-400 mt-3 text-center">아직 등록된 사진이 없어요</p>
           </div>
         </div>
 

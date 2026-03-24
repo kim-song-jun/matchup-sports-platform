@@ -29,7 +29,7 @@ export default function ReviewsPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">내 평가</h1>
       </header>
       <div className="hidden lg:block mb-6">
-        <h2 className="text-[24px] font-bold text-gray-900">내 평가</h2>
+        <h2 className="text-[22px] font-bold text-gray-900">내 평가</h2>
         <p className="text-[14px] text-gray-400 mt-1">매치가 끝나면 함께한 선수들을 평가해주세요</p>
       </div>
 
@@ -56,7 +56,7 @@ export default function ReviewsPage() {
           </div>
         )}
       </div>
-      <div className="h-8" />
+      <div className="h-6" />
     </div>
   );
 }
@@ -76,10 +76,10 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
       comment: comment || undefined,
     }) as Promise<unknown>,
     onSuccess: () => {
-      toast('success', '평가가 제출되었습니다');
+      toast('success', '평가가 제출되었어요');
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
     },
-    onError: () => toast('error', '평가 제출에 실패했습니다'),
+    onError: () => toast('error', '평가 제출에 실패했어요. 잠시 후 다시 시도해주세요'),
   });
 
   return (

@@ -157,9 +157,9 @@ export default function MercenaryPage() {
     try {
       await api.post(`/mercenary/${id}/apply`);
       setAppliedIds((prev) => new Set(prev).add(id));
-      toast('success', '용병 신청이 완료되었습니다');
+      toast('success', '용병 신청이 완료되었어요');
     } catch {
-      toast('error', '신청에 실패했습니다');
+      toast('error', '신청에 실패했어요. 잠시 후 다시 시도해주세요');
     }
   }
 

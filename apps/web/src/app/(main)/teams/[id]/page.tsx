@@ -94,7 +94,7 @@ export default function TeamDetailPage() {
               await navigator.share({ title: team.name, url: window.location.href });
             } else {
               await navigator.clipboard.writeText(window.location.href);
-              toast('success', '링크가 복사되었습니다');
+              toast('success', '링크가 복사되었어요');
             }
           }}
           aria-label="공유하기"
@@ -331,7 +331,7 @@ export default function TeamDetailPage() {
                 </div>
               ))}
             </div>
-            <p className="text-[12px] text-gray-400 mt-3 text-center">아직 등록된 사진이 없습니다</p>
+            <p className="text-[12px] text-gray-400 mt-3 text-center">아직 등록된 사진이 없어요</p>
           </div>
         </div>
 
@@ -345,9 +345,9 @@ export default function TeamDetailPage() {
                 onClick={async () => {
                   try {
                     await api.post(`/teams/${teamId}/apply`);
-                    toast('success', '팀 참여 신청이 완료되었습니다');
+                    toast('success', '팀 참여 신청이 완료되었어요');
                   } catch {
-                    toast('error', '신청에 실패했습니다. 이미 신청했거나 권한이 없습니다.');
+                    toast('error', '신청에 실패했어요. 이미 신청했거나 권한이 없을 수 있어요');
                   }
                 }}
                 className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"

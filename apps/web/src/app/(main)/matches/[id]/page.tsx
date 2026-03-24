@@ -42,24 +42,24 @@ export default function MatchDetailPage() {
   const joinMutation = useMutation({
     mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<unknown>,
     onSuccess: () => {
-      toast('success', '매치에 참가했습니다!');
+      toast('success', '매치에 참가했어요!');
       queryClient.invalidateQueries({ queryKey: ['match', matchId] });
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '참가에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '참가에 실패했어요. 잠시 후 다시 시도해주세요');
     },
   });
 
   const leaveMutation = useMutation({
     mutationFn: () => api.delete(`/matches/${matchId}/leave`) as Promise<unknown>,
     onSuccess: () => {
-      toast('info', '매치에서 탈퇴했습니다');
+      toast('info', '매치에서 탈퇴했어요');
       queryClient.invalidateQueries({ queryKey: ['match', matchId] });
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '탈퇴에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '탈퇴에 실패했어요. 다시 시도해주세요');
     },
   });
 
@@ -105,7 +105,7 @@ export default function MatchDetailPage() {
               await navigator.share({ title: match.title, url: window.location.href });
             } else {
               await navigator.clipboard.writeText(window.location.href);
-              toast('success', '링크가 복사되었습니다');
+              toast('success', '링크가 복사되었어요');
             }
           }}
           aria-label="공유하기"
@@ -314,7 +314,7 @@ export default function MatchDetailPage() {
             setShowCheckout(false);
           }}
           onError={() => {
-            toast('error', '결제에 실패했습니다');
+            toast('error', '결제에 실패했어요. 잠시 후 다시 시도해주세요');
             setShowCheckout(false);
           }}
         />

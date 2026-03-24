@@ -132,11 +132,11 @@ export default function EditTeamMatchPage() {
         opponentFee: form.opponentFee ? Number(form.opponentFee) : 0,
       };
       await api.patch(`/team-matches/${id}`, payload);
-      toast('success', '모집글이 수정되었습니다');
+      toast('success', '모집글이 수정되었어요');
       router.push(`/team-matches/${id}`);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '모집글 수정에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '모집글 수정에 실패했어요. 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }
@@ -146,11 +146,11 @@ export default function EditTeamMatchPage() {
     setIsCancelling(true);
     try {
       await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
-      toast('success', '모집글이 취소되었습니다');
+      toast('success', '모집글이 취소되었어요');
       router.push('/my/team-matches');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '취소에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '취소하지 못했어요. 다시 시도해주세요');
     } finally {
       setIsCancelling(false);
       setShowCancelModal(false);
@@ -530,7 +530,7 @@ export default function EditTeamMatchPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">모집글을 취소하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송됩니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}

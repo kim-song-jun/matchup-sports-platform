@@ -99,9 +99,9 @@ export default function AccountPage() {
           onClick={async () => {
             try {
               await api.patch('/users/me', { nickname, email, phone });
-              toast('success', '변경사항이 저장되었습니다');
+              toast('success', '변경사항이 저장되었어요');
             } catch {
-              toast('error', '저장에 실패했습니다');
+              toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요');
             }
           }}
           className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-[15px] font-semibold hover:bg-blue-600 active:bg-blue-700 transition-colors"
@@ -138,9 +138,9 @@ export default function AccountPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 mb-4">
                 <AlertTriangle size={28} className="text-red-500" />
               </div>
-              <h3 className="text-[18px] font-bold text-gray-900 mb-2">정말 탈퇴하시겠습니까?</h3>
+              <h3 className="text-[18px] font-bold text-gray-900 mb-2">정말 탈퇴하시겠어요?</h3>
               <p className="text-[14px] text-gray-500 mb-6">
-                탈퇴하면 모든 매치 기록, 채팅 내역, 팀 정보가 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+                탈퇴하면 모든 매치 기록, 채팅 내역, 팀 정보가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.
               </p>
 
               <div className="w-full mb-4">

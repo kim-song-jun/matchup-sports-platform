@@ -104,9 +104,9 @@ export default function MyMatchesPage() {
     try {
       await api.patch(`/matches/${id}`, { status: 'cancelled' });
       setMatches(prev => prev.map(m => m.id === id ? { ...m, status: 'cancelled' } : m));
-      toast('success', '매치가 취소되었습니다');
+      toast('success', '매치가 취소되었어요');
     } catch {
-      toast('error', '취소에 실패했습니다');
+      toast('error', '취소하지 못했어요. 다시 시도해주세요');
     }
     setDeleteTarget(null);
   };
@@ -120,7 +120,7 @@ export default function MyMatchesPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">내가 만든 매치</h1>
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">내가 만든 매치</h2>
+        <h2 className="text-[22px] font-bold text-gray-900">내가 만든 매치</h2>
         <p className="text-[14px] text-gray-400 mt-1">내가 생성한 매치를 관리하세요</p>
       </div>
 
@@ -209,7 +209,7 @@ export default function MyMatchesPage() {
               <AlertTriangle size={24} className="text-red-500" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center">매치를 취소하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 참가자들에게 알림이 발송됩니다. 이 작업은 되돌릴 수 없습니다.</p>
+            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 참가자들에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}

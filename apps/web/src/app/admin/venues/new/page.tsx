@@ -115,7 +115,7 @@ export default function AdminVenueNewPage() {
 
           <div>
             <label className={labelClass}>시설명</label>
-            <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="시설 이름을 입력하세요" className={inputClass} />
+            <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
           </div>
 
           <div>
@@ -156,7 +156,7 @@ export default function AdminVenueNewPage() {
             <textarea
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
-              placeholder="시설에 대한 설명을 입력하세요"
+              placeholder="시설의 특징, 편의시설 등을 소개해주세요"
               rows={3}
               className={`${inputClass} resize-none`}
             />
@@ -169,7 +169,7 @@ export default function AdminVenueNewPage() {
 
           <div>
             <label className={labelClass}>주소</label>
-            <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="상세 주소를 입력하세요" className={inputClass} />
+            <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

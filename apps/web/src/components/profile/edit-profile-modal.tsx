@@ -34,11 +34,11 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
       const updated = (res as unknown as ApiResponse<UserProfile>).data;
       setUser(updated as never);
       queryClient.invalidateQueries({ queryKey: ['me'] });
-      toast('success', '프로필이 수정되었습니다');
+      toast('success', '프로필이 수정되었어요');
       onClose();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '수정에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }

@@ -113,7 +113,7 @@ export default function AdminUserDetailPage() {
             ) : (
               <div className="rounded-xl bg-gray-50 p-8 text-center">
                 <Trophy size={24} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-[13px] text-gray-400">등록된 종목이 없습니다</p>
+                <p className="text-[13px] text-gray-400">등록된 종목이 없어요</p>
               </div>
             )}
           </div>
@@ -170,7 +170,7 @@ export default function AdminUserDetailPage() {
               <button onClick={async () => {
                 try {
                   await api.post(`/admin/users/${userId}/warn`);
-                  toast('success', '사용자에게 경고가 발송되었습니다');
+                  toast('success', '사용자에게 경고가 발송되었어요');
                 } catch {
                   toast('info', 'API 연동 준비 중입니다');
                 }
@@ -184,7 +184,7 @@ export default function AdminUserDetailPage() {
               <button onClick={async () => {
                 try {
                   await api.patch(`/admin/users/${userId}`, { status: 'suspended' });
-                  toast('success', '사용자의 계정이 정지되었습니다');
+                  toast('success', '사용자의 계정이 정지되었어요');
                 } catch {
                   toast('info', 'API 연동 준비 중입니다');
                 }

@@ -19,9 +19,9 @@ export default function NotificationsPage() {
             onClick={async () => {
               try {
                 await api.patch('/notifications/read-all');
-                toast('success', '모든 알림을 읽음 처리했습니다');
+                toast('success', '모든 알림을 읽음 처리했어요');
               } catch {
-                toast('info', '읽을 알림이 없습니다');
+                toast('info', '읽을 알림이 없어요');
               }
             }}
             className="text-[13px] text-blue-500 font-medium min-h-[44px] flex items-center hover:text-blue-600 active:scale-[0.98] transition-all"

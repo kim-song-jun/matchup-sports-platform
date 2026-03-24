@@ -78,13 +78,13 @@ export default function NewMercenaryPage() {
     if (!canSubmit) return;
     try {
       await api.post('/mercenary', form);
-      toast('success', '용병 모집글이 등록되었습니다');
+      toast('success', '용병 모집글이 등록되었어요');
       setSubmitted(true);
       setTimeout(() => {
         router.push('/mercenary');
       }, 1500);
     } catch {
-      toast('error', '등록에 실패했습니다');
+      toast('error', '등록에 실패했어요. 잠시 후 다시 시도해주세요');
     }
   }
 

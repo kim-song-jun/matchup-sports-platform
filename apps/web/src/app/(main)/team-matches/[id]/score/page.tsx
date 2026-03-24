@@ -58,9 +58,9 @@ export default function ScoreInputPage() {
     try {
       await api.post(`/team-matches/${id}/result`, { scoreHome: homeTotal, scoreAway: awayTotal, quarters: scores });
       setSubmitted(true);
-      toast('success', '스코어가 기록되었습니다');
+      toast('success', '스코어가 기록되었어요');
     } catch {
-      toast('error', '스코어 기록에 실패했습니다');
+      toast('error', '스코어 기록에 실패했어요. 다시 시도해주세요');
     }
   }
 

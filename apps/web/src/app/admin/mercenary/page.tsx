@@ -85,7 +85,7 @@ export default function AdminMercenaryPage() {
 
   const handleDelete = (id: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
-    toast('success', '용병 모집글이 삭제되었습니다');
+    toast('success', '용병 모집글이 삭제되었어요');
   };
 
   return (
@@ -166,7 +166,7 @@ export default function AdminMercenaryPage() {
                 <tr>
                   <td colSpan={8} className="px-5 py-12 text-center">
                     <UserPlus size={24} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-[14px] text-gray-400">용병 모집글이 없습니다</p>
+                    <p className="text-[14px] text-gray-400">아직 용병 모집글이 없어요</p>
                   </td>
                 </tr>
               )}

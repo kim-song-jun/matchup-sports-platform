@@ -155,9 +155,9 @@ export default function AdminVenueEditPage() {
         },
       });
       setSaved(true);
-      toast('success', '시설 정보가 저장되었습니다');
+      toast('success', '시설 정보가 저장되었어요');
     } catch {
-      toast('error', '저장에 실패했습니다. 다시 시도해주세요');
+      toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요');
     } finally {
       setSaving(false);
     }
@@ -167,11 +167,11 @@ export default function AdminVenueEditPage() {
     setDeleting(true);
     try {
       await api.delete(`/admin/venues/${venueId}`);
-      toast('success', '시설이 삭제되었습니다');
+      toast('success', '시설이 삭제되었어요');
       setShowDeleteModal(false);
       router.push('/admin/venues');
     } catch {
-      toast('error', '삭제에 실패했습니다. 다시 시도해주세요');
+      toast('error', '삭제하지 못했어요. 다시 시도해주세요');
       setDeleting(false);
       setShowDeleteModal(false);
     }
@@ -216,7 +216,7 @@ export default function AdminVenueEditPage() {
 
           <div>
             <label className={labelClass}>시설명</label>
-            <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="시설 이름을 입력하세요" className={inputClass} />
+            <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
           </div>
 
           <div>
@@ -257,7 +257,7 @@ export default function AdminVenueEditPage() {
             <textarea
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
-              placeholder="시설에 대한 설명을 입력하세요"
+              placeholder="시설의 특징, 편의시설 등을 소개해주세요"
               rows={3}
               className={`${inputClass} resize-none`}
             />
@@ -270,7 +270,7 @@ export default function AdminVenueEditPage() {
 
           <div>
             <label className={labelClass}>주소</label>
-            <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="상세 주소를 입력하세요" className={inputClass} />
+            <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -413,7 +413,7 @@ export default function AdminVenueEditPage() {
               </div>
             </div>
             <p className="text-[14px] text-gray-600 mb-6">
-              <span className="font-semibold text-gray-900">{form.name}</span> 시설을 정말 삭제하시겠습니까?
+              <span className="font-semibold text-gray-900">{form.name}</span> 시설을 삭제할까요?
               관련된 예약과 리뷰 데이터도 함께 삭제됩니다.
             </p>
             <div className="flex items-center gap-3">
@@ -421,7 +421,7 @@ export default function AdminVenueEditPage() {
                 onClick={() => setShowDeleteModal(false)}
                 className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                취소
+                돌아가기
               </button>
               <button
                 onClick={handleDelete}

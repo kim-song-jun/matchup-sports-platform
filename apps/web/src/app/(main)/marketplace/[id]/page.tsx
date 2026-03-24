@@ -68,7 +68,7 @@ export default function ListingDetailPage() {
                 await navigator.share({ title: listing?.title, url: window.location.href });
               } else {
                 await navigator.clipboard.writeText(window.location.href);
-                toast('success', '링크가 복사되었습니다');
+                toast('success', '링크가 복사되었어요');
               }
             }}
             aria-label="공유하기"
@@ -165,7 +165,7 @@ export default function ListingDetailPage() {
             </div>
             <div className="mt-3 pt-3 border-t border-gray-50 text-right">
               <button
-                onClick={() => toast('info', '신고가 접수되었습니다')}
+                onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
                 className="text-[12px] text-gray-400 hover:text-red-500 transition-colors"
               >
                 신고하기
@@ -200,7 +200,7 @@ export default function ListingDetailPage() {
                 </button>
                 <button
                   onClick={() => {
-                    toast('success', '판매자에게 채팅을 시작합니다');
+                    toast('success', '판매자에게 채팅을 시작해요');
                     router.push('/chat');
                   }}
                   className="w-full rounded-xl border border-gray-200 py-3.5 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
@@ -246,10 +246,10 @@ export default function ListingDetailPage() {
                 onClick={async () => {
                   try {
                     await api.delete(`/marketplace/listings/${listingId}`);
-                    toast('success', '매물이 삭제되었습니다');
+                    toast('success', '매물이 삭제되었어요');
                     router.push('/marketplace');
                   } catch {
-                    toast('error', '삭제에 실패했습니다');
+                    toast('error', '삭제하지 못했어요. 다시 시도해주세요');
                   }
                   setShowDeleteConfirm(false);
                 }}

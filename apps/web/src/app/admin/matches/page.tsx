@@ -85,7 +85,8 @@ export default function AdminMatchesPage() {
               <tr>
                 <td colSpan={7} className="px-5 py-12 text-center">
                   <Trophy size={24} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-[14px] text-gray-400">등록된 매치가 없습니다</p>
+                  <p className="text-[14px] text-gray-400">아직 등록된 매치가 없어요</p>
+                  <p className="text-[12px] text-gray-300 mt-1">첫 번째 매치를 만들어보세요</p>
                 </td>
               </tr>
             )}

@@ -37,7 +37,7 @@ export default function ProfilePage() {
                   {user.nickname?.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="text-[17px] font-bold text-gray-900">{user.nickname}</h2>
+                  <h2 className="text-[16px] font-bold text-gray-900">{user.nickname}</h2>
                   {user.bio && <p className="text-[13px] text-gray-500 mt-0.5">{user.bio}</p>}
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex items-center gap-0.5 text-[13px] text-amber-500">
@@ -96,7 +96,7 @@ export default function ProfilePage() {
           <div className="space-y-4">
             {/* Hero card */}
             <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white text-center">
-              <h2 className="text-[22px] font-bold">MatchUp에서 시작하세요</h2>
+              <h2 className="text-[22px] font-bold">운동 메이트, 찾고 계셨죠?</h2>
               <p className="text-[14px] text-white/70 mt-2">AI가 내 수준에 딱 맞는 상대를 찾아드려요</p>
               <Link href="/login" className="inline-block mt-4 rounded-xl bg-white px-6 py-3 text-[15px] font-bold text-blue-500">
                 3초 만에 시작하기

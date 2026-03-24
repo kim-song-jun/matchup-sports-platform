@@ -103,7 +103,7 @@ export default function CheckoutPage() {
       }, 1500);
     } catch {
       // API not available -- fall back to mock flow
-      toast('info', '테스트 모드: 결제가 시뮬레이션되었습니다');
+      toast('info', '테스트 모드: 결제가 시뮬레이션되었어요');
       await new Promise((r) => setTimeout(r, 1000));
 
       setIsProcessing(false);

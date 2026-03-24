@@ -91,7 +91,7 @@ export default function ReviewsReceivedPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">내가 받은 평가</h1>
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">내가 받은 평가</h2>
+        <h2 className="text-[22px] font-bold text-gray-900">내가 받은 평가</h2>
         <p className="text-[14px] text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
       </div>
 

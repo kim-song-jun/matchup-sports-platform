@@ -62,7 +62,7 @@ export default function AdminPaymentsPage() {
         ) : payments.length === 0 ? (
           <div className="p-16 text-center">
             <CreditCard size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">결제 내역이 없습니다</p>
+            <p className="text-[15px] font-medium text-gray-600">결제 내역이 없어요</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

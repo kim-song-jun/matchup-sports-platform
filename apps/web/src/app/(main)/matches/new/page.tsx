@@ -50,11 +50,11 @@ export default function CreateMatchPage() {
     setIsSubmitting(true);
     try {
       await api.post('/matches', form);
-      toast('success', '매치가 생성되었습니다!');
+      toast('success', '매치가 생성되었어요!');
       router.push('/matches');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '생성에 실패했습니다');
+      toast('error', axiosErr?.response?.data?.message || '생성에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }

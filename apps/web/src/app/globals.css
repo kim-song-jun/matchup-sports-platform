@@ -38,16 +38,35 @@
 
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
 
-  --animate-fade-in: fade-in 0.3s ease-out;
-  --animate-slide-up: slide-up 0.3s ease-out;
-  --animate-slide-down: slide-down 0.2s ease-out;
-  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-fade-in: fade-in 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-fade-out: fade-out 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  --animate-slide-up: slide-up 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-slide-down: slide-down 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-scale-in: scale-in 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  --animate-scale-out: scale-out 0.15s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  --animate-slide-up-out: slide-up-out 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  --animate-stagger-in: stagger-in 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+  --animate-badge-pulse: badge-pulse 2s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  --animate-shimmer: shimmer 1.5s infinite;
+  --animate-banner-in: banner-in 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
+/* ── Entrance ── */
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slide-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slide-down { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes stagger-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes banner-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ── Exit ── */
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes slide-up-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-12px); } }
+@keyframes scale-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+
+/* ── Feedback ── */
+@keyframes badge-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);
@@ -124,6 +143,38 @@ button:not(:disabled):active, a:active {
 
 /* Smooth content appearance */
 [data-loaded] { animation: fade-in 0.2s ease-out; }
+
+/* ── Stagger delay utilities ── */
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 50ms; }
+.stagger-3 { animation-delay: 100ms; }
+.stagger-4 { animation-delay: 150ms; }
+.stagger-5 { animation-delay: 200ms; }
+.stagger-6 { animation-delay: 250ms; }
+.stagger-7 { animation-delay: 300ms; }
+.stagger-8 { animation-delay: 350ms; }
+.stagger-9 { animation-delay: 400ms; }
+
+/* ── Shimmer skeleton ── */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.dark .skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+  background-size: 200% 100%;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 .pb-safe { padding-bottom: calc(var(--safe-area-bottom) + 4.5rem); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }

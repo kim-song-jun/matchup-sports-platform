@@ -63,7 +63,7 @@ export default function TeamMatchesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-gray-900">팀 매칭</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">팀 매칭</h1>
         <Link
           href="/team-matches/new"
           className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
@@ -81,8 +81,8 @@ export default function TeamMatchesPage() {
             onClick={() => setActiveSport(f.key)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeSport === f.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             }`}
           >
             {f.label}
@@ -109,8 +109,8 @@ export default function TeamMatchesPage() {
             onClick={() => setLevelFilter(f.key)}
             className={`shrink-0 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${
               levelFilter === f.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             }`}
           >
             {f.label}
@@ -155,7 +155,7 @@ export default function TeamMatchesPage() {
 
               return (
                 <Link key={match.id} href={`/team-matches/${match.id}`}>
-                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200">
+                  <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-all active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -179,7 +179,7 @@ export default function TeamMatchesPage() {
                             </span>
                           )}
                         </div>
-                        <h3 className="text-[15px] font-semibold text-gray-900 truncate">
+                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">
                           {match.title}
                         </h3>
                       </div>

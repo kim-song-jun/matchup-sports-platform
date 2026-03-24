@@ -57,7 +57,7 @@ export default function MarketplacePage() {
   return (
     <div className="pt-[var(--safe-area-top)]">
       <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900">장터</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">장터</h1>
         <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 active:bg-gray-700 transition-colors">
           <Plus size={16} strokeWidth={2.5} />
           글쓰기
@@ -73,7 +73,7 @@ export default function MarketplacePage() {
             placeholder="상품명, 종목 검색"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           />
         </div>
       </div>
@@ -86,8 +86,8 @@ export default function MarketplacePage() {
             onClick={() => setActiveCategory(cat.label)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeCategory === cat.label
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             }`}
           >
             {cat.label}
@@ -123,7 +123,7 @@ export default function MarketplacePage() {
 
                     {/* Content */}
                     <div className="flex flex-1 flex-col min-w-0 py-0.5">
-                      <h3 className="text-[15px] font-medium text-gray-900 truncate">{item.title}</h3>
+                      <h3 className="text-[15px] font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
 
                       {/* 지역 · 시간 */}
                       <p className="text-[13px] text-gray-400 mt-1">
@@ -131,7 +131,7 @@ export default function MarketplacePage() {
                       </p>
 
                       {/* 가격 (강조) */}
-                      <p className="text-[18px] font-bold text-gray-900 mt-1.5">{formatCurrency(item.price)}</p>
+                      <p className="text-[18px] font-bold text-gray-900 dark:text-gray-100 mt-1.5">{formatCurrency(item.price)}</p>
 
                       {/* 하단: 배지 + 통계 */}
                       <div className="flex items-center justify-between mt-auto pt-1.5">
@@ -139,7 +139,7 @@ export default function MarketplacePage() {
                           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${conditionStyle[item.condition]}`}>
                             {conditionLabel[item.condition]}
                           </span>
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${item.listingType === 'rent' ? 'text-emerald-600 bg-emerald-50' : 'text-orange-600 bg-orange-50'}`}>
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${item.listingType === 'rent' ? 'text-green-600 bg-green-50' : 'text-orange-600 bg-orange-50'}`}>
                             {item.listingType === 'rent' ? '대여' : '판매'}
                           </span>
                         </div>

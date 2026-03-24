@@ -42,11 +42,11 @@ const sportBorderColor: Record<string, string> = {
   futsal: 'border-l-blue-500',
   basketball: 'border-l-amber-500',
   badminton: 'border-l-cyan-500',
-  ice_hockey: 'border-l-indigo-500',
+  ice_hockey: 'border-l-blue-600',
   tennis: 'border-l-red-500',
   swimming: 'border-l-sky-500',
   figure_skating: 'border-l-purple-500',
-  short_track: 'border-l-violet-500',
+  short_track: 'border-l-gray-400',
   baseball: 'border-l-orange-500',
   volleyball: 'border-l-rose-500',
 };
@@ -78,7 +78,7 @@ export default function HomePage() {
       <header className="px-5 pt-4 pb-2 lg:hidden">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[22px] font-bold tracking-tight text-gray-900">MatchUp</h1>
+            <h1 className="text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
             {isAuthenticated && user ? (
               <p className="text-[13px] text-gray-500 mt-0.5">{user.nickname}님, 반가워요</p>
             ) : (
@@ -95,7 +95,7 @@ export default function HomePage() {
 
       {/* Desktop greeting */}
       <div className="hidden lg:block mb-6">
-        <h2 className="text-[24px] font-bold text-gray-900">
+        <h2 className="text-[24px] font-bold text-gray-900 dark:text-white">
           {isAuthenticated && user ? `${user.nickname}님, 반가워요` : '같이 운동할 사람을 찾아보세요'}
         </h2>
         <p className="text-[14px] text-gray-400 mt-1">AI가 최적의 매치를 추천해드려요</p>
@@ -112,7 +112,7 @@ export default function HomePage() {
             const Icon = SportIconMap[sport.type];
             return (
               <Link key={sport.type} href={`/matches?sport=${sport.type}`} className="flex flex-col items-center gap-1.5 shrink-0">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-transform active:scale-90 ${sport.color}`}>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-transform active:scale-90 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors ${sport.color}`}>
                   {Icon && <Icon size={22} />}
                 </div>
                 <span className="text-[10px] font-medium text-gray-500">{sport.label}</span>
@@ -161,7 +161,7 @@ export default function HomePage() {
 
         return todayMatches.length > 0 ? (
           <section className="mt-5 px-5 lg:px-0">
-            <h2 className="text-[17px] font-bold text-gray-900 mb-3">🔥 오늘·내일 매치</h2>
+            <h2 className="text-[17px] font-bold text-gray-900 dark:text-white mb-3">🔥 오늘·내일 매치</h2>
             <div className="space-y-2">
               {todayMatches.map((m: Match) => <MatchCard key={m.id} match={m} />)}
             </div>
@@ -172,7 +172,7 @@ export default function HomePage() {
       {/* 전체 매치 */}
       <section className="mt-5 px-5 lg:px-0 lg:mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[17px] font-bold text-gray-900">전체 매치</h2>
+          <h2 className="text-[17px] font-bold text-gray-900 dark:text-white">전체 매치</h2>
           <Link href="/matches" className="flex items-center text-[13px] text-gray-400 hover:text-gray-600 transition-colors">
             전체보기
             <ChevronRight size={14} className="ml-0.5" />
@@ -202,7 +202,7 @@ export default function HomePage() {
       {/* 모바일 빠른 메뉴 — 사이드바에만 있는 기능들 */}
       <section className="lg:hidden mt-5 px-5">
         <div className="h-2 bg-gray-50 -mx-5 mb-5" />
-        <h2 className="text-[17px] font-bold text-gray-900 mb-3">더 많은 기능</h2>
+        <h2 className="text-[17px] font-bold text-gray-900 dark:text-white mb-3">더 많은 기능</h2>
         <div className="grid grid-cols-4 gap-3">
           {[
             { href: '/team-matches', icon: Swords, label: '팀 매칭' },
@@ -235,7 +235,7 @@ function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className={`rounded-2xl bg-white border border-gray-100 border-l-2 ${sportBorderColor[match.sportType] || 'border-l-gray-300'} p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}>
+      <div className={`rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 border-l-2 ${sportBorderColor[match.sportType] || 'border-l-gray-300'} p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -245,7 +245,7 @@ function MatchCard({ match }: { match: Match }) {
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="text-[15px] font-semibold text-gray-900 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
+              <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
               <div className="flex items-center gap-1.5">
                 <span className="text-[12px] text-gray-400">{sportLabel[match.sportType]}</span>
                 {timeBadge && (

@@ -21,7 +21,7 @@ export default function TeamsPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
       <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
         <div>
-          <h1 className="text-[22px] font-bold text-gray-900">팀·클럽</h1>
+          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">팀·클럽</h1>
           <p className="text-[13px] text-gray-400 mt-0.5">동호회와 팀을 찾아보세요</p>
         </div>
         <Link href="/teams/new" className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 active:bg-gray-700 transition-colors">
@@ -46,7 +46,7 @@ export default function TeamsPage() {
             {teams.map((team: SportTeam) => {
               const SportIcon = SportIconMap[team.sportType];
               return (
-                <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+                <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
                   <div className="flex items-start gap-4">
                     {/* Team logo */}
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gray-900 text-white text-[18px] font-black">
@@ -54,7 +54,7 @@ export default function TeamsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <h3 className="text-[17px] font-bold text-gray-900">{team.name}</h3>
+                        <h3 className="text-[17px] font-bold text-gray-900 dark:text-gray-100">{team.name}</h3>
                         {team.isRecruiting && (
                           <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-600">모집중</span>
                         )}

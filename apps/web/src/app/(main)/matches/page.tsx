@@ -41,11 +41,11 @@ const sportBorderColor: Record<string, string> = {
   futsal: 'border-l-blue-500',
   basketball: 'border-l-amber-500',
   badminton: 'border-l-cyan-500',
-  ice_hockey: 'border-l-indigo-500',
+  ice_hockey: 'border-l-blue-600',
   tennis: 'border-l-red-500',
   swimming: 'border-l-sky-500',
   figure_skating: 'border-l-purple-500',
-  short_track: 'border-l-violet-500',
+  short_track: 'border-l-gray-400',
   baseball: 'border-l-orange-500',
   volleyball: 'border-l-rose-500',
 };
@@ -90,7 +90,7 @@ export default function MatchesPage() {
   return (
     <div className="pt-[var(--safe-area-top)]">
       <header className="px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900">매치 찾기</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">매치 찾기</h1>
       </header>
 
       {/* 검색바 */}
@@ -103,7 +103,7 @@ export default function MatchesPage() {
               placeholder="지역, 시설명 검색"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all"
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all"
             />
           </div>
           <button
@@ -124,8 +124,8 @@ export default function MatchesPage() {
             onClick={() => setActiveSport(f.key)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeSport === f.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             }`}
           >
             {f.label}
@@ -199,7 +199,7 @@ export default function MatchesPage() {
 
               return (
                 <Link key={match.id} href={`/matches/${match.id}`}>
-                  <div className={`rounded-2xl bg-white border border-gray-100 border-l-2 ${sportBorderColor[match.sportType] || 'border-l-gray-300'} p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}>
+                  <div className={`rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 border-l-2 ${sportBorderColor[match.sportType] || 'border-l-gray-300'} p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         {SportIcon && (
@@ -208,7 +208,7 @@ export default function MatchesPage() {
                           </div>
                         )}
                         <div className="min-w-0">
-                          <h3 className="text-[15px] font-semibold text-gray-900 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
+                          <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[12px] text-gray-400">{sportLabel[match.sportType]}</span>
                             {timeBadge && (

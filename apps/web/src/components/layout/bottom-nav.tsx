@@ -33,7 +33,7 @@ export function BottomNav() {
         </Link>
       )}
 
-      <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 bg-white/95 backdrop-blur-xl border-t border-gray-100 pb-[var(--safe-area-bottom)]">
+      <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 bg-white/95 dark:bg-gray-900 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800 pb-[var(--safe-area-bottom)]">
         <div className="flex items-center justify-around px-2 pt-2 pb-1">
           {navItems.map(({ href, icon: Icon, label }) => {
             const isActive = pathname.startsWith(href);
@@ -42,7 +42,7 @@ export function BottomNav() {
                 key={href}
                 href={href}
                 className={`flex flex-col items-center justify-center gap-0.5 rounded-xl min-w-[44px] min-h-[44px] px-3 py-1 transition-all duration-200 ${
-                  isActive ? 'text-blue-500' : 'text-gray-400 active:text-gray-600'
+                  isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 active:text-gray-600'
                 }`}
               >
                 <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} />

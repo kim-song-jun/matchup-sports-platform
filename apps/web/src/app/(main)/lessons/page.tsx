@@ -64,7 +64,7 @@ export default function LessonsPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-bold text-gray-900">강좌</h1>
+          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">강좌</h1>
           <p className="text-[13px] text-gray-400 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
         </div>
         <button
@@ -85,7 +85,7 @@ export default function LessonsPage() {
             placeholder="강좌명, 코치, 장소 검색"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           />
         </div>
       </div>
@@ -98,8 +98,8 @@ export default function LessonsPage() {
             onClick={() => setActiveType(f.key)}
             className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeType === f.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             }`}
           >
             {f.icon && <f.icon size={14} />}
@@ -128,7 +128,7 @@ export default function LessonsPage() {
               const SportIcon = SportIconMap[lesson.sportType];
               const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
               return (
-                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white border border-gray-100 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2.5">
                       {SportIcon && (
@@ -137,7 +137,7 @@ export default function LessonsPage() {
                         </div>
                       )}
                       <div>
-                        <h3 className="text-[15px] font-semibold text-gray-900">{lesson.title}</h3>
+                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">{lesson.title}</h3>
                         <span className="text-[12px] text-gray-400">{sportLabel[lesson.sportType]}</span>
                       </div>
                     </div>

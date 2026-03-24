@@ -45,7 +45,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [dismissToast]);
 
   const icons = {
-    success: <CheckCircle size={18} className="text-green-500" />,
+    success: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-green-500">
+        <circle cx="9" cy="9" r="8" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M5.5 9.5l2 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="animate-check-draw" />
+      </svg>
+    ),
     error: <XCircle size={18} className="text-red-500" />,
     info: <Info size={18} className="text-blue-500" />,
   };
@@ -58,7 +63,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3.5 text-white shadow-lg ${t.exiting ? 'animate-slide-up-out' : 'animate-slide-up'}`}
+            className={`flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3.5 text-white shadow-lg ${t.exiting ? 'animate-slide-up-out' : 'animate-fade-in-up'}`}
           >
             {icons[t.type]}
             <span className="flex-1 text-[14px] font-medium">{t.message}</span>

@@ -1,14 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDevLogin } from '@/hooks/use-api';
+
+const taglines = ['오늘도 한 판 어때요?', '실력이 쑥쑥 올라가는 중!', '내 수준에 딱 맞는 상대가 기다려요'];
 
 export default function LoginPage() {
   const router = useRouter();
   const devLogin = useDevLogin();
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [taglineIdx, setTaglineIdx] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setTaglineIdx(i => (i + 1) % taglines.length), 3000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleDevLogin = async (name?: string) => {
     const loginNickname = name || nickname || '테스트유저';
@@ -32,6 +40,7 @@ export default function LoginPage() {
           <p className="mt-2 text-[15px] text-gray-500 leading-relaxed">
             같이 운동할 사람, 찾고 계셨죠?<br />AI가 딱 맞는 메이트를 찾아드려요
           </p>
+          <p key={taglineIdx} className="text-[14px] text-gray-500 mt-2 animate-fade-in-up">{taglines[taglineIdx]}</p>
         </div>
 
         {/* Social login */}
@@ -75,7 +84,7 @@ export default function LoginPage() {
         </div>
 
         {/* Quick select */}
-        <div className="mt-3 flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
+        <div className="mt-3 flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto stagger-children">
           {['축구왕민수', '농구러버지영', '하키마스터준호', '배드민턴소희'].map((name) => (
             <button
               key={name}

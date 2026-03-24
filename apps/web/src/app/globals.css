@@ -196,3 +196,59 @@ button:not(:disabled):active, a:active {
   }
   .detail-sidebar > .sidebar-sticky::-webkit-scrollbar { display: none; }
 }
+
+/* ── Delight animations ── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes check-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
+}
+
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-fade-in-up { animation: fade-in-up 0.4s ease-out; }
+.animate-bounce-in { animation: bounce-in 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
+.animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
+.animate-check-draw { animation: check-draw 0.4s ease-out forwards; stroke-dasharray: 24; stroke-dashoffset: 24; }
+.animate-gentle-bounce { animation: gentle-bounce 2s ease-in-out infinite; }
+
+/* Staggered list animation */
+.stagger-children > * { animation: fade-in-up 0.4s ease-out backwards; }
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+
+/* Reduced motion — delight animations */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up, .animate-bounce-in, .animate-slide-in-right {
+    animation: none !important;
+  }
+  .animate-gentle-bounce { animation: none !important; }
+  .stagger-children > * { animation: none !important; }
+}

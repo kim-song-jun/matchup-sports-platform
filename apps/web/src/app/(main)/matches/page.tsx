@@ -36,19 +36,7 @@ function formatCurrency(n: number) {
   return new Intl.NumberFormat('ko-KR').format(n) + '원';
 }
 
-const sportBorderColor: Record<string, string> = {
-  soccer: 'border-l-green-500',
-  futsal: 'border-l-blue-500',
-  basketball: 'border-l-amber-500',
-  badminton: 'border-l-cyan-500',
-  ice_hockey: 'border-l-blue-600',
-  tennis: 'border-l-red-500',
-  swimming: 'border-l-sky-500',
-  figure_skating: 'border-l-purple-500',
-  short_track: 'border-l-gray-400',
-  baseball: 'border-l-orange-500',
-  volleyball: 'border-l-rose-500',
-};
+// 종목 아이콘 색상만으로 구분 (border-l 제거됨)
 
 const sportIconColor: Record<string, string> = {
   soccer: 'bg-green-50 text-green-600',
@@ -197,14 +185,14 @@ export default function MatchesPage() {
           </div>
         ) : matches.length === 0 ? (
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
-            <Search size={32} className="mx-auto text-gray-300 mb-3" />
+            <Search size={32} className="mx-auto text-gray-300 mb-3 animate-gentle-bounce" />
             <p className="text-[15px] font-medium text-gray-600">
               {activeSport ? `${sportLabel[activeSport]} 매치가 없어요` : '매치가 없어요'}
             </p>
-            <p className="text-[13px] text-gray-400 mt-1">다른 종목을 선택하거나 직접 매치를 만들어보세요</p>
+            <p className="text-[13px] text-gray-400 mt-1">직접 매치를 만들어서 첫 번째 호스트가 되어보세요! {'\u{1F3C6}'}</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
             {matches.map((match: Match) => {
               const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
               const isAlmostFull = filledPercent >= 70;
@@ -213,7 +201,7 @@ export default function MatchesPage() {
 
               return (
                 <Link key={match.id} href={`/matches/${match.id}`}>
-                  <div className={`rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 border-l-2 ${sportBorderColor[match.sportType] || 'border-l-gray-300'} p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}>
+                  <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         {SportIcon && (

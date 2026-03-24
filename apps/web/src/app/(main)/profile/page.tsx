@@ -68,7 +68,7 @@ export default function ProfilePage() {
                         </span>
                       </div>
                       <div className="text-[12px] text-gray-400">
-                        {sp.matchCount}전 {sp.winCount}승 · ELO {sp.eloRating}
+                        {sp.matchCount}전 {sp.winCount}승 · ELO <span className="animate-scale-in inline-block font-semibold text-blue-500">{sp.eloRating}</span>
                       </div>
                     </div>
                   );

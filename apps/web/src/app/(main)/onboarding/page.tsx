@@ -94,7 +94,7 @@ export default function OnboardingPage() {
               ? direction === 'left'
                 ? 'opacity-0 -translate-x-8'
                 : 'opacity-0 translate-x-8'
-              : 'opacity-100 translate-x-0'
+              : 'opacity-100 translate-x-0 animate-fade-in-up'
           }`}
         >
           {/* Icon */}

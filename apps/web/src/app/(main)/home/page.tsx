@@ -172,7 +172,7 @@ export default function HomePage() {
             <p className="text-[13px] text-gray-400 mt-1">첫 번째 매치를 만들어보세요!</p>
           </div>
         ) : (
-          <div className="space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 stagger-children">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-2.5 lg:space-y-0 stagger-children">
             {matches.map((match: Match, idx: number) => (
               <div key={match.id} className={`animate-stagger-in stagger-${Math.min(idx + 1, 9)}`}>
                 <MatchCard match={match} />
@@ -209,21 +209,21 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             {SportIcon && (
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${sportIconColor[match.sportType] || 'bg-blue-50 text-blue-500'}`}>
-                <SportIcon size={16} />
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sportIconColor[match.sportType] || 'bg-blue-50 text-blue-500'}`}>
+                <SportIcon size={18} />
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[11px] text-gray-400">{sportLabel[match.sportType]}</span>
+              <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12px] text-gray-400">{sportLabel[match.sportType]}</span>
                 {timeBadge && (
-                  <span className={`rounded px-1.5 py-px text-[10px] font-semibold ${timeBadge.color}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${timeBadge.color}`}>
                     {timeBadge.text}
                   </span>
                 )}
@@ -231,31 +231,37 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             </div>
           </div>
           {isAlmostFull && (
-            <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">
+            <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-500">
               마감임박
             </span>
           )}
         </div>
 
-        {/* Details — compact inline */}
-        <div className="mt-2 flex items-center gap-3 text-[12px] text-gray-500 flex-wrap">
-          <span className="flex items-center gap-1">
-            <Calendar size={12} className="text-gray-400" />
-            {formatMatchDate(match.matchDate)} {match.startTime}
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin size={12} className="text-gray-400" />
-            <span className="truncate max-w-[120px]">{match.venue?.name}</span>
-          </span>
-          <span className={isAlmostFull ? 'text-red-500 font-medium' : ''}>
-            {match.currentPlayers}/{match.maxPlayers}명
-          </span>
-          <span className="font-semibold text-gray-800 dark:text-gray-200">{formatCurrency(match.fee)}</span>
-          <span className="text-gray-300">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
+        {/* Details */}
+        <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+            <Calendar size={14} className="text-gray-400 shrink-0" />
+            <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+            <MapPin size={14} className="text-gray-400 shrink-0" />
+            <span className="truncate">{match.venue?.name}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+            <Users size={14} className="text-gray-400 shrink-0" />
+            <span className={isAlmostFull ? 'text-red-500 font-medium' : ''}>
+              {match.currentPlayers}/{match.maxPlayers}명
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+            <span className="text-[12px] font-semibold text-gray-800">{formatCurrency(match.fee)}</span>
+            <span className="text-gray-300">·</span>
+            <span className="text-[12px]">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
+          </div>
         </div>
 
-        {/* Progress bar — tighter */}
-        <div className="mt-2 flex items-center gap-2">
+        {/* Progress bar */}
+        <div className="mt-2.5 flex items-center gap-2">
           <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
@@ -264,7 +270,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
               style={{ width: `${filledPercent}%` }}
             />
           </div>
-          <span className={`text-[10px] font-medium shrink-0 ${isAlmostFull ? 'text-red-500' : 'text-gray-400'}`}>
+          <span className={`text-[11px] font-medium shrink-0 ${isAlmostFull ? 'text-red-500' : 'text-gray-400'}`}>
             {match.currentPlayers}/{match.maxPlayers}
           </span>
         </div>

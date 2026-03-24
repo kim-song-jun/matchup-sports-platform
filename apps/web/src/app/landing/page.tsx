@@ -163,7 +163,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ── Hero Section ── */}
-      <section className="relative pt-16 overflow-hidden">
+      <section className="relative pt-16 overflow-hidden cursor-grab active:cursor-grabbing">
         {/* Premium gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-gray-900" />
         {/* Subtle radial overlay for depth */}

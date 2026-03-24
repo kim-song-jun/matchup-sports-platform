@@ -89,7 +89,7 @@ export default function HomePage() {
 
       {/* 종목 선택 — tight horizontal scroll */}
       <section className="mt-2 px-5 lg:px-0">
-        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1 lg:justify-center">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1 lg:flex-wrap lg:justify-center">
           {(() => {
             const sportCounts: Record<string, number> = {};
             matches.forEach((m: Match) => { sportCounts[m.sportType] = (sportCounts[m.sportType] || 0) + 1; });

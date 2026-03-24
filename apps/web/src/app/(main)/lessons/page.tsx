@@ -120,8 +120,8 @@ export default function LessonsPage() {
                           <SportIcon size={20} />
                         </div>
                       )}
-                      <div>
-                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">{lesson.title}</h3>
+                      <div className="min-w-0">
+                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{lesson.title}</h3>
                         <span className="text-[12px] text-gray-400">{sportLabel[lesson.sportType]}</span>
                       </div>
                     </div>

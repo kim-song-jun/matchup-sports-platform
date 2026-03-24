@@ -155,7 +155,7 @@ export default function MyMatchesPage() {
                 </div>
 
                 <Link href={`/matches/${match.id}`}>
-                  <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors">{match.title}</h3>
+                  <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors truncate">{match.title}</h3>
                 </Link>
 
                 <div className="mt-2 space-y-1">

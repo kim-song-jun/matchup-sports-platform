@@ -120,7 +120,7 @@ export default function MyTeamsPage() {
           teams.map((team) => (
             <div key={team.id} className="rounded-2xl bg-white border border-gray-100 p-4">
               <div className="flex items-start justify-between">
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
                       {sportLabel[team.sportType]}
@@ -130,7 +130,7 @@ export default function MyTeamsPage() {
                     </span>
                   </div>
                   <Link href={`/teams/${team.id}`}>
-                    <h3 className="text-[16px] font-bold text-gray-900 hover:text-blue-500 transition-colors">{team.name}</h3>
+                    <h3 className="text-[16px] font-bold text-gray-900 hover:text-blue-500 transition-colors truncate">{team.name}</h3>
                   </Link>
                 </div>
                 <div className="flex items-center gap-0.5 text-amber-500">

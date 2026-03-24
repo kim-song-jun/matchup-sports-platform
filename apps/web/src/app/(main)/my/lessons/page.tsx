@@ -135,7 +135,7 @@ export default function MyLessonsPage() {
             </div>
 
             <Link href={`/lessons/${lesson.id}`}>
-              <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors">{lesson.title}</h3>
+              <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors truncate">{lesson.title}</h3>
             </Link>
 
             <div className="mt-2 space-y-1">

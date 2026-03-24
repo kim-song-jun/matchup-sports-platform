@@ -237,7 +237,7 @@ export default function MercenaryPage() {
                           </span>
                         )}
                       </div>
-                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">
                         {post.teamName}
                       </h3>
                     </div>

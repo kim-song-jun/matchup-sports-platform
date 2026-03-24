@@ -54,7 +54,7 @@ export default function TeamsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">{team.name}</h3>
+                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</h3>
                         {team.isRecruiting && (
                           <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-600">모집중</span>
                         )}

@@ -47,6 +47,81 @@ function extractData<T>(res: unknown): T {
   return (res as ApiResponse<T>).data;
 }
 
+// ── Query Key Factory ──
+export const queryKeys = {
+  me: ['me'] as const,
+  matches: {
+    all: ['matches'] as const,
+    list: (params?: Record<string, string>) => ['matches', params] as const,
+    detail: (id: string) => ['matches', id] as const,
+    recommended: ['matches', 'recommended'] as const,
+    my: (params?: Record<string, string>) => ['my-matches', params] as const,
+  },
+  teams: {
+    all: ['teams'] as const,
+    list: (params?: Record<string, string>) => ['teams', params] as const,
+    detail: (id: string) => ['teams', id] as const,
+  },
+  teamMatches: {
+    all: ['team-matches'] as const,
+    list: (params?: Record<string, string>) => ['team-matches', params] as const,
+    detail: (id: string) => ['team-matches', id] as const,
+    referee: (id: string) => ['team-matches', id, 'referee'] as const,
+  },
+  lessons: {
+    all: ['lessons'] as const,
+    list: (params?: Record<string, string>) => ['lessons', params] as const,
+    detail: (id: string) => ['lessons', id] as const,
+  },
+  venues: {
+    all: ['venues'] as const,
+    list: (params?: Record<string, string>) => ['venues', params] as const,
+    detail: (id: string) => ['venues', id] as const,
+    schedule: (id: string) => ['venues', id, 'schedule'] as const,
+  },
+  listings: {
+    all: ['listings'] as const,
+    list: (params?: Record<string, string>) => ['listings', params] as const,
+    detail: (id: string) => ['listings', id] as const,
+  },
+  payments: {
+    all: ['payments'] as const,
+    detail: (id: string) => ['payments', id] as const,
+  },
+  chat: {
+    rooms: ['chat', 'rooms'] as const,
+    messages: (roomId: string) => ['chat', 'messages', roomId] as const,
+  },
+  mercenary: {
+    all: ['mercenary'] as const,
+    list: (params?: Record<string, string>) => ['mercenary', params] as const,
+  },
+  badges: {
+    all: ['badges'] as const,
+    team: (teamId: string) => ['badges', 'team', teamId] as const,
+  },
+  reviews: {
+    all: ['reviews'] as const,
+    pending: ['reviews', 'pending'] as const,
+  },
+  notifications: ['notifications'] as const,
+  user: (id: string) => ['user', id] as const,
+  admin: {
+    users: (params?: Record<string, string>) => ['admin', 'users', params] as const,
+    user: (id: string) => ['admin', 'user', id] as const,
+    matches: ['admin', 'matches'] as const,
+    lessons: ['admin', 'lessons'] as const,
+    teams: ['admin', 'teams'] as const,
+    venues: ['admin', 'venues'] as const,
+    payments: ['admin', 'payments'] as const,
+    stats: ['admin', 'stats'] as const,
+    disputes: ['admin', 'disputes'] as const,
+    dispute: (id: string) => ['admin', 'dispute', id] as const,
+    settlements: ['admin', 'settlements'] as const,
+    settlementsSummary: ['admin', 'settlements', 'summary'] as const,
+  },
+} as const;
+
 // ── Auth ──
 export function useDevLogin() {
   const { login } = useAuthStore();
@@ -60,7 +135,7 @@ export function useDevLogin() {
     onSuccess: (data) => {
       const { accessToken, refreshToken, user } = data;
       login(accessToken, refreshToken, user as never);
-      queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.me });
     },
   });
 }
@@ -68,7 +143,7 @@ export function useDevLogin() {
 export function useMe() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<UserProfile>({
-    queryKey: ['me'],
+    queryKey: queryKeys.me,
     queryFn: async () => {
       const res = await api.get('/auth/me');
       return extractData<UserProfile>(res);
@@ -81,7 +156,7 @@ export function useMe() {
 // ── Matches ──
 export function useMatches(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<Match>>({
-    queryKey: ['matches', params],
+    queryKey: queryKeys.matches.list(params),
     queryFn: async () => {
       const res = await api.get('/matches', { params });
       return extractData<PaginatedResponse<Match>>(res);
@@ -92,7 +167,7 @@ export function useMatches(params?: Record<string, string>) {
 export function useRecommendedMatches() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<Match[]>({
-    queryKey: ['matches', 'recommended'],
+    queryKey: queryKeys.matches.recommended,
     queryFn: async () => {
       const res = await api.get('/matches/recommended');
       return extractData<Match[]>(res);
@@ -103,7 +178,7 @@ export function useRecommendedMatches() {
 
 export function useMatch(id: string) {
   return useQuery<Match>({
-    queryKey: ['match', id],
+    queryKey: queryKeys.matches.detail(id),
     queryFn: async () => {
       const res = await api.get(`/matches/${id}`);
       return extractData<Match>(res);
@@ -115,7 +190,7 @@ export function useMatch(id: string) {
 // ── Teams ──
 export function useTeams(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<SportTeam>>({
-    queryKey: ['teams', params],
+    queryKey: queryKeys.teams.list(params),
     queryFn: async () => {
       const res = await api.get('/teams', { params });
       return extractData<PaginatedResponse<SportTeam>>(res);
@@ -125,7 +200,7 @@ export function useTeams(params?: Record<string, string>) {
 
 export function useTeam(id: string) {
   return useQuery<SportTeam>({
-    queryKey: ['team', id],
+    queryKey: queryKeys.teams.detail(id),
     queryFn: async () => {
       const res = await api.get(`/teams/${id}`);
       return extractData<SportTeam>(res);
@@ -142,7 +217,7 @@ export function useCreateTeam() {
       return extractData<SportTeam>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.all });
     },
   });
 }
@@ -150,7 +225,7 @@ export function useCreateTeam() {
 // ── Lessons ──
 export function useLessons(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<Lesson>>({
-    queryKey: ['lessons', params],
+    queryKey: queryKeys.lessons.list(params),
     queryFn: async () => {
       const res = await api.get('/lessons', { params });
       return extractData<PaginatedResponse<Lesson>>(res);
@@ -160,7 +235,7 @@ export function useLessons(params?: Record<string, string>) {
 
 export function useLesson(id: string) {
   return useQuery<Lesson>({
-    queryKey: ['lesson', id],
+    queryKey: queryKeys.lessons.detail(id),
     queryFn: async () => {
       const res = await api.get(`/lessons/${id}`);
       return extractData<Lesson>(res);
@@ -177,7 +252,7 @@ export function useCreateLesson() {
       return extractData<Lesson>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lessons.all });
     },
   });
 }
@@ -185,7 +260,7 @@ export function useCreateLesson() {
 // ── Venues ──
 export function useVenues(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<Venue>>({
-    queryKey: ['venues', params],
+    queryKey: queryKeys.venues.list(params),
     queryFn: async () => {
       const res = await api.get('/venues', { params });
       return extractData<PaginatedResponse<Venue>>(res);
@@ -195,7 +270,7 @@ export function useVenues(params?: Record<string, string>) {
 
 export function useVenue(id: string) {
   return useQuery<Venue>({
-    queryKey: ['venue', id],
+    queryKey: queryKeys.venues.detail(id),
     queryFn: async () => {
       const res = await api.get(`/venues/${id}`);
       return extractData<Venue>(res);
@@ -206,7 +281,7 @@ export function useVenue(id: string) {
 
 export function useVenueSchedule(id: string) {
   return useQuery<VenueScheduleSlot[]>({
-    queryKey: ['venue', id, 'schedule'],
+    queryKey: queryKeys.venues.schedule(id),
     queryFn: async () => {
       const res = await api.get(`/venues/${id}/schedule`);
       return extractData<VenueScheduleSlot[]>(res);
@@ -223,7 +298,7 @@ export function useCreateVenueReview() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['venue', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.venues.detail(id) });
     },
   });
 }
@@ -231,7 +306,7 @@ export function useCreateVenueReview() {
 // ── Marketplace ──
 export function useListings(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<MarketplaceListing>>({
-    queryKey: ['listings', params],
+    queryKey: queryKeys.listings.list(params),
     queryFn: async () => {
       const res = await api.get('/marketplace/listings', { params });
       return extractData<PaginatedResponse<MarketplaceListing>>(res);
@@ -241,7 +316,7 @@ export function useListings(params?: Record<string, string>) {
 
 export function useListing(id: string) {
   return useQuery<MarketplaceListing>({
-    queryKey: ['listing', id],
+    queryKey: queryKeys.listings.detail(id),
     queryFn: async () => {
       const res = await api.get(`/marketplace/listings/${id}`);
       return extractData<MarketplaceListing>(res);
@@ -258,7 +333,7 @@ export function useCreateListing() {
       return extractData<MarketplaceListing>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
     },
   });
 }
@@ -271,7 +346,7 @@ export function useCreateOrder() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['listing', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.listings.detail(id) });
     },
   });
 }
@@ -280,7 +355,7 @@ export function useCreateOrder() {
 export function usePayments() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<Payment[]>({
-    queryKey: ['payments'],
+    queryKey: queryKeys.payments.all,
     queryFn: async () => {
       const res = await api.get('/payments/me');
       return extractData<Payment[]>(res);
@@ -291,7 +366,7 @@ export function usePayments() {
 
 export function usePayment(id: string) {
   return useQuery<Payment>({
-    queryKey: ['payment', id],
+    queryKey: queryKeys.payments.detail(id),
     queryFn: async () => {
       const res = await api.get(`/payments/${id}`);
       return extractData<Payment>(res);
@@ -343,7 +418,7 @@ export function useRefundPayment() {
 // ── Team Matches ──
 export function useTeamMatches(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<TeamMatch>>({
-    queryKey: ['team-matches', params],
+    queryKey: queryKeys.teamMatches.list(params),
     queryFn: async () => {
       const res = await api.get('/team-matches', { params });
       return extractData<PaginatedResponse<TeamMatch>>(res);
@@ -353,7 +428,7 @@ export function useTeamMatches(params?: Record<string, string>) {
 
 export function useTeamMatch(id: string) {
   return useQuery<TeamMatch>({
-    queryKey: ['team-match', id],
+    queryKey: queryKeys.teamMatches.detail(id),
     queryFn: async () => {
       const res = await api.get(`/team-matches/${id}`);
       return extractData<TeamMatch>(res);
@@ -364,7 +439,7 @@ export function useTeamMatch(id: string) {
 
 export function useTeamMatchRefereeSchedule(id: string) {
   return useQuery({
-    queryKey: ['team-match-referee', id],
+    queryKey: queryKeys.teamMatches.referee(id),
     queryFn: async () => {
       const res = await api.get(`/team-matches/${id}/referee-schedule`);
       return extractData<Array<{ quarter: number; teamName: string }>>(res);
@@ -381,7 +456,7 @@ export function useCreateTeamMatch() {
       return extractData<TeamMatch>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-matches'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
     },
   });
 }
@@ -441,7 +516,7 @@ export function useTeamMatchArrival() {
 // ── Admin ──
 export function useAdminUsers(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<UserProfile>>({
-    queryKey: ['admin', 'users', params],
+    queryKey: queryKeys.admin.users(params),
     queryFn: async () => {
       const res = await api.get('/admin/users', { params });
       return extractData<PaginatedResponse<UserProfile>>(res);
@@ -451,7 +526,7 @@ export function useAdminUsers(params?: Record<string, string>) {
 
 export function useAdminUser(id: string) {
   return useQuery<UserProfile>({
-    queryKey: ['admin', 'user', id],
+    queryKey: queryKeys.admin.user(id),
     queryFn: async () => {
       const res = await api.get(`/admin/users/${id}`);
       return extractData<UserProfile>(res);
@@ -462,7 +537,7 @@ export function useAdminUser(id: string) {
 
 export function useAdminMatches() {
   return useQuery<PaginatedResponse<Match>>({
-    queryKey: ['admin', 'matches'],
+    queryKey: queryKeys.admin.matches,
     queryFn: async () => {
       const res = await api.get('/admin/matches');
       return extractData<PaginatedResponse<Match>>(res);
@@ -472,7 +547,7 @@ export function useAdminMatches() {
 
 export function useAdminLessons() {
   return useQuery<Lesson[]>({
-    queryKey: ['admin', 'lessons'],
+    queryKey: queryKeys.admin.lessons,
     queryFn: async () => {
       const res = await api.get('/admin/lessons');
       return extractData<Lesson[]>(res);
@@ -482,7 +557,7 @@ export function useAdminLessons() {
 
 export function useAdminTeams() {
   return useQuery<SportTeam[]>({
-    queryKey: ['admin', 'teams'],
+    queryKey: queryKeys.admin.teams,
     queryFn: async () => {
       const res = await api.get('/admin/teams');
       return extractData<SportTeam[]>(res);
@@ -492,7 +567,7 @@ export function useAdminTeams() {
 
 export function useAdminVenues() {
   return useQuery<Venue[]>({
-    queryKey: ['admin', 'venues'],
+    queryKey: queryKeys.admin.venues,
     queryFn: async () => {
       const res = await api.get('/admin/venues');
       return extractData<Venue[]>(res);
@@ -502,7 +577,7 @@ export function useAdminVenues() {
 
 export function useAdminPayments() {
   return useQuery<PaginatedResponse<Payment>>({
-    queryKey: ['admin', 'payments'],
+    queryKey: queryKeys.admin.payments,
     queryFn: async () => {
       const res = await api.get('/admin/payments');
       return extractData<PaginatedResponse<Payment>>(res);
@@ -512,7 +587,7 @@ export function useAdminPayments() {
 
 export function useAdminStats() {
   return useQuery<AdminStats>({
-    queryKey: ['admin', 'stats'],
+    queryKey: queryKeys.admin.stats,
     queryFn: async () => {
       const res = await api.get('/admin/stats');
       return extractData<AdminStats>(res);
@@ -550,7 +625,7 @@ export function useUpdateLessonStatus() {
 export function useChatRooms() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<ChatRoom[]>({
-    queryKey: ['chat', 'rooms'],
+    queryKey: queryKeys.chat.rooms,
     queryFn: async () => {
       const res = await api.get('/chat/rooms');
       return extractData<ChatRoom[]>(res);
@@ -561,7 +636,7 @@ export function useChatRooms() {
 
 export function useChatMessages(roomId: string) {
   return useQuery<ChatMessage[]>({
-    queryKey: ['chat', 'messages', roomId],
+    queryKey: queryKeys.chat.messages(roomId),
     queryFn: async () => {
       const res = await api.get(`/chat/rooms/${roomId}`);
       return extractData<ChatMessage[]>(res);
@@ -586,7 +661,7 @@ export function useSendMessage() {
 // ── Mercenary ──
 export function useMercenaryPosts(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<MercenaryPost>>({
-    queryKey: ['mercenary', params],
+    queryKey: queryKeys.mercenary.list(params),
     queryFn: async () => {
       const res = await api.get('/mercenary', { params });
       return extractData<PaginatedResponse<MercenaryPost>>(res);
@@ -602,7 +677,7 @@ export function useCreateMercenaryPost() {
       return extractData<MercenaryPost>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mercenary'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
     },
   });
 }
@@ -615,7 +690,7 @@ export function useApplyMercenary() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mercenary'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
     },
   });
 }
@@ -623,7 +698,7 @@ export function useApplyMercenary() {
 // ── Badges ──
 export function useTeamBadges(teamId: string) {
   return useQuery<Badge[]>({
-    queryKey: ['badges', 'team', teamId],
+    queryKey: queryKeys.badges.team(teamId),
     queryFn: async () => {
       const res = await api.get(`/badges/team/${teamId}`);
       return extractData<Badge[]>(res);
@@ -634,7 +709,7 @@ export function useTeamBadges(teamId: string) {
 
 export function useAllBadgeTypes() {
   return useQuery<Badge[]>({
-    queryKey: ['badges'],
+    queryKey: queryKeys.badges.all,
     queryFn: async () => {
       const res = await api.get('/badges');
       return extractData<Badge[]>(res);
@@ -645,7 +720,7 @@ export function useAllBadgeTypes() {
 // ── Disputes ──
 export function useAdminDisputes() {
   return useQuery<Dispute[]>({
-    queryKey: ['admin', 'disputes'],
+    queryKey: queryKeys.admin.disputes,
     queryFn: async () => {
       const res = await api.get('/admin/disputes');
       return extractData<Dispute[]>(res);
@@ -655,7 +730,7 @@ export function useAdminDisputes() {
 
 export function useAdminDispute(id: string) {
   return useQuery<Dispute>({
-    queryKey: ['admin', 'dispute', id],
+    queryKey: queryKeys.admin.dispute(id),
     queryFn: async () => {
       const res = await api.get(`/admin/disputes/${id}`);
       return extractData<Dispute>(res);
@@ -680,7 +755,7 @@ export function useUpdateDisputeStatus() {
 // ── Settlements ──
 export function useAdminSettlements() {
   return useQuery<Settlement[]>({
-    queryKey: ['admin', 'settlements'],
+    queryKey: queryKeys.admin.settlements,
     queryFn: async () => {
       const res = await api.get('/admin/settlements');
       return extractData<Settlement[]>(res);
@@ -690,7 +765,7 @@ export function useAdminSettlements() {
 
 export function useSettlementsSummary() {
   return useQuery<SettlementSummary>({
-    queryKey: ['admin', 'settlements', 'summary'],
+    queryKey: queryKeys.admin.settlementsSummary,
     queryFn: async () => {
       const res = await api.get('/admin/settlements/summary');
       return extractData<SettlementSummary>(res);
@@ -720,7 +795,7 @@ export function useCreateReview() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reviews.all });
     },
   });
 }
@@ -728,7 +803,7 @@ export function useCreateReview() {
 export function usePendingReviews() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<PendingReview[]>({
-    queryKey: ['reviews', 'pending'],
+    queryKey: queryKeys.reviews.pending,
     queryFn: async () => {
       const res = await api.get('/reviews/pending');
       return extractData<PendingReview[]>(res);
@@ -741,7 +816,7 @@ export function usePendingReviews() {
 export function useNotifications() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<Notification[]>({
-    queryKey: ['notifications'],
+    queryKey: queryKeys.notifications,
     queryFn: async () => {
       const res = await api.get('/notifications');
       return extractData<Notification[]>(res);
@@ -766,7 +841,7 @@ export function useMarkNotificationRead() {
 // ── User profile (public) ──
 export function useUserProfile(id: string) {
   return useQuery<UserProfile>({
-    queryKey: ['user', id],
+    queryKey: queryKeys.user(id),
     queryFn: async () => {
       const res = await api.get(`/users/${id}`);
       return extractData<UserProfile>(res);
@@ -778,7 +853,7 @@ export function useUserProfile(id: string) {
 // ── My matches ──
 export function useMyMatches(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<Match>>({
-    queryKey: ['my-matches', params],
+    queryKey: queryKeys.matches.my(params),
     queryFn: async () => {
       const res = await api.get('/users/me/matches', { params });
       return extractData<PaginatedResponse<Match>>(res);

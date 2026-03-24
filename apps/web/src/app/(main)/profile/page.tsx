@@ -30,7 +30,7 @@ export default function ProfilePage() {
       <div className={`px-5 lg:px-0 ${isAuthenticated ? 'lg:grid lg:grid-cols-[1fr_340px] lg:gap-8' : ''}`}>
         <div>
         {isAuthenticated && user ? (
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-blue-50 text-xl font-bold text-blue-500">
@@ -180,7 +180,7 @@ export default function ProfilePage() {
           </div>
         </Link>
         {isAuthenticated && (
-          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full">
+          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-lg transition-colors">
             <LogOut size={20} className="text-gray-400" />
             <span className="text-[15px] font-medium text-gray-500">로그아웃</span>
           </button>
@@ -219,7 +219,7 @@ function UpcomingSchedule() {
             const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
             return (
               <Link key={m.id} href={`/matches/${m.id}`}>
-                <div className="rounded-xl bg-white border border-gray-100 p-3.5 flex items-center gap-3 hover:shadow-sm transition-all">
+                <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:shadow-sm active:scale-[0.98] transition-all">
                   <div className="flex flex-col items-center justify-center h-12 w-12 rounded-xl bg-blue-50 text-blue-500 shrink-0">
                     <span className="text-[11px] font-semibold">{d.getMonth() + 1}월</span>
                     <span className="text-[16px] font-black leading-none">{d.getDate()}</span>

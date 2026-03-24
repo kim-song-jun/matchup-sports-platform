@@ -13,12 +13,12 @@ export default function SettingsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in dark:bg-gray-900">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+      <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-[16px] font-semibold text-gray-900">설정</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">설정</h1>
       </header>
-      <div className="hidden lg:block mb-6">
-        <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">설정</h2>
+      <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">설정</h1>
       </div>
 
       <div className="px-5 lg:px-0 max-w-2xl">
@@ -92,7 +92,7 @@ export default function SettingsPage() {
         {isAuthenticated && (
           <div className="mb-6">
             <button onClick={() => { logout(); router.push('/login'); }}
-              className="w-full rounded-2xl bg-white border border-gray-100 px-4 py-3.5 flex items-center gap-3.5 hover:bg-red-50 transition-colors group">
+              className="w-full rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3.5 flex items-center gap-3.5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors group">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-500 group-hover:bg-red-100">
                 <LogOut size={18} />
               </div>
@@ -101,10 +101,12 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="text-center pb-8">
+        <div className="text-center">
           <p className="text-[12px] text-gray-300">MatchUp v1.0.0</p>
         </div>
       </div>
+
+      <div className="h-6" />
     </div>
   );
 }
@@ -113,7 +115,7 @@ function SettingsSection({ title, children }: { title: string; children: React.R
   return (
     <div className="mb-6">
       <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">{title}</h3>
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden divide-y divide-gray-50">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden divide-y divide-gray-50 dark:divide-gray-700">
         {children}
       </div>
     </div>

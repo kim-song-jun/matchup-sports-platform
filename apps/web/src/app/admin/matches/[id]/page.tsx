@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { ArrowLeft, ChevronRight, Calendar, MapPin, Users, CreditCard, Star, Trophy, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useMatch } from '@/hooks/use-api';
 import type { MatchParticipant } from '@/types/api';
@@ -51,6 +52,7 @@ export default function AdminMatchDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const matchId = params.id as string;
+  const { toast } = useToast();
   const [statusChanging, setStatusChanging] = useState(false);
 
   const { data: match, isLoading } = useMatch(matchId);
@@ -62,9 +64,11 @@ export default function AdminMatchDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'match', matchId] });
+      toast('success', '상태가 변경되었습니다');
       setStatusChanging(false);
     },
     onError: () => {
+      toast('error', '실패했어요. 다시 시도해주세요');
       setStatusChanging(false);
     },
   });

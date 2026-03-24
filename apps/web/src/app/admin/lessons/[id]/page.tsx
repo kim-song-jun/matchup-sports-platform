@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { ChevronRight, Calendar, MapPin, Users, CreditCard, User, GraduationCap, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLesson } from '@/hooks/use-api';
 import type { LessonParticipant } from '@/types/api';
@@ -41,6 +42,7 @@ export default function AdminLessonDetailPage() {
   const params = useParams();
   const queryClient = useQueryClient();
   const lessonId = params.id as string;
+  const { toast } = useToast();
   const [statusChanging, setStatusChanging] = useState(false);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
@@ -52,9 +54,11 @@ export default function AdminLessonDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'lesson', lessonId] });
+      toast('success', '상태가 변경되었습니다');
       setStatusChanging(false);
     },
     onError: () => {
+      toast('error', '실패했어요. 다시 시도해주세요');
       setStatusChanging(false);
     },
   });

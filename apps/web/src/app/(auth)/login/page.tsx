@@ -32,12 +32,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-white">
+    <div className="flex min-h-dvh flex-col bg-white dark:bg-gray-900">
       {/* Top area */}
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <div className="mb-10 text-center">
-          <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900">MatchUp</h1>
-          <p className="mt-2 text-[15px] text-gray-500 leading-relaxed">
+          <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
+          <p className="mt-2 text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed">
             같이 운동할 사람, 찾고 계셨죠?<br />AI가 딱 맞는 메이트를 찾아드려요
           </p>
           <p key={taglineIdx} className="text-[14px] text-gray-500 mt-2 animate-fade-in-up">{taglines[taglineIdx]}</p>
@@ -63,7 +63,7 @@ export default function LoginPage() {
       </div>
 
       {/* Dev login — bottom sheet style */}
-      <div className="w-full bg-gray-50 rounded-t-3xl px-6 pt-6 pb-8">
+      <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-3xl px-6 pt-6 pb-8">
         <p className="text-center text-[12px] font-medium text-gray-400 mb-4">개발 모드 · 빠른 로그인</p>
         <div className="flex gap-2 max-w-sm mx-auto">
           <input
@@ -72,7 +72,7 @@ export default function LoginPage() {
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleDevLogin()}
-            className="flex-1 rounded-xl bg-white border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all"
+            className="flex-1 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 dark:focus:border-blue-600 transition-all"
           />
           <button
             onClick={() => handleDevLogin()}
@@ -90,7 +90,7 @@ export default function LoginPage() {
               key={name}
               onClick={() => handleDevLogin(name)}
               disabled={isLoading}
-              className="rounded-full bg-white border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 active:bg-gray-100 transition-colors disabled:opacity-50"
+              className="rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-3 py-1.5 text-[12px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {name}
             </button>

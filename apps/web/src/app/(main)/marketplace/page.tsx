@@ -5,12 +5,9 @@ import Link from 'next/link';
 import { Plus, Heart, Eye, Package, Search, ShoppingBag } from 'lucide-react';
 import { useListings } from '@/hooks/use-api';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { sportLabel } from '@/lib/constants';
+import { formatCurrency } from '@/lib/utils';
 import type { MarketplaceListing } from '@/types/api';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
 
 const conditionLabel: Record<string, string> = {
   new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자',
@@ -23,10 +20,6 @@ const conditionStyle: Record<string, string> = {
   fair: 'bg-gray-100 text-gray-500',
   poor: 'bg-gray-100 text-gray-400',
 };
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 const categoryFilters: { label: string; match: (item: MarketplaceListing) => boolean }[] = [
   { label: '전체', match: () => true },
@@ -73,7 +66,7 @@ export default function MarketplacePage() {
             placeholder="상품명, 종목 검색"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 dark:focus:bg-gray-900 dark:focus:border-blue-600 transition-all"
           />
         </div>
       </div>
@@ -87,7 +80,7 @@ export default function MarketplacePage() {
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeCategory === cat.label
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
             }`}
           >
             {cat.label}
@@ -98,9 +91,9 @@ export default function MarketplacePage() {
       {/* 리스트 */}
       <div className="px-5 lg:px-0">
         {isLoading ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[1, 2].map(i => (
-              <div key={i} className="h-[100px] animate-pulse rounded-2xl bg-gray-50" />
+              <div key={i} className="h-[100px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : listings.length === 0 ? (
@@ -110,11 +103,11 @@ export default function MarketplacePage() {
             <p className="text-[13px] text-gray-400 mt-1">첫 번째 판매자가 되어보세요!</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="space-y-3 stagger-children">
             {listings.map((item: MarketplaceListing) => {
               const SportIcon = SportIconMap[item.sportType];
               return (
-                <Link key={item.id} href={`/marketplace/${item.id}`} className="block py-4 first:pt-0 last:pb-0">
+                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
                     <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
@@ -123,7 +116,7 @@ export default function MarketplacePage() {
 
                     {/* Content */}
                     <div className="flex flex-1 flex-col min-w-0 py-0.5">
-                      <h3 className="text-[15px] font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
+                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
 
                       {/* 지역 · 시간 */}
                       <p className="text-[13px] text-gray-400 mt-1">

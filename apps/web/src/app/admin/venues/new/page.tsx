@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronRight, X, Plus, Loader2, CheckCircle } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ui/toast';
 
 const sportOptions = [
   { value: 'futsal', label: '풋살' },
@@ -25,6 +26,7 @@ const venueTypes = [
 
 export default function AdminVenueNewPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [form, setForm] = useState({
     name: '',
@@ -58,7 +60,11 @@ export default function AdminVenueNewPage() {
       await api.post('/admin/venues', payload);
     },
     onSuccess: () => {
+      toast('success', '시설이 등록되었습니다');
       router.push('/admin/venues');
+    },
+    onError: () => {
+      toast('error', '실패했어요. 다시 시도해주세요');
     },
   });
 

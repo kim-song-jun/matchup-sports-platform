@@ -1,70 +1,78 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Target, Shield, Users, Zap, ChevronRight, Star, ArrowRight } from 'lucide-react';
+import { Target, Shield, Users, Zap, ChevronRight, Star, ArrowRight, Quote } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 
+/* ────────────────────────────────────────────
+   Data
+   ──────────────────────────────────────────── */
+
 const SPORTS = [
-  { key: 'soccer', name: '축구', iconColor: 'text-green-600', bg: 'bg-green-50' },
-  { key: 'futsal', name: '풋살', iconColor: 'text-blue-500', bg: 'bg-blue-50' },
-  { key: 'basketball', name: '농구', iconColor: 'text-amber-600', bg: 'bg-amber-50' },
-  { key: 'badminton', name: '배드민턴', iconColor: 'text-cyan-600', bg: 'bg-cyan-50' },
-  { key: 'tennis', name: '테니스', iconColor: 'text-red-500', bg: 'bg-red-50' },
-  { key: 'baseball', name: '야구', iconColor: 'text-orange-600', bg: 'bg-orange-50' },
-  { key: 'volleyball', name: '배구', iconColor: 'text-blue-500', bg: 'bg-blue-50' },
-  { key: 'swimming', name: '수영', iconColor: 'text-sky-600', bg: 'bg-sky-50' },
-  { key: 'ice_hockey', name: '아이스하키', iconColor: 'text-blue-600', bg: 'bg-blue-50' },
-  { key: 'figure_skating', name: '피겨스케이팅', iconColor: 'text-gray-500', bg: 'bg-gray-100' },
-  { key: 'short_track', name: '쇼트트랙', iconColor: 'text-gray-500', bg: 'bg-gray-100' },
+  { key: 'soccer', name: '축구', bg: 'bg-green-100', iconColor: 'text-green-600' },
+  { key: 'futsal', name: '풋살', bg: 'bg-blue-100', iconColor: 'text-blue-500' },
+  { key: 'basketball', name: '농구', bg: 'bg-amber-100', iconColor: 'text-amber-600' },
+  { key: 'badminton', name: '배드민턴', bg: 'bg-cyan-100', iconColor: 'text-cyan-600' },
+  { key: 'tennis', name: '테니스', bg: 'bg-red-100', iconColor: 'text-red-500' },
+  { key: 'baseball', name: '야구', bg: 'bg-orange-100', iconColor: 'text-orange-600' },
+  { key: 'volleyball', name: '배구', bg: 'bg-indigo-100', iconColor: 'text-indigo-500' },
+  { key: 'swimming', name: '수영', bg: 'bg-sky-100', iconColor: 'text-sky-600' },
+  { key: 'ice_hockey', name: '아이스하키', bg: 'bg-blue-100', iconColor: 'text-blue-600' },
+  { key: 'figure_skating', name: '피겨스케이팅', bg: 'bg-purple-100', iconColor: 'text-purple-500' },
+  { key: 'short_track', name: '쇼트트랙', bg: 'bg-slate-100', iconColor: 'text-slate-600' },
 ];
 
 const FEATURES = [
   {
     icon: Target,
     title: 'AI 매칭',
-    description: '실력 · 위치 · 시간 · 매너를 종합한 최적 매칭',
+    description: '실력, 위치, 시간, 매너를 종합 분석해 나와 가장 잘 맞는 상대를 자동으로 찾아드립니다.',
     color: 'text-blue-600',
     bg: 'bg-blue-50',
+    border: 'border-blue-100',
   },
   {
     icon: Users,
     title: '팀 매칭',
-    description: 'S~D 등급으로 딱 맞는 상대팀 찾기',
+    description: 'S~D 등급으로 팀 실력을 정확히 측정하고, 균형 잡힌 경기를 만들어드립니다.',
     color: 'text-emerald-600',
     bg: 'bg-emerald-50',
+    border: 'border-emerald-100',
   },
   {
     icon: Shield,
     title: '신뢰 시스템',
-    description: '3단계 허위 레벨링 방지 + 6항목 상호 평가',
+    description: '3단계 허위 레벨링 방지와 6항목 상호 평가로 매너 있는 경기 환경을 보장합니다.',
     color: 'text-amber-600',
     bg: 'bg-amber-50',
+    border: 'border-amber-100',
   },
   {
     icon: Zap,
     title: '올인원 플랫폼',
-    description: '매칭 · 채팅 · 결제 · 용병 · 장터까지 한 곳에서',
+    description: '매칭부터 채팅, 결제, 용병 구하기, 장터까지 — 모든 것을 한 곳에서 해결하세요.',
     color: 'text-violet-600',
     bg: 'bg-violet-50',
+    border: 'border-violet-100',
   },
 ];
 
 const STEPS = [
   {
-    step: '01',
-    title: '팀/개인 프로필 만들기',
-    description: '종목, 레벨, 활동 지역을 설정하세요',
+    num: 1,
+    title: '프로필 만들기',
+    description: '종목, 실력 레벨, 활동 지역을 설정하고 나만의 스포츠 프로필을 완성하세요.',
   },
   {
-    step: '02',
-    title: '매치 찾기 또는 모집하기',
-    description: 'AI 추천 매치를 받거나 직접 검색하세요',
+    num: 2,
+    title: '매치 찾기',
+    description: 'AI가 추천하는 최적의 매치를 받거나, 직접 원하는 경기를 검색해 참여하세요.',
   },
   {
-    step: '03',
+    num: 3,
     title: '경기하고 성장하기',
-    description: 'ELO 레이팅, 뱃지, 매너 점수로 성장하세요',
+    description: 'ELO 레이팅, 뱃지, 매너 점수가 쌓이며 나만의 스포츠 커리어가 만들어집니다.',
   },
 ];
 
@@ -72,51 +80,78 @@ const TESTIMONIALS = [
   {
     quote: '실력이 비슷한 상대를 만나니 경기가 훨씬 재밌어졌어요. 일방적인 경기는 이제 안녕!',
     author: '축구왕민수',
-    role: '축구 · B등급',
+    team: '서울 FC 선데이즈',
+    role: '축구 B등급',
     rating: 5,
   },
   {
     quote: '노쇼 없는 매칭이 최고입니다. 매너 점수 시스템 덕분에 진지한 사람들만 모여요.',
     author: 'FC 번개',
-    role: '풋살팀 · A등급',
+    team: '풋살 A등급 팀',
+    role: '풋살 A등급',
     rating: 5,
   },
   {
     quote: '주말마다 배드민턴 파트너 찾기 힘들었는데, 이제 앱 하나로 3분이면 매칭돼요.',
     author: '셔틀콕러버',
-    role: '배드민턴 · C등급',
+    team: '강남 배드민턴 클럽',
+    role: '배드민턴 C등급',
     rating: 5,
   },
 ];
 
+const STATS = [
+  { value: '11개', label: '지원 종목' },
+  { value: 'S~D', label: '실력 등급' },
+  { value: 'AI', label: '스마트 매칭' },
+  { value: '8종', label: '뱃지 시스템' },
+];
+
+/* ────────────────────────────────────────────
+   Component
+   ──────────────────────────────────────────── */
+
 export default function LandingPage() {
   const featuresRef = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const scrollToFeatures = () => {
     featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      {/* ── Fixed Navigation ── */}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-100 dark:border-gray-800 shadow-sm'
+            : 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-100 dark:border-gray-800'
+        }`}
+      >
+        <div className="max-w-[1200px] mx-auto px-5 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="font-bold text-lg text-gray-900">MatchUp</span>
+            <span className="font-bold text-[18px] text-gray-900 dark:text-white tracking-tight">MatchUp</span>
           </div>
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors px-3 py-2"
+              className="text-[14px] text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors px-3 py-2 hidden sm:block"
             >
               로그인
             </Link>
             <Link
               href="/login"
-              className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors px-4 py-2 rounded-lg"
+              className="text-[14px] font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors px-5 py-2.5 rounded-xl"
             >
               시작하기
             </Link>
@@ -124,38 +159,50 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* ── Hero Section ── */}
       <section className="relative pt-16 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
-        <div className="relative max-w-6xl mx-auto px-4 py-20 sm:py-28 md:py-36">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm text-white/90 text-sm font-medium px-4 py-2 rounded-full mb-6">
+        {/* Premium gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-gray-900" />
+        {/* Subtle radial overlay for depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_40%,rgba(255,255,255,0.08),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_80%,rgba(49,130,246,0.15),transparent_50%)]" />
+
+        <div className="relative max-w-[1200px] mx-auto px-5 py-20 sm:py-28 lg:py-36">
+          <div className="max-w-[640px]">
+            {/* Status badge */}
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm text-white/90 text-[13px] font-medium px-4 py-2 rounded-full mb-8">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               11개 종목 매칭 서비스 운영 중
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-tight mb-5">
+
+            {/* Main heading */}
+            <h1 className="text-[32px] lg:text-[48px] font-black text-white leading-[1.2] tracking-tight mb-5">
               내 수준에 딱 맞는{' '}
               <br className="hidden sm:block" />
               운동 메이트,{' '}
+              <br className="block sm:hidden" />
               <span className="text-blue-200">AI가 찾아드려요</span>
             </h1>
-            <p className="text-lg sm:text-xl text-blue-100 mb-8 leading-relaxed">
-              축구 · 풋살 · 농구 · 배드민턴 · 테니스 등 11개 종목 지원.
+
+            {/* Subtitle */}
+            <p className="text-[16px] lg:text-[20px] text-white/70 mb-10 leading-relaxed max-w-[520px]">
+              축구, 풋살, 농구, 배드민턴, 테니스 등 11개 종목 지원.
               <br className="hidden sm:block" />
               실력 기반 매칭으로 더 즐거운 경기를 경험하세요.
             </p>
+
+            {/* CTA buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center gap-2 bg-white text-blue-700 font-semibold px-7 py-3.5 rounded-xl hover:bg-blue-50 transition-colors text-base shadow-lg shadow-blue-900/20"
+                className="inline-flex items-center justify-center gap-2 bg-white text-blue-600 font-bold rounded-xl px-8 py-4 text-[16px] hover:bg-blue-50 transition-all duration-200 shadow-lg shadow-black/10"
               >
                 무료로 시작하기
-                <ArrowRight size={18} />
+                <ArrowRight size={18} strokeWidth={2.5} />
               </Link>
               <button
                 onClick={scrollToFeatures}
-                className="inline-flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm text-white font-medium px-7 py-3.5 rounded-xl hover:bg-white/20 transition-colors text-base border border-white/20"
+                className="inline-flex items-center justify-center gap-2 border border-white/30 text-white rounded-xl px-6 py-3.5 text-[15px] font-medium hover:bg-white/10 transition-all duration-200 backdrop-blur-sm"
               >
                 서비스 둘러보기
                 <ChevronRight size={18} />
@@ -163,31 +210,42 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+
+        {/* Hero bottom wave */}
+        <div className="relative -mb-px">
+          <svg
+            viewBox="0 0 1440 80"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-full h-auto block"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M0 80V40C120 53.3333 240 66.6667 360 60C480 53.3333 600 26.6667 720 16C840 5.33333 960 10.6667 1080 24C1200 37.3333 1320 58.6667 1380 69.3333L1440 80H0Z"
+              className="fill-white dark:fill-gray-900"
+            />
+          </svg>
+        </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="relative -mt-8 z-10 max-w-5xl mx-auto px-4">
-        <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100">
-          {[
-            { value: '11개', label: '종목 지원' },
-            { value: 'S~D', label: '실력 등급' },
-            { value: 'AI', label: '스마트 매칭' },
-            { value: '8종', label: '뱃지 시스템' },
-          ].map((stat) => (
-            <div key={stat.label} className="px-6 py-5 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stat.value}</div>
-              <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
+      {/* ── Stats Bar (floating overlap) ── */}
+      <section className="relative -mt-8 z-10 mx-5 lg:mx-auto lg:max-w-[800px]">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/20 border border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700">
+          {STATS.map((stat) => (
+            <div key={stat.label} className="px-5 py-5 sm:px-6 sm:py-6 text-center">
+              <div className="text-[28px] font-black text-gray-900 dark:text-white leading-none">{stat.value}</div>
+              <div className="text-[12px] text-gray-400 dark:text-gray-500 mt-1.5 font-medium">{stat.label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Features Section */}
-      <section ref={featuresRef} className="py-20 sm:py-28 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4">
+      {/* ── Features Section ── */}
+      <section ref={featuresRef} className="pt-24 pb-20 sm:pt-32 sm:pb-28 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-[1200px] mx-auto px-5">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-blue-600 mb-2">주요 기능</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <p className="text-[13px] font-semibold text-blue-600 mb-2 tracking-wide uppercase">주요 기능</p>
+            <h2 className="text-[28px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
               스포츠 매칭, 이렇게 달라집니다
             </h2>
           </div>
@@ -197,13 +255,19 @@ export default function LandingPage() {
               return (
                 <div
                   key={feature.title}
-                  className="bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all duration-200"
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default"
                 >
-                  <div className={`w-12 h-12 rounded-xl ${feature.bg} flex items-center justify-center mb-4`}>
-                    <Icon size={24} className={feature.color} />
+                  <div
+                    className={`h-14 w-14 rounded-2xl ${feature.bg} dark:bg-opacity-20 flex items-center justify-center mb-5`}
+                  >
+                    <Icon size={26} className={feature.color} />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{feature.description}</p>
+                  <h3 className="text-[17px] lg:text-[18px] font-semibold text-gray-900 dark:text-white mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {feature.description}
+                  </p>
                 </div>
               );
             })}
@@ -211,57 +275,105 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-20 sm:py-28 bg-white">
-        <div className="max-w-6xl mx-auto px-4">
+      {/* ── How It Works ── */}
+      <section className="py-20 sm:py-28 bg-white dark:bg-gray-900">
+        <div className="max-w-[1200px] mx-auto px-5">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-blue-600 mb-2">이용 방법</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <p className="text-[13px] font-semibold text-blue-600 mb-2 tracking-wide uppercase">이용 방법</p>
+            <h2 className="text-[28px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
               3단계로 시작하세요
             </h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
+
+          {/* Mobile: vertical with connecting line */}
+          <div className="lg:hidden space-y-0">
             {STEPS.map((step, idx) => (
-              <div key={step.step} className="relative">
-                {idx < STEPS.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-blue-200 to-transparent -translate-x-8" />
-                )}
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold">
-                    {step.step}
+              <div key={step.num} className="relative flex gap-5">
+                {/* Left column: number + line */}
+                <div className="flex flex-col items-center">
+                  <div className="h-10 w-10 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-[15px] shrink-0 z-10">
+                    {step.num}
                   </div>
-                  <div className="pt-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{step.title}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed">{step.description}</p>
-                  </div>
+                  {idx < STEPS.length - 1 && (
+                    <div className="w-0.5 flex-1 bg-gradient-to-b from-blue-300 to-blue-100 dark:from-blue-600 dark:to-blue-900 my-2" />
+                  )}
                 </div>
+                {/* Right column: content */}
+                <div className={`pb-10 ${idx === STEPS.length - 1 ? 'pb-0' : ''}`}>
+                  <h3 className="text-[17px] font-semibold text-gray-900 dark:text-white mb-1.5">{step.title}</h3>
+                  <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">{step.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: horizontal with connecting line */}
+          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8 relative">
+            {/* Connecting line behind the step numbers */}
+            <div className="absolute top-5 left-[calc(16.67%+20px)] right-[calc(16.67%+20px)] h-0.5 bg-gradient-to-r from-blue-300 via-blue-400 to-blue-300 dark:from-blue-700 dark:via-blue-600 dark:to-blue-700" />
+
+            {STEPS.map((step) => (
+              <div key={step.num} className="text-center relative">
+                <div className="h-10 w-10 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-[15px] mx-auto mb-5 relative z-10 ring-4 ring-white dark:ring-gray-900">
+                  {step.num}
+                </div>
+                <h3 className="text-[18px] font-semibold text-gray-900 dark:text-white mb-2">{step.title}</h3>
+                <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed max-w-[280px] mx-auto">
+                  {step.description}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Supported Sports */}
-      <section className="py-20 sm:py-28 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4">
+      {/* ── Supported Sports ── */}
+      <section className="py-20 sm:py-28 bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-[1200px] mx-auto px-5">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-blue-600 mb-2">지원 종목</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <p className="text-[13px] font-semibold text-blue-600 mb-2 tracking-wide uppercase">지원 종목</p>
+            <h2 className="text-[28px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
               11개 종목, 하나의 플랫폼
             </h2>
           </div>
-          <div className="flex overflow-x-auto gap-4 pb-4 -mx-4 px-4 scrollbar-hide">
+
+          {/* Mobile: horizontal scroll */}
+          <div className="lg:hidden">
+            <div className="flex overflow-x-auto gap-4 pb-4 -mx-5 px-5 scrollbar-hide">
+              {SPORTS.map((sport) => {
+                const Icon = SportIconMap[sport.key];
+                return (
+                  <div
+                    key={sport.key}
+                    className="shrink-0 w-[100px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-3 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className={`w-14 h-14 rounded-2xl ${sport.bg} flex items-center justify-center`}>
+                      {Icon && <Icon size={28} className={sport.iconColor} />}
+                    </div>
+                    <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {sport.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Desktop: centered flex wrap */}
+          <div className="hidden lg:flex lg:flex-wrap lg:justify-center lg:gap-4">
             {SPORTS.map((sport) => {
               const Icon = SportIconMap[sport.key];
               return (
                 <div
                   key={sport.key}
-                  className="shrink-0 w-28 bg-white rounded-2xl p-5 border border-gray-100 flex flex-col items-center gap-3 hover:shadow-md hover:border-gray-200 transition-all duration-200"
+                  className="w-[120px] bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default"
                 >
-                  <div className={`w-14 h-14 rounded-xl ${sport.bg} flex items-center justify-center`}>
+                  <div className={`w-14 h-14 rounded-2xl ${sport.bg} flex items-center justify-center`}>
                     {Icon && <Icon size={28} className={sport.iconColor} />}
                   </div>
-                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{sport.name}</span>
+                  <span className="text-[13px] font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    {sport.name}
+                  </span>
                 </div>
               );
             })}
@@ -269,32 +381,42 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-20 sm:py-28 bg-white">
-        <div className="max-w-6xl mx-auto px-4">
+      {/* ── Testimonials ── */}
+      <section className="py-20 sm:py-28 bg-white dark:bg-gray-900">
+        <div className="max-w-[1200px] mx-auto px-5">
           <div className="text-center mb-14">
-            <p className="text-sm font-semibold text-blue-600 mb-2">사용자 후기</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <p className="text-[13px] font-semibold text-blue-600 mb-2 tracking-wide uppercase">사용자 후기</p>
+            <h2 className="text-[28px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
               이미 많은 선수들이 경험하고 있어요
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((testimonial) => (
+            {TESTIMONIALS.map((t) => (
               <div
-                key={testimonial.author}
-                className="bg-gray-50 rounded-2xl p-6 border border-gray-100"
+                key={t.author}
+                className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 relative hover:shadow-lg transition-all duration-300"
               >
-                <div className="flex gap-1 mb-4">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star key={i} size={16} className="text-amber-400 fill-amber-400" />
+                {/* Quote icon */}
+                <div className="mb-4">
+                  <Quote size={24} className="text-blue-200 dark:text-blue-800" />
+                </div>
+
+                {/* Stars */}
+                <div className="flex gap-0.5 mb-4">
+                  {Array.from({ length: t.rating }).map((_, i) => (
+                    <Star key={i} size={14} className="text-amber-400 fill-amber-400" />
                   ))}
                 </div>
-                <p className="text-gray-700 leading-relaxed mb-5">
-                  &ldquo;{testimonial.quote}&rdquo;
+
+                {/* Quote text */}
+                <p className="text-[15px] text-gray-700 dark:text-gray-300 leading-relaxed mb-6">
+                  {t.quote}
                 </p>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{testimonial.author}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{testimonial.role}</p>
+
+                {/* Author info */}
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                  <p className="font-semibold text-gray-900 dark:text-white text-[14px]">{t.author}</p>
+                  <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5">{t.team} &middot; {t.role}</p>
                 </div>
               </div>
             ))}
@@ -302,42 +424,46 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="py-20 sm:py-28 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+      {/* ── Final CTA ── */}
+      <section className="relative overflow-hidden">
+        {/* Gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-gray-900" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,0.08),transparent_60%)]" />
+
+        <div className="relative max-w-[640px] mx-auto px-5 py-20 sm:py-28 text-center">
+          <h2 className="text-[28px] lg:text-[40px] font-black text-white mb-4 tracking-tight leading-tight">
             지금 바로 시작하세요
           </h2>
-          <p className="text-blue-100 mb-8 text-lg">
+          <p className="text-[16px] lg:text-[18px] text-white/70 mb-10 leading-relaxed">
             내 수준에 맞는 운동 메이트를 AI가 찾아드려요.
             <br />
             가입은 3초, 첫 매칭은 무료입니다.
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center justify-center gap-2 bg-white text-blue-700 font-semibold px-8 py-4 rounded-xl hover:bg-blue-50 transition-colors text-lg shadow-lg shadow-blue-900/30"
+            className="inline-flex items-center justify-center gap-2 bg-white text-blue-600 font-bold px-10 py-4 rounded-xl text-[17px] hover:bg-blue-50 transition-all duration-200 shadow-lg shadow-black/10"
           >
             3초 만에 가입하기
-            <ArrowRight size={20} />
+            <ArrowRight size={20} strokeWidth={2.5} />
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 py-10">
-        <div className="max-w-6xl mx-auto px-4">
+      {/* ── Footer ── */}
+      <footer className="bg-gray-900 dark:bg-black py-10 border-t border-gray-800">
+        <div className="max-w-[1200px] mx-auto px-5">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center">
                 <span className="text-white font-bold text-xs">M</span>
               </div>
-              <span className="font-semibold text-white">MatchUp</span>
+              <span className="font-semibold text-white text-[15px]">MatchUp</span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-gray-400">
+            <div className="flex items-center gap-6 text-[13px] text-gray-400">
               <a href="#" className="hover:text-gray-200 transition-colors">이용약관</a>
               <a href="#" className="hover:text-gray-200 transition-colors">개인정보처리방침</a>
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-[13px] text-gray-500">
               &copy; 2026 MatchUp. All rights reserved.
             </p>
           </div>

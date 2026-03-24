@@ -6,6 +6,8 @@ import { GraduationCap, Swords, Dumbbell, Calendar, MapPin, Users, Plus, Search 
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLessons } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
+import { sportLabel, lessonTypeLabel as typeLabel } from '@/lib/constants';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import type { Lesson } from '@/types/api';
 
 const typeFilters = [
@@ -15,15 +17,6 @@ const typeFilters = [
   { key: 'free_practice', label: '자유 연습', icon: Dumbbell },
 ];
 
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
-
-const typeLabel: Record<string, string> = {
-  group_lesson: '그룹 레슨', practice_match: '연습 경기',
-  free_practice: '자유 연습', clinic: '클리닉',
-};
 
 const typeColor: Record<string, string> = {
   group_lesson: 'bg-blue-50 text-blue-500',
@@ -32,15 +25,6 @@ const typeColor: Record<string, string> = {
   clinic: 'bg-blue-50 text-blue-500',
 };
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}/${d.getDate()} (${weekdays[d.getDay()]})`;
-}
-
-function formatCurrency(n: number) {
-  return n === 0 ? '무료' : new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export default function LessonsPage() {
   const [activeType, setActiveType] = useState('');
@@ -85,7 +69,7 @@ export default function LessonsPage() {
             placeholder="강좌명, 코치, 장소 검색"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 dark:focus:bg-gray-900 dark:focus:border-blue-600 transition-all"
           />
         </div>
       </div>
@@ -99,7 +83,7 @@ export default function LessonsPage() {
             className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeType === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
             }`}
           >
             {f.icon && <f.icon size={14} />}
@@ -113,7 +97,7 @@ export default function LessonsPage() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-[140px] animate-pulse rounded-2xl bg-gray-50" />
+              <div key={i} className="h-[140px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : lessons.length === 0 ? (
@@ -123,12 +107,12 @@ export default function LessonsPage() {
             <p className="text-[13px] text-gray-400 mt-1">곧 다양한 강좌가 등록될 예정이에요</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
             {lessons.map((lesson: Lesson) => {
               const SportIcon = SportIconMap[lesson.sportType];
               const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
               return (
-                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2.5">
                       {SportIcon && (
@@ -168,8 +152,8 @@ export default function LessonsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 h-[3px] rounded-full bg-gray-100 overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${filledPercent}%` }} />
+                  <div className="mt-3 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${filledPercent}%` }} />
                   </div>
                 </Link>
               );

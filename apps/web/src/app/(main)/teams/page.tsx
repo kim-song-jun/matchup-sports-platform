@@ -33,7 +33,7 @@ export default function TeamsPage() {
       <div className="px-5 lg:px-0">
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2].map(i => <div key={i} className="h-[140px] animate-pulse rounded-2xl bg-gray-50" />)}
+            {[1, 2].map(i => <div key={i} className="h-[140px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : teams.length === 0 ? (
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
@@ -42,11 +42,11 @@ export default function TeamsPage() {
             <p className="text-[13px] text-gray-400 mt-1">첫 번째 팀을 등록해보세요!</p>
           </div>
         ) : (
-          <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
             {teams.map((team: SportTeam) => {
               const SportIcon = SportIconMap[team.sportType];
               return (
-                <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+                <Link key={team.id} href={`/teams/${team.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200">
                   <div className="flex items-start gap-4">
                     {/* Team logo */}
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gray-900 text-white text-[18px] font-black">
@@ -54,7 +54,7 @@ export default function TeamsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <h3 className="text-[17px] font-bold text-gray-900 dark:text-gray-100">{team.name}</h3>
+                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">{team.name}</h3>
                         {team.isRecruiting && (
                           <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-600">모집중</span>
                         )}
@@ -69,7 +69,7 @@ export default function TeamsPage() {
                   </div>
 
                   {team.description && (
-                    <p className="mt-3 text-[14px] text-gray-600 leading-relaxed">{team.description}</p>
+                    <p className="mt-3 text-[14px] text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2">{team.description}</p>
                   )}
 
                   <div className="mt-4 flex items-center justify-between">

@@ -210,8 +210,8 @@ export default function BadgesPage() {
           onClick={() => setActiveTab('my')}
           className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
             activeTab === 'my'
-              ? 'bg-gray-900 text-white'
-              : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >
           내 뱃지 ({earnedBadges.length})
@@ -220,8 +220,8 @@ export default function BadgesPage() {
           onClick={() => setActiveTab('all')}
           className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
             activeTab === 'all'
-              ? 'bg-gray-900 text-white'
-              : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >
           전체 뱃지 ({allBadges.length})
@@ -230,7 +230,7 @@ export default function BadgesPage() {
 
       {/* Badge grid */}
       <div className="px-5 lg:px-0">
-        <div className="space-y-3">
+        <div className="space-y-3 stagger-children">
           {displayBadges.map((badge, idx) => {
             const Icon = badge.icon;
 
@@ -239,8 +239,8 @@ export default function BadgesPage() {
                 key={badge.id || `badge-${idx}`}
                 className={`rounded-2xl border p-4 transition-all ${
                   badge.earned
-                    ? 'bg-white border-gray-100'
-                    : 'bg-gray-50/50 border-gray-100/60'
+                    ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
+                    : 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-100/60 dark:border-gray-700/60'
                 }`}
               >
                 <div className="flex items-start gap-3.5">

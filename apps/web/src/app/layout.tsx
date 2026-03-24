@@ -9,8 +9,6 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 };
 
-export const dynamic = 'force-dynamic';
-
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -27,6 +25,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
+      <head>
+        <link
+          rel="preload"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+          as="style"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+        />
+      </head>
       <body className="min-h-dvh bg-background">
         <ProgressBar />
         <Providers>{children}</Providers>

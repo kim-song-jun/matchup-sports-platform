@@ -60,7 +60,7 @@ export default function VenuesPage() {
               placeholder="시설명, 지역 검색"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all"
             />
           </div>
           <button
@@ -74,15 +74,15 @@ export default function VenuesPage() {
       </div>
 
       {/* 종목 필터 */}
-      <div className="px-5 lg:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 lg:px-0 mb-3 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button
             key={f.key}
             onClick={() => setActiveSport(f.key)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeSport === f.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
             }`}
           >
             {f.label}
@@ -118,7 +118,7 @@ export default function VenuesPage() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-[120px] animate-pulse rounded-2xl bg-gray-50" />
+              <div key={i} className="h-[120px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : venues.length === 0 ? (
@@ -128,20 +128,20 @@ export default function VenuesPage() {
             <p className="text-[13px] text-gray-400 mt-1">다른 조건으로 검색해보세요</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
             {venues.map((venue: Venue) => {
               const primarySport = venue.sportTypes?.[0];
               const SportIcon = primarySport ? SportIconMap[primarySport] : null;
               return (
                 <Link key={venue.id} href={`/venues/${venue.id}`}>
-                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200">
+                  <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-all active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200">
                     <div className="flex gap-4">
                       <div className="flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
                         {SportIcon ? <SportIcon size={32} /> : <MapPin size={32} />}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-[15px] font-semibold text-gray-900 truncate">{venue.name}</h3>
+                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {venue.sportTypes?.map((s: string) => (
                             <span key={s} className="text-[11px] text-gray-400">{sportLabel[s] || s}</span>

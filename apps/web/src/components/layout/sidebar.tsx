@@ -28,11 +28,11 @@ export function Sidebar() {
   const totalUnread = useChatStore((s) => s.getTotalUnreadCount());
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[260px] flex-col border-r border-gray-100 bg-white">
+    <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[260px] flex-col border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* Logo */}
       <div className="px-6 pt-8 pb-4">
         <Link href="/home">
-          <h1 className="text-[20px] font-bold tracking-tight text-gray-900">MatchUp</h1>
+          <h1 className="text-[20px] font-bold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
         </Link>
         <p className="text-[11px] text-gray-400 mt-0.5">AI 스포츠 매칭 플랫폼</p>
       </div>
@@ -57,7 +57,7 @@ export function Sidebar() {
                 className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-[14px] font-medium transition-all ${
                   isActive
                     ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}>
                 <div className="relative">
                   <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
@@ -74,10 +74,10 @@ export function Sidebar() {
         </div>
 
         {/* Admin */}
-        <div className="mt-6 pt-4 border-t border-gray-100">
+        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
           <p className="px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">관리</p>
           <Link href="/admin/dashboard"
-            className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all">
+            className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-all">
             <ShieldCheck size={18} />
             Admin
           </Link>
@@ -85,7 +85,7 @@ export function Sidebar() {
       </nav>
 
       {/* User area */}
-      <div className="border-t border-gray-100 px-4 py-4">
+      <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-4">
         {isAuthenticated && user ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ export function Sidebar() {
                 {user.nickname?.charAt(0)}
               </div>
               <div>
-                <p className="text-[13px] font-semibold text-gray-900">{user.nickname}</p>
+                <p className="text-[13px] font-semibold text-gray-900 dark:text-gray-100">{user.nickname}</p>
                 <p className="text-[11px] text-gray-400">매너 {user.mannerScore?.toFixed(1)}</p>
               </div>
             </div>

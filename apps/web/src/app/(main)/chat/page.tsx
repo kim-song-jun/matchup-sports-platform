@@ -64,7 +64,7 @@ function ChatRoomItem({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-[15px] font-semibold text-gray-900 truncate">
+            <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">
               {opponentName}
             </h3>
             {room.lastMessageAt && (
@@ -155,7 +155,7 @@ export default function ChatListPage() {
         {/* Left panel - Chat room list */}
         <div className="border-r border-gray-200 flex flex-col bg-white">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100">
-            <h1 className="text-[22px] font-bold text-gray-900">채팅</h1>
+            <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">채팅</h1>
             <p className="text-[13px] text-gray-400 mt-0.5">팀 매칭 대화</p>
           </div>
 

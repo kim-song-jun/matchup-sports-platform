@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { useMatch } from '@/hooks/use-api';
 import { api } from '@/lib/api';
@@ -108,11 +109,15 @@ export default function EditMatchPage() {
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">매치 수정</h1>
       </header>
-      <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">매치 수정</h2>
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+        <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
+        <ChevronRight size={14} />
+        <Link href={`/matches/${matchId}`} className="hover:text-gray-600 transition-colors">매치 상세</Link>
+        <ChevronRight size={14} />
+        <span className="text-gray-700">매치 수정</span>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8 max-w-lg">
+      <div className="px-5 lg:px-0 pb-8 max-w-lg lg:max-w-[700px]">
         {/* Sport Type */}
         <div className="mb-5">
           <label className="block text-[14px] font-semibold text-gray-700 mb-2">종목</label>

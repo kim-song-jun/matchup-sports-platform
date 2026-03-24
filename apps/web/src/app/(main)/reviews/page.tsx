@@ -24,13 +24,13 @@ export default function ReviewsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+      <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-[16px] font-semibold text-gray-900">내 평가</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">내 평가</h1>
       </header>
-      <div className="hidden lg:block mb-6">
-        <h2 className="text-[22px] font-bold text-gray-900">내 평가</h2>
-        <p className="text-[14px] text-gray-400 mt-1">매치가 끝나면 함께한 선수들을 평가해주세요</p>
+      <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">내 평가</h1>
+        <p className="text-[13px] text-gray-400 mt-0.5">매치가 끝나면 함께한 선수들을 평가해주세요</p>
       </div>
 
       <div className="px-5 lg:px-0">
@@ -41,7 +41,7 @@ export default function ReviewsPage() {
             <Link href="/login" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
           </div>
         ) : isLoading ? (
-          <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 animate-pulse rounded-2xl bg-gray-50" />)}</div>
+          <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />)}</div>
         ) : pendingReviews.length === 0 ? (
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
             <Star size={32} className="mx-auto text-gray-300 mb-3" />
@@ -49,7 +49,7 @@ export default function ReviewsPage() {
             <p className="text-[13px] text-gray-400 mt-1">매치가 완료되면 평가 요청이 도착합니다</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 stagger-children">
             {pendingReviews.map((review: PendingReview, idx: number) => (
               <ReviewCard key={idx} review={review} toast={toast} queryClient={queryClient} />
             ))}
@@ -83,7 +83,7 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
   });
 
   return (
-    <div className="rounded-2xl bg-white border border-gray-100 p-4">
+    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">

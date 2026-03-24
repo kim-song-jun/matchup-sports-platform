@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   // 프로덕션: standalone, Capacitor: export
   output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
   images: {
-    unoptimized: true,
+    unoptimized: isCapacitorBuild,
   },
   // 개발 시 API 프록시
   async rewrites() {

@@ -45,7 +45,7 @@ export function BottomNav() {
                   isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 active:text-gray-600'
                 }`}
               >
-                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} className={isActive ? 'transition-transform duration-200' : 'transition-transform duration-200'} />
+                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} className="transition-transform duration-200" />
                 <span className={`text-[10px] transition-all duration-200 ${isActive ? 'font-semibold' : 'font-normal'}`}>{label}</span>
                 {isActive && <span className="absolute -bottom-0.5 h-[3px] w-4 rounded-full bg-blue-500 animate-scale-in" />}
               </Link>

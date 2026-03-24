@@ -6,6 +6,8 @@ import { Search, SlidersHorizontal, Calendar, MapPin, Users } from 'lucide-react
 import { useMatches } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { sportLabel, levelLabel, sportIconColor } from '@/lib/constants';
+import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import type { Match } from '@/types/api';
 
 const sportFilters = [
@@ -19,48 +21,6 @@ const sportFilters = [
   { key: 'tennis', label: '테니스' },
 ];
 
-const sportLabel: Record<string, string> = {
-  soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-  swimming: '수영', tennis: '테니스', baseball: '야구', volleyball: '배구',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
-
-function formatMatchDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}/${d.getDate()} (${weekdays[d.getDay()]})`;
-}
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
-
-// 종목 아이콘 색상만으로 구분 (border-l 제거됨)
-
-const sportIconColor: Record<string, string> = {
-  soccer: 'bg-green-50 text-green-600',
-  futsal: 'bg-blue-50 text-blue-500',
-  basketball: 'bg-amber-50 text-amber-600',
-  badminton: 'bg-cyan-50 text-cyan-600',
-  ice_hockey: 'bg-blue-50 text-blue-600',
-  tennis: 'bg-red-50 text-red-500',
-  swimming: 'bg-sky-50 text-sky-600',
-  figure_skating: 'bg-gray-100 text-gray-500',
-  short_track: 'bg-gray-100 text-gray-500',
-  baseball: 'bg-orange-50 text-orange-600',
-  volleyball: 'bg-blue-50 text-blue-500',
-};
-
-function getTimeBadge(dateStr: string) {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff <= 0) return { text: '오늘', color: 'bg-red-50 text-red-500' };
-  if (diff === 1) return { text: '내일', color: 'bg-blue-50 text-blue-500' };
-  if (diff <= 7) return { text: '이번 주', color: 'bg-gray-100 text-gray-500' };
-  return null;
-}
 
 export default function MatchesPage() {
   const [activeSport, setActiveSport] = useState('');
@@ -127,7 +87,7 @@ export default function MatchesPage() {
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeSport === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
             }`}
           >
             {f.label}
@@ -145,7 +105,7 @@ export default function MatchesPage() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[14px] text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-600 transition-all"
               />
             </div>
             <div>
@@ -153,13 +113,13 @@ export default function MatchesPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setSortBy('latest')}
-                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${sortBy === 'latest' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${sortBy === 'latest' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'}`}
                 >
                   최신순
                 </button>
                 <button
                   onClick={() => setSortBy('deadline')}
-                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${sortBy === 'deadline' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
+                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${sortBy === 'deadline' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'}`}
                 >
                   마감임박
                 </button>
@@ -180,7 +140,7 @@ export default function MatchesPage() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-[130px] animate-pulse rounded-2xl bg-gray-50" />
+              <div key={i} className="h-[130px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : matches.length === 0 ? (

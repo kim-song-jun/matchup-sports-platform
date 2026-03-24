@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Trash2, AlertTriangle, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 
@@ -91,11 +92,13 @@ export default function EditListingPage() {
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">매물 수정</h1>
       </header>
-      <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[24px] font-bold text-gray-900">매물 수정</h2>
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+        <Link href="/marketplace" className="hover:text-gray-600 transition-colors">장터</Link>
+        <ChevronRight size={14} />
+        <span className="text-gray-700">매물 수정</span>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8 max-w-lg">
+      <div className="px-5 lg:px-0 pb-8 max-w-lg lg:max-w-[700px]">
         {/* Title */}
         <div className="mb-5">
           <label className="block text-[14px] font-semibold text-gray-700 mb-2">제목</label>

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { ChevronRight, MapPin, Calendar, Users, Clock, Swords, MessageCircle, Building2, UserPlus, Award, Bell, Settings } from 'lucide-react';
+import { ChevronRight, MapPin, Calendar, Users, Swords, MessageCircle, Building2, UserPlus, Award, Bell, Settings } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { sportLabel, levelLabel, sportIconColor } from '@/lib/constants';
+import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import type { Match } from '@/types/api';
 
 const sports = [
@@ -20,40 +22,36 @@ const sports = [
   { type: 'tennis', label: '테니스', color: 'text-red-500 bg-red-50' },
 ];
 
-const sportLabel: Record<string, string> = {
-  soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-  swimming: '수영', tennis: '테니스', baseball: '야구', volleyball: '배구',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
-function formatMatchDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}/${d.getDate()} (${weekdays[d.getDay()]})`;
-}
+const banners = [
+  { bg: 'from-blue-500 to-blue-600', title: '팀 매칭 오픈!', desc: '실력등급(S~D)으로 딱 맞는 상대를 찾아보세요', cta: '팀 매칭 →', href: '/team-matches' },
+  { bg: 'from-gray-800 to-gray-900', title: '첫 매치 참가비 무료', desc: '지금 가입하고 첫 매치를 무료로 즐기세요', cta: '매치 찾기 →', href: '/matches' },
+  { bg: 'from-green-500 to-green-600', title: '용병 모집 중', desc: '팀에 빈 자리가 있나요? 용병을 구해보세요', cta: '용병 찾기 →', href: '/mercenary' },
+] as const;
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
+const quickMenuItems = [
+  { href: '/team-matches', icon: Swords, label: '팀 매칭' },
+  { href: '/teams', icon: Users, label: '팀·클럽' },
+  { href: '/chat', icon: MessageCircle, label: '채팅' },
+  { href: '/venues', icon: Building2, label: '시설' },
+  { href: '/mercenary', icon: UserPlus, label: '용병' },
+  { href: '/badges', icon: Award, label: '뱃지' },
+  { href: '/notifications', icon: Bell, label: '알림' },
+  { href: '/settings', icon: Settings, label: '설정' },
+] as const;
 
-// 종목 아이콘 색상만으로 구분 (border-l 제거됨)
-
-function getTimeBadge(dateStr: string) {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff <= 0) return { text: '오늘', color: 'bg-red-50 text-red-500' };
-  if (diff === 1) return { text: '내일', color: 'bg-blue-50 text-blue-500' };
-  if (diff <= 7) return { text: '이번 주', color: 'bg-gray-100 text-gray-500' };
-  return null;
-}
 
 export default function HomePage() {
   const { user, isAuthenticated } = useAuthStore();
   const { data: matchData, isLoading } = useMatches();
   const matches = matchData?.items ?? [];
   const [bannerIndex, setBannerIndex] = useState(0);
+  const todayMatches = useMemo(() =>
+    matches.filter((m: Match) => {
+      const diff = Math.ceil((new Date(m.matchDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return diff <= 1;
+    }).slice(0, 3),
+  [matches]);
 
   useEffect(() => {
     const t = setInterval(() => setBannerIndex(i => (i + 1) % 3), 5000);
@@ -117,11 +115,7 @@ export default function HomePage() {
       {/* 프로모션 배너 — generous spacing from icons */}
       <section className="mt-4 px-5 lg:px-0">
         <div className="relative overflow-hidden rounded-2xl">
-          {[
-            { bg: 'from-blue-500 to-blue-600', title: '팀 매칭 오픈!', desc: '실력등급(S~D)으로 딱 맞는 상대를 찾아보세요', cta: '팀 매칭 →', href: '/team-matches' },
-            { bg: 'from-gray-800 to-gray-900', title: '첫 매치 참가비 무료', desc: '지금 가입하고 첫 매치를 무료로 즐기세요', cta: '매치 찾기 →', href: '/matches' },
-            { bg: 'from-green-500 to-green-600', title: '용병 모집 중', desc: '팀에 빈 자리가 있나요? 용병을 구해보세요', cta: '용병 찾기 →', href: '/mercenary' },
-          ].filter((_, i) => i === bannerIndex).map((banner) => (
+          {banners.filter((_, i) => i === bannerIndex).map((banner) => (
             <Link key={banner.href} href={banner.href}>
               <div className={`bg-gradient-to-r ${banner.bg} px-5 py-3.5 lg:px-6 lg:py-4 text-white flex items-center justify-between`}>
                 <div>
@@ -141,15 +135,7 @@ export default function HomePage() {
       </section>
 
       {/* 오늘·내일 매치 — tight grouping with banner */}
-      {(() => {
-        const todayMatches = matches.filter((m: Match) => {
-          const d = new Date(m.matchDate);
-          const now = new Date();
-          const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          return diff <= 1;
-        }).slice(0, 3);
-
-        return todayMatches.length > 0 ? (
+      {todayMatches.length > 0 ? (
           <section className="mt-6 px-5 lg:px-0">
             <h2 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2.5 flex items-center gap-1.5">
               <span className="flex h-5 w-5 items-center justify-center rounded-md bg-red-50 text-[10px]">🔥</span>
@@ -159,8 +145,7 @@ export default function HomePage() {
               {todayMatches.map((m: Match) => <MatchCard key={m.id} match={m} />)}
             </div>
           </section>
-        ) : null;
-      })()}
+        ) : null}
 
       {/* 구분 — generous break before full list */}
       <div className="mt-6 mb-2 lg:mt-8 lg:mb-0" />
@@ -178,12 +163,12 @@ export default function HomePage() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-[130px] animate-pulse rounded-2xl bg-gray-50" />
+              <div key={i} className="h-[130px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : matches.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-10 text-center">
-            <p className="text-[15px] font-medium text-gray-600">아직 매치가 없어요</p>
+          <div className="rounded-2xl bg-gray-50 dark:bg-gray-800 p-10 text-center">
+            <p className="text-[15px] font-medium text-gray-600 dark:text-gray-300">아직 매치가 없어요</p>
             <p className="text-[13px] text-gray-400 mt-1">첫 번째 매치를 만들어보세요!</p>
           </div>
         ) : (
@@ -202,17 +187,8 @@ export default function HomePage() {
         <div className="h-2 bg-gray-50 -mx-5 mb-5" />
         <h2 className="text-[17px] font-bold text-gray-900 dark:text-white mb-3">더 많은 기능</h2>
         <div className="grid grid-cols-4 gap-3">
-          {[
-            { href: '/team-matches', icon: Swords, label: '팀 매칭' },
-            { href: '/teams', icon: Users, label: '팀·클럽' },
-            { href: '/chat', icon: MessageCircle, label: '채팅' },
-            { href: '/venues', icon: Building2, label: '시설' },
-            { href: '/mercenary', icon: UserPlus, label: '용병' },
-            { href: '/badges', icon: Award, label: '뱃지' },
-            { href: '/notifications', icon: Bell, label: '알림' },
-            { href: '/settings', icon: Settings, label: '설정' },
-          ].map(item => (
-            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 transition-colors">
+          {quickMenuItems.map(item => (
+            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.95] transition-all">
               <item.icon size={22} className="text-gray-500" />
               <span className="text-[11px] text-gray-600 font-medium">{item.label}</span>
             </Link>
@@ -224,20 +200,6 @@ export default function HomePage() {
     </div>
   );
 }
-
-const sportIconColor: Record<string, string> = {
-  soccer: 'bg-green-50 text-green-600',
-  futsal: 'bg-blue-50 text-blue-500',
-  basketball: 'bg-amber-50 text-amber-600',
-  badminton: 'bg-cyan-50 text-cyan-600',
-  ice_hockey: 'bg-blue-50 text-blue-600',
-  tennis: 'bg-red-50 text-red-500',
-  swimming: 'bg-sky-50 text-sky-600',
-  figure_skating: 'bg-gray-100 text-gray-500',
-  short_track: 'bg-gray-100 text-gray-500',
-  baseball: 'bg-orange-50 text-orange-600',
-  volleyball: 'bg-blue-50 text-blue-500',
-};
 
 function MatchCard({ match }: { match: Match }) {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;

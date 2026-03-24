@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useTeams } from '@/hooks/use-api';
@@ -108,7 +109,7 @@ export default function NewMercenaryPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="lg:hidden px-5 pt-4 pb-3 flex items-center gap-3">
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
@@ -119,7 +120,13 @@ export default function NewMercenaryPage() {
         <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
       </header>
 
-      <div className="px-5 lg:px-0">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+        <Link href="/mercenary" className="hover:text-gray-600 transition-colors">용병 모집</Link>
+        <ChevronRight size={14} />
+        <span className="text-gray-700">새 모집글</span>
+      </div>
+
+      <div className="px-5 lg:px-0 lg:max-w-[700px]">
         <div className="space-y-5">
           {/* 팀 선택 */}
           <div>
@@ -263,7 +270,7 @@ export default function NewMercenaryPage() {
       </div>
 
       {/* Submit */}
-      <div className="px-5 lg:px-0 mt-6 mb-8">
+      <div className="px-5 lg:px-0 lg:max-w-[700px] mt-6 mb-8">
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}

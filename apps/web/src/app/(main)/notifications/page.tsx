@@ -49,6 +49,8 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      <div className="h-6" />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import { useCreateTeamMatch } from '@/hooks/use-api';
 import { SKILL_GRADES, MATCH_TYPES, getGradeInfo } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
@@ -115,15 +116,21 @@ export default function NewTeamMatchPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="lg:hidden px-5 pt-4 pb-3 flex items-center gap-3">
         <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-[18px] font-bold text-gray-900">모집글 작성</h1>
       </header>
 
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+        <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
+        <ChevronRight size={14} />
+        <span className="text-gray-700">모집글 작성</span>
+      </div>
+
       {/* Progress */}
-      <div className="px-5 lg:px-0 mb-6">
+      <div className="px-5 lg:px-0 lg:max-w-[700px] mb-6">
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
@@ -137,7 +144,7 @@ export default function NewTeamMatchPage() {
         </div>
       </div>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 lg:px-0 lg:max-w-[700px]">
         {/* Step 0: 종목 */}
         {step === 0 && (
           <div className="space-y-5 animate-fade-in">
@@ -493,7 +500,7 @@ export default function NewTeamMatchPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-5 lg:px-0 mt-6 mb-8">
+      <div className="px-5 lg:px-0 lg:max-w-[700px] mt-6 mb-8">
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => setStep(step + 1)}

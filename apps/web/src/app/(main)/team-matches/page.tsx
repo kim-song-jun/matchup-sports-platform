@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Calendar, MapPin, Users, DollarSign, Trophy, Plus, Search } from 'lucide-react';
 import { useTeamMatches } from '@/hooks/use-api';
 import { getGradeInfo } from '@/lib/skill-grades';
+import { sportLabel } from '@/lib/constants';
+import { formatCurrency, formatMatchDate } from '@/lib/utils';
 import type { TeamMatch } from '@/types/api';
 
 const sportFilters = [
@@ -12,11 +14,6 @@ const sportFilters = [
   { key: 'soccer', label: '축구' },
   { key: 'futsal', label: '풋살' },
 ];
-
-const sportLabel: Record<string, string> = {
-  soccer: '축구',
-  futsal: '풋살',
-};
 
 const levelLabel: Record<string, string> = {
   beginner: '입문',
@@ -31,16 +28,6 @@ const matchStyleLabel: Record<string, string> = {
   competitive: '경쟁',
   manner_focused: '매너 중시',
 };
-
-function formatMatchDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}/${d.getDate()} (${weekdays[d.getDay()]})`;
-}
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export default function TeamMatchesPage() {
   const [activeSport, setActiveSport] = useState('');
@@ -129,7 +116,7 @@ export default function TeamMatchesPage() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-[160px] animate-pulse rounded-2xl bg-gray-50" />
+              <div key={i} className="h-[160px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : matches.length === 0 ? (
@@ -143,7 +130,7 @@ export default function TeamMatchesPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
             {matches.map((match: TeamMatch) => {
               const statusMap: Record<string, { label: string; className: string }> = {
                 recruiting: { label: '모집중', className: 'bg-blue-50 text-blue-500' },

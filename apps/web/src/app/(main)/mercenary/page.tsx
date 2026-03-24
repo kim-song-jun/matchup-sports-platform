@@ -189,8 +189,8 @@ export default function MercenaryPage() {
             onClick={() => setActiveSport(f.key)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
               activeSport === f.key
-                ? 'bg-gray-900 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50'
+                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
             }`}
           >
             {f.label}
@@ -213,14 +213,14 @@ export default function MercenaryPage() {
             <p className="text-[13px] text-gray-400 mt-1">직접 용병을 모집해보세요</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
             {filtered.map((post) => {
               const isApplied = appliedIds.has(post.id);
 
               return (
                 <div
                   key={post.id}
-                  className="rounded-2xl bg-white border border-gray-100 p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200"
+                  className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -237,7 +237,7 @@ export default function MercenaryPage() {
                           </span>
                         )}
                       </div>
-                      <h3 className="text-[15px] font-semibold text-gray-900">
+                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                         {post.teamName}
                       </h3>
                     </div>

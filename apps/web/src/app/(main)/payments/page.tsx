@@ -135,15 +135,15 @@ export default function PaymentsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 dark:bg-gray-900">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+      <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">결제 내역</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">결제 내역</h1>
       </header>
-      <div className="hidden lg:block mb-6">
-        <h2 className="text-[22px] font-bold text-gray-900">결제 내역</h2>
-        <p className="text-[14px] text-gray-400 mt-1">매치, 강좌, 장터 결제 내역을 확인하세요</p>
+      <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">결제 내역</h1>
+        <p className="text-[13px] text-gray-400 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
       </div>
 
       <div className="px-5 lg:px-0">
@@ -189,7 +189,7 @@ export default function PaymentsPage() {
             <p className="text-[13px] text-gray-400 mt-1">매치에 참가하면 여기서 확인할 수 있어요</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 stagger-children">
             {filtered.map((p) => {
               const s = statusConfig[p.status] || statusConfig.pending;
               const m = methodConfig[p.method] || methodConfig.card;
@@ -201,7 +201,7 @@ export default function PaymentsPage() {
                 <Link
                   key={p.id}
                   href={`/payments/${p.id}`}
-                  className="block rounded-2xl bg-white border border-gray-100 p-4 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all active:scale-[0.99]"
+                  className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">

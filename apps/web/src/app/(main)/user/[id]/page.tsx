@@ -146,7 +146,7 @@ export default function UserProfilePage() {
                     {/* Level bar */}
                     <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                        className="h-full rounded-full bg-blue-500 transition-all duration-300"
                         style={{ width: `${(profile.level / 5) * 100}%` }}
                       />
                     </div>
@@ -171,7 +171,7 @@ export default function UserProfilePage() {
             <div className="flex-1">
               <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
+                  className={`h-full rounded-full transition-all duration-300 ${
                     (user.mannerScore || 0) >= 3.5 ? 'bg-green-500' : (user.mannerScore || 0) >= 2.5 ? 'bg-gray-400' : 'bg-red-500'
                   }`}
                   style={{ width: `${((user.mannerScore || 0) / 5) * 100}%` }}

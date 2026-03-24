@@ -77,7 +77,7 @@ export default function LoginPage() {
           <button
             onClick={() => handleDevLogin()}
             disabled={isLoading}
-            className="shrink-0 rounded-xl bg-blue-500 px-5 py-3 text-[14px] font-semibold text-white active:bg-blue-600 transition-colors disabled:opacity-50"
+            className="shrink-0 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
           >
             {isLoading ? '...' : '입장'}
           </button>

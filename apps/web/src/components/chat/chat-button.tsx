@@ -44,7 +44,7 @@ export function ChatButton({ teamMatchId, inline = false }: ChatButtonProps) {
   return (
     <Link
       href={href}
-      className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-[0_4px_20px_rgba(59,130,246,0.4)] hover:bg-blue-600 active:bg-blue-700 active:scale-95 transition-all lg:hidden"
+      className="fixed bottom-24 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-[0_4px_20px_rgba(59,130,246,0.4)] hover:bg-blue-600 active:bg-blue-700 active:scale-95 transition-all duration-200 lg:hidden"
     >
       <MessageCircle size={24} />
       {unreadCount > 0 && (

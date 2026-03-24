@@ -153,7 +153,7 @@ export default function LessonsPage() {
                   </div>
 
                   <div className="mt-3 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${filledPercent}%` }} />
+                    <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${filledPercent}%` }} />
                   </div>
                 </Link>
               );

@@ -52,7 +52,7 @@ export function RefereeIncentive({
             <div className="flex items-center gap-2 mt-1">
               <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-blue-500 transition-all"
+                  className="h-full rounded-full bg-blue-500 transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>

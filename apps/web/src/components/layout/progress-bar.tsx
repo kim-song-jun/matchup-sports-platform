@@ -47,7 +47,7 @@ export function ProgressBar() {
   return (
     <div className="fixed top-0 left-0 right-0 z-[9999] h-[2px]">
       <div
-        className="h-full bg-blue-500 transition-all duration-300 ease-out"
+        className="h-full bg-blue-500 transition-all duration-200 ease-out"
         style={{ width: `${progress}%`, opacity: progress === 100 ? 0 : 1 }}
       />
     </div>

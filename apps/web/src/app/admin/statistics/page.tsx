@@ -143,7 +143,7 @@ export default function AdminStatisticsPage() {
                 <div key={m.month} className="flex-1 flex flex-col items-center justify-end h-full">
                   <span className="text-[12px] font-semibold text-gray-700 mb-1">{m.count}</span>
                   <div
-                    className="w-full rounded-t-lg bg-blue-500 transition-all duration-500 min-h-[4px]"
+                    className="w-full rounded-t-lg bg-blue-500 transition-all duration-300 min-h-[4px]"
                     style={{ height: `${heightPercent}%` }}
                   />
                   <span className="text-[11px] text-gray-400 mt-2">{m.month}</span>
@@ -166,7 +166,7 @@ export default function AdminStatisticsPage() {
                 <div key={r.month} className="flex-1 flex flex-col items-center justify-end h-full">
                   <span className="text-[11px] font-semibold text-gray-700 mb-1">{formatCurrency(r.revenue)}</span>
                   <div
-                    className="w-full rounded-t-lg bg-blue-500 transition-all duration-500 min-h-[4px]"
+                    className="w-full rounded-t-lg bg-blue-500 transition-all duration-300 min-h-[4px]"
                     style={{ height: `${heightPercent}%` }}
                   />
                   <span className="text-[11px] text-gray-400 mt-2">{r.month}</span>
@@ -195,7 +195,7 @@ export default function AdminStatisticsPage() {
                   </div>
                   <div className="h-[8px] rounded-full bg-gray-100 overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${s.color} transition-all duration-500`}
+                      className={`h-full rounded-full ${s.color} transition-all duration-300`}
                       style={{ width: `${widthPercent}%` }}
                     />
                   </div>

@@ -123,7 +123,7 @@ export default function OnboardingPage() {
                 key={i}
                 onClick={() => goTo(i)}
                 aria-label={`슬라이드 ${i + 1}`}
-                className={`rounded-full transition-all duration-300 ${
+                className={`rounded-full transition-all duration-200 ${
                   i === step
                     ? 'w-6 h-2.5 bg-blue-500'
                     : 'w-2.5 h-2.5 bg-gray-200 hover:bg-gray-300'

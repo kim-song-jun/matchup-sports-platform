@@ -195,7 +195,7 @@ export default function MatchDetailPage() {
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-              <div className={`h-full rounded-full transition-all duration-700 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${filledPercent}%` }} />
+              <div className={`h-full rounded-full transition-all duration-300 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${filledPercent}%` }} />
             </div>
 
             {!isAuthenticated ? (
@@ -227,7 +227,7 @@ export default function MatchDetailPage() {
               <button
                 onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
                 disabled={joinMutation.isPending}
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
+                className="w-full rounded-xl bg-blue-500 py-4 text-[16px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
               >
                 {joinMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">

@@ -40,7 +40,7 @@ export function Sidebar() {
       {/* CTA */}
       <div className="px-4 mb-2">
         <Link href="/matches/new"
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-all duration-200">
           <Plus size={18} strokeWidth={2.5} />
           매치 만들기
         </Link>
@@ -77,7 +77,7 @@ export function Sidebar() {
         <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
           <p className="px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">관리</p>
           <Link href="/admin/dashboard"
-            className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-all">
+            className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-[14px] font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-200">
             <ShieldCheck size={18} />
             Admin
           </Link>

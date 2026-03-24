@@ -98,7 +98,7 @@ export default function ProfilePage() {
             <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white text-center">
               <h2 className="text-[22px] font-bold">운동 메이트, 찾고 계셨죠?</h2>
               <p className="text-[14px] text-white/70 mt-2">AI가 내 수준에 딱 맞는 상대를 찾아드려요</p>
-              <Link href="/login" className="inline-block mt-4 rounded-xl bg-white px-6 py-3 text-[15px] font-bold text-blue-500">
+              <Link href="/login" className="inline-block mt-4 rounded-xl bg-white px-8 py-3.5 text-[15px] font-bold text-blue-500 hover:bg-blue-50 active:scale-[0.98] transition-all duration-200 shadow-sm">
                 3초 만에 시작하기
               </Link>
             </div>

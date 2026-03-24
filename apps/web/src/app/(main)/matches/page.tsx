@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, Calendar, MapPin, Users } from 'lucide-react';
 import { useMatches } from '@/hooks/use-api';
-import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { sportLabel, levelLabel, sportIconColor } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
@@ -28,7 +27,6 @@ export default function MatchesPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
   const [sortBy, setSortBy] = useState<'latest' | 'deadline'>('latest');
-  const { toast } = useToast();
   const params = activeSport ? { sportType: activeSport } : undefined;
   const { data, isLoading } = useMatches(params);
   const allMatches = data?.items ?? [];
@@ -152,7 +150,7 @@ export default function MatchesPage() {
             <p className="text-[13px] text-gray-400 mt-1">직접 매치를 만들어서 첫 번째 호스트가 되어보세요! {'\u{1F3C6}'}</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
+          <div className="space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 stagger-children">
             {matches.map((match: Match) => {
               const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
               const isAlmostFull = filledPercent >= 70;
@@ -209,7 +207,7 @@ export default function MatchesPage() {
                     <div className="mt-3 flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`}
+                          className={`h-full rounded-full transition-all duration-300 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`}
                           style={{ width: `${filledPercent}%` }}
                         />
                       </div>

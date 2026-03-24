@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -172,7 +172,7 @@ export default function HomePage() {
             <p className="text-[13px] text-gray-400 mt-1">첫 번째 매치를 만들어보세요!</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
+          <div className="space-y-2.5 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 stagger-children">
             {matches.map((match: Match, idx: number) => (
               <div key={match.id} className={`animate-stagger-in stagger-${Math.min(idx + 1, 9)}`}>
                 <MatchCard match={match} />
@@ -201,7 +201,7 @@ export default function HomePage() {
   );
 }
 
-function MatchCard({ match }: { match: Match }) {
+const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
   const isAlmostFull = filledPercent >= 70;
   const SportIcon = SportIconMap[match.sportType];
@@ -264,7 +264,7 @@ function MatchCard({ match }: { match: Match }) {
         <div className="mt-3 flex items-center gap-2">
           <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
+              className={`h-full rounded-full transition-all duration-300 ${
                 isAlmostFull ? 'bg-red-400' : 'bg-blue-500'
               }`}
               style={{ width: `${filledPercent}%` }}
@@ -277,4 +277,4 @@ function MatchCard({ match }: { match: Match }) {
       </div>
     </Link>
   );
-}
+});

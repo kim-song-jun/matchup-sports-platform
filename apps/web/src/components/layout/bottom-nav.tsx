@@ -24,7 +24,7 @@ export function BottomNav() {
       {totalUnread > 0 && !isChatPage && (
         <Link
           href="/chat"
-          className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-[0_4px_20px_rgba(59,130,246,0.4)] hover:bg-blue-600 active:bg-blue-700 active:scale-95 transition-all"
+          className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-[0_4px_20px_rgba(59,130,246,0.4)] hover:bg-blue-600 active:bg-blue-700 active:scale-95 transition-all duration-200"
         >
           <MessageCircle size={24} />
           <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white animate-badge-pulse">

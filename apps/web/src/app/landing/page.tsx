@@ -36,25 +36,25 @@ const FEATURES = [
     icon: Users,
     title: '팀 매칭',
     description: 'S~D 등급으로 팀 실력을 정확히 측정하고, 균형 잡힌 경기를 만들어드립니다.',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    border: 'border-emerald-100',
+    color: 'text-blue-500',
+    bg: 'bg-gray-50',
+    border: 'border-gray-100',
   },
   {
     icon: Shield,
     title: '신뢰 시스템',
     description: '3단계 허위 레벨링 방지와 6항목 상호 평가로 매너 있는 경기 환경을 보장합니다.',
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-    border: 'border-amber-100',
+    color: 'text-blue-500',
+    bg: 'bg-gray-50',
+    border: 'border-gray-100',
   },
   {
     icon: Zap,
     title: '올인원 플랫폼',
     description: '매칭부터 채팅, 결제, 용병 구하기, 장터까지 — 모든 것을 한 곳에서 해결하세요.',
-    color: 'text-violet-600',
-    bg: 'bg-violet-50',
-    border: 'border-violet-100',
+    color: 'text-blue-500',
+    bg: 'bg-gray-50',
+    border: 'border-gray-100',
   },
 ];
 
@@ -129,7 +129,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* ── Fixed Navigation ── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${
           scrolled
             ? 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-100 dark:border-gray-800 shadow-sm'
             : 'bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-100 dark:border-gray-800'
@@ -195,7 +195,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center gap-2 bg-white text-blue-600 font-bold rounded-xl px-8 py-4 text-[16px] hover:bg-blue-50 transition-all duration-200 shadow-lg shadow-black/10"
+                className="inline-flex items-center justify-center gap-2 bg-white text-blue-600 font-bold rounded-2xl px-10 py-4.5 text-[17px] hover:bg-blue-50 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-black/10"
               >
                 무료로 시작하기
                 <ArrowRight size={18} strokeWidth={2.5} />
@@ -230,7 +230,7 @@ export default function LandingPage() {
 
       {/* ── Stats Bar (floating overlap) ── */}
       <section className="relative -mt-8 z-10 mx-5 lg:mx-auto lg:max-w-[800px]">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/20 border border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-200/60 dark:shadow-black/20 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700">
           {STATS.map((stat) => (
             <div key={stat.label} className="px-5 py-5 sm:px-6 sm:py-6 text-center">
               <div className="text-[28px] font-black text-gray-900 dark:text-white leading-none">{stat.value}</div>
@@ -255,7 +255,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={feature.title}
-                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default"
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-default"
                 >
                   <div
                     className={`h-14 w-14 rounded-2xl ${feature.bg} dark:bg-opacity-20 flex items-center justify-center mb-5`}
@@ -366,7 +366,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={sport.key}
-                  className="w-[120px] bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-default"
+                  className="w-[120px] bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-default"
                 >
                   <div className={`w-14 h-14 rounded-2xl ${sport.bg} flex items-center justify-center`}>
                     {Icon && <Icon size={28} className={sport.iconColor} />}
@@ -394,7 +394,7 @@ export default function LandingPage() {
             {TESTIMONIALS.map((t) => (
               <div
                 key={t.author}
-                className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 relative hover:shadow-lg transition-all duration-300"
+                className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 relative hover:shadow-lg transition-all duration-200"
               >
                 {/* Quote icon */}
                 <div className="mb-4">
@@ -441,7 +441,7 @@ export default function LandingPage() {
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center justify-center gap-2 bg-white text-blue-600 font-bold px-10 py-4 rounded-xl text-[17px] hover:bg-blue-50 transition-all duration-200 shadow-lg shadow-black/10"
+            className="inline-flex items-center justify-center gap-2 bg-white text-blue-600 font-bold px-10 py-4.5 rounded-2xl text-[17px] hover:bg-blue-50 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-black/10"
           >
             3초 만에 가입하기
             <ArrowRight size={20} strokeWidth={2.5} />

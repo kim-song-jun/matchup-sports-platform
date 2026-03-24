@@ -166,7 +166,7 @@ export default function LessonDetailPage() {
                 <span className="text-[13px] font-semibold text-blue-500">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
               </div>
               <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-                <div className="h-full rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${filledPercent}%` }} />
+                <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${filledPercent}%` }} />
               </div>
               {!isAuthenticated ? (
                 <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white active:bg-gray-800 transition-colors">로그인 후 신청하기</Link>

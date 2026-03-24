@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, ExternalLink, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
 import { useTeam, useTeamBadges } from '@/hooks/use-api';

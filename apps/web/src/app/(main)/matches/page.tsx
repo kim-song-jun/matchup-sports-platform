@@ -36,6 +36,30 @@ function formatCurrency(n: number) {
   return new Intl.NumberFormat('ko-KR').format(n) + '원';
 }
 
+const sportBorderColor: Record<string, string> = {
+  soccer: 'border-l-green-500',
+  futsal: 'border-l-blue-500',
+  basketball: 'border-l-amber-500',
+  badminton: 'border-l-cyan-500',
+  ice_hockey: 'border-l-indigo-500',
+  tennis: 'border-l-red-500',
+  swimming: 'border-l-sky-500',
+  figure_skating: 'border-l-purple-500',
+  short_track: 'border-l-violet-500',
+  baseball: 'border-l-orange-500',
+  volleyball: 'border-l-rose-500',
+};
+
+function getTimeBadge(dateStr: string) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff <= 0) return { text: '오늘', color: 'bg-red-50 text-red-500' };
+  if (diff === 1) return { text: '내일', color: 'bg-blue-50 text-blue-500' };
+  if (diff <= 7) return { text: '이번 주', color: 'bg-gray-100 text-gray-500' };
+  return null;
+}
+
 export default function MatchesPage() {
   const [activeSport, setActiveSport] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -171,10 +195,11 @@ export default function MatchesPage() {
               const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
               const isAlmostFull = filledPercent >= 70;
               const SportIcon = SportIconMap[match.sportType];
+              const timeBadge = getTimeBadge(match.matchDate);
 
               return (
                 <Link key={match.id} href={`/matches/${match.id}`}>
-                  <div className="rounded-2xl bg-white border border-gray-100 p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5">
+                  <div className={`rounded-2xl bg-white border border-gray-100 border-l-2 ${sportBorderColor[match.sportType] || 'border-l-gray-300'} p-4 transition-all duration-200 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         {SportIcon && (
@@ -184,7 +209,14 @@ export default function MatchesPage() {
                         )}
                         <div className="min-w-0">
                           <h3 className="text-[15px] font-semibold text-gray-900 truncate">{match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h3>
-                          <span className="text-[12px] text-gray-400">{sportLabel[match.sportType]}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px] text-gray-400">{sportLabel[match.sportType]}</span>
+                            {timeBadge && (
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${timeBadge.color}`}>
+                                {timeBadge.text}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {isAlmostFull && (
@@ -212,11 +244,16 @@ export default function MatchesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-3 h-[3px] rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`}
-                        style={{ width: `${filledPercent}%` }}
-                      />
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`}
+                          style={{ width: `${filledPercent}%` }}
+                        />
+                      </div>
+                      <span className={`text-[11px] font-medium shrink-0 ${isAlmostFull ? 'text-red-500' : 'text-gray-400'}`}>
+                        {match.currentPlayers}/{match.maxPlayers}
+                      </span>
                     </div>
                   </div>
                 </Link>

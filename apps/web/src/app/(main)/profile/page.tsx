@@ -93,13 +93,35 @@ export default function ProfilePage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl bg-white border border-gray-100 p-6 text-center">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-50">
-              <User size={28} className="text-gray-300" />
+          <div className="space-y-4">
+            {/* Hero card */}
+            <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white text-center">
+              <h2 className="text-[22px] font-bold">MatchUp에서 시작하세요</h2>
+              <p className="text-[14px] text-white/70 mt-2">AI가 내 수준에 딱 맞는 상대를 찾아드려요</p>
+              <Link href="/login" className="inline-block mt-4 rounded-xl bg-white px-6 py-3 text-[15px] font-bold text-blue-500">
+                3초 만에 시작하기
+              </Link>
             </div>
-            <p className="text-[15px] font-medium text-gray-900">로그인하고 매치에 참가하세요</p>
-            <p className="text-[13px] text-gray-400 mt-1">기록과 레벨이 쌓여요</p>
-            <Link href="/login" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+
+            {/* Value props */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-white border border-gray-100 p-4 text-center">
+                <div className="text-[24px] font-bold text-gray-900">11</div>
+                <p className="text-[12px] text-gray-400 mt-1">지원 종목</p>
+              </div>
+              <div className="rounded-2xl bg-white border border-gray-100 p-4 text-center">
+                <div className="text-[24px] font-bold text-gray-900">S~D</div>
+                <p className="text-[12px] text-gray-400 mt-1">실력 등급 매칭</p>
+              </div>
+              <div className="rounded-2xl bg-white border border-gray-100 p-4 text-center">
+                <div className="text-[24px] font-bold text-blue-500">AI</div>
+                <p className="text-[12px] text-gray-400 mt-1">맞춤 추천</p>
+              </div>
+              <div className="rounded-2xl bg-white border border-gray-100 p-4 text-center">
+                <div className="text-[24px] font-bold text-gray-900">8종</div>
+                <p className="text-[12px] text-gray-400 mt-1">뱃지 시스템</p>
+              </div>
+            </div>
           </div>
         )}
         {/* 다가오는 일정 — mobile only */}
@@ -129,8 +151,8 @@ export default function ProfilePage() {
           { label: '받은 평가', icon: MessageSquare, href: '/my/reviews-received', count: null },
           { label: '결제 내역', icon: CreditCard, href: '/payments', count: null },
         ].map((item) => (
-          <Link key={item.label} href={item.href}>
-            <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:scale-[0.99] transition-all rounded-lg -mx-2 px-2">
+          <Link key={item.label} href={isAuthenticated ? item.href : '/login'}>
+            <div className={`flex items-center justify-between py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:scale-[0.99] transition-all rounded-lg -mx-2 px-2 ${!isAuthenticated ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-3">
                 <item.icon size={20} className="text-gray-400" />
                 <span className="text-[15px] font-medium text-gray-800">{item.label}</span>

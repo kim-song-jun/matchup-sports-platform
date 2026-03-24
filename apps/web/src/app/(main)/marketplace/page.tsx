@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Heart, Eye, Package, Search } from 'lucide-react';
+import { Plus, Heart, Eye, Package, Search, ShoppingBag } from 'lucide-react';
 import { useListings } from '@/hooks/use-api';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import type { MarketplaceListing } from '@/types/api';
@@ -17,11 +17,11 @@ const conditionLabel: Record<string, string> = {
 };
 
 const conditionStyle: Record<string, string> = {
-  new: 'text-blue-600 bg-blue-50',
-  like_new: 'text-blue-600 bg-blue-50',
-  good: 'text-gray-600 bg-gray-100',
-  fair: 'text-gray-600 bg-gray-100',
-  poor: 'text-red-600 bg-red-50',
+  new: 'bg-blue-50 text-blue-600 font-semibold',
+  like_new: 'bg-blue-50 text-blue-500',
+  good: 'bg-gray-100 text-gray-600',
+  fair: 'bg-gray-100 text-gray-500',
+  poor: 'bg-gray-100 text-gray-400',
 };
 
 function formatCurrency(n: number) {
@@ -117,8 +117,8 @@ export default function MarketplacePage() {
                 <Link key={item.id} href={`/marketplace/${item.id}`} className="block py-4 first:pt-0 last:pb-0">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
-                    <div className="flex h-[110px] w-[110px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
-                      {SportIcon ? <SportIcon size={36} /> : <Package size={36} />}
+                    <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
+                      {SportIcon ? <SportIcon size={24} /> : <ShoppingBag size={24} />}
                     </div>
 
                     {/* Content */}
@@ -131,7 +131,7 @@ export default function MarketplacePage() {
                       </p>
 
                       {/* 가격 (강조) */}
-                      <p className="text-[16px] font-bold text-gray-900 mt-1.5">{formatCurrency(item.price)}</p>
+                      <p className="text-[18px] font-bold text-gray-900 mt-1.5">{formatCurrency(item.price)}</p>
 
                       {/* 하단: 배지 + 통계 */}
                       <div className="flex items-center justify-between mt-auto pt-1.5">
@@ -139,9 +139,9 @@ export default function MarketplacePage() {
                           <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${conditionStyle[item.condition]}`}>
                             {conditionLabel[item.condition]}
                           </span>
-                          {item.listingType === 'rent' && (
-                            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-blue-600 bg-blue-50">대여</span>
-                          )}
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${item.listingType === 'rent' ? 'text-emerald-600 bg-emerald-50' : 'text-orange-600 bg-orange-50'}`}>
+                            {item.listingType === 'rent' ? '대여' : '판매'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2.5 text-gray-400 text-[11px]">
                           <span className="flex items-center gap-0.5">

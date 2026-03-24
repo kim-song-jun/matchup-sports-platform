@@ -9,6 +9,7 @@ interface Toast {
   id: string;
   type: ToastType;
   message: string;
+  exiting?: boolean;
 }
 
 interface ToastContextType {
@@ -24,17 +25,24 @@ export function useToast() {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.map((t) => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 200);
+  }, []);
+
   const addToast = useCallback((type: ToastType, message: string) => {
     const id = Date.now().toString();
     setToasts((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
+      dismissToast(id);
     }, 3000);
-  }, []);
+  }, [dismissToast]);
 
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    dismissToast(id);
+  }, [dismissToast]);
 
   const icons = {
     success: <CheckCircle size={18} className="text-green-500" />,
@@ -50,7 +58,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3.5 text-white shadow-lg animate-slide-up"
+            className={`flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3.5 text-white shadow-lg ${t.exiting ? 'animate-slide-up-out' : 'animate-slide-up'}`}
           >
             {icons[t.type]}
             <span className="flex-1 text-[14px] font-medium">{t.message}</span>

@@ -101,56 +101,58 @@ export default function HomePage() {
         <p className="text-[14px] text-gray-400 mt-1">AI가 최적의 매치를 추천해드려요</p>
       </div>
 
-      {/* 종목 선택 + 배너 */}
-      <section className="mt-4 px-5 lg:px-0">
-        {/* 종목 아이콘 */}
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-3">
+      {/* 종목 선택 — tight horizontal scroll */}
+      <section className="mt-2 px-5 lg:px-0">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1">
           {(() => {
             const sportCounts: Record<string, number> = {};
             matches.forEach((m: Match) => { sportCounts[m.sportType] = (sportCounts[m.sportType] || 0) + 1; });
             return sports.map((sport) => {
             const Icon = SportIconMap[sport.type];
+            const count = sportCounts[sport.type] || 0;
             return (
-              <Link key={sport.type} href={`/matches?sport=${sport.type}`} className="flex flex-col items-center gap-1.5 shrink-0">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-xl transition-transform active:scale-90 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors ${sport.color}`}>
-                  {Icon && <Icon size={22} />}
+              <Link key={sport.type} href={`/matches?sport=${sport.type}`} className="flex items-center gap-2 shrink-0 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3 py-2 hover:border-blue-200 dark:hover:border-blue-800 active:scale-[0.97] transition-all">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${sport.color}`}>
+                  {Icon && <Icon size={16} />}
                 </div>
-                <span className="text-[10px] font-medium text-gray-500">{sport.label}</span>
-                <span className="text-[9px] text-gray-400">{sportCounts[sport.type] || 0}</span>
+                <div className="pr-1">
+                  <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">{sport.label}</span>
+                  {count > 0 && <span className="text-[10px] text-blue-500 ml-1">{count}</span>}
+                </div>
               </Link>
             );
           });
           })()}
         </div>
+      </section>
 
-        {/* 프로모션 배너 */}
-        <div className="relative overflow-hidden rounded-2xl mt-3">
+      {/* 프로모션 배너 — generous spacing from icons */}
+      <section className="mt-4 px-5 lg:px-0">
+        <div className="relative overflow-hidden rounded-2xl">
           {[
             { bg: 'from-blue-500 to-blue-600', title: '팀 매칭 오픈!', desc: '실력등급(S~D)으로 딱 맞는 상대를 찾아보세요', cta: '팀 매칭 →', href: '/team-matches' },
             { bg: 'from-gray-800 to-gray-900', title: '첫 매치 참가비 무료', desc: '지금 가입하고 첫 매치를 무료로 즐기세요', cta: '매치 찾기 →', href: '/matches' },
             { bg: 'from-green-500 to-green-600', title: '용병 모집 중', desc: '팀에 빈 자리가 있나요? 용병을 구해보세요', cta: '용병 찾기 →', href: '/mercenary' },
           ].filter((_, i) => i === bannerIndex).map((banner) => (
             <Link key={banner.href} href={banner.href}>
-              <div className={`bg-gradient-to-r ${banner.bg} px-5 py-4 lg:px-6 lg:py-5 text-white flex items-center justify-between`}>
+              <div className={`bg-gradient-to-r ${banner.bg} px-5 py-3.5 lg:px-6 lg:py-4 text-white flex items-center justify-between`}>
                 <div>
-                  <h3 className="text-[16px] lg:text-[18px] font-bold">{banner.title}</h3>
-                  <p className="text-[12px] lg:text-[13px] text-white/70 mt-0.5">{banner.desc}</p>
+                  <h3 className="text-[15px] lg:text-[17px] font-bold">{banner.title}</h3>
+                  <p className="text-[11px] lg:text-[12px] text-white/70 mt-0.5">{banner.desc}</p>
                 </div>
-                <span className="shrink-0 text-[12px] font-semibold text-white/80 border border-white/30 rounded-lg px-3 py-1.5 hover:bg-white/10 transition-colors hidden sm:block">{banner.cta}</span>
+                <span className="shrink-0 text-[11px] font-semibold text-white/80 border border-white/30 rounded-lg px-3 py-1.5 hover:bg-white/10 transition-colors hidden sm:block">{banner.cta}</span>
               </div>
             </Link>
           ))}
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
             {[0, 1, 2].map(i => (
-              <button key={i} onClick={() => setBannerIndex(i)} aria-label={`배너 ${i + 1}`} className={`h-3 min-w-[12px] rounded-full transition-all ${bannerIndex === i ? 'w-4 bg-white' : 'w-3 bg-white/40'}`} />
+              <button key={i} onClick={() => setBannerIndex(i)} aria-label={`배너 ${i + 1}`} className={`h-1.5 rounded-full transition-all ${bannerIndex === i ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`} />
             ))}
           </div>
         </div>
       </section>
 
-      <div className="mt-4 h-[1px] bg-gray-100 lg:hidden mx-5" />
-
-      {/* 오늘·내일 매치 */}
+      {/* 오늘·내일 매치 — tight grouping with banner */}
       {(() => {
         const todayMatches = matches.filter((m: Match) => {
           const d = new Date(m.matchDate);
@@ -160,8 +162,11 @@ export default function HomePage() {
         }).slice(0, 3);
 
         return todayMatches.length > 0 ? (
-          <section className="mt-5 px-5 lg:px-0">
-            <h2 className="text-[17px] font-bold text-gray-900 dark:text-white mb-3">🔥 오늘·내일 매치</h2>
+          <section className="mt-6 px-5 lg:px-0">
+            <h2 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2.5 flex items-center gap-1.5">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-red-50 text-[10px]">🔥</span>
+              오늘·내일 매치
+            </h2>
             <div className="space-y-2">
               {todayMatches.map((m: Match) => <MatchCard key={m.id} match={m} />)}
             </div>
@@ -169,8 +174,11 @@ export default function HomePage() {
         ) : null;
       })()}
 
+      {/* 구분 — generous break before full list */}
+      <div className="mt-6 mb-2 lg:mt-8 lg:mb-0" />
+
       {/* 전체 매치 */}
-      <section className="mt-5 px-5 lg:px-0 lg:mt-6">
+      <section className="px-5 lg:px-0">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-[17px] font-bold text-gray-900 dark:text-white">전체 매치</h2>
           <Link href="/matches" className="flex items-center text-[13px] text-gray-400 hover:text-gray-600 transition-colors">
@@ -192,8 +200,10 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-            {matches.map((match: Match) => (
-              <MatchCard key={match.id} match={match} />
+            {matches.map((match: Match, idx: number) => (
+              <div key={match.id} className={`animate-stagger-in stagger-${Math.min(idx + 1, 9)}`}>
+                <MatchCard match={match} />
+              </div>
             ))}
           </div>
         )}

@@ -62,7 +62,7 @@ export function Sidebar() {
                 <div className="relative">
                   <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
                   {showBadge && (
-                    <span className="absolute -top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold text-white">
+                    <span className="absolute -top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[9px] font-bold text-white animate-badge-pulse">
                       {totalUnread}
                     </span>
                   )}

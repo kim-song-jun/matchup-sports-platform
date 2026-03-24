@@ -177,7 +177,7 @@ export default function ChatListPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 mb-4">
                 <MessageCircle size={28} className="text-gray-400" />
               </div>
-              <p className="text-[17px] font-semibold text-gray-600">
+              <p className="text-[16px] font-semibold text-gray-600">
                 채팅방을 선택하세요
               </p>
               <p className="text-[13px] text-gray-400 mt-1.5 max-w-[240px]">

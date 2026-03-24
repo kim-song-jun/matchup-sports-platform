@@ -231,7 +231,7 @@ export default function CreateMatchPage() {
         )}
       </div>
 
-      <div className="h-8" />
+      <div className="h-6" />
 
       <style jsx>{`
         .input-field {

@@ -208,7 +208,7 @@ export default function MyMatchesPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[17px] font-bold text-gray-900 text-center">매치를 취소하시겠어요?</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 text-center">매치를 취소하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 참가자들에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button

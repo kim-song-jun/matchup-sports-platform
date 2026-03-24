@@ -158,7 +158,7 @@ export default function TeamMembersPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[17px] font-bold text-gray-900 text-center">{kickTarget.name}님을 추방하시겠어요?</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 text-center">{kickTarget.name}님을 추방하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">추방된 멤버에게 알림이 발송됩니다.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setKickTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
@@ -172,7 +172,7 @@ export default function TeamMembersPage() {
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6">
-            <h3 className="text-[17px] font-bold text-gray-900 text-center mb-4">멤버 초대</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 text-center mb-4">멤버 초대</h3>
             <input
               type="text"
               value={inviteNickname}

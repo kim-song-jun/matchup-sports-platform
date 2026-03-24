@@ -119,7 +119,7 @@ export default function HomePage() {
             <Link key={banner.href} href={banner.href}>
               <div className={`bg-gradient-to-r ${banner.bg} px-5 py-3.5 lg:px-6 lg:py-4 text-white flex items-center justify-between`}>
                 <div>
-                  <h3 className="text-[15px] lg:text-[17px] font-bold">{banner.title}</h3>
+                  <h3 className="text-[15px] lg:text-[16px] font-bold">{banner.title}</h3>
                   <p className="text-[11px] lg:text-[12px] text-white/70 mt-0.5">{banner.desc}</p>
                 </div>
                 <span className="shrink-0 text-[11px] font-semibold text-white/80 border border-white/30 rounded-lg px-3 py-1.5 hover:bg-white/10 transition-colors hidden sm:block">{banner.cta}</span>
@@ -153,7 +153,7 @@ export default function HomePage() {
       {/* 전체 매치 */}
       <section className="px-5 lg:px-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[17px] font-bold text-gray-900 dark:text-white">전체 매치</h2>
+          <h2 className="text-[16px] font-bold text-gray-900 dark:text-white">전체 매치</h2>
           <Link href="/matches" className="flex items-center text-[13px] text-gray-400 hover:text-gray-600 transition-colors">
             전체보기
             <ChevronRight size={14} className="ml-0.5" />
@@ -185,7 +185,7 @@ export default function HomePage() {
       {/* 모바일 빠른 메뉴 — 사이드바에만 있는 기능들 */}
       <section className="lg:hidden mt-5 px-5">
         <div className="h-2 bg-gray-50 -mx-5 mb-5" />
-        <h2 className="text-[17px] font-bold text-gray-900 dark:text-white mb-3">더 많은 기능</h2>
+        <h2 className="text-[16px] font-bold text-gray-900 dark:text-white mb-3">더 많은 기능</h2>
         <div className="grid grid-cols-4 gap-3">
           {quickMenuItems.map(item => (
             <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.95] transition-all">
@@ -196,7 +196,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="h-8" />
+      <div className="h-6" />
     </div>
   );
 }

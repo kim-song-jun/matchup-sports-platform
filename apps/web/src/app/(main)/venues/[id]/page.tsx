@@ -435,7 +435,7 @@ export default function VenueDetailPage() {
         </div>
       </div>
 
-      <div className="h-8" />
+      <div className="h-6" />
     </div>
   );
 }

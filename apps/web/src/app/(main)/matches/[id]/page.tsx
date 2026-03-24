@@ -299,7 +299,7 @@ export default function MatchDetailPage() {
         </div>
       </div>
 
-      <div className="h-8" />
+      <div className="h-6" />
 
       {/* 결제 모달 */}
       {showCheckout && match && (

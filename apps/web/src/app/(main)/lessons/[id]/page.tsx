@@ -91,7 +91,7 @@ export default function LessonDetailPage() {
               <div className="flex items-start gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500"><User size={28} /></div>
                 <div>
-                  <p className="text-[17px] font-bold text-gray-900">{lesson.coachName}</p>
+                  <p className="text-[16px] font-bold text-gray-900">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-[13px] text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
                   <div className="flex items-center gap-3 mt-2 text-[12px] text-gray-400">
                     <span className="flex items-center gap-1"><Star size={12} className="text-amber-400" fill="currentColor" /> 4.8</span>
@@ -241,7 +241,7 @@ export default function LessonDetailPage() {
           </div>
         </div>
       </div>
-      <div className="h-8" />
+      <div className="h-6" />
 
       {/* 결제 모달 */}
       {showCheckout && lesson && (

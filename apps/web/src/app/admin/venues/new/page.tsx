@@ -294,7 +294,7 @@ export default function AdminVenueNewPage() {
         )}
       </div>
 
-      <div className="h-8" />
+      <div className="h-6" />
     </div>
   );
 }

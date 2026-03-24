@@ -102,7 +102,7 @@ export default function RefundRequestPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[17px] font-bold text-gray-900">환불 확인</h3>
+              <h3 className="text-[16px] font-bold text-gray-900">환불 확인</h3>
               <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-lg p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <X size={20} className="text-gray-400" />
               </button>

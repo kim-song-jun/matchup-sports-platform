@@ -235,7 +235,7 @@ export default function EditListingPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[17px] font-bold text-gray-900 text-center">매물을 삭제하시겠어요?</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 text-center">매물을 삭제하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>

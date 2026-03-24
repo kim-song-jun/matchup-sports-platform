@@ -10,7 +10,7 @@ export default function PrivacyPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5 hover:bg-gray-100">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="rounded-lg p-1.5 -ml-1.5 hover:bg-gray-100">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">개인정보 처리방침</h1>

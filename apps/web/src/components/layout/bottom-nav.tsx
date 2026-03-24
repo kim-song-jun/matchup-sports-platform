@@ -41,7 +41,7 @@ export function BottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 transition-all duration-200 ${
+                className={`flex flex-col items-center justify-center gap-0.5 rounded-xl min-w-[44px] min-h-[44px] px-3 py-1 transition-all duration-200 ${
                   isActive ? 'text-blue-500' : 'text-gray-400 active:text-gray-600'
                 }`}
               >

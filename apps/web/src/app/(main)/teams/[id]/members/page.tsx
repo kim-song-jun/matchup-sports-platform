@@ -55,14 +55,14 @@ export default function TeamMembersPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center justify-between px-5 py-3 border-b border-gray-50">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+          <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg -ml-1.5 hover:bg-gray-100 transition-colors">
             <ArrowLeft size={20} className="text-gray-700" />
           </button>
           <h1 className="text-[16px] font-semibold text-gray-900">멤버 관리</h1>
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-[13px] font-semibold text-white"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-3 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 transition-colors"
         >
           <UserPlus size={14} />
           초대
@@ -111,7 +111,8 @@ export default function TeamMembersPage() {
                 <div className="relative">
                   <button
                     onClick={() => setMenuOpen(menuOpen === member.id ? null : member.id)}
-                    className="rounded-lg p-2 hover:bg-gray-50 transition-colors"
+                    aria-label="멤버 메뉴"
+                    className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <MoreVertical size={16} className="text-gray-400" />
                   </button>
@@ -160,8 +161,8 @@ export default function TeamMembersPage() {
             <h3 className="text-[17px] font-bold text-gray-900 text-center">{kickTarget.name}님을 추방하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">추방된 멤버에게 알림이 발송됩니다.</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setKickTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700">돌아가기</button>
-              <button onClick={() => handleKick(kickTarget.id)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white">추방하기</button>
+              <button onClick={() => setKickTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
+              <button onClick={() => handleKick(kickTarget.id)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">추방하기</button>
             </div>
           </div>
         </div>
@@ -180,8 +181,8 @@ export default function TeamMembersPage() {
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors mb-4"
             />
             <div className="flex gap-3">
-              <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700">취소</button>
-              <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white">초대하기</button>
+              <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">취소</button>
+              <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors">초대하기</button>
             </div>
           </div>
         </div>

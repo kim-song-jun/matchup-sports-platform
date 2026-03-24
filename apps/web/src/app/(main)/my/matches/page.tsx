@@ -114,7 +114,7 @@ export default function MyMatchesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">내가 만든 매치</h1>
@@ -213,13 +213,13 @@ export default function MyMatchesPage() {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700"
+                className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
               >
                 돌아가기
               </button>
               <button
                 onClick={() => handleDelete(deleteTarget)}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors"
               >
                 취소하기
               </button>

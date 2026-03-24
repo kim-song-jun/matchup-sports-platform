@@ -69,12 +69,12 @@ export default function AdminPaymentsPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">사용자</th>
-                  <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">금액</th>
-                  <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">상태</th>
-                  <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">결제수단</th>
-                  <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">일시</th>
-                  <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">주문번호</th>
+                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">사용자</th>
+                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">금액</th>
+                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">결제수단</th>
+                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">일시</th>
+                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">주문번호</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

@@ -58,7 +58,7 @@ export default function MarketplacePage() {
     <div className="pt-[var(--safe-area-top)]">
       <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
         <h1 className="text-[22px] font-bold text-gray-900">장터</h1>
-        <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white active:bg-gray-800 transition-colors">
+        <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 active:bg-gray-700 transition-colors">
           <Plus size={16} strokeWidth={2.5} />
           글쓰기
         </Link>

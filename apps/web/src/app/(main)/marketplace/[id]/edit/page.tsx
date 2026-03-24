@@ -86,7 +86,7 @@ export default function EditListingPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">매물 수정</h1>
@@ -235,8 +235,8 @@ export default function EditListingPage() {
             <h3 className="text-[17px] font-bold text-gray-900 text-center">매물을 삭제하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700">돌아가기</button>
-              <button onClick={handleDelete} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white">삭제하기</button>
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
+              <button onClick={handleDelete} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>
             </div>
           </div>
         </div>

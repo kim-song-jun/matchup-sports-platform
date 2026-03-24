@@ -103,7 +103,7 @@ export default function RefundRequestPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[17px] font-bold text-gray-900">환불 확인</h3>
-              <button onClick={() => setShowModal(false)} className="rounded-lg p-1 hover:bg-gray-100 transition-colors">
+              <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-lg p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <X size={20} className="text-gray-400" />
               </button>
             </div>
@@ -151,7 +151,7 @@ export default function RefundRequestPage() {
 
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">환불 요청</h1>

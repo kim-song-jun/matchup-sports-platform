@@ -426,7 +426,7 @@ export default function AdminDisputeDetailPage() {
 
       {/* Resolve modal */}
       {showResolveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
@@ -463,7 +463,7 @@ export default function AdminDisputeDetailPage() {
 
       {/* Dismiss modal */}
       {showDismissModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
@@ -500,7 +500,7 @@ export default function AdminDisputeDetailPage() {
 
       {/* Warn modal */}
       {showWarnModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50">
@@ -537,7 +537,7 @@ export default function AdminDisputeDetailPage() {
 
       {/* Suspend modal */}
       {showSuspendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">

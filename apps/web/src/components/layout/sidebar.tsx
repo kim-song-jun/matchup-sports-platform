@@ -98,7 +98,7 @@ export function Sidebar() {
               </div>
             </div>
             <button onClick={() => { logout(); router.push('/login'); }}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors" title="로그아웃">
+              className="flex items-center justify-center h-[44px] w-[44px] rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-colors" aria-label="로그아웃" title="로그아웃">
               <LogOut size={16} />
             </button>
           </div>

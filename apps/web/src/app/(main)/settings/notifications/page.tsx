@@ -115,7 +115,10 @@ function ToggleRow({ label, desc, enabled, onToggle, disabled }: {
       <button
         onClick={onToggle}
         disabled={disabled}
-        className={`relative shrink-0 h-[30px] w-[52px] rounded-full transition-colors duration-200 ${
+        aria-label={`${label} ${enabled ? '켜짐' : '꺼짐'}`}
+        role="switch"
+        aria-checked={enabled}
+        className={`relative shrink-0 h-[30px] w-[52px] min-h-[44px] min-w-[52px] flex items-center rounded-full transition-colors duration-200 ${
           enabled ? 'bg-blue-500' : 'bg-gray-200'
         } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       >

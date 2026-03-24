@@ -116,7 +116,7 @@ export default function NewTeamMatchPage() {
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors">
+        <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-[18px] font-bold text-gray-900">모집글 작성</h1>

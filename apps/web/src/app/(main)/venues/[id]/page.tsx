@@ -150,14 +150,14 @@ export default function VenueDetailPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in dark:bg-gray-900">
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5 hover:bg-gray-100 transition-colors">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1 ml-3">{venue.name}</h1>
-        <button className="rounded-lg p-1.5 hover:bg-gray-100 transition-colors">
+        <button aria-label="공유하기" className="rounded-lg p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <Share2 size={18} className="text-gray-500" />
         </button>
       </header>

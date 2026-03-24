@@ -340,7 +340,7 @@ export default function AdminTeamDetailPage() {
 
       {/* Suspend confirmation modal */}
       {showSuspendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
@@ -377,7 +377,7 @@ export default function AdminTeamDetailPage() {
 
       {/* Badge management modal */}
       {showBadgeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[16px] font-bold text-gray-900">배지 관리</h3>

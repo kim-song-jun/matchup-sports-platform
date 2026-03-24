@@ -23,7 +23,8 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
         <button
           key={star}
           onClick={() => onChange(star)}
-          className="p-0.5 transition-transform active:scale-110"
+          aria-label={`${star}점`}
+          className="p-1 min-h-11 min-w-11 flex items-center justify-center transition-transform active:scale-110"
         >
           <Star
             size={28}
@@ -64,7 +65,8 @@ export default function TeamMatchEvaluatePage() {
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
+          aria-label="뒤로 가기"
+          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>

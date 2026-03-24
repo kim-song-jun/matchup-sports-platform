@@ -11,9 +11,9 @@ export default function NotificationsPage() {
   const { toast } = useToast();
 
   return (
-    <div className="pt-[var(--safe-area-top)]">
+    <div className="pt-[var(--safe-area-top)] dark:bg-gray-900">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-gray-900">알림</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">알림</h1>
         {isAuthenticated && (
           <button
             onClick={async () => {
@@ -24,7 +24,7 @@ export default function NotificationsPage() {
                 toast('info', '읽을 알림이 없습니다');
               }
             }}
-            className="text-[13px] text-blue-500 font-medium"
+            className="text-[13px] text-blue-500 font-medium min-h-[44px] flex items-center hover:text-blue-600 active:scale-[0.98] transition-all"
           >
             모두 읽음
           </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil } from 'lucide-react';
+import { Pencil, Trophy } from 'lucide-react';
 import { useAdminMatches } from '@/hooks/use-api';
 import type { Match } from '@/types/api';
 
@@ -36,16 +36,17 @@ export default function AdminMatchesPage() {
       </div>
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">매치</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">종목</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">일시</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">인원</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">상태</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">호스트</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">관리</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">매치</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">종목</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">일시</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">인원</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">상태</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">호스트</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -80,8 +81,17 @@ export default function AdminMatchesPage() {
                 </td>
               </tr>
             ))}
+            {!isLoading && matches.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-5 py-12 text-center">
+                  <Trophy size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-[14px] text-gray-400">등록된 매치가 없습니다</p>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

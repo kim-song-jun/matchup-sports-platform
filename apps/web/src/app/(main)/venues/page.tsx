@@ -44,9 +44,9 @@ export default function VenuesPage() {
     : allVenues;
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in dark:bg-gray-900">
       <header className="px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900">시설 찾기</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">시설 찾기</h1>
         <p className="text-[13px] text-gray-400 mt-0.5">내 주변 스포츠 시설을 찾아보세요</p>
       </header>
 
@@ -60,12 +60,13 @@ export default function VenuesPage() {
               placeholder="시설명, 지역 검색"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all"
+              className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-4 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 transition-all dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
             />
           </div>
           <button
+            aria-label="상세 필터"
             onClick={() => toast('info', '상세 필터 기능을 준비 중입니다')}
-            className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 active:bg-gray-100 transition-colors"
+            className="flex h-[46px] w-[46px] items-center justify-center rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 active:bg-gray-100 transition-colors dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           >
             <SlidersHorizontal size={18} />
           </button>

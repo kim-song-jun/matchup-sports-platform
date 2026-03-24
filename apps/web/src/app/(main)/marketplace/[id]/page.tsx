@@ -60,8 +60,8 @@ export default function ListingDetailPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <div className="flex gap-2">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <div className="flex gap-1">
           <button
             onClick={async () => {
               if (navigator.share) {
@@ -71,7 +71,8 @@ export default function ListingDetailPage() {
                 toast('success', '링크가 복사되었습니다');
               }
             }}
-            className="rounded-lg p-1.5"
+            aria-label="공유하기"
+            className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <Share2 size={18} className="text-gray-500" />
           </button>
@@ -82,7 +83,8 @@ export default function ListingDetailPage() {
                 await api.post(`/marketplace/listings/${listingId}/like`);
               } catch { /* silent fail for now */ }
             }}
-            className="rounded-lg p-1.5"
+            aria-label={liked ? '좋아요 취소' : '좋아요'}
+            className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <Heart size={18} className={liked ? 'text-red-500' : 'text-gray-500'} fill={liked ? 'currentColor' : 'none'} />
           </button>
@@ -185,7 +187,7 @@ export default function ListingDetailPage() {
           {/* CTA */}
           <div className="rounded-2xl bg-white border border-gray-100 p-4">
             {!isAuthenticated ? (
-              <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white">
+              <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white hover:bg-gray-800 transition-colors">
                 로그인 후 구매하기
               </Link>
             ) : (
@@ -236,7 +238,7 @@ export default function ListingDetailPage() {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700"
+                className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
               >
                 돌아가기
               </button>
@@ -251,7 +253,7 @@ export default function ListingDetailPage() {
                   }
                   setShowDeleteConfirm(false);
                 }}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors"
               >
                 삭제하기
               </button>

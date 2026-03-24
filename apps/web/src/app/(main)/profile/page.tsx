@@ -22,9 +22,9 @@ export default function ProfilePage() {
   const [showEditModal, setShowEditModal] = useState(false);
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
+    <div className="pt-[var(--safe-area-top)] lg:pt-0 dark:bg-gray-900">
       <header className="px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900">마이페이지</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">마이페이지</h1>
       </header>
 
       <div className={`px-5 lg:px-0 ${isAuthenticated ? 'lg:grid lg:grid-cols-[1fr_340px] lg:gap-8' : ''}`}>
@@ -49,7 +49,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setShowEditModal(true)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 transition-colors">
+              <button aria-label="프로필 수정" onClick={() => setShowEditModal(true)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <Pencil size={16} />
               </button>
             </div>
@@ -130,7 +130,7 @@ export default function ProfilePage() {
           { label: '결제 내역', icon: CreditCard, href: '/payments', count: null },
         ].map((item) => (
           <Link key={item.label} href={item.href}>
-            <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
+            <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:scale-[0.99] transition-all rounded-lg -mx-2 px-2">
               <div className="flex items-center gap-3">
                 <item.icon size={20} className="text-gray-400" />
                 <span className="text-[15px] font-medium text-gray-800">{item.label}</span>

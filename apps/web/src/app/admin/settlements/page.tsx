@@ -181,15 +181,15 @@ export default function AdminSettlementsPage() {
                     </button>
                   </th>
                 )}
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">거래 ID</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">유형</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">내용</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">판매자</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider text-right">금액</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider text-right">수수료</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider text-right">정산액</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">상태</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">날짜</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">거래 ID</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">유형</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">내용</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">판매자</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider text-right">금액</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider text-right">수수료</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider text-right">정산액</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">날짜</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

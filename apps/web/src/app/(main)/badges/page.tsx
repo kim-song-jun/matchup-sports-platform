@@ -171,12 +171,13 @@ export default function BadgesPage() {
       {/* Header */}
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
+          aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors lg:hidden"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 active:scale-[0.98] transition-all lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900">뱃지</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">뱃지</h1>
       </header>
 
       {/* Summary */}

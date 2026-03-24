@@ -120,7 +120,7 @@ export default function AdminStatisticsPage() {
 
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Users size={20} />
             </div>
           </div>
@@ -208,17 +208,17 @@ export default function AdminStatisticsPage() {
         {/* Top venues table */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Building2 size={16} className="text-gray-500" />
+            <Building2 size={16} className="text-blue-500" />
             <h3 className="text-[15px] font-bold text-gray-900">인기 시설 TOP 5</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="pb-2 text-[11px] font-semibold text-gray-400 uppercase">시설</th>
-                  <th className="pb-2 text-[11px] font-semibold text-gray-400 uppercase text-right">매치</th>
-                  <th className="pb-2 text-[11px] font-semibold text-gray-400 uppercase text-right">매출</th>
-                  <th className="pb-2 text-[11px] font-semibold text-gray-400 uppercase text-right">평점</th>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="px-3 py-2 text-[12px] font-medium text-gray-500 uppercase">시설</th>
+                  <th className="px-3 py-2 text-[12px] font-medium text-gray-500 uppercase text-right">매치</th>
+                  <th className="px-3 py-2 text-[12px] font-medium text-gray-500 uppercase text-right">매출</th>
+                  <th className="px-3 py-2 text-[12px] font-medium text-gray-500 uppercase text-right">평점</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

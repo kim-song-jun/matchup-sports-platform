@@ -26,7 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-dvh bg-gray-50 flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[240px] flex-col border-r border-gray-200 bg-white">
+      <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[240px] flex-col border-r border-gray-100 bg-white">
         <div className="px-5 pt-6 pb-4">
           <div className="flex items-center gap-2 text-gray-900">
             <ShieldCheck size={20} className="text-blue-500" />
@@ -39,8 +39,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const isActive = pathname.startsWith(href);
             return (
               <Link key={href} href={href}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all ${
-                  isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50'
+                className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all ${
+                  isActive ? 'bg-blue-50 text-blue-500' : 'text-gray-600 hover:bg-gray-50'
                 }`}>
                 <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
                 {label}
@@ -50,7 +50,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         <div className="border-t border-gray-100 p-3">
-          <Link href="/home" className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-gray-500 hover:bg-gray-50 transition-colors">
+          <Link href="/home" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-gray-500 hover:bg-gray-50 transition-colors">
             <ArrowLeft size={16} />
             서비스로 돌아가기
           </Link>

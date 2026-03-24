@@ -93,7 +93,7 @@ export default function MyLessonsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">내가 등록한 강좌</h1>
@@ -111,7 +111,13 @@ export default function MyLessonsPage() {
       )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
-        {lessons.map((lesson) => (
+        {lessons.length === 0 ? (
+          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+            <BookOpen size={32} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-[15px] font-medium text-gray-600">등록한 강좌가 없어요</p>
+            <p className="text-[13px] text-gray-400 mt-1">강좌를 등록해보세요</p>
+          </div>
+        ) : lessons.map((lesson) => (
           <div key={lesson.id} className="rounded-2xl bg-white border border-gray-100 p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -189,8 +195,8 @@ export default function MyLessonsPage() {
             <h3 className="text-[17px] font-bold text-gray-900 text-center">강좌를 취소하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 수강생들에게 알림이 발송됩니다.</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700">돌아가기</button>
-              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white">취소하기</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
+              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">취소하기</button>
             </div>
           </div>
         </div>

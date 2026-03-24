@@ -24,7 +24,7 @@ export default function TeamsPage() {
           <h1 className="text-[22px] font-bold text-gray-900">팀·클럽</h1>
           <p className="text-[13px] text-gray-400 mt-0.5">동호회와 팀을 찾아보세요</p>
         </div>
-        <Link href="/teams/new" className="flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white">
+        <Link href="/teams/new" className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 active:bg-gray-700 transition-colors">
           <Plus size={16} strokeWidth={2.5} />
           팀 등록
         </Link>
@@ -78,7 +78,7 @@ export default function TeamsPage() {
                       {team.city && <span className="flex items-center gap-1"><MapPin size={14} />{team.city} {team.district}</span>}
                     </div>
                     {team.contactInfo && (
-                      <button className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                      <button className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 min-h-11 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                         <MessageCircle size={14} />
                         연락하기
                       </button>

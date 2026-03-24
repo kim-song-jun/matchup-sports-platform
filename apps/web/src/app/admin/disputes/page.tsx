@@ -179,14 +179,14 @@ export default function AdminDisputesPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">ID</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">신고팀</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">피신고팀</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">매치일</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">유형</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">상태</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">신고일</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap"></th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">ID</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">신고팀</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">피신고팀</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">매치일</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">신고일</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

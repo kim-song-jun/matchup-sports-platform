@@ -32,17 +32,18 @@ export default function AdminLessonsPage() {
       </div>
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">강좌명</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">유형</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">일시</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">인원</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">수강료</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">상태</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">등록자</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">관리</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">강좌명</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">유형</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">일시</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">인원</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">수강료</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">상태</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">등록자</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -73,8 +74,17 @@ export default function AdminLessonsPage() {
                 </td>
               </tr>
             ))}
+            {!isLoading && lessons.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-5 py-12 text-center">
+                  <GraduationCap size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-[14px] text-gray-400">등록된 강좌가 없습니다</p>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

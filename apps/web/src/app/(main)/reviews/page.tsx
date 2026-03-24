@@ -25,7 +25,7 @@ export default function ReviewsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} className="rounded-lg p-1.5 -ml-1.5"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-[16px] font-semibold text-gray-900">내 평가</h1>
       </header>
       <div className="hidden lg:block mb-6">
@@ -125,7 +125,7 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
       <span className="text-[13px] font-semibold text-gray-700 mb-1 block">{label}</span>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} onClick={() => onChange(n)} className="p-0.5">
+          <button key={n} onClick={() => onChange(n)} aria-label={`${n}점`} className="p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center">
             <Star size={24} className={n <= value ? 'text-amber-400' : 'text-gray-200'} fill={n <= value ? 'currentColor' : 'none'} />
           </button>
         ))}

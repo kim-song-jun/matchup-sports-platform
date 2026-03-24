@@ -173,12 +173,12 @@ export default function AdminReviewsPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">매치</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">평가자</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">대상</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">매너점수</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">스킬점수</th>
-                <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase whitespace-nowrap">날짜</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">매치</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">평가자</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">대상</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">매너점수</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">스킬점수</th>
+                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">날짜</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

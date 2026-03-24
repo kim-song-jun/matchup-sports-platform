@@ -115,7 +115,7 @@ export default function TeamMatchDetailPage() {
 
       {/* Header */}
       <header className="px-5 lg:px-0 lg:pt-0 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => router.back()} className="lg:hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="lg:hidden flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-[18px] font-bold text-gray-900 truncate flex-1">{match.title}</h1>

@@ -132,7 +132,8 @@ export default function ArrivalCheckPage() {
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 transition-colors"
+          aria-label="뒤로 가기"
+          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>

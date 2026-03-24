@@ -164,10 +164,10 @@ export default function MercenaryPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-[22px] font-bold text-gray-900">용병 모집</h1>
+          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">용병 모집</h1>
           <Link href="/my/mercenary" className="text-[13px] text-gray-400 hover:text-gray-600 transition-colors">
             내 모집/신청
           </Link>

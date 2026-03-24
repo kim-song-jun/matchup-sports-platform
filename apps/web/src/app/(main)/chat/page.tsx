@@ -189,9 +189,9 @@ export default function ChatListPage() {
       </div>
 
       {/* ===== MOBILE: Full-width list ===== */}
-      <div className="lg:hidden pt-[var(--safe-area-top)] animate-fade-in">
+      <div className="lg:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
         <header className="px-5 pt-4 pb-3">
-          <h1 className="text-[22px] font-bold text-gray-900">채팅</h1>
+          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">채팅</h1>
           <p className="text-[13px] text-gray-400 mt-0.5">팀 매칭 대화</p>
         </header>
 

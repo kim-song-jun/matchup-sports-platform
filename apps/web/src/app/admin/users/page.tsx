@@ -1,6 +1,6 @@
 'use client';
 
-import { Star, Search } from 'lucide-react';
+import { Star, Search, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useAdminUsers } from '@/hooks/use-api';
 import type { UserProfile } from '@/types/api';
@@ -33,15 +33,16 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">사용자</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">매너</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">경기</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">종목</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">지역</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase tracking-wider">가입일</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">사용자</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">매너</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">경기</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">종목</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">지역</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">가입일</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -80,8 +81,17 @@ export default function AdminUsersPage() {
                 <td className="px-5 py-3.5 text-[13px] text-gray-400">{u.createdAt ? new Date(u.createdAt).toLocaleDateString('ko-KR') : '-'}</td>
               </tr>
             ))}
+            {!isLoading && users.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-5 py-12 text-center">
+                  <Users size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-[14px] text-gray-400">등록된 사용자가 없습니다</p>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

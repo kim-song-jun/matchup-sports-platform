@@ -113,7 +113,7 @@ export default function HomePage() {
           ))}
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
             {[0, 1, 2].map(i => (
-              <button key={i} onClick={() => setBannerIndex(i)} className={`h-1 rounded-full transition-all ${bannerIndex === i ? 'w-3 bg-white' : 'w-1 bg-white/40'}`} />
+              <button key={i} onClick={() => setBannerIndex(i)} aria-label={`배너 ${i + 1}`} className={`h-3 min-w-[12px] rounded-full transition-all ${bannerIndex === i ? 'w-4 bg-white' : 'w-3 bg-white/40'}`} />
             ))}
           </div>
         </div>

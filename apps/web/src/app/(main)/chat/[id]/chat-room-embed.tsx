@@ -224,16 +224,18 @@ export default function ChatRoomEmbed({
             </p>
           </div>
           <button
+            aria-label={showMatchInfo ? '매치 정보 닫기' : '매치 정보 보기'}
             onClick={() => setShowMatchInfo(!showMatchInfo)}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 transition-colors"
+            className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             {showMatchInfo ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
           {/* More menu */}
           <div className="relative" ref={menuRef}>
             <button
+              aria-label="더보기 메뉴"
               onClick={() => setShowMenu(!showMenu)}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 transition-colors"
+              className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <MoreVertical size={18} />
             </button>
@@ -391,9 +393,10 @@ export default function ChatRoomEmbed({
             className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
           />
           <button
+            aria-label="메시지 보내기"
             onClick={handleSend}
             disabled={!input.trim()}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
           >
             <Send size={18} />
           </button>

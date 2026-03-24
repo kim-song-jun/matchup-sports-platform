@@ -25,17 +25,18 @@ export default function AdminTeamsPage() {
       </div>
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">팀명</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">종목</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">인원</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">레벨</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">지역</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">모집</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">운영자</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">관리</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">팀명</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">종목</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">인원</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">레벨</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">지역</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">모집</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">운영자</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -70,8 +71,17 @@ export default function AdminTeamsPage() {
                 </td>
               </tr>
             ))}
+            {!isLoading && teams.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-5 py-12 text-center">
+                  <Users size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-[14px] text-gray-400">등록된 팀이 없습니다</p>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

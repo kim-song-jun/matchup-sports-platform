@@ -49,16 +49,17 @@ export default function AdminVenuesPage() {
       {!isLoading && <p className="text-[13px] text-gray-400 mb-3">{filtered.length}개의 시설</p>}
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">시설명</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">유형</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">종목</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">주소</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">평점</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">시간당</th>
-              <th className="px-5 py-3 text-[12px] font-semibold text-gray-500 uppercase">관리</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">시설명</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">유형</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">종목</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">주소</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">평점</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">시간당</th>
+              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -107,8 +108,17 @@ export default function AdminVenuesPage() {
                 </td>
               </tr>
             ))}
+            {!isLoading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-5 py-12 text-center">
+                  <Building2 size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-[14px] text-gray-400">등록된 시설이 없습니다</p>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

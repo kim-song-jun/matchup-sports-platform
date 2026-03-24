@@ -50,6 +50,20 @@ const sportBorderColor: Record<string, string> = {
   volleyball: 'border-l-rose-500',
 };
 
+const sportIconColor: Record<string, string> = {
+  soccer: 'bg-green-50 text-green-600',
+  futsal: 'bg-blue-50 text-blue-500',
+  basketball: 'bg-amber-50 text-amber-600',
+  badminton: 'bg-cyan-50 text-cyan-600',
+  ice_hockey: 'bg-blue-50 text-blue-600',
+  tennis: 'bg-red-50 text-red-500',
+  swimming: 'bg-sky-50 text-sky-600',
+  figure_skating: 'bg-gray-100 text-gray-500',
+  short_track: 'bg-gray-100 text-gray-500',
+  baseball: 'bg-orange-50 text-orange-600',
+  volleyball: 'bg-blue-50 text-blue-500',
+};
+
 function getTimeBadge(dateStr: string) {
   const d = new Date(dateStr);
   const now = new Date();
@@ -203,7 +217,7 @@ export default function MatchesPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         {SportIcon && (
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sportIconColor[match.sportType] || 'bg-blue-50 text-blue-500'}`}>
                             <SportIcon size={18} />
                           </div>
                         )}

@@ -8,14 +8,14 @@ export default function AdminDashboardPage() {
 
   const primaryCards = [
     { label: '총 사용자', value: stats?.totalUsers ?? '-', icon: Users, color: 'text-blue-500 bg-blue-50', trend: stats?.todayNewUsers ? `+${stats.todayNewUsers} 오늘` : undefined },
-    { label: '총 매치', value: stats?.totalMatches ?? '-', icon: Trophy, color: 'text-blue-500 bg-blue-50', trend: stats?.todayMatches ? `+${stats.todayMatches} 오늘` : undefined },
+    { label: '총 매치', value: stats?.totalMatches ?? '-', icon: Trophy, color: 'text-green-600 bg-green-50', trend: stats?.todayMatches ? `+${stats.todayMatches} 오늘` : undefined },
   ];
 
   const secondaryCards = [
-    { label: '총 강좌', value: stats?.totalLessons ?? '-', icon: GraduationCap, color: 'text-blue-500 bg-blue-50' },
-    { label: '등록 팀', value: stats?.totalTeams ?? '-', icon: Zap, color: 'text-blue-500 bg-blue-50' },
-    { label: '등록 시설', value: stats?.totalVenues ?? '-', icon: Building2, color: 'text-blue-500 bg-blue-50' },
-    { label: '장터 매물', value: stats?.activeListings ?? '-', icon: ShoppingBag, color: 'text-blue-500 bg-blue-50' },
+    { label: '총 강좌', value: stats?.totalLessons ?? '-', icon: GraduationCap, color: 'text-amber-600 bg-amber-50' },
+    { label: '등록 팀', value: stats?.totalTeams ?? '-', icon: Zap, color: 'text-violet-500 bg-violet-50' },
+    { label: '등록 시설', value: stats?.totalVenues ?? '-', icon: Building2, color: 'text-cyan-600 bg-cyan-50' },
+    { label: '장터 매물', value: stats?.activeListings ?? '-', icon: ShoppingBag, color: 'text-orange-500 bg-orange-50' },
   ];
 
   return (

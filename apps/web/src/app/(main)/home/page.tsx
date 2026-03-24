@@ -9,15 +9,15 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import type { Match } from '@/types/api';
 
 const sports = [
-  { type: 'soccer', label: '축구', color: 'text-blue-500 bg-blue-50' },
+  { type: 'soccer', label: '축구', color: 'text-green-600 bg-green-50' },
   { type: 'futsal', label: '풋살', color: 'text-blue-500 bg-blue-50' },
-  { type: 'basketball', label: '농구', color: 'text-blue-500 bg-blue-50' },
-  { type: 'badminton', label: '배드민턴', color: 'text-blue-500 bg-blue-50' },
-  { type: 'ice_hockey', label: '하키', color: 'text-blue-500 bg-blue-50' },
-  { type: 'figure_skating', label: '피겨', color: 'text-blue-500 bg-blue-50' },
-  { type: 'short_track', label: '쇼트트랙', color: 'text-blue-500 bg-blue-50' },
-  { type: 'swimming', label: '수영', color: 'text-blue-500 bg-blue-50' },
-  { type: 'tennis', label: '테니스', color: 'text-blue-500 bg-blue-50' },
+  { type: 'basketball', label: '농구', color: 'text-amber-600 bg-amber-50' },
+  { type: 'badminton', label: '배드민턴', color: 'text-cyan-600 bg-cyan-50' },
+  { type: 'ice_hockey', label: '하키', color: 'text-blue-600 bg-blue-50' },
+  { type: 'figure_skating', label: '피겨', color: 'text-gray-500 bg-gray-100' },
+  { type: 'short_track', label: '쇼트트랙', color: 'text-gray-500 bg-gray-100' },
+  { type: 'swimming', label: '수영', color: 'text-sky-600 bg-sky-50' },
+  { type: 'tennis', label: '테니스', color: 'text-red-500 bg-red-50' },
 ];
 
 const sportLabel: Record<string, string> = {
@@ -237,6 +237,20 @@ export default function HomePage() {
   );
 }
 
+const sportIconColor: Record<string, string> = {
+  soccer: 'bg-green-50 text-green-600',
+  futsal: 'bg-blue-50 text-blue-500',
+  basketball: 'bg-amber-50 text-amber-600',
+  badminton: 'bg-cyan-50 text-cyan-600',
+  ice_hockey: 'bg-blue-50 text-blue-600',
+  tennis: 'bg-red-50 text-red-500',
+  swimming: 'bg-sky-50 text-sky-600',
+  figure_skating: 'bg-gray-100 text-gray-500',
+  short_track: 'bg-gray-100 text-gray-500',
+  baseball: 'bg-orange-50 text-orange-600',
+  volleyball: 'bg-blue-50 text-blue-500',
+};
+
 function MatchCard({ match }: { match: Match }) {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
   const isAlmostFull = filledPercent >= 70;
@@ -250,7 +264,7 @@ function MatchCard({ match }: { match: Match }) {
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             {SportIcon && (
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${sportIconColor[match.sportType] || 'bg-blue-50 text-blue-500'}`}>
                 <SportIcon size={18} />
               </div>
             )}

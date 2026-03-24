@@ -6,17 +6,17 @@ import { Target, Shield, Users, Zap, ChevronRight, Star, ArrowRight } from 'luci
 import { SportIconMap } from '@/components/icons/sport-icons';
 
 const SPORTS = [
-  { key: 'soccer', name: '축구' },
-  { key: 'futsal', name: '풋살' },
-  { key: 'basketball', name: '농구' },
-  { key: 'badminton', name: '배드민턴' },
-  { key: 'tennis', name: '테니스' },
-  { key: 'baseball', name: '야구' },
-  { key: 'volleyball', name: '배구' },
-  { key: 'swimming', name: '수영' },
-  { key: 'ice_hockey', name: '아이스하키' },
-  { key: 'figure_skating', name: '피겨스케이팅' },
-  { key: 'short_track', name: '쇼트트랙' },
+  { key: 'soccer', name: '축구', iconColor: 'text-green-600', bg: 'bg-green-50' },
+  { key: 'futsal', name: '풋살', iconColor: 'text-blue-500', bg: 'bg-blue-50' },
+  { key: 'basketball', name: '농구', iconColor: 'text-amber-600', bg: 'bg-amber-50' },
+  { key: 'badminton', name: '배드민턴', iconColor: 'text-cyan-600', bg: 'bg-cyan-50' },
+  { key: 'tennis', name: '테니스', iconColor: 'text-red-500', bg: 'bg-red-50' },
+  { key: 'baseball', name: '야구', iconColor: 'text-orange-600', bg: 'bg-orange-50' },
+  { key: 'volleyball', name: '배구', iconColor: 'text-blue-500', bg: 'bg-blue-50' },
+  { key: 'swimming', name: '수영', iconColor: 'text-sky-600', bg: 'bg-sky-50' },
+  { key: 'ice_hockey', name: '아이스하키', iconColor: 'text-blue-600', bg: 'bg-blue-50' },
+  { key: 'figure_skating', name: '피겨스케이팅', iconColor: 'text-gray-500', bg: 'bg-gray-100' },
+  { key: 'short_track', name: '쇼트트랙', iconColor: 'text-gray-500', bg: 'bg-gray-100' },
 ];
 
 const FEATURES = [
@@ -256,12 +256,12 @@ export default function LandingPage() {
               return (
                 <div
                   key={sport.key}
-                  className="shrink-0 w-28 bg-white rounded-2xl p-5 border border-gray-100 flex flex-col items-center gap-3 hover:shadow-md hover:border-blue-200 transition-all duration-200"
+                  className="shrink-0 w-28 bg-white rounded-2xl p-5 border border-gray-100 flex flex-col items-center gap-3 hover:shadow-md hover:border-gray-200 transition-all duration-200"
                 >
-                  {Icon && <Icon size={32} className="text-blue-600" />}
-                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                    {sport.name}
-                  </span>
+                  <div className={`w-14 h-14 rounded-xl ${sport.bg} flex items-center justify-center`}>
+                    {Icon && <Icon size={28} className={sport.iconColor} />}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{sport.name}</span>
                 </div>
               );
             })}

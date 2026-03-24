@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart, Info } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { useListings } from '@/hooks/use-api';
 
 const mockMyListings = [
   {
@@ -74,7 +75,24 @@ export default function MyListingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const [listings, setListings] = useState(mockMyListings);
+  const { data: apiData } = useListings();
+  const usingMock = !apiData?.items;
+  const apiListings = apiData?.items?.map((l) => ({
+    id: l.id,
+    title: l.title,
+    sportType: l.sportType || '',
+    category: l.category || '',
+    condition: l.condition || 'good',
+    price: l.price,
+    status: l.status,
+    viewCount: l.viewCount ?? 0,
+    likeCount: l.likeCount ?? 0,
+    createdAt: '',
+    imageUrl: l.imageUrls?.[0] || null,
+  }));
+  const [localListings, setLocalListings] = useState(mockMyListings);
+  const listings = apiListings ?? localListings;
+  const setListings = setLocalListings;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
 
@@ -121,6 +139,13 @@ export default function MyListingsPage() {
         <h2 className="text-[24px] font-bold text-gray-900">내 장터 매물</h2>
         <p className="text-[14px] text-gray-400 mt-1">등록한 매물을 관리하세요</p>
       </div>
+
+      {usingMock && (
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+          <Info size={16} className="text-amber-500 shrink-0" />
+          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {listings.length === 0 ? (

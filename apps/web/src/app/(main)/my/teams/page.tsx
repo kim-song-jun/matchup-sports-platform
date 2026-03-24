@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog, Star, Trophy } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog, Star, Trophy, Info } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { useTeams } from '@/hooks/use-api';
 
 const mockMyTeams = [
   {
@@ -46,7 +47,24 @@ export default function MyTeamsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const [teams, setTeams] = useState(mockMyTeams);
+  const { data: apiData } = useTeams();
+  const usingMock = !apiData?.items;
+  const apiTeams = apiData?.items?.map((t) => ({
+    id: t.id,
+    name: t.name,
+    sportType: t.sportType,
+    description: t.description || '',
+    memberCount: t.memberCount,
+    maxMembers: 15,
+    region: [t.city, t.district].filter(Boolean).join(' ') || '',
+    level: t.level,
+    mannerScore: t.mannerScore ?? 0,
+    matchCount: 0,
+    winCount: 0,
+  }));
+  const [localTeams, setLocalTeams] = useState(mockMyTeams);
+  const teams = apiTeams ?? localTeams;
+  const setTeams = setLocalTeams;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   if (!isAuthenticated) {
@@ -81,6 +99,13 @@ export default function MyTeamsPage() {
         <h2 className="text-[24px] font-bold text-gray-900">내 팀</h2>
         <p className="text-[14px] text-gray-400 mt-1">내가 운영하는 팀을 관리하세요</p>
       </div>
+
+      {usingMock && (
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+          <Info size={16} className="text-amber-500 shrink-0" />
+          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {teams.length === 0 ? (

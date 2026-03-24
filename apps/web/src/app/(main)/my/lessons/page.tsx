@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star, Info } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { useLessons } from '@/hooks/use-api';
 
 const mockMyLessons = [
   {
@@ -49,7 +50,24 @@ export default function MyLessonsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const [lessons, setLessons] = useState(mockMyLessons);
+  const { data: apiData } = useLessons();
+  const usingMock = !apiData?.items;
+  const apiLessons = apiData?.items?.map((l) => ({
+    id: l.id,
+    title: l.title,
+    sportType: l.sportType,
+    schedule: `${l.lessonDate} ${l.startTime}~${l.endTime}`,
+    venue: l.venueName || '',
+    price: l.fee,
+    maxStudents: l.maxParticipants,
+    currentStudents: l.currentParticipants,
+    status: l.status === 'active' ? 'active' : l.status,
+    rating: 0,
+    reviewCount: 0,
+  }));
+  const [localLessons, setLocalLessons] = useState(mockMyLessons);
+  const lessons = apiLessons ?? localLessons;
+  const setLessons = setLocalLessons;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   if (!isAuthenticated) {
@@ -84,6 +102,13 @@ export default function MyLessonsPage() {
         <h2 className="text-[24px] font-bold text-gray-900">내가 등록한 강좌</h2>
         <p className="text-[14px] text-gray-400 mt-1">등록한 강좌를 관리하세요</p>
       </div>
+
+      {usingMock && (
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+          <Info size={16} className="text-amber-500 shrink-0" />
+          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {lessons.map((lesson) => (

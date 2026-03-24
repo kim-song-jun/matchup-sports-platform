@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Info } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { useTeamMatches } from '@/hooks/use-api';
 
 const mockTeamMatches = [
   {
@@ -50,7 +51,23 @@ export default function MyTeamMatchesPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const [posts, setPosts] = useState(mockTeamMatches);
+  const { data: apiData } = useTeamMatches();
+  const usingMock = !apiData?.items;
+  const apiPosts = apiData?.items?.map((tm) => ({
+    id: tm.id,
+    title: tm.title,
+    sportType: tm.sportType,
+    matchDate: tm.matchDate,
+    startTime: tm.startTime,
+    endTime: tm.endTime,
+    venue: tm.venueName || '',
+    teamName: tm.hostTeam?.name || '',
+    status: tm.status,
+    applicants: tm.applicationCount ?? 0,
+  }));
+  const [localPosts, setLocalPosts] = useState(mockTeamMatches);
+  const posts = apiPosts ?? localPosts;
+  const setPosts = setLocalPosts;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   if (!isAuthenticated) {
@@ -94,6 +111,13 @@ export default function MyTeamMatchesPage() {
           모집글 작성
         </Link>
       </div>
+
+      {usingMock && (
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+          <Info size={16} className="text-amber-500 shrink-0" />
+          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {posts.map((post) => {

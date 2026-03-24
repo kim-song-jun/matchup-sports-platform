@@ -15,11 +15,14 @@ const sportFilters = [
   { key: 'basketball', label: '농구' },
   { key: 'badminton', label: '배드민턴' },
   { key: 'ice_hockey', label: '아이스하키' },
+  { key: 'swimming', label: '수영' },
+  { key: 'tennis', label: '테니스' },
 ];
 
 const sportLabel: Record<string, string> = {
   soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
   ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
+  swimming: '수영', tennis: '테니스', baseball: '야구', volleyball: '배구',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 

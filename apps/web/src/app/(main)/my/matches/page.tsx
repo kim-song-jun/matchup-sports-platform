@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Clock, Users, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Clock, Users, Pencil, Trash2, AlertTriangle, Info } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { useMyMatches } from '@/hooks/use-api';
 
 const mockMyMatches = [
   {
@@ -70,7 +71,24 @@ export default function MyMatchesPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const [matches, setMatches] = useState(mockMyMatches);
+  const { data: apiData } = useMyMatches();
+  const usingMock = !apiData?.items;
+  const apiMatches = apiData?.items?.map((m) => ({
+    id: m.id,
+    title: m.title,
+    sportType: m.sportType,
+    matchDate: m.matchDate,
+    startTime: m.startTime,
+    endTime: m.endTime,
+    venue: m.venue?.name || '',
+    currentPlayers: m.currentPlayers,
+    maxPlayers: m.maxPlayers,
+    fee: m.fee,
+    status: m.status,
+  }));
+  const [localMatches, setLocalMatches] = useState(mockMyMatches);
+  const matches = apiMatches ?? localMatches;
+  const setMatches = setLocalMatches;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   if (!isAuthenticated) {
@@ -105,6 +123,13 @@ export default function MyMatchesPage() {
         <h2 className="text-[24px] font-bold text-gray-900">내가 만든 매치</h2>
         <p className="text-[14px] text-gray-400 mt-1">내가 생성한 매치를 관리하세요</p>
       </div>
+
+      {usingMock && (
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+          <Info size={16} className="text-amber-500 shrink-0" />
+          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {matches.length === 0 ? (

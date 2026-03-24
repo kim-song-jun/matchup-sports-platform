@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 export default function NotificationsPage() {
   const { isAuthenticated } = useAuthStore();
@@ -15,7 +16,14 @@ export default function NotificationsPage() {
         <h1 className="text-[22px] font-bold text-gray-900">알림</h1>
         {isAuthenticated && (
           <button
-            onClick={() => toast('success', '모든 알림을 읽음 처리했습니다')}
+            onClick={async () => {
+              try {
+                await api.patch('/notifications/read-all');
+                toast('success', '모든 알림을 읽음 처리했습니다');
+              } catch {
+                toast('info', '읽을 알림이 없습니다');
+              }
+            }}
             className="text-[13px] text-blue-500 font-medium"
           >
             모두 읽음

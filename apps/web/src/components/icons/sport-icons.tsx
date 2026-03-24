@@ -90,6 +90,59 @@ export function SoccerIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
+export function SwimmingIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="18" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M3 16C5 14 7 14 9 16C11 18 13 18 15 16C17 14 19 14 21 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M3 20C5 18 7 18 9 20C11 22 13 22 15 20C17 18 19 18 21 20" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M6 14L14 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M10 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function TennisIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5 5C8 8 8 14 5 19" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M17 3C14 6 14 16 17 21" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M3 11H19" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+export function BaseballIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5 5C7 8 7 16 5 19" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M19 5C17 8 17 16 19 19" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M6.5 6.5L7.5 7.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M5.5 9L6.5 10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M5.5 15L6.5 14" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M6.5 17.5L7.5 16.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M17.5 6.5L16.5 7.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M18.5 9L17.5 10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M18.5 15L17.5 14" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+      <path d="M17.5 17.5L16.5 16.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function VolleyballIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 2C12 8 16 12 22 12" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M12 2C12 8 8 12 2 12" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 12C8 12 12 16 12 22" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M22 12C16 12 12 16 12 22" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
 export const SportIconMap: Record<string, React.FC<IconProps>> = {
   soccer: SoccerIcon,
   futsal: FutsalIcon,
@@ -98,4 +151,8 @@ export const SportIconMap: Record<string, React.FC<IconProps>> = {
   ice_hockey: IceHockeyIcon,
   figure_skating: FigureSkatingIcon,
   short_track: ShortTrackIcon,
+  swimming: SwimmingIcon,
+  tennis: TennisIcon,
+  baseball: BaseballIcon,
+  volleyball: VolleyballIcon,
 };

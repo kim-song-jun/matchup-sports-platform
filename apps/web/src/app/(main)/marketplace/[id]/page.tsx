@@ -10,7 +10,11 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import { useListing } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 
-const sportLabel: Record<string, string> = { futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키' };
+const sportLabel: Record<string, string> = {
+  soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
+  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
+  swimming: '수영', tennis: '테니스', baseball: '야구', volleyball: '배구',
+};
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
 const conditionColor: Record<string, string> = {
   new: 'bg-blue-50 text-blue-600', like_new: 'bg-blue-50 text-blue-600',
@@ -72,7 +76,12 @@ export default function ListingDetailPage() {
             <Share2 size={18} className="text-gray-500" />
           </button>
           <button
-            onClick={() => setLiked(!liked)}
+            onClick={async () => {
+              setLiked(!liked);
+              try {
+                await api.post(`/marketplace/listings/${listingId}/like`);
+              } catch { /* silent fail for now */ }
+            }}
             className="rounded-lg p-1.5"
           >
             <Heart size={18} className={liked ? 'text-red-500' : 'text-gray-500'} fill={liked ? 'currentColor' : 'none'} />

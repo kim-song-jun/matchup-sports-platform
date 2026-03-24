@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 import { ChevronRight, Star, Trophy, Calendar, MapPin, Shield, AlertTriangle, Ban, User } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useUserProfile } from '@/hooks/use-api';
@@ -166,14 +167,28 @@ export default function AdminUserDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-4">관리 액션</h3>
             <div className="space-y-2">
-              <button onClick={() => toast('success', '사용자에게 경고가 발송되었습니다')} className="w-full flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left hover:bg-amber-100 transition-colors">
+              <button onClick={async () => {
+                try {
+                  await api.post(`/admin/users/${userId}/warn`);
+                  toast('success', '사용자에게 경고가 발송되었습니다');
+                } catch {
+                  toast('info', 'API 연동 준비 중입니다');
+                }
+              }} className="w-full flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left hover:bg-amber-100 transition-colors">
                 <AlertTriangle size={18} className="text-amber-500 shrink-0" />
                 <div>
                   <p className="text-[14px] font-medium text-amber-700">경고 부여</p>
                   <p className="text-[11px] text-amber-500">사용자에게 경고를 발송합니다</p>
                 </div>
               </button>
-              <button onClick={() => toast('success', '사용자의 계정이 정지되었습니다')} className="w-full flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left hover:bg-red-100 transition-colors">
+              <button onClick={async () => {
+                try {
+                  await api.patch(`/admin/users/${userId}`, { status: 'suspended' });
+                  toast('success', '사용자의 계정이 정지되었습니다');
+                } catch {
+                  toast('info', 'API 연동 준비 중입니다');
+                }
+              }} className="w-full flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left hover:bg-red-100 transition-colors">
                 <Ban size={18} className="text-red-500 shrink-0" />
                 <div>
                   <p className="text-[14px] font-medium text-red-700">계정 정지</p>

@@ -9,10 +9,12 @@ import { useTeam, useTeamBadges } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo } from '@/lib/skill-grades';
+import { api } from '@/lib/api';
 
 const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
+  soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
   ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
+  swimming: '수영', tennis: '테니스', baseball: '야구', volleyball: '배구',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
@@ -339,7 +341,14 @@ export default function TeamDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-4">
             {isAuthenticated ? (
               <button
-                onClick={() => toast('success', '팀 참여 신청이 완료되었습니다')}
+                onClick={async () => {
+                  try {
+                    await api.post(`/teams/${teamId}/apply`);
+                    toast('success', '팀 참여 신청이 완료되었습니다');
+                  } catch {
+                    toast('error', '신청에 실패했습니다. 이미 신청했거나 권한이 없습니다.');
+                  }
+                }}
                 className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
               >
                 팀 참여 신청

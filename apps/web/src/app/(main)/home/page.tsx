@@ -16,11 +16,14 @@ const sports = [
   { type: 'ice_hockey', label: '하키', color: 'text-blue-500 bg-blue-50' },
   { type: 'figure_skating', label: '피겨', color: 'text-blue-500 bg-blue-50' },
   { type: 'short_track', label: '쇼트트랙', color: 'text-blue-500 bg-blue-50' },
+  { type: 'swimming', label: '수영', color: 'text-blue-500 bg-blue-50' },
+  { type: 'tennis', label: '테니스', color: 'text-blue-500 bg-blue-50' },
 ];
 
 const sportLabel: Record<string, string> = {
   soccer: '축구', futsal: '풋살', basketball: '농구', badminton: '배드민턴',
   ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
+  swimming: '수영', tennis: '테니스', baseball: '야구', volleyball: '배구',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 

@@ -1,21 +1,31 @@
 export const SportType = {
+  SOCCER: 'soccer',
   FUTSAL: 'futsal',
   BASKETBALL: 'basketball',
   BADMINTON: 'badminton',
   ICE_HOCKEY: 'ice_hockey',
   FIGURE_SKATING: 'figure_skating',
   SHORT_TRACK: 'short_track',
+  SWIMMING: 'swimming',
+  TENNIS: 'tennis',
+  BASEBALL: 'baseball',
+  VOLLEYBALL: 'volleyball',
 } as const;
 
 export type SportType = (typeof SportType)[keyof typeof SportType];
 
 export const SportLabel: Record<SportType, string> = {
+  soccer: '축구',
   futsal: '풋살',
   basketball: '농구',
   badminton: '배드민턴',
   ice_hockey: '아이스하키',
   figure_skating: '피겨스케이팅',
   short_track: '쇼트트랙',
+  swimming: '수영',
+  tennis: '테니스',
+  baseball: '야구',
+  volleyball: '배구',
 };
 
 export const MatchStatus = {
@@ -60,11 +70,21 @@ export const VenueType = {
   BADMINTON_COURT: 'badminton_court',
   ICE_RINK: 'ice_rink',
   GYMNASIUM: 'gymnasium',
+  SOCCER_FIELD: 'soccer_field',
+  SWIMMING_POOL: 'swimming_pool',
+  TENNIS_COURT: 'tennis_court',
 } as const;
 
 export type VenueType = (typeof VenueType)[keyof typeof VenueType];
 
 export const Positions: Record<string, Record<string, string>> = {
+  soccer: {
+    GK: '골키퍼',
+    DF: '수비수',
+    MF: '미드필더',
+    FW: '공격수',
+    ALL: '올라운더',
+  },
   futsal: {
     GK: '골키퍼',
     DF: '수비수',
@@ -88,6 +108,23 @@ export const Positions: Record<string, Record<string, string>> = {
     ALL: '올라운더',
   },
   badminton: {
+    ALL: '올라운더',
+  },
+  swimming: {},
+  tennis: {},
+  baseball: {
+    P: '투수',
+    C: '포수',
+    IF: '내야수',
+    OF: '외야수',
+    ALL: '올라운더',
+  },
+  volleyball: {
+    S: '세터',
+    OH: '아웃사이드 히터',
+    MB: '미들 블로커',
+    OP: '아포짓 스파이커',
+    L: '리베로',
     ALL: '올라운더',
   },
 };

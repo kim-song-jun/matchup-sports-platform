@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { useTeams } from '@/hooks/use-api';
 
 const positionOptions = [
   { value: 'GK', label: '골키퍼 (GK)' },
@@ -57,6 +58,8 @@ const initialForm: FormData = {
 export default function NewMercenaryPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { data: teamData } = useTeams();
+  const teams = teamData?.items ?? mockTeams;
   const [form, setForm] = useState<FormData>(initialForm);
   const [submitted, setSubmitted] = useState(false);
 
@@ -127,7 +130,7 @@ export default function NewMercenaryPage() {
                 className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all bg-white"
               >
                 <option value="">팀을 선택하세요</option>
-                {mockTeams.map((t) => (
+                {teams.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>

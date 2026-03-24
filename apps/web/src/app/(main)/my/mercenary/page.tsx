@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Pencil, Trash2, AlertTriangle, UserCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Pencil, Trash2, AlertTriangle, UserCheck, Info } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { useMercenaryPosts } from '@/hooks/use-api';
 
 const mockMercenaryPosts = [
   {
@@ -47,7 +48,23 @@ export default function MyMercenaryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const [posts, setPosts] = useState(mockMercenaryPosts);
+  const { data: apiData } = useMercenaryPosts();
+  const usingMock = !apiData?.items;
+  const apiPosts = apiData?.items?.map((p) => ({
+    id: p.id,
+    title: p.description || '용병 모집',
+    sportType: p.sportType,
+    matchDate: p.matchDate,
+    startTime: '',
+    endTime: '',
+    venue: '',
+    fee: 0,
+    status: p.status,
+    applicants: 0,
+  }));
+  const [localPosts, setLocalPosts] = useState(mockMercenaryPosts);
+  const posts = apiPosts ?? localPosts;
+  const setPosts = setLocalPosts;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   if (!isAuthenticated) {
@@ -82,6 +99,13 @@ export default function MyMercenaryPage() {
         <h2 className="text-[24px] font-bold text-gray-900">내 용병 모집</h2>
         <p className="text-[14px] text-gray-400 mt-1">용병 모집글을 관리하세요</p>
       </div>
+
+      {usingMock && (
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+          <Info size={16} className="text-amber-500 shrink-0" />
+          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {posts.map((post) => (

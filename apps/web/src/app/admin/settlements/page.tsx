@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 import {
   Wallet,
   TrendingUp,
@@ -60,6 +61,23 @@ export default function AdminSettlementsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('pending');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleProcessSettlements = useCallback(async () => {
+    if (selectedRows.length === 0 || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      for (const id of selectedRows) {
+        await api.patch(`/admin/settlements/${id}/process`, { action: 'process' });
+      }
+      toast('success', `${selectedRows.length}건의 정산이 처리되었습니다`);
+      setSelectedRows([]);
+    } catch {
+      toast('error', '정산 처리에 실패했습니다');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [selectedRows, isProcessing, toast]);
 
   const filtered = mockSettlements.filter((s) => {
     if (activeTab === 'pending') return s.status === 'pending';
@@ -137,7 +155,7 @@ export default function AdminSettlementsPage() {
         <div className="flex items-center gap-3 mb-4 rounded-2xl bg-blue-50 border border-blue-100 px-5 py-3">
           <CheckCircle size={18} className="text-blue-500" />
           <span className="text-[14px] font-medium text-blue-700">{selectedRows.length}건 선택됨</span>
-          <button onClick={() => { toast('success', '선택된 항목의 정산이 처리되었습니다'); setSelectedRows([]); }} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-600 transition-colors">
+          <button onClick={handleProcessSettlements} disabled={isProcessing} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
             <Wallet size={16} />
             정산 처리
           </button>

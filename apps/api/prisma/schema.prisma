@@ -10,12 +10,17 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────
 
 enum SportType {
+  soccer
   futsal
   basketball
   badminton
   ice_hockey
   figure_skating
   short_track
+  swimming
+  tennis
+  baseball
+  volleyball
 }
 
 enum VenueType {
@@ -24,6 +29,9 @@ enum VenueType {
   badminton_court
   ice_rink
   gymnasium
+  soccer_field
+  swimming_pool
+  tennis_court
 }
 
 enum MatchStatus {
@@ -164,6 +172,7 @@ model User {
   receivedMarketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewTarget")
   hostedLessons       Lesson[]             @relation("LessonHost")
   ownedTeams          SportTeam[]          @relation("TeamOwner")
+  favorites           Favorite[]
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -752,4 +761,20 @@ model Badge {
 
   @@index([teamId])
   @@map("badges")
+}
+
+// ─── Favorites ──────────────────────────────────────────
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  targetType String   @map("target_type") // match, team, venue, listing
+  targetId   String   @map("target_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId])
+  @@map("favorites")
 }

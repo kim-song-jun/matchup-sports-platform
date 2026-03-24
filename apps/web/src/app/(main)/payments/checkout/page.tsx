@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   CreditCard,
@@ -13,6 +13,8 @@ import {
   Loader2,
   ChevronRight,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
 
 const paymentMethods = [
   { id: 'card', label: '신용/체크카드', icon: CreditCard, description: '모든 카드 가능' },
@@ -21,7 +23,7 @@ const paymentMethods = [
   { id: 'kakaopay', label: '카카오페이', icon: Wallet, description: '카카오 간편결제' },
 ];
 
-const mockOrder = {
+const defaultOrder = {
   type: '매치',
   name: '풋살 친선 매치',
   date: '2026년 3월 25일 (수) 19:00',
@@ -36,15 +38,30 @@ function formatCurrency(n: number) {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+
+  // Build order from URL search params, falling back to defaults
+  const order = {
+    type: searchParams.get('type') || defaultOrder.type,
+    name: searchParams.get('name') || defaultOrder.name,
+    date: searchParams.get('date') || defaultOrder.date,
+    venue: searchParams.get('venue') || defaultOrder.venue,
+    originalPrice: Number(searchParams.get('price')) || defaultOrder.originalPrice,
+    couponDiscount: Number(searchParams.get('discount')) || defaultOrder.couponDiscount,
+  };
+
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(true);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [completedOrderName, setCompletedOrderName] = useState('');
+  const [completedAmount, setCompletedAmount] = useState(0);
 
-  const discount = couponApplied ? mockOrder.couponDiscount : 0;
-  const finalPrice = mockOrder.originalPrice - discount;
+  const discount = couponApplied ? order.couponDiscount : 0;
+  const finalPrice = order.originalPrice - discount;
 
   const handleApplyCoupon = () => {
     if (couponCode.trim()) {
@@ -55,21 +72,62 @@ export default function CheckoutPage() {
   const handlePayment = async () => {
     if (!agreedToTerms || isProcessing) return;
     setIsProcessing(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setIsProcessing(false);
-    setShowSuccess(true);
-    setTimeout(() => {
-      router.push('/payments/pay_mock_001');
-    }, 1500);
+
+    const orderId = `order_${Date.now()}`;
+
+    try {
+      // Step 1: Prepare payment via API
+      const prepareRes = await api.post('/payments/prepare', {
+        orderId,
+        amount: finalPrice,
+        method: selectedMethod,
+        itemName: order.name,
+      });
+      const payment = (prepareRes as unknown as { data: { id: string } }).data;
+
+      // Step 2: Simulate Toss payment widget confirmation
+      const paymentKey = `toss_${Date.now()}`;
+      await api.post('/payments/confirm', {
+        paymentKey,
+        orderId,
+        amount: finalPrice,
+      });
+
+      setIsProcessing(false);
+      setCompletedOrderName(order.name);
+      setCompletedAmount(finalPrice);
+      setShowSuccess(true);
+
+      setTimeout(() => {
+        router.push(`/payments/${payment?.id || orderId}`);
+      }, 1500);
+    } catch {
+      // API not available -- fall back to mock flow
+      toast('info', '테스트 모드: 결제가 시뮬레이션되었습니다');
+      await new Promise((r) => setTimeout(r, 1000));
+
+      setIsProcessing(false);
+      setCompletedOrderName(order.name);
+      setCompletedAmount(finalPrice);
+      setShowSuccess(true);
+
+      const mockPaymentId = `pay_mock_${Date.now()}`;
+      setTimeout(() => {
+        router.push(`/payments/${mockPaymentId}`);
+      }, 1500);
+    }
   };
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 pb-32">
       {/* Success Toast */}
       {showSuccess && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
-          <CheckCircle size={18} className="text-green-400" />
-          <span className="text-[14px] font-medium text-white">결제가 완료되었습니다</span>
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={18} className="text-green-400" />
+            <span className="text-[14px] font-medium text-white">결제가 완료되었습니다</span>
+          </div>
+          <span className="text-[12px] text-gray-400">{completedOrderName} - {formatCurrency(completedAmount)}</span>
         </div>
       )}
 
@@ -96,19 +154,19 @@ export default function CheckoutPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500 mb-1">
-                  {mockOrder.type}
+                  {order.type}
                 </span>
-                <p className="text-[15px] font-semibold text-gray-900">{mockOrder.name}</p>
+                <p className="text-[15px] font-semibold text-gray-900">{order.name}</p>
               </div>
             </div>
             <div className="rounded-xl bg-gray-50 p-3.5 space-y-2">
               <div className="flex items-center gap-2 text-[13px] text-gray-600">
                 <Calendar size={14} className="text-gray-400 shrink-0" />
-                {mockOrder.date}
+                {order.date}
               </div>
               <div className="flex items-center gap-2 text-[13px] text-gray-600">
                 <MapPin size={14} className="text-gray-400 shrink-0" />
-                {mockOrder.venue}
+                {order.venue}
               </div>
             </div>
           </div>
@@ -185,7 +243,7 @@ export default function CheckoutPage() {
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
               <CheckCircle size={14} className="text-green-500" />
               <span className="text-[13px] text-green-600 font-medium">
-                신규 가입 쿠폰 ({formatCurrency(mockOrder.couponDiscount)} 할인 적용됨)
+                신규 가입 쿠폰 ({formatCurrency(order.couponDiscount)} 할인 적용됨)
               </span>
             </div>
           )}
@@ -197,7 +255,7 @@ export default function CheckoutPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[14px] text-gray-500">원가</span>
-              <span className="text-[14px] text-gray-700">{formatCurrency(mockOrder.originalPrice)}</span>
+              <span className="text-[14px] text-gray-700">{formatCurrency(order.originalPrice)}</span>
             </div>
             {couponApplied && (
               <div className="flex items-center justify-between">

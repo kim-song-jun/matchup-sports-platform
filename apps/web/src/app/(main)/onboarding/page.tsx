@@ -74,70 +74,72 @@ export default function OnboardingPage() {
   const isLast = step === slides.length - 1;
 
   return (
-    <div className="flex flex-col items-center justify-between min-h-dvh bg-white px-6 py-10 select-none">
-      {/* Skip */}
-      <div className="w-full flex justify-end">
-        <button
-          onClick={finish}
-          className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          건너뛰기
-        </button>
-      </div>
-
-      {/* Slide content */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full max-w-sm">
-        <div
-          key={step}
-          className={`flex flex-col items-center gap-6 transition-all duration-250 ease-out ${
-            isAnimating
-              ? direction === 'left'
-                ? 'opacity-0 -translate-x-8'
-                : 'opacity-0 translate-x-8'
-              : 'opacity-100 translate-x-0 animate-fade-in-up'
-          }`}
-        >
-          {/* Icon */}
-          <div className="w-28 h-28 rounded-full bg-blue-50 flex items-center justify-center">
-            <Icon className="w-14 h-14 text-blue-500" strokeWidth={1.5} />
-          </div>
-
-          {/* Title */}
-          <h1 className="text-2xl font-bold text-gray-900">{slide.title}</h1>
-
-          {/* Descriptions */}
-          <div className="text-center space-y-1">
-            <p className="text-base text-gray-600">{slide.desc1}</p>
-            <p className="text-sm text-gray-400">{slide.desc2}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom controls */}
-      <div className="w-full max-w-sm space-y-6">
-        {/* Dots */}
-        <div className="flex justify-center gap-2">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              aria-label={`슬라이드 ${i + 1}`}
-              className={`rounded-full transition-all duration-300 ${
-                i === step
-                  ? 'w-6 h-2.5 bg-blue-500'
-                  : 'w-2.5 h-2.5 bg-gray-200 hover:bg-gray-300'
-              }`}
-            />
-          ))}
+    <div className="fixed inset-0 z-[60] bg-white dark:bg-gray-900 flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-between w-full h-full max-w-sm mx-auto px-6 py-10 select-none">
+        {/* Skip */}
+        <div className="w-full flex justify-end">
+          <button
+            onClick={finish}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            건너뛰기
+          </button>
         </div>
 
-        {/* CTA button */}
-        <button
-          onClick={goNext}
-          className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-semibold text-base hover:bg-blue-600 active:scale-[0.98] transition-all"
-        >
-          {isLast ? '시작하기' : '다음'}
-        </button>
+        {/* Slide content */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full">
+          <div
+            key={step}
+            className={`flex flex-col items-center gap-6 transition-all duration-250 ease-out ${
+              isAnimating
+                ? direction === 'left'
+                  ? 'opacity-0 -translate-x-8'
+                  : 'opacity-0 translate-x-8'
+                : 'opacity-100 translate-x-0 animate-fade-in-up'
+            }`}
+          >
+            {/* Icon */}
+            <div className="w-28 h-28 rounded-full bg-blue-50 flex items-center justify-center">
+              <Icon className="w-14 h-14 text-blue-500" strokeWidth={1.5} />
+            </div>
+
+            {/* Title */}
+            <h1 className="text-2xl font-bold text-gray-900">{slide.title}</h1>
+
+            {/* Descriptions */}
+            <div className="text-center space-y-1">
+              <p className="text-base text-gray-600">{slide.desc1}</p>
+              <p className="text-sm text-gray-400">{slide.desc2}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom controls */}
+        <div className="w-full space-y-6">
+          {/* Dots */}
+          <div className="flex justify-center gap-2">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => goTo(i)}
+                aria-label={`슬라이드 ${i + 1}`}
+                className={`rounded-full transition-all duration-300 ${
+                  i === step
+                    ? 'w-6 h-2.5 bg-blue-500'
+                    : 'w-2.5 h-2.5 bg-gray-200 hover:bg-gray-300'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* CTA button */}
+          <button
+            onClick={goNext}
+            className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-semibold text-base hover:bg-blue-600 active:scale-[0.98] transition-all"
+          >
+            {isLast ? '시작하기' : '다음'}
+          </button>
+        </div>
       </div>
     </div>
   );

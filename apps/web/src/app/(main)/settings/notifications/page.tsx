@@ -46,7 +46,7 @@ export default function NotificationsPage() {
         <span className="text-gray-900 font-medium">알림 설정</span>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-6">
+      <div className="px-5 lg:px-0 max-w-2xl lg:max-w-[600px] py-6 space-y-6">
         {/* 마스터 토글 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
           <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">알림 수신</h3>

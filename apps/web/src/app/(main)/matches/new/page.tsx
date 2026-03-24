@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronRight, Check } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowLeft, ChevronRight, Check, Plus } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
@@ -62,9 +63,17 @@ export default function CreateMatchPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-[15px] font-medium text-gray-700">로그인 후 매치를 만들 수 있어요</p>
-        <button onClick={() => router.push('/login')} className="mt-4 rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-semibold text-white">로그인</button>
+      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+        <div className="max-w-[500px] mx-auto mt-20 text-center">
+          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-blue-50 text-blue-500 mb-4">
+            <Plus size={28} />
+          </div>
+          <h2 className="text-[22px] font-bold text-gray-900">매치를 만들어보세요</h2>
+          <p className="text-[14px] text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">
+            로그인하고 시작하기
+          </Link>
+        </div>
       </div>
     );
   }

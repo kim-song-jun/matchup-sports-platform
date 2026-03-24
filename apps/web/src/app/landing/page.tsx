@@ -176,7 +176,7 @@ export default function LandingPage() {
             </div>
 
             {/* Main heading */}
-            <h1 className="text-[32px] lg:text-[48px] font-black text-white leading-[1.2] tracking-tight mb-5">
+            <h1 className="text-[28px] sm:text-[32px] lg:text-[48px] font-black text-white leading-[1.2] tracking-tight mb-5">
               내 수준에 딱 맞는{' '}
               <br className="hidden sm:block" />
               운동 메이트,{' '}

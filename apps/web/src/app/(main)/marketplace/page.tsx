@@ -58,7 +58,7 @@ export default function MarketplacePage() {
       </header>
 
       {/* 검색 바 */}
-      <div className="px-5 lg:px-0 mb-3">
+      <div className="px-5 lg:px-0 mb-2">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
@@ -103,15 +103,15 @@ export default function MarketplacePage() {
             <p className="text-[13px] text-gray-400 mt-1">첫 번째 판매자가 되어보세요!</p>
           </div>
         ) : (
-          <div className="space-y-3 stagger-children">
+          <div className="space-y-2 stagger-children">
             {listings.map((item: MarketplaceListing) => {
               const SportIcon = SportIconMap[item.sportType];
               return (
                 <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 active:scale-[0.98] hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
-                    <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
-                      {SportIcon ? <SportIcon size={24} /> : <ShoppingBag size={24} />}
+                    <div className="flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-300">
+                      {SportIcon ? <SportIcon size={20} /> : <ShoppingBag size={20} />}
                     </div>
 
                     {/* Content */}

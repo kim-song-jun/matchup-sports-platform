@@ -89,7 +89,7 @@ export default function HomePage() {
 
       {/* 종목 선택 — tight horizontal scroll */}
       <section className="mt-2 px-5 lg:px-0">
-        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1 lg:justify-center">
           {(() => {
             const sportCounts: Record<string, number> = {};
             matches.forEach((m: Match) => { sportCounts[m.sportType] = (sportCounts[m.sportType] || 0) + 1; });
@@ -138,7 +138,7 @@ export default function HomePage() {
       {todayMatches.length > 0 ? (
           <section className="mt-6 px-5 lg:px-0">
             <h2 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2.5 flex items-center gap-1.5">
-              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-red-50 text-[10px]">🔥</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gray-100 text-[10px] text-gray-500">🔥</span>
               오늘·내일 매치
             </h2>
             <div className="space-y-2">
@@ -265,7 +265,7 @@ function MatchCard({ match }: { match: Match }) {
           <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                isAlmostFull ? 'bg-red-500' : 'bg-blue-500'
+                isAlmostFull ? 'bg-red-400' : 'bg-blue-500'
               }`}
               style={{ width: `${filledPercent}%` }}
             />

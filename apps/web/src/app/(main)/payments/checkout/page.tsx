@@ -133,7 +133,7 @@ export default function CheckoutPage() {
 
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">결제하기</h1>
@@ -146,7 +146,7 @@ export default function CheckoutPage() {
       <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
         {/* Order Summary Card */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">주문 정보</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">주문 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
@@ -174,7 +174,7 @@ export default function CheckoutPage() {
 
         {/* Payment Method */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">결제 수단</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 수단</h3>
           <div className="space-y-2">
             {paymentMethods.map((method) => {
               const Icon = method.icon;
@@ -223,7 +223,7 @@ export default function CheckoutPage() {
 
         {/* Coupon */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">쿠폰</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">쿠폰</h3>
           <div className="flex gap-2">
             <input
               type="text"
@@ -251,7 +251,7 @@ export default function CheckoutPage() {
 
         {/* Price Breakdown */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">결제 금액</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[14px] text-gray-500">원가</span>

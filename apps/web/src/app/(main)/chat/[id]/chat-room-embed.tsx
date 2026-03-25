@@ -407,7 +407,7 @@ export default function ChatRoomEmbed({
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 mx-4 animate-fade-in">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-4">신고하기</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 mb-3">신고하기</h3>
             <div className="space-y-2 mb-4">
               {['욕설/비매너', '허위정보', '스팸', '기타'].map((reason) => (
                 <label

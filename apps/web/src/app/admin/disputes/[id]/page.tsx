@@ -313,7 +313,7 @@ export default function AdminDisputeDetailPage() {
 
           {/* Timeline */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">타임라인</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">타임라인</h3>
             <div className="space-y-0">
               {dispute.timeline.map((event: TimelineEvent, idx: number) => (
                 <div key={event.id} className="flex gap-3">
@@ -354,7 +354,7 @@ export default function AdminDisputeDetailPage() {
 
           {/* Admin actions */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5 sticky top-6">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">처리 액션</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">처리 액션</h3>
             <div className="space-y-2">
               <button
                 onClick={() => setShowResolveModal(true)}

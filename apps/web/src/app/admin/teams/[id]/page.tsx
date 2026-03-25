@@ -260,7 +260,7 @@ export default function AdminTeamDetailPage() {
         <div className="space-y-4">
           {/* Owner info */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">운영자 정보</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">운영자 정보</h3>
             <div className="flex items-center gap-3 mb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-[14px] font-bold text-blue-500">
                 {team.owner.nickname.charAt(0)}
@@ -287,7 +287,7 @@ export default function AdminTeamDetailPage() {
 
           {/* Admin actions */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">관리 액션</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">관리 액션</h3>
             <div className="space-y-2">
               <button
                 onClick={() => { setEditing(!editing); }}

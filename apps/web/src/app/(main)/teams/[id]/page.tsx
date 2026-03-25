@@ -86,7 +86,7 @@ export default function TeamDetailPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1 ml-3">{team.name}</h1>
         <button
           onClick={async () => {
@@ -186,7 +186,7 @@ export default function TeamDetailPage() {
 
           {/* 신뢰도 점수 */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-4">신뢰도</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 mb-3">신뢰도</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <TrustItem
                 icon={<CheckCircle size={16} />}
@@ -275,7 +275,7 @@ export default function TeamDetailPage() {
 
           {/* 활동 정보 */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-4">활동 정보</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 mb-3">활동 정보</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <InfoItem icon={<MapPin size={16} />} label="활동 지역" value={`${team.city || ''} ${team.district || ''}`} />
               <InfoItem icon={<Calendar size={16} />} label="정기 활동" value="매주 토요일" />
@@ -287,7 +287,7 @@ export default function TeamDetailPage() {
           {/* SNS & 링크 */}
           {hasSns && (
             <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-4">SNS & 링크</h3>
+              <h3 className="text-[16px] font-bold text-gray-900 mb-3">SNS & 링크</h3>
               <div className="grid grid-cols-2 gap-2">
                 {team.instagramUrl && (
                   <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gray-800 text-white" />
@@ -308,7 +308,7 @@ export default function TeamDetailPage() {
           {/* 홍보 영상 */}
           {team.shortsUrl && (
             <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-4">홍보 영상</h3>
+              <h3 className="text-[16px] font-bold text-gray-900 mb-3">홍보 영상</h3>
               <a href={team.shortsUrl} target="_blank" rel="noopener noreferrer"
                 className="block rounded-xl bg-gray-900 h-48 lg:h-64 flex items-center justify-center text-white/60 hover:text-white/80 transition-colors relative overflow-hidden">
                 <div className="text-center z-10">
@@ -323,7 +323,7 @@ export default function TeamDetailPage() {
 
           {/* 갤러리 placeholder */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-4">갤러리</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 mb-3">갤러리</h3>
             <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="aspect-square rounded-xl bg-gray-50 flex items-center justify-center text-gray-300">

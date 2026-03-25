@@ -142,7 +142,7 @@ export default function AdminUserDetailPage() {
         <div className="space-y-4">
           {/* Activity stats */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">활동 통계</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">활동 통계</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-[13px]">
                 <span className="text-gray-400">가입일</span>
@@ -165,7 +165,7 @@ export default function AdminUserDetailPage() {
 
           {/* Admin actions */}
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">관리 액션</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">관리 액션</h3>
             <div className="space-y-2">
               <button onClick={async () => {
                 try {

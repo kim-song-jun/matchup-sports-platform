@@ -57,7 +57,7 @@ export default function LessonDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1">{lesson.title}</h1>
       </header>
       <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
@@ -87,7 +87,7 @@ export default function LessonDetailPage() {
           {/* 코치 */}
           {lesson.coachName && (
             <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-4">코치 소개</h3>
+              <h3 className="text-[16px] font-bold text-gray-900 mb-3">코치 소개</h3>
               <div className="flex items-start gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500"><User size={28} /></div>
                 <div>
@@ -146,7 +146,7 @@ export default function LessonDetailPage() {
 
           {/* 강좌 사진 */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-4">강좌 사진</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="aspect-square rounded-xl bg-gray-50 flex items-center justify-center text-gray-300"><Image size={20} /></div>

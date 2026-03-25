@@ -49,7 +49,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-              <button aria-label="프로필 수정" onClick={() => setShowEditModal(true)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <button aria-label="프로필 수정" onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-400 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <Pencil size={16} />
               </button>
             </div>
@@ -180,7 +180,7 @@ export default function ProfilePage() {
           </div>
         </Link>
         {isAuthenticated && (
-          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-lg transition-colors">
+          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
             <LogOut size={20} className="text-gray-400" />
             <span className="text-[15px] font-medium text-gray-500">로그아웃</span>
           </button>

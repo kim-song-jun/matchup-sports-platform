@@ -35,7 +35,7 @@ export default function NotificationsPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="rounded-lg p-1.5 -ml-1.5 hover:bg-gray-100">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="rounded-xl p-1.5 -ml-1.5 hover:bg-gray-100">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">알림 설정</h1>
@@ -49,7 +49,7 @@ export default function NotificationsPage() {
       <div className="px-5 lg:px-0 max-w-2xl lg:max-w-[600px] py-6 space-y-6">
         {/* 마스터 토글 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">알림 수신</h3>
+          <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">알림 수신</h3>
           <div className="space-y-4">
             <ToggleRow
               label="Push 알림"
@@ -70,7 +70,7 @@ export default function NotificationsPage() {
 
         {/* 카테고리별 알림 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">카테고리별 알림</h3>
+          <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">카테고리별 알림</h3>
           {!pushMaster && (
             <div className="rounded-xl bg-yellow-50 px-4 py-3 mb-4">
               <p className="text-[13px] text-yellow-700">Push 알림이 꺼져 있으면 아래 설정과 관계없이 알림을 받지 않습니다.</p>

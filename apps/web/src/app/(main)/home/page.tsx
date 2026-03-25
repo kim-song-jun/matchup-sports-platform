@@ -72,7 +72,7 @@ export default function HomePage() {
             )}
           </div>
           {!isAuthenticated && (
-            <Link href="/login" className="rounded-lg bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white active:bg-gray-800 transition-colors">
+            <Link href="/login" className="rounded-xl bg-gray-900 px-4 py-2 text-[13px] font-semibold text-white active:bg-gray-800 transition-colors">
               로그인
             </Link>
           )}

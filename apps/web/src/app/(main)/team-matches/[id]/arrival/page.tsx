@@ -214,7 +214,7 @@ export default function ArrivalCheckPage() {
 
         {/* Opponent Status */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5 mb-4">
-          <h3 className="text-[15px] font-semibold text-gray-900 mb-4">상대팀 도착 확인</h3>
+          <h3 className="text-[15px] font-semibold text-gray-900 mb-3">상대팀 도착 확인</h3>
           <div className="space-y-2.5">
             {[
               { value: 'normal' as const, label: '정상도착', color: 'text-green-600' },
@@ -272,7 +272,7 @@ export default function ArrivalCheckPage() {
 
         {/* Timeline */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5 mb-8">
-          <h3 className="text-[15px] font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <h3 className="text-[15px] font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <Radio size={16} className="text-blue-500" />
             도착 현황
           </h3>

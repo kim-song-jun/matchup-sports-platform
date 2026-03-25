@@ -212,7 +212,7 @@ export default function AdminLessonDetailPage() {
         {/* Right column - Admin controls */}
         <div className="space-y-4">
           <div className="rounded-2xl bg-white border border-gray-100 p-5 sticky top-6">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-4">관리</h3>
+            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">관리</h3>
 
             {/* Status change */}
             <div className="mb-4">

@@ -100,7 +100,7 @@ export default function MyListingsPage() {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
         <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-lg bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
       </div>
     );
   }
@@ -130,7 +130,7 @@ export default function MyListingsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[22px] font-bold text-gray-900">내 장터 매물</h1>
@@ -152,7 +152,7 @@ export default function MyListingsPage() {
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
             <Package size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">등록한 매물이 없어요</p>
-            <Link href="/marketplace/new" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">매물 등록</Link>
+            <Link href="/marketplace/new" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">매물 등록</Link>
           </div>
         ) : (
           listings.map((listing) => {

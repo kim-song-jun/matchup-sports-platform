@@ -363,7 +363,7 @@ export default function CreateLessonPage() {
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
             <div className="rounded-2xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-4">강좌 정보 확인</h3>
+              <h3 className="text-[16px] font-bold text-gray-900 mb-3">강좌 정보 확인</h3>
               <div className="space-y-3">
                 <SummaryRow label="종목" value={selectedSport?.label || ''} />
                 <SummaryRow label="유형" value={selectedType?.label || ''} />

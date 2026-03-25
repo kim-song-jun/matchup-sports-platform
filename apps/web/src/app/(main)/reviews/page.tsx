@@ -25,7 +25,7 @@ export default function ReviewsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
       <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">내 평가</h1>
       </header>
       <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
@@ -38,7 +38,7 @@ export default function ReviewsPage() {
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
             <Star size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">로그인 후 확인할 수 있어요</p>
-            <Link href="/login" className="mt-4 inline-block rounded-lg bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+            <Link href="/login" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
           </div>
         ) : isLoading ? (
           <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />)}</div>

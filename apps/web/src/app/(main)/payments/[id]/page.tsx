@@ -112,7 +112,7 @@ export default function PaymentDetailPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 pb-8">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">결제 상세</h1>
@@ -140,7 +140,7 @@ export default function PaymentDetailPage() {
 
         {/* Amount */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">결제 금액</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[14px] text-gray-500">원가</span>
@@ -181,7 +181,7 @@ export default function PaymentDetailPage() {
 
         {/* Related Match/Lesson */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">연결된 일정</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">연결된 일정</h3>
           <div className="rounded-xl bg-gray-50 p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
@@ -226,7 +226,7 @@ export default function PaymentDetailPage() {
 
         {/* Timeline */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">결제 타임라인</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 타임라인</h3>
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100" />
             {timelineSteps.map((step, i) => (

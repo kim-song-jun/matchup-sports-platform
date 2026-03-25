@@ -202,7 +202,7 @@ export default function AdminVenueEditPage() {
         </div>
         <button
           onClick={() => setShowDeleteModal(true)}
-          className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600 hover:bg-red-100 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600 hover:bg-red-100 transition-colors"
         >
           <Trash2 size={14} />
           삭제

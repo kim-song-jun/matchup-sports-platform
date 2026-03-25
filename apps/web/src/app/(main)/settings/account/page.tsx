@@ -19,7 +19,7 @@ export default function AccountPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">개인정보 관리</h1>
@@ -129,7 +129,7 @@ export default function AccountPage() {
             <button
               aria-label="닫기"
               onClick={() => setShowDeleteModal(false)}
-              className="absolute top-4 right-4 rounded-lg p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <X size={20} className="text-gray-400" />
             </button>
@@ -211,7 +211,7 @@ function SocialAccount({ provider, name, email, connected }: { provider: string;
       {connected ? (
         <span className="rounded-lg bg-green-50 px-2.5 py-1 text-[12px] font-medium text-green-600">연결됨</span>
       ) : (
-        <button className="rounded-lg bg-gray-100 px-2.5 py-1 text-[12px] font-medium text-gray-500 hover:bg-gray-200 transition-colors">
+        <button className="rounded-xl bg-gray-100 px-2.5 py-1 text-[12px] font-medium text-gray-500 hover:bg-gray-200 transition-colors">
           연결하기
         </button>
       )}

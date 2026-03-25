@@ -82,7 +82,7 @@ export default function CreateMatchPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-lg -ml-1.5 hover:bg-gray-100 transition-colors">
+        <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">매치 만들기</h1>
@@ -108,7 +108,7 @@ export default function CreateMatchPage() {
         {/* Step 0: Sport */}
         {step === 0 && (
           <div className="animate-slide-up space-y-3">
-            <h3 className="text-[18px] font-bold text-gray-900 mb-4">어떤 종목인가요?</h3>
+            <h3 className="text-[18px] font-bold text-gray-900 mb-3">어떤 종목인가요?</h3>
             <div className="grid grid-cols-2 gap-3">
               {sports.map((s) => {
                 const Icon = SportIconMap[s.type];
@@ -133,7 +133,7 @@ export default function CreateMatchPage() {
         {/* Step 1: Match info */}
         {step === 1 && (
           <div className="animate-slide-up space-y-4">
-            <h3 className="text-[18px] font-bold text-gray-900 mb-4">매치 정보를 입력해주세요</h3>
+            <h3 className="text-[18px] font-bold text-gray-900 mb-3">매치 정보를 입력해주세요</h3>
             <Field label="매치 제목" required>
               <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="예: 주말 풋살 한판!" className="input-field" />
@@ -174,7 +174,7 @@ export default function CreateMatchPage() {
         {/* Step 2: Venue + Date */}
         {step === 2 && (
           <div className="animate-slide-up space-y-4">
-            <h3 className="text-[18px] font-bold text-gray-900 mb-4">장소와 시간을 선택해주세요</h3>
+            <h3 className="text-[18px] font-bold text-gray-900 mb-3">장소와 시간을 선택해주세요</h3>
             <Field label="시설 선택" required>
               {Array.isArray(venues) && venues.length > 0 ? (
                 <div className="space-y-2">
@@ -213,7 +213,7 @@ export default function CreateMatchPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="animate-slide-up space-y-4">
-            <h3 className="text-[18px] font-bold text-gray-900 mb-4">매치 정보를 확인해주세요</h3>
+            <h3 className="text-[18px] font-bold text-gray-900 mb-3">매치 정보를 확인해주세요</h3>
             <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-3">
               <ConfirmRow label="종목" value={sports.find(s => s.type === form.sportType)?.label || ''} />
               <ConfirmRow label="제목" value={form.title} />

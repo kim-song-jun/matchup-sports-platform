@@ -115,7 +115,7 @@ export default function TeamMatchDetailPage() {
 
       {/* Header */}
       <header className="px-5 lg:px-0 lg:pt-0 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="lg:hidden flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="lg:hidden flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-[18px] font-bold text-gray-900 truncate flex-1">{match.title}</h1>
@@ -130,7 +130,7 @@ export default function TeamMatchDetailPage() {
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
             <div className="rounded-2xl bg-white border border-gray-100 p-5">
-              <h2 className="text-[16px] font-bold text-gray-900 mb-4">경기 정보</h2>
+              <h2 className="text-[16px] font-bold text-gray-900 mb-3">경기 정보</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500 shrink-0">
@@ -197,7 +197,7 @@ export default function TeamMatchDetailPage() {
 
             {/* 경기 조건 */}
             <div className="rounded-2xl bg-white border border-gray-100 p-5">
-              <h2 className="text-[16px] font-bold text-gray-900 mb-4">경기 조건</h2>
+              <h2 className="text-[16px] font-bold text-gray-900 mb-3">경기 조건</h2>
 
               {/* 실력등급 배지 + 무료초청 태그 */}
               <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -380,7 +380,7 @@ export default function TeamMatchDetailPage() {
             {/* 신청 목록 (호스트만) */}
             {isHost && applications.length > 0 && (
               <div className="rounded-2xl bg-white border border-gray-100 p-5">
-                <h2 className="text-[16px] font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <h2 className="text-[16px] font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <Users size={16} className="text-blue-500" />
                   신청 목록
                   <span className="ml-auto text-[13px] font-normal text-gray-400">{applications.length}팀</span>
@@ -455,7 +455,7 @@ export default function TeamMatchDetailPage() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowApplyModal(false)} />
           <div className="relative w-full max-w-lg bg-white rounded-t-2xl lg:rounded-2xl p-6 pb-[calc(1.5rem+var(--safe-area-bottom))] animate-fade-in">
-            <h3 className="text-[18px] font-bold text-gray-900 mb-4">경기 신청</h3>
+            <h3 className="text-[18px] font-bold text-gray-900 mb-3">경기 신청</h3>
 
             <label className="flex items-start gap-3 rounded-xl bg-gray-50 p-4 mb-4 cursor-pointer">
               <input

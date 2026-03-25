@@ -103,7 +103,7 @@ export default function RefundRequestPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[16px] font-bold text-gray-900">환불 확인</h3>
-              <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-lg p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <X size={20} className="text-gray-400" />
               </button>
             </div>
@@ -151,7 +151,7 @@ export default function RefundRequestPage() {
 
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">환불 요청</h1>
@@ -166,7 +166,7 @@ export default function RefundRequestPage() {
       <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
         {/* Payment Summary */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">결제 정보</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 정보</h3>
           <div className="rounded-xl bg-gray-50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-gray-500">상품명</span>
@@ -243,7 +243,7 @@ export default function RefundRequestPage() {
 
         {/* Reason Selection */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">환불 사유</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3">환불 사유</h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {refundReasons.map((reason) => (
               <button

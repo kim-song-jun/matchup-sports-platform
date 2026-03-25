@@ -146,7 +146,7 @@ export default function AdminVenueNewPage() {
                     onClick={() => toggleSport(s.value)}
                     className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
                       selected
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-gray-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >

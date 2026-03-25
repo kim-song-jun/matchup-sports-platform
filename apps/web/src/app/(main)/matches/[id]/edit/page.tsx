@@ -127,7 +127,7 @@ export default function EditMatchPage() {
                 key={s.type}
                 onClick={() => setForm({ ...form, sportType: s.type })}
                 className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all ${
-                  form.sportType === s.type ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.sportType === s.type ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {s.label}
@@ -259,7 +259,7 @@ export default function EditMatchPage() {
                 key={g.value}
                 onClick={() => setForm({ ...form, gender: g.value })}
                 className={`rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all ${
-                  form.gender === g.value ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.gender === g.value ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {g.label}

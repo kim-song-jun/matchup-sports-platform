@@ -317,21 +317,32 @@ export function HeroParticles() {
       return;
     }
 
+    // Visibility tracking — pause when offscreen
+    let isVisible = true;
+    let frameCount = 0;
+    const visObserver = new IntersectionObserver(
+      ([entry]) => { isVisible = entry.isIntersecting; },
+      { threshold: 0 }
+    );
+    visObserver.observe(canvas);
+
     // Animation loop
     const animate = () => {
+      rafRef.current = requestAnimationFrame(animate);
+      if (!isVisible) return;
+
       ctx.clearRect(0, 0, w, h);
       const mx = mouseRef.current.x;
       const my = mouseRef.current.y;
+      frameCount++;
 
-      particlesRef.current.forEach((p, i) => {
+      particlesRef.current.forEach((p) => {
         if (!p.grabbed) {
-          // Spring back to origin (gentle)
           const dx = p.originX - p.x;
           const dy = p.originY - p.y;
           p.vx += dx * SPRING_STIFFNESS;
           p.vy += dy * SPRING_STIFFNESS;
 
-          // Hover repulsion (non-grabbed particles)
           if (grabbedRef.current === null) {
             const dmx = p.x - mx;
             const dmy = p.y - my;
@@ -343,61 +354,46 @@ export function HeroParticles() {
             }
           }
 
-          // Damping
           p.vx *= SPRING_DAMPING;
           p.vy *= SPRING_DAMPING;
-
-          // Move
           p.x += p.vx;
           p.y += p.vy;
 
-          // Soft wrap
           if (p.x < -p.size * 2) p.x = w + p.size;
           if (p.x > w + p.size * 2) p.x = -p.size;
           if (p.y < -p.size * 2) p.y = h + p.size;
           if (p.y > h + p.size * 2) p.y = -p.size;
 
-          // Update origin to drift slowly
-          p.originX += (Math.random() - 0.5) * 0.15;
-          p.originY += (Math.random() - 0.5) * 0.15;
-          if (p.originX < 0) p.originX = 0;
-          if (p.originX > w) p.originX = w;
-          if (p.originY < 0) p.originY = 0;
-          if (p.originY > h) p.originY = h;
+          // Slow drift — sine-based instead of Math.random() per frame
+          if (frameCount % 60 === 0) {
+            p.originX += Math.sin(frameCount * 0.01 + p.size) * 0.5;
+            p.originY += Math.cos(frameCount * 0.01 + p.size) * 0.5;
+            p.originX = Math.max(0, Math.min(w, p.originX));
+            p.originY = Math.max(0, Math.min(h, p.originY));
+          }
         }
 
-        // Rotation
         p.rotation += p.rotationSpeed * (p.grabbed ? 3 : 1);
-
-        // Smooth scale & alpha interpolation
         p.scale += (p.targetScale - p.scale) * 0.15;
         p.alpha += (p.targetAlpha - p.alpha) * 0.1;
 
-        // Draw
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
         ctx.scale(p.scale, p.scale);
         ctx.globalAlpha = p.alpha;
-
-        // Glow effect when grabbed
-        if (p.grabbed || p.scale > 1.05) {
-          ctx.shadowColor = 'rgba(255,255,255,0.3)';
-          ctx.shadowBlur = p.size * 0.8;
-        }
-
         BALL_TYPES[p.type](ctx, p.size);
         ctx.restore();
       });
 
       ctx.globalAlpha = 1;
-      rafRef.current = requestAnimationFrame(animate);
     };
 
     rafRef.current = requestAnimationFrame(animate);
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      visObserver.disconnect();
       window.removeEventListener('resize', resize);
       parent.removeEventListener('mousemove', onMouseMove);
       parent.removeEventListener('mousedown', onMouseDown);

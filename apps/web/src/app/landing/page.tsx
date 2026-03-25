@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Target, Shield, Users, Zap, ChevronDown, Star, ArrowRight, Quote, Sparkles } from 'lucide-react';
+import { Target, Shield, Users, Zap, ChevronDown, Star, ArrowRight, Sparkles } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { HeroParticles } from '@/components/landing/hero-particles';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
@@ -105,7 +105,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
 
       {/* ── Nav ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      <nav aria-label="메인 네비게이션" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
           ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-sm'
           : 'bg-transparent'
@@ -120,10 +120,10 @@ export default function LandingPage() {
             </span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login" className={`text-[14px] font-medium transition-colors px-3 py-2 rounded-lg hidden sm:block ${scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-white/80 hover:text-white'}`}>
+            <Link href="/login" className={`text-[14px] font-medium transition-colors px-3 py-2.5 rounded-lg hidden sm:block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-white/80 hover:text-white'}`}>
               로그인
             </Link>
-            <Link href="/login" className={`text-[14px] font-semibold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] ${scrolled ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-500/20' : 'bg-white text-gray-900 hover:bg-gray-50'}`}>
+            <Link href="/login" className={`text-[14px] font-semibold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-500/20' : 'bg-white text-gray-900 hover:bg-gray-50'}`}>
               시작하기
             </Link>
           </div>
@@ -165,7 +165,7 @@ export default function LandingPage() {
 
             {/* CTA */}
             <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up" style={{ animationDelay: '0.55s', animationFillMode: 'both' }}>
-              <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold rounded-2xl px-8 py-4 text-[16px] hover:shadow-2xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg">
+              <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold rounded-2xl px-8 py-4 text-[16px] hover:shadow-2xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
                 무료로 시작하기
                 <ArrowRight size={18} strokeWidth={2.5} />
               </Link>
@@ -352,9 +352,9 @@ export default function LandingPage() {
             {TESTIMONIALS.map((t, idx) => (
               <ScrollReveal key={t.author} delay={idx * 120}>
                 <div className="bg-white dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
-                  <div className="flex gap-0.5 mb-4">
+                  <div className="flex gap-0.5 mb-4" role="img" aria-label="5점 만점">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} size={14} className="text-amber-400 fill-amber-400" />
+                      <Star key={i} size={14} className="text-amber-400 fill-amber-400" aria-hidden="true" />
                     ))}
                   </div>
                   <p className="text-[15px] text-gray-700 dark:text-gray-300 leading-relaxed flex-1 mb-5">
@@ -393,7 +393,7 @@ export default function LandingPage() {
               <br />
               가입은 3초, 첫 매칭은 무료입니다.
             </p>
-            <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold px-10 py-4 rounded-2xl text-[16px] hover:shadow-2xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg">
+            <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold px-10 py-4 rounded-2xl text-[16px] hover:shadow-2xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
               3초 만에 가입하기
               <ArrowRight size={20} strokeWidth={2.5} />
             </Link>
@@ -411,9 +411,9 @@ export default function LandingPage() {
               </div>
               <span className="font-semibold text-white text-[15px]">MatchUp</span>
             </div>
-            <div className="flex items-center gap-6 text-[13px] text-gray-400">
-              <a href="#" className="hover:text-gray-200 transition-colors">이용약관</a>
-              <a href="#" className="hover:text-gray-200 transition-colors">개인정보처리방침</a>
+            <div className="flex items-center gap-2 text-[13px] text-gray-400">
+              <a href="#" className="hover:text-gray-200 transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">이용약관</a>
+              <a href="#" className="hover:text-gray-200 transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">개인정보처리방침</a>
             </div>
             <p className="text-[13px] text-gray-500">&copy; 2026 MatchUp. All rights reserved.</p>
           </div>

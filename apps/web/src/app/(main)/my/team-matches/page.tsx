@@ -96,7 +96,7 @@ export default function MyTeamMatchesPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-lg p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">내 팀 매칭 모집글</h1>
+        <h1 className="text-[22px] font-bold text-gray-900">내 팀 매칭 모집글</h1>
       </header>
       <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
         <div>

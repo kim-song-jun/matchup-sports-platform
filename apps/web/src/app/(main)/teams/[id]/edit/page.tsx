@@ -104,7 +104,7 @@ export default function EditTeamPage() {
                 key={s.type}
                 onClick={() => setForm({ ...form, sportType: s.type })}
                 className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all ${
-                  form.sportType === s.type ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.sportType === s.type ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {s.label}

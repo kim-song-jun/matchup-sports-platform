@@ -69,7 +69,7 @@ export default function MatchesPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             aria-label="필터 열기"
-            className={`flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${showFilters ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-500 active:bg-gray-100'}`}
+            className={`flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${showFilters ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-500 active:bg-gray-100'}`}
           >
             <SlidersHorizontal size={18} />
           </button>

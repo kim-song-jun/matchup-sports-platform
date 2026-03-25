@@ -9,6 +9,13 @@ interface ScrollRevealProps {
   direction?: 'up' | 'left' | 'right' | 'none';
 }
 
+const TRANSFORMS: Record<string, string> = {
+  up: 'translate3d(0, 24px, 0)',
+  left: 'translate3d(-24px, 0, 0)',
+  right: 'translate3d(24px, 0, 0)',
+  none: 'translate3d(0, 0, 0)',
+};
+
 export function ScrollReveal({ children, className = '', delay = 0, direction = 'up' }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -17,7 +24,6 @@ export function ScrollReveal({ children, className = '', delay = 0, direction = 
     const el = ref.current;
     if (!el) return;
 
-    // Skip animation for reduced motion
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       setVisible(true);
       return;
@@ -37,20 +43,13 @@ export function ScrollReveal({ children, className = '', delay = 0, direction = 
     return () => observer.disconnect();
   }, []);
 
-  const transforms = {
-    up: 'translate3d(0, 24px, 0)',
-    left: 'translate3d(-24px, 0, 0)',
-    right: 'translate3d(24px, 0, 0)',
-    none: 'translate3d(0, 0, 0)',
-  };
-
   return (
     <div
       ref={ref}
       className={className}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translate3d(0, 0, 0)' : transforms[direction],
+        transform: visible ? 'translate3d(0, 0, 0)' : TRANSFORMS[direction],
         transition: `opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms, transform 0.6s cubic-bezier(0.25, 1, 0.5, 1) ${delay}ms`,
         willChange: visible ? 'auto' : 'opacity, transform',
       }}

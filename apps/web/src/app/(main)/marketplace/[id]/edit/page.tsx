@@ -130,7 +130,7 @@ export default function EditListingPage() {
                 key={s.type}
                 onClick={() => setForm({ ...form, sportType: s.type })}
                 className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all ${
-                  form.sportType === s.type ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.sportType === s.type ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {s.label}
@@ -148,7 +148,7 @@ export default function EditListingPage() {
                 key={cat}
                 onClick={() => setForm({ ...form, category: cat })}
                 className={`rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all ${
-                  form.category === cat ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.category === cat ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {cat}
@@ -166,7 +166,7 @@ export default function EditListingPage() {
                 key={c.value}
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`rounded-xl px-3.5 py-2 text-[13px] font-medium transition-all ${
-                  form.condition === c.value ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.condition === c.value ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {c.label}
@@ -195,7 +195,7 @@ export default function EditListingPage() {
                 key={opt.value}
                 onClick={() => setForm({ ...form, status: opt.value })}
                 className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all ${
-                  form.status === opt.value ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.status === opt.value ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {opt.label}

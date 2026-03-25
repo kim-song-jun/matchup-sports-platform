@@ -61,7 +61,7 @@ export default function HomePage() {
   return (
     <div className="pt-[var(--safe-area-top)]">
       {/* Header — mobile only, desktop uses sidebar */}
-      <header className="px-5 pt-4 pb-2 lg:hidden">
+      <header className="px-5 pt-4 pb-3 lg:hidden">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>

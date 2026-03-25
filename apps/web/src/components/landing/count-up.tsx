@@ -48,18 +48,19 @@ export function CountUp({ value, className = '' }: CountUpProps) {
     const duration = 800;
     const start = performance.now();
 
+    let rafId = 0;
     const animate = (now: number) => {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      // Ease out quart
       const eased = 1 - Math.pow(1 - progress, 4);
       const current = Math.round(eased * target);
       setDisplay(`${prefix}${current}${suffix}`);
-      if (progress < 1) requestAnimationFrame(animate);
+      if (progress < 1) rafId = requestAnimationFrame(animate);
     };
 
     setDisplay(`${prefix}0${suffix}`);
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
   }, [triggered, value]);
 
   return (

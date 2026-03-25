@@ -239,7 +239,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
           type="button"
           onClick={handleSubmit}
           disabled={!isValid || isSubmitting}
-          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Send size={14} />
           {isSubmitting ? '등록 중...' : '리뷰 등록'}

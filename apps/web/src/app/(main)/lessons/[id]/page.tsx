@@ -180,7 +180,7 @@ export default function LessonDetailPage() {
                     }
                   }}
                   disabled={isEnrolling}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   {isEnrolling ? (
                     <span className="flex items-center justify-center gap-2">

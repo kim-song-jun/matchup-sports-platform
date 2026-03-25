@@ -304,7 +304,7 @@ export default function AdminTeamDetailPage() {
                 <button
                   onClick={handleSaveEdit}
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   {saving ? '저장 중...' : '변경사항 저장'}
@@ -411,7 +411,7 @@ export default function AdminTeamDetailPage() {
             </div>
             <button
               onClick={() => setShowBadgeModal(false)}
-              className="w-full mt-4 rounded-xl bg-blue-500 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors"
+              className="w-full mt-4 rounded-xl bg-blue-500 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors"
             >
               완료
             </button>

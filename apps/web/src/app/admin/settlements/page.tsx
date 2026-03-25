@@ -155,7 +155,7 @@ export default function AdminSettlementsPage() {
         <div className="flex items-center gap-3 mb-4 rounded-2xl bg-blue-50 border border-blue-100 px-5 py-3">
           <CheckCircle size={18} className="text-blue-500" />
           <span className="text-[14px] font-medium text-blue-700">{selectedRows.length}건 선택됨</span>
-          <button onClick={handleProcessSettlements} disabled={isProcessing} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+          <button onClick={handleProcessSettlements} disabled={isProcessing} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
             <Wallet size={16} />
             정산 처리
           </button>

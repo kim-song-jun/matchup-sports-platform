@@ -212,7 +212,7 @@ export default function EditTeamPage() {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="flex-1 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             {isSaving ? '저장 중...' : '저장'}
           </button>

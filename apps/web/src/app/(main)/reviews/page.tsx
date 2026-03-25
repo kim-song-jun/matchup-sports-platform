@@ -110,7 +110,7 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-[14px] outline-none focus:border-blue-300 resize-none" />
           </div>
           <button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}
-            className="w-full rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+            className="w-full rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
             {submitMutation.isPending ? '제출 중...' : '평가 제출'}
           </button>
         </div>

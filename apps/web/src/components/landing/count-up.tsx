@@ -35,16 +35,21 @@ export function CountUp({ value, className = '' }: CountUpProps) {
   useEffect(() => {
     if (!triggered) return;
 
-    // Extract numeric part
-    const numMatch = value.match(/(\d+)/);
+    // Extract numeric part (handle comma-separated numbers like "2,400")
+    const cleaned = value.replace(/,/g, '');
+    const numMatch = cleaned.match(/(\d+)/);
     if (!numMatch) {
       setDisplay(value);
       return;
     }
 
     const target = parseInt(numMatch[1]);
-    const prefix = value.slice(0, numMatch.index);
-    const suffix = value.slice((numMatch.index ?? 0) + numMatch[1].length);
+    // Find position in original string (accounting for removed commas)
+    const cleanedPrefix = cleaned.slice(0, numMatch.index);
+    const cleanedSuffix = cleaned.slice((numMatch.index ?? 0) + numMatch[1].length);
+    const hasComma = value.includes(',');
+    const prefix = cleanedPrefix;
+    const suffix = cleanedSuffix;
     const duration = 800;
     const start = performance.now();
 
@@ -54,11 +59,12 @@ export function CountUp({ value, className = '' }: CountUpProps) {
       const progress = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 4);
       const current = Math.round(eased * target);
-      setDisplay(`${prefix}${current}${suffix}`);
+      const formatted = hasComma ? current.toLocaleString() : String(current);
+      setDisplay(`${prefix}${formatted}${suffix}`);
       if (progress < 1) rafId = requestAnimationFrame(animate);
     };
 
-    setDisplay(`${prefix}0${suffix}`);
+    setDisplay(`${prefix}${hasComma ? '0' : '0'}${suffix}`);
     rafId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafId);
   }, [triggered, value]);

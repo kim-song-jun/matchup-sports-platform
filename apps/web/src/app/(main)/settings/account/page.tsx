@@ -104,7 +104,7 @@ export default function AccountPage() {
               toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요');
             }
           }}
-          className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-[15px] font-semibold hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-[15px] font-bold hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           변경사항 저장
         </button>

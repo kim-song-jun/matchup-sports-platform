@@ -201,7 +201,7 @@ export default function PaymentsPage() {
                 <Link
                   key={p.id}
                   href={`/payments/${p.id}`}
-                  className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all active:scale-[0.99]"
+                  className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">

@@ -53,7 +53,7 @@ export default function LessonsPage() {
         </div>
         <button
           onClick={() => toast('info', '강좌 등록 기능을 준비 중입니다')}
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <Plus size={16} strokeWidth={2.5} />
           강좌 등록

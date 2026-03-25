@@ -409,7 +409,6 @@ export function HeroParticles() {
     <canvas
       ref={canvasRef}
       className="absolute inset-0 pointer-events-none"
-      style={{ cursor: 'grab' }}
       aria-hidden="true"
     />
   );

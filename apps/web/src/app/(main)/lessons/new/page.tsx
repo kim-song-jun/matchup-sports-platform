@@ -102,7 +102,7 @@ export default function CreateLessonPage() {
         <p className="text-[15px] font-medium text-gray-700">로그인 후 강좌를 등록할 수 있어요</p>
         <button
           onClick={() => router.push('/login')}
-          className="mt-4 rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors"
+          className="mt-4 rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
         >
           로그인
         </button>
@@ -392,7 +392,7 @@ export default function CreateLessonPage() {
           <button
             onClick={() => canProceed() ? setStep(step + 1) : toast('error', '필수 항목을 입력해주세요')}
             disabled={!canProceed()}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             다음
             <ArrowRight size={16} />
@@ -401,7 +401,7 @@ export default function CreateLessonPage() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Check size={16} />
             {isSubmitting ? '등록 중...' : '강좌 등록하기'}

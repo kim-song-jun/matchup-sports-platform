@@ -447,7 +447,7 @@ export default function ChatRoomEmbed({
               <button
                 onClick={handleReport}
                 disabled={!reportReason}
-                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 신고하기
               </button>

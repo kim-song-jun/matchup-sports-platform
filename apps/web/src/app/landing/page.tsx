@@ -24,35 +24,10 @@ const SPORTS = [
   { key: 'short_track', name: '쇼트트랙', bg: 'bg-slate-50', iconColor: 'text-slate-600' },
 ];
 
-const FEATURES = [
-  {
-    icon: Target,
-    title: 'AI 매칭',
-    description: '실력, 위치, 시간, 매너를 종합 분석해 딱 맞는 상대를 자동으로 찾아드려요.',
-    accent: 'from-blue-500 to-blue-600',
-    iconBg: 'bg-blue-500',
-  },
-  {
-    icon: Users,
-    title: '팀 매칭',
-    description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.',
-    accent: 'from-emerald-500 to-emerald-600',
-    iconBg: 'bg-emerald-500',
-  },
-  {
-    icon: Shield,
-    title: '신뢰 시스템',
-    description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.',
-    accent: 'from-amber-500 to-amber-600',
-    iconBg: 'bg-amber-500',
-  },
-  {
-    icon: Zap,
-    title: '올인원',
-    description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.',
-    accent: 'from-violet-500 to-violet-600',
-    iconBg: 'bg-violet-500',
-  },
+const SUB_FEATURES = [
+  { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-green-500' },
+  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-amber-500' },
+  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-violet-500' },
 ];
 
 const STEPS = [
@@ -114,7 +89,7 @@ export default function LandingPage() {
           : 'bg-transparent'
       }`}>
         <div className="max-w-[1200px] mx-auto px-5 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
               <span className="text-white font-black text-sm">M</span>
             </div>
@@ -123,10 +98,10 @@ export default function LandingPage() {
             </span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login" className={`text-[14px] font-medium transition-colors px-3 py-2.5 rounded-lg hidden sm:block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-white/80 hover:text-white'}`}>
+            <Link href="/login" className={`text-[14px] font-medium transition-colors px-3 py-2.5 rounded-lg hidden sm:block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100' : 'text-white/80 hover:text-white'} active:scale-[0.97]`}>
               로그인
             </Link>
-            <Link href="/login" className={`text-[14px] font-semibold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-500/20' : 'bg-white text-gray-900 hover:bg-gray-50'}`}>
+            <Link href="/login" className={`text-[14px] font-bold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-500/20' : 'bg-white text-gray-900 hover:bg-gray-50'}`}>
               시작하기
             </Link>
           </div>
@@ -138,7 +113,7 @@ export default function LandingPage() {
         {/* Background — brighter, more energetic */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(99,102,241,0.2),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(49,130,246,0.2),transparent_50%)]" />
         <HeroParticles />
 
         <div className="relative max-w-[1200px] mx-auto px-5 pt-24 pb-20 lg:pt-0 lg:pb-0">
@@ -168,11 +143,11 @@ export default function LandingPage() {
 
             {/* CTA */}
             <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up" style={{ animationDelay: '0.55s', animationFillMode: 'both' }}>
-              <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold rounded-2xl px-8 py-4 text-[16px] hover:shadow-2xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+              <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold rounded-2xl px-8 py-4 text-[16px] hover:shadow-xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
                 무료로 시작하기
                 <ArrowRight size={18} strokeWidth={2.5} />
               </Link>
-              <button onClick={() => featuresRef.current?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center justify-center gap-2 text-white/90 rounded-xl px-6 py-3.5 text-[15px] font-medium hover:bg-white/10 transition-all duration-200">
+              <button onClick={() => featuresRef.current?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center justify-center gap-2 text-white/90 rounded-xl px-6 py-3.5 text-[15px] font-medium hover:bg-white/10 active:scale-[0.97] transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
                 더 알아보기
                 <ChevronDown size={18} />
               </button>
@@ -207,7 +182,7 @@ export default function LandingPage() {
         <div className="max-w-[800px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center">
-              <h2 className="text-[24px] lg:text-[30px] font-bold text-gray-900 dark:text-white tracking-tight mb-10">
+              <h2 className="text-[22px] lg:text-[28px] font-bold text-gray-900 dark:text-white tracking-tight mb-10">
                 이런 경험, 있지 않나요?
               </h2>
               <div className="grid sm:grid-cols-3 gap-4">
@@ -247,7 +222,7 @@ export default function LandingPage() {
           </ScrollReveal>
           {/* AI 매칭 — 히어로 카드 */}
           <ScrollReveal className="mb-6">
-            <div className="group bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white hover:shadow-2xl hover:shadow-gray-900/30 transition-all duration-300 lg:flex lg:items-center lg:gap-10">
+            <div className="group bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white hover:shadow-xl hover:shadow-gray-900/30 transition-all duration-300 lg:flex lg:items-center lg:gap-10">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-[12px] font-semibold px-3 py-1 rounded-full mb-4">
                   <Target size={13} /> 핵심 기능
@@ -263,13 +238,13 @@ export default function LandingPage() {
                     <div className="h-9 w-9 rounded-full bg-blue-500/30 flex items-center justify-center text-[13px] font-bold text-blue-300">K</div>
                     <div>
                       <div className="text-[13px] font-semibold text-white">김민수</div>
-                      <div className="text-[11px] text-gray-500">축구 · B등급</div>
+                      <div className="text-[12px] text-gray-500">축구 · B등급</div>
                     </div>
                   </div>
                   <div className="space-y-2.5">
-                    <div><div className="flex justify-between text-[11px] text-gray-500 mb-1"><span>실력 매칭</span><span className="text-blue-400 font-semibold">94%</span></div><div className="h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-blue-500 w-[94%]" /></div></div>
-                    <div><div className="flex justify-between text-[11px] text-gray-500 mb-1"><span>매너 점수</span><span className="text-emerald-400 font-semibold">98%</span></div><div className="h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-emerald-500 w-[98%]" /></div></div>
-                    <div><div className="flex justify-between text-[11px] text-gray-500 mb-1"><span>거리</span><span className="text-amber-400 font-semibold">2.1km</span></div><div className="h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-amber-500 w-[85%]" /></div></div>
+                    <div><div className="flex justify-between text-[12px] text-gray-500 mb-1"><span>실력 매칭</span><span className="text-blue-400 font-semibold">94%</span></div><div className="h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-blue-500 w-[94%]" /></div></div>
+                    <div><div className="flex justify-between text-[12px] text-gray-500 mb-1"><span>매너 점수</span><span className="text-green-400 font-semibold">98%</span></div><div className="h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-green-500 w-[98%]" /></div></div>
+                    <div><div className="flex justify-between text-[12px] text-gray-500 mb-1"><span>거리</span><span className="text-amber-400 font-semibold">2.1km</span></div><div className="h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-amber-500 w-[85%]" /></div></div>
                   </div>
                   <div className="mt-4 text-center text-[12px] font-bold text-blue-400 bg-blue-500/10 rounded-lg py-2">매칭 적합도 96%</div>
                 </div>
@@ -279,7 +254,7 @@ export default function LandingPage() {
 
           {/* 나머지 기능 */}
           <div className="grid sm:grid-cols-3 gap-5">
-            {FEATURES.slice(1).map((f, idx) => {
+            {SUB_FEATURES.map((f, idx) => {
               const Icon = f.icon;
               return (
                 <ScrollReveal key={f.title} delay={idx * 100}>
@@ -324,7 +299,7 @@ export default function LandingPage() {
                       <div className="w-0.5 flex-1 bg-gradient-to-b from-blue-200 to-transparent my-2" />
                     )}
                   </div>
-                  <div className={`pb-10 ${idx === STEPS.length - 1 ? 'pb-0' : ''}`}>
+                  <div className={idx === STEPS.length - 1 ? 'pb-0' : 'pb-10'}>
                     <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-1">{step.title}</h3>
                     <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">{step.description}</p>
                   </div>
@@ -371,7 +346,7 @@ export default function LandingPage() {
               {SPORTS.map((sport) => {
                 const Icon = SportIconMap[sport.key];
                 return (
-                  <div key={sport.key} className="shrink-0 w-[88px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform">
+                  <div key={sport.key} className="shrink-0 w-[88px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform duration-200">
                     <div className={`w-12 h-12 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={24} className={sport.iconColor} />}
                     </div>
@@ -392,7 +367,7 @@ export default function LandingPage() {
                     <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={22} className={sport.iconColor} />}
                     </div>
-                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">{sport.name}</span>
+                    <span className="text-[12px] font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">{sport.name}</span>
                   </div>
                 );
               })}
@@ -420,7 +395,7 @@ export default function LandingPage() {
               const SportIcon = SportIconMap[t.sport];
               return (
                 <ScrollReveal key={t.author} delay={idx * 120}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full flex flex-col">
                     <div className="flex gap-0.5 mb-4" role="img" aria-label={`${t.rating}점 만점`}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star key={i} size={14} className={i < t.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'} aria-hidden="true" />
@@ -447,7 +422,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="relative overflow-hidden bg-gray-900">
+      <section className="relative overflow-hidden bg-gray-900 dark:bg-black">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.15),transparent_60%)]" />
 
         <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center">
@@ -463,9 +438,9 @@ export default function LandingPage() {
               <br className="hidden sm:block" />
               경기할수록 더 정확해지는 스마트 매칭.
             </p>
-            <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-10 py-4 rounded-2xl text-[16px] hover:bg-blue-400 hover:shadow-2xl hover:shadow-blue-500/30 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+            <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-[16px] hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
               무료로 시작하기
-              <ArrowRight size={20} strokeWidth={2.5} />
+              <ArrowRight size={18} strokeWidth={2.5} />
             </Link>
           </ScrollReveal>
         </div>
@@ -476,14 +451,14 @@ export default function LandingPage() {
         <div className="max-w-[1200px] mx-auto px-5">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                 <span className="text-white font-bold text-xs">M</span>
               </div>
               <span className="font-semibold text-white text-[15px]">MatchUp</span>
             </div>
             <div className="flex items-center gap-2 text-[13px] text-gray-400">
-              <a href="#" className="hover:text-gray-200 transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">이용약관</a>
-              <a href="#" className="hover:text-gray-200 transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">개인정보처리방침</a>
+              <a href="#" className="hover:text-gray-200 active:text-white transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">이용약관</a>
+              <a href="#" className="hover:text-gray-200 active:text-white transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">개인정보처리방침</a>
             </div>
             <p className="text-[13px] text-gray-500">&copy; 2026 MatchUp. All rights reserved.</p>
           </div>

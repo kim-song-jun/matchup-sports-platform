@@ -75,7 +75,7 @@ export default function CreateListingPage() {
           </div>
           <h2 className="text-[22px] font-bold text-gray-900">매물을 등록해보세요</h2>
           <p className="text-[14px] text-gray-500 mt-2">로그인하면 장비를 등록하고 거래할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
           </Link>
         </div>
@@ -286,7 +286,7 @@ export default function CreateListingPage() {
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mt-2 mb-8"
+          className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mt-2 mb-8"
         >
           {isSubmitting ? '등록 중...' : '매물 등록하기'}
         </button>

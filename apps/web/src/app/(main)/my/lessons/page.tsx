@@ -74,7 +74,7 @@ export default function MyLessonsPage() {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
         <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-bold text-white">로그인</Link>
       </div>
     );
   }

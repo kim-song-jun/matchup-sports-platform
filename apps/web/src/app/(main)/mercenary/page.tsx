@@ -174,7 +174,7 @@ export default function MercenaryPage() {
         </div>
         <Link
           href="/mercenary/new"
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <UserPlus size={16} strokeWidth={2.5} />
           용병 모집하기
@@ -279,7 +279,7 @@ export default function MercenaryPage() {
                     <button
                       onClick={() => handleApply(post.id)}
                       disabled={isApplied}
-                      className={`rounded-xl px-5 py-2 text-[13px] font-semibold transition-colors ${
+                      className={`rounded-xl px-5 py-2 text-[13px] font-bold transition-colors ${
                         isApplied
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'

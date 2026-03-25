@@ -514,7 +514,7 @@ export default function EditTeamMatchPage() {
           <button
             onClick={handleSave}
             disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
             {isSubmitting ? '저장 중...' : '수정 완료'}

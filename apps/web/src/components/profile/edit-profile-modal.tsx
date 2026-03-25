@@ -81,7 +81,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
           취소
         </button>
         <button onClick={handleSubmit} disabled={isSubmitting}
-          className="flex-1 rounded-xl bg-blue-500 py-3 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+          className="flex-1 rounded-xl bg-blue-500 py-3 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
           {isSubmitting ? '저장 중...' : '저장'}
         </button>
       </div>

@@ -74,7 +74,7 @@ export default function MyTeamMatchesPage() {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
         <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-bold text-white">로그인</Link>
       </div>
     );
   }
@@ -105,7 +105,7 @@ export default function MyTeamMatchesPage() {
         </div>
         <Link
           href="/team-matches/new"
-          className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 active:scale-[0.98] transition-all"
+          className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 active:scale-[0.98] transition-all"
         >
           <Plus size={16} />
           모집글 작성

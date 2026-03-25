@@ -350,7 +350,7 @@ export default function TeamDetailPage() {
                     toast('error', '신청에 실패했어요. 이미 신청했거나 권한이 없을 수 있어요');
                   }
                 }}
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors"
               >
                 팀 참여 신청
               </button>
@@ -377,7 +377,7 @@ export default function TeamDetailPage() {
                 <p className="text-[13px] text-gray-400">현재 팀원을 모집하고 있지 않습니다</p>
               </div>
             )}
-            <button className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
+            <button className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
               <MessageCircle size={18} />
               연락하기
             </button>

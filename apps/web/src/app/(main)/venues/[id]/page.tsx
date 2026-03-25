@@ -416,7 +416,7 @@ export default function VenueDetailPage() {
 
             <Link
               href="/team-matches/new"
-              className="block w-full text-center rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors mt-3"
+              className="block w-full text-center rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors mt-3"
             >
               이 구장에서 경기 만들기
             </Link>

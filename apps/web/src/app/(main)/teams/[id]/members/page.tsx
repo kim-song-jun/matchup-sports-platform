@@ -62,7 +62,7 @@ export default function TeamMembersPage() {
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-3 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-3 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 transition-colors"
         >
           <UserPlus size={14} />
           초대
@@ -75,7 +75,7 @@ export default function TeamMembersPage() {
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors"
         >
           <UserPlus size={16} />
           초대하기
@@ -182,7 +182,7 @@ export default function TeamMembersPage() {
             />
             <div className="flex gap-3">
               <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
-              <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors">초대하기</button>
+              <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">초대하기</button>
             </div>
           </div>
         </div>

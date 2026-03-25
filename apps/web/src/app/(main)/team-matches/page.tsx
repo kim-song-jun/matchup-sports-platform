@@ -53,7 +53,7 @@ export default function TeamMatchesPage() {
         <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">팀 매칭</h1>
         <Link
           href="/team-matches/new"
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <Plus size={16} strokeWidth={2.5} />
           모집글 작성

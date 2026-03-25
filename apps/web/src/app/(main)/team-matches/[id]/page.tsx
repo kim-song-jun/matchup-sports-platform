@@ -336,7 +336,7 @@ export default function TeamMatchDetailPage() {
               {isRecruiting && !isHost && (
                 <button
                   onClick={() => setShowApplyModal(true)}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
                   <span className="flex items-center justify-center gap-2">경기 신청하기</span>
                 </button>
@@ -493,7 +493,7 @@ export default function TeamMatchDetailPage() {
               <button
                 onClick={handleApply}
                 disabled={!confirmed || applyMutation.isPending}
-                className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {applyMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">

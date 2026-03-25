@@ -194,7 +194,7 @@ export default function ListingDetailPage() {
               <div className="space-y-2">
                 <button
                   onClick={() => router.push('/payments/checkout')}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors"
                 >
                   {listing.listingType === 'rent' ? '대여 신청하기' : '구매하기'}
                 </button>

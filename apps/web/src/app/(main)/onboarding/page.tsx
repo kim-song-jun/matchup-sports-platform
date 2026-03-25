@@ -135,7 +135,7 @@ export default function OnboardingPage() {
           {/* CTA button */}
           <button
             onClick={goNext}
-            className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-semibold text-base hover:bg-blue-600 active:scale-[0.98] transition-all"
+            className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-bold text-base hover:bg-blue-600 active:scale-[0.98] transition-all"
           >
             {isLast ? '시작하기' : '다음'}
           </button>

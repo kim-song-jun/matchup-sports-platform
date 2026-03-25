@@ -70,7 +70,7 @@ export default function CreateMatchPage() {
           </div>
           <h2 className="text-[22px] font-bold text-gray-900">매치를 만들어보세요</h2>
           <p className="text-[14px] text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
           </Link>
         </div>
@@ -165,7 +165,7 @@ export default function CreateMatchPage() {
               </Field>
             </div>
             <button onClick={() => form.title ? setStep(2) : toast('error', '매치 제목을 입력해주세요')}
-              className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors mt-4">
+              className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors mt-4">
               다음
             </button>
           </div>
@@ -204,7 +204,7 @@ export default function CreateMatchPage() {
               </Field>
             </div>
             <button onClick={() => (form.venueId && form.matchDate) ? setStep(3) : toast('error', '시설과 날짜를 선택해주세요')}
-              className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors mt-4">
+              className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors mt-4">
               다음
             </button>
           </div>
@@ -224,7 +224,7 @@ export default function CreateMatchPage() {
               <ConfirmRow label="레벨" value={`${levelLabel[form.levelMin]} ~ ${levelLabel[form.levelMax]}`} />
             </div>
             <button onClick={handleSubmit} disabled={isSubmitting}
-              className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
               {isSubmitting ? '생성 중...' : (<><Check size={18} /> 매치 생성하기</>)}
             </button>
           </div>

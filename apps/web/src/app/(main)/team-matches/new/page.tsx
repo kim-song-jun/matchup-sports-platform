@@ -505,7 +505,7 @@ export default function NewTeamMatchPage() {
           <button
             onClick={() => setStep(step + 1)}
             disabled={!canProceed()}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             다음
             <ArrowRight size={16} />
@@ -514,7 +514,7 @@ export default function NewTeamMatchPage() {
           <button
             onClick={handleSubmit}
             disabled={createMutation.isPending}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Check size={16} />
             {createMutation.isPending ? '등록 중...' : '모집글 등록'}

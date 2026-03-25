@@ -131,7 +131,7 @@ export default function TeamMatchEvaluatePage() {
           <button
             onClick={handleSubmit}
             disabled={!allRated || submitMutation.isPending}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Send size={16} />
             {submitMutation.isPending ? '제출 중...' : '평가 제출하기'}

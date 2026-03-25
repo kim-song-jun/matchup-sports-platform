@@ -62,7 +62,7 @@ export function MapPlaceholder({ lat, lng, address, name, height = 200 }: MapPla
           href={naverMapUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="shrink-0 flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="shrink-0 flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <ExternalLink size={12} />
           지도 보기

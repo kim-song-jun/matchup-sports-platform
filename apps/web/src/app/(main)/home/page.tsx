@@ -147,12 +147,9 @@ export default function HomePage() {
           </section>
         ) : null}
 
-      {/* 구분 — generous break before full list */}
-      <div className="mt-6 mb-2 lg:mt-8 lg:mb-0" />
-
       {/* 전체 매치 */}
-      <section className="px-5 lg:px-0">
-        <div className="flex items-center justify-between mb-4">
+      <section className="mt-5 px-5 lg:px-0">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-[16px] font-bold text-gray-900 dark:text-white">전체 매치</h2>
           <Link href="/matches" className="flex items-center text-[13px] text-gray-400 hover:text-gray-600 transition-colors">
             전체보기

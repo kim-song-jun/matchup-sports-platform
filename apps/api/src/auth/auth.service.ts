@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 
@@ -13,10 +14,59 @@ export class AuthService {
     private readonly usersService: UsersService,
   ) {}
 
+  /** 이메일 회원가입 */
+  async emailRegister(email: string, password: string, nickname: string) {
+    // 이메일 중복 체크
+    const existing = await this.prisma.user.findFirst({
+      where: { OR: [{ email }, { nickname }], deletedAt: null },
+    });
+    if (existing) {
+      if (existing.email === email) throw new ConflictException('이미 가입된 이메일이에요');
+      throw new ConflictException('이미 사용 중인 닉네임이에요');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        nickname,
+        oauthProvider: 'email',
+        oauthId: `email_${email}`,
+        sportTypes: [],
+        mannerScore: 3.0,
+      },
+    });
+
+    const tokens = this.generateTokens(user.id);
+    const fullUser = await this.usersService.findById(user.id);
+    return { ...tokens, user: fullUser };
+  }
+
+  /** 이메일 로그인 */
+  async emailLogin(email: string, password: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+    });
+    if (!user || !user.passwordHash) {
+      throw new BadRequestException('이메일 또는 비밀번호가 올바르지 않아요');
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      throw new BadRequestException('이메일 또는 비밀번호가 올바르지 않아요');
+    }
+
+    const tokens = this.generateTokens(user.id);
+    const fullUser = await this.usersService.findById(user.id);
+    return { ...tokens, user: fullUser };
+  }
+
   async oauthLogin(provider: string, code: string, redirectUri?: string) {
-    // TODO: 실제 OAuth 검증 및 사용자 정보 조회
+    // TODO: 실제 OAuth 검증 — 카카오/네이버 API 연동 필요
     throw new UnauthorizedException(
-      `OAuth ${provider} login not yet implemented. Use /api/v1/auth/dev-login for testing.`,
+      `OAuth ${provider} login not yet implemented. Use /api/v1/auth/dev-login or email login.`,
     );
   }
 

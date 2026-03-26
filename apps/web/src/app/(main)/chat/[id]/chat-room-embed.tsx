@@ -5,6 +5,7 @@ import {
   Send, ChevronDown, ChevronUp,
   Calendar, MapPin, DollarSign, Info,
   MoreVertical, Flag, Ban, LogOut,
+  Image as ImageIcon, Smile, Paperclip,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -100,6 +101,9 @@ export default function ChatRoomEmbed({
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDetail, setReportDetail] = useState('');
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +129,17 @@ export default function ChatRoomEmbed({
       markAsRead(chatRoomId);
     }
   }, [chatRoomId, markAsRead]);
+
+  // Mock 타이핑 인디케이터
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (last.senderId !== currentUserId) return;
+    const delay = 2000 + Math.random() * 2000;
+    const t1 = setTimeout(() => setIsTyping(true), delay);
+    const t2 = setTimeout(() => setIsTyping(false), delay + 3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [messages.length, currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll: 첫 로드는 instant, 이후는 하단 근처일 때만
   useEffect(() => {
@@ -403,8 +418,32 @@ export default function ChatRoomEmbed({
             })}
           </div>
         ))}
+        {/* 타이핑 인디케이터 */}
+        {isTyping && (
+          <div className="flex items-center gap-2 mb-2 ml-10">
+            <div className="flex gap-1 rounded-2xl rounded-tl-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* 이모지 피커 (간단 버전) */}
+      {showEmoji && (
+        <div className="shrink-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-2">
+          <div className="flex flex-wrap gap-2">
+            {['👍', '👏', '🔥', '⚽', '🏀', '🏒', '💪', '🎉', '😊', '😂', '🙏', '❤️'].map(emoji => (
+              <button key={emoji} onClick={() => { setInput(prev => prev + emoji); setShowEmoji(false); }}
+                className="text-[22px] p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="shrink-0 px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-50 dark:border-gray-800">
@@ -423,7 +462,19 @@ export default function ChatRoomEmbed({
 
       {/* Input Bar */}
       <div className={`shrink-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-3 ${!embedded ? 'pb-[calc(0.75rem+var(--safe-area-bottom))] lg:pb-3' : ''}`}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* 첨부 */}
+          <button aria-label="파일 첨부" onClick={() => { fileInputRef.current?.click(); toast('info', '파일 첨부 기능을 준비 중이에요'); }}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0">
+            <Paperclip size={18} />
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={() => toast('info', '이미지 전송 기능을 준비 중이에요')} />
+          {/* 이모지 */}
+          <button aria-label="이모지" onClick={() => setShowEmoji(!showEmoji)}
+            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors shrink-0 ${showEmoji ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+            <Smile size={18} />
+          </button>
+          {/* 입력 */}
           <input
             ref={inputRef}
             type="text"
@@ -431,15 +482,16 @@ export default function ChatRoomEmbed({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="메시지를 입력하세요"
-            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
           />
+          {/* 전송 */}
           <button
             aria-label="메시지 보내기"
             onClick={handleSend}
             disabled={!input.trim()}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
           >
-            <Send size={18} />
+            <Send size={16} />
           </button>
         </div>
       </div>

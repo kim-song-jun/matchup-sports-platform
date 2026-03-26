@@ -140,6 +140,40 @@ export function useDevLogin() {
   });
 }
 
+export function useEmailRegister() {
+  const { login } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dto: { email: string; password: string; nickname: string }) => {
+      const res = await api.post('/auth/register', dto);
+      return extractData<{ accessToken: string; refreshToken: string; user: UserProfile }>(res);
+    },
+    onSuccess: (data) => {
+      const { accessToken, refreshToken, user } = data;
+      login(accessToken, refreshToken, user as never);
+      queryClient.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
+export function useEmailLogin() {
+  const { login } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dto: { email: string; password: string }) => {
+      const res = await api.post('/auth/login', dto);
+      return extractData<{ accessToken: string; refreshToken: string; user: UserProfile }>(res);
+    },
+    onSuccess: (data) => {
+      const { accessToken, refreshToken, user } = data;
+      login(accessToken, refreshToken, user as never);
+      queryClient.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
 export function useMe() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<UserProfile>({

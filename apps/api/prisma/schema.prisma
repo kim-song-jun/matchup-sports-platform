@@ -130,6 +130,7 @@ enum OrderStatus {
 model User {
   id              String   @id @default(uuid())
   email           String?  @unique
+  passwordHash    String?  @map("password_hash")
   nickname        String   @unique
   profileImageUrl String?  @map("profile_image_url")
   phone           String?

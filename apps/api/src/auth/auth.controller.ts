@@ -3,12 +3,24 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { OAuthLoginDto, RefreshTokenDto } from './dto/auth.dto';
+import { OAuthLoginDto, RefreshTokenDto, EmailRegisterDto, EmailLoginDto } from './dto/auth.dto';
 
 @ApiTags('인증')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  @ApiOperation({ summary: '이메일 회원가입' })
+  async register(@Body() dto: EmailRegisterDto) {
+    return this.authService.emailRegister(dto.email, dto.password, dto.nickname);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: '이메일 로그인' })
+  async login(@Body() dto: EmailLoginDto) {
+    return this.authService.emailLogin(dto.email, dto.password);
+  }
 
   @Post('dev-login')
   @ApiOperation({ summary: '개발용 로그인 (닉네임으로 바로 로그인/가입)' })

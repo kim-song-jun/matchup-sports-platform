@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { ChevronRight, Plus, Clock, ArrowRight, Swords, Sparkles, UserPlus } from 'lucide-react';
+import { ChevronRight, Plus, Clock, ArrowRight } from 'lucide-react';
 import { sportLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportImage, getTeamImage, getListingImage } from '@/lib/sport-image';
@@ -16,9 +16,9 @@ const sportFilters = [
 ] as const;
 
 const banners = [
-  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, gradient: 'from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700' },
-  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Sparkles, gradient: 'from-gray-800 to-gray-900 dark:from-gray-700 dark:to-gray-800' },
-  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: UserPlus, gradient: 'from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800' },
+  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches' },
+  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches' },
+  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary' },
 ] as const;
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -164,19 +164,17 @@ export default function HomePage() {
           <div className="relative rounded-xl overflow-hidden h-[88px]" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
             {/* Crossfade layers */}
             {banners.map((banner, i) => {
-              const Icon = banner.icon;
               return (
                 <Link key={i} href={banner.href}
                   className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${bannerIdx === i ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                   aria-hidden={bannerIdx !== i}
                   tabIndex={bannerIdx === i ? 0 : -1}
                 >
-                  <div className={`h-full bg-gradient-to-r ${banner.gradient} px-5 py-4 flex items-center justify-between`}>
-                    <div className="relative z-10">
+                  <div className="h-full bg-gray-900 dark:bg-gray-800 px-5 py-4 flex items-center justify-between">
+                    <div>
                       <p className="text-[15px] font-bold text-white">{banner.title}</p>
-                      <p className="text-[12px] text-white/60 mt-1">{banner.desc}</p>
+                      <p className="text-[12px] text-gray-400 mt-1">{banner.desc}</p>
                     </div>
-                    <Icon size={56} className="absolute right-5 top-1/2 -translate-y-1/2 text-white/10" strokeWidth={1.5} />
                   </div>
                 </Link>
               );

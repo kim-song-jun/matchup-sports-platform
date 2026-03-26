@@ -43,7 +43,7 @@ export function BottomNav() {
                 key={href}
                 href={href}
                 className={`flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] px-3 py-1 transition-colors ${
-                  isActive ? 'text-blue-500' : 'text-gray-500 dark:text-gray-500'
+                  isActive ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'
                 }`}
               >
                 <Icon size={20} strokeWidth={isActive ? 2 : 1.5} />

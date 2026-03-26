@@ -53,8 +53,8 @@ export function Sidebar() {
               <Link key={href} href={href}
                 className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'
-                    : 'text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}>
                 <div className="relative">
                   <Icon size={16} strokeWidth={isActive ? 2 : 1.5} />

@@ -133,7 +133,7 @@ export default function ListingDetailPage() {
           {listing.listingType === 'rent' && (
             <div className="rounded-xl bg-blue-50 border border-blue-100 p-5 mb-4">
               <h3 className="text-[15px] font-semibold text-blue-800 mb-2">대여 정보</h3>
-              <div className="space-y-1 text-[14px] text-blue-700">
+              <div className="space-y-2 text-[14px] text-blue-700">
                 <p>일일 대여비: {formatCurrency(listing.rentalPricePerDay || 0)}</p>
                 <p>보증금: {formatCurrency(listing.rentalDeposit || 0)}</p>
               </div>

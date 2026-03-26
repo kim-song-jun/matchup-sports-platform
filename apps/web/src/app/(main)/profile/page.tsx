@@ -75,7 +75,7 @@ export default function ProfilePage() {
             )}
 
             {/* 활동 통계 */}
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 grid grid-cols-3 gap-3">
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
                 <p className="text-[18px] font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
                 <p className="text-[12px] text-gray-500 mt-0.5">총 매치</p>

@@ -294,7 +294,7 @@ export default function MyMatchesPage() {
                     <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{match.title}</h3>
                   </Link>
 
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-2 space-y-1.5">
                     <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
                       <Calendar size={13} />
                       <span>{match.matchDate} ({getDayLabel(match.matchDate)})</span>

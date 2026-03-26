@@ -84,7 +84,7 @@ export default function NotificationsPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-1 stagger-children">
+          <div className="space-y-2 stagger-children">
             {notifications.map((n) => (
               <Link key={n.id} href={n.link || '#'} onClick={() => markRead(n.id)}>
                 <div className={`rounded-xl p-4 transition-colors active:scale-[0.98] ${n.isRead ? 'hover:bg-gray-50 dark:hover:bg-gray-800' : 'bg-blue-50/30 dark:bg-blue-900/10 hover:bg-blue-50/50'}`}>

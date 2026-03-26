@@ -25,7 +25,7 @@ export default function AdminDashboardPage() {
       {/* 주의 항목 */}
       <section className="mb-8">
         <h2 className="text-[14px] font-bold text-gray-900 mb-3">처리 필요</h2>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <ActionItem label="미처리 분쟁" count={2} href="/admin/disputes" />
           <ActionItem label="정산 대기" count={3} href="/admin/settlements" />
           <ActionItem label="오늘 노쇼 신고" count={1} href="/admin/disputes" />
@@ -35,7 +35,7 @@ export default function AdminDashboardPage() {
       {/* 빠른 이동 */}
       <section>
         <h2 className="text-[14px] font-bold text-gray-900 mb-3">관리 메뉴</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: '매치 관리', href: '/admin/matches', desc: '매치 상태 관리' },
             { label: '사용자 관리', href: '/admin/users', desc: '회원 조회·검색' },

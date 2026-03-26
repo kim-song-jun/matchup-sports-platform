@@ -102,7 +102,7 @@ export default function HomePage() {
               <h2 className="text-[13px] font-bold text-gray-900 dark:text-white">다가오는 일정</h2>
               <Link href="/my/matches" className="text-[11px] text-gray-500">전체 →</Link>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {upcoming.map((m: Match) => {
                 const d = new Date(m.matchDate);
                 return (

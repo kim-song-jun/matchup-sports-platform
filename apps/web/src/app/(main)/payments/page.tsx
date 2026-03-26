@@ -28,8 +28,8 @@ const methodConfig: Record<string, { label: string; icon: typeof CreditCard }> =
 };
 
 const typeConfig: Record<string, { label: string; icon: typeof Trophy; color: string }> = {
-  match: { label: '매치', icon: Trophy, color: 'bg-blue-50 text-blue-500' },
-  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-blue-50 text-blue-500' },
+  match: { label: '매치', icon: Trophy, color: 'bg-gray-100 text-gray-500' },
+  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-gray-100 text-gray-500' },
   market: { label: '장터', icon: ShoppingBag, color: 'bg-gray-100 text-gray-600' },
 };
 
@@ -143,7 +143,7 @@ export default function PaymentsPage() {
       </header>
       <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
         <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">결제 내역</h1>
-        <p className="text-[13px] text-gray-400 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
+        <p className="text-[13px] text-gray-500 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
       </div>
 
       <div className="px-5 lg:px-0">
@@ -155,7 +155,7 @@ export default function PaymentsPage() {
             onChange={(e) => setDateFrom(e.target.value)}
             className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
           />
-          <span className="text-[13px] text-gray-400">~</span>
+          <span className="text-[13px] text-gray-500">~</span>
           <input
             type="date"
             value={dateTo}
@@ -183,10 +183,10 @@ export default function PaymentsPage() {
 
         {/* Payment List */}
         {filtered.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-xl bg-gray-50 p-16 text-center">
             <CreditCard size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">결제 내역이 없어요</p>
-            <p className="text-[13px] text-gray-400 mt-1">매치에 참가하면 여기서 확인할 수 있어요</p>
+            <p className="text-[13px] text-gray-500 mt-1">매치에 참가하면 여기서 확인할 수 있어요</p>
           </div>
         ) : (
           <div className="space-y-3 stagger-children">
@@ -201,7 +201,7 @@ export default function PaymentsPage() {
                 <Link
                   key={p.id}
                   href={`/payments/${p.id}`}
-                  className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.99]"
+                  className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
@@ -215,7 +215,7 @@ export default function PaymentsPage() {
                             {s.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-[12px] text-gray-400">
+                        <div className="flex items-center gap-2 text-[12px] text-gray-500">
                           <span className="flex items-center gap-1">
                             <MethodIcon size={12} />
                             {m.label}
@@ -236,7 +236,6 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
-      <div className="h-6" />
     </div>
   );
 }

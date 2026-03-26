@@ -23,7 +23,7 @@ packages/shared/ → 공유 타입/상수
 
 ## 개발 명령어
 ```bash
-pnpm dev          # 전체 개발 서버 (프론트 3000 + 백엔드 8000)
+pnpm dev          # 전체 개발 서버 (프론트 3003 + 백엔드 8100)
 pnpm db:push      # Prisma 스키마 DB 반영
 pnpm db:studio    # Prisma Studio (DB 브라우저)
 docker compose up -d  # PostgreSQL + Redis 실행

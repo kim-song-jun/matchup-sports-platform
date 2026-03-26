@@ -4,7 +4,7 @@ import { Providers } from './providers';
 import { ProgressBar } from '@/components/layout/progress-bar';
 
 export const metadata: Metadata = {
-  title: 'MatchUp - 스포츠 매칭 플랫폼',
+  title: 'TeamMeet - 스포츠 매칭 플랫폼',
   description: 'AI 기반 멀티스포츠 소셜 매칭 플랫폼',
   manifest: '/manifest.json',
 };
@@ -12,8 +12,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#3182F6',
 };

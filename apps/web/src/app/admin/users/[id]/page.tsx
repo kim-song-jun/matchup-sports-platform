@@ -8,12 +8,7 @@ import { ChevronRight, Star, Trophy, Calendar, MapPin, Shield, AlertTriangle, Ba
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useUserProfile } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
+import { sportLabel, levelLabel } from '@/lib/constants';
 
 export default function AdminUserDetailPage() {
   const params = useParams();

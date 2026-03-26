@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { useMercenaryPosts } from '@/hooks/use-api';
+import { sportLabel } from '@/lib/constants';
 
 const mockMercenaryPosts = [
   {
@@ -35,10 +36,6 @@ const mockMercenaryPosts = [
     applicants: 4,
   },
 ];
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키',
-};
 
 function formatCurrency(n: number) {
   return n === 0 ? '무료' : new Intl.NumberFormat('ko-KR').format(n) + '원';
@@ -97,31 +94,31 @@ export default function MyMercenaryPage() {
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
         <h2 className="text-[22px] font-bold text-gray-900">내 용병 모집</h2>
-        <p className="text-[14px] text-gray-400 mt-1">용병 모집글을 관리하세요</p>
+        <p className="text-[14px] text-gray-500 mt-1">용병 모집글을 관리하세요</p>
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
-          <Info size={16} className="text-amber-500 shrink-0" />
-          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-100 px-4 py-2.5">
+          <Info size={16} className="text-gray-500 shrink-0" />
+          <span className="text-[13px] text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
       )}
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {posts.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-xl bg-gray-50 p-16 text-center">
             <UserCheck size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">용병 모집글이 없어요</p>
-            <p className="text-[13px] text-gray-400 mt-1">용병을 모집해보세요</p>
+            <p className="text-[13px] text-gray-500 mt-1">용병을 모집해보세요</p>
           </div>
         ) : posts.map((post) => (
-          <div key={post.id} className="rounded-2xl bg-white border border-gray-100 p-4">
+          <div key={post.id} className="rounded-xl bg-white border border-gray-100 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
+              <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                 {sportLabel[post.sportType]}
               </span>
               <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                post.status === 'open' ? 'bg-green-50 text-green-600' :
+                post.status === 'open' ? 'text-blue-500' :
                 post.status === 'closed' ? 'bg-gray-100 text-gray-500' :
                 'bg-red-50 text-red-500'
               }`}>

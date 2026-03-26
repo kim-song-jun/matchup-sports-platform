@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  Search, AlertCircle, ChevronRight, Clock, Filter,
-} from 'lucide-react';
+import { AlertCircle, ChevronRight, Clock } from 'lucide-react';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
 type DisputeType = 'no_show' | 'late' | 'level_mismatch' | 'misconduct';
 type DisputeStatus = 'pending' | 'investigating' | 'resolved' | 'dismissed';
@@ -96,12 +95,12 @@ const statusColor: Record<DisputeStatus, string> = {
   dismissed: 'bg-gray-100 text-gray-500',
 };
 
-const statusFilters: { value: string; label: string }[] = [
-  { value: 'all', label: '전체' },
-  { value: 'pending', label: '대기중' },
-  { value: 'investigating', label: '조사중' },
-  { value: 'resolved', label: '해결됨' },
-  { value: 'dismissed', label: '기각됨' },
+const disputeFilters = [
+  { key: 'all', label: '전체' },
+  { key: 'pending', label: '대기중' },
+  { key: 'investigating', label: '조사중' },
+  { key: 'resolved', label: '해결됨' },
+  { key: 'dismissed', label: '기각됨' },
 ];
 
 export default function AdminDisputesPage() {
@@ -119,6 +118,21 @@ export default function AdminDisputesPage() {
 
   const pendingCount = mockDisputes.filter((d) => d.status === 'pending').length;
   const investigatingCount = mockDisputes.filter((d) => d.status === 'investigating').length;
+
+  const handleDownloadCSV = () => {
+    downloadCSV(
+      filtered.map((d) => ({
+        ID: d.id,
+        신고팀: d.reporterTeam,
+        피신고팀: d.reportedTeam,
+        매치일: d.matchDate,
+        유형: typeLabel[d.type],
+        상태: statusLabel[d.status],
+        신고일: d.createdAt,
+      })),
+      '신고분쟁'
+    );
+  };
 
   return (
     <div className="animate-fade-in">
@@ -143,36 +157,15 @@ export default function AdminDisputesPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="팀명 또는 ID로 검색"
-            className="w-full rounded-xl bg-gray-50 border border-gray-200 py-2.5 pl-9 pr-4 text-[14px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all"
-          />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Filter size={14} className="text-gray-400" />
-          {statusFilters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setStatusFilter(f.value)}
-              className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
-                statusFilter === f.value
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-[13px] text-gray-400 mb-3">{filtered.length}건의 신고</p>
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '팀명 또는 ID로 검색' }}
+        filters={disputeFilters}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        onDownload={handleDownloadCSV}
+        count={filtered.length}
+        countLabel="건"
+      />
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">

@@ -24,7 +24,7 @@ export default function AccountPage() {
         </button>
         <h1 className="text-[16px] font-semibold text-gray-900">개인정보 관리</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-400">
+      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600">설정</button>
         <ChevronRight size={14} />
         <span className="text-gray-900 font-medium">개인정보 관리</span>
@@ -33,7 +33,7 @@ export default function AccountPage() {
       <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-6">
         {/* 닉네임 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <label className="block text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">닉네임</label>
+          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>
           <input
             type="text"
             value={nickname}
@@ -41,12 +41,12 @@ export default function AccountPage() {
             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             placeholder="닉네임을 입력하세요"
           />
-          <p className="text-[12px] text-gray-400 mt-2">2~12자, 한글/영문/숫자 사용 가능</p>
+          <p className="text-[12px] text-gray-500 mt-2">2~12자, 한글/영문/숫자 사용 가능</p>
         </div>
 
         {/* 이메일 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <label className="block text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">이메일</label>
+          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">이메일</label>
           <input
             type="email"
             value={email}
@@ -58,7 +58,7 @@ export default function AccountPage() {
 
         {/* 전화번호 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <label className="block text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">전화번호</label>
+          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">전화번호</label>
           <input
             type="tel"
             value={phone}
@@ -70,7 +70,7 @@ export default function AccountPage() {
 
         {/* 비밀번호 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <label className="block text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">비밀번호</label>
+          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">비밀번호</label>
           <div className="flex items-center gap-3 rounded-xl bg-blue-50 px-4 py-3.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
@@ -86,7 +86,7 @@ export default function AccountPage() {
 
         {/* 연결된 소셜 계정 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <label className="block text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-3">연결된 소셜 계정</label>
+          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">연결된 소셜 계정</label>
           <div className="space-y-3">
             <SocialAccount provider="kakao" name="카카오" email="player@kakao.com" connected />
             <SocialAccount provider="naver" name="네이버" connected={false} />
@@ -117,7 +117,7 @@ export default function AccountPage() {
           >
             회원 탈퇴
           </button>
-          <p className="text-[12px] text-gray-400 text-center mt-2">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
+          <p className="text-[12px] text-gray-500 text-center mt-2">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export default function AccountPage() {
               onClick={() => setShowDeleteModal(false)}
               className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
-              <X size={20} className="text-gray-400" />
+              <X size={20} className="text-gray-500" />
             </button>
 
             <div className="flex flex-col items-center text-center">
@@ -206,7 +206,7 @@ function SocialAccount({ provider, name, email, connected }: { provider: string;
       {icons[provider]}
       <div className="flex-1 min-w-0">
         <p className="text-[15px] font-medium text-gray-900">{name}</p>
-        {email && <p className="text-[13px] text-gray-400 mt-0.5">{email}</p>}
+        {email && <p className="text-[13px] text-gray-500 mt-0.5">{email}</p>}
       </div>
       {connected ? (
         <span className="rounded-lg bg-green-50 px-2.5 py-1 text-[12px] font-medium text-green-600">연결됨</span>

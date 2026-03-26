@@ -1,30 +1,14 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { PrivacyNavHeader } from './nav-header';
 
 export default function PrivacyPage() {
-  const router = useRouter();
-
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="rounded-xl p-1.5 -ml-1.5 hover:bg-gray-100">
-          <ArrowLeft size={20} className="text-gray-700" />
-        </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">개인정보 처리방침</h1>
-      </header>
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-400">
-        <button onClick={() => router.push('/settings')} className="hover:text-gray-600">설정</button>
-        <ChevronRight size={14} />
-        <span className="text-gray-900 font-medium">개인정보 처리방침</span>
-      </div>
+      <PrivacyNavHeader />
 
       <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-8">
         <Section title="1. 수집하는 정보">
           <p>
-            MatchUp(이하 &quot;회사&quot;)은 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다. 회원가입 시 필수적으로 수집하는 정보는 이메일 주소, 닉네임이며, 소셜 로그인(카카오, 네이버, Apple)을 통해 가입하는 경우 해당 플랫폼에서 제공하는 프로필 정보(이름, 이메일, 프로필 사진)가 수집됩니다.
+            TeamMeet(이하 &quot;회사&quot;)은 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다. 회원가입 시 필수적으로 수집하는 정보는 이메일 주소, 닉네임이며, 소셜 로그인(카카오, 네이버, Apple)을 통해 가입하는 경우 해당 플랫폼에서 제공하는 프로필 정보(이름, 이메일, 프로필 사진)가 수집됩니다.
           </p>
           <p>
             서비스 이용 과정에서 자동으로 수집되는 정보에는 기기 정보(기기 종류, OS 버전, 앱 버전), 접속 로그(접속 일시, IP 주소), 서비스 이용 기록(매치 참여 기록, 채팅 기록, 결제 기록) 등이 포함됩니다. 위치 기반 서비스 이용 시 이용자의 동의 하에 위치 정보가 수집될 수 있습니다.
@@ -78,12 +62,12 @@ export default function PrivacyPage() {
             이용자는 회원 탈퇴를 통해 개인정보의 수집 및 이용에 대한 동의를 철회할 수 있습니다. 탈퇴 요청은 서비스 내 &quot;설정 &gt; 개인정보 관리 &gt; 회원 탈퇴&quot;에서 직접 처리할 수 있으며, 탈퇴 즉시 개인정보가 파기됩니다. 다만, 법령에 의해 보관이 필요한 정보는 해당 기간 동안 보관 후 파기됩니다.
           </p>
           <p>
-            이용자는 개인정보 보호와 관련하여 불만이 있는 경우 개인정보 보호위원회(국번없이 182), 한국인터넷진흥원(국번없이 118) 등에 상담 또는 구제를 신청할 수 있습니다. 회사의 개인정보 보호책임자에게 직접 문의할 수도 있으며, 연락처는 support@matchup.kr입니다.
+            이용자는 개인정보 보호와 관련하여 불만이 있는 경우 개인정보 보호위원회(국번없이 182), 한국인터넷진흥원(국번없이 118) 등에 상담 또는 구제를 신청할 수 있습니다. 회사의 개인정보 보호책임자에게 직접 문의할 수도 있으며, 연락처는 support@teammeet.kr입니다.
           </p>
         </Section>
 
         <div className="text-center py-4 border-t border-gray-100">
-          <p className="text-[13px] text-gray-400">최종 수정일: 2026년 1월 1일</p>
+          <p className="text-[13px] text-gray-500">최종 수정일: 2026년 1월 1일</p>
         </div>
       </div>
     </div>

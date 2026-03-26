@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, Swords, ChevronRight } from 'lucide-react';
+import { Swords, ChevronRight } from 'lucide-react';
+import { sportLabel } from '@/lib/constants';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
 type TeamMatchStatus = 'recruiting' | 'approved' | 'completed' | 'cancelled';
 
@@ -73,10 +75,6 @@ const mockTeamMatches: TeamMatch[] = [
   },
 ];
 
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', soccer: '축구', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키',
-};
-
 const statusLabel: Record<TeamMatchStatus, string> = {
   recruiting: '모집중', approved: '매칭완료', completed: '경기완료', cancelled: '취소됨',
 };
@@ -88,18 +86,42 @@ const statusColor: Record<TeamMatchStatus, string> = {
   cancelled: 'bg-red-50 text-red-500',
 };
 
+const teamMatchFilters = [
+  { key: 'all', label: '전체' },
+  { key: 'recruiting', label: '모집중' },
+  { key: 'matched', label: '매칭완료' },
+  { key: 'completed', label: '경기종료' },
+  { key: 'cancelled', label: '취소' },
+];
+
 export default function AdminTeamMatchesPage() {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const filtered = mockTeamMatches.filter((tm) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      tm.title.toLowerCase().includes(q) ||
-      tm.hostTeam.toLowerCase().includes(q) ||
-      tm.id.toLowerCase().includes(q)
-    );
+    const matchesSearch = !search ||
+      tm.title.toLowerCase().includes(search.toLowerCase()) ||
+      tm.hostTeam.toLowerCase().includes(search.toLowerCase()) ||
+      tm.id.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'matched' ? tm.status === 'approved' : tm.status === statusFilter);
+    return matchesSearch && matchesStatus;
   });
+
+  const handleDownloadCSV = () => {
+    downloadCSV(
+      filtered.map((tm) => ({
+        ID: tm.id,
+        제목: tm.title,
+        호스트팀: tm.hostTeam,
+        종목: sportLabel[tm.sportType] || tm.sportType,
+        날짜: tm.matchDate,
+        상태: statusLabel[tm.status],
+        신청수: tm.applicationCount,
+      })),
+      '팀매칭'
+    );
+  };
 
   return (
     <div className="animate-fade-in">
@@ -115,24 +137,17 @@ export default function AdminTeamMatchesPage() {
           <h1 className="text-[24px] font-bold text-gray-900">팀 매칭 관리</h1>
           <p className="text-[14px] text-gray-400 mt-1">팀 간 매칭 모집글을 관리하세요</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Swords size={20} className="text-blue-500" />
-          <span className="text-[14px] font-semibold text-gray-700">{mockTeamMatches.length}건</span>
-        </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="제목 또는 팀명으로 검색"
-          className="w-full rounded-xl bg-gray-50 border border-gray-200 py-2.5 pl-9 pr-4 text-[14px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all"
-        />
-      </div>
-
-      <p className="text-[13px] text-gray-400 mb-3">{filtered.length}건의 팀 매칭</p>
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '제목 또는 팀명으로 검색' }}
+        filters={teamMatchFilters}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        onDownload={handleDownloadCSV}
+        count={filtered.length}
+        countLabel="건"
+      />
 
       {/* Table */}
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">

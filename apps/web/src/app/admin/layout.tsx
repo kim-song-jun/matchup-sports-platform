@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-5 pt-6 pb-4">
           <div className="flex items-center gap-2 text-gray-900">
             <ShieldCheck size={20} className="text-blue-500" />
-            <h1 className="text-[16px] font-bold">MatchUp Admin</h1>
+            <h1 className="text-[16px] font-bold">TeamMeet Admin</h1>
           </div>
         </div>
 
@@ -40,7 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             return (
               <Link key={href} href={href}
                 className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all ${
-                  isActive ? 'bg-blue-50 text-blue-500' : 'text-gray-600 hover:bg-gray-50'
+                  isActive ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                 }`}>
                 <Icon size={18} strokeWidth={isActive ? 2 : 1.5} />
                 {label}

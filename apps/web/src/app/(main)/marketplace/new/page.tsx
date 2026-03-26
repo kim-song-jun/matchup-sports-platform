@@ -4,17 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Camera, Plus, X, ShoppingBag } from 'lucide-react';
-import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { sportLabel } from '@/lib/constants';
 
-const sports = [
-  { type: 'futsal', label: '풋살' },
-  { type: 'basketball', label: '농구' },
-  { type: 'badminton', label: '배드민턴' },
-  { type: 'ice_hockey', label: '아이스하키' },
-];
+const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
 const categories = [
   '축구화/풋살화', '농구화', '라켓', '유니폼', '보호장비',
@@ -70,7 +65,7 @@ export default function CreateListingPage() {
     return (
       <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-blue-50 text-blue-500 mb-4">
+          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
           </div>
           <h2 className="text-[22px] font-bold text-gray-900">매물을 등록해보세요</h2>
@@ -94,7 +89,7 @@ export default function CreateListingPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600 transition-colors">장터</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">매물 등록</span>
@@ -107,7 +102,7 @@ export default function CreateListingPage() {
             상품 이미지
           </label>
           <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-            <button className="flex h-[80px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors">
+            <button className="flex h-[80px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors">
               <Camera size={22} />
               <span className="text-[11px] font-medium">0/10</span>
             </button>
@@ -118,14 +113,16 @@ export default function CreateListingPage() {
               </div>
             ))}
           </div>
-          <p className="text-[12px] text-gray-400 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다</p>
+          <p className="text-[12px] text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다</p>
         </div>
 
         {/* 제목 */}
-        <Field label="제목" required>
+        <Field label="제목" required id="mkt-title">
           <input
+            id="mkt-title"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
+            maxLength={100}
             placeholder="상품 제목을 입력해주세요"
             className="input-field"
           />
@@ -133,24 +130,21 @@ export default function CreateListingPage() {
 
         {/* 종목 */}
         <Field label="종목" required>
-          <div className="grid grid-cols-2 gap-2">
-            {sports.map((s) => {
-              const Icon = SportIconMap[s.type];
-              const selected = form.sportType === s.type;
-              return (
-                <button
-                  key={s.type}
-                  type="button"
-                  onClick={() => setForm({ ...form, sportType: s.type })}
-                  className={`flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all text-left ${
-                    selected ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-100 bg-white hover:border-gray-200'
-                  }`}
-                >
-                  {Icon && <Icon size={20} />}
-                  <span className="text-[14px] font-medium">{s.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            {sportTypes.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setForm({ ...form, sportType: type })}
+                className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+                  form.sportType === type
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {sportLabel[type] || type}
+              </button>
+            ))}
           </div>
         </Field>
 
@@ -164,7 +158,7 @@ export default function CreateListingPage() {
                 onClick={() => setForm({ ...form, category: cat })}
                 className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
                   form.category === cat
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                 }`}
               >
@@ -184,14 +178,14 @@ export default function CreateListingPage() {
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`w-full text-left rounded-xl border-2 p-3.5 transition-all ${
                   form.condition === c.value
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-semibold ${form.condition === c.value ? 'text-blue-600' : 'text-gray-900'}`}>
+                <p className={`text-[14px] font-semibold ${form.condition === c.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                   {c.label}
                 </p>
-                <p className="text-[12px] text-gray-400 mt-0.5">{c.desc}</p>
+                <p className="text-[12px] text-gray-500 mt-0.5">{c.desc}</p>
               </button>
             ))}
           </div>
@@ -205,7 +199,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'sell' })}
               className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                 form.listingType === 'sell'
-                  ? 'border-blue-500 bg-blue-50 text-blue-600'
+                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
               }`}
             >
@@ -216,7 +210,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'rent' })}
               className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                 form.listingType === 'rent'
-                  ? 'border-blue-500 bg-blue-50 text-blue-600'
+                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
               }`}
             >
@@ -226,9 +220,10 @@ export default function CreateListingPage() {
         </Field>
 
         {/* 가격 */}
-        <Field label="가격" required>
+        <Field label="가격" required id="mkt-price">
           <div className="relative">
             <input
+              id="mkt-price"
               type="number"
               value={form.price || ''}
               onChange={(e) => setForm({ ...form, price: +e.target.value })}
@@ -237,45 +232,49 @@ export default function CreateListingPage() {
               step={1000}
               className="input-field pr-10"
             />
-            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-400">원</span>
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-500">원</span>
           </div>
         </Field>
 
         {/* 대여 추가 정보 */}
         {form.listingType === 'rent' && (
           <div className="grid grid-cols-2 gap-3">
-            <Field label="일일 대여비">
+            <Field label="일일 대여비" id="mkt-rental-price">
               <div className="relative">
                 <input
+                  id="mkt-rental-price"
                   type="number"
                   value={form.rentalPricePerDay || ''}
                   onChange={(e) => setForm({ ...form, rentalPricePerDay: +e.target.value })}
                   placeholder="0"
                   className="input-field pr-10"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-400">원</span>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-500">원</span>
               </div>
             </Field>
-            <Field label="보증금">
+            <Field label="보증금" id="mkt-deposit">
               <div className="relative">
                 <input
+                  id="mkt-deposit"
                   type="number"
                   value={form.rentalDeposit || ''}
                   onChange={(e) => setForm({ ...form, rentalDeposit: +e.target.value })}
                   placeholder="0"
                   className="input-field pr-10"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-400">원</span>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-500">원</span>
               </div>
             </Field>
           </div>
         )}
 
         {/* 설명 */}
-        <Field label="상세 설명">
+        <Field label="상세 설명" id="mkt-description">
           <textarea
+            id="mkt-description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+            maxLength={1000}
             placeholder="구매시기, 브랜드/모델명, 사용감 등 자세하게 적어주세요"
             rows={5}
             className="input-field resize-none"
@@ -309,15 +308,26 @@ export default function CreateListingPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
+        @media (prefers-color-scheme: dark) {
+          .input-field {
+            background: #1A1D23;
+            border-color: #333D4B;
+            color: #F2F4F6;
+          }
+          .input-field:focus {
+            background: #1A1D23;
+            border-color: #3182F6;
+          }
+        }
       `}</style>
     </div>
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, children, id }: { label: string; required?: boolean; children: React.ReactNode; id?: string }) {
   return (
     <div className="mb-5">
-      <label className="block text-[13px] font-semibold text-gray-700 mb-1.5">
+      <label htmlFor={id} className="block text-[13px] font-semibold text-gray-700 mb-1.5">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}

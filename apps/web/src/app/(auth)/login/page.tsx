@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDevLogin } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
 
 const taglines = ['오늘도 한 판 어때요?', '실력이 쑥쑥 올라가는 중!', '내 수준에 딱 맞는 상대가 기다려요'];
 
@@ -12,6 +13,12 @@ export default function LoginPage() {
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [taglineIdx, setTaglineIdx] = useState(0);
+
+  // Redirect if already logged in AND auth store confirms it
+  const { isAuthenticated: alreadyLoggedIn } = useAuthStore();
+  useEffect(() => {
+    if (alreadyLoggedIn) router.replace('/home');
+  }, [alreadyLoggedIn, router]);
 
   useEffect(() => {
     const t = setInterval(() => setTaglineIdx(i => (i + 1) % taglines.length), 3000);
@@ -36,7 +43,7 @@ export default function LoginPage() {
       {/* Top area */}
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <div className="mb-10 text-center">
-          <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
+          <h1 className="text-[32px] font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
           <p className="mt-2 text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed">
             같이 운동할 사람, 찾고 계셨죠?<br />AI가 딱 맞는 메이트를 찾아드려요
           </p>

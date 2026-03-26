@@ -127,7 +127,7 @@ export default function CheckoutPage() {
             <CheckCircle size={18} className="text-green-400" />
             <span className="text-[14px] font-medium text-white">결제가 완료되었습니다</span>
           </div>
-          <span className="text-[12px] text-gray-400">{completedOrderName} - {formatCurrency(completedAmount)}</span>
+          <span className="text-[12px] text-gray-500">{completedOrderName} - {formatCurrency(completedAmount)}</span>
         </div>
       )}
 
@@ -140,7 +140,7 @@ export default function CheckoutPage() {
       </header>
       <div className="hidden lg:block mb-6">
         <h2 className="text-[24px] font-bold text-gray-900">결제하기</h2>
-        <p className="text-[14px] text-gray-400 mt-1">주문 내용을 확인하고 결제를 진행해 주세요</p>
+        <p className="text-[14px] text-gray-500 mt-1">주문 내용을 확인하고 결제를 진행해 주세요</p>
       </div>
 
       <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
@@ -161,11 +161,11 @@ export default function CheckoutPage() {
             </div>
             <div className="rounded-xl bg-gray-50 p-3.5 space-y-2">
               <div className="flex items-center gap-2 text-[13px] text-gray-600">
-                <Calendar size={14} className="text-gray-400 shrink-0" />
+                <Calendar size={14} className="text-gray-500 shrink-0" />
                 {order.date}
               </div>
               <div className="flex items-center gap-2 text-[13px] text-gray-600">
-                <MapPin size={14} className="text-gray-400 shrink-0" />
+                <MapPin size={14} className="text-gray-500 shrink-0" />
                 {order.venue}
               </div>
             </div>
@@ -191,7 +191,7 @@ export default function CheckoutPage() {
                 >
                   <div
                     className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                      isSelected ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-400'
+                      isSelected ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'
                     }`}
                   >
                     <Icon size={20} />
@@ -204,7 +204,7 @@ export default function CheckoutPage() {
                     >
                       {method.label}
                     </p>
-                    <p className="text-[12px] text-gray-400">{method.description}</p>
+                    <p className="text-[12px] text-gray-500">{method.description}</p>
                   </div>
                   <div
                     className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
@@ -234,7 +234,7 @@ export default function CheckoutPage() {
             />
             <button
               onClick={handleApplyCoupon}
-              className="shrink-0 rounded-xl bg-gray-900 px-5 py-3 text-[14px] font-semibold text-white hover:bg-gray-800 transition-colors"
+              className="shrink-0 rounded-xl bg-blue-500 px-5 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors"
             >
               적용
             </button>
@@ -286,9 +286,9 @@ export default function CheckoutPage() {
             <span className="text-[14px] text-gray-700">결제 및 취소 규정에 동의합니다</span>
           </button>
           <div className="mt-3 rounded-xl bg-gray-50 p-3.5">
-            <p className="text-[12px] text-gray-400 leading-relaxed">
+            <p className="text-[12px] text-gray-500 leading-relaxed">
               경기 시작 24시간 전: 전액 환불 / 1~24시간 전: 50% 환불 / 1시간 이내: 환불 불가.
-              결제 완료 시 MatchUp 이용약관 및 결제 취소 규정에 동의하는 것으로 간주합니다.
+              결제 완료 시 TeamMeet 이용약관 및 결제 취소 규정에 동의하는 것으로 간주합니다.
             </p>
           </div>
         </div>
@@ -306,7 +306,7 @@ export default function CheckoutPage() {
           className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-[16px] font-bold transition-all ${
             agreedToTerms && !isProcessing
               ? 'bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98]'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}
         >
           {isProcessing ? (

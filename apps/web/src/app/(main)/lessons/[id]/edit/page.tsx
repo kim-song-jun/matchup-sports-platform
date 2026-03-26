@@ -132,9 +132,9 @@ export default function EditLessonPage() {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
         <div className="space-y-4 animate-pulse">
-          <div className="h-10 bg-gray-100 rounded-xl" />
-          <div className="h-48 bg-gray-100 rounded-2xl" />
-          <div className="h-48 bg-gray-100 rounded-2xl" />
+          <div className="h-10 bg-gray-100 dark:bg-gray-700 rounded-xl" />
+          <div className="h-48 bg-gray-100 dark:bg-gray-700 rounded-xl" />
+          <div className="h-48 bg-gray-100 dark:bg-gray-700 rounded-xl" />
         </div>
       </div>
     );
@@ -149,32 +149,32 @@ export default function EditLessonPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all';
-  const selectClass = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
+  const selectClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-[14px] text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1">강좌 수정</h1>
+        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white truncate flex-1">강좌 수정</h1>
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/lessons" className="hover:text-gray-600">강좌</Link>
         <ChevronRight size={14} />
         <Link href={`/lessons/${lessonId}`} className="hover:text-gray-600">{lesson.title}</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">수정</span>
+        <span className="text-gray-700 dark:text-gray-200">수정</span>
       </div>
 
       <div className="px-5 lg:px-0 max-w-2xl">
         {/* 종목 선택 */}
         <section className="mb-6">
-          <label className="text-[13px] font-medium text-gray-700 mb-2 block">종목 선택</label>
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">종목 선택</label>
           <div className="grid grid-cols-2 gap-3">
             {sports.map((s) => {
               const Icon = SportIconMap[s.type];
@@ -183,10 +183,10 @@ export default function EditLessonPage() {
                 <button
                   key={s.type}
                   onClick={() => update('sportType', s.type)}
-                  className={`flex items-center gap-3 rounded-2xl border-2 p-4 transition-all ${
+                  className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
                     selected
-                      ? 'border-blue-500 bg-blue-50 text-blue-600'
-                      : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
+                      ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                      : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-200 text-gray-700 dark:text-gray-200'
                   }`}
                 >
                   {Icon && <Icon size={28} />}
@@ -199,7 +199,7 @@ export default function EditLessonPage() {
 
         {/* 강좌 유형 */}
         <section className="mb-6">
-          <label className="text-[13px] font-medium text-gray-700 mb-2 block">강좌 유형</label>
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">강좌 유형</label>
           <div className="space-y-2">
             {lessonTypes.map((t) => (
               <button
@@ -207,14 +207,14 @@ export default function EditLessonPage() {
                 onClick={() => update('type', t.value)}
                 className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
                   form.type === t.value
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-100 hover:border-gray-200'
+                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
+                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-semibold ${form.type === t.value ? 'text-blue-600' : 'text-gray-900'}`}>
+                <p className={`text-[14px] font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
                   {t.label}
                 </p>
-                <p className="text-[12px] text-gray-400 mt-0.5">{t.desc}</p>
+                <p className="text-[12px] text-gray-500 mt-0.5">{t.desc}</p>
               </button>
             ))}
           </div>
@@ -222,7 +222,7 @@ export default function EditLessonPage() {
 
         {/* 강좌 제목 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             강좌 제목 <span className="text-red-400">*</span>
           </label>
           <input
@@ -236,7 +236,7 @@ export default function EditLessonPage() {
 
         {/* 강좌 설명 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">강좌 설명</label>
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">강좌 설명</label>
           <textarea
             value={form.description}
             onChange={(e) => update('description', e.target.value)}
@@ -248,7 +248,7 @@ export default function EditLessonPage() {
 
         {/* 코치명 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             코치명 <span className="text-red-400">*</span>
           </label>
           <input
@@ -262,7 +262,7 @@ export default function EditLessonPage() {
 
         {/* 코치 소개 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">코치 소개</label>
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">코치 소개</label>
           <textarea
             value={form.coachBio}
             onChange={(e) => update('coachBio', e.target.value)}
@@ -274,7 +274,7 @@ export default function EditLessonPage() {
 
         {/* 장소명 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소명 <span className="text-red-400">*</span>
           </label>
           <input
@@ -288,7 +288,7 @@ export default function EditLessonPage() {
 
         {/* 날짜 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             날짜 <span className="text-red-400">*</span>
           </label>
           <input
@@ -303,7 +303,7 @@ export default function EditLessonPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 시작 시간 <span className="text-red-400">*</span>
               </label>
               <input
@@ -314,7 +314,7 @@ export default function EditLessonPage() {
               />
             </div>
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 종료 시간 <span className="text-red-400">*</span>
               </label>
               <input
@@ -331,7 +331,7 @@ export default function EditLessonPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">최대 인원</label>
+              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 인원</label>
               <input
                 type="number"
                 value={form.maxParticipants}
@@ -342,7 +342,7 @@ export default function EditLessonPage() {
               />
             </div>
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">수강료 (원)</label>
+              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">수강료 (원)</label>
               <input
                 type="number"
                 value={form.fee}
@@ -352,7 +352,7 @@ export default function EditLessonPage() {
                 className={inputClass}
               />
               {form.fee > 0 && (
-                <p className="text-[12px] text-gray-400 mt-1">
+                <p className="text-[12px] text-gray-500 mt-1">
                   {new Intl.NumberFormat('ko-KR').format(form.fee)}원
                 </p>
               )}
@@ -364,7 +364,7 @@ export default function EditLessonPage() {
         <section className="mb-6">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">최소 레벨</label>
+              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최소 레벨</label>
               <select
                 value={form.levelMin}
                 onChange={(e) => update('levelMin', +e.target.value)}
@@ -376,7 +376,7 @@ export default function EditLessonPage() {
               </select>
             </div>
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">최대 레벨</label>
+              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 레벨</label>
               <select
                 value={form.levelMax}
                 onChange={(e) => update('levelMax', +e.target.value)}
@@ -413,16 +413,16 @@ export default function EditLessonPage() {
       {/* Delete confirmation modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 animate-fade-in">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 text-center">강좌를 삭제하시겠어요?</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">강좌를 삭제하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
+                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 돌아가기
               </button>

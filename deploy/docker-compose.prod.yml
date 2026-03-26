@@ -30,9 +30,7 @@ services:
       retries: 5
 
   api:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.api
+    image: matchup-api:latest
     container_name: matchup_api
     restart: always
     environment:
@@ -50,9 +48,7 @@ services:
       - "8100:8100"
 
   web:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.web
+    image: matchup-web:latest
     container_name: matchup_web
     restart: always
     environment:

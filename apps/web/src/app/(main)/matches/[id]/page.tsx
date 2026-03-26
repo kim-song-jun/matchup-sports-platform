@@ -10,14 +10,10 @@ import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import type { MatchParticipant } from '@/types/api';
 import { api } from '@/lib/api';
+import { sportLabel, levelLabel } from '@/lib/constants';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckoutModal } from '@/components/payment/checkout-modal';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
+import dynamic from 'next/dynamic';
+const CheckoutModal = dynamic(() => import('@/components/payment/checkout-modal').then(m => ({ default: m.CheckoutModal })), { ssr: false });
 
 function formatMatchDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -116,7 +112,7 @@ export default function MatchDetailPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</span>
@@ -129,16 +125,16 @@ export default function MatchDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-5 lg:p-6">
             <div className="flex items-start gap-3">
               {SportIcon && (
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
                   <SportIcon size={24} />
                 </div>
               )}
               <div>
-                <span className="text-[12px] font-medium text-blue-500">{sportLabel[match.sportType]}</span>
+                <span className="text-[12px] font-medium text-gray-500">{sportLabel[match.sportType]}</span>
                 <h2 className="text-[20px] font-bold text-gray-900 mt-0.5 leading-tight">
                   {match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
                 </h2>
-                <p className="text-[13px] text-gray-400 mt-1">
+                <p className="text-[13px] text-gray-500 mt-1">
                   호스트: {match.host?.nickname}
                   <Star size={12} className="inline ml-1 text-amber-400" fill="currentColor" />
                   <span className="ml-0.5">{match.host?.mannerScore?.toFixed(1)}</span>
@@ -169,7 +165,7 @@ export default function MatchDetailPage() {
                 </div>
                 <div>
                   <p className="text-[14px] font-medium text-gray-800">{match.venue.name}</p>
-                  <p className="text-[12px] text-gray-400 mt-0.5">{match.venue.address}</p>
+                  <p className="text-[12px] text-gray-500 mt-0.5">{match.venue.address}</p>
                   {(match.venue.rating ?? 0) > 0 && (
                     <div className="flex items-center gap-1 mt-1">
                       <Star size={12} className="text-amber-400" fill="currentColor" />
@@ -199,18 +195,18 @@ export default function MatchDetailPage() {
             </div>
 
             {!isAuthenticated ? (
-              <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white hover:bg-gray-800 transition-colors">
+              <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">
                 로그인 후 참가하기
               </Link>
             ) : isHost ? (
-              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-400 cursor-not-allowed">
+              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-500 cursor-not-allowed">
                 내가 만든 매치
               </button>
             ) : isParticipant ? (
               <button
                 onClick={() => leaveMutation.mutate()}
                 disabled={leaveMutation.isPending}
-                className="w-full rounded-xl border-2 border-red-100 bg-red-50 py-3.5 text-[15px] font-semibold text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 bg-white py-3.5 text-[15px] font-semibold text-red-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {leaveMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
@@ -220,7 +216,7 @@ export default function MatchDetailPage() {
                 ) : '참가 취소하기'}
               </button>
             ) : isFull ? (
-              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-400 cursor-not-allowed">
+              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-500 cursor-not-allowed">
                 마감되었습니다
               </button>
             ) : (
@@ -282,12 +278,12 @@ export default function MatchDetailPage() {
                     <p className="text-[14px] font-medium text-gray-800 truncate">
                       {p.user?.nickname}
                       {p.userId === match.hostId && (
-                        <span className="ml-1.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-500">호스트</span>
+                        <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">호스트</span>
                       )}
                     </p>
                   </div>
                   <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
-                    p.status === 'confirmed' ? 'bg-green-50 text-green-500' : 'bg-gray-100 text-gray-500'
+                    p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
                   }`}>
                     {p.status === 'confirmed' ? '확정' : '대기'}
                   </span>
@@ -299,7 +295,6 @@ export default function MatchDetailPage() {
         </div>
       </div>
 
-      <div className="h-6" />
 
       {/* 결제 모달 */}
       {showCheckout && match && (
@@ -333,11 +328,11 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   return (
     <div className="rounded-xl bg-white border border-gray-100 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-gray-400">{icon}</span>
+        <span className="text-gray-500">{icon}</span>
         <span className="text-[12px] text-gray-500">{label}</span>
       </div>
       <p className={`text-[15px] font-semibold ${highlight ? 'text-red-500' : 'text-gray-900'}`}>{value}</p>
-      {sub && <p className={`text-[12px] mt-0.5 ${highlight ? 'text-red-400' : 'text-gray-400'}`}>{sub}</p>}
+      {sub && <p className={`text-[12px] mt-0.5 ${highlight ? 'text-red-400' : 'text-gray-500'}`}>{sub}</p>}
     </div>
   );
 }

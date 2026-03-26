@@ -1,30 +1,14 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { TermsNavHeader } from './nav-header';
 
 export default function TermsPage() {
-  const router = useRouter();
-
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="rounded-xl p-1.5 -ml-1.5 hover:bg-gray-100">
-          <ArrowLeft size={20} className="text-gray-700" />
-        </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">이용약관</h1>
-      </header>
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-400">
-        <button onClick={() => router.push('/settings')} className="hover:text-gray-600">설정</button>
-        <ChevronRight size={14} />
-        <span className="text-gray-900 font-medium">이용약관</span>
-      </div>
+      <TermsNavHeader />
 
       <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-8">
         <Section title="제1장 서비스 이용약관">
           <p>
-            본 약관은 MatchUp(이하 &quot;회사&quot;)이 제공하는 스포츠 매칭 플랫폼 서비스(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 규정합니다. 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있으며, 회사는 관련 법령에 따라 약관의 내용을 변경할 수 있습니다.
+            본 약관은 TeamMeet(이하 &quot;회사&quot;)이 제공하는 스포츠 매칭 플랫폼 서비스(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 규정합니다. 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있으며, 회사는 관련 법령에 따라 약관의 내용을 변경할 수 있습니다.
           </p>
           <p>
             서비스 이용자는 본 약관을 충분히 읽고 이해한 후 동의하여야 합니다. 서비스에 가입하거나 이용을 시작하는 경우, 본 약관에 동의한 것으로 간주됩니다. 이용자는 약관 변경 시 변경된 내용을 확인할 의무가 있으며, 변경된 약관에 동의하지 않는 경우 서비스 이용을 중단하고 탈퇴할 수 있습니다.
@@ -71,7 +55,7 @@ export default function TermsPage() {
         </Section>
 
         <div className="text-center py-4 border-t border-gray-100">
-          <p className="text-[13px] text-gray-400">최종 수정일: 2026년 1월 1일</p>
+          <p className="text-[13px] text-gray-500">최종 수정일: 2026년 1월 1일</p>
         </div>
       </div>
     </div>

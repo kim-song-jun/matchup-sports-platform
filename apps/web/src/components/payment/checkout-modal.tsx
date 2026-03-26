@@ -62,7 +62,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
     <Modal isOpen={isOpen} onClose={onClose} title="결제하기" size="md">
       {/* 주문 요약 */}
       <div className="rounded-xl bg-gray-50 p-4 mb-5">
-        <p className="text-[12px] text-gray-400 mb-1">주문 내역</p>
+        <p className="text-[12px] text-gray-500 mb-1">주문 내역</p>
         <p className="text-[15px] font-semibold text-gray-900">{itemName}</p>
         <p className="text-[20px] font-bold text-gray-900 mt-2">{formatCurrency(amount)}</p>
       </div>
@@ -85,7 +85,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
                 } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                  isSelected ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-400'
+                  isSelected ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'
                 }`}>
                   <method.icon size={20} />
                 </div>
@@ -93,7 +93,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
                   <p className={`text-[14px] font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
                     {method.label}
                   </p>
-                  <p className="text-[12px] text-gray-400">{method.description}</p>
+                  <p className="text-[12px] text-gray-500">{method.description}</p>
                 </div>
                 <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
                   isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'

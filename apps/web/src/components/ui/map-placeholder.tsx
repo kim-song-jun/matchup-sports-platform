@@ -55,7 +55,7 @@ export function MapPlaceholder({ lat, lng, address, name, height = 200 }: MapPla
       {/* Bottom address bar */}
       <div className="absolute bottom-0 left-0 right-0 z-10 bg-white/90 backdrop-blur-sm border-t border-gray-100 px-4 py-2.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <MapPin size={14} className="text-gray-400 shrink-0" />
+          <MapPin size={14} className="text-gray-500 shrink-0" />
           <span className="text-[13px] text-gray-600 truncate">{address}</span>
         </div>
         <a

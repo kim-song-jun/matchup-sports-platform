@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Star, ChevronRight, TrendingUp } from 'lucide-react';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
 interface Review {
   id: string;
@@ -104,10 +106,36 @@ function renderStars(score: number) {
 }
 
 export default function AdminReviewsPage() {
+  const [search, setSearch] = useState('');
+
+  const filtered = mockReviews.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      r.matchTitle.toLowerCase().includes(q) ||
+      r.reviewerName.toLowerCase().includes(q) ||
+      r.targetName.toLowerCase().includes(q)
+    );
+  });
+
   const totalReviews = mockReviews.length;
   const avgManner = mockReviews.reduce((sum, r) => sum + r.mannerScore, 0) / totalReviews;
   const avgSkill = mockReviews.reduce((sum, r) => sum + r.skillScore, 0) / totalReviews;
   const avgTotal = (avgManner + avgSkill) / 2;
+
+  const handleDownloadCSV = () => {
+    downloadCSV(
+      filtered.map((r) => ({
+        매치: r.matchTitle,
+        평가자: r.reviewerName,
+        대상: r.targetName,
+        매너점수: r.mannerScore,
+        실력점수: r.skillScore,
+        날짜: r.date,
+      })),
+      '평가'
+    );
+  };
 
   return (
     <div className="animate-fade-in">
@@ -165,7 +193,12 @@ export default function AdminReviewsPage() {
         </div>
       </div>
 
-      <p className="text-[13px] text-gray-400 mb-3">{totalReviews}건의 평가</p>
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '매치명 또는 평가자/대상 검색' }}
+        onDownload={handleDownloadCSV}
+        count={filtered.length}
+        countLabel="건"
+      />
 
       {/* Table */}
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
@@ -182,7 +215,7 @@ export default function AdminReviewsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {mockReviews.map((r) => (
+              {filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3.5">
                     <p className="text-[14px] font-medium text-gray-900 truncate max-w-[180px]">{r.matchTitle}</p>

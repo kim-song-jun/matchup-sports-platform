@@ -146,15 +146,15 @@ export default function ArrivalCheckPage() {
           <h2 className="text-[15px] font-semibold text-gray-900 mb-3">{mockMatch.title}</h2>
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
-              <Calendar size={15} className="text-gray-400 shrink-0" />
+              <Calendar size={15} className="text-gray-500 shrink-0" />
               <span>{mockMatch.matchDate}</span>
             </div>
             <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
-              <Clock size={15} className="text-gray-400 shrink-0" />
+              <Clock size={15} className="text-gray-500 shrink-0" />
               <span>{mockMatch.startTime} ~ {mockMatch.endTime}</span>
             </div>
             <div className="flex items-center gap-2.5 text-[13px] text-gray-600">
-              <MapPin size={15} className="text-gray-400 shrink-0" />
+              <MapPin size={15} className="text-gray-500 shrink-0" />
               <span>{mockMatch.venueName}</span>
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function ArrivalCheckPage() {
 
         {/* Timer */}
         <div className="rounded-2xl bg-gray-900 p-5 mb-4 text-center">
-          <p className="text-[12px] text-gray-400 mb-1">경기 시작까지</p>
+          <p className="text-[12px] text-gray-500 mb-1">경기 시작까지</p>
           <p className="text-[28px] font-bold text-white tracking-wide">{timeUntilMatch || '--:--'}</p>
         </div>
 
@@ -177,7 +177,7 @@ export default function ArrivalCheckPage() {
           <button
             onClick={handleArrivalConfirm}
             disabled={gpsStatus !== 'in_range'}
-            className="w-full rounded-2xl bg-blue-500 py-5 text-[18px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors mb-4 flex items-center justify-center gap-3 shadow-lg shadow-blue-500/20"
+            className="w-full rounded-2xl bg-blue-500 py-5 text-[18px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors mb-4 flex items-center justify-center gap-3 "
           >
             <CheckCircle2 size={24} />
             도착 완료
@@ -199,7 +199,7 @@ export default function ArrivalCheckPage() {
             <button
               type="button"
               onClick={handlePhotoCapture}
-              className="w-full flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-8 text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors"
+              className="w-full flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-8 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors"
             >
               <Camera size={32} />
               <span className="text-[13px] font-medium">사진 촬영 또는 선택</span>
@@ -264,7 +264,7 @@ export default function ArrivalCheckPage() {
                 value={opponentNote}
                 onChange={(e) => setOpponentNote(e.target.value)}
                 placeholder="지각/미도착 사유를 입력해주세요"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
             </div>
           )}
@@ -293,7 +293,7 @@ export default function ArrivalCheckPage() {
                     {item.status === 'arrived' ? (
                       <CheckCircle2 size={16} className="text-white" />
                     ) : (
-                      <Clock size={14} className="text-gray-400" />
+                      <Clock size={14} className="text-gray-500" />
                     )}
                   </div>
                   {idx < timeline.length - 1 && (
@@ -311,7 +311,7 @@ export default function ArrivalCheckPage() {
                           ? 'bg-green-50 text-green-600'
                           : item.status === 'late'
                             ? 'bg-amber-50 text-amber-600'
-                            : 'bg-gray-100 text-gray-400'
+                            : 'bg-gray-100 text-gray-500'
                       }`}
                     >
                       {item.status === 'arrived'
@@ -322,7 +322,7 @@ export default function ArrivalCheckPage() {
                     </span>
                   </div>
                   {item.time && (
-                    <p className="text-[12px] text-gray-400 mt-0.5">{item.time} 도착</p>
+                    <p className="text-[12px] text-gray-500 mt-0.5">{item.time} 도착</p>
                   )}
                   {item.note && (
                     <p className="text-[12px] text-gray-500 mt-0.5">{item.note}</p>

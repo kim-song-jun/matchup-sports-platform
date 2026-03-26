@@ -28,6 +28,7 @@ export interface Match {
   levelMax: number;
   gender: string;
   status: string;
+  imageUrl?: string;
   teamConfig: Record<string, unknown> | null;
   createdAt?: string;
   venue?: { id: string; name: string; city: string; district?: string; address?: string; rating?: number; reviewCount?: number; lat?: number; lng?: number };
@@ -99,6 +100,7 @@ export interface Lesson {
   status: string;
   coachName: string | null;
   coachBio: string | null;
+  imageUrl?: string;
   createdAt?: string;
   host?: { id: string; nickname: string; profileImageUrl: string | null };
   participants?: LessonParticipant[];

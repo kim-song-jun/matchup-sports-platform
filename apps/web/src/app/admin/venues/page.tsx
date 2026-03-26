@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, MapPin, Star, Plus, Building2, Pencil } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Star, Plus, Building2, Pencil } from 'lucide-react';
 import { useAdminVenues } from '@/hooks/use-api';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import type { Venue } from '@/types/api';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
+import { sportLabel } from '@/lib/constants';
 
 const venueTypeLabel: Record<string, string> = {
   futsal_court: '풋살장', basketball_court: '농구장', badminton_court: '배드민턴장',
@@ -18,6 +16,7 @@ const venueTypeLabel: Record<string, string> = {
 
 export default function AdminVenuesPage() {
   const [search, setSearch] = useState('');
+  const router = useRouter();
 
   const { data, isLoading } = useAdminVenues();
 
@@ -39,14 +38,24 @@ export default function AdminVenuesPage() {
         </Link>
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="시설명으로 검색"
-          className="w-full rounded-xl bg-gray-50 border border-gray-200 py-2.5 pl-9 pr-4 text-[14px] outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all" />
-      </div>
-
-      {!isLoading && <p className="text-[13px] text-gray-400 mb-3">{filtered.length}개의 시설</p>}
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '시설명으로 검색' }}
+        count={filtered.length}
+        countLabel="개의 시설"
+        onDownload={() => {
+          downloadCSV(
+            filtered.map((v: Venue) => ({
+              시설명: v.name,
+              종류: venueTypeLabel[v.type] || v.type,
+              주소: `${v.city} ${v.district}`,
+              평점: v.rating > 0 ? v.rating.toFixed(1) : '-',
+              리뷰수: v.reviewCount ?? 0,
+              시간당가격: v.pricePerHour ? `${new Intl.NumberFormat('ko-KR').format(v.pricePerHour)}원` : '-',
+            })),
+            'venues',
+          );
+        }}
+      />
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -66,7 +75,7 @@ export default function AdminVenuesPage() {
             {isLoading ? Array.from({ length: 4 }).map((_, i) => (
               <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
             )) : filtered.map((v: Venue) => (
-              <tr key={v.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/venues/${v.id}`}>
+              <tr key={v.id} className="hover:bg-gray-50 transition-colors cursor-pointer" role="link" tabIndex={0} onClick={() => router.push(`/admin/venues/${v.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/admin/venues/${v.id}`); }}>
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500">

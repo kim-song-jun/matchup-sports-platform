@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { UserPlus, ChevronRight, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { sportLabel } from '@/lib/constants';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
 type MercenaryStatus = 'recruiting' | 'closed' | 'completed';
 
@@ -65,10 +67,6 @@ const mockMercenaries: MercenaryPost[] = [
   },
 ];
 
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', soccer: '축구', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키',
-};
-
 const statusLabel: Record<MercenaryStatus, string> = {
   recruiting: '모집중', closed: '마감', completed: '완료',
 };
@@ -79,13 +77,44 @@ const statusColor: Record<MercenaryStatus, string> = {
   completed: 'bg-green-50 text-green-600',
 };
 
+const mercenaryFilters = [
+  { key: 'all', label: '전체' },
+  { key: 'recruiting', label: '모집중' },
+  { key: 'closed', label: '마감' },
+];
+
 export default function AdminMercenaryPage() {
   const { toast } = useToast();
   const [posts, setPosts] = useState<MercenaryPost[]>(mockMercenaries);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const handleDelete = (id: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== id));
     toast('success', '용병 모집글이 삭제되었어요');
+  };
+
+  const filtered = posts.filter((m) => {
+    const matchesSearch = !search ||
+      m.teamName.toLowerCase().includes(search.toLowerCase()) ||
+      m.id.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleDownloadCSV = () => {
+    downloadCSV(
+      filtered.map((m) => ({
+        ID: m.id,
+        팀명: m.teamName,
+        종목: sportLabel[m.sportType] || m.sportType,
+        포지션: m.position,
+        날짜: m.matchDate,
+        지원수: m.applicationCount,
+        상태: statusLabel[m.status],
+      })),
+      '용병모집'
+    );
   };
 
   return (
@@ -102,13 +131,17 @@ export default function AdminMercenaryPage() {
           <h1 className="text-[24px] font-bold text-gray-900">용병 관리</h1>
           <p className="text-[14px] text-gray-400 mt-1">용병 모집글을 관리하세요</p>
         </div>
-        <div className="flex items-center gap-2">
-          <UserPlus size={20} className="text-blue-500" />
-          <span className="text-[14px] font-semibold text-gray-700">{posts.length}건</span>
-        </div>
       </div>
 
-      <p className="text-[13px] text-gray-400 mb-3">{posts.length}건의 용병 모집</p>
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '팀명 또는 ID로 검색' }}
+        filters={mercenaryFilters}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        onDownload={handleDownloadCSV}
+        count={filtered.length}
+        countLabel="건"
+      />
 
       {/* Table */}
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
@@ -127,7 +160,7 @@ export default function AdminMercenaryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {posts.map((m) => (
+              {filtered.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3.5 text-[13px] font-mono text-gray-500">{m.id}</td>
                   <td className="px-5 py-3.5">
@@ -162,7 +195,7 @@ export default function AdminMercenaryPage() {
                   </td>
                 </tr>
               ))}
-              {posts.length === 0 && (
+              {filtered.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-5 py-12 text-center">
                     <UserPlus size={24} className="mx-auto text-gray-300 mb-2" />

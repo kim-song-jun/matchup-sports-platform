@@ -8,8 +8,8 @@ import {
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 
-// Mock match data
-const mockMatch = {
+// Mock match data (dev only)
+const _mockMatch = {
   id: 'tm-001',
   title: '서울 FC vs 강남 유나이티드',
   homeTeam: { name: '서울 FC', logo: null },
@@ -23,6 +23,18 @@ const mockMatch = {
     { quarter: 4, teamName: '강남 유나이티드' },
   ],
 };
+
+const emptyMatch = {
+  id: '',
+  title: '',
+  homeTeam: { name: '-', logo: null },
+  awayTeam: { name: '-', logo: null },
+  quarterCount: 4,
+  hasReferee: false,
+  refereeSchedule: [] as { quarter: number; teamName: string }[],
+};
+
+const mockMatch = process.env.NODE_ENV === 'development' ? _mockMatch : emptyMatch;
 
 interface QuarterScore {
   home: string;
@@ -71,16 +83,16 @@ export default function ScoreInputPage() {
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[18px] font-bold text-gray-900">스코어 입력</h1>
+        <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">스코어 입력</h1>
       </header>
 
       <div className="px-5 lg:px-0 lg:max-w-2xl lg:mx-auto">
         {/* Match header with team names */}
-        <div className="rounded-2xl bg-gray-900 p-5 mb-4">
+        <div className="rounded-xl bg-gray-900 p-5 mb-4">
           <div className="flex items-center justify-between">
             {/* Home team */}
             <div className="flex-1 text-center">
@@ -90,7 +102,7 @@ export default function ScoreInputPage() {
                 </span>
               </div>
               <p className="text-[14px] font-semibold text-white">{mockMatch.homeTeam.name}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">홈</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">홈</p>
             </div>
 
             {/* Score display */}
@@ -113,7 +125,7 @@ export default function ScoreInputPage() {
                 </span>
               </div>
               <p className="text-[14px] font-semibold text-white">{mockMatch.awayTeam.name}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">원정</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">원정</p>
             </div>
           </div>
         </div>
@@ -126,18 +138,18 @@ export default function ScoreInputPage() {
             const quarterAway = parseInt(score.away) || 0;
 
             return (
-              <div key={idx} className="rounded-2xl bg-white border border-gray-100 p-4">
+              <div key={idx} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500">
                       <Hash size={14} />
                     </div>
-                    <span className="text-[14px] font-semibold text-gray-900">
+                    <span className="text-[14px] font-semibold text-gray-900 dark:text-white">
                       {idx + 1}쿼터
                     </span>
                   </div>
                   {score.home !== '' && score.away !== '' && (
-                    <span className="text-[12px] text-gray-400">
+                    <span className="text-[12px] text-gray-500">
                       {quarterHome} : {quarterAway}
                     </span>
                   )}
@@ -146,7 +158,7 @@ export default function ScoreInputPage() {
                 <div className="flex items-center gap-3">
                   {/* Home score */}
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-400 mb-1 block text-center">
+                    <label className="text-[11px] text-gray-500 mb-1 block text-center">
                       {mockMatch.homeTeam.name}
                     </label>
                     <input
@@ -156,7 +168,7 @@ export default function ScoreInputPage() {
                       onChange={(e) => updateScore(idx, 'home', e.target.value)}
                       placeholder="0"
                       disabled={submitted}
-                      className="w-full rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 dark:text-white placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
                     />
                   </div>
 
@@ -164,7 +176,7 @@ export default function ScoreInputPage() {
 
                   {/* Away score */}
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-400 mb-1 block text-center">
+                    <label className="text-[11px] text-gray-500 mb-1 block text-center">
                       {mockMatch.awayTeam.name}
                     </label>
                     <input
@@ -174,14 +186,14 @@ export default function ScoreInputPage() {
                       onChange={(e) => updateScore(idx, 'away', e.target.value)}
                       placeholder="0"
                       disabled={submitted}
-                      className="w-full rounded-xl bg-gray-50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 dark:text-white placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
                     />
                   </div>
                 </div>
 
                 {/* Referee assignment */}
                 {ref && (
-                  <div className="mt-3 flex items-center gap-1.5 text-[12px] text-gray-400">
+                  <div className="mt-3 flex items-center gap-1.5 text-[12px] text-gray-500">
                     <Shield size={12} className="text-gray-300" />
                     <span>심판: {ref.teamName}</span>
                   </div>
@@ -192,42 +204,42 @@ export default function ScoreInputPage() {
         </div>
 
         {/* Running total summary */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-4">
-          <h3 className="text-[14px] font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
+          <h3 className="text-[14px] font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
             <Trophy size={16} className="text-amber-500" />
             쿼터별 누적 점수
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-gray-100">
+                <tr className="border-b border-gray-100 dark:border-gray-700">
                   <th className="py-2 px-2 text-left font-semibold text-gray-500">팀</th>
                   {scores.map((_, idx) => (
                     <th key={idx} className="py-2 px-2 text-center font-semibold text-gray-500">
                       Q{idx + 1}
                     </th>
                   ))}
-                  <th className="py-2 px-2 text-center font-semibold text-gray-900">합계</th>
+                  <th className="py-2 px-2 text-center font-semibold text-gray-900 dark:text-white">합계</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-gray-50">
-                  <td className="py-2.5 px-2 font-medium text-gray-900">
+                <tr className="border-b border-gray-50 dark:border-gray-800">
+                  <td className="py-2.5 px-2 font-medium text-gray-900 dark:text-white">
                     {mockMatch.homeTeam.name}
                   </td>
                   {scores.map((s, idx) => (
-                    <td key={idx} className="py-2.5 px-2 text-center text-gray-700">
+                    <td key={idx} className="py-2.5 px-2 text-center text-gray-700 dark:text-gray-200">
                       {s.home || '-'}
                     </td>
                   ))}
                   <td className="py-2.5 px-2 text-center font-bold text-blue-500">{homeTotal}</td>
                 </tr>
                 <tr>
-                  <td className="py-2.5 px-2 font-medium text-gray-900">
+                  <td className="py-2.5 px-2 font-medium text-gray-900 dark:text-white">
                     {mockMatch.awayTeam.name}
                   </td>
                   {scores.map((s, idx) => (
-                    <td key={idx} className="py-2.5 px-2 text-center text-gray-700">
+                    <td key={idx} className="py-2.5 px-2 text-center text-gray-700 dark:text-gray-200">
                       {s.away || '-'}
                     </td>
                   ))}
@@ -250,13 +262,13 @@ export default function ScoreInputPage() {
               경기 완료
             </button>
             {!allFilled && (
-              <p className="text-center text-[12px] text-gray-400 mt-2">
+              <p className="text-center text-[12px] text-gray-500 mt-2">
                 모든 쿼터의 점수를 입력해주세요
               </p>
             )}
           </div>
         ) : (
-          <div className="rounded-2xl bg-green-50 border border-green-100 p-5 mb-8 text-center">
+          <div className="rounded-xl bg-green-50 border border-green-100 p-5 mb-8 text-center">
             <CheckCircle2 size={32} className="mx-auto text-green-500 mb-2" />
             <p className="text-[16px] font-bold text-green-700">스코어가 기록되었습니다</p>
             <p className="text-[13px] text-green-500 mt-1">

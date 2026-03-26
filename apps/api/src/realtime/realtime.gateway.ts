@@ -7,6 +7,7 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
@@ -18,16 +19,17 @@ import { Server, Socket } from 'socket.io';
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
+  private readonly logger = new Logger(RealtimeGateway.name);
+
   @WebSocketServer()
   server: Server;
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
-    // TODO: JWT 검증
+    this.logger.log(`Client connected: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage('match:join')
@@ -60,7 +62,7 @@ export class RealtimeGateway
   }
 
   // 서버에서 호출하는 이벤트 발송 메서드
-  emitMatchUpdate(matchId: string, event: string, data: unknown) {
+  emitTeamMeetdate(matchId: string, event: string, data: unknown) {
     this.server.to(`match:${matchId}`).emit(event, data);
   }
 

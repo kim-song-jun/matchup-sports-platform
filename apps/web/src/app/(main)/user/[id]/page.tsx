@@ -6,12 +6,7 @@ import { ArrowLeft, ChevronRight, Star, Trophy, Users, Shield, Calendar, Trendin
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useUserProfile } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
+import { sportLabel, levelLabel } from '@/lib/constants';
 
 function getMannerLabel(score: number) {
   if (score >= 4.5) return { text: '최고', color: 'text-green-500 bg-green-50' };
@@ -62,7 +57,7 @@ export default function UserProfilePage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/home" className="hover:text-gray-600 transition-colors">홈</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{user.nickname} 프로필</span>
@@ -72,7 +67,7 @@ export default function UserProfilePage() {
         {/* Profile header */}
         <div className="rounded-2xl bg-white border border-gray-100 p-5 lg:p-6 mb-3">
           <div className="flex items-center gap-4">
-            <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-50 to-blue-100 text-[28px] font-black text-blue-500">
+            <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-gray-100 text-[28px] font-black text-blue-500">
               {user.nickname?.charAt(0)}
             </div>
             <div className="flex-1">
@@ -82,7 +77,7 @@ export default function UserProfilePage() {
                   매너 {mannerInfo.text}
                 </span>
                 {user.city && (
-                  <span className="text-[13px] text-gray-400">{user.city} {user.district}</span>
+                  <span className="text-[13px] text-gray-500">{user.city} {user.district}</span>
                 )}
               </div>
             </div>
@@ -100,21 +95,21 @@ export default function UserProfilePage() {
               <Star size={16} className="text-amber-400" fill="currentColor" />
             </div>
             <p className="text-[18px] font-bold text-gray-900">{(user.mannerScore || 0).toFixed(1)}</p>
-            <p className="text-[12px] text-gray-400">매너점수</p>
+            <p className="text-[12px] text-gray-500">매너점수</p>
           </div>
           <div className="rounded-xl bg-white border border-gray-100 p-3.5 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Trophy size={16} className="text-gray-400" />
+              <Trophy size={16} className="text-gray-500" />
             </div>
             <p className="text-[18px] font-bold text-gray-900">{user.totalMatches || 0}</p>
-            <p className="text-[12px] text-gray-400">매치 참여</p>
+            <p className="text-[12px] text-gray-500">매치 참여</p>
           </div>
           <div className="rounded-xl bg-white border border-gray-100 p-3.5 text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Users size={16} className="text-gray-400" />
+              <Users size={16} className="text-gray-500" />
             </div>
             <p className="text-[18px] font-bold text-gray-900">{user.teamCount || 0}</p>
-            <p className="text-[12px] text-gray-400">소속 팀</p>
+            <p className="text-[12px] text-gray-500">소속 팀</p>
           </div>
         </div>
 
@@ -122,7 +117,7 @@ export default function UserProfilePage() {
         {sportProfiles.length > 0 && (
           <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">
-              <TrendingUp size={16} className="inline mr-1.5 text-gray-400" />
+              <TrendingUp size={16} className="inline mr-1.5 text-gray-500" />
               종목별 프로필
             </h3>
             <div className="space-y-3">
@@ -150,7 +145,7 @@ export default function UserProfilePage() {
                         style={{ width: `${(profile.level / 5) * 100}%` }}
                       />
                     </div>
-                    <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-400">
+                    <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-500">
                       {profile.matchCount > 0 && <span>매치 {profile.matchCount}회</span>}
                       {profile.position && <span>포지션: {profile.position}</span>}
                     </div>
@@ -164,7 +159,7 @@ export default function UserProfilePage() {
         {/* Manner score detail */}
         <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
           <h3 className="text-[14px] font-semibold text-gray-900 mb-3">
-            <Shield size={16} className="inline mr-1.5 text-gray-400" />
+            <Shield size={16} className="inline mr-1.5 text-gray-500" />
             매너 정보
           </h3>
           <div className="flex items-center gap-3 mb-3">
@@ -180,11 +175,10 @@ export default function UserProfilePage() {
             </div>
             <span className="text-[15px] font-bold text-gray-900">{(user.mannerScore || 0).toFixed(1)} / 5.0</span>
           </div>
-          <p className="text-[13px] text-gray-400">매너 점수는 매치 후 상대방의 평가를 기반으로 산정됩니다</p>
+          <p className="text-[13px] text-gray-500">매너 점수는 매치 후 상대방의 평가를 기반으로 산정됩니다</p>
         </div>
       </div>
 
-      <div className="h-6" />
     </div>
   );
 }

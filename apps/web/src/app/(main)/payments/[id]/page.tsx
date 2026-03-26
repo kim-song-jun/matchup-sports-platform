@@ -118,7 +118,7 @@ export default function PaymentDetailPage() {
         <h1 className="text-[16px] font-semibold text-gray-900">결제 상세</h1>
       </header>
       <div className="hidden lg:block mb-6">
-        <div className="flex items-center gap-2 text-[13px] text-gray-400 mb-4">
+        <div className="flex items-center gap-2 text-[13px] text-gray-500 mb-4">
           <Link href="/payments" className="hover:text-gray-600 transition-colors">결제 내역</Link>
           <ChevronRight size={14} />
           <span className="text-gray-700">상세</span>
@@ -170,11 +170,11 @@ export default function PaymentDetailPage() {
           <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 수단</h3>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50">
-              <CreditCard size={20} className="text-gray-400" />
+              <CreditCard size={20} className="text-gray-500" />
             </div>
             <div>
               <p className="text-[14px] font-medium text-gray-900">{payment.method}</p>
-              <p className="text-[12px] text-gray-400">{payment.methodDetail}</p>
+              <p className="text-[12px] text-gray-500">{payment.methodDetail}</p>
             </div>
           </div>
         </div>
@@ -191,11 +191,11 @@ export default function PaymentDetailPage() {
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-[13px] text-gray-500">
-                <Calendar size={14} className="text-gray-400 shrink-0" />
+                <Calendar size={14} className="text-gray-500 shrink-0" />
                 {payment.match.date}
               </div>
               <div className="flex items-center gap-2 text-[13px] text-gray-500">
-                <MapPin size={14} className="text-gray-400 shrink-0" />
+                <MapPin size={14} className="text-gray-500 shrink-0" />
                 {payment.match.venue}
               </div>
             </div>
@@ -236,9 +236,9 @@ export default function PaymentDetailPage() {
                 }`}>
                   {step.done && <CheckCircle size={10} className="text-white" />}
                 </div>
-                <p className={`text-[14px] font-medium ${step.done ? 'text-gray-900' : 'text-gray-400'}`}>{step.label}</p>
+                <p className={`text-[14px] font-medium ${step.done ? 'text-gray-900' : 'text-gray-500'}`}>{step.label}</p>
                 {step.time && (
-                  <p className="text-[12px] text-gray-400 mt-0.5">{formatDateTime(step.time)}</p>
+                  <p className="text-[12px] text-gray-500 mt-0.5">{formatDateTime(step.time)}</p>
                 )}
               </div>
             ))}

@@ -182,7 +182,7 @@ export default function BadgesPage() {
 
       {/* Summary */}
       <div className="px-5 lg:px-0 mb-4">
-        <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 text-white">
+        <div className="rounded-xl bg-blue-500 p-5 text-white">
           <p className="text-[13px] text-blue-100">획득한 뱃지</p>
           <div className="flex items-end gap-1 mt-1">
             <span className="text-[32px] font-black leading-none">{earnedBadges.length}</span>
@@ -237,7 +237,7 @@ export default function BadgesPage() {
             return (
               <div
                 key={badge.id || `badge-${idx}`}
-                className={`rounded-2xl border p-4 transition-all ${
+                className={`rounded-xl border p-4 transition-all ${
                   badge.earned
                     ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
                     : 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-100/60 dark:border-gray-700/60'
@@ -245,8 +245,8 @@ export default function BadgesPage() {
               >
                 <div className="flex items-start gap-3.5">
                   <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-all ${
-                      badge.earned ? `${badge.bg} ${badge.color}` : 'bg-gray-100 text-gray-300'
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all ${
+                      badge.earned ? 'bg-gray-100 text-gray-500' : 'bg-gray-100 text-gray-300'
                     }`}
                   >
                     {badge.earned ? <Icon size={22} /> : <Lock size={18} />}
@@ -255,42 +255,32 @@ export default function BadgesPage() {
                     <div className="flex items-center gap-2">
                       <h3
                         className={`text-[15px] font-semibold ${
-                          badge.earned ? 'text-gray-900' : 'text-gray-400'
+                          badge.earned ? 'text-gray-900' : 'text-gray-500'
                         }`}
                       >
                         {badge.name}
                       </h3>
                       {badge.earned && (
-                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-600">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
                           획득
                         </span>
                       )}
                     </div>
-                    <p className={`text-[13px] mt-0.5 ${badge.earned ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <p className={`text-[13px] mt-0.5 ${badge.earned ? 'text-gray-500' : 'text-gray-500'}`}>
                       {badge.description}
                     </p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-[12px] text-gray-400">
+                      <span className="text-[12px] text-gray-500">
                         {badge.requirement}
                       </span>
                       {badge.earned && badge.earnedAt ? (
-                        <span className="text-[11px] text-gray-400">
+                        <span className="text-[11px] text-gray-500">
                           {formatDate(badge.earnedAt)} 획득
                         </span>
                       ) : badge.progress ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-16 rounded-full bg-gray-200 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-blue-400 transition-all"
-                              style={{
-                                width: `${(parseInt(badge.progress.split('/')[0]) / parseInt(badge.progress.split('/')[1])) * 100}%`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-[11px] font-medium text-gray-500">
-                            {badge.progress}
-                          </span>
-                        </div>
+                        <span className="text-[11px] font-medium text-gray-500">
+                          {badge.progress}
+                        </span>
                       ) : (
                         <span className="text-[11px] text-gray-300">미달성</span>
                       )}
@@ -303,7 +293,6 @@ export default function BadgesPage() {
         </div>
       </div>
 
-      <div className="h-6" />
     </div>
   );
 }

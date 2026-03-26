@@ -3,22 +3,22 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Video, Image, BookOpen, Pencil } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Image, BookOpen, Pencil } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { CheckoutModal } from '@/components/payment/checkout-modal';
+import dynamic from 'next/dynamic';
+const CheckoutModal = dynamic(() => import('@/components/payment/checkout-modal').then(m => ({ default: m.CheckoutModal })), { ssr: false });
 import { useLesson } from '@/hooks/use-api';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
+import { useToast } from '@/components/ui/toast';
+import { api } from '@/lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { sportLabel } from '@/lib/constants';
 const typeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
 };
 const typeColor: Record<string, string> = {
-  group_lesson: 'bg-blue-50 text-blue-500', practice_match: 'bg-gray-100 text-gray-700',
-  free_practice: 'bg-gray-100 text-gray-700', clinic: 'bg-blue-50 text-blue-500',
+  group_lesson: 'bg-gray-100 text-gray-700', practice_match: 'bg-gray-100 text-gray-700',
+  free_practice: 'bg-gray-100 text-gray-700', clinic: 'bg-gray-100 text-gray-700',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
@@ -40,13 +40,28 @@ export default function LessonDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const lessonId = params.id as string;
   const [showCheckout, setShowCheckout] = useState(false);
-  const [isEnrolling, setIsEnrolling] = useState(false);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
 
+  const enrollMutation = useMutation({
+    mutationFn: () => api.post(`/lessons/${lessonId}/enroll`) as Promise<unknown>,
+    onSuccess: () => {
+      toast('success', '수강 신청 완료! 강좌에서 만나요');
+      queryClient.invalidateQueries({ queryKey: ['lesson', lessonId] });
+    },
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '수강 신청에 실패했어요. 잠시 후 다시 시도해주세요');
+    },
+  });
+
   const isHost = user?.id === lesson?.hostId;
+  const isEnrolled = !!(lesson?.participants?.some((p) => p.userId === user?.id));
+  const isFull = !!(lesson && lesson.currentParticipants >= lesson.maxParticipants);
 
   if (isLoading) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 rounded-2xl" /><div className="h-32 bg-gray-100 rounded-2xl" /></div></div>;
   if (!lesson) return <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20"><p className="text-gray-500">강좌를 찾을 수 없습니다</p><Link href="/lessons" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link></div>;
@@ -60,14 +75,14 @@ export default function LessonDetailPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1">{lesson.title}</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/lessons" className="hover:text-gray-600">강좌</Link><ChevronRight size={14} /><span className="text-gray-700">{lesson.title}</span>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
         <div className="px-5 lg:px-0">
           {/* 커버 */}
-          <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 h-44 lg:h-56 flex items-center justify-center mb-4 overflow-hidden">
+          <div className="rounded-2xl bg-blue-500 h-44 lg:h-56 flex items-center justify-center mb-4 overflow-hidden">
             <div className="text-center text-white/80">
               {SportIcon && <SportIcon size={48} className="mx-auto mb-2 text-white/60" />}
               <span className="rounded-md px-3 py-1 text-[12px] font-semibold bg-white/20 backdrop-blur-sm">{typeLabel[lesson.type]}</span>
@@ -78,7 +93,7 @@ export default function LessonDetailPage() {
           <div className="rounded-2xl bg-white border border-gray-100 p-5">
             <div className="flex items-center gap-2 mb-2">
               <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${typeColor[lesson.type]}`}>{typeLabel[lesson.type]}</span>
-              <span className="text-[12px] text-gray-400">{sportLabel[lesson.sportType]}</span>
+              <span className="text-[12px] text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
             <h2 className="text-[22px] font-bold text-gray-900 leading-tight">{lesson.title}</h2>
             {lesson.description && <p className="mt-3 text-[14px] text-gray-600 leading-relaxed whitespace-pre-line">{lesson.description}</p>}
@@ -93,7 +108,7 @@ export default function LessonDetailPage() {
                 <div>
                   <p className="text-[16px] font-bold text-gray-900">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-[13px] text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
-                  <div className="flex items-center gap-3 mt-2 text-[12px] text-gray-400">
+                  <div className="flex items-center gap-3 mt-2 text-[12px] text-gray-500">
                     <span className="flex items-center gap-1"><Star size={12} className="text-amber-400" fill="currentColor" /> 4.8</span>
                     <span>수강생 42명</span>
                   </div>
@@ -113,18 +128,18 @@ export default function LessonDetailPage() {
           {/* 커리큘럼 */}
           <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <BookOpen size={18} className="text-blue-500" />
+              <BookOpen size={18} className="text-gray-500" />
               <h3 className="text-[16px] font-bold text-gray-900">커리큘럼</h3>
-              <span className="text-[12px] text-gray-400 ml-auto">총 {sampleCurriculum.length}개 섹션</span>
+              <span className="text-[12px] text-gray-500 ml-auto">총 {sampleCurriculum.length}개 섹션</span>
             </div>
             {sampleCurriculum.map((item, idx) => (
               <div key={idx} className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 text-[12px] font-bold mt-0.5">{idx + 1}</div>
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 text-[12px] font-bold mt-0.5">{idx + 1}</div>
                 <div className="flex-1">
                   <p className="text-[14px] font-semibold text-gray-900">{item.title}</p>
-                  <p className="text-[13px] text-gray-400 mt-0.5">{item.desc}</p>
+                  <p className="text-[13px] text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
-                <span className="text-[12px] text-gray-400 shrink-0 mt-0.5"><Clock size={12} className="inline mr-0.5" />{item.duration}</span>
+                <span className="text-[12px] text-gray-500 shrink-0 mt-0.5"><Clock size={12} className="inline mr-0.5" />{item.duration}</span>
               </div>
             ))}
           </div>
@@ -139,7 +154,7 @@ export default function LessonDetailPage() {
               '전문 코치의 피드백을 받고 싶은 분',
             ].map((text, i) => (
               <div key={i} className="flex items-center gap-2 text-[14px] text-gray-600 py-1">
-                <CheckCircle size={16} className="text-blue-500 shrink-0" />{text}
+                <CheckCircle size={16} className="text-gray-500 shrink-0" />{text}
               </div>
             ))}
           </div>
@@ -152,7 +167,7 @@ export default function LessonDetailPage() {
                 <div key={i} className="aspect-square rounded-xl bg-gray-50 flex items-center justify-center text-gray-300"><Image size={20} /></div>
               ))}
             </div>
-            <p className="text-[12px] text-gray-400 mt-3 text-center">아직 등록된 사진이 없어요</p>
+            <p className="text-[12px] text-gray-500 mt-3 text-center">아직 등록된 사진이 없어요</p>
           </div>
         </div>
 
@@ -169,20 +184,36 @@ export default function LessonDetailPage() {
                 <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${filledPercent}%` }} />
               </div>
               {!isAuthenticated ? (
-                <Link href="/login" className="block w-full text-center rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white active:bg-gray-800 transition-colors">로그인 후 신청하기</Link>
+                <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white active:bg-blue-600 hover:bg-blue-600 transition-colors">로그인 후 신청하기</Link>
+              ) : isEnrolled ? (
+                <button
+                  onClick={() => {
+                    toast('info', '수강 취소 기능은 준비 중입니다');
+                  }}
+                  className="w-full rounded-xl bg-red-50 border border-red-200 py-3.5 text-[15px] font-bold text-red-500 hover:bg-red-100 active:bg-red-200 transition-colors"
+                >
+                  수강 취소
+                </button>
+              ) : isFull ? (
+                <button
+                  disabled
+                  className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-bold text-gray-500 cursor-not-allowed"
+                >
+                  마감
+                </button>
               ) : (
                 <button
                   onClick={() => {
                     if (lesson.fee > 0) {
-                      setIsEnrolling(true);
                       setShowCheckout(true);
-                      setTimeout(() => setIsEnrolling(false), 500);
+                    } else {
+                      enrollMutation.mutate();
                     }
                   }}
-                  disabled={isEnrolling}
+                  disabled={enrollMutation.isPending}
                   className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
                 >
-                  {isEnrolling ? (
+                  {enrollMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                       처리 중...
@@ -211,9 +242,9 @@ export default function LessonDetailPage() {
                 캘린더에 추가
               </button>
 
-              <div className="mt-3 space-y-1.5 text-[12px] text-gray-400">
-                <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 24시간 내 환불 가능</p>
-                <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-green-500" /> 코치 직접 피드백</p>
+              <div className="mt-3 space-y-1.5 text-[12px] text-gray-500">
+                <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-gray-500" /> 24시간 내 환불 가능</p>
+                <p className="flex items-center gap-1.5"><CheckCircle size={12} className="text-gray-500" /> 코치 직접 피드백</p>
               </div>
             </div>
 
@@ -221,10 +252,10 @@ export default function LessonDetailPage() {
             <div className="rounded-2xl bg-white border border-gray-100 p-4">
               <h3 className="text-[14px] font-semibold text-gray-900 mb-3">등록자</h3>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
                 <div>
                   <p className="text-[14px] font-semibold text-gray-900">{lesson.host?.nickname}</p>
-                  <p className="text-[12px] text-gray-400">호스트</p>
+                  <p className="text-[12px] text-gray-500">호스트</p>
                 </div>
               </div>
             </div>
@@ -232,7 +263,7 @@ export default function LessonDetailPage() {
             {isHost && (
               <Link
                 href={`/lessons/${lessonId}/edit`}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-white border border-gray-100 p-4 text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-xl bg-white border border-gray-100 p-4 text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Pencil size={16} />
                 강좌 수정
@@ -241,7 +272,6 @@ export default function LessonDetailPage() {
           </div>
         </div>
       </div>
-      <div className="h-6" />
 
       {/* 결제 모달 */}
       {showCheckout && lesson && (
@@ -253,9 +283,11 @@ export default function LessonDetailPage() {
           orderId={`lesson-${lessonId}-${Date.now()}`}
           onSuccess={() => {
             setShowCheckout(false);
+            enrollMutation.mutate();
           }}
           onError={() => {
             setShowCheckout(false);
+            toast('error', '결제에 실패했어요. 다시 시도해주세요');
           }}
         />
       )}
@@ -266,9 +298,9 @@ export default function LessonDetailPage() {
 function InfoCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl bg-white border border-gray-100 p-3.5">
-      <div className="flex items-center gap-2 mb-1.5">{icon}<span className="text-[12px] text-gray-400">{label}</span></div>
+      <div className="flex items-center gap-2 mb-1.5">{icon}<span className="text-[12px] text-gray-500">{label}</span></div>
       <p className="text-[15px] font-semibold text-gray-900">{value}</p>
-      {sub && <p className="text-[12px] text-gray-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[12px] text-gray-500 mt-0.5">{sub}</p>}
     </div>
   );
 }

@@ -80,7 +80,7 @@ export default function OnboardingPage() {
         <div className="w-full flex justify-end">
           <button
             onClick={finish}
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-sm text-gray-500 hover:text-gray-600 transition-colors"
           >
             건너뛰기
           </button>
@@ -109,7 +109,7 @@ export default function OnboardingPage() {
             {/* Descriptions */}
             <div className="text-center space-y-1">
               <p className="text-base text-gray-600">{slide.desc1}</p>
-              <p className="text-sm text-gray-400">{slide.desc2}</p>
+              <p className="text-sm text-gray-500">{slide.desc2}</p>
             </div>
           </div>
         </div>

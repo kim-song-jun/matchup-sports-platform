@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star, Info } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star, Info, ChevronRight, ListChecks } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { useLessons } from '@/hooks/use-api';
+import { sportLabel } from '@/lib/constants';
+import { formatCurrency } from '@/lib/utils';
 
 const mockMyLessons = [
   {
@@ -22,6 +24,12 @@ const mockMyLessons = [
     status: 'active',
     rating: 4.8,
     reviewCount: 12,
+    nextDate: '2026-03-28',
+    curriculum: [
+      '기본 패스 & 트래핑 자세 교정',
+      '2:1 / 3:2 미니 게임 전술 훈련',
+      '경기 영상 분석 & 피드백',
+    ],
   },
   {
     id: 'lesson-2',
@@ -35,15 +43,25 @@ const mockMyLessons = [
     status: 'active',
     rating: 4.6,
     reviewCount: 8,
+    nextDate: '2026-04-01',
+    curriculum: [
+      '레이업 & 미드레인지 슈팅 폼 교정',
+      '3점슛 릴리즈 포인트 훈련',
+      '실전 픽앤롤 상황 슈팅 드릴',
+    ],
   },
 ];
 
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키',
-};
+function getDayLabel(dateStr: string) {
+  return ['일','월','화','수','목','금','토'][new Date(dateStr).getDay()];
+}
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
+function daysUntil(dateStr: string) {
+  const diff = Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (diff === 0) return '오늘';
+  if (diff === 1) return '내일';
+  if (diff < 0) return '지남';
+  return `${diff}일 후`;
 }
 
 export default function MyLessonsPage() {
@@ -64,16 +82,18 @@ export default function MyLessonsPage() {
     status: l.status === 'active' ? 'active' : l.status,
     rating: 0,
     reviewCount: 0,
+    nextDate: l.lessonDate || '',
+    curriculum: [] as string[],
   }));
   const [localLessons, setLocalLessons] = useState(mockMyLessons);
-  const lessons = apiLessons ?? localLessons;
+  const lessons = apiLessons ?? (process.env.NODE_ENV === 'development' ? localLessons : []);
   const setLessons = setLocalLessons;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   if (!isAuthenticated) {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
+        <p className="text-[15px] font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
         <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-bold text-white">로그인</Link>
       </div>
     );
@@ -92,110 +112,168 @@ export default function MyLessonsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900">내가 등록한 강좌</h1>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h1>
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[22px] font-bold text-gray-900">내가 등록한 강좌</h2>
-        <p className="text-[14px] text-gray-400 mt-1">등록한 강좌를 관리하세요</p>
+        <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h2>
+        <p className="text-[14px] text-gray-500 mt-1">등록한 강좌를 관리하세요</p>
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
-          <Info size={16} className="text-amber-500 shrink-0" />
-          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-100 px-4 py-2.5">
+          <Info size={16} className="text-gray-500 shrink-0" />
+          <span className="text-[13px] text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
       )}
 
-      <div className="px-5 lg:px-0 space-y-3 pb-8">
+      <div className="px-5 lg:px-0 space-y-4 pb-8 stagger-children">
         {lessons.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 p-16 text-center">
             <BookOpen size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">등록한 강좌가 없어요</p>
-            <p className="text-[13px] text-gray-400 mt-1">강좌를 등록해보세요</p>
+            <p className="text-[15px] font-medium text-gray-600 dark:text-gray-300">등록한 강좌가 없어요</p>
+            <p className="text-[13px] text-gray-500 mt-1">강좌를 등록해보세요</p>
           </div>
-        ) : lessons.map((lesson) => (
-          <div key={lesson.id} className="rounded-2xl bg-white border border-gray-100 p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
-                  {sportLabel[lesson.sportType]}
-                </span>
-                <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                  lesson.status === 'active' ? 'bg-green-50 text-green-600' :
-                  lesson.status === 'cancelled' ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {lesson.status === 'active' ? '진행중' : lesson.status === 'cancelled' ? '취소됨' : '마감'}
-                </span>
-              </div>
-              <span className="text-[14px] font-bold text-gray-900">{formatCurrency(lesson.price)}</span>
-            </div>
-
-            <Link href={`/lessons/${lesson.id}`}>
-              <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors truncate">{lesson.title}</h3>
-            </Link>
-
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                <Calendar size={13} /><span>{lesson.schedule}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                <MapPin size={13} /><span>{lesson.venue}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                  <Users size={13} /><span>{lesson.currentStudents}/{lesson.maxStudents}명</span>
+        ) : lessons.map((lesson) => {
+          const fillPercent = Math.round((lesson.currentStudents / lesson.maxStudents) * 100);
+          const isFull = lesson.currentStudents >= lesson.maxStudents;
+          return (
+            <div key={lesson.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:border-gray-200 transition-all">
+              {/* Card header */}
+              <div className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-[11px] font-semibold text-gray-500">
+                      {sportLabel[lesson.sportType]}
+                    </span>
+                    <span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${
+                      lesson.status === 'active' ? 'bg-blue-50 text-blue-500' :
+                      lesson.status === 'cancelled' ? 'bg-red-50 text-red-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                    }`}>
+                      {lesson.status === 'active' ? '진행중' : lesson.status === 'cancelled' ? '취소됨' : '마감'}
+                    </span>
+                  </div>
+                  <span className="text-[15px] font-bold text-gray-900 dark:text-white">{formatCurrency(lesson.price)}</span>
                 </div>
-                <div className="flex items-center gap-1 text-amber-500">
-                  <Star size={13} fill="currentColor" />
-                  <span className="text-[13px] font-semibold">{lesson.rating}</span>
-                  <span className="text-[12px] text-gray-400">({lesson.reviewCount})</span>
+
+                <Link href={`/lessons/${lesson.id}`}>
+                  <h3 className="text-[16px] font-bold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{lesson.title}</h3>
+                </Link>
+
+                {/* Info rows */}
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <Calendar size={13} className="shrink-0" /><span>{lesson.schedule}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <MapPin size={13} className="shrink-0" /><span>{lesson.venue}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-amber-500">
+                      <Star size={13} fill="currentColor" />
+                      <span className="text-[13px] font-semibold">{lesson.rating}</span>
+                      <span className="text-[12px] text-gray-500">({lesson.reviewCount})</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Next lesson date */}
+                {lesson.status === 'active' && lesson.nextDate && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
+                    <Clock size={14} className="text-blue-400" />
+                    <span className="text-[13px] text-blue-600 font-medium">다음 수업</span>
+                    <span className="text-[13px] text-blue-700 font-semibold ml-auto">
+                      {lesson.nextDate} ({getDayLabel(lesson.nextDate)})
+                    </span>
+                    <span className="text-[12px] text-blue-400">{daysUntil(lesson.nextDate)}</span>
+                  </div>
+                )}
+
+                {/* Progress bar */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                      <Users size={13} />
+                      <span>수강생</span>
+                    </div>
+                    <span className={`text-[13px] font-semibold ${isFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-200'}`}>
+                      {lesson.currentStudents}/{lesson.maxStudents}명
+                      {isFull && <span className="ml-1 text-[11px] text-red-400">마감</span>}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${isFull ? 'bg-red-400' : 'bg-blue-400'}`}
+                      style={{ width: `${fillPercent}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {lesson.status === 'active' && (
-              <div className="mt-3 flex gap-2">
-                <Link
-                  href={`/lessons/${lesson.id}/edit`}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 py-2.5 text-[13px] font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <Pencil size={14} />
-                  수정
-                </Link>
-                <Link
-                  href={`/lessons/${lesson.id}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 py-2.5 text-[13px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-                >
-                  <BookOpen size={14} />
-                  수강생목록
-                </Link>
-                <button
-                  onClick={() => setDeleteTarget(lesson.id)}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-100 transition-colors"
-                >
-                  <Trash2 size={14} />
-                  취소
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+              {/* Curriculum section */}
+              {lesson.curriculum && lesson.curriculum.length > 0 && (
+                <div className="border-t border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <ListChecks size={13} className="text-gray-500" />
+                    <span className="text-[12px] font-semibold text-gray-500">커리큘럼 요약</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {lesson.curriculum.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-[13px] text-gray-600 dark:text-gray-300">
+                        <span className="shrink-0 mt-0.5 w-[18px] h-[18px] rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-[10px] font-bold">
+                          {idx + 1}
+                        </span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              {lesson.status === 'active' && (
+                <div className="border-t border-gray-50 dark:border-gray-800 px-5 py-3 flex gap-2">
+                  <Link
+                    href={`/lessons/${lesson.id}/edit`}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 py-2.5 text-[13px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Pencil size={14} />
+                    수정
+                  </Link>
+                  <Link
+                    href={`/lessons/${lesson.id}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 py-2.5 text-[13px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                  >
+                    <BookOpen size={14} />
+                    수강생목록
+                  </Link>
+                  <button
+                    onClick={() => setDeleteTarget(lesson.id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                    취소
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 text-center">강좌를 취소하시겠어요?</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">강좌를 취소하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 수강생들에게 알림이 발송돼요.</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors">돌아가기</button>
               <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">취소하기</button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { useTeamMatches } from '@/hooks/use-api';
+import { sportLabel } from '@/lib/constants';
 
 const mockTeamMatches = [
   {
@@ -36,14 +37,9 @@ const mockTeamMatches = [
   },
 ];
 
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키',
-};
-
 const statusLabel: Record<string, { text: string; style: string }> = {
-  recruiting: { text: '모집중', style: 'bg-blue-50 text-blue-600' },
-  matched: { text: '매칭완료', style: 'bg-green-50 text-green-600' },
+  recruiting: { text: '모집중', style: 'bg-gray-100 text-gray-500' },
+  matched: { text: '매칭완료', style: 'text-blue-500' },
   cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500' },
 };
 
@@ -101,7 +97,7 @@ export default function MyTeamMatchesPage() {
       <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
         <div>
           <h2 className="text-[22px] font-bold text-gray-900">내 팀 매칭 모집글</h2>
-          <p className="text-[14px] text-gray-400 mt-1">팀 매칭 모집 현황을 관리하세요</p>
+          <p className="text-[14px] text-gray-500 mt-1">팀 매칭 모집 현황을 관리하세요</p>
         </div>
         <Link
           href="/team-matches/new"
@@ -113,9 +109,9 @@ export default function MyTeamMatchesPage() {
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
-          <Info size={16} className="text-amber-500 shrink-0" />
-          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-100 px-4 py-2.5">
+          <Info size={16} className="text-gray-500 shrink-0" />
+          <span className="text-[13px] text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
       )}
 
@@ -124,20 +120,20 @@ export default function MyTeamMatchesPage() {
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
             <Calendar size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">팀 매칭 모집글이 없어요</p>
-            <p className="text-[13px] text-gray-400 mt-1">새로운 모집글을 작성해보세요</p>
+            <p className="text-[13px] text-gray-500 mt-1">새로운 모집글을 작성해보세요</p>
           </div>
         ) : posts.map((post) => {
           const st = statusLabel[post.status] || statusLabel.recruiting;
           return (
             <div key={post.id} className="rounded-2xl bg-white border border-gray-100 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
+                <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                   {sportLabel[post.sportType]}
                 </span>
                 <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${st.style}`}>
                   {st.text}
                 </span>
-                <span className="text-[12px] text-gray-400 ml-auto">{post.teamName}</span>
+                <span className="text-[12px] text-gray-500 ml-auto">{post.teamName}</span>
               </div>
 
               <Link href={`/team-matches/${post.id}`}>
@@ -192,7 +188,7 @@ export default function MyTeamMatchesPage() {
       <Link
         href="/team-matches/new"
         aria-label="모집글 작성"
-        className="lg:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 active:scale-95 transition-all"
+        className="lg:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-colors"
       >
         <Plus size={24} />
       </Link>

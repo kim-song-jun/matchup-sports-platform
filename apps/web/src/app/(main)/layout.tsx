@@ -22,8 +22,10 @@ export default function MainLayout({
       {/* Mobile: bottom nav */}
       <div className="lg:hidden">
         <div className="mx-auto max-w-lg bg-white min-h-dvh shadow-[0_0_40px_rgba(0,0,0,0.04)]">
-          <main className="pb-safe">{children}</main>
-          <Footer />
+          <main className="pb-safe">
+            {children}
+            <Footer />
+          </main>
         </div>
         <BottomNav />
       </div>

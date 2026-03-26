@@ -11,14 +11,14 @@ import {
   CheckCircle,
   ArrowUpRight,
   ArrowDownRight,
-  Filter,
-  Download,
 } from 'lucide-react';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
-const tabs = [
-  { id: 'pending', label: '정산 대기' },
-  { id: 'completed', label: '정산 완료' },
-  { id: 'refunded', label: '환불' },
+const settlementFilters = [
+  { key: 'all', label: '전체' },
+  { key: 'pending', label: '정산 대기' },
+  { key: 'completed', label: '정산 완료' },
+  { key: 'refunded', label: '환불' },
 ];
 
 const typeLabel: Record<string, { text: string; color: string }> = {
@@ -59,7 +59,8 @@ function formatCurrency(n: number) {
 
 export default function AdminSettlementsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('all');
+  const [search, setSearch] = useState('');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -80,11 +81,29 @@ export default function AdminSettlementsPage() {
   }, [selectedRows, isProcessing, toast]);
 
   const filtered = mockSettlements.filter((s) => {
-    if (activeTab === 'pending') return s.status === 'pending';
-    if (activeTab === 'completed') return s.status === 'completed';
-    if (activeTab === 'refunded') return s.status === 'refunded';
-    return true;
+    const matchesTab = activeTab === 'all' || s.status === activeTab;
+    const matchesSearch = !search ||
+      s.id.toLowerCase().includes(search.toLowerCase()) ||
+      s.user.toLowerCase().includes(search.toLowerCase());
+    return matchesTab && matchesSearch;
   });
+
+  const handleDownloadCSV = () => {
+    downloadCSV(
+      filtered.map((s) => ({
+        거래ID: s.id,
+        유형: typeLabel[s.type].text,
+        내용: s.description,
+        판매자: s.user,
+        금액: s.amount,
+        수수료: s.fee,
+        정산액: s.settled,
+        상태: statusConfig[s.status].label,
+        날짜: s.date,
+      })),
+      '정산'
+    );
+  };
 
   const toggleRow = (id: string) => {
     setSelectedRows((prev) =>
@@ -107,10 +126,6 @@ export default function AdminSettlementsPage() {
           <h1 className="text-[24px] font-bold text-gray-900">정산 관리</h1>
           <p className="text-[14px] text-gray-400 mt-1">거래 정산 현황을 관리하세요</p>
         </div>
-        <button onClick={() => toast('info', '내보내기 기능을 준비 중입니다')} className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-gray-800 transition-colors">
-          <Download size={16} />
-          내보내기
-        </button>
       </div>
 
       {/* Summary Cards */}
@@ -133,22 +148,15 @@ export default function AdminSettlementsPage() {
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 mb-4 rounded-xl bg-gray-100 p-1 w-fit">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => { setActiveTab(tab.id); setSelectedRows([]); }}
-            className={`rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${
-              activeTab === tab.id
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '거래 ID 또는 판매자 검색' }}
+        filters={settlementFilters}
+        activeFilter={activeTab}
+        onFilterChange={(key) => { setActiveTab(key); setSelectedRows([]); }}
+        onDownload={handleDownloadCSV}
+        count={filtered.length}
+        countLabel="건"
+      />
 
       {/* Bulk Action */}
       {activeTab === 'pending' && selectedRows.length > 0 && (

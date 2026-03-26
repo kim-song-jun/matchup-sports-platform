@@ -16,6 +16,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo, MATCH_TYPES } from '@/lib/skill-grades';
 import type { TeamMatchApplication } from '@/types/api';
+import { sportLabel } from '@/lib/constants';
 
 const levelLabel: Record<string, string> = {
   beginner: '입문', lower: '하', middle: '중', upper: '상', pro: '프로',
@@ -23,7 +24,6 @@ const levelLabel: Record<string, string> = {
 const matchStyleLabel: Record<string, string> = {
   friendly: '친선', competitive: '경쟁', manner_focused: '매너 중시',
 };
-const sportLabel: Record<string, string> = { soccer: '축구', futsal: '풋살' };
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -69,6 +69,7 @@ export default function TeamMatchDetailPage() {
       <div className="pt-[var(--safe-area-top)] px-5 lg:px-0 py-20 text-center">
         <AlertCircle size={32} className="mx-auto text-gray-300 mb-3" />
         <p className="text-[15px] text-gray-600">모집글을 찾을 수 없어요</p>
+        <p className="text-[13px] text-gray-500 mt-1">목록으로 돌아가세요</p>
       </div>
     );
   }
@@ -80,8 +81,8 @@ export default function TeamMatchDetailPage() {
   const applications = match.applications ?? [];
 
   const statusMap: Record<string, { label: string; className: string }> = {
-    recruiting: { label: '모집중', className: 'bg-blue-50 text-blue-500' },
-    matched: { label: '매칭완료', className: 'bg-green-50 text-green-600' },
+    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500' },
+    matched: { label: '매칭완료', className: 'bg-gray-100 text-blue-500' },
     in_progress: { label: '경기중', className: 'bg-amber-50 text-amber-600' },
     completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500' },
     cancelled: { label: '취소됨', className: 'bg-red-50 text-red-500' },
@@ -107,7 +108,7 @@ export default function TeamMatchDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6 px-5 lg:px-0 pt-4">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6 px-5 lg:px-0 pt-4">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">상세</span>
@@ -133,61 +134,61 @@ export default function TeamMatchDetailPage() {
               <h2 className="text-[16px] font-bold text-gray-900 mb-3">경기 정보</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
                     <Calendar size={16} />
                   </div>
                   <div>
-                    <p className="text-[13px] text-gray-400">날짜</p>
+                    <p className="text-[13px] text-gray-500">날짜</p>
                     <p className="text-[14px] font-medium text-gray-900">{formatDate(match.matchDate)}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
                     <Clock size={16} />
                   </div>
                   <div>
-                    <p className="text-[13px] text-gray-400">시간</p>
+                    <p className="text-[13px] text-gray-500">시간</p>
                     <p className="text-[14px] font-medium text-gray-900">
                       {match.startTime} ~ {match.endTime}
-                      {match.totalMinutes && <span className="text-gray-400 ml-1">({match.totalMinutes}분)</span>}
+                      {match.totalMinutes && <span className="text-gray-500 ml-1">({match.totalMinutes}분)</span>}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
                     <Trophy size={16} />
                   </div>
                   <div>
-                    <p className="text-[13px] text-gray-400">쿼터 수</p>
+                    <p className="text-[13px] text-gray-500">쿼터 수</p>
                     <p className="text-[14px] font-medium text-gray-900">{match.quarterCount}쿼터</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
                     <MapPin size={16} />
                   </div>
                   <div>
-                    <p className="text-[13px] text-gray-400">구장</p>
+                    <p className="text-[13px] text-gray-500">구장</p>
                     <p className="text-[14px] font-medium text-gray-900">{match.venueName}</p>
                     {match.venueAddress && (
-                      <p className="text-[12px] text-gray-400">{match.venueAddress}</p>
+                      <p className="text-[12px] text-gray-500">{match.venueAddress}</p>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
                     <DollarSign size={16} />
                   </div>
                   <div>
-                    <p className="text-[13px] text-gray-400">비용</p>
+                    <p className="text-[13px] text-gray-500">비용</p>
                     <p className="text-[14px] font-medium text-gray-900">
                       총 {formatCurrency(match.totalFee)}
                       {match.opponentFee != null && (
-                        <span className="text-gray-400 ml-1">(상대팀 {formatCurrency(match.opponentFee)})</span>
+                        <span className="text-gray-500 ml-1">(상대팀 {formatCurrency(match.opponentFee)})</span>
                       )}
                     </p>
                   </div>
@@ -218,55 +219,55 @@ export default function TeamMatchDetailPage() {
 
               <div className="grid grid-cols-2 gap-3 lg:gap-5">
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">실력등급</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">실력등급</p>
                   <p className="text-[14px] font-semibold text-gray-900">
                     {match.skillGrade ? `${getGradeInfo(match.skillGrade).label} - ${getGradeInfo(match.skillGrade).desc}` : (match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한 없음')}
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">선출선수</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">선출선수</p>
                   <p className="text-[14px] font-semibold text-gray-900">{match.proPlayerCount != null ? `${match.proPlayerCount}명` : (match.hasProPlayers ? '있음' : '없음')}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">경기방식</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">경기방식</p>
                   <p className="text-[14px] font-semibold text-gray-900">{match.gameFormat || '-'}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">매치 유형</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">매치 유형</p>
                   <p className="text-[14px] font-semibold text-gray-900">
                     {match.matchType ? (MATCH_TYPES.find(mt => mt.value === match.matchType)?.label ?? match.matchType) : '-'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">경기 스타일</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">경기 스타일</p>
                   <p className="text-[14px] font-semibold text-gray-900">
                     {match.matchStyle ? matchStyleLabel[match.matchStyle] ?? match.matchStyle : '미정'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">종목</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">종목</p>
                   <p className="text-[14px] font-semibold text-gray-900">
                     {sportLabel[match.sportType] ?? match.sportType}
                   </p>
                 </div>
                 {match.uniformColor && (
                   <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                    <p className="text-[12px] text-gray-400 mb-0.5">유니폼 색상</p>
+                    <p className="text-[12px] text-gray-500 mb-0.5">유니폼 색상</p>
                     <p className="text-[14px] font-semibold text-gray-900">{match.uniformColor}</p>
                   </div>
                 )}
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">용병 허용</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">용병 허용</p>
                   <p className="text-[14px] font-semibold text-gray-900">{match.allowMercenary ? '허용' : '불가'}</p>
                 </div>
                 <div className="rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-0.5">심판 유무</p>
+                  <p className="text-[12px] text-gray-500 mb-0.5">심판 유무</p>
                   <p className="text-[14px] font-semibold text-gray-900">{match.hasReferee ? '있음' : '없음'}</p>
                 </div>
               </div>
               {match.notes && (
                 <div className="mt-4 rounded-xl bg-gray-50 px-3.5 py-3">
-                  <p className="text-[12px] text-gray-400 mb-1">추가 안내</p>
+                  <p className="text-[12px] text-gray-500 mb-1">추가 안내</p>
                   <p className="text-[14px] text-gray-700 whitespace-pre-wrap">{match.notes}</p>
                 </div>
               )}
@@ -305,7 +306,7 @@ export default function TeamMatchDetailPage() {
               <div className="rounded-2xl bg-white border border-gray-100 p-5">
                 <h2 className="text-[16px] font-bold text-gray-900 mb-3">호스트 팀</h2>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-500 text-lg font-bold">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-500 text-lg font-bold">
                     {match.hostTeam.name?.charAt(0)}
                   </div>
                   <div className="flex-1">
@@ -318,7 +319,7 @@ export default function TeamMatchDetailPage() {
                         </div>
                       )}
                       {match.hostTeam.matchCount != null && (
-                        <span className="text-[12px] text-gray-400">{String(match.hostTeam.matchCount)}경기</span>
+                        <span className="text-[12px] text-gray-500">{String(match.hostTeam.matchCount)}경기</span>
                       )}
                     </div>
                   </div>
@@ -332,7 +333,7 @@ export default function TeamMatchDetailPage() {
           <div className="mt-4 lg:mt-0 detail-sidebar">
             <div className="sidebar-sticky space-y-3">
             {/* CTA 버튼 영역 */}
-            <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-3">
+            <div className="rounded-xl bg-white border border-gray-100 p-5 space-y-3">
               {isRecruiting && !isHost && (
                 <button
                   onClick={() => setShowApplyModal(true)}
@@ -356,7 +357,7 @@ export default function TeamMatchDetailPage() {
               {isCompleted && (
                 <Link
                   href={`/team-matches/${id}/evaluate`}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-900 py-3.5 text-[15px] font-semibold text-white hover:bg-gray-800 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
                 >
                   <ClipboardCheck size={18} />
                   경기 평가하기
@@ -372,7 +373,7 @@ export default function TeamMatchDetailPage() {
                     <Pencil size={16} />
                     모집글 수정
                   </Link>
-                  <p className="text-center text-[13px] text-gray-400">내가 작성한 모집글이에요</p>
+                  <p className="text-center text-[13px] text-gray-500">내가 작성한 모집글이에요</p>
                 </>
               )}
             </div>
@@ -383,7 +384,7 @@ export default function TeamMatchDetailPage() {
                 <h2 className="text-[16px] font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <Users size={16} className="text-blue-500" />
                   신청 목록
-                  <span className="ml-auto text-[13px] font-normal text-gray-400">{applications.length}팀</span>
+                  <span className="ml-auto text-[13px] font-normal text-gray-500">{applications.length}팀</span>
                 </h2>
                 <div className="space-y-3">
                   {applications.map((app: TeamMatchApplication) => {
@@ -448,7 +449,6 @@ export default function TeamMatchDetailPage() {
         </div>
       </div>
 
-      <div className="h-6" />
 
       {/* 신청 모달 */}
       {showApplyModal && (
@@ -479,7 +479,7 @@ export default function TeamMatchDetailPage() {
                 onChange={(e) => setApplyMessage(e.target.value)}
                 placeholder="호스트에게 전달할 메시지를 작성하세요"
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
               />
             </div>
 

@@ -87,7 +87,7 @@ export default function TeamMatchEvaluatePage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="text-[15px] font-semibold text-gray-900">{item.label}</p>
-                  <p className="text-[12px] text-gray-400 mt-0.5">{item.desc}</p>
+                  <p className="text-[12px] text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
                 <div className="text-[14px] font-bold text-amber-500">
                   {ratings[item.key] > 0 ? ratings[item.key].toFixed(0) : '-'}
@@ -106,7 +106,7 @@ export default function TeamMatchEvaluatePage() {
         {/* 평균 점수 */}
         {allRated && (
           <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-center">
-            <p className="text-[13px] text-gray-400">종합 평점</p>
+            <p className="text-[13px] text-gray-500">종합 평점</p>
             <div className="flex items-center justify-center gap-2 mt-1">
               <Star size={24} className="text-amber-400" fill="currentColor" />
               <span className="text-[28px] font-bold text-white">{averageRating.toFixed(1)}</span>
@@ -122,7 +122,7 @@ export default function TeamMatchEvaluatePage() {
             onChange={(e) => setComment(e.target.value)}
             placeholder="상대팀에 대한 한마디를 남겨주세요"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
           />
         </div>
 
@@ -137,7 +137,7 @@ export default function TeamMatchEvaluatePage() {
             {submitMutation.isPending ? '제출 중...' : '평가 제출하기'}
           </button>
           {!allRated && (
-            <p className="text-center text-[12px] text-gray-400 mt-2">모든 항목을 평가해주세요</p>
+            <p className="text-center text-[12px] text-gray-500 mt-2">모든 항목을 평가해주세요</p>
           )}
         </div>
       </div>

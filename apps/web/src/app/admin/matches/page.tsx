@@ -1,20 +1,32 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil, Trophy } from 'lucide-react';
+import { Trophy, ChevronRight, Users, Calendar } from 'lucide-react';
+import { useState } from 'react';
 import { useAdminMatches } from '@/hooks/use-api';
+import { sportLabel } from '@/lib/constants';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import type { Match } from '@/types/api';
+
+const matchFilters = [
+  { key: '', label: '전체' },
+  { key: 'recruiting', label: '모집중' },
+  { key: 'full', label: '마감' },
+  { key: 'in_progress', label: '진행중' },
+  { key: 'completed', label: '완료' },
+  { key: 'cancelled', label: '취소' },
+];
 
 const statusLabel: Record<string, string> = {
   recruiting: '모집중', full: '마감', in_progress: '진행중', completed: '완료', cancelled: '취소',
 };
 
-const statusColor: Record<string, string> = {
-  recruiting: 'bg-blue-50 text-blue-500',
-  full: 'bg-gray-100 text-gray-500',
-  in_progress: 'bg-blue-50 text-blue-500',
-  completed: 'bg-gray-100 text-gray-500',
-  cancelled: 'bg-red-50 text-red-500',
+const statusTextColor: Record<string, string> = {
+  recruiting: 'text-blue-500',
+  full: 'text-gray-400',
+  in_progress: 'text-blue-500',
+  completed: 'text-gray-400',
+  cancelled: 'text-red-500',
 };
 
 function formatDate(d: string) {
@@ -22,77 +34,108 @@ function formatDate(d: string) {
 }
 
 export default function AdminMatchesPage() {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const { data, isLoading } = useAdminMatches();
 
   const matches = data?.items ?? [];
 
+  const filtered = matches.filter((m: Match) => {
+    const matchesSearch = !search ||
+      m.title?.toLowerCase().includes(search.toLowerCase()) ||
+      m.host?.nickname?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = !statusFilter || m.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleDownload = () => {
+    downloadCSV(
+      filtered.map((m: Match) => ({
+        제목: m.title || '',
+        종목: sportLabel[m.sportType] || m.sportType,
+        일시: `${formatDate(m.matchDate)} ${m.startTime || ''}`,
+        인원: `${m.currentPlayers}/${m.maxPlayers}`,
+        상태: statusLabel[m.status] || m.status,
+        호스트: m.host?.nickname || '',
+      })),
+      'matches',
+    );
+  };
+
   return (
-    <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-[24px] font-bold text-gray-900">매치 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">전체 매치를 관리하세요</p>
-        </div>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-[22px] font-bold text-gray-900">매치 관리</h1>
+        <p className="text-[14px] text-gray-400 mt-1">전체 매치를 관리하세요</p>
       </div>
 
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">매치</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">종목</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">일시</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">인원</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">상태</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">호스트</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
-              ))
-            ) : matches.map((m: Match) => (
-              <tr key={m.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/matches/${m.id}`}>
-                <td className="px-5 py-3.5">
-                  <p className="text-[14px] font-medium text-gray-900 truncate max-w-[200px]">{m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
-                  <p className="text-[11px] text-gray-400">{m.venue?.name}</p>
-                </td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{m.sportType}</td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{formatDate(m.matchDate)} {m.startTime}</td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{m.currentPlayers}/{m.maxPlayers}</td>
-                <td className="px-5 py-3.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor[m.status] || 'bg-gray-100'}`}>
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '매치명 또는 호스트 검색' }}
+        filters={matchFilters}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        count={filtered.length}
+        countLabel="건의 매치"
+        onDownload={handleDownload}
+      />
+
+      {/* List */}
+      <div className="space-y-2">
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-xl bg-white border border-gray-100 p-4">
+              <div className="h-4 w-3/5 bg-gray-100 rounded animate-pulse mb-2" />
+              <div className="h-3 w-2/5 bg-gray-50 rounded animate-pulse" />
+            </div>
+          ))
+        ) : filtered.length === 0 ? (
+          <div className="rounded-xl bg-white border border-gray-100 py-16 text-center">
+            <Trophy size={24} className="mx-auto text-gray-400 mb-2" />
+            <p className="text-[14px] text-gray-400">아직 등록된 매치가 없어요</p>
+            <p className="text-[12px] text-gray-300 mt-1">첫 번째 매치를 만들어보세요</p>
+          </div>
+        ) : (
+          filtered.map((m: Match) => (
+            <Link
+              key={m.id}
+              href={`/admin/matches/${m.id}`}
+              className="flex items-center justify-between rounded-xl bg-white border border-gray-100 p-4 hover:bg-gray-50 transition-colors"
+            >
+              {/* Left — key info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[12px] text-gray-400">
+                    {sportLabel[m.sportType] || m.sportType}
+                  </span>
+                  <span className={`text-[12px] font-medium ${statusTextColor[m.status] || 'text-gray-400'}`}>
                     {statusLabel[m.status] || m.status}
                   </span>
-                </td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{m.host?.nickname}</td>
-                <td className="px-5 py-3.5">
-                  <Link
-                    href={`/matches/${m.id}/edit`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-500 transition-colors"
-                  >
-                    <Pencil size={12} />
-                    수정
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {!isLoading && matches.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-12 text-center">
-                  <Trophy size={24} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-[14px] text-gray-400">아직 등록된 매치가 없어요</p>
-                  <p className="text-[12px] text-gray-300 mt-1">첫 번째 매치를 만들어보세요</p>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </div>
+                </div>
+                <p className="text-[15px] font-medium text-gray-900 truncate">
+                  {m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
+                </p>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="flex items-center gap-1 text-[12px] text-gray-400">
+                    <Calendar size={12} className="text-gray-400" />
+                    {formatDate(m.matchDate)} {m.startTime}
+                  </span>
+                  <span className="flex items-center gap-1 text-[12px] text-gray-400">
+                    <Users size={12} className="text-gray-400" />
+                    {m.currentPlayers}/{m.maxPlayers}명
+                  </span>
+                  {m.host?.nickname && (
+                    <span className="text-[12px] text-gray-400">
+                      {m.host.nickname}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right — chevron */}
+              <ChevronRight size={16} className="text-gray-300 ml-3 shrink-0" />
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { useTeams } from '@/hooks/use-api';
+import { sportLabel, levelLabel } from '@/lib/constants';
 
 const mockMyTeams = [
   {
@@ -37,11 +38,6 @@ const mockMyTeams = [
     winCount: 10,
   },
 ];
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
 export default function MyTeamsPage() {
   const router = useRouter();
@@ -97,13 +93,13 @@ export default function MyTeamsPage() {
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
         <h2 className="text-[22px] font-bold text-gray-900">내 팀</h2>
-        <p className="text-[14px] text-gray-400 mt-1">내가 운영하는 팀을 관리하세요</p>
+        <p className="text-[14px] text-gray-500 mt-1">내가 운영하는 팀을 관리하세요</p>
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
-          <Info size={16} className="text-amber-500 shrink-0" />
-          <span className="text-[13px] text-amber-700">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-100 px-4 py-2.5">
+          <Info size={16} className="text-gray-500 shrink-0" />
+          <span className="text-[13px] text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
       )}
 
@@ -112,7 +108,7 @@ export default function MyTeamsPage() {
           <div className="rounded-2xl bg-gray-50 p-16 text-center">
             <Users size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">운영 중인 팀이 없어요</p>
-            <Link href="/teams/new" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">
+            <Link href="/teams/new" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors">
               팀 만들기
             </Link>
           </div>

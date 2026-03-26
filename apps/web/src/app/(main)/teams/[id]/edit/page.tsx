@@ -71,40 +71,40 @@ export default function EditTeamPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">팀 수정</h1>
+        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">팀 수정</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
-        <Link href={`/teams/${teamId}`} className="hover:text-gray-600 transition-colors">팀 상세</Link>
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+        <Link href={`/teams/${teamId}`} className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">팀 상세</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">팀 수정</span>
+        <span className="text-gray-700 dark:text-gray-200">팀 수정</span>
       </div>
 
       <div className="px-5 lg:px-0 pb-8 max-w-lg lg:max-w-[700px]">
         {/* Team Name */}
         <div className="mb-5">
-          <label className="block text-[14px] font-semibold text-gray-700 mb-2">팀 이름</label>
+          <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 이름</label>
           <input
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
           />
         </div>
 
         {/* Sport Type */}
         <div className="mb-5">
-          <label className="block text-[14px] font-semibold text-gray-700 mb-2">종목</label>
+          <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">종목</label>
           <div className="flex gap-2 flex-wrap">
             {sports.map((s) => (
               <button
                 key={s.type}
                 onClick={() => setForm({ ...form, sportType: s.type })}
                 className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all ${
-                  form.sportType === s.type ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                  form.sportType === s.type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {s.label}
@@ -115,55 +115,55 @@ export default function EditTeamPage() {
 
         {/* Description */}
         <div className="mb-5">
-          <label className="block text-[14px] font-semibold text-gray-700 mb-2">팀 소개</label>
+          <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 소개</label>
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={4}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors resize-none"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors resize-none"
           />
         </div>
 
         {/* Region */}
         <div className="mb-5">
-          <label className="block text-[14px] font-semibold text-gray-700 mb-2">활동 지역</label>
+          <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">활동 지역</label>
           <input
             type="text"
             value={form.region}
             onChange={(e) => setForm({ ...form, region: e.target.value })}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
           />
         </div>
 
         {/* Activity Days */}
         <div className="mb-5">
-          <label className="block text-[14px] font-semibold text-gray-700 mb-2">활동 요일</label>
+          <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">활동 요일</label>
           <input
             type="text"
             value={form.activityDays}
             onChange={(e) => setForm({ ...form, activityDays: e.target.value })}
             placeholder="예: 토, 일"
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
           />
         </div>
 
         {/* Max Members & Level */}
         <div className="mb-5 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[14px] font-semibold text-gray-700 mb-2">최대 인원</label>
+            <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">최대 인원</label>
             <input
               type="number"
               value={form.maxMembers}
               onChange={(e) => setForm({ ...form, maxMembers: parseInt(e.target.value) || 0 })}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
             />
           </div>
           <div>
-            <label className="block text-[14px] font-semibold text-gray-700 mb-2">팀 레벨</label>
+            <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 레벨</label>
             <select
               value={form.level}
               onChange={(e) => setForm({ ...form, level: parseInt(e.target.value) })}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
             >
               {[1, 2, 3, 4, 5].map((l) => (
                 <option key={l} value={l}>Lv.{l} {levelLabel[l]}</option>
@@ -175,21 +175,21 @@ export default function EditTeamPage() {
         {/* Age Range */}
         <div className="mb-8 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[14px] font-semibold text-gray-700 mb-2">최소 나이</label>
+            <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">최소 나이</label>
             <input
               type="number"
               value={form.ageMin}
               onChange={(e) => setForm({ ...form, ageMin: parseInt(e.target.value) || 0 })}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
             />
           </div>
           <div>
-            <label className="block text-[14px] font-semibold text-gray-700 mb-2">최대 나이</label>
+            <label className="block text-[14px] font-semibold text-gray-700 dark:text-gray-200 mb-2">최대 나이</label>
             <input
               type="number"
               value={form.ageMax}
               onChange={(e) => setForm({ ...form, ageMax: parseInt(e.target.value) || 0 })}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 focus:border-blue-500 focus:outline-none transition-colors"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
             />
           </div>
         </div>
@@ -205,7 +205,7 @@ export default function EditTeamPage() {
           </button>
           <button
             onClick={() => router.back()}
-            className="flex-1 rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
+            className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3.5 text-[15px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             취소
           </button>
@@ -221,14 +221,14 @@ export default function EditTeamPage() {
 
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 text-center">팀을 삭제하시겠어요?</h3>
+            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">팀을 삭제하시겠어요?</h3>
             <p className="text-[14px] text-gray-500 text-center mt-2">팀 삭제 시 모든 데이터가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-200 transition-colors">돌아가기</button>
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
               <button onClick={handleDelete} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>
             </div>
           </div>

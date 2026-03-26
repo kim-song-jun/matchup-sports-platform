@@ -56,7 +56,7 @@ const mockVenues: Record<string, any> = {
 
 function getVenueData(id: string) {
   return mockVenues[id] || {
-    id, name: 'MatchUp 스포츠센터', type: 'gym',
+    id, name: 'TeamMeet 스포츠센터', type: 'gym',
     sportTypes: ['futsal', 'badminton'],
     address: '서울시 마포구 월드컵로 100', city: '서울', district: '마포구',
     phone: '02-5555-1234', description: '다목적 체육관입니다.',

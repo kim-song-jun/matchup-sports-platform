@@ -7,10 +7,7 @@ import {
   ChevronRight, Users, Shield, Star, Trophy, Calendar,
   Edit3, Ban, Award, Save, Loader2, AlertTriangle, X, MapPin,
 } from 'lucide-react';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴', ice_hockey: '아이스하키',
-};
+import { sportLabel } from '@/lib/constants';
 
 const mockTeams: Record<string, any> = {
   '1': {

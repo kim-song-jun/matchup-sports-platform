@@ -60,7 +60,7 @@ export default function AdminVenueNewPage() {
       await api.post('/admin/venues', payload);
     },
     onSuccess: () => {
-      toast('success', '시설이 등록되었습니다');
+      toast('success', '시설이 등록되었어요');
       router.push('/admin/venues');
     },
     onError: () => {

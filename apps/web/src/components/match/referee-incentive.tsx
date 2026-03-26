@@ -37,7 +37,7 @@ export function RefereeIncentive({
           </div>
           <div className="flex-1">
             <p className="text-[13px] font-medium text-gray-800">매너 포인트</p>
-            <p className="text-[12px] text-gray-400">심판 활동 보상</p>
+            <p className="text-[12px] text-gray-500">심판 활동 보상</p>
           </div>
           <span className="text-[14px] font-bold text-blue-500">+50</span>
         </div>
@@ -70,7 +70,7 @@ export function RefereeIncentive({
           </div>
           <div className="flex-1">
             <p className="text-[13px] font-medium text-gray-800">다음 경기 할인 쿠폰</p>
-            <p className="text-[12px] text-gray-400">바로 사용 가능</p>
+            <p className="text-[12px] text-gray-500">바로 사용 가능</p>
           </div>
           <span className="text-[13px] font-bold text-blue-500">500원</span>
         </div>
@@ -83,7 +83,7 @@ export function RefereeIncentive({
           disabled={applied}
           className={`w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold transition-colors ${
             applied
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
               : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
           }`}
         >

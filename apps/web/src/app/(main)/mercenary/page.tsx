@@ -2,21 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, MapPin, UserPlus, Search, Shield, Star, DollarSign } from 'lucide-react';
+import { UserPlus, Search, Star } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useMercenaryPosts } from '@/hooks/use-api';
 import { api } from '@/lib/api';
+import { sportLabel, levelLabel } from '@/lib/constants';
 
 const sportFilters = [
   { key: '', label: '전체' },
   { key: 'soccer', label: '축구' },
   { key: 'futsal', label: '풋살' },
 ];
-
-const sportLabel: Record<string, string> = {
-  soccer: '축구',
-  futsal: '풋살',
-};
 
 const positionLabel: Record<string, string> = {
   GK: '골키퍼',
@@ -25,8 +21,6 @@ const positionLabel: Record<string, string> = {
   FW: '공격수',
   ALL: '포지션 무관',
 };
-
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
 interface MercenaryPost {
   id: string;
@@ -168,7 +162,7 @@ export default function MercenaryPage() {
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">용병 모집</h1>
-          <Link href="/my/mercenary" className="text-[13px] text-gray-400 hover:text-gray-600 transition-colors">
+          <Link href="/my/mercenary" className="text-[13px] text-gray-500 hover:text-gray-600 transition-colors">
             내 모집/신청
           </Link>
         </div>
@@ -187,7 +181,7 @@ export default function MercenaryPage() {
           <button
             key={f.key}
             onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+            className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors ${
               activeSport === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
@@ -199,42 +193,40 @@ export default function MercenaryPage() {
       </div>
 
       <div className="px-5 lg:px-0 mb-3">
-        <p className="text-[13px] text-gray-400">{filtered.length}개의 모집글</p>
+        <p className="text-[13px] text-gray-500">{filtered.length}개의 모집글</p>
       </div>
 
       {/* 모집글 리스트 */}
       <div className="px-5 lg:px-0">
         {filtered.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-xl bg-gray-50 p-16 text-center">
             <Search size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">
               {activeSport ? `${sportLabel[activeSport]} 용병 모집이 없어요` : '용병 모집이 없어요'}
             </p>
-            <p className="text-[13px] text-gray-400 mt-1">직접 용병을 모집해보세요</p>
+            <p className="text-[13px] text-gray-500 mt-1">직접 용병을 모집해보세요</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
             {filtered.map((post) => {
               const isApplied = appliedIds.has(post.id);
 
               return (
                 <div
                   key={post.id}
-                  className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 duration-200"
+                  className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-750 duration-200"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
-                          {sportLabel[post.sportType]}
-                        </span>
-                        <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
-                          {positionLabel[post.position]}
-                        </span>
+                      <div className="flex items-center gap-1.5 mb-1 text-[12px] text-gray-500">
+                        <span>{sportLabel[post.sportType]}</span>
+                        <span className="text-gray-200">·</span>
+                        <span>{positionLabel[post.position]}</span>
                         {post.fee === 0 && (
-                          <span className="rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-600">
-                            무료
-                          </span>
+                          <>
+                            <span className="text-gray-200">·</span>
+                            <span className="text-green-600 font-semibold">무료</span>
+                          </>
                         )}
                       </div>
                       <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">
@@ -247,33 +239,25 @@ export default function MercenaryPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-y-1.5 gap-x-4">
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <Calendar size={15} className="text-gray-400" />
-                      <span>{formatMatchDate(post.matchDate)} {post.startTime}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <MapPin size={15} className="text-gray-400" />
-                      <span className="truncate">{post.venue}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                      <Shield size={15} className="text-gray-400" />
-                      <span>Lv.{post.levelRequired} {levelLabel[post.levelRequired]} 이상</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[13px]">
-                      <DollarSign size={15} className="text-gray-400" />
-                      <span className={`font-semibold ${post.fee === 0 ? 'text-green-600' : 'text-gray-800'}`}>
-                        {formatFee(post.fee)}
-                      </span>
-                    </div>
-                  </div>
+                  <p className="mt-2.5 text-[13px] text-gray-500 leading-relaxed">
+                    {formatMatchDate(post.matchDate)} {post.startTime}
+                    <span className="text-gray-300 mx-1">·</span>
+                    {post.venue}
+                  </p>
+                  <p className="mt-1 text-[13px] text-gray-500">
+                    Lv.{post.levelRequired} {levelLabel[post.levelRequired]} 이상
+                    <span className="text-gray-300 mx-1">·</span>
+                    <span className={`font-semibold ${post.fee === 0 ? 'text-green-600' : 'text-gray-800 dark:text-gray-200'}`}>
+                      {formatFee(post.fee)}
+                    </span>
+                  </p>
 
                   {post.notes && (
-                    <p className="mt-2 text-[12px] text-gray-400 truncate">{post.notes}</p>
+                    <p className="mt-2 text-[12px] text-gray-500 truncate">{post.notes}</p>
                   )}
 
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-[12px] text-gray-400">
+                    <span className="text-[12px] text-gray-500">
                       {post.count}명 모집
                     </span>
                     <button
@@ -281,7 +265,7 @@ export default function MercenaryPage() {
                       disabled={isApplied}
                       className={`rounded-xl px-5 py-2 text-[13px] font-bold transition-colors ${
                         isApplied
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
                       }`}
                     >
@@ -295,7 +279,6 @@ export default function MercenaryPage() {
         )}
       </div>
 
-      <div className="h-6" />
     </div>
   );
 }

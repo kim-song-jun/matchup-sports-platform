@@ -56,7 +56,7 @@ export function BadgeDisplay({ badges, size = 'sm' }: BadgeDisplayProps) {
                 <div className="rounded-lg bg-gray-900 px-3 py-2 text-center whitespace-nowrap shadow-lg">
                   <p className="text-[12px] font-semibold text-white">{badge.name}</p>
                   {badge.description && (
-                    <p className="text-[11px] text-gray-400 mt-0.5">{badge.description}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{badge.description}</p>
                   )}
                 </div>
                 <div className="flex justify-center">

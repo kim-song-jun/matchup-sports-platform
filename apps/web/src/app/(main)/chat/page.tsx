@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
 import { useChatStore } from '@/stores/chat-store';
+import { useAuthStore } from '@/stores/auth-store';
 import type { ChatRoom } from '@/stores/chat-store';
 import ChatRoomEmbed from './[id]/chat-room-embed';
 
@@ -43,20 +44,16 @@ function ChatRoomItem({
 }) {
   const inner = (
     <div
-      className={`rounded-2xl border p-4 transition-all active:scale-[0.98] ${
+      className={`rounded-xl border p-4 transition-all active:scale-[0.98] ${
         isActive
-          ? 'bg-blue-50/60 border-blue-200 shadow-[0_2px_12px_rgba(59,130,246,0.08)]'
-          : 'bg-white border-gray-100 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)]'
+          ? 'bg-gray-50 border-gray-200'
+          : 'bg-white border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-750'
       }`}
     >
       <div className="flex items-start gap-3">
         {/* Team Avatar */}
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl text-[15px] font-bold shrink-0 ${
-            isActive
-              ? 'bg-blue-100 text-blue-600'
-              : 'bg-blue-50 text-blue-500'
-          }`}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl text-[15px] font-bold shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300`}
         >
           {opponentName.charAt(0)}
         </div>
@@ -68,13 +65,13 @@ function ChatRoomItem({
               {opponentName}
             </h3>
             {room.lastMessageAt && (
-              <span className="text-[11px] text-gray-400 shrink-0">
+              <span className="text-[11px] text-gray-500 shrink-0">
                 {formatRelativeTime(room.lastMessageAt)}
               </span>
             )}
           </div>
 
-          <p className="text-[12px] text-gray-400 mt-0.5">
+          <p className="text-[12px] text-gray-500 mt-0.5">
             {room.matchTitle} · {formatMatchDate(room.matchDate)}
           </p>
 
@@ -97,6 +94,7 @@ function ChatRoomItem({
 }
 
 export default function ChatListPage() {
+  const { isAuthenticated } = useAuthStore();
   const { getChatRooms, currentTeamId } = useChatStore();
   const chatRooms = getChatRooms();
 
@@ -106,13 +104,31 @@ export default function ChatListPage() {
     setSelectedRoomId(roomId);
   }, []);
 
+  if (!isAuthenticated) {
+    return (
+      <div className="pt-[var(--safe-area-top)] lg:pt-0">
+        <header className="px-5 lg:px-0 pt-4 pb-3">
+          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">채팅</h1>
+        </header>
+        <div className="px-5 lg:px-0">
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-14 text-center">
+            <p className="text-[14px] text-gray-500">로그인 후 채팅을 이용할 수 있어요</p>
+            <p className="text-[12px] text-gray-500 mt-1">팀 매칭이 성사되면 채팅방이 생성돼요</p>
+            <Link href="/login" className="inline-block mt-3 rounded-xl bg-blue-500 px-6 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 transition-colors">
+              로그인
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const emptyState = (
-    <div className="rounded-2xl bg-gray-50 p-16 text-center">
-      <MessageCircle size={32} className="mx-auto text-gray-300 mb-3" />
-      <p className="text-[15px] font-medium text-gray-600">
+    <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-14 text-center">
+      <p className="text-[14px] text-gray-500">
         아직 채팅방이 없어요
       </p>
-      <p className="text-[13px] text-gray-400 mt-1">
+      <p className="text-[13px] text-gray-500 mt-1">
         팀 매칭이 성사되면 채팅방이 생성됩니다
       </p>
     </div>
@@ -151,12 +167,12 @@ export default function ChatListPage() {
   return (
     <>
       {/* ===== DESKTOP: 2-column layout ===== */}
-      <div className="hidden lg:grid lg:grid-cols-[380px_1fr] lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-2xl overflow-hidden border border-gray-200 bg-white">
+      <div className="hidden lg:grid lg:grid-cols-[380px_1fr] lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-xl overflow-hidden border border-gray-200 bg-white">
         {/* Left panel - Chat room list */}
         <div className="border-r border-gray-200 flex flex-col bg-white">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100">
             <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">채팅</h1>
-            <p className="text-[13px] text-gray-400 mt-0.5">팀 매칭 대화</p>
+            <p className="text-[13px] text-gray-500 mt-0.5">팀 매칭 대화</p>
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-3">
@@ -174,13 +190,13 @@ export default function ChatListPage() {
             <ChatRoomEmbed chatRoomId={selectedRoomId} />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 mb-4">
-                <MessageCircle size={28} className="text-gray-400" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 mb-4">
+                <MessageCircle size={28} className="text-gray-500" />
               </div>
               <p className="text-[16px] font-semibold text-gray-600">
                 채팅방을 선택하세요
               </p>
-              <p className="text-[13px] text-gray-400 mt-1.5 max-w-[240px]">
+              <p className="text-[13px] text-gray-500 mt-1.5 max-w-[240px]">
                 왼쪽 목록에서 대화할 채팅방을 선택하면 여기에 표시됩니다
               </p>
             </div>
@@ -192,7 +208,7 @@ export default function ChatListPage() {
       <div className="lg:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
         <header className="px-5 pt-4 pb-3">
           <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">채팅</h1>
-          <p className="text-[13px] text-gray-400 mt-0.5">팀 매칭 대화</p>
+          <p className="text-[13px] text-gray-500 mt-0.5">팀 매칭 대화</p>
         </header>
 
         <div className="px-5">
@@ -203,7 +219,6 @@ export default function ChatListPage() {
           )}
         </div>
 
-        <div className="h-6" />
       </div>
     </>
   );

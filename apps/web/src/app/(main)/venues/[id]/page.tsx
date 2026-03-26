@@ -11,11 +11,7 @@ import type { Venue } from '@/types/api';
 import { MapPlaceholder } from '@/components/ui/map-placeholder';
 import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
 import { useVenue } from '@/hooks/use-api';
-
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
+import { sportLabel } from '@/lib/constants';
 
 const dayLabels: Record<string, string> = {
   mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일',
@@ -163,7 +159,7 @@ export default function VenueDetailPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/venues" className="hover:text-gray-600 transition-colors">시설 찾기</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{venue.name}</span>
@@ -184,13 +180,13 @@ export default function VenueDetailPage() {
           </div>
 
           {/* Title card */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5 mb-3">
+          <div className="rounded-xl bg-white border border-gray-100 p-5 mb-3">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[12px] font-medium text-blue-500">{sportLabel[venue.sportType || venue.sportTypes?.[0] || venue.type] || venue.type}</span>
               <div className="flex items-center gap-1 text-[13px]">
                 <Star size={13} className="text-amber-400" fill="currentColor" />
                 <span className="font-medium text-gray-700">{venueRating.toFixed(1)}</span>
-                <span className="text-gray-400">({venueReviewCount})</span>
+                <span className="text-gray-500">({venueReviewCount})</span>
               </div>
             </div>
             <h2 className="text-[22px] font-bold text-gray-900">{venue.name}</h2>
@@ -202,22 +198,22 @@ export default function VenueDetailPage() {
 
           {/* Info cards */}
           <div className="space-y-3 mb-3">
-            <div className="rounded-2xl bg-white border border-gray-100 p-4">
+            <div className="rounded-xl bg-white border border-gray-100 p-4">
               <div className="space-y-3">
                 {/* Address */}
                 <div className="flex items-start gap-3">
-                  <MapPin size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <MapPin size={18} className="text-gray-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[13px] text-gray-400">주소</p>
+                    <p className="text-[13px] text-gray-500">주소</p>
                     <p className="text-[15px] text-gray-900 mt-0.5">{venue.address}</p>
                   </div>
                 </div>
 
                 {/* Operating Hours - nicely formatted */}
                 <div className="flex items-start gap-3">
-                  <Clock size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <Clock size={18} className="text-gray-500 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-[13px] text-gray-400 mb-2">운영 시간</p>
+                    <p className="text-[13px] text-gray-500 mb-2">운영 시간</p>
                     {operatingHours && Object.keys(operatingHours).length > 0 ? (
                       <div className="space-y-1.5">
                         {Object.entries(operatingHours).map(([day, hours]) => {
@@ -237,16 +233,16 @@ export default function VenueDetailPage() {
                         })}
                       </div>
                     ) : (
-                      <p className="text-[13px] text-gray-400">운영 시간 정보 없음</p>
+                      <p className="text-[13px] text-gray-500">운영 시간 정보 없음</p>
                     )}
                   </div>
                 </div>
 
                 {/* Price */}
                 <div className="flex items-start gap-3">
-                  <DollarSign size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <DollarSign size={18} className="text-gray-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[13px] text-gray-400">이용 요금</p>
+                    <p className="text-[13px] text-gray-500">이용 요금</p>
                     <p className="text-[15px] text-gray-900 mt-0.5">
                       {venuePricePerHour
                         ? `시간당 ${new Intl.NumberFormat('ko-KR').format(venuePricePerHour)}원`
@@ -257,15 +253,15 @@ export default function VenueDetailPage() {
 
                 {/* Phone */}
                 <div className="flex items-start gap-3">
-                  <Phone size={18} className="text-gray-400 shrink-0 mt-0.5" />
+                  <Phone size={18} className="text-gray-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[13px] text-gray-400">전화번호</p>
+                    <p className="text-[13px] text-gray-500">전화번호</p>
                     {venuePhone ? (
                       <a href={`tel:${venuePhone}`} className="text-[15px] text-blue-500 mt-0.5 block">
                         {venuePhone}
                       </a>
                     ) : (
-                      <p className="text-[15px] text-gray-400 mt-0.5">전화번호 없음</p>
+                      <p className="text-[15px] text-gray-500 mt-0.5">전화번호 없음</p>
                     )}
                   </div>
                 </div>
@@ -274,7 +270,7 @@ export default function VenueDetailPage() {
           </div>
 
           {/* Facilities - colored tags */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+          <div className="rounded-xl bg-white border border-gray-100 p-4 mb-3">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3">시설 정보</h3>
             {venueFacilities.length > 0 ? (
               <div className="flex flex-wrap gap-2">
@@ -292,12 +288,12 @@ export default function VenueDetailPage() {
                 })}
               </div>
             ) : (
-              <p className="text-[13px] text-gray-400">등록된 시설 정보가 없습니다</p>
+              <p className="text-[13px] text-gray-500">등록된 시설 정보가 없습니다</p>
             )}
           </div>
 
           {/* Reviews */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+          <div className="rounded-xl bg-white border border-gray-100 p-4 mb-3">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[14px] font-semibold text-gray-900">
                 리뷰 ({venueReviews.length})
@@ -335,7 +331,7 @@ export default function VenueDetailPage() {
             ) : (
               <div className="rounded-xl bg-gray-50 p-6 text-center">
                 <MessageSquareOff size={24} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-[13px] text-gray-400">아직 리뷰가 없습니다</p>
+                <p className="text-[13px] text-gray-500">아직 리뷰가 없습니다</p>
               </div>
             )}
           </div>
@@ -345,7 +341,7 @@ export default function VenueDetailPage() {
             {!showReviewForm ? (
               <button
                 onClick={() => setShowReviewForm(true)}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white py-3.5 text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3.5 text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <PenLine size={16} className="text-blue-500" />
                 리뷰 쓰기
@@ -365,7 +361,7 @@ export default function VenueDetailPage() {
         <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Upcoming team matches at this venue */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4">
+          <div className="rounded-xl bg-white border border-gray-100 p-4">
             <h3 className="text-[14px] font-semibold text-gray-900 mb-3 flex items-center gap-2">
               <Trophy size={16} className="text-blue-500" />
               이 구장 예정 경기
@@ -374,8 +370,8 @@ export default function VenueDetailPage() {
               <div className="space-y-2.5">
                 {mockUpcomingMatches.map((match) => {
                   const statusMap: Record<string, { label: string; className: string }> = {
-                    recruiting: { label: '모집중', className: 'bg-blue-50 text-blue-500' },
-                    matched: { label: '매칭완료', className: 'bg-green-50 text-green-600' },
+                    recruiting: { label: '모집중', className: 'text-blue-500' },
+                    matched: { label: '매칭완료', className: 'text-blue-500' },
                   };
                   const status = statusMap[match.status] ?? statusMap.recruiting;
 
@@ -393,7 +389,7 @@ export default function VenueDetailPage() {
                           {status.label}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-[12px] text-gray-400">
+                      <div className="flex items-center gap-2 text-[12px] text-gray-500">
                         <Calendar size={11} className="shrink-0" />
                         <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
                       </div>
@@ -410,7 +406,7 @@ export default function VenueDetailPage() {
             ) : (
               <div className="rounded-xl bg-gray-50 p-6 text-center">
                 <Calendar size={24} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-[13px] text-gray-400">예정된 경기가 없어요</p>
+                <p className="text-[13px] text-gray-500">예정된 경기가 없어요</p>
               </div>
             )}
 
@@ -435,7 +431,6 @@ export default function VenueDetailPage() {
         </div>
       </div>
 
-      <div className="h-6" />
     </div>
   );
 }

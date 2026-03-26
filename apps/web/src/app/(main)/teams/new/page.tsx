@@ -4,19 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Globe, Video, Users } from 'lucide-react';
-import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
+import { sportLabel } from '@/lib/constants';
 import { SKILL_GRADES } from '@/lib/skill-grades';
 import type { SkillGrade } from '@/lib/skill-grades';
 
-const sports = [
-  { type: 'futsal', label: '풋살', color: 'bg-blue-50 text-blue-500 border-gray-200' },
-  { type: 'basketball', label: '농구', color: 'bg-blue-50 text-blue-500 border-gray-200' },
-  { type: 'badminton', label: '배드민턴', color: 'bg-blue-50 text-blue-500 border-gray-200' },
-  { type: 'ice_hockey', label: '아이스하키', color: 'bg-blue-50 text-blue-500 border-gray-200' },
-];
+const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
@@ -66,7 +61,7 @@ export default function CreateTeamPage() {
     return (
       <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-blue-50 text-blue-500 mb-4">
+          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <Users size={28} />
           </div>
           <h2 className="text-[22px] font-bold text-gray-900">팀을 만들어보세요</h2>
@@ -90,7 +85,7 @@ export default function CreateTeamPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/teams" className="hover:text-gray-600 transition-colors">팀/클럽</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">팀 등록</span>
@@ -98,10 +93,12 @@ export default function CreateTeamPage() {
 
       <div className="px-5 lg:px-0 max-w-2xl">
         {/* 팀명 */}
-        <Field label="팀명" required>
+        <Field label="팀명" required id="team-name">
           <input
+            id="team-name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
+            maxLength={50}
             placeholder="팀/동호회 이름을 입력해주세요"
             className="input-field"
           />
@@ -109,32 +106,31 @@ export default function CreateTeamPage() {
 
         {/* 종목 */}
         <Field label="종목" required>
-          <div className="grid grid-cols-2 gap-2">
-            {sports.map((s) => {
-              const Icon = SportIconMap[s.type];
-              const selected = form.sportType === s.type;
-              return (
-                <button
-                  key={s.type}
-                  type="button"
-                  onClick={() => setForm({ ...form, sportType: s.type })}
-                  className={`flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all text-left ${
-                    selected ? `${s.color} border-current` : 'border-gray-100 bg-white hover:border-gray-200'
-                  }`}
-                >
-                  {Icon && <Icon size={20} />}
-                  <span className="text-[14px] font-semibold">{s.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            {sportTypes.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setForm({ ...form, sportType: type })}
+                className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+                  form.sportType === type
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {sportLabel[type] || type}
+              </button>
+            ))}
           </div>
         </Field>
 
         {/* 팀 소개 */}
-        <Field label="팀 소개">
+        <Field label="팀 소개" id="team-description">
           <textarea
+            id="team-description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
+            maxLength={1000}
             placeholder="팀 소개, 활동 시간, 분위기 등을 자유롭게 적어주세요"
             rows={4}
             className="input-field resize-none"
@@ -143,8 +139,9 @@ export default function CreateTeamPage() {
 
         {/* 활동 지역 */}
         <div className="grid grid-cols-2 gap-3 mb-5">
-          <Field label="시/도" required>
+          <Field label="시/도" required id="team-city">
             <select
+              id="team-city"
               value={form.city}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
               className="input-field"
@@ -153,8 +150,9 @@ export default function CreateTeamPage() {
               {cities.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
-          <Field label="구/군">
+          <Field label="구/군" id="team-district">
             <input
+              id="team-district"
               value={form.district}
               onChange={(e) => setForm({ ...form, district: e.target.value })}
               placeholder="예: 강남구"
@@ -173,22 +171,23 @@ export default function CreateTeamPage() {
                 onClick={() => setForm({ ...form, skillGrade: g.grade as SkillGrade })}
                 className={`shrink-0 rounded-xl border-2 px-3.5 py-2.5 text-center transition-all ${
                   form.skillGrade === g.grade
-                    ? 'border-blue-500 bg-blue-50'
+                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-blue-600' : 'text-gray-900'}`}>
+                <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                   {g.label}
                 </p>
-                <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{g.desc}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
               </button>
             ))}
           </div>
         </Field>
 
         {/* 선출선수 */}
-        <Field label="선출선수 (명)">
+        <Field label="선출선수 (명)" id="team-proPlayerCount">
           <input
+            id="team-proPlayerCount"
             type="number"
             min={0}
             max={10}
@@ -197,12 +196,13 @@ export default function CreateTeamPage() {
             placeholder="0"
             className="input-field"
           />
-          <p className="text-[12px] text-gray-400 mt-1">팀 내 선출 출신 선수 수 (0~10명)</p>
+          <p className="text-[12px] text-gray-500 mt-1">팀 내 선출 출신 선수 수 (0~10명)</p>
         </Field>
 
         {/* 유니폼 색상 */}
-        <Field label="유니폼 색상">
+        <Field label="유니폼 색상" id="team-uniformColor">
           <input
+            id="team-uniformColor"
             value={form.uniformColor}
             onChange={(e) => setForm({ ...form, uniformColor: e.target.value })}
             placeholder="예: 빨강 상의 + 검정 하의"
@@ -218,7 +218,7 @@ export default function CreateTeamPage() {
               onClick={() => setForm({ ...form, isRecruiting: true })}
               className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                 form.isRecruiting
-                  ? 'border-blue-500 bg-blue-50 text-blue-500'
+                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
               }`}
             >
@@ -239,8 +239,9 @@ export default function CreateTeamPage() {
         </Field>
 
         {/* 연락처 */}
-        <Field label="연락처">
+        <Field label="연락처" id="team-contactInfo">
           <input
+            id="team-contactInfo"
             value={form.contactInfo}
             onChange={(e) => setForm({ ...form, contactInfo: e.target.value })}
             placeholder="카카오톡 ID 또는 연락 가능한 연락처"
@@ -251,13 +252,14 @@ export default function CreateTeamPage() {
         {/* SNS 링크 */}
         <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
-            <Globe size={16} className="text-gray-400" />
+            <Globe size={16} className="text-gray-500" />
             <h3 className="text-[14px] font-semibold text-gray-900">SNS 링크</h3>
           </div>
           <div className="space-y-3">
             <div>
-              <label className="block text-[12px] text-gray-400 mb-1">Instagram</label>
+              <label htmlFor="team-instagram" className="block text-[12px] text-gray-500 mb-1">Instagram</label>
               <input
+                id="team-instagram"
                 value={form.snsLinks.instagram}
                 onChange={(e) => setForm({ ...form, snsLinks: { ...form.snsLinks, instagram: e.target.value } })}
                 placeholder="https://instagram.com/..."
@@ -265,8 +267,9 @@ export default function CreateTeamPage() {
               />
             </div>
             <div>
-              <label className="block text-[12px] text-gray-400 mb-1">YouTube</label>
+              <label htmlFor="team-youtube" className="block text-[12px] text-gray-500 mb-1">YouTube</label>
               <input
+                id="team-youtube"
                 value={form.snsLinks.youtube}
                 onChange={(e) => setForm({ ...form, snsLinks: { ...form.snsLinks, youtube: e.target.value } })}
                 placeholder="https://youtube.com/..."
@@ -274,8 +277,9 @@ export default function CreateTeamPage() {
               />
             </div>
             <div>
-              <label className="block text-[12px] text-gray-400 mb-1">카카오톡 오픈채팅</label>
+              <label htmlFor="team-kakaotalk" className="block text-[12px] text-gray-500 mb-1">카카오톡 오픈채팅</label>
               <input
+                id="team-kakaotalk"
                 value={form.snsLinks.kakaotalk}
                 onChange={(e) => setForm({ ...form, snsLinks: { ...form.snsLinks, kakaotalk: e.target.value } })}
                 placeholder="https://open.kakao.com/..."
@@ -288,16 +292,17 @@ export default function CreateTeamPage() {
         {/* 홍보 영상(Shorts) */}
         <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
-            <Video size={16} className="text-gray-400" />
+            <Video size={16} className="text-gray-500" />
             <h3 className="text-[14px] font-semibold text-gray-900">홍보 영상 (Shorts)</h3>
           </div>
           <input
+            id="team-shortsUrl"
             value={form.shortsUrl}
             onChange={(e) => setForm({ ...form, shortsUrl: e.target.value })}
             placeholder="YouTube Shorts 또는 Instagram Reels URL"
             className="input-field"
           />
-          <p className="text-[12px] text-gray-400 mt-1.5">팀 활동을 보여주는 짧은 영상 링크를 등록하세요</p>
+          <p className="text-[12px] text-gray-500 mt-1.5">팀 활동을 보여주는 짧은 영상 링크를 등록하세요</p>
         </div>
 
         {/* 등록 버튼 */}
@@ -327,15 +332,26 @@ export default function CreateTeamPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
+        @media (prefers-color-scheme: dark) {
+          .input-field {
+            background: #1A1D23;
+            border-color: #333D4B;
+            color: #F2F4F6;
+          }
+          .input-field:focus {
+            background: #1A1D23;
+            border-color: #3182F6;
+          }
+        }
       `}</style>
     </div>
   );
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
   return (
     <div className="mb-5">
-      <label className="block text-[13px] font-semibold text-gray-700 mb-1.5">
+      <label htmlFor={id} className="block text-[13px] font-semibold text-gray-700 mb-1.5">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}

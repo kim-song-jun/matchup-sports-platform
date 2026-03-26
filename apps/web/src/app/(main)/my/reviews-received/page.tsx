@@ -92,7 +92,7 @@ export default function ReviewsReceivedPage() {
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
         <h2 className="text-[22px] font-bold text-gray-900">내가 받은 평가</h2>
-        <p className="text-[14px] text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
+        <p className="text-[14px] text-gray-500 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
       </div>
 
       <div className="px-5 lg:px-0 pb-8">
@@ -102,7 +102,7 @@ export default function ReviewsReceivedPage() {
             <div className="text-center">
               <p className="text-[36px] font-black text-gray-900">{avgScore.toFixed(1)}</p>
               <StarRating rating={Math.round(avgScore)} />
-              <p className="text-[12px] text-gray-400 mt-1">{mockReviewsReceived.length}개 평가</p>
+              <p className="text-[12px] text-gray-500 mt-1">{mockReviewsReceived.length}개 평가</p>
             </div>
             <div className="flex-1 space-y-1.5">
               {ratingDistribution.map((d) => (
@@ -114,7 +114,7 @@ export default function ReviewsReceivedPage() {
                       style={{ width: `${(d.count / mockReviewsReceived.length) * 100}%` }}
                     />
                   </div>
-                  <span className="text-[12px] text-gray-400 w-4 text-right">{d.count}</span>
+                  <span className="text-[12px] text-gray-500 w-4 text-right">{d.count}</span>
                 </div>
               ))}
             </div>
@@ -127,18 +127,18 @@ export default function ReviewsReceivedPage() {
             <div key={review.id} className="rounded-2xl bg-white border border-gray-100 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 shrink-0">
-                  <User size={18} className="text-gray-400" />
+                  <User size={18} className="text-gray-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className="text-[14px] font-semibold text-gray-900">{review.reviewerName}</span>
-                    <span className="text-[12px] text-gray-400">{review.date}</span>
+                    <span className="text-[12px] text-gray-500">{review.date}</span>
                   </div>
                   <div className="mt-0.5">
                     <StarRating rating={review.rating} />
                   </div>
                   <p className="text-[14px] text-gray-700 mt-2">{review.comment}</p>
-                  <p className="text-[12px] text-gray-400 mt-1.5">{review.matchTitle}</p>
+                  <p className="text-[12px] text-gray-500 mt-1.5">{review.matchTitle}</p>
                 </div>
               </div>
             </div>

@@ -30,7 +30,7 @@ async function bootstrap() {
 
   // Swagger
   const config = new DocumentBuilder()
-    .setTitle('MatchUp API')
+    .setTitle('TeamMeet API')
     .setDescription('AI 기반 멀티스포츠 소셜 매칭 플랫폼 API')
     .setVersion('1.0')
     .addBearerAuth()
@@ -40,7 +40,7 @@ async function bootstrap() {
 
   const port = process.env.API_PORT || 8000;
   await app.listen(port);
-  console.log(`🚀 MatchUp API running on http://localhost:${port}`);
+  console.log(`🚀 TeamMeet API running on http://localhost:${port}`);
   console.log(`📚 Swagger docs: http://localhost:${port}/docs`);
 }
 

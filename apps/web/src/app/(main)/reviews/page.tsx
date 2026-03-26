@@ -30,23 +30,23 @@ export default function ReviewsPage() {
       </header>
       <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
         <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">내 평가</h1>
-        <p className="text-[13px] text-gray-400 mt-0.5">매치가 끝나면 함께한 선수들을 평가해주세요</p>
+        <p className="text-[13px] text-gray-500 mt-0.5">매치가 끝나면 함께한 선수들을 평가해주세요</p>
       </div>
 
       <div className="px-5 lg:px-0">
         {!isAuthenticated ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-xl bg-gray-50 p-16 text-center">
             <Star size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">로그인 후 확인할 수 있어요</p>
-            <Link href="/login" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">로그인</Link>
+            <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors">로그인</Link>
           </div>
         ) : isLoading ? (
-          <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />)}</div>
+          <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 rounded-xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />)}</div>
         ) : pendingReviews.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-xl bg-gray-50 p-16 text-center">
             <Star size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">작성할 평가가 없어요</p>
-            <p className="text-[13px] text-gray-400 mt-1">매치가 완료되면 평가 요청이 도착합니다</p>
+            <p className="text-[13px] text-gray-500 mt-1">매치가 완료되면 평가 요청이 도착합니다</p>
           </div>
         ) : (
           <div className="space-y-3 stagger-children">
@@ -56,7 +56,6 @@ export default function ReviewsPage() {
           </div>
         )}
       </div>
-      <div className="h-6" />
     </div>
   );
 }
@@ -83,7 +82,7 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
   });
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">
@@ -91,7 +90,7 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
           </div>
           <div>
             <p className="text-[14px] font-semibold text-gray-900">{review.target?.nickname}</p>
-            <p className="text-[12px] text-gray-400">{review.matchTitle}</p>
+            <p className="text-[12px] text-gray-500">{review.matchTitle}</p>
           </div>
         </div>
         <button onClick={() => setExpanded(!expanded)}

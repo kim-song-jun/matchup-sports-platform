@@ -33,7 +33,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addToast = useCallback((type: ToastType, message: string) => {
-    const id = Date.now().toString();
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setToasts((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {
       dismissToast(id);
@@ -67,7 +67,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           >
             {icons[t.type]}
             <span className="flex-1 text-[14px] font-medium">{t.message}</span>
-            <button onClick={() => removeToast(t.id)} aria-label="알림 닫기" className="flex items-center justify-center min-w-[44px] min-h-[44px] -mr-2 text-gray-400 hover:text-white">
+            <button onClick={() => removeToast(t.id)} aria-label="알림 닫기" className="flex items-center justify-center min-w-[44px] min-h-[44px] -mr-2 text-gray-500 hover:text-white">
               <X size={16} />
             </button>
           </div>

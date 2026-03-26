@@ -108,7 +108,7 @@ body {
 .dark .bg-white\/95 { background-color: rgba(26, 29, 35, 0.95) !important; }
 .dark table thead tr { background-color: #22262E !important; }
 .dark table tbody tr:hover { background-color: #22262E !important; }
-.dark .from-violet-500 { --tw-gradient-from: #3182F6 !important; }
+/* violet-500 override removed — all accents use blue now */
 .dark .to-blue-600 { --tw-gradient-to: #1B64DA !important; }
 
 /* Semantic color overrides for badges/status */
@@ -126,25 +126,18 @@ body {
 .dark .text-amber-600 { color: #FF9500 !important; }
 .dark .text-red-500 { color: #FF3B30 !important; }
 
+/* Dark hover/focus state overrides */
+.dark .hover\:bg-gray-50:hover { background-color: #22262E !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #2C3038 !important; }
+.dark .focus\:bg-white:focus { background-color: #1A1D23 !important; }
+.dark .bg-white\/90 { background-color: rgba(26, 29, 35, 0.9) !important; }
+
 /* Global touch responsiveness */
 a, button, [role="button"], [tabindex="0"] {
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0.04);
   touch-action: manipulation;
 }
 
-/* Cards and list items — subtle press effect */
-.touch-card {
-  transition: transform 0.1s ease, box-shadow 0.2s ease;
-}
-.touch-card:active {
-  transform: scale(0.98);
-}
-@media (hover: hover) {
-  .touch-card:hover {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-    transform: translateY(-1px);
-  }
-}
 
 /* Buttons — instant feedback */
 button:not(:disabled):active, a:active {
@@ -224,15 +217,21 @@ button:not(:disabled):active, a:active {
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes expand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 300px; }
+}
+
 @keyframes check-draw {
   from { stroke-dashoffset: 24; }
   to { stroke-dashoffset: 0; }
 }
 
-@keyframes confetti {
-  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
-}
 
 @keyframes gentle-bounce {
   0%, 100% { transform: translateY(0); }
@@ -242,6 +241,8 @@ button:not(:disabled):active, a:active {
 .animate-fade-in-up { animation: fade-in-up 0.4s ease-out; }
 .animate-bounce-in { animation: bounce-in 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
 .animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
+.animate-slide-in-left { animation: slide-in-left 0.3s ease-out; }
+.animate-expand { animation: expand 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards; overflow: hidden; }
 .animate-check-draw { animation: check-draw 0.4s ease-out forwards; stroke-dasharray: 24; stroke-dashoffset: 24; }
 .animate-gentle-bounce { animation: gentle-bounce 2s ease-in-out infinite; }
 
@@ -256,9 +257,22 @@ button:not(:disabled):active, a:active {
 
 /* Reduced motion — delight animations */
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in-up, .animate-bounce-in, .animate-slide-in-right {
+  .animate-fade-in-up, .animate-bounce-in, .animate-slide-in-right, .animate-slide-in-left, .animate-expand {
     animation: none !important;
   }
   .animate-gentle-bounce { animation: none !important; }
   .stagger-children > * { animation: none !important; }
+}
+
+/* ── Global focus-visible for all interactive elements ── */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(49, 130, 246, 0.5);
+  outline-offset: 2px;
+  border-radius: 8px;
 }

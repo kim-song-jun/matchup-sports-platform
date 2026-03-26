@@ -1,0 +1,284 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
+import { LessonsService } from './lessons.service';
+import { PrismaService } from '../prisma/prisma.service';
+
+describe('LessonsService', () => {
+  let service: LessonsService;
+  let prisma: PrismaService;
+
+  const mockPrismaService = {
+    lesson: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        LessonsService,
+        { provide: PrismaService, useValue: mockPrismaService },
+      ],
+    }).compile();
+
+    service = module.get<LessonsService>(LessonsService);
+    prisma = module.get<PrismaService>(PrismaService);
+
+    jest.clearAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('findAll', () => {
+    const mockLessons = [
+      {
+        id: 'lesson-1',
+        title: '풋살 기초 레슨',
+        sportType: 'FUTSAL',
+        type: 'group',
+        status: 'open',
+        lessonDate: new Date('2026-04-01'),
+        host: { id: 'u1', nickname: '코치1', profileImageUrl: null },
+      },
+      {
+        id: 'lesson-2',
+        title: '농구 슈팅 클리닉',
+        sportType: 'BASKETBALL',
+        type: 'clinic',
+        status: 'open',
+        lessonDate: new Date('2026-04-02'),
+        host: { id: 'u2', nickname: '코치2', profileImageUrl: null },
+      },
+    ];
+
+    it('should return paginated lessons', async () => {
+      mockPrismaService.lesson.findMany.mockResolvedValue(mockLessons);
+
+      const result = await service.findAll({});
+
+      expect(result).toEqual({
+        items: mockLessons,
+        nextCursor: null,
+      });
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: 'open' },
+          take: 21,
+          orderBy: { lessonDate: 'asc' },
+        }),
+      );
+    });
+
+    it('should return nextCursor when there are more results', async () => {
+      const manyLessons = Array.from({ length: 21 }, (_, i) => ({
+        id: `lesson-${i}`,
+        title: `레슨 ${i}`,
+        sportType: 'FUTSAL',
+        status: 'open',
+        lessonDate: new Date(),
+        host: { id: `u${i}`, nickname: `코치${i}`, profileImageUrl: null },
+      }));
+      mockPrismaService.lesson.findMany.mockResolvedValue(manyLessons);
+
+      const result = await service.findAll({});
+
+      expect(result.items).toHaveLength(20);
+      expect(result.nextCursor).toBe('lesson-19');
+    });
+
+    it('should filter by sportType', async () => {
+      mockPrismaService.lesson.findMany.mockResolvedValue([mockLessons[0]]);
+
+      await service.findAll({ sportType: 'FUTSAL' });
+
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'open',
+            sportType: 'FUTSAL',
+          }),
+        }),
+      );
+    });
+
+    it('should filter by type', async () => {
+      mockPrismaService.lesson.findMany.mockResolvedValue([mockLessons[1]]);
+
+      await service.findAll({ type: 'clinic' });
+
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'open',
+            type: 'clinic',
+          }),
+        }),
+      );
+    });
+
+    it('should apply both sportType and type filters together', async () => {
+      mockPrismaService.lesson.findMany.mockResolvedValue([]);
+
+      await service.findAll({ sportType: 'BASKETBALL', type: 'group' });
+
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            status: 'open',
+            sportType: 'BASKETBALL',
+            type: 'group',
+          },
+        }),
+      );
+    });
+
+    it('should use cursor-based pagination when cursor provided', async () => {
+      mockPrismaService.lesson.findMany.mockResolvedValue([mockLessons[1]]);
+
+      await service.findAll({ cursor: 'lesson-1' });
+
+      expect(prisma.lesson.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { id: 'lesson-1' },
+          skip: 1,
+          take: 21,
+        }),
+      );
+    });
+  });
+
+  describe('findById', () => {
+    const mockLessonDetail = {
+      id: 'lesson-1',
+      title: '풋살 기초 레슨',
+      sportType: 'FUTSAL',
+      type: 'group',
+      status: 'open',
+      lessonDate: new Date('2026-04-01'),
+      maxParticipants: 10,
+      fee: 30000,
+      host: {
+        id: 'u1',
+        nickname: '코치1',
+        profileImageUrl: 'https://example.com/img.jpg',
+        mannerScore: 4.8,
+      },
+    };
+
+    it('should return lesson with host details', async () => {
+      mockPrismaService.lesson.findUnique.mockResolvedValue(mockLessonDetail);
+
+      const result = await service.findById('lesson-1');
+
+      expect(result).toEqual(mockLessonDetail);
+      expect(prisma.lesson.findUnique).toHaveBeenCalledWith({
+        where: { id: 'lesson-1' },
+        include: {
+          host: {
+            select: {
+              id: true,
+              nickname: true,
+              profileImageUrl: true,
+              mannerScore: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('should throw NotFoundException when lesson does not exist', async () => {
+      mockPrismaService.lesson.findUnique.mockResolvedValue(null);
+
+      await expect(service.findById('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.findById('non-existent')).rejects.toThrow(
+        '강좌를 찾을 수 없습니다.',
+      );
+    });
+  });
+
+  describe('create', () => {
+    const createData = {
+      sportType: 'FUTSAL',
+      type: 'group',
+      title: '풋살 기초 레슨',
+      description: '초보자를 위한 레슨',
+      venueName: '강남 풋살장',
+      lessonDate: '2026-04-10',
+      startTime: '18:00',
+      endTime: '20:00',
+      maxParticipants: 10,
+      fee: 30000,
+      coachName: '김코치',
+      coachBio: '프로 경력 10년',
+    };
+
+    const createdLesson = {
+      id: 'lesson-new',
+      hostId: 'user-1',
+      ...createData,
+      lessonDate: new Date('2026-04-10'),
+      levelMin: 1,
+      levelMax: 5,
+      imageUrls: [],
+    };
+
+    it('should create a new lesson', async () => {
+      mockPrismaService.lesson.create.mockResolvedValue(createdLesson);
+
+      const result = await service.create('user-1', createData);
+
+      expect(result).toEqual(createdLesson);
+      expect(prisma.lesson.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          hostId: 'user-1',
+          title: '풋살 기초 레슨',
+          sportType: 'FUTSAL',
+          type: 'group',
+          maxParticipants: 10,
+          fee: 30000,
+          coachName: '김코치',
+          coachBio: '프로 경력 10년',
+          startTime: '18:00',
+          endTime: '20:00',
+        }),
+      });
+    });
+
+    it('should use default values for optional fields', async () => {
+      const minimalData = {
+        sportType: 'BASKETBALL',
+        type: 'clinic',
+        title: '농구 클리닉',
+        lessonDate: '2026-04-15',
+        startTime: '10:00',
+        endTime: '12:00',
+        maxParticipants: 8,
+      };
+
+      mockPrismaService.lesson.create.mockResolvedValue({
+        id: 'lesson-min',
+        hostId: 'user-1',
+        ...minimalData,
+        lessonDate: new Date('2026-04-15'),
+      });
+
+      await service.create('user-1', minimalData);
+
+      expect(prisma.lesson.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          hostId: 'user-1',
+          fee: 0,
+          levelMin: 1,
+          levelMax: 5,
+          imageUrls: [],
+        }),
+      });
+    });
+  });
+});

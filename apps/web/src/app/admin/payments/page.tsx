@@ -1,8 +1,28 @@
 'use client';
 
+import { useState } from 'react';
 import { CreditCard } from 'lucide-react';
 import { useAdminPayments } from '@/hooks/use-api';
-import type { Payment } from '@/types/api';
+import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
+
+interface AdminPayment {
+  id: string;
+  userName: string;
+  itemName: string;
+  amount: number;
+  status: string;
+  method: string;
+  createdAt: string;
+  orderId: string;
+}
+
+const paymentFilters = [
+  { key: '', label: '전체' },
+  { key: 'completed', label: '결제완료' },
+  { key: 'pending', label: '대기' },
+  { key: 'refunded', label: '환불' },
+  { key: 'failed', label: '실패' },
+];
 
 const statusLabel: Record<string, string> = {
   completed: '결제완료', pending: '대기', refunded: '환불', failed: '실패',
@@ -37,11 +57,36 @@ const mockAdminPayments = [
 ];
 
 export default function AdminPaymentsPage() {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const { data, isLoading } = useAdminPayments();
 
   const apiPayments = data?.items ?? data ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const payments: any[] = (Array.isArray(apiPayments) && apiPayments.length > 0) ? apiPayments : mockAdminPayments;
+  const allPayments: AdminPayment[] = (Array.isArray(apiPayments) && apiPayments.length > 0) ? (apiPayments as unknown as AdminPayment[]) : mockAdminPayments;
+
+  const payments = allPayments.filter((p: AdminPayment) => {
+    const userName = p.userName || '';
+    const orderId = p.orderId || '';
+    const matchesSearch = !search ||
+      userName.toLowerCase().includes(search.toLowerCase()) ||
+      orderId.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = !statusFilter || p.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleDownload = () => {
+    downloadCSV(
+      payments.map((p: AdminPayment) => ({
+        사용자: p.userName || '알 수 없음',
+        금액: p.amount || 0,
+        상태: statusLabel[p.status] || p.status,
+        결제수단: p.method ? (methodLabel[p.method] || p.method) : '-',
+        일시: p.createdAt ? formatDate(p.createdAt) : '-',
+        주문번호: p.orderId || '-',
+      })),
+      'payments',
+    );
+  };
 
   return (
     <div className="animate-fade-in">
@@ -51,6 +96,16 @@ export default function AdminPaymentsPage() {
           <p className="text-[14px] text-gray-400 mt-1">전체 결제 내역을 관리하세요</p>
         </div>
       </div>
+
+      <AdminToolbar
+        search={{ value: search, onChange: setSearch, placeholder: '사용자 또는 주문번호 검색' }}
+        filters={paymentFilters}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        count={payments.length}
+        countLabel="건"
+        onDownload={handleDownload}
+      />
 
       <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
         {isLoading ? (
@@ -78,39 +133,38 @@ export default function AdminPaymentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {payments.map((p: any, idx: number) => {
-                  const userName = (p.user as Record<string, unknown>)?.nickname || p.userName || '알 수 없음';
-                  const userEmail = (p.user as Record<string, unknown>)?.email || '';
+                {payments.map((p: AdminPayment, idx: number) => {
+                  const userName = p.userName || '알 수 없음';
                   const itemName = p.itemName || p.orderId || '';
                   return (
-                  <tr key={p.id as string || idx} className="hover:bg-gray-50 transition-colors">
+                  <tr key={p.id || idx} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[12px] font-bold text-blue-500">
-                          {String(userName).charAt(0)}
+                          {userName.charAt(0)}
                         </div>
                         <div>
-                          <p className="text-[14px] font-medium text-gray-900">{String(userName)}</p>
-                          <p className="text-[11px] text-gray-400">{String(itemName || userEmail)}</p>
+                          <p className="text-[14px] font-medium text-gray-900">{userName}</p>
+                          <p className="text-[11px] text-gray-400">{itemName}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[14px] font-semibold text-gray-900">{formatCurrency(Number(p.amount) || 0)}</span>
+                      <span className="text-[14px] font-semibold text-gray-900">{formatCurrency(p.amount || 0)}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor[String(p.status)] || 'bg-gray-100 text-gray-400'}`}>
-                        {statusLabel[String(p.status)] || String(p.status)}
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor[p.status] || 'bg-gray-100 text-gray-400'}`}>
+                        {statusLabel[p.status] || p.status}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-[13px] text-gray-600">
-                      {p.method ? methodLabel[String(p.method)] || String(p.method) : '-'}
+                      {p.method ? methodLabel[p.method] || p.method : '-'}
                     </td>
                     <td className="px-5 py-3.5 text-[13px] text-gray-500">
-                      {p.createdAt ? formatDate(String(p.createdAt)) : '-'}
+                      {p.createdAt ? formatDate(p.createdAt) : '-'}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[12px] font-mono text-gray-400">{String(p.orderId || '-')}</span>
+                      <span className="text-[12px] font-mono text-gray-400">{p.orderId || '-'}</span>
                     </td>
                   </tr>
                   );

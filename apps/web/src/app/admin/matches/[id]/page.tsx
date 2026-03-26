@@ -10,12 +10,8 @@ import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useMatch } from '@/hooks/use-api';
 import type { MatchParticipant } from '@/types/api';
+import { sportLabel, levelLabel } from '@/lib/constants';
 
-const sportLabel: Record<string, string> = {
-  futsal: '풋살', basketball: '농구', badminton: '배드민턴',
-  ice_hockey: '아이스하키', figure_skating: '피겨', short_track: '쇼트트랙',
-};
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 const statusLabel: Record<string, string> = {
   recruiting: '모집중', full: '마감', in_progress: '진행중', completed: '완료', cancelled: '취소',
 };
@@ -64,11 +60,11 @@ export default function AdminMatchDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'match', matchId] });
-      toast('success', '상태가 변경되었습니다');
+      toast('success', '상태가 변경되었어요');
       setStatusChanging(false);
     },
     onError: () => {
-      toast('error', '실패했어요. 다시 시도해주세요');
+      toast('error', '상태 변경에 실패했어요. 다시 시도해주세요');
       setStatusChanging(false);
     },
   });
@@ -246,13 +242,13 @@ export default function AdminMatchDetailPage() {
               {statusMutation.isSuccess && (
                 <p className="flex items-center gap-1 text-[12px] text-green-500 mt-1.5">
                   <CheckCircle size={12} />
-                  상태가 변경되었습니다
+                  상태가 변경되었어요
                 </p>
               )}
               {statusMutation.isError && (
                 <p className="flex items-center gap-1 text-[12px] text-red-500 mt-1.5">
                   <AlertCircle size={12} />
-                  상태 변경에 실패했습니다
+                  상태 변경에 실패했어요. 다시 시도해주세요
                 </p>
               )}
             </div>

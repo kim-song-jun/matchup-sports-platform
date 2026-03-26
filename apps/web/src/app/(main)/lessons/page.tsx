@@ -1,168 +1,137 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { GraduationCap, Swords, Dumbbell, Calendar, MapPin, Users, Plus, Search } from 'lucide-react';
-import { SportIconMap } from '@/components/icons/sport-icons';
+import { Plus, Search } from 'lucide-react';
 import { useLessons } from '@/hooks/use-api';
+import { useDebounce } from '@/hooks/use-debounce';
+import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel, lessonTypeLabel as typeLabel } from '@/lib/constants';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { getSportImage } from '@/lib/sport-image';
 import type { Lesson } from '@/types/api';
 
 const typeFilters = [
   { key: '', label: '전체' },
-  { key: 'group_lesson', label: '그룹 레슨', icon: GraduationCap },
-  { key: 'practice_match', label: '연습 경기', icon: Swords },
-  { key: 'free_practice', label: '자유 연습', icon: Dumbbell },
+  { key: 'group_lesson', label: '그룹 레슨' },
+  { key: 'practice_match', label: '연습 경기' },
+  { key: 'free_practice', label: '자유 연습' },
 ];
 
-
-const typeColor: Record<string, string> = {
-  group_lesson: 'bg-blue-50 text-blue-500',
-  practice_match: 'bg-gray-100 text-gray-700',
-  free_practice: 'bg-gray-100 text-gray-700',
-  clinic: 'bg-blue-50 text-blue-500',
-};
-
+const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }) {
+  return (
+    <Link href={`/lessons/${lesson.id}`}>
+      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors">
+        {/* 이미지 */}
+        <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+          <img src={getSportImage(lesson.sportType, lesson.imageUrl)} alt={lesson.title} className="w-full h-full object-cover" loading="lazy" />
+        </div>
+        {/* 텍스트 */}
+        <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100 truncate">{lesson.title}</h3>
+            <span className="shrink-0 text-[10px] font-medium text-blue-500">{typeLabel[lesson.type] || lesson.type}</span>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1">
+            {sportLabel[lesson.sportType]}
+            {lesson.coachName && ` · 코치 ${lesson.coachName}`}
+          </p>
+          <div className="flex items-center gap-2 mt-1.5 text-[11px]">
+            <span className="text-gray-500">{formatDate(lesson.lessonDate)} {lesson.startTime}</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <span className="text-gray-700 dark:text-gray-300 font-medium">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <span className="text-gray-500">{formatCurrency(lesson.fee)}</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+});
 
 export default function LessonsPage() {
   const [activeType, setActiveType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const { toast } = useToast();
   const params: Record<string, string> = {};
   if (activeType) params.type = activeType;
 
-  const { data, isLoading } = useLessons(Object.keys(params).length > 0 ? params : undefined);
+  const { data, isLoading, error, refetch } = useLessons(Object.keys(params).length > 0 ? params : undefined);
 
   const allLessons = data?.items ?? [];
-  const lessons = searchQuery
-    ? allLessons.filter((lesson: Lesson) =>
-        lesson.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lesson.coachName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lesson.venueName?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : allLessons;
+  const lessons = useMemo(() => {
+    if (!debouncedSearch) return allLessons;
+    return allLessons.filter((lesson: Lesson) =>
+      lesson.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      lesson.coachName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      lesson.venueName?.toLowerCase().includes(debouncedSearch.toLowerCase())
+    );
+  }, [allLessons, debouncedSearch]);
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
         <div>
           <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">강좌</h1>
-          <p className="text-[13px] text-gray-400 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
+          <p className="text-[13px] text-gray-500 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
         </div>
-        <button
-          onClick={() => toast('info', '강좌 등록 기능을 준비 중입니다')}
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
-        >
-          <Plus size={16} strokeWidth={2.5} />
+        <button onClick={() => toast('info', '강좌 등록 기능을 준비 중입니다')}
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
+          <Plus size={14} strokeWidth={2.5} />
           강좌 등록
         </button>
       </header>
 
-      {/* 검색 바 */}
+      {/* 검색 */}
       <div className="px-5 lg:px-0 mb-3">
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="강좌명, 코치, 장소 검색"
-            value={searchQuery}
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+          <input type="text" placeholder="강좌명, 코치, 장소 검색" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 dark:focus:bg-gray-900 dark:focus:border-blue-600 transition-all"
-          />
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-all" />
         </div>
       </div>
 
-      {/* Type filter */}
+      {/* 필터 칩 */}
       <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {typeFilters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setActiveType(f.key)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+          <button key={f.key} onClick={() => setActiveType(f.key)}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
               activeType === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
-            }`}
-          >
-            {f.icon && <f.icon size={14} />}
+                : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}>
             {f.label}
           </button>
         ))}
       </div>
 
-      {/* List */}
+      {/* 리스트 */}
       <div className="px-5 lg:px-0">
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-[140px] rounded-2xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
+              <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
+        ) : error ? (
+          <ErrorState onRetry={() => refetch()} />
         ) : lessons.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
-            <GraduationCap size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">등록된 강좌가 없어요</p>
-            <p className="text-[13px] text-gray-400 mt-1">곧 다양한 강좌가 등록될 예정이에요</p>
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-14 text-center">
+            <p className="text-[14px] text-gray-500">강좌가 없어요</p>
+            <p className="text-[13px] text-gray-500 mt-1">곧 다양한 강좌가 등록될 예정이에요</p>
           </div>
         ) : (
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 stagger-children">
-            {lessons.map((lesson: Lesson) => {
-              const SportIcon = SportIconMap[lesson.sportType];
-              const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
-              return (
-                <Link key={lesson.id} href={`/lessons/${lesson.id}`} className="block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      {SportIcon && (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-                          <SportIcon size={20} />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{lesson.title}</h3>
-                        <span className="text-[12px] text-gray-400">{sportLabel[lesson.sportType]}</span>
-                      </div>
-                    </div>
-                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${typeColor[lesson.type] || 'bg-gray-100 text-gray-500'}`}>
-                      {typeLabel[lesson.type]}
-                    </span>
-                  </div>
-
-                  {lesson.coachName && (
-                    <p className="text-[13px] text-gray-500 mb-2">코치: {lesson.coachName}</p>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-y-1 text-[13px] text-gray-500">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar size={15} className="text-gray-400" />
-                      {formatDate(lesson.lessonDate)} {lesson.startTime}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <MapPin size={15} className="text-gray-400" />
-                      <span className="truncate">{lesson.venueName || '장소 미정'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Users size={15} className="text-gray-400" />
-                      {lesson.currentParticipants}/{lesson.maxParticipants}명
-                    </div>
-                    <div className="text-[14px] font-semibold text-gray-800">
-                      {formatCurrency(lesson.fee)}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${filledPercent}%` }} />
-                  </div>
-                </Link>
-              );
-            })}
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+            {lessons.map((lesson: Lesson) => (
+              <LessonCard key={lesson.id} lesson={lesson} />
+            ))}
           </div>
         )}
       </div>
 
-      <div className="h-6" />
     </div>
   );
 }

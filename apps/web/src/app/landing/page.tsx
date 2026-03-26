@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
-import { Target, Shield, Users, Zap, ChevronDown, Star, ArrowRight, Sparkles, Frown, SearchX, UserX } from 'lucide-react';
+import { Target, Shield, Users, Zap, ChevronDown, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { HeroParticles } from '@/components/landing/hero-particles';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { CountUp } from '@/components/landing/count-up';
+import { LandingNav } from '@/components/landing/landing-nav';
+import { LandingFooter } from '@/components/landing/landing-footer';
 
 /* ── Data ── */
 
@@ -25,9 +26,9 @@ const SPORTS = [
 ];
 
 const SUB_FEATURES = [
-  { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-green-500' },
-  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-amber-500' },
-  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-violet-500' },
+  { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-blue-500' },
+  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-blue-500' },
+  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-blue-500' },
 ];
 
 const STEPS = [
@@ -37,27 +38,9 @@ const STEPS = [
 ];
 
 const TESTIMONIALS = [
-  {
-    quote: '3개월간 47경기를 매칭 받았는데, 실력 차이로 재미없었던 경기가 단 한 번도 없었어요. AI가 진짜 잘 잡아줍니다.',
-    author: '김민수',
-    detail: '축구 B등급 · 47경기',
-    rating: 5,
-    sport: 'soccer',
-  },
-  {
-    quote: '노쇼 때문에 경기가 무산된 적이 많았는데, 매너 점수 시스템 도입 후 노쇼율이 거의 0%예요.',
-    author: '이수진',
-    detail: '풋살 A등급 팀장 · FC 번개',
-    rating: 5,
-    sport: 'futsal',
-  },
-  {
-    quote: '퇴근 후 배드민턴 파트너 찾기가 제일 힘들었는데, 이제 평균 3분이면 매칭돼요. 주 3회 꾸준히 치고 있습니다.',
-    author: '박지영',
-    detail: '배드민턴 C등급 · 32경기',
-    rating: 4,
-    sport: 'badminton',
-  },
+  { quote: '3개월간 47경기를 매칭 받았는데, 실력 차이로 재미없었던 경기가 단 한 번도 없었어요.', author: '김민수', detail: '축구 B등급 · 47경기', rating: 5, sport: 'soccer' },
+  { quote: '노쇼 때문에 경기가 무산된 적이 많았는데, 매너 점수 시스템 도입 후 노쇼율이 거의 0%예요.', author: '이수진', detail: '풋살 A등급 팀장 · FC 번개', rating: 5, sport: 'futsal' },
+  { quote: '퇴근 후 배드민턴 파트너 찾기가 제일 힘들었는데, 이제 평균 3분이면 매칭돼요.', author: '박지영', detail: '배드민턴 C등급 · 32경기', rating: 4, sport: 'badminton' },
 ];
 
 const STATS = [
@@ -71,118 +54,86 @@ const STATS = [
 
 export default function LandingPage() {
   const featuresRef = useRef<HTMLDivElement>(null);
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
 
-      {/* ── Nav ── */}
-      <nav aria-label="메인 네비게이션" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-sm'
-          : 'bg-transparent'
-      }`}>
-        <div className="max-w-[1200px] mx-auto px-5 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
-              <span className="text-white font-black text-sm">M</span>
-            </div>
-            <span className={`font-bold text-[18px] tracking-tight transition-colors duration-300 ${scrolled ? 'text-gray-900 dark:text-white' : 'text-white'}`}>
-              MatchUp
-            </span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className={`text-[14px] font-medium transition-colors px-3 py-2.5 rounded-lg hidden sm:block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100' : 'text-white/80 hover:text-white'} active:scale-[0.97]`}>
-              로그인
-            </Link>
-            <Link href="/login" className={`text-[14px] font-bold px-5 py-2.5 rounded-xl transition-all active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${scrolled ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md shadow-blue-500/20' : 'bg-white text-gray-900 hover:bg-gray-50'}`}>
-              시작하기
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <LandingNav />
 
-      {/* ── Hero ── */}
-      <section className="relative min-h-[100dvh] flex flex-col justify-center overflow-hidden">
-        {/* Background — brighter, more energetic */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(49,130,246,0.2),transparent_50%)]" />
-        <HeroParticles />
-
-        <div className="relative max-w-[1200px] mx-auto px-5 pt-24 pb-20 lg:pt-0 lg:pb-0">
-          <div className="max-w-[660px]">
+      {/* ── Hero — 화이트 베이스, 텍스트 중심 ── */}
+      <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
+        <div className="max-w-[1100px] mx-auto px-5">
+          <div className="max-w-[680px] mx-auto text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md text-white text-[13px] font-medium px-4 py-2 rounded-full mb-8 animate-fade-in-up" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
-              <Sparkles size={14} className="text-yellow-300" />
-              11개 종목 매칭 서비스 운영 중
-            </div>
+            <ScrollReveal delay={0}>
+              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[13px] font-semibold px-4 py-2 rounded-full mb-8">
+                <Sparkles size={14} />
+                11개 종목 · 2,400+ 매칭 완료
+              </div>
+            </ScrollReveal>
 
             {/* Heading */}
-            <h1 className="text-[32px] sm:text-[40px] lg:text-[56px] font-black text-white leading-[1.15] tracking-tight mb-6 animate-fade-in-up" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
-              내 수준에 딱 맞는
-              <br />
-              운동 메이트,{' '}
-              <span className="bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-200 bg-clip-text text-transparent">
-                AI가 찾아드려요
-              </span>
-            </h1>
+            <ScrollReveal delay={100}>
+              <h1 className="text-[32px] sm:text-[44px] lg:text-[56px] font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-6">
+                내 수준에 딱 맞는
+                <br />
+                운동 메이트를{' '}
+                <span className="text-blue-500">AI가 찾아드려요</span>
+              </h1>
+            </ScrollReveal>
 
             {/* Subtitle */}
-            <p className="text-[17px] lg:text-[20px] text-blue-100 mb-10 leading-relaxed max-w-[520px] animate-fade-in-up" style={{ animationDelay: '0.4s', animationFillMode: 'both' }}>
-              실력·위치·매너를 종합 분석해서
-              <br className="hidden sm:block" />
-              딱 맞는 상대와 매칭해드려요.
-            </p>
+            <ScrollReveal delay={200}>
+              <p className="text-[17px] lg:text-[18px] text-gray-500 dark:text-gray-400 mb-10 leading-relaxed max-w-[480px] mx-auto">
+                실력·위치·매너를 종합 분석해서
+                <br className="hidden sm:block" />
+                딱 맞는 상대와 매칭해드려요.
+              </p>
+            </ScrollReveal>
 
             {/* CTA */}
-            <div className="flex flex-col sm:flex-row gap-3 animate-fade-in-up" style={{ animationDelay: '0.55s', animationFillMode: 'both' }}>
-              <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-white text-blue-600 font-bold rounded-2xl px-8 py-4 text-[16px] hover:shadow-xl hover:shadow-white/20 active:scale-[0.97] transition-all duration-200 shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                무료로 시작하기
-                <ArrowRight size={18} strokeWidth={2.5} />
-              </Link>
-              <button onClick={() => featuresRef.current?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center justify-center gap-2 text-white/90 rounded-xl px-6 py-3.5 text-[15px] font-medium hover:bg-white/10 active:scale-[0.97] transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                더 알아보기
-                <ChevronDown size={18} />
-              </button>
-            </div>
+            <ScrollReveal delay={300}>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold rounded-2xl px-8 py-4 text-[16px] hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/20 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+                  무료로 시작하기
+                  <ArrowRight size={18} strokeWidth={2.5} />
+                </Link>
+                <button onClick={() => featuresRef.current?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400 rounded-xl px-6 py-3.5 text-[15px] font-semibold hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.97] transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+                  더 알아보기
+                  <ChevronDown size={18} />
+                </button>
+              </div>
+            </ScrollReveal>
           </div>
         </div>
 
-        {/* Bottom curve */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 60" fill="none" className="w-full block" preserveAspectRatio="none">
-            <path d="M0 60V30Q360 0 720 30T1440 30V60H0Z" className="fill-white dark:fill-gray-900" />
-          </svg>
-        </div>
+        {/* 배경 장식 — 은은한 그라데이션 원 */}
+        <div className="absolute top-20 -right-32 w-[500px] h-[500px] bg-blue-100/40 dark:bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-32 w-[400px] h-[400px] bg-blue-100/30 dark:bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
       </section>
 
       {/* ── Stats ── */}
-      <section className="relative -mt-1 z-10 pb-16 sm:pb-20">
+      <section className="pb-16 sm:pb-20">
         <div className="mx-5 lg:mx-auto lg:max-w-[800px]">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl shadow-gray-900/5 dark:shadow-black/20 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
-            {STATS.map((stat) => (
-              <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
-                <CountUp value={stat.value} className="text-[28px] font-black text-gray-900 dark:text-white leading-none block" />
-                <div className="text-[12px] text-gray-400 mt-2 font-medium">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+          <ScrollReveal>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/5 dark:shadow-black/20 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
+              {STATS.map((stat) => (
+                <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
+                  <CountUp value={stat.value} className="text-[26px] font-black text-gray-900 dark:text-white leading-none block" />
+                  <div className="text-[12px] text-gray-500 mt-2 font-medium">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 
-      {/* ── Pain Points (공감) ── */}
+      {/* ── Pain Points ── */}
       <section className="pb-20 sm:pb-24">
         <div className="max-w-[800px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center">
-              <h2 className="text-[22px] lg:text-[28px] font-bold text-gray-900 dark:text-white tracking-tight mb-10">
+              <h2 className="text-[22px] lg:text-[28px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight mb-10">
                 이런 경험, 있지 않나요?
               </h2>
               <div className="grid sm:grid-cols-3 gap-4">
@@ -200,7 +151,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <p className="mt-10 text-[16px] text-gray-500 dark:text-gray-400">
-                MatchUp이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
+                TeamMeet이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
               </p>
             </div>
           </ScrollReveal>
@@ -208,29 +159,37 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ── */}
-      <section ref={featuresRef} className="pb-28 sm:pb-36">
-        <div className="max-w-[1200px] mx-auto px-5">
+      <section ref={featuresRef} className="py-24 sm:py-32 bg-gray-50 dark:bg-gray-800/30">
+        <div className="max-w-[1100px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-16">
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 <Target size={13} /> 주요 기능
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
+              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 스포츠 매칭, 이렇게 달라집니다
               </h2>
             </div>
           </ScrollReveal>
-          {/* AI 매칭 — 히어로 카드 */}
+
+          {/* AI 매칭 히어로 카드 */}
           <ScrollReveal className="mb-6">
-            <div className="group bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white hover:shadow-xl hover:shadow-gray-900/30 transition-all duration-300 lg:flex lg:items-center lg:gap-10">
+            <div className="bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white hover:shadow-xl transition-all duration-300 lg:flex lg:items-center lg:gap-10">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-[12px] font-semibold px-3 py-1 rounded-full mb-4">
                   <Target size={13} /> 핵심 기능
                 </div>
-                <h3 className="text-[22px] lg:text-[26px] font-black mb-3">AI 매칭</h3>
+                <h3 className="text-[22px] lg:text-[26px] font-bold mb-3">AI 매칭</h3>
                 <p className="text-[15px] text-gray-400 leading-relaxed max-w-[400px]">
                   실력, 위치, 시간, 매너 점수를 종합 분석해 나와 가장 잘 맞는 상대를 자동으로 찾아드려요. 경기할수록 AI가 더 정확해집니다.
                 </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {['실력 분석', '위치 매칭', '매너 필터', 'ELO 반영'].map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 text-[12px] text-gray-400 bg-white/5 px-2.5 py-1 rounded-lg">
+                      <Check size={12} className="text-blue-400" /> {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="mt-6 lg:mt-0 shrink-0">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5 w-[220px]">
@@ -273,30 +232,30 @@ export default function LandingPage() {
       </section>
 
       {/* ── How It Works ── */}
-      <section className="py-20 sm:py-28 bg-gray-50 dark:bg-gray-800/30">
+      <section className="py-20 sm:py-28">
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-12">
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 이용 방법
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
+              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 3단계로 시작하세요
               </h2>
             </div>
           </ScrollReveal>
 
-          {/* Mobile steps */}
+          {/* Mobile */}
           <ScrollReveal className="lg:hidden">
             <div className="space-y-0">
               {STEPS.map((step, idx) => (
                 <div key={step.num} className="relative flex gap-5">
                   <div className="flex flex-col items-center">
-                    <div className="h-11 w-11 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold flex items-center justify-center text-[15px] shrink-0 z-10 shadow-lg shadow-blue-500/25">
+                    <div className="h-11 w-11 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-[15px] shrink-0 z-10 shadow-lg shadow-blue-500/25">
                       {step.num}
                     </div>
                     {idx < STEPS.length - 1 && (
-                      <div className="w-0.5 flex-1 bg-gradient-to-b from-blue-200 to-transparent my-2" />
+                      <div className="w-0.5 flex-1 bg-gradient-to-b from-blue-200 to-transparent dark:from-blue-700 my-2" />
                     )}
                   </div>
                   <div className={idx === STEPS.length - 1 ? 'pb-0' : 'pb-10'}>
@@ -308,13 +267,13 @@ export default function LandingPage() {
             </div>
           </ScrollReveal>
 
-          {/* Desktop steps */}
+          {/* Desktop */}
           <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8 relative">
-            <div className="absolute top-[22px] left-[calc(16.67%+22px)] right-[calc(16.67%+22px)] h-0.5 bg-gradient-to-r from-blue-200 via-blue-300 to-blue-200" />
+            <div className="absolute top-[22px] left-[calc(16.67%+22px)] right-[calc(16.67%+22px)] h-0.5 bg-gradient-to-r from-blue-200 via-blue-300 to-blue-200 dark:from-blue-700 dark:via-blue-600 dark:to-blue-700" />
             {STEPS.map((step, idx) => (
               <ScrollReveal key={step.num} delay={idx * 200}>
                 <div className="text-center relative">
-                  <div className="h-11 w-11 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold flex items-center justify-center text-[15px] mx-auto mb-5 relative z-10 ring-4 ring-gray-50 dark:ring-gray-900 shadow-lg shadow-blue-500/25">
+                  <div className="h-11 w-11 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-[15px] mx-auto mb-5 relative z-10 ring-4 ring-white dark:ring-gray-900 shadow-lg shadow-blue-500/25">
                     {step.num}
                   </div>
                   <h3 className="text-[18px] font-bold text-gray-900 dark:text-white mb-2">{step.title}</h3>
@@ -327,20 +286,20 @@ export default function LandingPage() {
       </section>
 
       {/* ── Sports ── */}
-      <section className="py-20 sm:py-28">
+      <section className="py-20 sm:py-28 bg-gray-50 dark:bg-gray-800/30">
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-10">
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 지원 종목
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
+              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 11개 종목, 하나의 플랫폼
               </h2>
             </div>
           </ScrollReveal>
 
-          {/* Mobile scroll */}
+          {/* Mobile */}
           <div className="lg:hidden">
             <div className="flex overflow-x-auto gap-3 pb-4 -mx-5 px-5 scrollbar-hide">
               {SPORTS.map((sport) => {
@@ -357,7 +316,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Desktop — centered rows */}
+          {/* Desktop */}
           <ScrollReveal className="hidden lg:block">
             <div className="flex flex-wrap justify-center gap-3 max-w-[760px] mx-auto">
               {SPORTS.map((sport) => {
@@ -377,17 +336,17 @@ export default function LandingPage() {
       </section>
 
       {/* ── Testimonials ── */}
-      <section className="py-24 sm:py-32 bg-gray-50 dark:bg-gray-800/30">
+      <section className="py-24 sm:py-32">
         <div className="max-w-[1080px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-12">
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 사용자 후기
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight">
+              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 이미 많은 선수들이 경험하고 있어요
               </h2>
-              <p className="text-[14px] text-gray-400 mt-3">평균 만족도 <span className="text-amber-500 font-semibold">4.8</span> / 5.0 · 리뷰 <span className="font-semibold text-gray-600 dark:text-gray-300">340</span>건</p>
+              <p className="text-[14px] text-gray-500 mt-3">평균 만족도 <span className="text-amber-500 font-semibold">4.8</span> / 5.0 · 리뷰 <span className="font-semibold text-gray-600 dark:text-gray-300">340</span>건</p>
             </div>
           </ScrollReveal>
           <div className="grid md:grid-cols-3 gap-6">
@@ -410,7 +369,7 @@ export default function LandingPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-white text-[14px]">{t.author}</p>
-                        <p className="text-[12px] text-gray-400">{t.detail}</p>
+                        <p className="text-[12px] text-gray-500">{t.detail}</p>
                       </div>
                     </div>
                   </div>
@@ -423,12 +382,11 @@ export default function LandingPage() {
 
       {/* ── Final CTA ── */}
       <section className="relative overflow-hidden bg-gray-900 dark:bg-black">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.15),transparent_60%)]" />
-
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.12),transparent_60%)]" />
         <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center">
           <ScrollReveal>
             <p className="text-[14px] text-blue-400 font-semibold mb-4">가입은 3초, 첫 매칭은 무료</p>
-            <h2 className="text-[28px] lg:text-[40px] font-black text-white mb-6 tracking-tight leading-tight">
+            <h2 className="text-[28px] lg:text-[36px] font-black text-white mb-6 tracking-tight leading-tight">
               운동이 더 즐거워지는 경험,
               <br />
               지금 시작하세요
@@ -446,24 +404,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="bg-gray-950 dark:bg-black py-8 sm:py-10 border-t border-gray-800">
-        <div className="max-w-[1200px] mx-auto px-5">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">M</span>
-              </div>
-              <span className="font-semibold text-white text-[15px]">MatchUp</span>
-            </div>
-            <div className="flex items-center gap-2 text-[13px] text-gray-400">
-              <a href="#" className="hover:text-gray-200 active:text-white transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">이용약관</a>
-              <a href="#" className="hover:text-gray-200 active:text-white transition-colors py-2 px-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">개인정보처리방침</a>
-            </div>
-            <p className="text-[13px] text-gray-500">&copy; 2026 MatchUp. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 }

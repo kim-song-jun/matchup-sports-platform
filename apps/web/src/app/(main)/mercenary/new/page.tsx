@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useTeams } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
 
 const positionOptions = [
   { value: 'GK', label: '골키퍼 (GK)' },
@@ -59,6 +60,7 @@ const initialForm: FormData = {
 export default function NewMercenaryPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuthStore();
   const { data: teamData } = useTeams();
   const teams = teamData?.items ?? mockTeams;
   const [form, setForm] = useState<FormData>(initialForm);
@@ -92,6 +94,18 @@ export default function NewMercenaryPage() {
   const formatCurrency = (n: string) =>
     n && Number(n) > 0 ? new Intl.NumberFormat('ko-KR').format(Number(n)) + '원' : '무료';
 
+  if (!isAuthenticated) {
+    return (
+      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+        <div className="max-w-[500px] mx-auto mt-20 text-center">
+          <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">용병을 모집하려면</h2>
+          <p className="text-[13px] text-gray-500 mt-2">로그인 후 용병 모집 글을 작성할 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">로그인</Link>
+        </div>
+      </div>
+    );
+  }
+
   if (submitted) {
     return (
       <div className="pt-[var(--safe-area-top)] animate-fade-in">
@@ -120,7 +134,7 @@ export default function NewMercenaryPage() {
         <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/mercenary" className="hover:text-gray-600 transition-colors">용병 모집</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">새 모집글</span>
@@ -130,9 +144,10 @@ export default function NewMercenaryPage() {
         <div className="space-y-5">
           {/* 팀 선택 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">팀 선택</label>
+            <label htmlFor="merc-team" className="text-[13px] font-medium text-gray-700 mb-1.5 block">팀 선택</label>
             <div className="relative">
               <select
+                id="merc-team"
                 value={form.teamId}
                 onChange={(e) => update('teamId', e.target.value)}
                 className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all bg-white"
@@ -142,14 +157,15 @@ export default function NewMercenaryPage() {
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
-              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             </div>
           </div>
 
           {/* 경기 날짜 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">경기 날짜</label>
+            <label htmlFor="merc-match-date" className="text-[13px] font-medium text-gray-700 mb-1.5 block">경기 날짜</label>
             <input
+              id="merc-match-date"
               type="date"
               value={form.matchDate}
               onChange={(e) => update('matchDate', e.target.value)}
@@ -159,8 +175,9 @@ export default function NewMercenaryPage() {
 
           {/* 시작 시간 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">시작 시간</label>
+            <label htmlFor="merc-start-time" className="text-[13px] font-medium text-gray-700 mb-1.5 block">시작 시간</label>
             <input
+              id="merc-start-time"
               type="time"
               value={form.startTime}
               onChange={(e) => update('startTime', e.target.value)}
@@ -170,13 +187,15 @@ export default function NewMercenaryPage() {
 
           {/* 장소 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">장소</label>
+            <label htmlFor="merc-venue" className="text-[13px] font-medium text-gray-700 mb-1.5 block">장소</label>
             <input
+              id="merc-venue"
               type="text"
               value={form.venue}
               onChange={(e) => update('venue', e.target.value)}
+              maxLength={200}
               placeholder="예: 난지천 풋살장 A"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
             />
           </div>
 
@@ -190,7 +209,7 @@ export default function NewMercenaryPage() {
                   onClick={() => update('position', opt.value)}
                   className={`rounded-xl border-2 px-4 py-3 text-[13px] font-semibold transition-all ${
                     form.position === opt.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-600'
+                      ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 text-gray-600 hover:border-gray-200'
                   }`}
                 >
@@ -210,7 +229,7 @@ export default function NewMercenaryPage() {
                   onClick={() => update('count', c)}
                   className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                     form.count === c
-                      ? 'border-blue-500 bg-blue-50 text-blue-600'
+                      ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 text-gray-600 hover:border-gray-200'
                   }`}
                 >
@@ -230,7 +249,7 @@ export default function NewMercenaryPage() {
                   onClick={() => update('levelRequired', opt.value)}
                   className={`rounded-xl border-2 px-5 py-3 text-[14px] font-semibold transition-all ${
                     form.levelRequired === opt.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-600'
+                      ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 text-gray-600 hover:border-gray-200'
                   }`}
                 >
@@ -242,28 +261,31 @@ export default function NewMercenaryPage() {
 
           {/* 비용 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">참가비 (원)</label>
+            <label htmlFor="merc-fee" className="text-[13px] font-medium text-gray-700 mb-1.5 block">참가비 (원)</label>
             <input
+              id="merc-fee"
               type="number"
               value={form.fee}
               onChange={(e) => update('fee', e.target.value)}
               placeholder="0 = 무료"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
             />
-            <p className="text-[12px] text-gray-400 mt-1">
+            <p className="text-[12px] text-gray-500 mt-1">
               {formatCurrency(form.fee)}
             </p>
           </div>
 
           {/* 요청사항 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">요청사항 (선택)</label>
+            <label htmlFor="merc-notes" className="text-[13px] font-medium text-gray-700 mb-1.5 block">요청사항 (선택)</label>
             <textarea
+              id="merc-notes"
               value={form.notes}
               onChange={(e) => update('notes', e.target.value)}
+              maxLength={500}
               placeholder="유니폼 색상, 준비물, 기타 안내 등"
               rows={4}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
             />
           </div>
         </div>

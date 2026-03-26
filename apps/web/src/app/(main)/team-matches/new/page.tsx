@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useCreateTeamMatch } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/toast';
+import { useAuthStore } from '@/stores/auth-store';
 import { SKILL_GRADES, MATCH_TYPES, getGradeInfo } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 
@@ -79,6 +81,8 @@ const initialForm: FormData = {
 
 export default function NewTeamMatchPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuthStore();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(initialForm);
   const createMutation = useCreateTeamMatch();
@@ -92,7 +96,7 @@ export default function NewTeamMatchPage() {
       case 0: return !!form.sportType && !!form.title;
       case 1: return !!form.matchDate && !!form.startTime && !!form.endTime && !!form.venueName;
       case 2: return !!form.skillGrade && !!form.matchStyle;
-      case 3: return !!form.totalFee;
+      case 3: return form.totalFee !== '';
       case 4: return true;
       default: return false;
     }
@@ -107,11 +111,26 @@ export default function NewTeamMatchPage() {
     } as Record<string, unknown>;
     createMutation.mutate(payload as never, {
       onSuccess: () => router.push('/team-matches'),
+      onError: () => toast('error', '모집글 등록에 실패했어요. 잠시 후 다시 시도해주세요'),
     });
   }
 
   const formatCurrency = (n: string) =>
     n ? new Intl.NumberFormat('ko-KR').format(Number(n)) + '원' : '';
+
+  if (!isAuthenticated) {
+    return (
+      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+        <div className="max-w-[500px] mx-auto mt-20 text-center">
+          <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">팀 매칭 모집글을 작성해보세요</h2>
+          <p className="text-[13px] text-gray-500 mt-2">로그인하면 모집글을 작성하고 상대팀을 찾을 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">
+            로그인하고 시작하기
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
@@ -123,7 +142,7 @@ export default function NewTeamMatchPage() {
         <h1 className="text-[18px] font-bold text-gray-900">모집글 작성</h1>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">모집글 작성</span>
@@ -140,7 +159,7 @@ export default function NewTeamMatchPage() {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-[14px] font-semibold text-gray-900">{STEPS[step]}</p>
-          <p className="text-[12px] text-gray-400">{step + 1} / {STEPS.length}</p>
+          <p className="text-[12px] text-gray-500">{step + 1} / {STEPS.length}</p>
         </div>
       </div>
 
@@ -157,7 +176,7 @@ export default function NewTeamMatchPage() {
                     onClick={() => update('sportType', opt.value)}
                     className={`rounded-xl border-2 px-4 py-4 text-[15px] font-semibold text-center transition-all ${
                       form.sportType === opt.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                         : 'border-gray-100 text-gray-600 hover:border-gray-200'
                     }`}
                   >
@@ -174,7 +193,7 @@ export default function NewTeamMatchPage() {
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
                 placeholder="예: 일요일 오전 친선경기 모집합니다"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
             </div>
           </div>
@@ -221,7 +240,7 @@ export default function NewTeamMatchPage() {
                 value={form.totalMinutes}
                 onChange={(e) => update('totalMinutes', e.target.value)}
                 placeholder="예: 120"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
             </div>
 
@@ -234,7 +253,7 @@ export default function NewTeamMatchPage() {
                     onClick={() => update('quarterCount', q)}
                     className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                       form.quarterCount === q
-                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                         : 'border-gray-100 text-gray-600 hover:border-gray-200'
                     }`}
                   >
@@ -251,7 +270,7 @@ export default function NewTeamMatchPage() {
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
             </div>
 
@@ -262,7 +281,7 @@ export default function NewTeamMatchPage() {
                 value={form.venueAddress}
                 onChange={(e) => update('venueAddress', e.target.value)}
                 placeholder="예: 서울시 마포구 상암동 481-6"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
             </div>
           </div>
@@ -281,14 +300,14 @@ export default function NewTeamMatchPage() {
                     onClick={() => update('skillGrade', g.grade as SkillGrade)}
                     className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-all ${
                       form.skillGrade === g.grade
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 hover:border-gray-200'
                     }`}
                   >
-                    <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-blue-600' : 'text-gray-900'}`}>
+                    <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                       {g.label}
                     </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5 whitespace-nowrap">{g.desc}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
                   </button>
                 ))}
               </div>
@@ -304,9 +323,9 @@ export default function NewTeamMatchPage() {
                 value={form.proPlayerCount}
                 onChange={(e) => update('proPlayerCount', Math.min(10, Math.max(0, Number(e.target.value))))}
                 placeholder="0"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
-              <p className="text-[12px] text-gray-400 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
+              <p className="text-[12px] text-gray-500 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
             </div>
 
             {/* 경기방식 */}
@@ -319,7 +338,7 @@ export default function NewTeamMatchPage() {
                     onClick={() => update('gameFormat', fmt)}
                     className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
                       form.gameFormat === fmt
-                        ? 'border-blue-500 bg-blue-50 text-blue-600'
+                        ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                         : 'border-gray-100 text-gray-600 hover:border-gray-200'
                     }`}
                   >
@@ -338,7 +357,7 @@ export default function NewTeamMatchPage() {
                     key={mt.value}
                     className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-all ${
                       form.matchType === mt.value
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 hover:border-gray-200'
                     }`}
                   >
@@ -348,13 +367,13 @@ export default function NewTeamMatchPage() {
                       value={mt.value}
                       checked={form.matchType === mt.value}
                       onChange={() => update('matchType', mt.value as MatchType)}
-                      className="h-4 w-4 text-blue-500 border-gray-300 focus:ring-blue-500"
+                      className="h-4 w-4 text-gray-900 border-gray-300 focus:ring-gray-500"
                     />
                     <div>
-                      <p className={`text-[14px] font-semibold ${form.matchType === mt.value ? 'text-blue-600' : 'text-gray-900'}`}>
+                      <p className={`text-[14px] font-semibold ${form.matchType === mt.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                         {mt.label}
                       </p>
-                      <p className="text-[12px] text-gray-400 mt-0.5">{mt.desc}</p>
+                      <p className="text-[12px] text-gray-500 mt-0.5">{mt.desc}</p>
                     </div>
                   </label>
                 ))}
@@ -371,14 +390,14 @@ export default function NewTeamMatchPage() {
                     onClick={() => update('matchStyle', opt.value)}
                     className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
                       form.matchStyle === opt.value
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 hover:border-gray-200'
                     }`}
                   >
-                    <p className={`text-[14px] font-semibold ${form.matchStyle === opt.value ? 'text-blue-600' : 'text-gray-900'}`}>
+                    <p className={`text-[14px] font-semibold ${form.matchStyle === opt.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                       {opt.label}
                     </p>
-                    <p className="text-[12px] text-gray-400 mt-0.5">{opt.desc}</p>
+                    <p className="text-[12px] text-gray-500 mt-0.5">{opt.desc}</p>
                   </button>
                 ))}
               </div>
@@ -392,7 +411,7 @@ export default function NewTeamMatchPage() {
                 value={form.uniformColor}
                 onChange={(e) => update('uniformColor', e.target.value)}
                 placeholder="예: 빨강 상의 + 검정 하의"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
             </div>
 
@@ -430,10 +449,10 @@ export default function NewTeamMatchPage() {
                 value={form.totalFee}
                 onChange={(e) => update('totalFee', e.target.value)}
                 placeholder="예: 200000"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
               {form.totalFee && (
-                <p className="text-[12px] text-gray-400 mt-1">{formatCurrency(form.totalFee)}</p>
+                <p className="text-[12px] text-gray-500 mt-1">{formatCurrency(form.totalFee)}</p>
               )}
             </div>
 
@@ -444,10 +463,10 @@ export default function NewTeamMatchPage() {
                 value={form.opponentFee}
                 onChange={(e) => update('opponentFee', e.target.value)}
                 placeholder="비워두면 총 비용의 절반"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
               />
               {form.opponentFee && (
-                <p className="text-[12px] text-gray-400 mt-1">{formatCurrency(form.opponentFee)}</p>
+                <p className="text-[12px] text-gray-500 mt-1">{formatCurrency(form.opponentFee)}</p>
               )}
             </div>
 
@@ -458,7 +477,7 @@ export default function NewTeamMatchPage() {
                 onChange={(e) => update('notes', e.target.value)}
                 placeholder="유니폼 색상, 주차 안내, 기타 규정 등"
                 rows={4}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
               />
             </div>
           </div>
@@ -467,7 +486,7 @@ export default function NewTeamMatchPage() {
         {/* Step 4: 확인 */}
         {step === 4 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-2xl bg-white border border-gray-100 p-5">
+            <div className="rounded-xl bg-white border border-gray-100 p-5">
               <h3 className="text-[16px] font-bold text-gray-900 mb-3">모집글 요약</h3>
 
               <div className="space-y-3">
@@ -545,7 +564,7 @@ function ToggleField({ label, checked, onChange }: { label: string; checked: boo
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1">
-      <span className="text-[13px] text-gray-400 shrink-0">{label}</span>
+      <span className="text-[13px] text-gray-500 shrink-0">{label}</span>
       <span className="text-[14px] font-medium text-gray-900 text-right">{value}</span>
     </div>
   );

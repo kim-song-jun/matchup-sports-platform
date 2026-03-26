@@ -56,7 +56,7 @@ const conditionLabel: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { text: string; style: string }> = {
-  on_sale: { text: '판매중', style: 'bg-blue-50 text-blue-600' },
+  on_sale: { text: '판매중', style: 'text-blue-500' },
   reserved: { text: '예약중', style: 'bg-amber-50 text-amber-600' },
   sold: { text: '판매완료', style: 'bg-gray-100 text-gray-500' },
 };
@@ -137,7 +137,7 @@ export default function MyListingsPage() {
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
         <h2 className="text-[22px] font-bold text-gray-900">내 장터 매물</h2>
-        <p className="text-[14px] text-gray-400 mt-1">등록한 매물을 관리하세요</p>
+        <p className="text-[14px] text-gray-500 mt-1">등록한 매물을 관리하세요</p>
       </div>
 
       {usingMock && (
@@ -149,16 +149,16 @@ export default function MyListingsPage() {
 
       <div className="px-5 lg:px-0 space-y-3 pb-8">
         {listings.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 p-16 text-center">
+          <div className="rounded-xl bg-gray-50 p-16 text-center">
             <Package size={32} className="mx-auto text-gray-300 mb-3" />
             <p className="text-[15px] font-medium text-gray-600">등록한 매물이 없어요</p>
-            <Link href="/marketplace/new" className="mt-4 inline-block rounded-xl bg-gray-900 px-6 py-2.5 text-[14px] font-semibold text-white">매물 등록</Link>
+            <Link href="/marketplace/new" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors">매물 등록</Link>
           </div>
         ) : (
           listings.map((listing) => {
             const st = statusConfig[listing.status] || statusConfig.on_sale;
             return (
-              <div key={listing.id} className="rounded-2xl bg-white border border-gray-100 p-4">
+              <div key={listing.id} className="rounded-xl bg-white border border-gray-100 p-4">
                 <div className="flex items-start gap-3">
                   <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
                     <Package size={24} className="text-gray-300" />
@@ -172,7 +172,7 @@ export default function MyListingsPage() {
                       <h3 className="text-[15px] font-semibold text-gray-900 hover:text-blue-500 transition-colors truncate">{listing.title}</h3>
                     </Link>
                     <p className="text-[15px] font-bold text-gray-900 mt-0.5">{formatCurrency(listing.price)}</p>
-                    <div className="flex items-center gap-3 mt-1 text-[12px] text-gray-400">
+                    <div className="flex items-center gap-3 mt-1 text-[12px] text-gray-500">
                       <span className="flex items-center gap-0.5"><Eye size={12} />{listing.viewCount}</span>
                       <span className="flex items-center gap-0.5"><Heart size={12} />{listing.likeCount}</span>
                       <span>{listing.createdAt}</span>

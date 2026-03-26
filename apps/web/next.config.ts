@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
   images: {
     unoptimized: isCapacitorBuild,
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+    ],
   },
   // 개발 시 API 프록시
   async rewrites() {

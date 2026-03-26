@@ -42,7 +42,7 @@ jobs:
       - name: Sync code
         run: |
           rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git \
+            --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' --exclude 'deploy/.env' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ec2-user@${{ secrets.EC2_HOST }}:~/matchup/
 

@@ -16,6 +16,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: cd apps/api && npx prisma generate
       - run: pnpm --filter web test
       - run: cd apps/api && npx jest --config jest.config.ts
 

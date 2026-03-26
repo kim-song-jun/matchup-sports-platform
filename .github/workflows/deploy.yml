@@ -48,8 +48,9 @@ jobs:
             ./ ec2-user@${{ secrets.EC2_HOST }}:~/matchup/
 
       - name: Build and deploy
+        timeout-minutes: 20
         run: |
-          ssh ec2 'cd ~/matchup && sudo docker build --no-cache -f deploy/Dockerfile.api -t matchup-api . && sudo docker build --no-cache -f deploy/Dockerfile.web -t matchup-web . && cd deploy && sudo docker-compose -f docker-compose.prod.yml --env-file .env down && sudo docker-compose -f docker-compose.prod.yml --env-file .env up -d && sleep 10 && sudo docker exec matchup_api npx prisma db push --accept-data-loss && sudo docker image prune -f'
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 'cd ~/matchup && sudo docker build -f deploy/Dockerfile.api -t matchup-api . && sudo docker build -f deploy/Dockerfile.web -t matchup-web . && cd deploy && sudo docker-compose -f docker-compose.prod.yml --env-file .env down && sudo docker-compose -f docker-compose.prod.yml --env-file .env up -d && sleep 10 && sudo docker exec matchup_api npx prisma db push --accept-data-loss && sudo docker image prune -f'
 
       - name: Health check
         run: |

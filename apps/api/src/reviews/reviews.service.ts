@@ -65,8 +65,8 @@ export class ReviewsService {
 
     return completedParticipations.flatMap((p) =>
       p.match.participants
-        .filter((mp) => !reviewedSet.has(`${p.matchId}:${mp.userId}`))
-        .map((mp) => ({
+        .filter((mp: { userId: string; user?: { id: string; nickname: string } }) => !reviewedSet.has(`${p.matchId}:${mp.userId}`))
+        .map((mp: { userId: string; user?: { id: string; nickname: string } }) => ({
           matchId: p.matchId,
           matchTitle: p.match.title,
           target: mp.user,

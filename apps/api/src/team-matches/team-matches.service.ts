@@ -224,7 +224,7 @@ export class TeamMatchesService {
     if (evals.length === 0) return;
 
     const avg = (field: keyof typeof evals[0]) =>
-      evals.reduce((sum, e) => sum + (e[field] as number), 0) / evals.length;
+      evals.reduce((sum: number, e: Record<string, unknown>) => sum + (e[field as string] as number), 0) / evals.length;
 
     await this.prisma.teamTrustScore.upsert({
       where: { teamId },

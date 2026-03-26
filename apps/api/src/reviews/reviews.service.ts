@@ -60,10 +60,10 @@ export class ReviewsService {
     });
 
     const reviewedSet = new Set(
-      existingReviews.map((r) => `${r.matchId}:${r.targetId}`),
+      existingReviews.map((r: { matchId: string; targetId: string }) => `${r.matchId}:${r.targetId}`),
     );
 
-    return completedParticipations.flatMap((p) =>
+    return completedParticipations.flatMap((p: { matchId: string; match: { title: string; participants: Array<{ userId: string; user?: { id: string; nickname: string } }> } }) =>
       p.match.participants
         .filter((mp: { userId: string; user?: { id: string; nickname: string } }) => !reviewedSet.has(`${p.matchId}:${mp.userId}`))
         .map((mp: { userId: string; user?: { id: string; nickname: string } }) => ({

@@ -132,6 +132,23 @@ body {
 .dark .focus\:bg-white:focus { background-color: #1A1D23 !important; }
 .dark .bg-white\/90 { background-color: rgba(26, 29, 35, 0.9) !important; }
 
+/* Dark — additional coverage */
+.dark .bg-gray-50\/50 { background-color: rgba(15, 17, 20, 0.5) !important; }
+.dark .border-t.border-gray-100 { border-color: #2C3038 !important; }
+.dark .border-b.border-gray-50 { border-color: #22262E !important; }
+.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.3) !important; }
+.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3), 0 4px 6px -4px rgba(0,0,0,0.2) !important; }
+.dark .divide-gray-100 > * + * { border-color: #2C3038 !important; }
+.dark .bg-gradient-to-r { --tw-gradient-from: #1A1D23 !important; --tw-gradient-to: #22262E !important; }
+.dark .bg-gradient-to-br { --tw-gradient-from: #1A1D23 !important; --tw-gradient-to: #22262E !important; }
+.dark .placeholder\:text-gray-400::placeholder { color: #565C66 !important; }
+.dark .ring-blue-500\/20 { --tw-ring-color: rgba(49,130,246,0.15) !important; }
+.dark .border-t.border-gray-50 { border-color: #22262E !important; }
+.dark h1, .dark h2, .dark h3 { color: #F2F4F6; }
+.dark label { color: #AEB6C0; }
+.dark .rounded-2xl { border-color: #2C3038; }
+.dark .rounded-3xl { border-color: #2C3038; }
+
 /* Global touch responsiveness */
 a, button, [role="button"], [tabindex="0"] {
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0.04);

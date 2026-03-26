@@ -332,17 +332,6 @@ export default function CreateTeamPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
-        @media (prefers-color-scheme: dark) {
-          .input-field {
-            background: #1A1D23;
-            border-color: #333D4B;
-            color: #F2F4F6;
-          }
-          .input-field:focus {
-            background: #1A1D23;
-            border-color: #3182F6;
-          }
-        }
       `}</style>
     </div>
   );

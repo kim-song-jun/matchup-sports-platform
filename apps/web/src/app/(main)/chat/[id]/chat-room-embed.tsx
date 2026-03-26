@@ -23,8 +23,14 @@ function formatTime(dateStr: string): string {
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr);
+  const now = new Date();
   const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${weekdays[d.getDay()]}요일`;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+  if (diffDays === 0) return '오늘';
+  if (diffDays === 1) return '어제';
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
 }
 
 function formatMatchDate(dateStr: string): string {
@@ -95,8 +101,11 @@ export default function ChatRoomEmbed({
   const [reportReason, setReportReason] = useState('');
   const [reportDetail, setReportDetail] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isNearBottom = useRef(true);
+  const isFirstLoad = useRef(true);
 
   const opponentName = room
     ? room.homeTeamId === currentTeamId
@@ -117,10 +126,22 @@ export default function ChatRoomEmbed({
     }
   }, [chatRoomId, markAsRead]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll: 첫 로드는 instant, 이후는 하단 근처일 때만
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isFirstLoad.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+      isFirstLoad.current = false;
+    } else if (isNearBottom.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages.length, chatRoomId]);
+
+  // 스크롤 위치 감지
+  const handleScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -291,7 +312,7 @@ export default function ChatRoomEmbed({
       </header>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 dark:bg-gray-900/50">
+      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 dark:bg-gray-900/50">
         {groupedMessages.map((group) => (
           <div key={group.date}>
             {/* Date separator */}
@@ -301,12 +322,12 @@ export default function ChatRoomEmbed({
               </span>
             </div>
 
-            {/* Messages */}
-            {group.messages.map((msg) => {
+            {/* Messages — 그루핑 적용 */}
+            {group.messages.map((msg, idx, arr) => {
               if (msg.isSystem) {
                 return (
                   <div key={msg.id} className="flex justify-center my-3">
-                    <span className="text-[12px] text-gray-500 text-center max-w-[80%]">
+                    <span className="text-[12px] text-gray-500 dark:text-gray-400 text-center max-w-[80%]">
                       {msg.message}
                     </span>
                   </div>
@@ -314,45 +335,65 @@ export default function ChatRoomEmbed({
               }
 
               const isMine = msg.senderId === currentUserId;
+              const prev = idx > 0 ? arr[idx - 1] : null;
+              const next = idx < arr.length - 1 ? arr[idx + 1] : null;
+              const isFirstInGroup = !prev || prev.isSystem || prev.senderId !== msg.senderId;
+              const isLastInGroup = !next || next.isSystem || next.senderId !== msg.senderId;
 
               return (
                 <div
                   key={msg.id}
-                  className={`flex mb-2.5 group ${isMine ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${isLastInGroup ? 'mb-3' : 'mb-0.5'} ${isMine ? 'justify-end' : 'justify-start'}`}
                 >
+                  {/* ── 상대방 메시지 ── */}
                   {!isMine && (
                     <div className="flex items-start gap-2 max-w-[75%] lg:max-w-[60%]">
-                      {/* Avatar */}
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-[12px] font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
-                        {msg.senderName.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">
-                            {msg.senderName}
-                          </span>
-                          <span className="text-[10px] text-gray-500">
-                            {msg.senderTeamName}
-                          </span>
+                      {/* 아바타: 그룹 첫 메시지만 */}
+                      {isFirstInGroup ? (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-[12px] font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
+                          {msg.senderName.charAt(0)}
                         </div>
+                      ) : (
+                        <div className="w-8 shrink-0" /> /* 들여쓰기 공간 */
+                      )}
+                      <div>
+                        {/* 이름: 그룹 첫 메시지만 */}
+                        {isFirstInGroup && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">{msg.senderName}</span>
+                            <span className="text-[10px] text-gray-500">{msg.senderTeamName}</span>
+                          </div>
+                        )}
                         <div className="flex items-end gap-1.5">
-                          <div className="rounded-2xl rounded-tl-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2.5 text-[14px] text-gray-800 dark:text-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                          <div className={`bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-[14px] text-gray-800 dark:text-gray-200 ${
+                            isFirstInGroup ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl'
+                          }`}>
                             {msg.message}
                           </div>
-                          <span className="text-[10px] text-gray-500 shrink-0 pb-0.5 opacity-0 group-hover:opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 max-lg:opacity-100">
-                            {formatTime(msg.timestamp)}
-                          </span>
+                          {/* 시간: 그룹 마지막만 */}
+                          {isLastInGroup && (
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0 pb-0.5">
+                              {formatTime(msg.timestamp)}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                   )}
 
+                  {/* ── 내 메시지 ── */}
                   {isMine && (
                     <div className="flex items-end gap-1.5 max-w-[75%] lg:max-w-[60%]">
-                      <span className="text-[10px] text-gray-500 shrink-0 pb-0.5 opacity-0 group-hover:opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 max-lg:opacity-100">
-                        {formatTime(msg.timestamp)}
-                      </span>
-                      <div className="rounded-2xl rounded-tr-md bg-blue-500 px-3.5 py-2.5 text-[14px] text-white">
+                      {/* 시간 + 읽음: 그룹 마지막만 */}
+                      {isLastInGroup && (
+                        <div className="flex flex-col items-end shrink-0 pb-0.5">
+                          {msg.isRead === false && <span className="text-[9px] text-blue-500 font-medium">1</span>}
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatTime(msg.timestamp)}</span>
+                        </div>
+                      )}
+                      <div className={`bg-blue-500 px-3.5 py-2 text-[14px] text-white ${
+                        isFirstInGroup ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'
+                      }`}>
                         {msg.message}
                       </div>
                     </div>

@@ -9,6 +9,7 @@ export interface ChatMessage {
   message: string;
   timestamp: string;
   isSystem?: boolean;
+  isRead?: boolean;
 }
 
 export interface ChatRoom {
@@ -91,7 +92,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '',
       message: '매칭이 성사되었습니다! 채팅으로 세부사항을 조율하세요.',
       timestamp: '2026-03-18T09:00:00Z',
-      isSystem: true,
+      isSystem: true, isRead: true,
     },
     {
       id: 'msg-1-2',
@@ -101,6 +102,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: 'FC 번개',
       message: '안녕하세요! 매칭 감사합니다. 경기 관련해서 몇 가지 확인 부탁드립니다.',
       timestamp: '2026-03-18T09:05:00Z',
+      isRead: true,
     },
     {
       id: 'msg-1-3',
@@ -110,6 +112,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '올스타즈',
       message: '네 안녕하세요! 말씀해주세요.',
       timestamp: '2026-03-18T09:10:00Z',
+      isRead: true,
     },
     {
       id: 'msg-1-4',
@@ -119,6 +122,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: 'FC 번개',
       message: '유니폼 색상 어떻게 하실건가요? 저희는 파란색 유니폼입니다.',
       timestamp: '2026-03-18T09:12:00Z',
+      isRead: true,
     },
     {
       id: 'msg-1-5',
@@ -128,6 +132,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '올스타즈',
       message: '저희는 빨간색으로 갈게요. 겹치지 않아서 좋네요!',
       timestamp: '2026-03-18T09:15:00Z',
+      isRead: true,
     },
     {
       id: 'msg-1-6',
@@ -137,7 +142,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '',
       message: 'FC 번개 팀이 입금을 완료했습니다.',
       timestamp: '2026-03-19T10:00:00Z',
-      isSystem: true,
+      isSystem: true, isRead: true,
     },
     {
       id: 'msg-1-7',
@@ -147,6 +152,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '올스타즈',
       message: '저희도 곧 입금할게요. 주차장은 넉넉한가요?',
       timestamp: '2026-03-19T14:20:00Z',
+      isRead: true,
     },
     {
       id: 'msg-1-8',
@@ -156,6 +162,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: 'FC 번개',
       message: '네 확인했습니다! 일찍 도착하겠습니다',
       timestamp: '2026-03-19T14:30:00Z',
+      isRead: false,
     },
   ],
   'cr-2': [
@@ -167,7 +174,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '',
       message: '매칭이 성사되었습니다! 채팅으로 세부사항을 조율하세요.',
       timestamp: '2026-03-16T11:00:00Z',
-      isSystem: true,
+      isSystem: true, isRead: true,
     },
     {
       id: 'msg-2-2',
@@ -224,7 +231,7 @@ const MOCK_MESSAGES: Record<string, ChatMessage[]> = {
       senderTeamName: '',
       message: '매칭이 성사되었습니다! 채팅으로 세부사항을 조율하세요.',
       timestamp: '2026-03-17T10:00:00Z',
-      isSystem: true,
+      isSystem: true, isRead: true,
     },
     {
       id: 'msg-3-2',

@@ -111,19 +111,19 @@ export default function PaymentDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 pb-8">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">결제 상세</h1>
+        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">결제 상세</h1>
       </header>
       <div className="hidden lg:block mb-6">
         <div className="flex items-center gap-2 text-[13px] text-gray-500 mb-4">
-          <Link href="/payments" className="hover:text-gray-600 transition-colors">결제 내역</Link>
+          <Link href="/payments" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">결제 내역</Link>
           <ChevronRight size={14} />
-          <span className="text-gray-700">상세</span>
+          <span className="text-gray-700 dark:text-gray-300">상세</span>
         </div>
-        <h2 className="text-[24px] font-bold text-gray-900">결제 상세</h2>
+        <h2 className="text-[24px] font-bold text-gray-900 dark:text-white">결제 상세</h2>
       </div>
 
       <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
@@ -139,12 +139,12 @@ export default function PaymentDetailPage() {
         </div>
 
         {/* Amount */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 금액</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[14px] text-gray-500">원가</span>
-              <span className="text-[14px] text-gray-700">{formatCurrency(payment.originalAmount)}</span>
+              <span className="text-[14px] text-gray-700 dark:text-gray-300">{formatCurrency(payment.originalAmount)}</span>
             </div>
             {payment.couponDiscount > 0 && (
               <div className="flex items-center justify-between">
@@ -152,8 +152,8 @@ export default function PaymentDetailPage() {
                 <span className="text-[14px] text-red-500 font-medium">-{formatCurrency(payment.couponDiscount)}</span>
               </div>
             )}
-            <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
-              <span className="text-[15px] font-bold text-gray-900">결제 금액</span>
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
+              <span className="text-[15px] font-bold text-gray-900 dark:text-white">결제 금액</span>
               <span className="text-[20px] font-bold text-blue-500">{formatCurrency(payment.amount)}</span>
             </div>
             {payment.status === 'refunded' && (
@@ -166,28 +166,28 @@ export default function PaymentDetailPage() {
         </div>
 
         {/* Payment Method */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 수단</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/50">
               <CreditCard size={20} className="text-gray-500" />
             </div>
             <div>
-              <p className="text-[14px] font-medium text-gray-900">{payment.method}</p>
+              <p className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{payment.method}</p>
               <p className="text-[12px] text-gray-500">{payment.methodDetail}</p>
             </div>
           </div>
         </div>
 
         {/* Related Match/Lesson */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-3">연결된 일정</h3>
-          <div className="rounded-xl bg-gray-50 p-4">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">연결된 일정</h3>
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
                 {payment.match.type}
               </span>
-              <p className="text-[14px] font-semibold text-gray-900">{payment.match.name}</p>
+              <p className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">{payment.match.name}</p>
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-[13px] text-gray-500">
@@ -203,40 +203,40 @@ export default function PaymentDetailPage() {
         </div>
 
         {/* Receipt */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-3">영수증 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">영수증 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-gray-500">주문번호</span>
-              <span className="text-[13px] font-mono text-gray-700">{payment.orderId}</span>
+              <span className="text-[13px] font-mono text-gray-700 dark:text-gray-300">{payment.orderId}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-gray-500">영수증 번호</span>
-              <button onClick={handleCopyReceipt} className="flex items-center gap-1.5 text-[13px] font-mono text-gray-700 hover:text-blue-500 transition-colors">
+              <button onClick={handleCopyReceipt} className="flex items-center gap-1.5 text-[13px] font-mono text-gray-700 dark:text-gray-300 hover:text-blue-500 transition-colors">
                 {payment.receiptNumber}
                 <Copy size={12} className={copied ? 'text-green-500' : 'text-gray-300'} />
               </button>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-gray-500">결제수단 상세</span>
-              <span className="text-[13px] text-gray-700">{payment.methodDetail}</span>
+              <span className="text-[13px] text-gray-700 dark:text-gray-300">{payment.methodDetail}</span>
             </div>
           </div>
         </div>
 
         {/* Timeline */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-3">결제 타임라인</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
           <div className="relative pl-6">
-            <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100" />
+            <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100 dark:bg-gray-700" />
             {timelineSteps.map((step, i) => (
               <div key={i} className="relative pb-5 last:pb-0">
                 <div className={`absolute -left-6 top-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 ${
-                  step.done ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
+                  step.done ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white dark:bg-gray-800'
                 }`}>
                   {step.done && <CheckCircle size={10} className="text-white" />}
                 </div>
-                <p className={`text-[14px] font-medium ${step.done ? 'text-gray-900' : 'text-gray-500'}`}>{step.label}</p>
+                <p className={`text-[14px] font-medium ${step.done ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>{step.label}</p>
                 {step.time && (
                   <p className="text-[12px] text-gray-500 mt-0.5">{formatDateTime(step.time)}</p>
                 )}
@@ -247,20 +247,20 @@ export default function PaymentDetailPage() {
 
         {/* Refund Policy & Button */}
         {payment.isRefundable && payment.status === 'completed' && (
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[15px] font-bold text-gray-900 mb-3">환불 규정</h3>
-            <div className="rounded-xl bg-gray-50 p-4 space-y-2 mb-4">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-2 mb-4">
               <div className="flex items-start gap-2">
                 <div className="mt-1.5 h-1 w-1 rounded-full bg-gray-400 shrink-0" />
-                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700">24시간 전</strong>: 전액 환불</p>
+                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">24시간 전</strong>: 전액 환불</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="mt-1.5 h-1 w-1 rounded-full bg-gray-400 shrink-0" />
-                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700">1~24시간 전</strong>: 50% 환불</p>
+                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">1~24시간 전</strong>: 50% 환불</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="mt-1.5 h-1 w-1 rounded-full bg-gray-400 shrink-0" />
-                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700">1시간 이내</strong>: 환불 불가</p>
+                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">1시간 이내</strong>: 환불 불가</p>
               </div>
             </div>
             <Link

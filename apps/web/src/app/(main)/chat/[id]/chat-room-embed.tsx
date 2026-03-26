@@ -226,7 +226,7 @@ export default function ChatRoomEmbed({
           {!embedded && onBack && (
             <button
               onClick={onBack}
-              className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors lg:hidden"
+              className="rounded-lg p-1.5 min-w-[44px] min-h-[44px] text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors lg:hidden"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7" />

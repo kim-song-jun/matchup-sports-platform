@@ -209,7 +209,7 @@ export default function ScoreInputPage() {
             <Trophy size={16} className="text-amber-500" />
             쿼터별 누적 점수
           </h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-hide">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700">

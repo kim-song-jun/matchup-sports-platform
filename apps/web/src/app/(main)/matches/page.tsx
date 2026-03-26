@@ -34,7 +34,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
           {timeBadge && (
-            <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
+            <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
         </div>
         {/* 텍스트 */}

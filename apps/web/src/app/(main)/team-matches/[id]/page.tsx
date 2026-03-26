@@ -280,7 +280,7 @@ export default function TeamMatchDetailPage() {
                   <Shield size={16} className="text-blue-500" />
                   심판 배정표
                 </h2>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto scrollbar-hide">
                   <table className="w-full text-[13px]">
                     <thead>
                       <tr className="border-b border-gray-100">

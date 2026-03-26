@@ -25,7 +25,7 @@ export function BottomNav() {
         <Link
           href="/chat"
           aria-label="채팅"
-          className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-lg active:scale-95 transition-transform"
+          className="fixed bottom-24 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-lg active:scale-95 transition-transform"
         >
           <MessageCircle size={20} />
           <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">

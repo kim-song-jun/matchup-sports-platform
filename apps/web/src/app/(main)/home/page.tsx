@@ -110,7 +110,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
                         <span className="text-[11px] font-bold text-blue-500">{d.getMonth()+1}/{d.getDate()}</span>
-                        <span className="text-[9px] text-gray-500">{weekdays[d.getDay()]}</span>
+                        <span className="text-[10px] text-gray-500">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100 truncate">{m.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
@@ -130,7 +130,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
                         <span className="text-[11px] font-bold text-blue-500">{d.getMonth()+1}/{d.getDate()}</span>
-                        <span className="text-[9px] text-gray-500">{weekdays[d.getDay()]}</span>
+                        <span className="text-[10px] text-gray-500">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100 truncate">{tm.title}</p>
@@ -327,7 +327,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
           {timeBadge && (
-            <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
+            <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
         </div>
         {/* 텍스트 */}

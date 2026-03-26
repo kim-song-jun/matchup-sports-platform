@@ -281,7 +281,7 @@ export default function RefundRequestPage() {
       </div>
 
       {/* Fixed Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 pb-[calc(1rem+var(--safe-area-bottom))] lg:relative lg:border-0 lg:px-0 lg:mt-4 lg:pb-4 max-w-lg mx-auto lg:mx-0">
+      <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] lg:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 lg:relative lg:border-0 lg:px-0 lg:mt-4 lg:pb-4 max-w-lg mx-auto lg:mx-0">
         <div className="flex items-center justify-between mb-3 lg:hidden">
           <span className="text-[13px] text-gray-500">환불 예상 금액</span>
           <span className={`text-[18px] font-bold ${refundInfo.color}`}>{formatCurrency(refundAmount)}</span>

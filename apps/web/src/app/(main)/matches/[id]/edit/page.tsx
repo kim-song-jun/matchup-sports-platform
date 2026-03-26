@@ -137,7 +137,7 @@ export default function EditMatchPage() {
 
         {/* Images */}
         <FormSection label="이미지 (선택)">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {imagePreviews.map((src, i) => (
               <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
                 <img src={src} alt="" className="w-full h-full object-cover" />

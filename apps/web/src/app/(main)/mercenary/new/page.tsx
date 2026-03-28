@@ -253,7 +253,7 @@ export default function NewMercenaryPage() {
                       : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
                   }`}
                 >
-                  Lv.{opt.value} {opt.label}
+                  {opt.label}
                 </button>
               ))}
             </div>

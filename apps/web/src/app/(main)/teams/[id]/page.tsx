@@ -154,12 +154,12 @@ export default function TeamDetailPage() {
                 {team.skillGrade ? (() => {
                   const grade = getGradeInfo(team.skillGrade);
                   return (
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${grade.color}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
                 })() : (
-                  <span>Lv.{team.level} {levelLabel[team.level]}</span>
+                  <span>{levelLabel[team.level]}</span>
                 )}
                 <span className="text-gray-200">|</span>
                 <span>{team.memberCount}명</span>

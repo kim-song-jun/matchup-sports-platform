@@ -150,7 +150,7 @@ export default function CheckoutPage() {
                 <Tag size={20} className="text-blue-500 dark:text-blue-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 mb-1">
+                <span className="inline-block rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 mb-1">
                   {order.type}
                 </span>
                 <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{order.name}</p>

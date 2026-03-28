@@ -27,10 +27,10 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
             {team.isRecruiting && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>}
           </div>
           <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>
+            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
               {sportLabel[team.sportType] || team.sportType}
             </span>
-            <span>Lv.{team.level} {levelLabel[team.level]} · {team.memberCount}명</span>
+            <span>{levelLabel[team.level]} · {team.memberCount}명</span>
           </p>
           {team.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{team.description}</p>}
           {team.city && <p className="text-2xs text-gray-500 mt-0.5">{team.city} {team.district}</p>}

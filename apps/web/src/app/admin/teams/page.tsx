@@ -33,7 +33,7 @@ export default function AdminTeamsPage() {
         팀명: t.name,
         종목: sportLabel[t.sportType] || t.sportType,
         인원: `${t.memberCount}명`,
-        레벨: `Lv.${t.level}`,
+        레벨: `${t.level}`,
         지역: `${t.city} ${t.district}`,
         모집상태: t.isRecruiting ? '모집중' : '마감',
       })),
@@ -95,7 +95,7 @@ export default function AdminTeamsPage() {
                 </td>
                 <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{sportLabel[t.sportType] || t.sportType}</td>
                 <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.memberCount}명</td>
-                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">Lv.{t.level}</td>
+                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.level}</td>
                 <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.city} {t.district}</td>
                 <td className="px-5 py-3.5">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.isRecruiting ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>

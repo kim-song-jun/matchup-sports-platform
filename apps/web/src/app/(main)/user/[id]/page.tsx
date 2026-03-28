@@ -140,7 +140,7 @@ export default function UserProfilePage() {
                         <span className="text-base font-semibold text-gray-900">{sportLabel[profile.sportType]}</span>
                       </div>
                       <span className="text-sm font-medium text-blue-500">
-                        Lv.{profile.level} {levelLabel[profile.level]}
+                        {levelLabel[profile.level]}
                       </span>
                     </div>
                     {/* Level bar */}

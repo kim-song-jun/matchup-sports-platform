@@ -85,7 +85,7 @@ export default function NotificationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-400 dark:text-gray-500">{timeAgo(n.createdAt)}</span>
-                        {!n.isRead && <span className="flex h-2.5 w-2.5 rounded-full bg-blue-500 animate-badge-pulse" />}
+                        {!n.isRead && <span className="flex h-2.5 w-2.5 rounded-full bg-blue-500" />}
                       </div>
                       <p className={`text-base mt-0.5 ${n.isRead ? 'text-gray-600 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100 font-bold'}`}>
                         {n.title}

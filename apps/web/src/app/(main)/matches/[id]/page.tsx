@@ -128,7 +128,7 @@ export default function MatchDetailPage() {
                 </div>
               )}
               <div>
-                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>{sportLabel[match.sportType]}</span>
+                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[match.sportType]}</span>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
                   {match.title}
                 </h2>

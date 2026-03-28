@@ -166,7 +166,7 @@ export default function EditTeamPage() {
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
             >
               {[1, 2, 3, 4, 5].map((l) => (
-                <option key={l} value={l}>Lv.{l} {levelLabel[l]}</option>
+                <option key={l} value={l}>{levelLabel[l]}</option>
               ))}
             </select>
           </div>

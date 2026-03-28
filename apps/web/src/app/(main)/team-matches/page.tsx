@@ -89,9 +89,9 @@ export default function TeamMatchesPage() {
         />
         {[
           { key: '', label: '전체' },
-          { key: '1-2', label: 'Lv.1-2' },
-          { key: '3-4', label: 'Lv.3-4' },
-          { key: '5-5', label: 'Lv.5' },
+          { key: '1-2', label: '입문~초급' },
+          { key: '3-4', label: '중급~상급' },
+          { key: '5-5', label: '고수' },
         ].map((f) => (
           <button
             key={f.key}

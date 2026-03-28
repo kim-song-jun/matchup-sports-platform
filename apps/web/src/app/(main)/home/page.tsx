@@ -6,7 +6,7 @@ import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@
 import { useAuthStore } from '@/stores/auth-store';
 import { ChevronRight, Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { sportLabel, sportCardAccent } from '@/lib/constants';
+import { sportLabel, sportCardAccent, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportImage, getTeamImage, getListingImage } from '@/lib/sport-image';
 import type { Match, SportTeam, Lesson, MarketplaceListing, TeamMatch } from '@/types/api';
@@ -261,7 +261,7 @@ export default function HomePage() {
                         {t.isRecruiting && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 shrink-0 ml-1">모집중</span>}
                       </div>
                       <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
-                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>{sportLabel[t.sportType]}</span>
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[t.sportType]}</span>
                         <span>{t.memberCount}명</span>
                       </p>
                       {t.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.description}</p>}
@@ -284,7 +284,7 @@ export default function HomePage() {
                   <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
-                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
                           {sportLabel[l.sportType]}
                         </span>
                         <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(l.fee)}</span>
@@ -373,19 +373,19 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             {match.title}
           </p>
           <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 truncate">
-            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium shrink-0`}>
+            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}>
               {sportLabel[match.sportType]}
             </span>
             <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
             {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className={`text-xs font-normal ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
             <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
             {match.levelMin != null && match.levelMax != null && (
-              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
+              <span className="text-2xs text-gray-500 dark:text-gray-400">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
             )}
           </div>
         </div>

@@ -129,7 +129,7 @@ export default function MyTeamsPage() {
                       {sportLabel[team.sportType]}
                     </span>
                     <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                      Lv.{team.level} {levelLabel[team.level]}
+                      {levelLabel[team.level]}
                     </span>
                   </div>
                   <Link href={`/teams/${team.id}`}>

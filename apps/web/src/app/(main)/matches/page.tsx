@@ -44,19 +44,19 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             {match.title}
           </h3>
           <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 truncate">
-            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium shrink-0`}>
+            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}>
               {sportLabel[match.sportType]}
             </span>
             <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
             {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className={`text-xs font-normal ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
             <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
             {match.levelMin != null && match.levelMax != null && (
-              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
+              <span className="text-2xs text-gray-500 dark:text-gray-400">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
             )}
             {isAlmostFull && <span className="text-2xs font-medium text-amber-500">마감임박</span>}
           </div>

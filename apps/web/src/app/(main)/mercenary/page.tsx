@@ -236,7 +236,7 @@ export default function MercenaryPage() {
                     {post.venue}
                   </p>
                   <p className="mt-1 text-sm text-gray-500">
-                    Lv.{post.levelRequired} {levelLabel[post.levelRequired]} 이상
+                    {levelLabel[post.levelRequired]} 이상
                     <span className="text-gray-300 mx-1">·</span>
                     <span className={`font-semibold ${post.fee === 0 ? 'text-green-600' : 'text-gray-800 dark:text-gray-200'}`}>
                       {formatCurrency(post.fee)}

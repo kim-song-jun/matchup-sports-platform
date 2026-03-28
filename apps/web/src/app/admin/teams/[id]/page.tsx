@@ -155,7 +155,7 @@ export default function AdminTeamDetailPage() {
                       {team.city} {team.district}
                     </span>
                     <span className="text-gray-200 dark:text-gray-600">|</span>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Lv.{team.level}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{team.level}</span>
                   </div>
                 </div>
               </div>

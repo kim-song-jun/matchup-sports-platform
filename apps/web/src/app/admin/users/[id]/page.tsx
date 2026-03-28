@@ -99,7 +99,7 @@ export default function AdminUserDetailPage() {
                         {SportIcon && <SportIcon size={16} className="text-gray-400" />}
                         <span className="text-base font-medium text-gray-800 dark:text-gray-200">{sportLabel[sp.sportType]}</span>
                         <span className="rounded-md bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 text-xs font-semibold text-blue-500">
-                          Lv.{sp.level} {levelLabel[sp.level]}
+                          {levelLabel[sp.level]}
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">

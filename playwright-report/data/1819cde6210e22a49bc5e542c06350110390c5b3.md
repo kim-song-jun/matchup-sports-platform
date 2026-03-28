@@ -1,0 +1,310 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e8]:
+          - generic [ref=e9]:
+            - heading "TeamMeet" [level=1] [ref=e10]
+            - paragraph [ref=e11]: 같이 운동할 사람을 찾아보세요
+          - link "로그인" [ref=e12] [cursor=pointer]:
+            - /url: /login
+        - generic [ref=e14]:
+          - paragraph [ref=e15]: AI가 딱 맞는 상대를 찾아줘요
+          - paragraph [ref=e16]: 실력에 맞는 상대, 5분이면 매칭 완료
+          - link "시작하기" [ref=e17] [cursor=pointer]:
+            - /url: /login
+            - text: 시작하기
+            - img [ref=e18]
+        - generic [ref=e21]:
+          - button "전체" [ref=e22]
+          - button "축구" [ref=e23]
+          - button "풋살" [ref=e24]
+          - button "농구" [ref=e25]
+          - button "배드민턴" [ref=e26]
+          - button "아이스하키" [ref=e27]
+          - button "수영" [ref=e28]
+          - button "테니스" [ref=e29]
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - heading "추천 매치" [level=2] [ref=e33]
+              - generic [ref=e34]: "20"
+            - link "더보기" [ref=e35] [cursor=pointer]:
+              - /url: /matches
+              - text: 더보기
+              - img [ref=e36]
+          - generic [ref=e38]:
+            - link "배드민턴 복식 모집 🏸 오늘 배드민턴 복식 모집 🏸 배드민턴 3/25 (수) 19:00 · 영등포 배드민턴클럽 2/4명 8,000원 입문~중급" [ref=e39] [cursor=pointer]:
+              - /url: /matches/2295dcc8-5755-4010-8efc-ee8ab37df805
+              - generic [ref=e40]:
+                - generic [ref=e41]:
+                  - img "배드민턴 복식 모집 🏸" [ref=e42]
+                  - generic [ref=e43]: 오늘
+                - generic [ref=e44]:
+                  - paragraph [ref=e45]: 배드민턴 복식 모집 🏸
+                  - paragraph [ref=e46]:
+                    - generic [ref=e47]: 배드민턴
+                    - generic [ref=e48]: 3/25 (수) 19:00
+                    - generic [ref=e49]: ·
+                    - generic [ref=e50]: 영등포 배드민턴클럽
+                  - generic [ref=e51]:
+                    - generic [ref=e52]: 2/4명
+                    - generic [ref=e53]: 8,000원
+                    - generic [ref=e54]: 입문~중급
+            - link "평일 저녁 농구 3:3 오늘 평일 저녁 농구 3:3 농구 3/25 (수) 20:00 · 강남 스포츠센터 5/6명 12,000원 초급~상급" [ref=e55] [cursor=pointer]:
+              - /url: /matches/241e1f21-7a13-4dc9-9b6c-6a87e9dae04d
+              - generic [ref=e56]:
+                - generic [ref=e57]:
+                  - img "평일 저녁 농구 3:3" [ref=e58]
+                  - generic [ref=e59]: 오늘
+                - generic [ref=e60]:
+                  - paragraph [ref=e61]: 평일 저녁 농구 3:3
+                  - paragraph [ref=e62]:
+                    - generic [ref=e63]: 농구
+                    - generic [ref=e64]: 3/25 (수) 20:00
+                    - generic [ref=e65]: ·
+                    - generic [ref=e66]: 강남 스포츠센터
+                  - generic [ref=e67]:
+                    - generic [ref=e68]: 5/6명
+                    - generic [ref=e69]: 12,000원
+                    - generic [ref=e70]: 초급~상급
+            - link "초보 환영 배드민턴 오늘 초보 환영 배드민턴 배드민턴 3/26 (목) 10:00 · 서초 배드민턴아레나 3/8명 8,000원 입문~초급" [ref=e71] [cursor=pointer]:
+              - /url: /matches/6129e706-afd1-42b9-b46e-c1bb1dbd5f11
+              - generic [ref=e72]:
+                - generic [ref=e73]:
+                  - img "초보 환영 배드민턴" [ref=e74]
+                  - generic [ref=e75]: 오늘
+                - generic [ref=e76]:
+                  - paragraph [ref=e77]: 초보 환영 배드민턴
+                  - paragraph [ref=e78]:
+                    - generic [ref=e79]: 배드민턴
+                    - generic [ref=e80]: 3/26 (목) 10:00
+                    - generic [ref=e81]: ·
+                    - generic [ref=e82]: 서초 배드민턴아레나
+                  - generic [ref=e83]:
+                    - generic [ref=e84]: 3/8명
+                    - generic [ref=e85]: 8,000원
+                    - generic [ref=e86]: 입문~초급
+            - link "퇴근 후 풋살 ⚡ 오늘 퇴근 후 풋살 ⚡ 풋살 3/26 (목) 20:00 · 마포 풋살파크 6/10명 15,000원 초급~고수" [ref=e87] [cursor=pointer]:
+              - /url: /matches/5471b5ec-6590-49a6-bc1d-86be94659b7d
+              - generic [ref=e88]:
+                - generic [ref=e89]:
+                  - img "퇴근 후 풋살 ⚡" [ref=e90]
+                  - generic [ref=e91]: 오늘
+                - generic [ref=e92]:
+                  - paragraph [ref=e93]: 퇴근 후 풋살 ⚡
+                  - paragraph [ref=e94]:
+                    - generic [ref=e95]: 풋살
+                    - generic [ref=e96]: 3/26 (목) 20:00
+                    - generic [ref=e97]: ·
+                    - generic [ref=e98]: 마포 풋살파크
+                  - generic [ref=e99]:
+                    - generic [ref=e100]: 6/10명
+                    - generic [ref=e101]: 15,000원
+                    - generic [ref=e102]: 초급~고수
+            - link "축구 11:11 팀매칭 오늘 축구 11:11 팀매칭 축구 3/27 (금) 14:00 · 노원 축구전용구장 9/14명 20,000원 중급~고수" [ref=e103] [cursor=pointer]:
+              - /url: /matches/91bd1539-7fff-4555-8320-ac1934c29ea2
+              - generic [ref=e104]:
+                - generic [ref=e105]:
+                  - img "축구 11:11 팀매칭" [ref=e106]
+                  - generic [ref=e107]: 오늘
+                - generic [ref=e108]:
+                  - paragraph [ref=e109]: 축구 11:11 팀매칭
+                  - paragraph [ref=e110]:
+                    - generic [ref=e111]: 축구
+                    - generic [ref=e112]: 3/27 (금) 14:00
+                    - generic [ref=e113]: ·
+                    - generic [ref=e114]: 노원 축구전용구장
+                  - generic [ref=e115]:
+                    - generic [ref=e116]: 9/14명
+                    - generic [ref=e117]: 20,000원
+                    - generic [ref=e118]: 중급~고수
+            - link "아이스하키 픽업게임 🏒 오늘 아이스하키 픽업게임 🏒 아이스하키 3/27 (금) 10:00 · 잠실 아이스링크 7/12명 25,000원 중급~고수" [ref=e119] [cursor=pointer]:
+              - /url: /matches/2f4605bf-397a-49d2-800a-393eb976513c
+              - generic [ref=e120]:
+                - generic [ref=e121]:
+                  - img "아이스하키 픽업게임 🏒" [ref=e122]
+                  - generic [ref=e123]: 오늘
+                - generic [ref=e124]:
+                  - paragraph [ref=e125]: 아이스하키 픽업게임 🏒
+                  - paragraph [ref=e126]:
+                    - generic [ref=e127]: 아이스하키
+                    - generic [ref=e128]: 3/27 (금) 10:00
+                    - generic [ref=e129]: ·
+                    - generic [ref=e130]: 잠실 아이스링크
+                  - generic [ref=e131]:
+                    - generic [ref=e132]: 7/12명
+                    - generic [ref=e133]: 25,000원
+                    - generic [ref=e134]: 중급~고수
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - heading "활동 중인 팀" [level=2] [ref=e139]
+              - link "더보기" [ref=e140] [cursor=pointer]:
+                - /url: /teams
+                - text: 더보기
+                - img [ref=e141]
+            - generic [ref=e143]:
+              - link "잠 잠실 아이스베어스 모집중 아이스하키 18명 송파구 기반 아이스하키 동호회. 주 1회 정기전." [ref=e144] [cursor=pointer]:
+                - /url: /teams/73e82aaf-94f3-4b62-b8e3-ffdca54a760a
+                - generic [ref=e145]:
+                  - generic [ref=e146]:
+                    - generic [ref=e147]:
+                      - generic [ref=e149]: 잠
+                      - paragraph [ref=e150]: 잠실 아이스베어스
+                    - generic [ref=e151]: 모집중
+                  - paragraph [ref=e152]:
+                    - generic [ref=e153]: 아이스하키
+                    - generic [ref=e154]: 18명
+                  - paragraph [ref=e155]: 송파구 기반 아이스하키 동호회. 주 1회 정기전.
+              - link "F FC 마포 모집중 풋살 15명 마포구 직장인 풋살 동호회. 매주 토요일 저녁." [ref=e156] [cursor=pointer]:
+                - /url: /teams/c957d3ee-9924-4b64-a705-ebbe429b27d2
+                - generic [ref=e157]:
+                  - generic [ref=e158]:
+                    - generic [ref=e159]:
+                      - generic [ref=e161]: F
+                      - paragraph [ref=e162]: FC 마포
+                    - generic [ref=e163]: 모집중
+                  - paragraph [ref=e164]:
+                    - generic [ref=e165]: 풋살
+                    - generic [ref=e166]: 15명
+                  - paragraph [ref=e167]: 마포구 직장인 풋살 동호회. 매주 토요일 저녁.
+              - link "강 강남 슬래머즈 모집중 농구 12명 강남 농구 동호회. 주 2회 정기 모임." [ref=e168] [cursor=pointer]:
+                - /url: /teams/4fd2ea48-ae24-4f1b-bab8-d5dcba27f07c
+                - generic [ref=e169]:
+                  - generic [ref=e170]:
+                    - generic [ref=e171]:
+                      - generic [ref=e173]: 강
+                      - paragraph [ref=e174]: 강남 슬래머즈
+                    - generic [ref=e175]: 모집중
+                  - paragraph [ref=e176]:
+                    - generic [ref=e177]: 농구
+                    - generic [ref=e178]: 12명
+                  - paragraph [ref=e179]: 강남 농구 동호회. 주 2회 정기 모임.
+              - link "셔 셔틀콕 파이터즈 배드민턴 20명 서초/강남 배드민턴 동호회. 매주 수/토 모임." [ref=e180] [cursor=pointer]:
+                - /url: /teams/fe6be1e8-0a3c-4cc8-9558-ef2ad1d19804
+                - generic [ref=e181]:
+                  - generic [ref=e183]:
+                    - generic [ref=e185]: 셔
+                    - paragraph [ref=e186]: 셔틀콕 파이터즈
+                  - paragraph [ref=e187]:
+                    - generic [ref=e188]: 배드민턴
+                    - generic [ref=e189]: 20명
+                  - paragraph [ref=e190]: 서초/강남 배드민턴 동호회. 매주 수/토 모임.
+          - generic [ref=e191]:
+            - generic [ref=e192]:
+              - heading "추천 강좌" [level=2] [ref=e194]
+              - link "더보기" [ref=e195] [cursor=pointer]:
+                - /url: /lessons
+                - text: 더보기
+                - img [ref=e196]
+            - generic [ref=e198]:
+              - link "배드민턴 20,000원 배드민턴 입문 클래스 박 박소희 코치 코치" [ref=e199] [cursor=pointer]:
+                - /url: /lessons/d7ca4bca-494d-407b-a586-793bc0309627
+                - generic [ref=e200]:
+                  - generic [ref=e201]:
+                    - generic [ref=e202]: 배드민턴
+                    - generic [ref=e203]: 20,000원
+                  - paragraph [ref=e204]: 배드민턴 입문 클래스
+                  - paragraph [ref=e205]:
+                    - generic [ref=e206]: 박
+                    - text: 박소희 코치 코치
+              - link "농구 5,000원 농구 자유 연습 (코트 대여)" [ref=e207] [cursor=pointer]:
+                - /url: /lessons/5ad4444c-abce-4c4a-8818-b5b04a07cafd
+                - generic [ref=e208]:
+                  - generic [ref=e209]:
+                    - generic [ref=e210]: 농구
+                    - generic [ref=e211]: 5,000원
+                  - paragraph [ref=e212]: 농구 자유 연습 (코트 대여)
+              - link "아이스하키 35,000원 아이스하키 기초 레슨 김 김준호 코치 코치" [ref=e213] [cursor=pointer]:
+                - /url: /lessons/3d16fcf9-578d-4e76-8ca5-43bef40738ee
+                - generic [ref=e214]:
+                  - generic [ref=e215]:
+                    - generic [ref=e216]: 아이스하키
+                    - generic [ref=e217]: 35,000원
+                  - paragraph [ref=e218]: 아이스하키 기초 레슨
+                  - paragraph [ref=e219]:
+                    - generic [ref=e220]: 김
+                    - text: 김준호 코치 코치
+              - link "풋살 12,000원 풋살 연습 경기" [ref=e221] [cursor=pointer]:
+                - /url: /lessons/e80d68dc-2eda-419c-9dbc-1f2b94381727
+                - generic [ref=e222]:
+                  - generic [ref=e223]:
+                    - generic [ref=e224]: 풋살
+                    - generic [ref=e225]: 12,000원
+                  - paragraph [ref=e226]: 풋살 연습 경기
+          - generic [ref=e227]:
+            - generic [ref=e228]:
+              - heading "최신 장터" [level=2] [ref=e230]
+              - link "더보기" [ref=e231] [cursor=pointer]:
+                - /url: /marketplace
+                - text: 더보기
+                - img [ref=e232]
+            - generic [ref=e234]:
+              - link "아디다스 축구화 270mm (프레데터) 아디다스 축구화 270mm (프레데터) 95,000원" [ref=e235] [cursor=pointer]:
+                - /url: /marketplace/38fe28d5-a6fc-4a19-8a11-57de5cac9ba0
+                - generic [ref=e236]:
+                  - img "아디다스 축구화 270mm (프레데터)" [ref=e238]
+                  - generic [ref=e239]:
+                    - paragraph [ref=e240]: 아디다스 축구화 270mm (프레데터)
+                    - paragraph [ref=e241]: 95,000원
+              - link "나이키 농구화 275mm (에어조던) 나이키 농구화 275mm (에어조던) 65,000원" [ref=e242] [cursor=pointer]:
+                - /url: /marketplace/27f31503-1f7f-498c-814f-2233074fdc38
+                - generic [ref=e243]:
+                  - img "나이키 농구화 275mm (에어조던)" [ref=e245]
+                  - generic [ref=e246]:
+                    - paragraph [ref=e247]: 나이키 농구화 275mm (에어조던)
+                    - paragraph [ref=e248]: 65,000원
+              - link "바우어 아이스하키 스틱 (좌타) 바우어 아이스하키 스틱 (좌타) 120,000원" [ref=e249] [cursor=pointer]:
+                - /url: /marketplace/00c904ca-bb55-4441-81fc-59a000ec1187
+                - generic [ref=e250]:
+                  - img "바우어 아이스하키 스틱 (좌타)" [ref=e252]
+                  - generic [ref=e253]:
+                    - paragraph [ref=e254]: 바우어 아이스하키 스틱 (좌타)
+                    - paragraph [ref=e255]: 120,000원
+              - link "빅터 배드민턴 라켓 (쓰러스터 K) 빅터 배드민턴 라켓 (쓰러스터 K) 150,000원" [ref=e256] [cursor=pointer]:
+                - /url: /marketplace/c6bc2717-641a-47bd-92fa-4682ac87be5b
+                - generic [ref=e257]:
+                  - img "빅터 배드민턴 라켓 (쓰러스터 K)" [ref=e259]
+                  - generic [ref=e260]:
+                    - paragraph [ref=e261]: 빅터 배드민턴 라켓 (쓰러스터 K)
+                    - paragraph [ref=e262]: 150,000원
+      - generic [ref=e264]:
+        - paragraph [ref=e265]: © 2026 TeamMeet. All rights reserved.
+        - generic [ref=e266]:
+          - link "이용약관" [ref=e267] [cursor=pointer]:
+            - /url: /settings/terms
+          - generic [ref=e268]: ·
+          - link "개인정보처리방침" [ref=e269] [cursor=pointer]:
+            - /url: /settings/privacy
+    - navigation [ref=e270]:
+      - generic [ref=e271]:
+        - link "홈" [ref=e272] [cursor=pointer]:
+          - /url: /home
+          - img [ref=e274]
+          - generic [ref=e277]: 홈
+        - link "매치" [ref=e278] [cursor=pointer]:
+          - /url: /matches
+          - img [ref=e280]
+          - generic [ref=e283]: 매치
+        - link "강좌" [ref=e284] [cursor=pointer]:
+          - /url: /lessons
+          - img [ref=e286]
+          - generic [ref=e289]: 강좌
+        - link "장터" [ref=e290] [cursor=pointer]:
+          - /url: /marketplace
+          - img [ref=e292]
+          - generic [ref=e295]: 장터
+        - link "5 프로필" [ref=e296] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=e297]:
+            - img [ref=e298]
+            - generic [ref=e301]: "5"
+          - generic [ref=e302]: 프로필
+  - button "Open Next.js Dev Tools" [ref=e308] [cursor=pointer]:
+    - img [ref=e309]
+  - alert [ref=e312]
+```

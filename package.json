@@ -16,6 +16,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "turbo": "^2.8.19"
   },
   "dependencies": {

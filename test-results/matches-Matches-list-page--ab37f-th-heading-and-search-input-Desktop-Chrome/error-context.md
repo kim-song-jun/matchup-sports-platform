@@ -1,0 +1,441 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - link "TeamMeet" [ref=e6] [cursor=pointer]:
+        - /url: /home
+        - heading "TeamMeet" [level=1] [ref=e7]
+      - link "매치 찾기" [ref=e9] [cursor=pointer]:
+        - /url: /matches/new
+        - img [ref=e10]
+        - text: 매치 찾기
+      - navigation [ref=e11]:
+        - link "홈" [ref=e14] [cursor=pointer]:
+          - /url: /home
+          - img [ref=e15]
+          - generic [ref=e18]: 홈
+        - generic [ref=e19]:
+          - paragraph [ref=e20]: 매칭
+          - generic [ref=e21]:
+            - link "매치 찾기" [ref=e22] [cursor=pointer]:
+              - /url: /matches
+              - img [ref=e23]
+              - generic [ref=e26]: 매치 찾기
+            - link "팀 매칭" [ref=e27] [cursor=pointer]:
+              - /url: /team-matches
+              - img [ref=e28]
+              - generic [ref=e37]: 팀 매칭
+        - generic [ref=e38]:
+          - paragraph [ref=e39]: 탐색
+          - generic [ref=e40]:
+            - link "강좌" [ref=e41] [cursor=pointer]:
+              - /url: /lessons
+              - img [ref=e42]
+              - generic [ref=e45]: 강좌
+            - link "장터" [ref=e46] [cursor=pointer]:
+              - /url: /marketplace
+              - img [ref=e47]
+              - generic [ref=e50]: 장터
+            - link "팀·클럽" [ref=e51] [cursor=pointer]:
+              - /url: /teams
+              - img [ref=e52]
+              - generic [ref=e57]: 팀·클럽
+        - generic [ref=e58]:
+          - paragraph [ref=e59]: 소통
+          - generic [ref=e60]:
+            - link "채팅 3" [ref=e61] [cursor=pointer]:
+              - /url: /chat
+              - img [ref=e62]
+              - generic [ref=e64]: 채팅
+              - generic [ref=e65]: "3"
+            - link "알림 2" [ref=e66] [cursor=pointer]:
+              - /url: /notifications
+              - img [ref=e67]
+              - generic [ref=e70]: 알림
+              - generic [ref=e71]: "2"
+        - link "마이페이지" [ref=e74] [cursor=pointer]:
+          - /url: /profile
+          - img [ref=e75]
+          - generic [ref=e78]: 마이페이지
+        - link "Admin" [ref=e80] [cursor=pointer]:
+          - /url: /admin/dashboard
+          - img [ref=e81]
+          - text: Admin
+      - button "Switch language" [ref=e85]:
+        - img [ref=e86]
+        - text: English
+      - link "로그인" [ref=e90] [cursor=pointer]:
+        - /url: /login
+    - main [ref=e91]:
+      - generic [ref=e93]:
+        - heading "매치 찾기" [level=1] [ref=e95]
+        - generic [ref=e97]:
+          - generic [ref=e98]:
+            - img [ref=e99]
+            - textbox "지역, 시설명 검색" [ref=e102]
+          - button "필터 열기" [ref=e103]:
+            - img [ref=e104]
+        - generic [ref=e105]:
+          - button "전체" [ref=e106]
+          - button "축구" [ref=e107]
+          - button "풋살" [ref=e108]
+          - button "농구" [ref=e109]
+          - button "배드민턴" [ref=e110]
+          - button "아이스하키" [ref=e111]
+          - button "수영" [ref=e112]
+          - button "테니스" [ref=e113]
+        - paragraph [ref=e115]: 20개의 매치
+        - generic [ref=e117]:
+          - link "배드민턴 복식 모집 🏸 오늘 배드민턴 복식 모집 🏸 배드민턴 3/25 (수) 19:00 · 영등포 배드민턴클럽 2/4 8,000원 입문~중급" [ref=e118] [cursor=pointer]:
+            - /url: /matches/2295dcc8-5755-4010-8efc-ee8ab37df805
+            - generic [ref=e119]:
+              - generic [ref=e120]:
+                - img "배드민턴 복식 모집 🏸" [ref=e121]
+                - generic [ref=e122]: 오늘
+              - generic [ref=e123]:
+                - heading "배드민턴 복식 모집 🏸" [level=3] [ref=e124]
+                - paragraph [ref=e125]:
+                  - generic [ref=e126]: 배드민턴
+                  - generic [ref=e127]: 3/25 (수) 19:00
+                  - generic [ref=e128]: ·
+                  - generic [ref=e129]: 영등포 배드민턴클럽
+                - generic [ref=e130]:
+                  - generic [ref=e131]: 2/4
+                  - generic [ref=e132]: 8,000원
+                  - generic [ref=e133]: 입문~중급
+          - link "평일 저녁 농구 3:3 오늘 평일 저녁 농구 3:3 농구 3/25 (수) 20:00 · 강남 스포츠센터 5/6 12,000원 초급~상급 마감임박" [ref=e134] [cursor=pointer]:
+            - /url: /matches/241e1f21-7a13-4dc9-9b6c-6a87e9dae04d
+            - generic [ref=e135]:
+              - generic [ref=e136]:
+                - img "평일 저녁 농구 3:3" [ref=e137]
+                - generic [ref=e138]: 오늘
+              - generic [ref=e139]:
+                - heading "평일 저녁 농구 3:3" [level=3] [ref=e140]
+                - paragraph [ref=e141]:
+                  - generic [ref=e142]: 농구
+                  - generic [ref=e143]: 3/25 (수) 20:00
+                  - generic [ref=e144]: ·
+                  - generic [ref=e145]: 강남 스포츠센터
+                - generic [ref=e146]:
+                  - generic [ref=e147]: 5/6
+                  - generic [ref=e148]: 12,000원
+                  - generic [ref=e149]: 초급~상급
+                  - generic [ref=e150]: 마감임박
+          - link "퇴근 후 풋살 ⚡ 오늘 퇴근 후 풋살 ⚡ 풋살 3/26 (목) 20:00 · 마포 풋살파크 6/10 15,000원 초급~고수" [ref=e151] [cursor=pointer]:
+            - /url: /matches/5471b5ec-6590-49a6-bc1d-86be94659b7d
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - img "퇴근 후 풋살 ⚡" [ref=e154]
+                - generic [ref=e155]: 오늘
+              - generic [ref=e156]:
+                - heading "퇴근 후 풋살 ⚡" [level=3] [ref=e157]
+                - paragraph [ref=e158]:
+                  - generic [ref=e159]: 풋살
+                  - generic [ref=e160]: 3/26 (목) 20:00
+                  - generic [ref=e161]: ·
+                  - generic [ref=e162]: 마포 풋살파크
+                - generic [ref=e163]:
+                  - generic [ref=e164]: 6/10
+                  - generic [ref=e165]: 15,000원
+                  - generic [ref=e166]: 초급~고수
+          - link "초보 환영 배드민턴 오늘 초보 환영 배드민턴 배드민턴 3/26 (목) 10:00 · 서초 배드민턴아레나 3/8 8,000원 입문~초급" [ref=e167] [cursor=pointer]:
+            - /url: /matches/6129e706-afd1-42b9-b46e-c1bb1dbd5f11
+            - generic [ref=e168]:
+              - generic [ref=e169]:
+                - img "초보 환영 배드민턴" [ref=e170]
+                - generic [ref=e171]: 오늘
+              - generic [ref=e172]:
+                - heading "초보 환영 배드민턴" [level=3] [ref=e173]
+                - paragraph [ref=e174]:
+                  - generic [ref=e175]: 배드민턴
+                  - generic [ref=e176]: 3/26 (목) 10:00
+                  - generic [ref=e177]: ·
+                  - generic [ref=e178]: 서초 배드민턴아레나
+                - generic [ref=e179]:
+                  - generic [ref=e180]: 3/8
+                  - generic [ref=e181]: 8,000원
+                  - generic [ref=e182]: 입문~초급
+          - link "테니스 단식 매치 오늘 테니스 단식 매치 테니스 3/27 (금) 18:00 · 강남 스포츠센터 3/4 15,000원 초급~중급 마감임박" [ref=e183] [cursor=pointer]:
+            - /url: /matches/ee1b87d2-b9d3-4bb1-b924-19ef6b9791db
+            - generic [ref=e184]:
+              - generic [ref=e185]:
+                - img "테니스 단식 매치" [ref=e186]
+                - generic [ref=e187]: 오늘
+              - generic [ref=e188]:
+                - heading "테니스 단식 매치" [level=3] [ref=e189]
+                - paragraph [ref=e190]:
+                  - generic [ref=e191]: 테니스
+                  - generic [ref=e192]: 3/27 (금) 18:00
+                  - generic [ref=e193]: ·
+                  - generic [ref=e194]: 강남 스포츠센터
+                - generic [ref=e195]:
+                  - generic [ref=e196]: 3/4
+                  - generic [ref=e197]: 15,000원
+                  - generic [ref=e198]: 초급~중급
+                  - generic [ref=e199]: 마감임박
+          - link "수영 자유형 연습 모임 오늘 수영 자유형 연습 모임 수영 3/27 (금) 07:00 · 강남 스포츠센터 2/6 무료 입문~고수" [ref=e200] [cursor=pointer]:
+            - /url: /matches/84c01c27-72d3-46be-a802-eb1a9dadcf31
+            - generic [ref=e201]:
+              - generic [ref=e202]:
+                - img "수영 자유형 연습 모임" [ref=e203]
+                - generic [ref=e204]: 오늘
+              - generic [ref=e205]:
+                - heading "수영 자유형 연습 모임" [level=3] [ref=e206]
+                - paragraph [ref=e207]:
+                  - generic [ref=e208]: 수영
+                  - generic [ref=e209]: 3/27 (금) 07:00
+                  - generic [ref=e210]: ·
+                  - generic [ref=e211]: 강남 스포츠센터
+                - generic [ref=e212]:
+                  - generic [ref=e213]: 2/6
+                  - generic [ref=e214]: 무료
+                  - generic [ref=e215]: 입문~고수
+          - link "아이스하키 픽업게임 🏒 오늘 아이스하키 픽업게임 🏒 아이스하키 3/27 (금) 10:00 · 잠실 아이스링크 7/12 25,000원 중급~고수" [ref=e216] [cursor=pointer]:
+            - /url: /matches/2f4605bf-397a-49d2-800a-393eb976513c
+            - generic [ref=e217]:
+              - generic [ref=e218]:
+                - img "아이스하키 픽업게임 🏒" [ref=e219]
+                - generic [ref=e220]: 오늘
+              - generic [ref=e221]:
+                - heading "아이스하키 픽업게임 🏒" [level=3] [ref=e222]
+                - paragraph [ref=e223]:
+                  - generic [ref=e224]: 아이스하키
+                  - generic [ref=e225]: 3/27 (금) 10:00
+                  - generic [ref=e226]: ·
+                  - generic [ref=e227]: 잠실 아이스링크
+                - generic [ref=e228]:
+                  - generic [ref=e229]: 7/12
+                  - generic [ref=e230]: 25,000원
+                  - generic [ref=e231]: 중급~고수
+          - link "축구 11:11 팀매칭 오늘 축구 11:11 팀매칭 축구 3/27 (금) 14:00 · 노원 축구전용구장 9/14 20,000원 중급~고수" [ref=e232] [cursor=pointer]:
+            - /url: /matches/91bd1539-7fff-4555-8320-ac1934c29ea2
+            - generic [ref=e233]:
+              - generic [ref=e234]:
+                - img "축구 11:11 팀매칭" [ref=e235]
+                - generic [ref=e236]: 오늘
+              - generic [ref=e237]:
+                - heading "축구 11:11 팀매칭" [level=3] [ref=e238]
+                - paragraph [ref=e239]:
+                  - generic [ref=e240]: 축구
+                  - generic [ref=e241]: 3/27 (금) 14:00
+                  - generic [ref=e242]: ·
+                  - generic [ref=e243]: 노원 축구전용구장
+                - generic [ref=e244]:
+                  - generic [ref=e245]: 9/14
+                  - generic [ref=e246]: 20,000원
+                  - generic [ref=e247]: 중급~고수
+          - link "주말 배드민턴 혼합복식 오늘 주말 배드민턴 혼합복식 배드민턴 3/27 (금) 14:00 · 서초 배드민턴아레나 6/8 10,000원 초급~상급 마감임박" [ref=e248] [cursor=pointer]:
+            - /url: /matches/dcd4872d-7f03-48d8-a2e5-b2f143deaa4c
+            - generic [ref=e249]:
+              - generic [ref=e250]:
+                - img "주말 배드민턴 혼합복식" [ref=e251]
+                - generic [ref=e252]: 오늘
+              - generic [ref=e253]:
+                - heading "주말 배드민턴 혼합복식" [level=3] [ref=e254]
+                - paragraph [ref=e255]:
+                  - generic [ref=e256]: 배드민턴
+                  - generic [ref=e257]: 3/27 (금) 14:00
+                  - generic [ref=e258]: ·
+                  - generic [ref=e259]: 서초 배드민턴아레나
+                - generic [ref=e260]:
+                  - generic [ref=e261]: 6/8
+                  - generic [ref=e262]: 10,000원
+                  - generic [ref=e263]: 초급~상급
+                  - generic [ref=e264]: 마감임박
+          - link "test 오늘 test 아이스하키 3/27 (금) 11:05 · 잠실 아이스링크 1/10 15,000원 입문~초급" [ref=e265] [cursor=pointer]:
+            - /url: /matches/1b68aafa-c743-4b4f-b107-d22de057becf
+            - generic [ref=e266]:
+              - generic [ref=e267]:
+                - img "test" [ref=e268]
+                - generic [ref=e269]: 오늘
+              - generic [ref=e270]:
+                - heading "test" [level=3] [ref=e271]
+                - paragraph [ref=e272]:
+                  - generic [ref=e273]: 아이스하키
+                  - generic [ref=e274]: 3/27 (금) 11:05
+                  - generic [ref=e275]: ·
+                  - generic [ref=e276]: 잠실 아이스링크
+                - generic [ref=e277]:
+                  - generic [ref=e278]: 1/10
+                  - generic [ref=e279]: 15,000원
+                  - generic [ref=e280]: 입문~초급
+          - link "주말 풋살 한판! 🔥 오늘 주말 풋살 한판! 🔥 풋살 3/27 (금) 18:00 · 마포 풋살파크 4/10 15,000원 초급~상급" [ref=e281] [cursor=pointer]:
+            - /url: /matches/3e03cf14-77d6-4c8a-a038-acdf3522dfb4
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - img "주말 풋살 한판! 🔥" [ref=e284]
+                - generic [ref=e285]: 오늘
+              - generic [ref=e286]:
+                - heading "주말 풋살 한판! 🔥" [level=3] [ref=e287]
+                - paragraph [ref=e288]:
+                  - generic [ref=e289]: 풋살
+                  - generic [ref=e290]: 3/27 (금) 18:00
+                  - generic [ref=e291]: ·
+                  - generic [ref=e292]: 마포 풋살파크
+                - generic [ref=e293]:
+                  - generic [ref=e294]: 4/10
+                  - generic [ref=e295]: 15,000원
+                  - generic [ref=e296]: 초급~상급
+          - link "하키 정기전 멤버 충원 오늘 하키 정기전 멤버 충원 아이스하키 3/28 (토) 20:00 · 잠실 아이스링크 10/12 25,000원 중급~고수 마감임박" [ref=e297] [cursor=pointer]:
+            - /url: /matches/38e61471-d095-4cdd-9b1b-b15d899977cb
+            - generic [ref=e298]:
+              - generic [ref=e299]:
+                - img "하키 정기전 멤버 충원" [ref=e300]
+                - generic [ref=e301]: 오늘
+              - generic [ref=e302]:
+                - heading "하키 정기전 멤버 충원" [level=3] [ref=e303]
+                - paragraph [ref=e304]:
+                  - generic [ref=e305]: 아이스하키
+                  - generic [ref=e306]: 3/28 (토) 20:00
+                  - generic [ref=e307]: ·
+                  - generic [ref=e308]: 잠실 아이스링크
+                - generic [ref=e309]:
+                  - generic [ref=e310]: 10/12
+                  - generic [ref=e311]: 25,000원
+                  - generic [ref=e312]: 중급~고수
+                  - generic [ref=e313]: 마감임박
+          - link "직장인 풋살 리그 3주차 오늘 직장인 풋살 리그 3주차 풋살 3/28 (토) 19:00 · 마포 풋살파크 8/10 15,000원 초급~상급 마감임박" [ref=e314] [cursor=pointer]:
+            - /url: /matches/9f2fe8c1-c8e6-455c-b204-fb419f7941f4
+            - generic [ref=e315]:
+              - generic [ref=e316]:
+                - img "직장인 풋살 리그 3주차" [ref=e317]
+                - generic [ref=e318]: 오늘
+              - generic [ref=e319]:
+                - heading "직장인 풋살 리그 3주차" [level=3] [ref=e320]
+                - paragraph [ref=e321]:
+                  - generic [ref=e322]: 풋살
+                  - generic [ref=e323]: 3/28 (토) 19:00
+                  - generic [ref=e324]: ·
+                  - generic [ref=e325]: 마포 풋살파크
+                - generic [ref=e326]:
+                  - generic [ref=e327]: 8/10
+                  - generic [ref=e328]: 15,000원
+                  - generic [ref=e329]: 초급~상급
+                  - generic [ref=e330]: 마감임박
+          - link "주말 아침 축구 오늘 주말 아침 축구 축구 3/28 (토) 08:00 · 노원 축구전용구장 10/14 20,000원 초급~상급 마감임박" [ref=e331] [cursor=pointer]:
+            - /url: /matches/49b8f250-5168-4711-9775-4ceec51ab544
+            - generic [ref=e332]:
+              - generic [ref=e333]:
+                - img "주말 아침 축구" [ref=e334]
+                - generic [ref=e335]: 오늘
+              - generic [ref=e336]:
+                - heading "주말 아침 축구" [level=3] [ref=e337]
+                - paragraph [ref=e338]:
+                  - generic [ref=e339]: 축구
+                  - generic [ref=e340]: 3/28 (토) 08:00
+                  - generic [ref=e341]: ·
+                  - generic [ref=e342]: 노원 축구전용구장
+                - generic [ref=e343]:
+                  - generic [ref=e344]: 10/14
+                  - generic [ref=e345]: 20,000원
+                  - generic [ref=e346]: 초급~상급
+                  - generic [ref=e347]: 마감임박
+          - link "농구 3대3 모집 🏀 오늘 농구 3대3 모집 🏀 농구 3/28 (토) 14:00 · 강남 스포츠센터 3/6 12,000원 초급~상급" [ref=e348] [cursor=pointer]:
+            - /url: /matches/ee07af01-0ed3-48da-a399-ab5f00574566
+            - generic [ref=e349]:
+              - generic [ref=e350]:
+                - img "농구 3대3 모집 🏀" [ref=e351]
+                - generic [ref=e352]: 오늘
+              - generic [ref=e353]:
+                - heading "농구 3대3 모집 🏀" [level=3] [ref=e354]
+                - paragraph [ref=e355]:
+                  - generic [ref=e356]: 농구
+                  - generic [ref=e357]: 3/28 (토) 14:00
+                  - generic [ref=e358]: ·
+                  - generic [ref=e359]: 강남 스포츠센터
+                - generic [ref=e360]:
+                  - generic [ref=e361]: 3/6
+                  - generic [ref=e362]: 12,000원
+                  - generic [ref=e363]: 초급~상급
+          - link "테니스 복식 파트너 구합니다 오늘 테니스 복식 파트너 구합니다 테니스 3/28 (토) 10:00 · 강남 스포츠센터 2/4 15,000원 중급~상급" [ref=e364] [cursor=pointer]:
+            - /url: /matches/f70b7226-e820-4009-ba5f-c4cce7405074
+            - generic [ref=e365]:
+              - generic [ref=e366]:
+                - img "테니스 복식 파트너 구합니다" [ref=e367]
+                - generic [ref=e368]: 오늘
+              - generic [ref=e369]:
+                - heading "테니스 복식 파트너 구합니다" [level=3] [ref=e370]
+                - paragraph [ref=e371]:
+                  - generic [ref=e372]: 테니스
+                  - generic [ref=e373]: 3/28 (토) 10:00
+                  - generic [ref=e374]: ·
+                  - generic [ref=e375]: 강남 스포츠센터
+                - generic [ref=e376]:
+                  - generic [ref=e377]: 2/4
+                  - generic [ref=e378]: 15,000원
+                  - generic [ref=e379]: 중급~상급
+          - link "배드민턴 단식 스파링 내일 배드민턴 단식 스파링 배드민턴 3/29 (일) 18:00 · 영등포 배드민턴클럽 1/4 8,000원 중급~고수" [ref=e380] [cursor=pointer]:
+            - /url: /matches/b40dd1d2-26da-42d1-be89-2b1db681158b
+            - generic [ref=e381]:
+              - generic [ref=e382]:
+                - img "배드민턴 단식 스파링" [ref=e383]
+                - generic [ref=e384]: 내일
+              - generic [ref=e385]:
+                - heading "배드민턴 단식 스파링" [level=3] [ref=e386]
+                - paragraph [ref=e387]:
+                  - generic [ref=e388]: 배드민턴
+                  - generic [ref=e389]: 3/29 (일) 18:00
+                  - generic [ref=e390]: ·
+                  - generic [ref=e391]: 영등포 배드민턴클럽
+                - generic [ref=e392]:
+                  - generic [ref=e393]: 1/4
+                  - generic [ref=e394]: 8,000원
+                  - generic [ref=e395]: 중급~고수
+          - link "여성 풋살 모집 이번 주 여성 풋살 모집 풋살 4/3 (금) 10:00 · 마포 풋살파크 3/10 12,000원 입문~중급" [ref=e396] [cursor=pointer]:
+            - /url: /matches/0c35270e-9fc3-4ab4-80e6-8ff31d7d2533
+            - generic [ref=e397]:
+              - generic [ref=e398]:
+                - img "여성 풋살 모집" [ref=e399]
+                - generic [ref=e400]: 이번 주
+              - generic [ref=e401]:
+                - heading "여성 풋살 모집" [level=3] [ref=e402]
+                - paragraph [ref=e403]:
+                  - generic [ref=e404]: 풋살
+                  - generic [ref=e405]: 4/3 (금) 10:00
+                  - generic [ref=e406]: ·
+                  - generic [ref=e407]: 마포 풋살파크
+                - generic [ref=e408]:
+                  - generic [ref=e409]: 3/10
+                  - generic [ref=e410]: 12,000원
+                  - generic [ref=e411]: 입문~중급
+          - link "주말 농구 5:5 풀코트 이번 주 주말 농구 5:5 풀코트 농구 4/3 (금) 16:00 · 강남 스포츠센터 7/10 12,000원 중급~고수 마감임박" [ref=e412] [cursor=pointer]:
+            - /url: /matches/685b89b1-cd08-4647-a541-de35aa09c786
+            - generic [ref=e413]:
+              - generic [ref=e414]:
+                - img "주말 농구 5:5 풀코트" [ref=e415]
+                - generic [ref=e416]: 이번 주
+              - generic [ref=e417]:
+                - heading "주말 농구 5:5 풀코트" [level=3] [ref=e418]
+                - paragraph [ref=e419]:
+                  - generic [ref=e420]: 농구
+                  - generic [ref=e421]: 4/3 (금) 16:00
+                  - generic [ref=e422]: ·
+                  - generic [ref=e423]: 강남 스포츠센터
+                - generic [ref=e424]:
+                  - generic [ref=e425]: 7/10
+                  - generic [ref=e426]: 12,000원
+                  - generic [ref=e427]: 중급~고수
+                  - generic [ref=e428]: 마감임박
+          - link "수영 접영/배영 연습 이번 주 수영 접영/배영 연습 수영 4/4 (토) 07:00 · 강남 스포츠센터 1/6 무료 중급~고수" [ref=e429] [cursor=pointer]:
+            - /url: /matches/8b774c89-1860-4252-8079-c7e0a4277ec5
+            - generic [ref=e430]:
+              - generic [ref=e431]:
+                - img "수영 접영/배영 연습" [ref=e432]
+                - generic [ref=e433]: 이번 주
+              - generic [ref=e434]:
+                - heading "수영 접영/배영 연습" [level=3] [ref=e435]
+                - paragraph [ref=e436]:
+                  - generic [ref=e437]: 수영
+                  - generic [ref=e438]: 4/4 (토) 07:00
+                  - generic [ref=e439]: ·
+                  - generic [ref=e440]: 강남 스포츠센터
+                - generic [ref=e441]:
+                  - generic [ref=e442]: 1/6
+                  - generic [ref=e443]: 무료
+                  - generic [ref=e444]: 중급~고수
+  - button "Open Next.js Dev Tools" [ref=e450] [cursor=pointer]:
+    - img [ref=e451]
+  - alert [ref=e454]
+```

@@ -72,7 +72,7 @@ export default function MarketplacePage() {
           <button
             key={cat.label}
             onClick={() => setActiveCategory(cat.label)}
-            className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeCategory === cat.label
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-gray-50 text-gray-500 hover:bg-gray-100 active:bg-gray-150 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700'

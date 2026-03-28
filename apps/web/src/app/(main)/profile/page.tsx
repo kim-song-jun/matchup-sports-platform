@@ -217,7 +217,7 @@ function UpcomingSchedule() {
 
   const calendarMatches = upcoming.map((m: Match) => ({
     id: m.id,
-    title: m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim() || '',
+    title: m.title || '',
     matchDate: m.matchDate,
     startTime: m.startTime,
     sportType: m.sportType,
@@ -273,7 +273,7 @@ function UpcomingSchedule() {
                     <span className="text-lg font-black leading-none">{d.getDate()}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-medium text-gray-900 dark:text-white truncate">{m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
+                    <p className="text-base font-medium text-gray-900 dark:text-white truncate">{m.title}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                       <span className="flex items-center gap-0.5"><Clock size={11} /> {m.startTime}</span>
                       <span>({weekdays[d.getDay()]})</span>

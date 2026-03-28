@@ -82,7 +82,7 @@ export default function VenuesPage() {
       <div className="px-5 lg:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === f.key ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}>
             {f.label}

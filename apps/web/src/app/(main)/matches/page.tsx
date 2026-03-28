@@ -41,7 +41,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
         {/* 텍스트 */}
         <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
-            {match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
+            {match.title}
           </h3>
           <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
             <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
@@ -119,7 +119,7 @@ export default function MatchesPage() {
       <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -143,7 +143,7 @@ export default function MatchesPage() {
               <div className="flex gap-2">
                 {(['latest', 'deadline'] as const).map((s) => (
                   <button key={s} onClick={() => setSortBy(s)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${sortBy === s ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
+                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${sortBy === s ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
                     {s === 'latest' ? '최신순' : '마감임박'}
                   </button>
                 ))}

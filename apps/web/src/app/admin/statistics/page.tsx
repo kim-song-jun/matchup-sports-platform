@@ -51,7 +51,7 @@ const topVenues = [
   { name: '강서 배드민턴장', city: '서울 강서', matches: 31, revenue: 1550000, rating: 4.2 },
 ];
 
-function formatCurrency(n: number) {
+function formatCurrencyCompact(n: number) {
   if (n >= 100000000) return `${(n / 100000000).toFixed(1)}억`;
   if (n >= 10000) return `${(n / 10000).toFixed(0)}만`;
   return new Intl.NumberFormat('ko-KR').format(n);
@@ -164,7 +164,7 @@ export default function AdminStatisticsPage() {
               const heightPercent = (r.revenue / maxRevenue) * 100;
               return (
                 <div key={r.month} className="flex-1 flex flex-col items-center justify-end h-full">
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{formatCurrency(r.revenue)}</span>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{formatCurrencyCompact(r.revenue)}</span>
                   <div
                     className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-[4px]"
                     style={{ height: `${heightPercent}%` }}
@@ -241,7 +241,7 @@ export default function AdminStatisticsPage() {
                       </div>
                     </td>
                     <td className="py-2.5 text-right text-sm font-medium text-gray-700 dark:text-gray-300">{v.matches}건</td>
-                    <td className="py-2.5 text-right text-sm font-medium text-gray-700 dark:text-gray-300">{formatCurrency(v.revenue)}원</td>
+                    <td className="py-2.5 text-right text-sm font-medium text-gray-700 dark:text-gray-300">{formatCurrencyCompact(v.revenue)}원</td>
                     <td className="py-2.5 text-right text-sm font-semibold text-amber-500">{v.rating}</td>
                   </tr>
                 ))}

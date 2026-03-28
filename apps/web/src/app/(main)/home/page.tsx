@@ -114,7 +114,7 @@ export default function HomePage() {
                         <span className="text-2xs text-gray-500">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{m.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{m.title}</p>
                         <p className="text-xs text-gray-500">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
                       </div>
                       <span className={`shrink-0 text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-red-500' : 'text-gray-500'}`}>
@@ -370,7 +370,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
         {/* 텍스트 */}
         <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
           <p className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
-            {match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
+            {match.title}
           </p>
           <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
             <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>

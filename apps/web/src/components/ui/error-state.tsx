@@ -19,7 +19,7 @@ export function ErrorState({ message = '앗, 잠시 문제가 생겼어요', onR
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">잠시 후 다시 시도해주세요</p>
       {onRetry && (
         <button onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] rounded-lg bg-gray-100 dark:bg-gray-700 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
           <RefreshCw size={12} />
           다시 불러오기
         </button>

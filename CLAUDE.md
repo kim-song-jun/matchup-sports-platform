@@ -35,31 +35,6 @@ cd apps/api && pnpm test       # 백엔드 (jest)
 npx playwright test            # E2E
 ```
 
-### 브라우저 E2E 테스트 (Preview 도구)
-```bash
-# 1. 환경 준비 (DB + API 필수)
-docker compose up -d                    # PostgreSQL + Redis
-pnpm --filter api exec prisma generate  # Prisma client 생성
-pnpm --filter api exec prisma db push   # 스키마 반영
-# 2. .claude/launch.json의 "web"(3003) + "api"(8100) 서버 사용
-```
-- **Preview 도구 패턴**: `preview_start("web")` → `preview_snapshot` (구조) → `preview_screenshot` (시각) → `preview_console_logs(level:"error")` (에러)
-- **페이지 이동**: 사이드바/Link 클릭(`preview_click`)으로 클라이언트 네비게이션 유지. `window.location.href`는 Zustand 스토어 리셋됨
-- **로그인**: devLogin(`축구왕민수` 버튼)으로 테스트 계정 사용. API 서버 필수
-- **인증 복원**: `auth-store.ts`에서 localStorage 토큰 기반 초기값 설정 + `providers.tsx`의 `AuthHydrator`가 `/auth/me`로 사용자 정보 복원
-- **검증 순서**: 로그인 → 네비게이션(사이드바/하단탭) → 핵심 페이지 → 퍼블릭 → 마이페이지 → 어드민 → 크로스커팅(다크모드/반응형/접근성)
-- **다크모드 테스트**: `preview_eval("document.documentElement.classList.toggle('dark')")`
-- **반응형 테스트**: `preview_resize(preset:"mobile"|"tablet"|"desktop")` 또는 `preview_resize(width:1280, height:800)`
-- **접근성 체크**: `preview_snapshot`으로 aria-label 존재 확인, `preview_inspect`로 터치 타겟 44px 검증
-
-## 인증 아키텍처
-- **스토어**: `stores/auth-store.ts` — Zustand, localStorage 토큰 존재 시 `isAuthenticated: true`로 초기화 (SSR-safe)
-- **복원**: `providers.tsx`의 `AuthHydrator` — 마운트 시 `/auth/me` 호출하여 실제 사용자 정보 채움
-- **토큰**: localStorage(`accessToken`/`refreshToken`) + cookie(`accessToken=1`, 미들웨어용)
-- **API 인터셉터**: `lib/api.ts` — 요청마다 `Authorization: Bearer` 자동 첨부
-- **가드**: 어드민 레이아웃은 `isAuthenticated` 체크 → 미인증 시 `/login` 리다이렉트
-- **주의**: `window.location.href` 하드 네비게이션은 Zustand 리셋 — Next.js `<Link>` 또는 `router.push` 사용할 것
-
 ## 코드 컨벤션
 - 한국어 사용자 대상이므로 UI 텍스트는 한국어
 - API 응답은 `{ status, data, timestamp }` 형태

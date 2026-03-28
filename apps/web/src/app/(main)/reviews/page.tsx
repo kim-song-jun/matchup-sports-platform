@@ -95,7 +95,7 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
           </div>
         </div>
         <button onClick={() => setExpanded(!expanded)}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          className="min-h-[44px] rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           {expanded ? '접기' : '평가하기'}
         </button>
       </div>

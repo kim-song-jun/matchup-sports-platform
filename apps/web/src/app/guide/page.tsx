@@ -203,8 +203,6 @@ export default function GuidePage() {
           </div>
         </div>
 
-        <div className="absolute top-20 -right-32 w-[500px] h-[500px] bg-blue-100/40 dark:bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-32 w-[400px] h-[400px] bg-blue-100/30 dark:bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
       </section>
 
       {/* ── Step-by-Step Tutorial ── */}

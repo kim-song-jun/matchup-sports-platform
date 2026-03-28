@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePayments } from '@/hooks/use-api';
 import { EmptyState } from '@/components/ui/empty-state';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount, formatFullDate } from '@/lib/utils';
 
 const tabs = [
   { id: 'all', label: '전체' },
@@ -91,14 +91,6 @@ const mockPayments = [
     createdAt: '2026-03-08T13:15:00',
   },
 ];
-
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
 
 export default function PaymentsPage() {
   const router = useRouter();
@@ -219,7 +211,7 @@ export default function PaymentsPage() {
                             {m.label}
                           </span>
                           <span aria-hidden="true">·</span>
-                          <span>{formatDate(p.createdAt)}</span>
+                          <span>{formatFullDate(p.createdAt)}</span>
                         </div>
                       </div>
                     </div>

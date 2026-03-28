@@ -113,7 +113,7 @@ export default function AdminMatchDetailPage() {
                   </div>
                 )}
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{match.title}</h2>
                   <span className="text-sm text-gray-400">{sportLabel[match.sportType]} · ID: {match.id?.slice(0, 8)}</span>
                 </div>
               </div>

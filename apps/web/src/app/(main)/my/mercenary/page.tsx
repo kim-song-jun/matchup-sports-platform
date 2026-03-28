@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { useMercenaryPosts } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
+import { formatCurrency } from '@/lib/utils';
 
 const mockMercenaryPosts = [
   {
@@ -37,10 +38,6 @@ const mockMercenaryPosts = [
     applicants: 4,
   },
 ];
-
-function formatCurrency(n: number) {
-  return n === 0 ? '무료' : new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export default function MyMercenaryPage() {
   const router = useRouter();

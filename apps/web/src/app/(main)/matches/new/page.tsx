@@ -199,7 +199,7 @@ export default function CreateMatchPage() {
               <div className="flex gap-2">
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
                   <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                     }`}>
                     {g.label}

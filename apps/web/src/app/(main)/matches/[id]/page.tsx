@@ -90,7 +90,7 @@ export default function MatchDetailPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
         <button
           onClick={async () => {
             try {
@@ -113,7 +113,7 @@ export default function MatchDetailPage() {
       <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</span>
+        <span className="text-gray-700">{match.title}</span>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
@@ -130,7 +130,7 @@ export default function MatchDetailPage() {
               <div>
                 <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>{sportLabel[match.sportType]}</span>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
-                  {match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
+                  {match.title}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
                   호스트: {match.host?.nickname}

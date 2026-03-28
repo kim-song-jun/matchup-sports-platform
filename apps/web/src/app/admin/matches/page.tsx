@@ -113,7 +113,7 @@ export default function AdminMatchesPage() {
                   </span>
                 </div>
                 <p className="text-md font-medium text-gray-900 dark:text-white truncate">
-                  {m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
+                  {m.title}
                 </p>
                 <div className="flex items-center gap-3 mt-1.5">
                   <span className="flex items-center gap-1 text-xs text-gray-400">

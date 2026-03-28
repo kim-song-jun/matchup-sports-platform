@@ -107,9 +107,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* 배경 장식 — 은은한 그라데이션 원 */}
-        <div className="absolute top-20 -right-32 w-[500px] h-[500px] bg-blue-100/40 dark:bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-32 w-[400px] h-[400px] bg-blue-100/30 dark:bg-blue-900/10 rounded-full blur-3xl pointer-events-none" />
       </section>
 
       {/* ── Stats ── */}

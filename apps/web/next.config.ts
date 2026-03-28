@@ -9,6 +9,12 @@ const isProd = process.env.NODE_ENV === 'production';
 const nextConfig: NextConfig = {
   // 프로덕션: standalone, Capacitor: export
   output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = { ...config.resolve.fallback, buffer: false };
+    }
+    return config;
+  },
   images: {
     unoptimized: isCapacitorBuild,
     remotePatterns: [

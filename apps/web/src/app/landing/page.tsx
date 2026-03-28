@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Target, Shield, Users, Zap, ChevronDown, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-import { CountUp } from '@/components/landing/count-up';
+
 import { LandingNav } from '@/components/landing/landing-nav';
 import { LandingFooter } from '@/components/landing/landing-footer';
 
@@ -116,7 +116,7 @@ export default function LandingPage() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/5 dark:shadow-black/20 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
               {STATS.map((stat) => (
                 <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
-                  <CountUp value={stat.value} className="text-2xl font-black text-gray-900 dark:text-white leading-none block" />
+                  <span className="text-2xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
                   <div className="text-xs text-gray-500 mt-2 font-medium">{stat.label}</div>
                 </div>
               ))}

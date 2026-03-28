@@ -10,19 +10,19 @@ import { LandingFooter } from '@/components/landing/landing-footer';
 
 const PROBLEMS = [
   {
-    emoji: '\uD83D\uDE25',
+    emoji: '😥',
     title: '실력 차이로 재미없는 경기',
     description:
       '초보자와 고수가 같은 경기에 섞이면 아무도 즐겁지 않습니다. 양쪽 모두 시간을 낭비한 기분이 들죠.',
   },
   {
-    emoji: '\uD83D\uDD0D',
+    emoji: '🔍',
     title: '상대 찾기의 어려움',
     description:
       '카톡방 돌리고, 동호회 카페 뒤지고, 결국 인원 안 맞아서 경기 취소. 운동보다 상대 찾기가 더 힘듭니다.',
   },
   {
-    emoji: '\uD83D\uDEAB',
+    emoji: '🚫',
     title: '노쇼와 신뢰 문제',
     description:
       '열심히 모은 인원인데 당일 연락 두절. 반복되는 노쇼에 경기 운영 자체가 무너집니다.',

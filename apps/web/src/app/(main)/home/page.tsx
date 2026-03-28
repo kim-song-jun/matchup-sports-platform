@@ -343,8 +343,8 @@ function SectionHeader({ title, count, href, showMore = true }: { title: string;
         {count !== undefined && count > 0 && <span className="text-xs text-gray-500">{count}</span>}
       </div>
       {showMore && (
-        <Link href={href} className="text-xs text-gray-500 hover:text-gray-600 transition-colors flex items-center min-h-[44px]">
-          더보기 <ChevronRight size={12} className="ml-0.5" />
+        <Link href={href} className="text-sm text-blue-500 hover:text-blue-600 font-medium transition-colors flex items-center min-h-[44px]">
+          더보기 <ChevronRight size={14} className="ml-0.5" />
         </Link>
       )}
     </div>

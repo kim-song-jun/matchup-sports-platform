@@ -30,7 +30,7 @@ export default function MatchDetailPage() {
   const joinMutation = useMutation({
     mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<unknown>,
     onSuccess: () => {
-      toast('success', '참가 완료! \u{1F389} 경기에서 만나요');
+      toast('success', '참가 완료! 경기에서 만나요');
       queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
     },
     onError: (err: unknown) => {

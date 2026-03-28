@@ -5,15 +5,15 @@ import { useRouter } from 'next/navigation';
 import { sportLabel } from '@/lib/constants';
 
 const sportOptions = [
-  { key: 'soccer', emoji: '\u26BD', label: '축구' },
-  { key: 'futsal', emoji: '\u{1F3C3}', label: '풋살' },
-  { key: 'basketball', emoji: '\u{1F3C0}', label: '농구' },
-  { key: 'badminton', emoji: '\u{1F3F8}', label: '배드민턴' },
-  { key: 'tennis', emoji: '\u{1F3BE}', label: '테니스' },
-  { key: 'ice_hockey', emoji: '\u{1F3D2}', label: '아이스하키' },
-  { key: 'swimming', emoji: '\u{1F3CA}', label: '수영' },
-  { key: 'baseball', emoji: '\u26BE', label: '야구' },
-  { key: 'volleyball', emoji: '\u{1F3D0}', label: '배구' },
+  { key: 'soccer', emoji: '⚽', label: '축구' },
+  { key: 'futsal', emoji: '🏃', label: '풋살' },
+  { key: 'basketball', emoji: '🏀', label: '농구' },
+  { key: 'badminton', emoji: '🏸', label: '배드민턴' },
+  { key: 'tennis', emoji: '🎾', label: '테니스' },
+  { key: 'ice_hockey', emoji: '🏒', label: '아이스하키' },
+  { key: 'swimming', emoji: '🏊', label: '수영' },
+  { key: 'baseball', emoji: '⚾', label: '야구' },
+  { key: 'volleyball', emoji: '🏐', label: '배구' },
 ] as const;
 
 const features = [

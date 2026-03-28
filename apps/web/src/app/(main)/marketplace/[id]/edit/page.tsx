@@ -85,20 +85,20 @@ export default function EditListingPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매물 수정</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">장터</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-200">매물 수정</span>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8 max-w-lg lg:max-w-[700px]">
+      <div className="px-5 @3xl:px-0 pb-8 max-w-lg @3xl:max-w-[700px]">
         {/* Title */}
         <div className="mb-5">
           <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>

@@ -58,9 +58,9 @@ export default function LessonDetailPage() {
   const isEnrolled = !!(lesson?.participants?.some((p) => p.userId === user?.id));
   const isFull = !!(lesson && lesson.currentParticipants >= lesson.maxParticipants);
 
-  if (isLoading) return <div role="status" aria-label="로딩 중" className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-2xl" /><div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-2xl" /></div></div>;
+  if (isLoading) return <div role="status" aria-label="로딩 중" className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-2xl" /><div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-2xl" /></div></div>;
   if (!lesson) return (
-    <div role="alert" className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+    <div role="alert" className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
       <EmptyState
         icon={GraduationCap}
         title="강좌를 찾을 수 없어요"
@@ -74,19 +74,19 @@ export default function LessonDetailPage() {
   const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" /></button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{lesson.title}</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/lessons" className="hover:text-gray-600">강좌</Link><ChevronRight size={14} /><span className="text-gray-700 dark:text-gray-300">{lesson.title}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
-        <div className="px-5 lg:px-0">
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
+        <div className="px-5 @3xl:px-0">
           {/* 커버 */}
-          <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 lg:h-56 flex items-center justify-center mb-4 overflow-hidden">
+          <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 @3xl:h-56 flex items-center justify-center mb-4 overflow-hidden">
             <div className="text-center text-white/80">
               {SportIcon && <SportIcon size={48} className="mx-auto mb-2 text-white/60" />}
               <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm">{typeLabel[lesson.type]}</span>
@@ -122,7 +122,7 @@ export default function LessonDetailPage() {
           )}
 
           {/* 일정 */}
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:gap-5">
+          <div className="mt-4 grid grid-cols-2 gap-3 @3xl:gap-5">
             <InfoCard icon={<Calendar size={18} />} label="일시" value={formatFullDate(lesson.lessonDate)} sub={`${lesson.startTime} ~ ${lesson.endTime}`} />
             <InfoCard icon={<MapPin size={18} />} label="장소" value={lesson.venueName || '장소 미정'} />
             <InfoCard icon={<Users size={18} />} label="인원" value={`${lesson.currentParticipants}/${lesson.maxParticipants}명`} sub={`${levelLabel[lesson.levelMin]}~${levelLabel[lesson.levelMax]}`} />
@@ -176,7 +176,7 @@ export default function LessonDetailPage() {
         </div>
 
         {/* Right CTA — sidebar-sticky로 전체 오른쪽 컬럼이 sticky */}
-        <div className="detail-sidebar px-5 lg:px-0 mt-4 lg:mt-0">
+        <div className="detail-sidebar px-5 @3xl:px-0 mt-4 @3xl:mt-0">
           <div className="sidebar-sticky space-y-3">
             <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <p className="text-2xl font-black text-gray-900 dark:text-white text-center mb-3">{formatCurrency(lesson.fee)}</p>

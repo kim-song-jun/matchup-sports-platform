@@ -36,7 +36,7 @@ export default function AdminDashboardPage() {
       {/* 빠른 이동 */}
       <section>
         <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">관리 메뉴</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-3">
           {[
             { label: '매치 관리', href: '/admin/matches', desc: '매치 상태 관리' },
             { label: '사용자 관리', href: '/admin/users', desc: '회원 조회·검색' },

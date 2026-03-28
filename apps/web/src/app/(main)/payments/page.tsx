@@ -123,20 +123,20 @@ export default function PaymentsPage() {
   });
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 dark:bg-gray-900">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
       </header>
-      <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
+      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
         <p className="text-sm text-gray-500 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
       </div>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {/* 기간 필터 */}
         <div className="flex items-center gap-2 mb-4">
           <input

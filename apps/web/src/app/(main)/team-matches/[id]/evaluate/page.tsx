@@ -67,7 +67,7 @@ export default function TeamMatchEvaluatePage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
@@ -78,7 +78,7 @@ export default function TeamMatchEvaluatePage() {
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">경기 평가</h1>
       </header>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {/* 안내 */}
         <div className="rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3.5 mb-6">
           <p className="text-base font-medium text-blue-700">상대팀에 대한 솔직한 평가를 남겨주세요</p>

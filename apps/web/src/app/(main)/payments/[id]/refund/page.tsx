@@ -86,7 +86,7 @@ export default function RefundRequestPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 pb-32">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
       {/* Success Toast */}
       {showSuccess && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
@@ -148,20 +148,20 @@ export default function RefundRequestPage() {
       )}
 
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">환불 요청</h1>
       </header>
-      <div className="hidden lg:block mb-6">
+      <div className="hidden @3xl:block mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-base text-gray-500 hover:text-gray-600 mb-2 transition-colors">
           <ArrowLeft size={16} /> 결제 상세
         </button>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">환불 요청</h2>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
+      <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
         {/* Payment Summary */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 정보</h3>
@@ -268,8 +268,8 @@ export default function RefundRequestPage() {
       </div>
 
       {/* Fixed Bottom CTA */}
-      <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] lg:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 lg:relative lg:border-0 lg:px-0 lg:mt-4 lg:pb-4 max-w-lg mx-auto lg:mx-0">
-        <div className="flex items-center justify-between mb-3 lg:hidden">
+      <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
+        <div className="flex items-center justify-between mb-3 @3xl:hidden">
           <span className="text-sm text-gray-500">환불 예상 금액</span>
           <span className={`text-xl font-bold ${refundInfo.color}`}>{formatAmount(refundAmount)}</span>
         </div>

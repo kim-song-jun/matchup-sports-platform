@@ -70,20 +70,20 @@ export default function EditTeamPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">팀 수정</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href={`/teams/${teamId}`} className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">팀 상세</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-200">팀 수정</span>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8 max-w-lg lg:max-w-[700px]">
+      <div className="px-5 @3xl:px-0 pb-8 max-w-lg @3xl:max-w-[700px]">
         {/* Team Name */}
         <div className="mb-5">
           <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 이름</label>

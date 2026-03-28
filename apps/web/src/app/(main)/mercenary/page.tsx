@@ -151,7 +151,7 @@ export default function MercenaryPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">용병 모집</h1>
           <Link href="/my/mercenary" className="text-sm text-gray-500 hover:text-gray-600 transition-colors">
@@ -168,7 +168,7 @@ export default function MercenaryPage() {
       </header>
 
       {/* 필터 칩 */}
-      <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button
             key={f.key}
@@ -184,12 +184,12 @@ export default function MercenaryPage() {
         ))}
       </div>
 
-      <div className="px-5 lg:px-0 mb-3">
+      <div className="px-5 @3xl:px-0 mb-3">
         <p className="text-sm text-gray-500">{filtered.length}개의 모집글</p>
       </div>
 
       {/* 모집글 리스트 */}
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {filtered.length === 0 ? (
           <EmptyState
             icon={Search}
@@ -198,7 +198,7 @@ export default function MercenaryPage() {
             action={{ label: '용병 모집하기', href: '/mercenary/new' }}
           />
         ) : (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {filtered.map((post) => {
               const isApplied = appliedIds.has(post.id);
 

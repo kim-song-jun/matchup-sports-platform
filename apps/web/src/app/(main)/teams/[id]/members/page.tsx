@@ -52,8 +52,8 @@ export default function TeamMembersPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center justify-between px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
             <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
@@ -68,7 +68,7 @@ export default function TeamMembersPage() {
           초대
         </button>
       </header>
-      <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
+      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">멤버 관리</h2>
           <p className="text-base text-gray-500 mt-1">팀 멤버 {members.length}명</p>
@@ -82,7 +82,7 @@ export default function TeamMembersPage() {
         </button>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8 space-y-2">
+      <div className="px-5 @3xl:px-0 pb-8 space-y-2">
         {members.map((member) => {
           const role = roleConfig[member.role] || roleConfig.member;
           return (

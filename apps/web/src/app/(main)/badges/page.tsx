@@ -165,11 +165,11 @@ export default function BadgesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] @3xl:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
@@ -177,7 +177,7 @@ export default function BadgesPage() {
       </header>
 
       {/* Summary */}
-      <div className="px-5 lg:px-0 mb-4">
+      <div className="px-5 @3xl:px-0 mb-4">
         <div className="rounded-xl bg-blue-500 p-5 text-white">
           <p className="text-sm text-blue-100">획득한 뱃지</p>
           <div className="flex items-end gap-1 mt-1">
@@ -201,7 +201,7 @@ export default function BadgesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="px-5 lg:px-0 mb-4 flex gap-2">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2">
         <button
           onClick={() => setActiveTab('my')}
           className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
@@ -225,7 +225,7 @@ export default function BadgesPage() {
       </div>
 
       {/* Badge grid */}
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         <div className="space-y-3 stagger-children">
           {displayBadges.map((badge, idx) => {
             const Icon = badge.icon;

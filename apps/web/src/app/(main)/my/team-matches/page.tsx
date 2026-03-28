@@ -69,7 +69,7 @@ export default function MyTeamMatchesPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
         <p className="text-md font-medium text-gray-700">로그인이 필요합니다</p>
         <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
       </div>
@@ -88,14 +88,14 @@ export default function MyTeamMatchesPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭 모집글</h1>
       </header>
-      <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
+      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭 모집글</h2>
           <p className="text-base text-gray-500 mt-1">팀 매칭 모집 현황을 관리하세요</p>
@@ -110,13 +110,13 @@ export default function MyTeamMatchesPage() {
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
+        <div className="mx-5 @3xl:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
           <Info size={16} className="text-gray-500 shrink-0" />
           <span className="text-sm text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
       )}
 
-      <div className="px-5 lg:px-0 space-y-3 pb-8">
+      <div className="px-5 @3xl:px-0 space-y-3 pb-8">
         {posts.length === 0 ? (
           <EmptyState
             icon={Swords}
@@ -190,7 +190,7 @@ export default function MyTeamMatchesPage() {
       <Link
         href="/team-matches/new"
         aria-label="모집글 작성"
-        className="lg:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-colors"
+        className="@3xl:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-colors"
       >
         <Plus size={24} />
       </Link>

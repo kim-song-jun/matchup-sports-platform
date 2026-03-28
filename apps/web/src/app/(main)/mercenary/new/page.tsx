@@ -96,7 +96,7 @@ export default function NewMercenaryPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">용병을 모집하려면</h2>
           <p className="text-sm text-gray-500 mt-2">로그인 후 용병 모집 글을 작성할 수 있어요</p>
@@ -123,7 +123,7 @@ export default function NewMercenaryPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="lg:hidden px-5 pt-4 pb-3 flex items-center gap-3">
+      <header className="@3xl:hidden px-5 pt-4 pb-3 flex items-center gap-3">
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
@@ -134,13 +134,13 @@ export default function NewMercenaryPage() {
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/mercenary" className="hover:text-gray-600 transition-colors">용병 모집</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">새 모집글</span>
       </div>
 
-      <div className="px-5 lg:px-0 lg:max-w-[700px]">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px]">
         <div className="space-y-5">
           {/* 팀 선택 */}
           <div>
@@ -292,7 +292,7 @@ export default function NewMercenaryPage() {
       </div>
 
       {/* Submit */}
-      <div className="px-5 lg:px-0 lg:max-w-[700px] mt-6 mb-8">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8">
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}

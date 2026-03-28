@@ -102,11 +102,11 @@ export default function ChatListPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="pt-[var(--safe-area-top)] lg:pt-0">
-        <header className="px-5 lg:px-0 pt-4 pb-3">
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+        <header className="px-5 @3xl:px-0 pt-4 pb-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
         </header>
-        <div className="px-5 lg:px-0">
+        <div className="px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-14 text-center">
             <p className="text-base text-gray-500">로그인 후 채팅을 이용할 수 있어요</p>
             <p className="text-xs text-gray-500 mt-1">팀 매칭이 성사되면 채팅방이 생성돼요</p>
@@ -161,7 +161,7 @@ export default function ChatListPage() {
   return (
     <>
       {/* ===== DESKTOP: 2-column layout ===== */}
-      <div className="hidden lg:grid lg:grid-cols-[380px_1fr] lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 bg-white">
+      <div className="hidden @3xl:grid @3xl:grid-cols-[380px_1fr] @3xl:h-[calc(100dvh-5rem)] @3xl:-my-10 @3xl:-mx-8 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 bg-white">
         {/* Left panel - Chat room list */}
         <div className="border-r border-gray-100 dark:border-gray-700 flex flex-col bg-white">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100">
@@ -199,7 +199,7 @@ export default function ChatListPage() {
       </div>
 
       {/* ===== MOBILE: Full-width list ===== */}
-      <div className="lg:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
+      <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
         <header className="px-5 pt-4 pb-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
           <p className="text-sm text-gray-500 mt-0.5">팀 매칭 대화</p>

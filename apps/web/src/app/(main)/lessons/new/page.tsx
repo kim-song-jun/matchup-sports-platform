@@ -98,7 +98,7 @@ export default function CreateLessonPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
         <p className="text-md font-medium text-gray-700">로그인 후 강좌를 등록할 수 있어요</p>
         <button
           onClick={() => router.push('/login')}
@@ -114,9 +114,9 @@ export default function CreateLessonPage() {
   const selectedType = lessonTypes.find((t) => t.value === form.type);
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           onClick={() => (step > 0 ? setStep(step - 1) : router.back())}
           aria-label="뒤로 가기"
@@ -128,7 +128,7 @@ export default function CreateLessonPage() {
       </header>
 
       {/* Progress */}
-      <div className="px-5 lg:px-0 mb-6">
+      <div className="px-5 @3xl:px-0 mb-6">
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
@@ -142,7 +142,7 @@ export default function CreateLessonPage() {
         </div>
       </div>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {/* Step 0: Sport type + Lesson type */}
         {step === 0 && (
           <div className="space-y-6 animate-fade-in">
@@ -403,7 +403,7 @@ export default function CreateLessonPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-5 lg:px-0 mt-6 mb-8">
+      <div className="px-5 @3xl:px-0 mt-6 mb-8">
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => canProceed() ? setStep(step + 1) : toast('error', '필수 항목을 입력해주세요')}

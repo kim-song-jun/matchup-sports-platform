@@ -32,7 +32,7 @@ export default function ListingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <div className="space-y-4 animate-pulse">
           <div className="h-64 bg-gray-100 rounded-xl" />
           <div className="h-24 bg-gray-100 rounded-xl" />
@@ -43,7 +43,7 @@ export default function ListingDetailPage() {
 
   if (!listing) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
           icon={ShoppingBag}
           title="매물을 찾을 수 없어요"
@@ -57,9 +57,9 @@ export default function ListingDetailPage() {
   const SportIcon = SportIconMap[listing.sportType];
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
+      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
         <div className="flex gap-1">
           <button
@@ -91,17 +91,17 @@ export default function ListingDetailPage() {
         </div>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600">장터</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300 truncate">{listing.title}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left: product info */}
-        <div className="px-5 lg:px-0">
+        <div className="px-5 @3xl:px-0">
           {/* Image placeholder */}
-          <div className="h-64 lg:h-80 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+          <div className="h-64 @3xl:h-80 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
             {SportIcon ? <SportIcon size={64} className="text-gray-300" /> : <div className="text-6xl text-gray-300">📦</div>}
           </div>
 
@@ -146,7 +146,7 @@ export default function ListingDetailPage() {
         </div>
 
         {/* Right: seller + CTA */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+        <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Seller */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">

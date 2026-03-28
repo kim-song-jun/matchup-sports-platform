@@ -110,7 +110,7 @@ export default function MyMatchesPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
         <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
         <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
       </div>
@@ -138,21 +138,21 @@ export default function MyMatchesPage() {
   const totalElo = participatedData.reduce((sum, m) => sum + m.eloChange, 0);
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
       </header>
-      <div className="hidden lg:block mb-2 px-5 lg:px-0 pt-4">
+      <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h2>
         <p className="text-base text-gray-500 mt-1">참가 기록과 내가 만든 매치를 확인하세요</p>
       </div>
 
       {/* Tabs */}
-      <div className="px-5 lg:px-0 pt-3 pb-1">
+      <div className="px-5 @3xl:px-0 pt-3 pb-1">
         <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1">
           {([
             { key: 'participated' as Tab, label: '참가 매치' },
@@ -174,7 +174,7 @@ export default function MyMatchesPage() {
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mt-3 mb-1 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
+        <div className="mx-5 @3xl:mx-0 mt-3 mb-1 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
           <Info size={16} className="text-gray-500 shrink-0" />
           <span className="text-sm text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
@@ -182,7 +182,7 @@ export default function MyMatchesPage() {
 
       {/* ── Tab: 참가 매치 ── */}
       {activeTab === 'participated' && (
-        <div className="px-5 lg:px-0 pb-8">
+        <div className="px-5 @3xl:px-0 pb-8">
           {/* Stats bar */}
           <div className="mt-3 mb-4 flex items-center gap-3">
             <div className="flex-1 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3 text-center">
@@ -268,7 +268,7 @@ export default function MyMatchesPage() {
 
       {/* ── Tab: 내가 만든 매치 ── */}
       {activeTab === 'created' && (
-        <div className="px-5 lg:px-0 space-y-3 pb-8 mt-3 stagger-children">
+        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3 stagger-children">
           {matches.length === 0 ? (
             <EmptyState
               icon={Calendar}

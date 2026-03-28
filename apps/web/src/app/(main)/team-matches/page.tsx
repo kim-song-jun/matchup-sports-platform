@@ -51,7 +51,7 @@ export default function TeamMatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 매칭</h1>
         <Link
           href="/team-matches/new"
@@ -63,7 +63,7 @@ export default function TeamMatchesPage() {
       </header>
 
       {/* 필터 칩 */}
-      <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button
             key={f.key}
@@ -80,7 +80,7 @@ export default function TeamMatchesPage() {
       </div>
 
       {/* 필터 행 */}
-      <div className="px-5 lg:px-0 mb-4 flex flex-wrap items-center gap-2">
+      <div className="px-5 @3xl:px-0 mb-4 flex flex-wrap items-center gap-2">
         <input
           type="date"
           value={dateFilter}
@@ -108,13 +108,13 @@ export default function TeamMatchesPage() {
       </div>
 
       {!isLoading && matches.length > 0 && (
-        <div className="px-5 lg:px-0 mb-3">
+        <div className="px-5 @3xl:px-0 mb-3">
           <p className="text-sm text-gray-500">{matches.length}개의 모집글</p>
         </div>
       )}
 
       {/* 모집글 리스트 */}
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -131,7 +131,7 @@ export default function TeamMatchesPage() {
             action={{ label: '모집글 작성', href: '/team-matches/new' }}
           />
         ) : (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {matches.map((match: TeamMatch) => {
               const statusMap: Record<string, { label: string; className: string }> = {
                 recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500' },

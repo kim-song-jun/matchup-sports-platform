@@ -13,15 +13,15 @@ export default function MainLayout({
       <div className="hidden lg:block">
         <Sidebar />
         <main className="pl-[260px] min-h-dvh">
-          <div className="max-w-[960px] mx-auto px-8 py-10">
+          <div className="@container max-w-[960px] mx-auto px-8 py-10">
             {children}
           </div>
         </main>
       </div>
 
-      {/* Mobile: bottom nav */}
+      {/* Mobile + Tablet: bottom nav */}
       <div className="lg:hidden">
-        <div className="mx-auto max-w-lg bg-white min-h-dvh shadow-[0_0_40px_rgba(0,0,0,0.04)]">
+        <div className="@container mx-auto max-w-3xl bg-white dark:bg-gray-900 min-h-dvh shadow-[0_0_40px_rgba(0,0,0,0.04)]">
           <main className="pb-safe">
             {children}
             <Footer />

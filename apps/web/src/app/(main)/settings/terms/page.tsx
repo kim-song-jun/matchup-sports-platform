@@ -2,10 +2,10 @@ import { TermsNavHeader } from './nav-header';
 
 export default function TermsPage() {
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <TermsNavHeader />
 
-      <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-8">
+      <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-8">
         <Section title="제1장 서비스 이용약관">
           <p>
             본 약관은 TeamMeet(이하 &quot;회사&quot;)이 제공하는 스포츠 매칭 플랫폼 서비스(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 규정합니다. 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있으며, 회사는 관련 법령에 따라 약관의 내용을 변경할 수 있습니다.

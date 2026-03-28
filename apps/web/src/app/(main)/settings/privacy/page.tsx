@@ -2,10 +2,10 @@ import { PrivacyNavHeader } from './nav-header';
 
 export default function PrivacyPage() {
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <PrivacyNavHeader />
 
-      <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-8">
+      <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-8">
         <Section title="1. 수집하는 정보">
           <p>
             TeamMeet(이하 &quot;회사&quot;)은 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다. 회원가입 시 필수적으로 수집하는 정보는 이메일 주소, 닉네임이며, 소셜 로그인(카카오, 네이버, Apple)을 통해 가입하는 경우 해당 플랫폼에서 제공하는 프로필 정보(이름, 이메일, 프로필 사진)가 수집됩니다.

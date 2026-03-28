@@ -25,12 +25,12 @@ export default function ProfilePage() {
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 dark:bg-gray-900">
-      <header className="px-5 lg:px-0 pt-4 pb-3">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">마이페이지</h1>
       </header>
 
-      <div className={`px-5 lg:px-0 ${isAuthenticated ? 'lg:grid lg:grid-cols-[1fr_340px] lg:gap-8' : 'max-w-[600px] mx-auto'}`}>
+      <div className={`px-5 @3xl:px-0 ${isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
         <div>
         {isAuthenticated && user ? (
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
@@ -105,22 +105,22 @@ export default function ProfilePage() {
           </div>
         )}
         {/* 다가오는 일정 — mobile only */}
-        <div className="lg:hidden">
+        <div className="@3xl:hidden">
           {isAuthenticated && <UpcomingSchedule />}
         </div>
         </div>
 
         {/* 다가오는 일정 — desktop only, appears as right column */}
-        <div className="hidden lg:block">
+        <div className="hidden @3xl:block">
           {isAuthenticated && <UpcomingSchedule />}
         </div>
       </div>
 
-      <div className="mt-5 h-2 bg-gray-50 dark:bg-gray-800 lg:hidden" />
+      <div className="mt-5 h-2 bg-gray-50 dark:bg-gray-800 @3xl:hidden" />
 
       {/* 소통 바로가기 */}
       {isAuthenticated && (
-        <div className="px-5 lg:px-0 pt-4 pb-2">
+        <div className="px-5 @3xl:px-0 pt-4 pb-2">
           <div className="grid grid-cols-2 gap-3">
             <Link href="/chat">
               <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.98] transition-colors min-h-[44px]">
@@ -152,7 +152,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="px-5 lg:px-0 py-2 lg:mt-4">
+      <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
         {[
           { label: '매치 히스토리', icon: History, href: '/matches', count: null },
           { label: '내가 만든 매치', icon: Swords, href: '/my/matches', count: null },
@@ -184,9 +184,9 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      <div className="h-2 bg-gray-50 dark:bg-gray-800 lg:hidden" />
+      <div className="h-2 bg-gray-50 dark:bg-gray-800 @3xl:hidden" />
 
-      <div className="px-5 lg:px-0 py-2">
+      <div className="px-5 @3xl:px-0 py-2">
         <Link href="/settings">
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">설정</span></div>
@@ -224,7 +224,7 @@ function UpcomingSchedule() {
   }));
 
   return (
-    <div className="mt-4 lg:mt-0 px-5 lg:px-0">
+    <div className="mt-4 @3xl:mt-0 px-5 @3xl:px-0">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">다가오는 일정</h3>
         <div className="flex items-center gap-1" role="tablist">

@@ -4,16 +4,16 @@ import { SettingsBackButton, ThemePicker, LogoutButton } from './settings-client
 
 export default function SettingsPage() {
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in dark:bg-gray-900">
-      <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in dark:bg-gray-900">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
         <SettingsBackButton />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
       </header>
-      <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
+      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl">
+      <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* 계정 */}
         <SettingsSection title="계정">
           <SettingsLink icon={User} label="프로필 수정" desc="닉네임, 프로필 사진 변경" href="/profile" />

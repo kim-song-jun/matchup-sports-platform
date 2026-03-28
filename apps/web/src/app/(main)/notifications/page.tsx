@@ -42,8 +42,8 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">알림</h1>
           {unreadCount > 0 && (
@@ -57,7 +57,7 @@ export default function NotificationsPage() {
         )}
       </header>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {!isAuthenticated ? (
           <EmptyState
             icon={Bell}

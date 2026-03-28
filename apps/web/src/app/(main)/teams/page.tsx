@@ -4,8 +4,8 @@ import { TeamList } from './team-list';
 
 export default function TeamsPage() {
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <header className="flex items-center justify-between px-5 @3xl:px-0 pt-4 pb-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀·클럽</h1>
           <p className="text-sm text-gray-500 mt-0.5">동호회와 팀을 찾아보세요</p>
@@ -16,7 +16,7 @@ export default function TeamsPage() {
         </Link>
       </header>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         <TeamList />
       </div>
     </div>

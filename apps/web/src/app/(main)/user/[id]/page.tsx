@@ -25,7 +25,7 @@ export default function UserProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <div className="space-y-4 animate-pulse">
           <div className="h-8 w-32 bg-gray-100 rounded-lg" />
           <div className="h-48 bg-gray-100 rounded-2xl" />
@@ -37,7 +37,7 @@ export default function UserProfilePage() {
 
   if (!user) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
           icon={User}
           title="사용자를 찾을 수 없어요"
@@ -52,9 +52,9 @@ export default function UserProfilePage() {
   const sportProfiles = user.sportProfiles ?? [];
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
@@ -62,15 +62,15 @@ export default function UserProfilePage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/home" className="hover:text-gray-600 transition-colors">홈</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{user.nickname} 프로필</span>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl">
+      <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* Profile header */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 lg:p-6 mb-3">
+        <div className="rounded-2xl bg-white border border-gray-100 p-5 @3xl:p-6 mb-3">
           <div className="flex items-center gap-4">
             <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-gray-100 text-3xl font-black text-blue-500">
               {user.nickname?.charAt(0)}

@@ -52,7 +52,7 @@ export default function AdminUserDetailPage() {
         <span className="text-gray-700 dark:text-gray-300">{user.nickname}</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_320px] gap-6">
         {/* Left column */}
         <div className="space-y-4">
           {/* Profile card */}

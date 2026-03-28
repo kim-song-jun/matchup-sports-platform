@@ -91,7 +91,7 @@ export default function AdminLessonDetailPage() {
         <span className="text-gray-700 dark:text-gray-300">강좌 상세</span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+      <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_360px] gap-6">
         {/* Left column */}
         <div className="space-y-4">
           {/* Lesson info card */}

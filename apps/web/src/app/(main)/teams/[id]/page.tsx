@@ -55,7 +55,7 @@ export default function TeamDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <div className="space-y-4 animate-pulse">
           <div className="h-8 w-32 bg-gray-100 rounded-lg" />
           <div className="h-48 bg-gray-100 rounded-xl" />
@@ -67,7 +67,7 @@ export default function TeamDetailPage() {
 
   if (!team) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
           icon={Users}
           title="팀을 찾을 수 없어요"
@@ -82,9 +82,9 @@ export default function TeamDetailPage() {
   const hasSns = team.instagramUrl || team.youtubeUrl || team.kakaoOpenChat || team.websiteUrl;
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
+      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-lg font-semibold text-gray-900 truncate flex-1 ml-3">{team.name}</h1>
         <button
@@ -105,19 +105,19 @@ export default function TeamDetailPage() {
         </button>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/teams" className="hover:text-gray-600">팀&middot;클럽</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{team.name}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left */}
-        <div className="px-5 lg:px-0">
+        <div className="px-5 @3xl:px-0">
           {/* Cover + Team header */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
-            <div className="h-32 lg:h-44 bg-gray-800 flex items-center justify-center relative">
+            <div className="h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center relative">
               {team.coverImageUrl ? (
                 <img src={team.coverImageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -188,7 +188,7 @@ export default function TeamDetailPage() {
           {/* 신뢰도 점수 */}
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">신뢰도</h3>
-            <div className="grid grid-cols-2 gap-3 lg:gap-5">
+            <div className="grid grid-cols-2 gap-3 @3xl:gap-5">
               <TrustItem
                 icon={<CheckCircle size={16} />}
                 label="정보 일치도"
@@ -277,7 +277,7 @@ export default function TeamDetailPage() {
           {/* 활동 정보 */}
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">활동 정보</h3>
-            <div className="grid grid-cols-2 gap-3 lg:gap-5">
+            <div className="grid grid-cols-2 gap-3 @3xl:gap-5">
               <InfoItem icon={<MapPin size={16} />} label="활동 지역" value={`${team.city || ''} ${team.district || ''}`} />
               <InfoItem icon={<Calendar size={16} />} label="정기 활동" value="매주 토요일" />
               <InfoItem icon={<Clock size={16} />} label="활동 시간" value="18:00 ~ 20:00" />
@@ -311,7 +311,7 @@ export default function TeamDetailPage() {
             <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">홍보 영상</h3>
               <a href={team.shortsUrl} target="_blank" rel="noopener noreferrer"
-                className="block rounded-xl bg-gray-900 h-48 lg:h-64 flex items-center justify-center text-white/60 hover:text-white/80 transition-colors relative overflow-hidden">
+                className="block rounded-xl bg-gray-900 h-48 @3xl:h-64 flex items-center justify-center text-white/60 hover:text-white/80 transition-colors relative overflow-hidden">
                 <div className="text-center z-10">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm mx-auto mb-2">
                     <Video size={24} />
@@ -338,7 +338,7 @@ export default function TeamDetailPage() {
         </div>
 
         {/* Right sidebar */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+        <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* 팀 참여 신청 */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">

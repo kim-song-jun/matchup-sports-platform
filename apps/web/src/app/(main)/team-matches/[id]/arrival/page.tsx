@@ -129,7 +129,7 @@ export default function ArrivalCheckPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
@@ -140,7 +140,7 @@ export default function ArrivalCheckPage() {
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">도착 인증</h1>
       </header>
 
-      <div className="px-5 lg:px-0 lg:max-w-2xl lg:mx-auto">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-2xl @3xl:mx-auto">
         {/* Match info header card */}
         <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <h2 className="text-md font-semibold text-gray-900 dark:text-white mb-3">{mockMatch.title}</h2>

@@ -93,14 +93,14 @@ export default function EditMatchPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={18} className="text-gray-600 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 수정</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-xs text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={12} />
         <Link href={`/matches/${matchId}`} className="hover:text-gray-600 transition-colors">매치 상세</Link>
@@ -108,7 +108,7 @@ export default function EditMatchPage() {
         <span className="text-gray-700 dark:text-gray-300">수정</span>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8 max-w-lg">
+      <div className="px-5 @3xl:px-0 pb-8 max-w-lg">
         {/* Sport Type */}
         <FormSection label="종목">
           <div className="flex flex-wrap gap-2">

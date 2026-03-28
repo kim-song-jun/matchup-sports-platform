@@ -69,7 +69,7 @@ export default function ReviewsReceivedPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
         <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
         <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
       </div>
@@ -83,19 +83,19 @@ export default function ReviewsReceivedPage() {
   }));
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h1>
       </header>
-      <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
+      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h2>
         <p className="text-base text-gray-500 dark:text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
       </div>
 
-      <div className="px-5 lg:px-0 pb-8">
+      <div className="px-5 @3xl:px-0 pb-8">
         {/* Summary */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <div className="flex items-center gap-6">

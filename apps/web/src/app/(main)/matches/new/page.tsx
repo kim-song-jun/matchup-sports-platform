@@ -78,7 +78,7 @@ export default function CreateMatchPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치를 만들어보세요</h2>
           <p className="text-sm text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
@@ -91,21 +91,21 @@ export default function CreateMatchPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3">
         <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={18} className="text-gray-600" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 만들기</h1>
       </header>
 
-      <div className="hidden lg:block mb-6">
+      <div className="hidden @3xl:block mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 만들기</h2>
       </div>
 
       {/* Step indicator */}
-      <div className="px-5 lg:px-0 py-3">
+      <div className="px-5 @3xl:px-0 py-3">
         <div className="flex items-center gap-1">
           {steps.map((_, i) => (
             <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`} />
@@ -114,7 +114,7 @@ export default function CreateMatchPage() {
         <p className="text-xs text-gray-500 mt-2">Step {step + 1}. {steps[step]}</p>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-lg">
+      <div className="px-5 @3xl:px-0 max-w-lg">
         {/* Step 0: Sport */}
         {step === 0 && (
           <div className="space-y-3 mt-2">
@@ -258,7 +258,7 @@ export default function CreateMatchPage() {
                 />
               </div>
             </Field>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-3">
               <Field label="날짜" id="match-date">
                 <input id="match-date" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} className="form-input" />
               </Field>

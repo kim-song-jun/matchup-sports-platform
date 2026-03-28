@@ -120,7 +120,7 @@ export default function NewTeamMatchPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">팀 매칭 모집글을 작성해보세요</h2>
           <p className="text-sm text-gray-500 mt-2">로그인하면 모집글을 작성하고 상대팀을 찾을 수 있어요</p>
@@ -135,21 +135,21 @@ export default function NewTeamMatchPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="lg:hidden px-5 pt-4 pb-3 flex items-center gap-3">
+      <header className="@3xl:hidden px-5 pt-4 pb-3 flex items-center gap-3">
         <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">모집글 작성</h1>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">모집글 작성</span>
       </div>
 
       {/* Progress */}
-      <div className="px-5 lg:px-0 lg:max-w-[700px] mb-6">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mb-6">
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
@@ -163,7 +163,7 @@ export default function NewTeamMatchPage() {
         </div>
       </div>
 
-      <div className="px-5 lg:px-0 lg:max-w-[700px]">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px]">
         {/* Step 0: 종목 */}
         {step === 0 && (
           <div className="space-y-5 animate-fade-in">
@@ -519,7 +519,7 @@ export default function NewTeamMatchPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-5 lg:px-0 lg:max-w-[700px] mt-6 mb-8">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8">
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => setStep(step + 1)}

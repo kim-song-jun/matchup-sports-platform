@@ -49,9 +49,9 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Header — mobile */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
@@ -63,7 +63,7 @@ export default function NotificationsPage() {
       </header>
 
       {/* Header — desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-sm text-gray-500">
+      <div className="hidden @3xl:flex items-center gap-2 mb-6 text-sm text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600 dark:hover:text-gray-300">
           설정
         </button>
@@ -71,7 +71,7 @@ export default function NotificationsPage() {
         <span className="text-gray-900 dark:text-gray-50 font-medium">알림 설정</span>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl lg:max-w-[600px] py-6 space-y-5">
+      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] py-6 space-y-5">
         {/* ── 마스터 토글 ── */}
         <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">

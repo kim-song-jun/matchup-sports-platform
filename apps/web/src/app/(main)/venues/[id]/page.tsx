@@ -142,9 +142,9 @@ export default function VenueDetailPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in dark:bg-gray-900">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in dark:bg-gray-900">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50">
+      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
@@ -155,15 +155,15 @@ export default function VenueDetailPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/venues" className="hover:text-gray-600 transition-colors">시설 찾기</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{venue.name}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left: Venue info */}
-        <div className="px-5 lg:px-0">
+        <div className="px-5 @3xl:px-0">
           {/* Map Placeholder */}
           <div className="mb-4">
             <MapPlaceholder
@@ -360,7 +360,7 @@ export default function VenueDetailPage() {
         </div>
 
         {/* Right sidebar */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+        <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Upcoming team matches at this venue */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">

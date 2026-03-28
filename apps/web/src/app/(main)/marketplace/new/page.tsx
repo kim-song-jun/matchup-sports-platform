@@ -63,7 +63,7 @@ export default function CreateListingPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
           <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
@@ -79,9 +79,9 @@ export default function CreateListingPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
@@ -89,13 +89,13 @@ export default function CreateListingPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600 transition-colors">장터</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">매물 등록</span>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl">
+      <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* 사진 추가 영역 */}
         <div className="mb-6">
           <label className="block text-sm font-semibold text-gray-700 mb-2">

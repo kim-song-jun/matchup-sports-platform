@@ -44,7 +44,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="pt-[var(--safe-area-top)]">
-      <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
+      <header className="flex items-center justify-between px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">장터</h1>
         <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-gray-700 transition-colors">
           <Plus size={14} strokeWidth={2.5} />
@@ -53,7 +53,7 @@ export default function MarketplacePage() {
       </header>
 
       {/* 검색 바 */}
-      <div className="px-5 lg:px-0 mb-2">
+      <div className="px-5 @3xl:px-0 mb-2">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
           <input
@@ -67,7 +67,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* 카테고리 칩 */}
-      <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {categoryFilters.map((cat) => (
           <button
             key={cat.label}
@@ -84,7 +84,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* 리스트 */}
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2].map(i => (
@@ -100,7 +100,7 @@ export default function MarketplacePage() {
             description="필요 없는 장비, 새 주인을 찾아주세요"
           />
         ) : (
-          <div className="space-y-3 stagger-children">
+          <div className="space-y-3 @3xl:grid @3xl:grid-cols-2 @3xl:gap-3 @3xl:space-y-0 stagger-children">
             {listings.map((item: MarketplaceListing) => (
                 <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex gap-3.5">

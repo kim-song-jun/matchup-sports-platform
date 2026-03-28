@@ -96,15 +96,15 @@ export default function PaymentDetailPage() {
   ];
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 pb-8">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-8">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제 상세</h1>
       </header>
-      <div className="hidden lg:block mb-6">
+      <div className="hidden @3xl:block mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <Link href="/payments" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">결제 내역</Link>
           <ChevronRight size={14} />
@@ -113,7 +113,7 @@ export default function PaymentDetailPage() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제 상세</h2>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
+      <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
         {/* Status Banner */}
         <div className={`rounded-2xl ${status.bgColor} p-5 flex items-center gap-4`}>
           <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${status.color}`}>

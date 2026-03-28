@@ -79,7 +79,7 @@ export default function ScoreInputPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
@@ -90,7 +90,7 @@ export default function ScoreInputPage() {
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">스코어 입력</h1>
       </header>
 
-      <div className="px-5 lg:px-0 lg:max-w-2xl lg:mx-auto">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-2xl @3xl:mx-auto">
         {/* Match header with team names */}
         <div className="rounded-xl bg-gray-900 p-5 mb-4">
           <div className="flex items-center justify-between">

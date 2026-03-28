@@ -58,8 +58,8 @@ export default function VenuesPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">시설 찾기</h1>
           <p className="text-sm text-gray-500 mt-0.5">내 주변 스포츠 시설을 찾아보세요</p>
@@ -70,7 +70,7 @@ export default function VenuesPage() {
         </button>
       </header>
 
-      <div className="px-5 lg:px-0 mb-3">
+      <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
           <input type="text" placeholder="시설명, 지역 검색" value={searchQuery}
@@ -79,7 +79,7 @@ export default function VenuesPage() {
         </div>
       </div>
 
-      <div className="px-5 lg:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveSport(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -90,7 +90,7 @@ export default function VenuesPage() {
         ))}
       </div>
 
-      <div className="px-5 lg:px-0 mb-4 flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
         {cities.map((c) => (
           <button key={c} onClick={() => setActiveCity(c === '전체' ? '' : c)}
             className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -103,9 +103,9 @@ export default function VenuesPage() {
         ))}
       </div>
 
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : error ? (
@@ -118,7 +118,7 @@ export default function VenuesPage() {
             size="sm"
           />
         ) : (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {venues.map((venue: Venue) => {
               const primarySport = venue.sportTypes?.[0] || 'soccer';
               return (

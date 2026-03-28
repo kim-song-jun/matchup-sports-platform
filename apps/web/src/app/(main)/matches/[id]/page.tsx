@@ -53,7 +53,7 @@ export default function MatchDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <div className="space-y-4 animate-pulse">
           <div className="h-8 w-32 bg-gray-100 rounded-lg" />
           <div className="h-48 bg-gray-100 rounded-2xl" />
@@ -65,7 +65,7 @@ export default function MatchDetailPage() {
 
   if (!match) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
           icon={Trophy}
           title="매치를 찾을 수 없어요"
@@ -84,9 +84,9 @@ export default function MatchDetailPage() {
   const isFull = match.currentPlayers >= match.maxPlayers;
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
@@ -110,17 +110,17 @@ export default function MatchDetailPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">{match.title}</span>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left: match info */}
-        <div className="px-5 lg:px-0">
+        <div className="px-5 @3xl:px-0">
           {/* Title card */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 lg:p-6">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 @3xl:p-6">
             <div className="flex items-start gap-3">
               {SportIcon && (
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
@@ -146,7 +146,7 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Info grid */}
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:gap-5">
+          <div className="mt-4 grid grid-cols-2 gap-3 @3xl:gap-5">
             <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
             <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
             <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={isAlmostFull ? '마감 임박' : '모집중'} highlight={isAlmostFull} />
@@ -177,7 +177,7 @@ export default function MatchDetailPage() {
         </div>
 
         {/* Right sidebar: participants + action */}
-        <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
+        <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Action button */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">

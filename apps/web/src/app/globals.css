@@ -206,15 +206,13 @@ button:not(:disabled):active, a:active {
 /* Container query */
 .@container { container-type: inline-size; }
 
-/* Sticky sidebar wrapper — sticky 적용은 내부 div에 */
-.detail-sidebar {
-  position: relative;
-}
-@media (min-width: 1024px) {
+/* Sticky sidebar — container query based */
+.detail-sidebar { position: relative; }
+@container (min-width: 48rem) {
   .detail-sidebar > .sidebar-sticky {
     position: sticky;
-    top: 1.5rem;
-    max-height: calc(100dvh - 3rem);
+    top: 1rem;
+    max-height: calc(100dvh - 2rem);
     overflow-y: auto;
   }
   .detail-sidebar > .sidebar-sticky::-webkit-scrollbar { display: none; }

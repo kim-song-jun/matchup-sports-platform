@@ -46,7 +46,7 @@ export function TeamList() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
+      <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
         {[1, 2].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
       </div>
     );
@@ -67,7 +67,7 @@ export function TeamList() {
   }
 
   return (
-    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+    <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
       {teams.map((team: SportTeam) => (
         <TeamCard key={team.id} team={team} />
       ))}

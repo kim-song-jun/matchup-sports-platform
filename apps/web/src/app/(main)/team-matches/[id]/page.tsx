@@ -45,10 +45,10 @@ export default function TeamMatchDetailPage() {
   if (isLoading) {
     return (
       <div className="pt-[var(--safe-area-top)]">
-        <div className="px-5 lg:px-0 pt-4">
+        <div className="px-5 @3xl:px-0 pt-4">
           <div className="h-6 w-32 animate-pulse rounded-lg bg-gray-100" />
         </div>
-        <div className="px-5 lg:px-0 mt-6 space-y-4">
+        <div className="px-5 @3xl:px-0 mt-6 space-y-4">
           <div className="h-[200px] animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
           <div className="h-[300px] animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
         </div>
@@ -58,7 +58,7 @@ export default function TeamMatchDetailPage() {
 
   if (!match) {
     return (
-      <div className="pt-[var(--safe-area-top)] px-5 lg:px-0">
+      <div className="pt-[var(--safe-area-top)] px-5 @3xl:px-0">
         <EmptyState
           icon={AlertCircle}
           title="모집글을 찾을 수 없어요"
@@ -103,15 +103,15 @@ export default function TeamMatchDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6 px-5 lg:px-0 pt-4">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6 px-5 @3xl:px-0 pt-4">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">상세</span>
       </div>
 
       {/* Header */}
-      <header className="px-5 lg:px-0 lg:pt-0 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="lg:hidden flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+      <header className="px-5 @3xl:px-0 @3xl:pt-0 pt-4 pb-3 flex items-center gap-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="@3xl:hidden flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
@@ -120,8 +120,8 @@ export default function TeamMatchDetailPage() {
         </span>
       </header>
 
-      <div className="px-5 lg:px-0">
-        <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
+      <div className="px-5 @3xl:px-0">
+        <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
           {/* 왼쪽: 경기 정보 */}
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
@@ -212,7 +212,7 @@ export default function TeamMatchDetailPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 lg:gap-5">
+              <div className="grid grid-cols-2 gap-3 @3xl:gap-5">
                 <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">실력등급</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
@@ -325,7 +325,7 @@ export default function TeamMatchDetailPage() {
           </div>
 
           {/* 오른쪽: CTA + 신청 목록 */}
-          <div className="mt-4 lg:mt-0 detail-sidebar">
+          <div className="mt-4 @3xl:mt-0 detail-sidebar">
             <div className="sidebar-sticky space-y-3">
             {/* CTA 버튼 영역 */}
             <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-3">
@@ -449,9 +449,9 @@ export default function TeamMatchDetailPage() {
 
       {/* 신청 모달 */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end @3xl:items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowApplyModal(false)} />
-          <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-t-2xl lg:rounded-2xl p-6 pb-[calc(1.5rem+var(--safe-area-bottom))] animate-fade-in">
+          <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-t-2xl @3xl:rounded-2xl p-6 pb-[calc(1.5rem+var(--safe-area-bottom))] animate-fade-in">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">경기 신청</h3>
 
             <label className="flex items-start gap-3 rounded-xl bg-gray-50 dark:bg-gray-700 p-4 mb-4 cursor-pointer">

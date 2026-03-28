@@ -98,12 +98,12 @@ export default function MatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)]">
-      <header className="px-5 lg:px-0 pt-4 pb-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 찾기</h1>
       </header>
 
       {/* 검색바 */}
-      <div className="px-5 lg:px-0 mb-3">
+      <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
@@ -119,7 +119,7 @@ export default function MatchesPage() {
       </div>
 
       {/* 필터 칩 */}
-      <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveSport(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -134,7 +134,7 @@ export default function MatchesPage() {
 
       {/* 상세 필터 */}
       {showFilters && (
-        <div className="px-5 lg:px-0 mb-4">
+        <div className="px-5 @3xl:px-0 mb-4">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1.5 block">날짜</label>
@@ -157,15 +157,15 @@ export default function MatchesPage() {
       )}
 
       {!isLoading && matches.length > 0 && (
-        <div className="px-5 lg:px-0 mb-3">
+        <div className="px-5 @3xl:px-0 mb-3">
           <p className="text-sm text-gray-500">{matches.length}개의 매치</p>
         </div>
       )}
 
       {/* 매치 리스트 */}
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3].map(i => (
               <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />
             ))}
@@ -180,7 +180,7 @@ export default function MatchesPage() {
             action={{ label: '용병 모집 보기', href: '/mercenary' }}
           />
         ) : (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {matches.map((match: Match) => (
               <MatchCard key={match.id} match={match} />
             ))}

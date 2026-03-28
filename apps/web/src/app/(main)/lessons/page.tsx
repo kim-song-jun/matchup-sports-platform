@@ -74,8 +74,8 @@ export default function LessonsPage() {
   }, [allLessons, debouncedSearch]);
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0">
-      <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">강좌</h1>
           <p className="text-sm text-gray-500 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
@@ -88,7 +88,7 @@ export default function LessonsPage() {
       </header>
 
       {/* 검색 */}
-      <div className="px-5 lg:px-0 mb-3">
+      <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
           <input type="text" placeholder="강좌명, 코치, 장소 검색" value={searchQuery}
@@ -98,7 +98,7 @@ export default function LessonsPage() {
       </div>
 
       {/* 필터 칩 */}
-      <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {typeFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveType(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -112,9 +112,9 @@ export default function LessonsPage() {
       </div>
 
       {/* 리스트 */}
-      <div className="px-5 lg:px-0">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3].map(i => (
               <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />
             ))}
@@ -128,7 +128,7 @@ export default function LessonsPage() {
             description="곧 다양한 강좌가 올라올 거예요!"
           />
         ) : (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {lessons.map((lesson: Lesson) => (
               <LessonCard key={lesson.id} lesson={lesson} />
             ))}

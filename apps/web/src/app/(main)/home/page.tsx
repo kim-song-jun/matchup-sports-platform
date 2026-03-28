@@ -69,7 +69,7 @@ export default function HomePage() {
     <div className="pt-[var(--safe-area-top)]">
 
       {/* ═══ ZONE 1: 헤더 + 일정 (개인화 영역) ═══ */}
-      <section className="px-5 lg:px-0 pt-4 pb-1">
+      <section className="px-5 @3xl:px-0 pt-4 pb-1">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
@@ -97,7 +97,7 @@ export default function HomePage() {
 
       {/* 다가오는 일정 — 컴팩트 리스트 (이미지 없음, 긴급성 강조) */}
       {isAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
-        <section className="mt-3 px-5 lg:px-0">
+        <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-bold text-gray-900 dark:text-white">다가오는 일정</h2>
@@ -148,7 +148,7 @@ export default function HomePage() {
 
       {/* 비로그인 가치 제안 */}
       {!isAuthenticated && (
-        <section className="mt-3 px-5 lg:px-0">
+        <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-900 dark:bg-gray-800 p-5">
             <p className="text-lg font-bold text-white">AI가 딱 맞는 상대를 찾아줘요</p>
             <p className="text-xs text-gray-500 mt-1">실력에 맞는 상대, 5분이면 매칭 완료</p>
@@ -161,7 +161,7 @@ export default function HomePage() {
 
       {/* 배너 (로그인 유저) */}
       {isAuthenticated && (
-        <section className="mt-4 px-5 lg:px-0">
+        <section className="mt-4 px-5 @3xl:px-0">
           <div className="relative rounded-xl overflow-hidden h-[96px]" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
             {/* Crossfade layers */}
             {banners.map((banner, i) => {
@@ -199,7 +199,7 @@ export default function HomePage() {
       )}
 
       {/* ═══ ZONE 2: 매치 탐색 (핵심 기능) ═══ */}
-      <section className="mt-6 px-5 lg:px-0">
+      <section className="mt-6 px-5 @3xl:px-0">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
             <button key={type} onClick={() => handleSportClick(type)}
@@ -214,14 +214,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mt-3 px-5 lg:px-0">
+      <section className="mt-3 px-5 @3xl:px-0">
         <SectionHeader
           title={activeSport === 'all' ? '추천 매치' : `${sportLabel[activeSport]} 매치`}
           count={filteredMatches.length}
           href={activeSport === 'all' ? '/matches' : `/matches?sport=${activeSport}`}
         />
         {isLoading ? (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1,2,3].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : filteredMatches.length === 0 ? (
@@ -233,7 +233,7 @@ export default function HomePage() {
             secondaryAction={activeSport !== 'all' ? { label: '전체 보기', onClick: () => setActiveSport('all') } : undefined}
           />
         ) : (
-          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {filteredMatches.slice(0, 6).map((m: Match) => <MatchCard key={m.id} match={m} />)}
           </div>
         )}
@@ -243,13 +243,13 @@ export default function HomePage() {
       <div className="mt-8 bg-gray-50/50 dark:bg-gray-800/20 py-6">
         {/* 팀 — 텍스트 카드 */}
         {teams.length > 0 && (
-          <section className="px-5 lg:px-0">
+          <section className="px-5 @3xl:px-0">
             <SectionHeader title="활동 중인 팀" href="/teams" showMore={teams.length > 3} />
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
               {teams.map((t: SportTeam) => {
                 const accent = sportCardAccent[t.sportType];
                 return (
-                  <Link key={t.id} href={`/teams/${t.id}`} className="shrink-0 w-[200px] lg:w-auto">
+                  <Link key={t.id} href={`/teams/${t.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
@@ -275,13 +275,13 @@ export default function HomePage() {
 
         {/* 강좌 — 텍스트 카드 */}
         {lessons.length > 0 && (
-          <section className="mt-6 px-5 lg:px-0">
+          <section className="mt-6 px-5 @3xl:px-0">
             <SectionHeader title="추천 강좌" href="/lessons" showMore={lessons.length > 3} />
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
               {lessons.map((l: Lesson) => {
                 const accent = sportCardAccent[l.sportType];
                 return (
-                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] lg:w-auto">
+                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>
@@ -306,9 +306,9 @@ export default function HomePage() {
 
         {/* 장터 — 이미지 그리드 (상품은 이미지가 핵심) */}
         {listings.length > 0 && (
-          <section className="mt-6 px-5 lg:px-0">
+          <section className="mt-6 px-5 @3xl:px-0">
             <SectionHeader title="최신 장터" href="/marketplace" showMore={listings.length > 3} />
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-3">
+            <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-3 @5xl:grid-cols-4 @3xl:gap-3">
               {listings.map((item: MarketplaceListing) => (
                 <Link key={item.id} href={`/marketplace/${item.id}`}>
                   <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">

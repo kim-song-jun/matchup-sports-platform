@@ -16,21 +16,21 @@ export default function AccountPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-sm text-gray-500">
+      <div className="hidden @3xl:flex items-center gap-2 mb-6 text-sm text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600 dark:hover:text-gray-400">설정</button>
         <ChevronRight size={14} />
         <span className="text-gray-900 dark:text-white font-medium">개인정보 관리</span>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-6">
+      <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-6">
         {/* 닉네임 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>

@@ -131,7 +131,7 @@ export default function EditLessonPage() {
 
   if (isLoading) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <div className="space-y-4 animate-pulse">
           <div className="h-10 bg-gray-100 dark:bg-gray-700 rounded-xl" />
           <div className="h-48 bg-gray-100 dark:bg-gray-700 rounded-xl" />
@@ -143,7 +143,7 @@ export default function EditLessonPage() {
 
   if (!lesson) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
           icon={GraduationCap}
           title="강좌를 찾을 수 없어요"
@@ -158,9 +158,9 @@ export default function EditLessonPage() {
   const selectClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
 
   return (
-    <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
@@ -168,7 +168,7 @@ export default function EditLessonPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/lessons" className="hover:text-gray-600">강좌</Link>
         <ChevronRight size={14} />
         <Link href={`/lessons/${lessonId}`} className="hover:text-gray-600">{lesson.title}</Link>
@@ -176,7 +176,7 @@ export default function EditLessonPage() {
         <span className="text-gray-700 dark:text-gray-200">수정</span>
       </div>
 
-      <div className="px-5 lg:px-0 max-w-2xl">
+      <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* 종목 선택 */}
         <section className="mb-6">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">종목 선택</label>

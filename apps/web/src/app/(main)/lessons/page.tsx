@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Plus, Search, GraduationCap } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useLessons } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
@@ -13,11 +14,11 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Lesson } from '@/types/api';
 
-const typeFilters = [
-  { key: '', label: '전체' },
-  { key: 'group_lesson', label: '그룹 레슨' },
-  { key: 'practice_match', label: '연습 경기' },
-  { key: 'free_practice', label: '자유 연습' },
+const typeFilterKeys = [
+  { key: '', labelKey: 'typeAll' as const },
+  { key: 'group_lesson', labelKey: 'typeGroupLesson' as const },
+  { key: 'practice_match', labelKey: 'typePracticeMatch' as const },
+  { key: 'free_practice', labelKey: 'typeFreePractice' as const },
 ];
 
 const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }) {
@@ -54,6 +55,8 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
 });
 
 export default function LessonsPage() {
+  const t = useTranslations('lessons');
+  const te = useTranslations('empty');
   const [activeType, setActiveType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -77,13 +80,13 @@ export default function LessonsPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">강좌</h1>
-          <p className="text-sm text-gray-500 mt-0.5">레슨, 연습경기, 자유연습을 찾아보세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('subtitle')}</p>
         </div>
         <Link href="/lessons/new"
           className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
           <Plus size={14} strokeWidth={2.5} />
-          강좌 만들기
+          {t('createLesson')}
         </Link>
       </header>
 
@@ -91,7 +94,7 @@ export default function LessonsPage() {
       <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-          <input type="text" placeholder="강좌명, 코치, 장소 검색" value={searchQuery}
+          <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-colors" />
         </div>
@@ -99,14 +102,14 @@ export default function LessonsPage() {
 
       {/* 필터 칩 */}
       <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {typeFilters.map((f) => (
+        {typeFilterKeys.map((f) => (
           <button key={f.key} onClick={() => setActiveType(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeType === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}>
-            {f.label}
+            {t(f.labelKey)}
           </button>
         ))}
       </div>
@@ -124,9 +127,9 @@ export default function LessonsPage() {
         ) : lessons.length === 0 ? (
           <EmptyState
             icon={GraduationCap}
-            title="아직 강좌가 없어요"
-            description="강좌를 직접 만들어보거나 다른 종목을 찾아보세요"
-            action={{ label: '강좌 만들기', href: '/lessons/new' }}
+            title={te('noLessons')}
+            description={te('noLessonsDesc')}
+            action={{ label: t('createLesson'), href: '/lessons/new' }}
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">

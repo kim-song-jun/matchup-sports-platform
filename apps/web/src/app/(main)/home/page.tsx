@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ChevronRight, Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users } from 'lucide-react';
@@ -28,6 +29,10 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 export default function HomePage() {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const t = useTranslations('home');
+  const te = useTranslations('empty');
+  const ts = useTranslations('sports');
+  const tc = useTranslations('common');
   const { data: matchData, isLoading } = useMatches();
   const { data: teamData } = useTeams();
   const { data: lessonData } = useLessons();
@@ -73,23 +78,23 @@ export default function HomePage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              {isAuthenticated && user ? `${user.nickname}님` : 'TeamMeet'}
+              {isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'TeamMeet'}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {isAuthenticated
-                ? upcoming.length > 0 ? `다가오는 일정 ${upcoming.length}개` : '오늘 매치를 찾아보세요'
-                : '같이 운동할 사람을 찾아보세요'
+                ? upcoming.length > 0 ? `${t('upcomingSchedule')} ${t('upcomingCount', { count: upcoming.length })}` : t('findMatchToday')
+                : t('findPartner')
               }
             </p>
           </div>
           {isAuthenticated ? (
             <Link href="/matches/new" className="flex items-center gap-1 rounded-xl bg-blue-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
               <Plus size={14} strokeWidth={2.5} />
-              매치 만들기
+              {t('createMatch')}
             </Link>
           ) : (
             <Link href="/login" className="rounded-xl bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
-              로그인
+              {tc('login')}
             </Link>
           )}
         </div>
@@ -100,8 +105,8 @@ export default function HomePage() {
         <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white">다가오는 일정</h2>
-              <Link href="/my/matches" className="text-xs text-gray-500 min-h-[44px] flex items-center">전체 →</Link>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h2>
+              <Link href="/my/matches" className="text-xs text-gray-500 min-h-[44px] flex items-center">{t('viewAll')}</Link>
             </div>
             <div className="space-y-2">
               {upcoming.map((m: Match) => {
@@ -135,7 +140,7 @@ export default function HomePage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{tm.title}</p>
-                        <p className="text-xs text-gray-500">{tm.startTime} · 팀 매치</p>
+                        <p className="text-xs text-gray-500">{tm.startTime} · {t('teamMatch')}</p>
                       </div>
                     </div>
                   </Link>
@@ -150,10 +155,10 @@ export default function HomePage() {
       {!isAuthenticated && (
         <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-900 dark:bg-gray-800 p-5">
-            <p className="text-lg font-bold text-white">AI가 딱 맞는 상대를 찾아줘요</p>
-            <p className="text-xs text-gray-500 mt-1">실력에 맞는 상대, 5분이면 매칭 완료</p>
+            <p className="text-lg font-bold text-white">{t('aiMatchIntro')}</p>
+            <p className="text-xs text-gray-500 mt-1">{t('valueProposition')}</p>
             <Link href="/login" className="inline-flex items-center gap-1 mt-3 rounded-lg bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600 transition-colors">
-              시작하기 <ArrowRight size={14} />
+              {t('getStarted')} <ArrowRight size={14} />
             </Link>
           </div>
         </section>
@@ -208,7 +213,7 @@ export default function HomePage() {
                   ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
                   : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}>
-              {type === 'all' ? '전체' : sportLabel[type]}
+              {type === 'all' ? ts('all') : sportLabel[type]}
             </button>
           ))}
         </div>
@@ -216,9 +221,10 @@ export default function HomePage() {
 
       <section className="mt-3 px-5 @3xl:px-0">
         <SectionHeader
-          title={activeSport === 'all' ? '추천 매치' : `${sportLabel[activeSport]} 매치`}
+          title={activeSport === 'all' ? t('recommendedMatches') : `${sportLabel[activeSport]} ${tc('matches')}`}
           count={filteredMatches.length}
           href={activeSport === 'all' ? '/matches' : `/matches?sport=${activeSport}`}
+          moreLabel={t('viewMore')}
         />
         {isLoading ? (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
@@ -227,10 +233,10 @@ export default function HomePage() {
         ) : filteredMatches.length === 0 ? (
           <EmptyState
             icon={Calendar}
-            title="아직 매치가 없네요"
-            description="첫 매치를 만들어보는 건 어때요?"
+            title={te('noMatches')}
+            description={te('noMatchesDesc')}
             size="sm"
-            secondaryAction={activeSport !== 'all' ? { label: '전체 보기', onClick: () => setActiveSport('all') } : undefined}
+            secondaryAction={activeSport !== 'all' ? { label: t('viewAllMatches'), onClick: () => setActiveSport('all') } : undefined}
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
@@ -244,27 +250,27 @@ export default function HomePage() {
         {/* 팀 — 텍스트 카드 */}
         {teams.length > 0 && (
           <section className="px-5 @3xl:px-0">
-            <SectionHeader title="활동 중인 팀" href="/teams" showMore={teams.length > 3} />
+            <SectionHeader title={t('activeTeams')} href="/teams" showMore={teams.length > 3} moreLabel={t('viewMore')} />
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
-              {teams.map((t: SportTeam) => {
-                const accent = sportCardAccent[t.sportType];
+              {teams.map((team: SportTeam) => {
+                const accent = sportCardAccent[team.sportType];
                 return (
-                  <Link key={t.id} href={`/teams/${t.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
+                  <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`flex h-7 w-7 items-center justify-center rounded-full ${accent?.tint || 'bg-gray-100'} shrink-0`}>
-                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{t.name?.charAt(0)}</span>
+                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{team.name?.charAt(0)}</span>
                           </div>
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{t.name}</p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
                         </div>
-                        {t.isRecruiting && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 shrink-0 ml-1">모집중</span>}
+                        {team.isRecruiting && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 shrink-0 ml-1">{t('recruiting')}</span>}
                       </div>
                       <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
-                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[t.sportType]}</span>
-                        <span>{t.memberCount}명</span>
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[team.sportType]}</span>
+                        <span>{team.memberCount}{tc('people')}</span>
                       </p>
-                      {t.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.description}</p>}
+                      {team.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{team.description}</p>}
                     </div>
                   </Link>
                 );
@@ -276,7 +282,7 @@ export default function HomePage() {
         {/* 강좌 — 텍스트 카드 */}
         {lessons.length > 0 && (
           <section className="mt-6 px-5 @3xl:px-0">
-            <SectionHeader title="추천 강좌" href="/lessons" showMore={lessons.length > 3} />
+            <SectionHeader title={t('recommendedLessons')} href="/lessons" showMore={lessons.length > 3} moreLabel={t('viewMore')} />
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
               {lessons.map((l: Lesson) => {
                 const accent = sportCardAccent[l.sportType];
@@ -307,7 +313,7 @@ export default function HomePage() {
         {/* 장터 — 이미지 그리드 (상품은 이미지가 핵심) */}
         {listings.length > 0 && (
           <section className="mt-6 px-5 @3xl:px-0">
-            <SectionHeader title="최신 장터" href="/marketplace" showMore={listings.length > 3} />
+            <SectionHeader title={t('latestMarketplace')} href="/marketplace" showMore={listings.length > 3} moreLabel={t('viewMore')} />
             <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-3 @5xl:grid-cols-4 @3xl:gap-3">
               {listings.map((item: MarketplaceListing) => (
                 <Link key={item.id} href={`/marketplace/${item.id}`}>
@@ -335,7 +341,7 @@ export default function HomePage() {
 }
 
 
-function SectionHeader({ title, count, href, showMore = true }: { title: string; count?: number; href: string; showMore?: boolean }) {
+function SectionHeader({ title, count, href, showMore = true, moreLabel = '더보기' }: { title: string; count?: number; href: string; showMore?: boolean; moreLabel?: string }) {
   return (
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-baseline gap-2">
@@ -344,7 +350,7 @@ function SectionHeader({ title, count, href, showMore = true }: { title: string;
       </div>
       {showMore && (
         <Link href={href} className="text-sm text-blue-500 hover:text-blue-600 font-medium transition-colors flex items-center min-h-[44px]">
-          더보기 <ChevronRight size={14} className="ml-0.5" />
+          {moreLabel} <ChevronRight size={14} className="ml-0.5" />
         </Link>
       )}
     </div>

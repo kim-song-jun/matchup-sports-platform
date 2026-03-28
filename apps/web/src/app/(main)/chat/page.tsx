@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useChatStore } from '@/stores/chat-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -38,6 +39,8 @@ function ChatRoomItem({
   isActive?: boolean;
   onClick?: () => void;
 }) {
+  const t = useTranslations('chat');
+
   const inner = (
     <div
       className={`rounded-xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
@@ -73,7 +76,7 @@ function ChatRoomItem({
 
           <div className="flex items-center justify-between mt-1.5">
             <p className="text-sm text-gray-500 truncate flex-1 mr-2">
-              {room.lastMessage ?? '대화를 시작하세요'}
+              {room.lastMessage ?? t('startConversation')}
             </p>
             {room.unreadCount > 0 && (
               <span className="shrink-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white">
@@ -90,6 +93,9 @@ function ChatRoomItem({
 }
 
 export default function ChatListPage() {
+  const t = useTranslations('chat');
+  const te = useTranslations('empty');
+  const tc = useTranslations('common');
   const { isAuthenticated } = useAuthStore();
   const { getChatRooms, currentTeamId } = useChatStore();
   const chatRooms = getChatRooms();
@@ -104,14 +110,14 @@ export default function ChatListPage() {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
         <header className="px-5 @3xl:px-0 pt-4 pb-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
         </header>
         <div className="px-5 @3xl:px-0">
           <EmptyState
             icon={MessageCircle}
-            title="채팅으로 팀과 대화해보세요"
-            description="매칭이 성사되면 팀과 직접 연락할 수 있어요"
-            action={{ label: '로그인', href: '/login' }}
+            title={te('noChat')}
+            description={te('noChatDesc')}
+            action={{ label: tc('login'), href: '/login' }}
           />
         </div>
       </div>
@@ -121,8 +127,8 @@ export default function ChatListPage() {
   const emptyState = (
     <EmptyState
       icon={MessageCircle}
-      title="아직 채팅방이 없어요"
-      description="팀 매칭이 성사되면 채팅방이 생성돼요"
+      title={t('noChatRooms')}
+      description={t('noChatRoomsDesc')}
       size="sm"
     />
   );
@@ -164,8 +170,8 @@ export default function ChatListPage() {
         {/* Left panel - Chat room list */}
         <div className="border-r border-gray-100 dark:border-gray-700 flex flex-col bg-white">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
-            <p className="text-sm text-gray-500 mt-0.5">팀 매칭 대화</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{t('subtitle')}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-3">
@@ -187,10 +193,10 @@ export default function ChatListPage() {
                 <MessageCircle size={28} className="text-gray-500" />
               </div>
               <p className="text-lg font-semibold text-gray-600">
-                채팅방을 선택하세요
+                {t('selectRoom')}
               </p>
               <p className="text-sm text-gray-500 mt-1.5 max-w-[240px]">
-                왼쪽 목록에서 대화할 채팅방을 선택하면 여기에 표시됩니다
+                {t('selectRoomDesc')}
               </p>
             </div>
           )}
@@ -200,8 +206,8 @@ export default function ChatListPage() {
       {/* ===== MOBILE: Full-width list ===== */}
       <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
         <header className="px-5 pt-4 pb-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
-          <p className="text-sm text-gray-500 mt-0.5">팀 매칭 대화</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('subtitle')}</p>
         </header>
 
         <div className="px-5">

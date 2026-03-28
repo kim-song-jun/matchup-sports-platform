@@ -1,26 +1,32 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
+import { useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useTransition } from 'react';
+import { Globe } from 'lucide-react';
 
 export function LocaleSwitcher() {
+  const locale = useLocale();
   const router = useRouter();
-  const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
 
-  const switchLocale = (locale: string) => {
-    const segments = pathname.split('/');
-    segments[1] = locale;
-    router.push(segments.join('/'));
+  const switchLocale = () => {
+    const next = locale === 'ko' ? 'en' : 'ko';
+    document.cookie = `NEXT_LOCALE=${next};path=/;max-age=31536000`;
+    startTransition(() => {
+      router.refresh();
+    });
   };
-
-  const currentLocale = pathname.split('/')[1] || 'ko';
 
   return (
     <button
-      onClick={() => switchLocale(currentLocale === 'ko' ? 'en' : 'ko')}
-      className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-      aria-label="언어 변경"
+      onClick={switchLocale}
+      disabled={isPending}
+      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+      aria-label="Switch language"
     >
-      {currentLocale === 'ko' ? 'EN' : '한국어'}
+      <Globe size={14} />
+      {locale === 'ko' ? 'English' : '한국어'}
     </button>
   );
 }

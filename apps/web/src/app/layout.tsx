@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 import { ProgressBar } from '@/components/layout/progress-bar';
+import { NextIntlClientProvider } from 'next-intl';
+import { getMessages, getLocale } from 'next-intl/server';
 
 export const metadata: Metadata = {
   title: 'TeamMeet - 스포츠 매칭 플랫폼',
@@ -16,13 +18,16 @@ export const viewport: Viewport = {
   themeColor: '#3182F6',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -40,8 +45,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh bg-background">
-        <ProgressBar />
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider messages={messages}>
+          <ProgressBar />
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

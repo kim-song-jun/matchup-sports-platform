@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useTeams } from '@/hooks/use-api';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -10,9 +11,10 @@ import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getTeamImage } from '@/lib/sport-image';
 import type { SportTeam } from '@/types/api';
 
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
-
 const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
+  const t = useTranslations('teams');
+  const tl = useTranslations('levels');
+
   return (
     <Link href={`/teams/${team.id}`}>
       <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
@@ -24,13 +26,13 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
         <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</h3>
-            {team.isRecruiting && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>}
+            {team.isRecruiting && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">{t('recruiting')}</span>}
           </div>
           <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
             <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
               {sportLabel[team.sportType] || team.sportType}
             </span>
-            <span>{levelLabel[team.level]} · {team.memberCount}명</span>
+            <span>{tl(String(team.level) as any)} · {t('memberCount', { count: team.memberCount })}</span>
           </p>
           {team.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{team.description}</p>}
           {team.city && <p className="text-2xs text-gray-500 mt-0.5">{team.city} {team.district}</p>}
@@ -41,6 +43,7 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
 });
 
 export function TeamList() {
+  const te = useTranslations('empty');
   const { data, isLoading, error, refetch } = useTeams();
   const teams = data?.items ?? [];
 
@@ -60,8 +63,8 @@ export function TeamList() {
     return (
       <EmptyState
         icon={UsersIcon}
-        title="아직 팀이 없어요"
-        description="첫 번째 팀을 등록해보세요"
+        title={te('noTeams')}
+        description={te('noTeamsDesc')}
       />
     );
   }

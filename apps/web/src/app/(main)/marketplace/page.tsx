@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Package, Search, ShoppingBag } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useListings } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
@@ -11,28 +12,34 @@ import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
 import type { MarketplaceListing } from '@/types/api';
 
-const conditionLabel: Record<string, string> = {
-  new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자',
-};
-
-const categoryFilters: { label: string; match: (item: MarketplaceListing) => boolean }[] = [
-  { label: '전체', match: () => true },
-  { label: '풋살화', match: (item) => item.sportType === 'futsal' },
-  { label: '하키장비', match: (item) => item.sportType === 'ice_hockey' },
-  { label: '농구화', match: (item) => item.sportType === 'basketball' },
-  { label: '라켓', match: (item) => item.sportType === 'badminton' },
-  { label: '유니폼', match: (item) => item.title?.toLowerCase().includes('유니폼') },
-  { label: '보호장비', match: (item) => item.title?.toLowerCase().includes('보호') || item.title?.toLowerCase().includes('장갑') },
+const categoryFilterKeys = [
+  { labelKey: 'categoryAll' as const, match: () => true },
+  { labelKey: 'categoryFutsalShoes' as const, match: (item: MarketplaceListing) => item.sportType === 'futsal' },
+  { labelKey: 'categoryHockeyGear' as const, match: (item: MarketplaceListing) => item.sportType === 'ice_hockey' },
+  { labelKey: 'categoryBasketballShoes' as const, match: (item: MarketplaceListing) => item.sportType === 'basketball' },
+  { labelKey: 'categoryRacket' as const, match: (item: MarketplaceListing) => item.sportType === 'badminton' },
+  { labelKey: 'categoryUniform' as const, match: (item: MarketplaceListing) => item.title?.toLowerCase().includes('유니폼') },
+  { labelKey: 'categoryProtective' as const, match: (item: MarketplaceListing) => item.title?.toLowerCase().includes('보호') || item.title?.toLowerCase().includes('장갑') },
 ];
 
+const conditionKeyMap: Record<string, string> = {
+  new: 'conditionNew',
+  like_new: 'conditionLikeNew',
+  good: 'conditionGood',
+  fair: 'conditionFair',
+  poor: 'conditionPoor',
+};
+
 export default function MarketplacePage() {
-  const [activeCategory, setActiveCategory] = useState('전체');
+  const t = useTranslations('marketplace');
+  const te = useTranslations('empty');
+  const [activeCategoryKey, setActiveCategoryKey] = useState('categoryAll');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { data, isLoading, error, refetch } = useListings();
   const allListings = data?.items ?? [];
-  const activeCategoryFilter = categoryFilters.find((c) => c.label === activeCategory);
-  const categoryFiltered = activeCategoryFilter && activeCategory !== '전체'
+  const activeCategoryFilter = categoryFilterKeys.find((c) => c.labelKey === activeCategoryKey);
+  const categoryFiltered = activeCategoryFilter && activeCategoryKey !== 'categoryAll'
     ? allListings.filter(activeCategoryFilter.match)
     : allListings;
   const listings = debouncedSearch
@@ -45,10 +52,10 @@ export default function MarketplacePage() {
   return (
     <div className="pt-[var(--safe-area-top)]">
       <header className="flex items-center justify-between px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">장터</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
         <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-gray-700 transition-colors">
           <Plus size={14} strokeWidth={2.5} />
-          상품 등록하기
+          {t('createListing')}
         </Link>
       </header>
 
@@ -58,7 +65,7 @@ export default function MarketplacePage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
           <input
             type="text"
-            placeholder="상품명, 종목 검색"
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 dark:focus:bg-gray-900 dark:focus:border-blue-600 transition-colors"
@@ -68,17 +75,17 @@ export default function MarketplacePage() {
 
       {/* 카테고리 칩 */}
       <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {categoryFilters.map((cat) => (
+        {categoryFilterKeys.map((cat) => (
           <button
-            key={cat.label}
-            onClick={() => setActiveCategory(cat.label)}
+            key={cat.labelKey}
+            onClick={() => setActiveCategoryKey(cat.labelKey)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-              activeCategory === cat.label
+              activeCategoryKey === cat.labelKey
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-gray-50 text-gray-500 hover:bg-gray-100 active:bg-gray-150 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700'
             }`}
           >
-            {cat.label}
+            {t(cat.labelKey)}
           </button>
         ))}
       </div>
@@ -96,8 +103,8 @@ export default function MarketplacePage() {
         ) : listings.length === 0 ? (
           <EmptyState
             icon={Package}
-            title="아직 등록된 매물이 없어요"
-            description="필요 없는 장비, 새 주인을 찾아주세요"
+            title={te('noListings')}
+            description={te('noListingsDesc')}
           />
         ) : (
           <div className="space-y-3 @3xl:grid @3xl:grid-cols-2 @3xl:gap-3 @3xl:space-y-0 stagger-children">
@@ -116,10 +123,10 @@ export default function MarketplacePage() {
                       {/* meta: 지역 · 종목 · 상태 */}
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
-                          {sportLabel[item.sportType] || '기타'}
+                          {sportLabel[item.sportType] || t('other')}
                         </span>
                         <span className="text-sm text-gray-500 truncate">
-                          {item.locationDistrict || item.locationCity || '지역 미정'} · {conditionLabel[item.condition]}
+                          {item.locationDistrict || item.locationCity || t('locationUndecided')} · {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition] as any) : item.condition}
                         </span>
                       </div>
 
@@ -129,10 +136,10 @@ export default function MarketplacePage() {
                       {/* 하단: 타입 + 통계 */}
                       <div className="flex items-center justify-between mt-auto pt-1">
                         <span className="rounded-full px-2 py-0.5 text-xs font-normal bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                          {item.listingType === 'rent' ? '대여' : '판매'}
+                          {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
                         </span>
                         <span className="text-xs text-gray-400 dark:text-gray-500">
-                          관심 {item.likeCount} · 조회 {item.viewCount}
+                          {t('likes', { count: item.likeCount })} · {t('views', { count: item.viewCount })}
                         </span>
                       </div>
                     </div>

@@ -20,7 +20,8 @@
     "won": "원",
     "people": "명",
     "matches": "매치",
-    "settings": "설정"
+    "settings": "설정",
+    "viewAll": "전체보기"
   },
   "nav": {
     "home": "홈",
@@ -34,7 +35,11 @@
     "teamMatching": "팀 매칭",
     "mercenary": "용병",
     "myPage": "마이페이지",
-    "admin": "Admin"
+    "admin": "Admin",
+    "matching": "매칭",
+    "explore": "탐색",
+    "communication": "소통",
+    "findMatch": "매치 찾기"
   },
   "sports": {
     "all": "전체",
@@ -74,7 +79,28 @@
     "recommendedLessons": "추천 강좌",
     "latestMarketplace": "최신 장터",
     "almostFull": "마감임박",
-    "valueProposition": "실력에 맞는 상대, 5분이면 매칭 완료"
+    "valueProposition": "실력에 맞는 상대, 5분이면 매칭 완료",
+    "findMatchToday": "오늘 매치를 찾아보세요",
+    "findPartner": "같이 운동할 사람을 찾아보세요",
+    "aiMatchIntro": "AI가 딱 맞는 상대를 찾아줘요",
+    "getStarted": "시작하기",
+    "viewAll": "전체 →",
+    "viewMore": "더보기",
+    "teamMatch": "팀 매치",
+    "recruiting": "모집중",
+    "viewAllMatches": "전체 보기"
+  },
+  "matches": {
+    "findMatch": "매치 찾기",
+    "searchPlaceholder": "지역, 시설명 검색",
+    "openFilters": "필터 열기",
+    "date": "날짜",
+    "sort": "정렬",
+    "latest": "최신순",
+    "deadline": "마감임박",
+    "matchCount": "{count}개의 매치",
+    "almostFull": "마감임박",
+    "viewMercenary": "용병 모집 보기"
   },
   "empty": {
     "noMatches": "아직 매치가 없네요",
@@ -93,5 +119,103 @@
     "noChatDesc": "매칭이 성사되면 팀과 직접 연락할 수 있어요",
     "noSchedule": "예정된 일정이 없어요",
     "noScheduleDesc": "매치나 강좌에 참가해보세요"
+  },
+  "lessons": {
+    "title": "강좌",
+    "subtitle": "레슨, 연습경기, 자유연습을 찾아보세요",
+    "createLesson": "강좌 만들기",
+    "searchPlaceholder": "강좌명, 코치, 장소 검색",
+    "coach": "코치 {name}",
+    "typeAll": "전체",
+    "typeGroupLesson": "그룹 레슨",
+    "typePracticeMatch": "연습 경기",
+    "typeFreePractice": "자유 연습"
+  },
+  "marketplace": {
+    "title": "장터",
+    "createListing": "상품 등록하기",
+    "searchPlaceholder": "상품명, 종목 검색",
+    "categoryAll": "전체",
+    "categoryFutsalShoes": "풋살화",
+    "categoryHockeyGear": "하키장비",
+    "categoryBasketballShoes": "농구화",
+    "categoryRacket": "라켓",
+    "categoryUniform": "유니폼",
+    "categoryProtective": "보호장비",
+    "conditionNew": "새 상품",
+    "conditionLikeNew": "거의 새 것",
+    "conditionGood": "양호",
+    "conditionFair": "사용감",
+    "conditionPoor": "하자",
+    "typeRent": "대여",
+    "typeSell": "판매",
+    "other": "기타",
+    "locationUndecided": "지역 미정",
+    "likes": "관심 {count}",
+    "views": "조회 {count}"
+  },
+  "teams": {
+    "title": "팀·클럽",
+    "subtitle": "동호회와 팀을 찾아보세요",
+    "createTeam": "팀 만들기",
+    "recruiting": "모집중",
+    "memberCount": "{count}명"
+  },
+  "profile": {
+    "title": "마이페이지",
+    "editProfile": "프로필 수정",
+    "loginPromptTitle": "로그인하고 시작하세요",
+    "loginPromptDesc": "매치 참가, 팀 가입, 평가 확인 등\n모든 기능을 이용할 수 있어요",
+    "totalMatches": "총 매치",
+    "mannerScore": "매너 점수",
+    "badges": "뱃지",
+    "badgeCount": "{count}개",
+    "matchRecord": "{matchCount}전 {winCount}승",
+    "elo": "ELO",
+    "chatLabel": "채팅",
+    "notificationsLabel": "알림",
+    "matchHistory": "매치 히스토리",
+    "myMatches": "내가 만든 매치",
+    "myTeamMatches": "내 팀 매칭 모집글",
+    "myTeams": "내 팀",
+    "myLessons": "내 강좌",
+    "myListings": "내 장터 매물",
+    "myMercenary": "내 용병 모집",
+    "myReviews": "내 평가",
+    "receivedReviews": "받은 평가",
+    "paymentHistory": "결제 내역",
+    "upcomingSchedule": "다가오는 일정",
+    "listView": "리스트 보기",
+    "calendarView": "캘린더 보기",
+    "findMatch": "매치 찾기",
+    "matchCount": "{count}매치"
+  },
+  "notifications": {
+    "title": "알림",
+    "unreadCount": "읽지 않은 알림 {count}개",
+    "markAllRead": "모두 읽음",
+    "markAllReadLabel": "모든 알림 읽음 처리",
+    "markAllReadToast": "모든 알림을 읽음 처리했어요",
+    "loginPromptTitle": "알림이 기다리고 있어요",
+    "loginPromptDesc": "로그인하면 매치 소식을 받아볼 수 있어요",
+    "typeMatch": "매치",
+    "typeTeam": "팀",
+    "typeChat": "채팅",
+    "typeSystem": "시스템"
+  },
+  "chat": {
+    "title": "채팅",
+    "subtitle": "팀 매칭 대화",
+    "noChatRooms": "아직 채팅방이 없어요",
+    "noChatRoomsDesc": "팀 매칭이 성사되면 채팅방이 생성돼요",
+    "selectRoom": "채팅방을 선택하세요",
+    "selectRoomDesc": "왼쪽 목록에서 대화할 채팅방을 선택하면 여기에 표시됩니다",
+    "startConversation": "대화를 시작하세요"
+  },
+  "time": {
+    "justNow": "방금",
+    "minutesAgo": "{count}분 전",
+    "hoursAgo": "{count}시간 전",
+    "daysAgo": "{count}일 전"
   }
 }

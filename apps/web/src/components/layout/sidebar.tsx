@@ -3,46 +3,11 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useNotificationStore } from '@/stores/notification-store';
-
-const navSections = [
-  {
-    label: null,
-    items: [
-      { href: '/home', icon: Home, label: '홈' },
-    ],
-  },
-  {
-    label: '매칭',
-    items: [
-      { href: '/matches', icon: Search, label: '매치 찾기' },
-      { href: '/team-matches', icon: Swords, label: '팀 매칭' },
-    ],
-  },
-  {
-    label: '탐색',
-    items: [
-      { href: '/lessons', icon: GraduationCap, label: '강좌' },
-      { href: '/marketplace', icon: ShoppingBag, label: '장터' },
-      { href: '/teams', icon: Users, label: '팀·클럽' },
-    ],
-  },
-  {
-    label: '소통',
-    items: [
-      { href: '/chat', icon: MessageCircle, label: '채팅' },
-      { href: '/notifications', icon: Bell, label: '알림' },
-    ],
-  },
-  {
-    label: null,
-    items: [
-      { href: '/profile', icon: User, label: '마이페이지' },
-    ],
-  },
-] as const;
+import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -50,6 +15,45 @@ export function Sidebar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
+  const t = useTranslations('nav');
+  const tc = useTranslations('common');
+
+  const navSections = [
+    {
+      label: null,
+      items: [
+        { href: '/home', icon: Home, label: t('home') },
+      ],
+    },
+    {
+      label: t('matching'),
+      items: [
+        { href: '/matches', icon: Search, label: t('findMatch') },
+        { href: '/team-matches', icon: Swords, label: t('teamMatching') },
+      ],
+    },
+    {
+      label: t('explore'),
+      items: [
+        { href: '/lessons', icon: GraduationCap, label: t('lessons') },
+        { href: '/marketplace', icon: ShoppingBag, label: t('marketplace') },
+        { href: '/teams', icon: Users, label: t('teams') },
+      ],
+    },
+    {
+      label: t('communication'),
+      items: [
+        { href: '/chat', icon: MessageCircle, label: t('chat') },
+        { href: '/notifications', icon: Bell, label: t('notifications') },
+      ],
+    },
+    {
+      label: null,
+      items: [
+        { href: '/profile', icon: User, label: t('myPage') },
+      ],
+    },
+  ];
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-dvh w-[240px] flex-col border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -65,7 +69,7 @@ export function Sidebar() {
         <Link href="/matches/new"
           className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-500 px-4 py-3 text-base font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
           <Plus size={16} strokeWidth={2.5} />
-          매치 만들기
+          {t('findMatch')}
         </Link>
       </div>
 
@@ -112,10 +116,15 @@ export function Sidebar() {
                 : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <ShieldCheck size={16} strokeWidth={pathname.startsWith('/admin') ? 2 : 1.5} />
-            Admin
+            {t('admin')}
           </Link>
         </div>
       </nav>
+
+      {/* Locale Switcher */}
+      <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-800">
+        <LocaleSwitcher />
+      </div>
 
       {/* User */}
       <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-4">
@@ -128,13 +137,13 @@ export function Sidebar() {
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.nickname}</p>
             </div>
             <button onClick={() => { logout(); router.push('/login'); }}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label="로그아웃">
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label={tc('logout')}>
               <LogOut size={14} />
             </button>
           </div>
         ) : (
           <Link href="/login" className="flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            로그인
+            {tc('login')}
           </Link>
         )}
       </div>

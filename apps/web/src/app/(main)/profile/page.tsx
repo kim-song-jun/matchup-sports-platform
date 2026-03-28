@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
 import Link from 'next/link';
@@ -18,16 +19,32 @@ import type { SportProfile, Match } from '@/types/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
 
 export default function ProfilePage() {
+  const t = useTranslations('profile');
+  const te = useTranslations('empty');
+  const tc = useTranslations('common');
   const { user, isAuthenticated, logout } = useAuthStore();
   const router = useRouter();
   const [showEditModal, setShowEditModal] = useState(false);
   const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
 
+  const menuItems = [
+    { label: t('matchHistory'), icon: History, href: '/matches', count: null },
+    { label: t('myMatches'), icon: Swords, href: '/my/matches', count: null },
+    { label: t('myTeamMatches'), icon: Users, href: '/my/team-matches', count: null },
+    { label: t('myTeams'), icon: Users, href: '/my/teams', count: null },
+    { label: t('myLessons'), icon: BookOpen, href: '/my/lessons', count: null },
+    { label: t('myListings'), icon: ShoppingBag, href: '/my/listings', count: null },
+    { label: t('myMercenary'), icon: UserCheck, href: '/my/mercenary', count: null },
+    { label: t('myReviews'), icon: Star, href: '/reviews', count: null },
+    { label: t('receivedReviews'), icon: MessageSquare, href: '/my/reviews-received', count: null },
+    { label: t('paymentHistory'), icon: CreditCard, href: '/payments', count: null },
+  ];
+
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
       <header className="px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">마이페이지</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
       </header>
 
       <div className={`px-5 @3xl:px-0 ${isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
@@ -48,11 +65,11 @@ export default function ProfilePage() {
                       <span className="font-semibold">{user.mannerScore?.toFixed(1)}</span>
                     </div>
                     <span className="text-gray-200">|</span>
-                    <span className="text-sm text-gray-500">{user.totalMatches}매치</span>
+                    <span className="text-sm text-gray-500">{t('matchCount', { count: user.totalMatches })}</span>
                   </div>
                 </div>
               </div>
-              <button aria-label="프로필 수정" onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <Pencil size={16} />
               </button>
             </div>
@@ -71,7 +88,7 @@ export default function ProfilePage() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {sp.matchCount}전 {sp.winCount}승 · ELO <span className="animate-scale-in inline-block font-semibold text-gray-900 dark:text-white">{sp.eloRating}</span>
+                        {t('matchRecord', { matchCount: sp.matchCount, winCount: sp.winCount })} · {t('elo')} <span className="animate-scale-in inline-block font-semibold text-gray-900 dark:text-white">{sp.eloRating}</span>
                       </div>
                     </div>
                   );
@@ -83,24 +100,24 @@ export default function ProfilePage() {
             <div className="mt-4 flex items-center divide-x divide-gray-100 dark:divide-gray-700">
               <div className="flex-1 text-center py-2">
                 <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">총 매치</p>
+                <p className="text-xs text-gray-500 mt-1">{t('totalMatches')}</p>
               </div>
               <div className="flex-1 text-center py-2">
                 <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                <p className="text-xs text-gray-500 mt-1">매너 점수</p>
+                <p className="text-xs text-gray-500 mt-1">{t('mannerScore')}</p>
               </div>
               <div className="flex-1 text-center py-2">
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}개</p>
-                <p className="text-xs text-gray-500 mt-1">뱃지</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{t('badgeCount', { count: user.sportProfiles?.length || 0 })}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('badges')}</p>
               </div>
             </div>
           </div>
         ) : (
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-8 text-center">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">로그인하고 시작하세요</h2>
-            <p className="text-sm text-gray-500 mt-1.5">매치 참가, 팀 가입, 평가 확인 등<br/>모든 기능을 이용할 수 있어요</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t('loginPromptTitle')}</h2>
+            <p className="text-sm text-gray-500 mt-1.5 whitespace-pre-line">{t('loginPromptDesc')}</p>
             <Link href="/login" className="inline-block mt-4 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
-              로그인
+              {tc('login')}
             </Link>
           </div>
         )}
@@ -127,7 +144,7 @@ export default function ProfilePage() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
                   <MessageCircle size={20} className="text-blue-500" />
                 </div>
-                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">채팅</span>
+                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">{t('chatLabel')}</span>
                 {chatUnread > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
                     {chatUnread > 99 ? '99+' : chatUnread}
@@ -140,7 +157,7 @@ export default function ProfilePage() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-900/30">
                   <Bell size={20} className="text-amber-500" />
                 </div>
-                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">알림</span>
+                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">{t('notificationsLabel')}</span>
                 {notifUnread > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
                     {notifUnread > 99 ? '99+' : notifUnread}
@@ -153,18 +170,7 @@ export default function ProfilePage() {
       )}
 
       <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
-        {[
-          { label: '매치 히스토리', icon: History, href: '/matches', count: null },
-          { label: '내가 만든 매치', icon: Swords, href: '/my/matches', count: null },
-          { label: '내 팀 매칭 모집글', icon: Users, href: '/my/team-matches', count: null },
-          { label: '내 팀', icon: Users, href: '/my/teams', count: null },
-          { label: '내 강좌', icon: BookOpen, href: '/my/lessons', count: null },
-          { label: '내 장터 매물', icon: ShoppingBag, href: '/my/listings', count: null },
-          { label: '내 용병 모집', icon: UserCheck, href: '/my/mercenary', count: null },
-          { label: '내 평가', icon: Star, href: '/reviews', count: null },
-          { label: '받은 평가', icon: MessageSquare, href: '/my/reviews-received', count: null },
-          { label: '결제 내역', icon: CreditCard, href: '/payments', count: null },
-        ].map((item) => (
+        {menuItems.map((item) => (
           <Link key={item.label} href={isAuthenticated ? item.href : '/login'}>
             <div className={`flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] rounded-lg -mx-2 px-2 ${!isAuthenticated ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-3">
@@ -189,14 +195,14 @@ export default function ProfilePage() {
       <div className="px-5 @3xl:px-0 py-2">
         <Link href="/settings">
           <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">설정</span></div>
+            <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">{tc('settings')}</span></div>
             <ChevronRight size={18} className="text-gray-300" />
           </div>
         </Link>
         {isAuthenticated && (
           <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
             <LogOut size={20} className="text-gray-500" />
-            <span className="text-md font-medium text-gray-500">로그아웃</span>
+            <span className="text-md font-medium text-gray-500">{tc('logout')}</span>
           </button>
         )}
       </div>
@@ -208,6 +214,9 @@ export default function ProfilePage() {
 }
 
 function UpcomingSchedule() {
+  const t = useTranslations('profile');
+  const te = useTranslations('empty');
+  const tc = useTranslations('common');
   const { data } = useMyMatches({ limit: '20' });
   const [view, setView] = useState<'list' | 'calendar'>('list');
 
@@ -226,14 +235,14 @@ function UpcomingSchedule() {
   return (
     <div className="mt-4 @3xl:mt-0 px-5 @3xl:px-0">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">다가오는 일정</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
         <div className="flex items-center gap-1" role="tablist">
           <button
             role="tab"
             aria-selected={view === 'list'}
             onClick={() => setView('list')}
             className={`p-1.5 rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            aria-label="리스트 보기"
+            aria-label={t('listView')}
           >
             <List size={16} />
           </button>
@@ -242,11 +251,11 @@ function UpcomingSchedule() {
             aria-selected={view === 'calendar'}
             onClick={() => setView('calendar')}
             className={`p-1.5 rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            aria-label="캘린더 보기"
+            aria-label={t('calendarView')}
           >
             <CalendarDays size={16} />
           </button>
-          <Link href="/matches" className="text-sm text-blue-500 font-medium ml-2">전체보기</Link>
+          <Link href="/matches" className="text-sm text-blue-500 font-medium ml-2">{tc('viewAll')}</Link>
         </div>
       </div>
 
@@ -255,10 +264,10 @@ function UpcomingSchedule() {
       ) : listMatches.length === 0 ? (
         <EmptyState
           icon={Calendar}
-          title="예정된 일정이 없어요"
-          description="매치나 강좌에 참가해보세요"
+          title={te('noSchedule')}
+          description={te('noScheduleDesc')}
           size="sm"
-          action={{ label: '매치 찾기', href: '/matches' }}
+          action={{ label: t('findMatch'), href: '/matches' }}
         />
       ) : (
         <div className="space-y-2">

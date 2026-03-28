@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, GraduationCap } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { useLesson } from '@/hooks/use-api';
@@ -142,15 +143,19 @@ export default function EditLessonPage() {
 
   if (!lesson) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">강좌를 찾을 수 없습니다</p>
-        <Link href="/lessons" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={GraduationCap}
+          title="강좌를 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 강좌예요"
+          action={{ label: '목록으로', href: '/lessons' }}
+        />
       </div>
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
-  const selectClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
+  const selectClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
@@ -183,7 +188,7 @@ export default function EditLessonPage() {
                 <button
                   key={s.type}
                   onClick={() => update('sportType', s.type)}
-                  className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
+                  className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-colors ${
                     selected
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-200 text-gray-700 dark:text-gray-200'
@@ -205,7 +210,7 @@ export default function EditLessonPage() {
               <button
                 key={t.value}
                 onClick={() => update('type', t.value)}
-                className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
                   form.type === t.value
                     ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'

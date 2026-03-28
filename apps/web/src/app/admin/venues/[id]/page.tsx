@@ -185,7 +185,7 @@ export default function AdminVenueEditPage() {
   }, [showDeleteModal]);
 
   const inputClass =
-    'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-all';
+    'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-colors';
   const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
 
   return (
@@ -246,7 +246,7 @@ export default function AdminVenueEditPage() {
                     key={s.value}
                     type="button"
                     onClick={() => toggleSport(s.value)}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       selected
                         ? 'bg-gray-900 dark:bg-gray-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -376,7 +376,7 @@ export default function AdminVenueEditPage() {
           <button
             onClick={handleSave}
             disabled={saving || !form.name}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold text-white transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold text-white transition-[colors,transform] ${
               saving || !form.name
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.98]'

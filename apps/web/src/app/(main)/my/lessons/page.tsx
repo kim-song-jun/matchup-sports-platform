@@ -121,7 +121,7 @@ export default function MyLessonsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h1>
@@ -149,7 +149,7 @@ export default function MyLessonsPage() {
           const fillPercent = Math.round((lesson.currentStudents / lesson.maxStudents) * 100);
           const isFull = lesson.currentStudents >= lesson.maxStudents;
           return (
-            <div key={lesson.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:border-gray-200 transition-all">
+            <div key={lesson.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:border-gray-200 transition-colors">
               {/* Card header */}
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
@@ -214,7 +214,7 @@ export default function MyLessonsPage() {
                   </div>
                   <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${isFull ? 'bg-red-400' : 'bg-blue-400'}`}
+                      className={`h-full rounded-full transition-[width,colors] ${isFull ? 'bg-red-400' : 'bg-blue-400'}`}
                       style={{ width: `${fillPercent}%` }}
                     />
                   </div>

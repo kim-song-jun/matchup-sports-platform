@@ -2,7 +2,8 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Star, Trophy, Users, Shield, Calendar, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Star, Trophy, Users, Shield, Calendar, TrendingUp, User } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useUserProfile } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
@@ -36,9 +37,13 @@ export default function UserProfilePage() {
 
   if (!user) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">사용자를 찾을 수 없습니다</p>
-        <Link href="/home" className="text-blue-500 text-sm mt-2 inline-block">홈으로 돌아가기</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={User}
+          title="사용자를 찾을 수 없어요"
+          description="탈퇴했거나 존재하지 않는 사용자예요"
+          action={{ label: '홈으로', href: '/home' }}
+        />
       </div>
     );
   }
@@ -50,7 +55,7 @@ export default function UserProfilePage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Mobile header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900">프로필</h1>
@@ -141,7 +146,7 @@ export default function UserProfilePage() {
                     {/* Level bar */}
                     <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                        className="h-full rounded-full bg-blue-500 transition-[width] duration-300"
                         style={{ width: `${(profile.level / 5) * 100}%` }}
                       />
                     </div>
@@ -166,7 +171,7 @@ export default function UserProfilePage() {
             <div className="flex-1">
               <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${
+                  className={`h-full rounded-full transition-[width] duration-300 ${
                     (user.mannerScore || 0) >= 3.5 ? 'bg-green-500' : (user.mannerScore || 0) >= 2.5 ? 'bg-gray-400' : 'bg-red-500'
                   }`}
                   style={{ width: `${((user.mannerScore || 0) / 5) * 100}%` }}

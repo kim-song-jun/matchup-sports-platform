@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, UserPlus } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 
@@ -131,20 +132,24 @@ export default function EditMercenaryPage() {
 
   if (!mockData) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">모집글을 찾을 수 없습니다</p>
-        <Link href="/mercenary" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={UserPlus}
+          title="모집글을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 모집글이에요"
+          action={{ label: '목록으로', href: '/mercenary' }}
+        />
       </div>
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Mobile header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">용병 모집 수정</h1>
@@ -207,7 +212,7 @@ export default function EditMercenaryPage() {
               <button
                 key={opt.value}
                 onClick={() => update('position', opt.value)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-colors ${
                   form.position === opt.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -260,7 +265,7 @@ export default function EditMercenaryPage() {
               <button
                 key={opt.value}
                 onClick={() => update('level', opt.value)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-colors ${
                   form.level === opt.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'

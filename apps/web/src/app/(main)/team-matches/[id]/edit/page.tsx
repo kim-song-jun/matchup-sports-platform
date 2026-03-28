@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Save, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Save, XCircle, AlertTriangle, Swords } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useTeamMatch } from '@/hooks/use-api';
 import { SKILL_GRADES, MATCH_TYPES } from '@/lib/skill-grades';
@@ -171,14 +172,18 @@ export default function EditTeamMatchPage() {
 
   if (!match) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">모집글을 찾을 수 없습니다</p>
-        <Link href="/team-matches" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={Swords}
+          title="모집글을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 모집글이에요"
+          action={{ label: '목록으로', href: '/team-matches' }}
+        />
       </div>
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
@@ -208,7 +213,7 @@ export default function EditTeamMatchPage() {
               <button
                 key={opt.value}
                 onClick={() => update('sportType', opt.value)}
-                className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-all ${
+                className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-colors ${
                   form.sportType === opt.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -283,7 +288,7 @@ export default function EditTeamMatchPage() {
               <button
                 key={q}
                 onClick={() => update('quarterCount', q)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                   form.quarterCount === q
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -328,7 +333,7 @@ export default function EditTeamMatchPage() {
               <button
                 key={g.grade}
                 onClick={() => update('skillGrade', g.grade as SkillGrade)}
-                className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-all ${
+                className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-colors ${
                   form.skillGrade === g.grade
                     ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
@@ -366,7 +371,7 @@ export default function EditTeamMatchPage() {
               <button
                 key={fmt}
                 onClick={() => update('gameFormat', fmt)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                   form.gameFormat === fmt
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -385,7 +390,7 @@ export default function EditTeamMatchPage() {
             {MATCH_TYPES.map((mt) => (
               <label
                 key={mt.value}
-                className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-all ${
+                className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-colors ${
                   form.matchType === mt.value
                     ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
@@ -418,7 +423,7 @@ export default function EditTeamMatchPage() {
               <button
                 key={opt.value}
                 onClick={() => update('matchStyle', opt.value)}
-                className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
                   form.matchStyle === opt.value
                     ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'

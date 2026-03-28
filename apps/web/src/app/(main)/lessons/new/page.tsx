@@ -132,7 +132,7 @@ export default function CreateLessonPage() {
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
+              <div className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
             </div>
           ))}
         </div>
@@ -156,7 +156,7 @@ export default function CreateLessonPage() {
                     <button
                       key={s.type}
                       onClick={() => update('sportType', s.type)}
-                      className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-all ${
+                      className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-colors ${
                         selected
                           ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                           : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
@@ -177,7 +177,7 @@ export default function CreateLessonPage() {
                   <button
                     key={t.value}
                     onClick={() => update('type', t.value)}
-                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
                       form.type === t.value
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 hover:border-gray-200'
@@ -208,7 +208,7 @@ export default function CreateLessonPage() {
                 onChange={(e) => update('title', e.target.value)}
                 maxLength={100}
                 placeholder="예: 초보자를 위한 풋살 기초 레슨"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
             </div>
 
@@ -221,7 +221,7 @@ export default function CreateLessonPage() {
                 maxLength={1000}
                 placeholder="강좌에 대한 자세한 설명을 입력해주세요"
                 rows={4}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
               />
             </div>
 
@@ -236,7 +236,7 @@ export default function CreateLessonPage() {
                 onChange={(e) => update('coachName', e.target.value)}
                 maxLength={50}
                 placeholder="예: 김코치"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
             </div>
 
@@ -249,7 +249,7 @@ export default function CreateLessonPage() {
                 maxLength={500}
                 placeholder="코치 경력 및 자격증 등을 입력해주세요"
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
               />
             </div>
           </div>
@@ -268,7 +268,7 @@ export default function CreateLessonPage() {
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
             </div>
 
@@ -281,7 +281,7 @@ export default function CreateLessonPage() {
                 type="date"
                 value={form.lessonDate}
                 onChange={(e) => update('lessonDate', e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
             </div>
 
@@ -295,7 +295,7 @@ export default function CreateLessonPage() {
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
               </div>
               <div>
@@ -307,7 +307,7 @@ export default function CreateLessonPage() {
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
               </div>
             </div>
@@ -322,7 +322,7 @@ export default function CreateLessonPage() {
                   onChange={(e) => update('maxParticipants', +e.target.value)}
                   min={1}
                   max={50}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
               </div>
               <div>
@@ -334,7 +334,7 @@ export default function CreateLessonPage() {
                   onChange={(e) => update('fee', +e.target.value)}
                   min={0}
                   step={1000}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
                 {form.fee > 0 && (
                   <p className="text-xs text-gray-500 mt-1">
@@ -351,7 +351,7 @@ export default function CreateLessonPage() {
                   id="lesson-level-min"
                   value={form.levelMin}
                   onChange={(e) => update('levelMin', +e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
@@ -364,7 +364,7 @@ export default function CreateLessonPage() {
                   id="lesson-level-max"
                   value={form.levelMax}
                   onChange={(e) => update('levelMax', +e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>

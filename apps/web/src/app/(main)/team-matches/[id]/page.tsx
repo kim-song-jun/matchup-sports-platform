@@ -58,10 +58,13 @@ export default function TeamMatchDetailPage() {
 
   if (!match) {
     return (
-      <div className="pt-[var(--safe-area-top)] px-5 lg:px-0 py-20 text-center">
-        <AlertCircle size={32} className="mx-auto text-gray-300 mb-3" />
-        <p className="text-md text-gray-600">모집글을 찾을 수 없어요</p>
-        <Link href="/team-matches" className="text-sm text-blue-500 mt-2 inline-block hover:underline">목록으로 돌아가기</Link>
+      <div className="pt-[var(--safe-area-top)] px-5 lg:px-0">
+        <EmptyState
+          icon={AlertCircle}
+          title="모집글을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 모집글이에요"
+          action={{ label: '목록으로', href: '/team-matches' }}
+        />
       </div>
     );
   }
@@ -473,7 +476,7 @@ export default function TeamMatchDetailPage() {
                 onChange={(e) => setApplyMessage(e.target.value)}
                 placeholder="호스트에게 전달할 메시지를 작성하세요"
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
               />
             </div>
 

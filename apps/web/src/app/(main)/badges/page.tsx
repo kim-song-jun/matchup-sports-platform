@@ -169,7 +169,7 @@ export default function BadgesPage() {
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
@@ -204,7 +204,7 @@ export default function BadgesPage() {
       <div className="px-5 lg:px-0 mb-4 flex gap-2">
         <button
           onClick={() => setActiveTab('my')}
-          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
             activeTab === 'my'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -214,7 +214,7 @@ export default function BadgesPage() {
         </button>
         <button
           onClick={() => setActiveTab('all')}
-          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
             activeTab === 'all'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -233,7 +233,7 @@ export default function BadgesPage() {
             return (
               <div
                 key={badge.id || `badge-${idx}`}
-                className={`rounded-xl border p-4 transition-all ${
+                className={`rounded-xl border p-4 transition-colors ${
                   badge.earned
                     ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
                     : 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-100/60 dark:border-gray-700/60'
@@ -241,7 +241,7 @@ export default function BadgesPage() {
               >
                 <div className="flex items-start gap-3.5">
                   <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all ${
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors ${
                       badge.earned ? 'bg-gray-100 text-gray-500' : 'bg-gray-100 text-gray-300'
                     }`}
                   >

@@ -19,7 +19,7 @@ export default function AccountPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
@@ -38,7 +38,7 @@ export default function AccountPage() {
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors dark:placeholder:text-gray-500"
             placeholder="닉네임을 입력하세요"
           />
           <p className="text-xs text-gray-500 mt-2">2~12자, 한글/영문/숫자 사용 가능</p>
@@ -51,7 +51,7 @@ export default function AccountPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors dark:placeholder:text-gray-500"
             placeholder="이메일을 입력하세요"
           />
         </div>
@@ -63,7 +63,7 @@ export default function AccountPage() {
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors dark:placeholder:text-gray-500"
             placeholder="전화번호를 입력하세요"
           />
         </div>
@@ -129,7 +129,7 @@ export default function AccountPage() {
             <button
               aria-label="닫기"
               onClick={() => setShowDeleteModal(false)}
-              className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <X size={20} className="text-gray-500" />
             </button>
@@ -149,7 +149,7 @@ export default function AccountPage() {
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all dark:placeholder:text-gray-500"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors dark:placeholder:text-gray-500"
                   placeholder="탈퇴합니다"
                 />
               </div>

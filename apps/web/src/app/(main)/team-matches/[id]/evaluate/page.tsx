@@ -127,7 +127,7 @@ export default function TeamMatchEvaluatePage() {
             onChange={(e) => setComment(e.target.value)}
             placeholder="상대팀에 대한 한마디를 남겨주세요"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors resize-none"
           />
         </div>
 

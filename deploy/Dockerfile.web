@@ -4,11 +4,9 @@ RUN npm install -g pnpm@9
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/
-COPY packages/shared/package.json packages/shared/
 RUN pnpm install --frozen-lockfile
 
 COPY apps/web/ apps/web/
-COPY packages/shared/ packages/shared/
 
 ARG NEXT_PUBLIC_API_URL=/api/v1
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}

@@ -90,7 +90,7 @@ export default function MyTeamMatchesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭 모집글</h1>
@@ -102,7 +102,7 @@ export default function MyTeamMatchesPage() {
         </div>
         <Link
           href="/team-matches/new"
-          className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-base font-bold text-white hover:bg-blue-600 active:scale-[0.98] transition-all"
+          className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-base font-bold text-white hover:bg-blue-600 active:scale-[0.98] transition-[colors,transform]"
         >
           <Plus size={16} />
           모집글 작성

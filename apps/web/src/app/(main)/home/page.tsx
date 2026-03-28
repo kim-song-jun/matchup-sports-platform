@@ -190,7 +190,7 @@ export default function HomePage() {
                 <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
                   aria-label={`배너 ${i + 1}`}
                   className="relative flex items-center justify-center p-2.5">
-                  <span className={`block h-1.5 rounded-full transition-all duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
+                  <span className={`block h-1.5 rounded-full transition-[width,colors] duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
                 </button>
               ))}
             </div>

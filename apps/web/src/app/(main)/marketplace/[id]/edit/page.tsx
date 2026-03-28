@@ -129,7 +129,7 @@ export default function EditListingPage() {
               <button
                 key={s.type}
                 onClick={() => setForm({ ...form, sportType: s.type })}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                   form.sportType === s.type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
@@ -147,7 +147,7 @@ export default function EditListingPage() {
               <button
                 key={cat}
                 onClick={() => setForm({ ...form, category: cat })}
-                className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-all ${
+                className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.category === cat ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
@@ -165,7 +165,7 @@ export default function EditListingPage() {
               <button
                 key={c.value}
                 onClick={() => setForm({ ...form, condition: c.value })}
-                className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-all ${
+                className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.condition === c.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
@@ -194,7 +194,7 @@ export default function EditListingPage() {
               <button
                 key={opt.value}
                 onClick={() => setForm({ ...form, status: opt.value })}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                   form.status === opt.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >

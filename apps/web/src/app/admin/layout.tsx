@@ -98,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const isActive = pathname.startsWith(href);
             return (
               <Link key={href} href={href}
-                className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold'
                     : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'

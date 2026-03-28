@@ -101,7 +101,7 @@ export default function RefundRequestPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">환불 확인</h3>
-              <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
@@ -149,7 +149,7 @@ export default function RefundRequestPage() {
 
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">환불 요청</h1>
@@ -247,7 +247,7 @@ export default function RefundRequestPage() {
               <button
                 key={reason.id}
                 onClick={() => setSelectedReason(reason.id)}
-                className={`rounded-xl border-2 py-3 px-4 text-base font-medium transition-all ${
+                className={`rounded-xl border-2 py-3 px-4 text-base font-medium transition-colors ${
                   selectedReason === reason.id
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -279,7 +279,7 @@ export default function RefundRequestPage() {
             setShowModal(true);
           }}
           disabled={!selectedReason || refundInfo.percentage === 0}
-          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-all ${
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-colors ${
             selectedReason && refundInfo.percentage > 0
               ? 'bg-red-500 text-white hover:bg-red-600 active:scale-[0.98]'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'

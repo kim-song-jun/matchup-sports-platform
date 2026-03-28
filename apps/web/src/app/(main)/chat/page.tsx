@@ -40,7 +40,7 @@ function ChatRoomItem({
 }) {
   const inner = (
     <div
-      className={`rounded-xl border p-4 transition-all active:scale-[0.98] ${
+      className={`rounded-xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
         isActive
           ? 'bg-gray-50 border-gray-200'
           : 'bg-white border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'

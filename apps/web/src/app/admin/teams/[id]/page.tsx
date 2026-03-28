@@ -120,7 +120,7 @@ export default function AdminTeamDetailPage() {
   const losses = team.recentMatches.filter((m: { result: string }) => m.result === 'loss').length;
 
   const inputClass =
-    'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-all';
+    'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-colors';
 
   return (
     <div className="animate-fade-in">
@@ -405,7 +405,7 @@ export default function AdminTeamDetailPage() {
                   <button
                     key={badge}
                     onClick={() => toggleBadge(badge)}
-                    className={`w-full flex items-center justify-between rounded-xl px-4 py-3 text-left transition-all ${
+                    className={`w-full flex items-center justify-between rounded-xl px-4 py-3 text-left transition-colors ${
                       active ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >

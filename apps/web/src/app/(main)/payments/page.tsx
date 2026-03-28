@@ -134,7 +134,7 @@ export default function PaymentsPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 dark:bg-gray-900">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
@@ -168,7 +168,7 @@ export default function PaymentsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'

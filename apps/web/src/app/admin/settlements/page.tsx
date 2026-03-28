@@ -129,7 +129,7 @@ export default function AdminSettlementsPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {summaryCards.map((card) => (
-          <div key={card.label} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+          <div key={card.label} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
             <div className="flex items-center justify-between mb-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.color}`}>
                 <card.icon size={20} />

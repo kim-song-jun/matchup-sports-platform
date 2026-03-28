@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
 import { useTeam, useTeamBadges } from '@/hooks/use-api';
@@ -66,9 +67,13 @@ export default function TeamDetailPage() {
 
   if (!team) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">팀을 찾을 수 없습니다</p>
-        <Link href="/teams" className="text-blue-500 text-sm mt-2 inline-block">목록으로 돌아가기</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={Users}
+          title="팀을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 팀이에요"
+          action={{ label: '목록으로', href: '/teams' }}
+        />
       </div>
     );
   }

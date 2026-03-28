@@ -264,7 +264,7 @@ export default function ArrivalCheckPage() {
                 value={opponentNote}
                 onChange={(e) => setOpponentNote(e.target.value)}
                 placeholder="지각/미도착 사유를 입력해주세요"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
           )}

@@ -127,7 +127,7 @@ export default function NewMercenaryPage() {
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
@@ -150,7 +150,7 @@ export default function NewMercenaryPage() {
                 id="merc-team"
                 value={form.teamId}
                 onChange={(e) => update('teamId', e.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all bg-white dark:bg-gray-800"
+                className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors bg-white dark:bg-gray-800"
               >
                 <option value="">팀을 선택하세요</option>
                 {teams.map((t) => (
@@ -169,7 +169,7 @@ export default function NewMercenaryPage() {
               type="date"
               value={form.matchDate}
               onChange={(e) => update('matchDate', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
             />
           </div>
 
@@ -181,7 +181,7 @@ export default function NewMercenaryPage() {
               type="time"
               value={form.startTime}
               onChange={(e) => update('startTime', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
             />
           </div>
 
@@ -195,7 +195,7 @@ export default function NewMercenaryPage() {
               onChange={(e) => update('venue', e.target.value)}
               maxLength={200}
               placeholder="예: 난지천 풋살장 A"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
             />
           </div>
 
@@ -207,7 +207,7 @@ export default function NewMercenaryPage() {
                 <button
                   key={opt.value}
                   onClick={() => update('position', opt.value)}
-                  className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
+                  className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-colors ${
                     form.position === opt.value
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
@@ -227,7 +227,7 @@ export default function NewMercenaryPage() {
                 <button
                   key={c}
                   onClick={() => update('count', c)}
-                  className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+                  className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                     form.count === c
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
@@ -247,7 +247,7 @@ export default function NewMercenaryPage() {
                 <button
                   key={opt.value}
                   onClick={() => update('levelRequired', opt.value)}
-                  className={`rounded-xl border-2 px-5 py-3 text-base font-semibold transition-all ${
+                  className={`rounded-xl border-2 px-5 py-3 text-base font-semibold transition-colors ${
                     form.levelRequired === opt.value
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
@@ -268,7 +268,7 @@ export default function NewMercenaryPage() {
               value={form.fee}
               onChange={(e) => update('fee', e.target.value)}
               placeholder="0 = 무료"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
             />
             <p className="text-xs text-gray-500 mt-1">
               {formatCurrency(form.fee)}
@@ -285,7 +285,7 @@ export default function NewMercenaryPage() {
               maxLength={500}
               placeholder="유니폼 색상, 준비물, 기타 안내 등"
               rows={4}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors resize-none"
             />
           </div>
         </div>

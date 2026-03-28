@@ -124,7 +124,7 @@ export default function CreateMatchPage() {
                 <button
                   key={type}
                   onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
-                  className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+                  className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                     form.sportType === type
                       ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                       : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -199,7 +199,7 @@ export default function CreateMatchPage() {
               <div className="flex gap-2">
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
                   <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                     }`}>
                     {g.label}
@@ -238,7 +238,7 @@ export default function CreateMatchPage() {
                 <div className="space-y-2 mb-3">
                   {venues.map((v: Venue) => (
                     <button key={v.id} onClick={() => setForm({ ...form, venueId: v.id, customVenue: '' })}
-                      className={`w-full text-left rounded-xl p-3 transition-all ${
+                      className={`w-full text-left rounded-xl p-3 transition-colors ${
                         form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}>
                       <p className={`text-sm font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>

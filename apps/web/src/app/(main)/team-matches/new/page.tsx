@@ -153,7 +153,7 @@ export default function NewTeamMatchPage() {
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
+              <div className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
             </div>
           ))}
         </div>
@@ -174,7 +174,7 @@ export default function NewTeamMatchPage() {
                   <button
                     key={opt.value}
                     onClick={() => update('sportType', opt.value)}
-                    className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-all ${
+                    className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-colors ${
                       form.sportType === opt.value
                         ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                         : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
@@ -193,7 +193,7 @@ export default function NewTeamMatchPage() {
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
                 placeholder="예: 일요일 오전 친선경기 모집합니다"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function NewTeamMatchPage() {
                 type="date"
                 value={form.matchDate}
                 onChange={(e) => update('matchDate', e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
 
@@ -219,7 +219,7 @@ export default function NewTeamMatchPage() {
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
                 />
               </div>
               <div>
@@ -228,7 +228,7 @@ export default function NewTeamMatchPage() {
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
                 />
               </div>
             </div>
@@ -240,7 +240,7 @@ export default function NewTeamMatchPage() {
                 value={form.totalMinutes}
                 onChange={(e) => update('totalMinutes', e.target.value)}
                 placeholder="예: 120"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
 
@@ -251,7 +251,7 @@ export default function NewTeamMatchPage() {
                   <button
                     key={q}
                     onClick={() => update('quarterCount', q)}
-                    className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+                    className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                       form.quarterCount === q
                         ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                         : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
@@ -270,7 +270,7 @@ export default function NewTeamMatchPage() {
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
 
@@ -281,7 +281,7 @@ export default function NewTeamMatchPage() {
                 value={form.venueAddress}
                 onChange={(e) => update('venueAddress', e.target.value)}
                 placeholder="예: 서울시 마포구 상암동 481-6"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
           </div>
@@ -298,7 +298,7 @@ export default function NewTeamMatchPage() {
                   <button
                     key={g.grade}
                     onClick={() => update('skillGrade', g.grade as SkillGrade)}
-                    className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-all ${
+                    className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-colors ${
                       form.skillGrade === g.grade
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
@@ -323,7 +323,7 @@ export default function NewTeamMatchPage() {
                 value={form.proPlayerCount}
                 onChange={(e) => update('proPlayerCount', Math.min(10, Math.max(0, Number(e.target.value))))}
                 placeholder="0"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
               <p className="text-xs text-gray-500 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
             </div>
@@ -336,7 +336,7 @@ export default function NewTeamMatchPage() {
                   <button
                     key={fmt}
                     onClick={() => update('gameFormat', fmt)}
-                    className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+                    className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                       form.gameFormat === fmt
                         ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                         : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
@@ -355,7 +355,7 @@ export default function NewTeamMatchPage() {
                 {MATCH_TYPES.map((mt) => (
                   <label
                     key={mt.value}
-                    className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-all ${
+                    className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-colors ${
                       form.matchType === mt.value
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
@@ -388,7 +388,7 @@ export default function NewTeamMatchPage() {
                   <button
                     key={opt.value}
                     onClick={() => update('matchStyle', opt.value)}
-                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
                       form.matchStyle === opt.value
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
@@ -411,7 +411,7 @@ export default function NewTeamMatchPage() {
                 value={form.uniformColor}
                 onChange={(e) => update('uniformColor', e.target.value)}
                 placeholder="예: 빨강 상의 + 검정 하의"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
             </div>
 
@@ -449,7 +449,7 @@ export default function NewTeamMatchPage() {
                 value={form.totalFee}
                 onChange={(e) => update('totalFee', e.target.value)}
                 placeholder="예: 200000"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
               {form.totalFee && (
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.totalFee)}</p>
@@ -463,7 +463,7 @@ export default function NewTeamMatchPage() {
                 value={form.opponentFee}
                 onChange={(e) => update('opponentFee', e.target.value)}
                 placeholder="비워두면 총 비용의 절반"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
               {form.opponentFee && (
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.opponentFee)}</p>
@@ -477,7 +477,7 @@ export default function NewTeamMatchPage() {
                 onChange={(e) => update('notes', e.target.value)}
                 placeholder="유니폼 색상, 주차 안내, 기타 규정 등"
                 rows={4}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors resize-none"
               />
             </div>
           </div>

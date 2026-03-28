@@ -145,11 +145,11 @@ export default function VenueDetailPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in dark:bg-gray-900">
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1 ml-3">{venue.name}</h1>
-        <button aria-label="공유하기" className="rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="공유하기" className="rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <Share2 size={18} className="text-gray-500" />
         </button>
       </header>
@@ -284,7 +284,11 @@ export default function VenueDetailPage() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">등록된 시설 정보가 없습니다</p>
+              <EmptyState
+                icon={MapPin}
+                title="등록된 시설 정보가 없어요"
+                size="sm"
+              />
             )}
           </div>
 
@@ -325,10 +329,12 @@ export default function VenueDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-6 text-center">
-                <MessageSquareOff size={24} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-sm text-gray-500">아직 리뷰가 없습니다</p>
-              </div>
+              <EmptyState
+                icon={Star}
+                title="아직 리뷰가 없어요"
+                description="이 시설을 이용한 후 리뷰를 남겨보세요"
+                size="sm"
+              />
             )}
           </div>
 
@@ -400,10 +406,12 @@ export default function VenueDetailPage() {
                 })}
               </div>
             ) : (
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-6 text-center">
-                <Calendar size={24} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-sm text-gray-500">예정된 경기가 없어요</p>
-              </div>
+              <EmptyState
+                icon={Calendar}
+                title="예정된 경기가 없어요"
+                description="이 시설에서 매치를 만들어보세요"
+                size="sm"
+              />
             )}
 
             <Link

@@ -141,7 +141,7 @@ export default function MyMatchesPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
@@ -161,7 +161,7 @@ export default function MyMatchesPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-all ${
+              className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-colors ${
                 activeTab === tab.key
                   ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'
@@ -222,7 +222,7 @@ export default function MyMatchesPage() {
                 const ResultIcon = rc.icon;
                 return (
                   <Link key={match.id} href={`/matches/${match.id}`} className="block">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 transition-all active:scale-[0.995]">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 transition-[colors,transform] active:scale-[0.995]">
                       <div className="flex items-start justify-between mb-2.5">
                         <div className="flex items-center gap-2">
                           <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">

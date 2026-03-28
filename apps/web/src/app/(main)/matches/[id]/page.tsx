@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
@@ -64,9 +65,13 @@ export default function MatchDetailPage() {
 
   if (!match) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">매치를 찾을 수 없습니다</p>
-        <Link href="/matches" className="text-blue-500 text-sm mt-2 inline-block">목록으로 돌아가기</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={Trophy}
+          title="매치를 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 매치예요"
+          action={{ label: '목록으로', href: '/matches' }}
+        />
       </div>
     );
   }
@@ -216,7 +221,7 @@ export default function MatchDetailPage() {
               <button
                 onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
                 disabled={joinMutation.isPending}
-                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
               >
                 {joinMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">

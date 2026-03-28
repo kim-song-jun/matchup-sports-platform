@@ -137,7 +137,7 @@ export default function CreateListingPage() {
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 dark:bg-gray-700 text-gray-600 hover:bg-gray-100'
@@ -157,7 +157,7 @@ export default function CreateListingPage() {
                 key={cat}
                 type="button"
                 onClick={() => setForm({ ...form, category: cat })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.category === cat
                     ? 'bg-blue-500 text-white'
                     : 'bg-white dark:bg-gray-800 text-gray-600 border border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -177,7 +177,7 @@ export default function CreateListingPage() {
                 key={c.value}
                 type="button"
                 onClick={() => setForm({ ...form, condition: c.value })}
-                className={`w-full text-left rounded-xl border-2 p-3.5 transition-all ${
+                className={`w-full text-left rounded-xl border-2 p-3.5 transition-colors ${
                   form.condition === c.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
@@ -198,7 +198,7 @@ export default function CreateListingPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, listingType: 'sell' })}
-              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'sell'
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-200'
@@ -209,7 +209,7 @@ export default function CreateListingPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, listingType: 'rent' })}
-              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'rent'
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-200'

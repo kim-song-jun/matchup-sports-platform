@@ -261,7 +261,7 @@ export default function ChatRoomEmbed({
           <button
             aria-label={showMatchInfo ? '매치 정보 닫기' : '매치 정보 보기'}
             onClick={() => setShowMatchInfo(!showMatchInfo)}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             {showMatchInfo ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
@@ -270,7 +270,7 @@ export default function ChatRoomEmbed({
             <button
               aria-label="더보기 메뉴"
               onClick={() => setShowMenu(!showMenu)}
-              className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <MoreVertical size={18} />
             </button>
@@ -439,7 +439,7 @@ export default function ChatRoomEmbed({
           <div className="flex flex-wrap gap-2">
             {['👍', '👏', '🔥', '⚽', '🏀', '🏒', '💪', '🎉', '😊', '😂', '🙏', '❤️'].map(emoji => (
               <button key={emoji} onClick={() => { setInput(prev => prev + emoji); setShowEmoji(false); }}
-                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
                 {emoji}
               </button>
             ))}
@@ -485,7 +485,7 @@ export default function ChatRoomEmbed({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="메시지를 입력하세요"
-            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
           />
           {/* 전송 */}
           <button
@@ -508,7 +508,7 @@ export default function ChatRoomEmbed({
               {['욕설/비매너', '허위정보', '스팸', '기타'].map((reason) => (
                 <label
                   key={reason}
-                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
                     reportReason === reason
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
                       : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -531,7 +531,7 @@ export default function ChatRoomEmbed({
               onChange={(e) => setReportDetail(e.target.value)}
               placeholder="상세 내용을 입력하세요 (선택)"
               rows={3}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-800 transition-all resize-none mb-4"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-800 transition-colors resize-none mb-4"
             />
             <div className="flex items-center gap-3">
               <button

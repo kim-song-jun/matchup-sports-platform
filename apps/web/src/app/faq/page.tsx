@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Mail, MessageCircle } from 'lucide-react';
+import { ChevronDown, Mail, MessageCircle, Search } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { LandingNav } from '@/components/landing/landing-nav';
 import { LandingFooter } from '@/components/landing/landing-footer';
@@ -273,9 +274,12 @@ export default function FaqPage() {
                   />
                 ))
               ) : (
-                <div className="py-12 text-center">
-                  <p className="text-md text-gray-400">해당 카테고리에 질문이 없습니다.</p>
-                </div>
+                <EmptyState
+                  icon={Search}
+                  title="해당 카테고리에 질문이 없어요"
+                  description="다른 카테고리를 선택해보세요"
+                  size="sm"
+                />
               )}
             </div>
           </ScrollReveal>

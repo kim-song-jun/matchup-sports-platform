@@ -62,8 +62,8 @@ export default function OnboardingPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex gap-1.5">
-            <div className={`h-1 rounded-full transition-all duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
-            <div className={`h-1 rounded-full transition-all duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
+            <div className={`h-1 rounded-full transition-[width,colors] duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
+            <div className={`h-1 rounded-full transition-[width,colors] duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
           </div>
           <button
             onClick={finish}
@@ -92,7 +92,7 @@ export default function OnboardingPage() {
                   <button
                     key={sport.key}
                     onClick={() => toggleSport(sport.key)}
-                    className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-all duration-200 active:scale-[0.96] ${
+                    className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-[colors,transform] duration-200 active:scale-[0.96] ${
                       isSelected
                         ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800'
                         : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 dark:hover:border-gray-700'
@@ -115,7 +115,7 @@ export default function OnboardingPage() {
             <div className="mt-auto pt-6 space-y-3">
               <button
                 onClick={() => setStep('features')}
-                className="w-full py-3.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-base hover:bg-gray-800 dark:hover:bg-gray-100 active:scale-[0.98] transition-all"
+                className="w-full py-3.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-base hover:bg-gray-800 dark:hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform]"
               >
                 {selectedSports.length > 0
                   ? `${selectedSports.map(s => sportLabel[s] || s).join(', ')} 선택 완료`
@@ -160,7 +160,7 @@ export default function OnboardingPage() {
             <div className="mt-auto pt-6 space-y-3">
               <button
                 onClick={finish}
-                className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-bold text-base hover:bg-blue-600 active:scale-[0.98] transition-all"
+                className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-bold text-base hover:bg-blue-600 active:scale-[0.98] transition-[colors,transform]"
               >
                 시작하기
               </button>

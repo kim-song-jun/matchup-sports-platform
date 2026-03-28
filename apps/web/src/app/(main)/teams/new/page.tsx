@@ -112,7 +112,7 @@ export default function CreateTeamPage() {
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
@@ -169,7 +169,7 @@ export default function CreateTeamPage() {
                 key={g.grade}
                 type="button"
                 onClick={() => setForm({ ...form, skillGrade: g.grade as SkillGrade })}
-                className={`shrink-0 rounded-xl border-2 px-3.5 py-2.5 text-center transition-all ${
+                className={`shrink-0 rounded-xl border-2 px-3.5 py-2.5 text-center transition-colors ${
                   form.skillGrade === g.grade
                     ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-100 hover:border-gray-200'
@@ -216,7 +216,7 @@ export default function CreateTeamPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, isRecruiting: true })}
-              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                 form.isRecruiting
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
@@ -227,7 +227,7 @@ export default function CreateTeamPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, isRecruiting: false })}
-              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                 !form.isRecruiting
                   ? 'border-gray-800 bg-gray-50 text-gray-800'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'

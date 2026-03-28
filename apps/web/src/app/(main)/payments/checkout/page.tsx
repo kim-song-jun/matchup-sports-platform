@@ -130,7 +130,7 @@ export default function CheckoutPage() {
 
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제하기</h1>
@@ -180,7 +180,7 @@ export default function CheckoutPage() {
                 <button
                   key={method.id}
                   onClick={() => setSelectedMethod(method.id)}
-                  className={`w-full flex items-center gap-3.5 rounded-xl border-2 p-4 transition-all text-left ${
+                  className={`w-full flex items-center gap-3.5 rounded-xl border-2 p-4 transition-colors text-left ${
                     isSelected
                       ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/30'
                       : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600'
@@ -300,7 +300,7 @@ export default function CheckoutPage() {
         <button
           onClick={handlePayment}
           disabled={!agreedToTerms || isProcessing}
-          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-all ${
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-colors ${
             agreedToTerms && !isProcessing
               ? 'bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98]'
               : 'bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed'

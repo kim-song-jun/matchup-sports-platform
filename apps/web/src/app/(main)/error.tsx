@@ -28,7 +28,7 @@ export default function Error({
       </p>
       <button
         onClick={reset}
-        className="rounded-xl bg-blue-500 px-6 py-3 text-base font-bold text-white hover:bg-blue-600 active:scale-[0.98] transition-all duration-200"
+        className="rounded-xl bg-blue-500 px-6 py-3 text-base font-bold text-white hover:bg-blue-600 active:scale-[0.98] transition-[colors,transform] duration-200"
       >
         다시 시도하기
       </button>

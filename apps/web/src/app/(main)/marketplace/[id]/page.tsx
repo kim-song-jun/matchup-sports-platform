@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
@@ -42,9 +43,13 @@ export default function ListingDetailPage() {
 
   if (!listing) {
     return (
-      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-gray-500">매물을 찾을 수 없습니다</p>
-        <Link href="/marketplace" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link>
+      <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+        <EmptyState
+          icon={ShoppingBag}
+          title="매물을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 매물이에요"
+          action={{ label: '목록으로', href: '/marketplace' }}
+        />
       </div>
     );
   }

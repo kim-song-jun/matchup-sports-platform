@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Image, BookOpen, Pencil } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Image, BookOpen, Pencil, GraduationCap } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import dynamic from 'next/dynamic';
@@ -58,7 +59,16 @@ export default function LessonDetailPage() {
   const isFull = !!(lesson && lesson.currentParticipants >= lesson.maxParticipants);
 
   if (isLoading) return <div role="status" aria-label="로딩 중" className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-2xl" /><div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-2xl" /></div></div>;
-  if (!lesson) return <div role="alert" className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20"><p className="text-gray-500">강좌를 찾을 수 없습니다</p><Link href="/lessons" className="text-blue-500 text-sm mt-2 inline-block">목록으로</Link></div>;
+  if (!lesson) return (
+    <div role="alert" className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0">
+      <EmptyState
+        icon={GraduationCap}
+        title="강좌를 찾을 수 없어요"
+        description="삭제되었거나 존재하지 않는 강좌예요"
+        action={{ label: '목록으로', href: '/lessons' }}
+      />
+    </div>
+  );
 
   const SportIcon = SportIconMap[lesson.sportType];
   const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;

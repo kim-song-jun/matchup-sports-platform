@@ -11,7 +11,7 @@ export default function ChatRoomPage() {
   return (
     <>
       {/* Desktop: full-height embedded in layout */}
-      <div className="hidden lg:flex lg:flex-col lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-2xl overflow-hidden border border-gray-200">
+      <div className="hidden lg:flex lg:flex-col lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
         <ChatRoomEmbed
           chatRoomId={chatRoomId}
           embedded={true}

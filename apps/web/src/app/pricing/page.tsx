@@ -243,7 +243,7 @@ export default function PricingPage() {
           <ScrollReveal>
             <div className="text-center mb-10">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                <CreditCard size={13} />
+                <CreditCard size={14} />
                 매치 참가비
               </span>
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">

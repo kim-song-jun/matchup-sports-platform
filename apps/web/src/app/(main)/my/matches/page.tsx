@@ -231,7 +231,7 @@ export default function MyMatchesPage() {
                           <span className="text-xs font-medium text-gray-500">{match.players}</span>
                         </div>
                         <span className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold ${rc.style}`}>
-                          <ResultIcon size={13} />
+                          <ResultIcon size={12} />
                           {rc.text}
                         </span>
                       </div>
@@ -299,19 +299,19 @@ export default function MyMatchesPage() {
 
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Calendar size={13} />
+                      <Calendar size={12} />
                       <span>{match.matchDate} ({getDayLabel(match.matchDate)})</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Clock size={13} />
+                      <Clock size={12} />
                       <span>{match.startTime} ~ {match.endTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <MapPin size={13} />
+                      <MapPin size={12} />
                       <span>{match.venue}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Users size={13} />
+                      <Users size={12} />
                       <span>{match.currentPlayers}/{match.maxPlayers}명</span>
                     </div>
                   </div>

@@ -36,7 +36,7 @@ export function AdminToolbar({
       <div className="flex items-center gap-2">
         {search && (
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400" size={15} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400" size={14} />
             <input
               type="text"
               value={search.value}
@@ -49,7 +49,7 @@ export function AdminToolbar({
         {onDownload && (
           <button onClick={onDownload}
             className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0">
-            <Download size={13} />
+            <Download size={12} />
             내보내기
           </button>
         )}

@@ -151,26 +151,26 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
           value={facilityRating}
           onChange={setFacilityRating}
           label="시설 상태"
-          size={22}
+          size={24}
         />
         <StarRating
           value={accessRating}
           onChange={setAccessRating}
           label="접근성"
-          size={22}
+          size={24}
         />
         <StarRating
           value={costRating}
           onChange={setCostRating}
           label="가격 대비"
-          size={22}
+          size={24}
         />
         {isIceRink && (
           <StarRating
             value={iceQualityRating}
             onChange={setIceQualityRating}
             label="빙질"
-            size={22}
+            size={24}
           />
         )}
         <div className="h-px bg-gray-100" />

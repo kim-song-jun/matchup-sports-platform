@@ -141,7 +141,7 @@ export default function LandingPage() {
                 ] as const).map((pain) => (
                   <div key={pain.text} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center">
                     <div className={`h-12 w-12 rounded-xl ${pain.bg} flex items-center justify-center mx-auto mb-4`}>
-                      <pain.icon size={22} className={pain.color} />
+                      <pain.icon size={20} className={pain.color} />
                     </div>
                     <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed font-medium">{pain.text}</p>
                   </div>
@@ -161,7 +161,7 @@ export default function LandingPage() {
           <ScrollReveal>
             <div className="text-center mb-16">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                <Target size={13} /> 주요 기능
+                <Target size={14} /> 주요 기능
               </span>
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 스포츠 매칭, 이렇게 달라집니다
@@ -174,7 +174,7 @@ export default function LandingPage() {
             <div className="bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white hover:shadow-xl transition-[colors,shadow] duration-300 lg:flex lg:items-center lg:gap-10">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs font-semibold px-3 py-1 rounded-full mb-4">
-                  <Target size={13} /> 핵심 기능
+                  <Target size={14} /> 핵심 기능
                 </div>
                 <h3 className="text-2xl lg:text-2xl font-bold mb-3">AI 매칭</h3>
                 <p className="text-md text-gray-400 leading-relaxed max-w-[400px]">
@@ -216,7 +216,7 @@ export default function LandingPage() {
                 <ScrollReveal key={f.title} delay={idx * 100}>
                   <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-1.5 transition-[colors,transform,shadow] duration-300 h-full">
                     <div className={`h-12 w-12 rounded-xl ${f.iconBg} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                      <Icon size={22} className="text-white" />
+                      <Icon size={20} className="text-white" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{f.title}</h3>
                     <p className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">{f.description}</p>
@@ -321,7 +321,7 @@ export default function LandingPage() {
                 return (
                   <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800 transition-[colors,transform,shadow] duration-300 cursor-default">
                     <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`}>
-                      {Icon && <Icon size={22} className={sport.iconColor} />}
+                      {Icon && <Icon size={20} className={sport.iconColor} />}
                     </div>
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">{sport.name}</span>
                   </div>

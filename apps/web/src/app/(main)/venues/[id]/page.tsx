@@ -180,7 +180,7 @@ export default function VenueDetailPage() {
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-medium text-blue-500">{sportLabel[venue.sportType || venue.sportTypes?.[0] || venue.type] || venue.type}</span>
               <div className="flex items-center gap-1 text-sm">
-                <Star size={13} className="text-amber-400" fill="currentColor" />
+                <Star size={12} className="text-amber-400" fill="currentColor" />
                 <span className="font-medium text-gray-700">{venueRating.toFixed(1)}</span>
                 <span className="text-gray-500">({venueReviewCount})</span>
               </div>
@@ -299,7 +299,7 @@ export default function VenueDetailPage() {
                 리뷰 ({venueReviews.length})
               </h3>
               <div className="flex items-center gap-1 text-sm">
-                <Star size={13} className="text-amber-400" fill="currentColor" />
+                <Star size={12} className="text-amber-400" fill="currentColor" />
                 <span className="font-semibold text-gray-700">{venueRating.toFixed(1)}</span>
               </div>
             </div>
@@ -316,7 +316,7 @@ export default function VenueDetailPage() {
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star
                             key={i}
-                            size={11}
+                            size={12}
                             className={i < (review.rating ?? 0) ? 'text-amber-400' : 'text-gray-200'}
                             fill={i < (review.rating ?? 0) ? 'currentColor' : 'none'}
                           />
@@ -392,11 +392,11 @@ export default function VenueDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Calendar size={11} className="shrink-0" />
+                        <Calendar size={12} className="shrink-0" />
                         <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                        <Users size={11} className="shrink-0" />
+                        <Users size={12} className="shrink-0" />
                         <span>{match.homeTeam}</span>
                         <span className="text-gray-300">vs</span>
                         <span>{match.awayTeam ?? '상대팀 모집중'}</span>

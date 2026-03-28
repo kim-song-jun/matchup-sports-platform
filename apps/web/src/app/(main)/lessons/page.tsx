@@ -32,7 +32,7 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
         <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{lesson.title}</h3>
-            <span className="shrink-0 text-2xs font-medium text-blue-500">{typeLabel[lesson.type] || lesson.type}</span>
+            <span className="shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">{typeLabel[lesson.type] || lesson.type}</span>
           </div>
           <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
             <span className={`${sportCardAccent[lesson.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>

@@ -245,7 +245,7 @@ export default function BadgesPage() {
                       badge.earned ? 'bg-gray-100 text-gray-500' : 'bg-gray-100 text-gray-300'
                     }`}
                   >
-                    {badge.earned ? <Icon size={22} /> : <Lock size={18} />}
+                    {badge.earned ? <Icon size={20} /> : <Lock size={18} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

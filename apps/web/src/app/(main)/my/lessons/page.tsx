@@ -174,14 +174,14 @@ export default function MyLessonsPage() {
                 {/* Info rows */}
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                    <Calendar size={13} className="shrink-0" /><span>{lesson.schedule}</span>
+                    <Calendar size={12} className="shrink-0" /><span>{lesson.schedule}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                    <MapPin size={13} className="shrink-0" /><span>{lesson.venue}</span>
+                    <MapPin size={12} className="shrink-0" /><span>{lesson.venue}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1 text-amber-500">
-                      <Star size={13} fill="currentColor" />
+                      <Star size={12} fill="currentColor" />
                       <span className="text-sm font-semibold">{lesson.rating}</span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">({lesson.reviewCount})</span>
                     </div>
@@ -204,7 +204,7 @@ export default function MyLessonsPage() {
                 <div className="mt-3">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                      <Users size={13} />
+                      <Users size={12} />
                       <span>수강생</span>
                     </div>
                     <span className={`text-sm font-semibold ${isFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-200'}`}>
@@ -225,7 +225,7 @@ export default function MyLessonsPage() {
               {lesson.curriculum && lesson.curriculum.length > 0 && (
                 <div className="border-t border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <ListChecks size={13} className="text-gray-500" />
+                    <ListChecks size={12} className="text-gray-500" />
                     <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">커리큘럼 요약</span>
                   </div>
                   <ul className="space-y-1.5">

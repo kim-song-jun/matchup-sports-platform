@@ -144,13 +144,13 @@ export default function MyTeamMatchesPage() {
 
               <div className="mt-2 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                  <Calendar size={13} /><span>{post.matchDate}</span>
+                  <Calendar size={12} /><span>{post.matchDate}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                  <Clock size={13} /><span>{post.startTime} ~ {post.endTime}</span>
+                  <Clock size={12} /><span>{post.startTime} ~ {post.endTime}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                  <MapPin size={13} /><span>{post.venue}</span>
+                  <MapPin size={12} /><span>{post.venue}</span>
                 </div>
               </div>
 

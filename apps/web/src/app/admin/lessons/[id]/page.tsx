@@ -165,7 +165,7 @@ export default function AdminLessonDetailPage() {
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">코치 정보</h3>
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
-                  <User size={22} />
+                  <User size={24} />
                 </div>
                 <div>
                   <p className="text-md font-semibold text-gray-900 dark:text-white">{lesson.coachName}</p>

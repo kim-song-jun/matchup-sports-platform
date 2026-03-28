@@ -42,7 +42,7 @@ function ChatRoomItem({
     <div
       className={`rounded-xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
         isActive
-          ? 'bg-gray-50 border-gray-200'
+          ? 'bg-gray-50 border-gray-100 dark:border-gray-700'
           : 'bg-white border-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700'
       }`}
     >
@@ -161,9 +161,9 @@ export default function ChatListPage() {
   return (
     <>
       {/* ===== DESKTOP: 2-column layout ===== */}
-      <div className="hidden lg:grid lg:grid-cols-[380px_1fr] lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-xl overflow-hidden border border-gray-200 bg-white">
+      <div className="hidden lg:grid lg:grid-cols-[380px_1fr] lg:h-[calc(100dvh-5rem)] lg:-my-10 lg:-mx-8 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 bg-white">
         {/* Left panel - Chat room list */}
-        <div className="border-r border-gray-200 flex flex-col bg-white">
+        <div className="border-r border-gray-100 dark:border-gray-700 flex flex-col bg-white">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
             <p className="text-sm text-gray-500 mt-0.5">팀 매칭 대화</p>

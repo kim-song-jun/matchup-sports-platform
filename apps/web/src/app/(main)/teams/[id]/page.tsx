@@ -115,7 +115,7 @@ export default function TeamDetailPage() {
         {/* Left */}
         <div className="px-5 lg:px-0">
           {/* Cover + Team header */}
-          <div className="rounded-xl bg-white border border-gray-100 overflow-hidden">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
             <div className="h-32 lg:h-44 bg-gray-800 flex items-center justify-center relative">
               {team.coverImageUrl ? (
@@ -138,7 +138,7 @@ export default function TeamDetailPage() {
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold text-gray-900">{team.name}</h2>
                 {team.isRecruiting && (
-                  <span className="rounded-full bg-blue-500 px-2.5 py-0.5 text-xs font-semibold text-white">모집중</span>
+                  <span className="text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5">모집중</span>
                 )}
                 {hasMercenaryPost && (
                   <Link href="/mercenary" className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 flex items-center gap-1">
@@ -154,7 +154,7 @@ export default function TeamDetailPage() {
                 {team.skillGrade ? (() => {
                   const grade = getGradeInfo(team.skillGrade);
                   return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${grade.color}`}>
+                    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-semibold ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
@@ -186,8 +186,8 @@ export default function TeamDetailPage() {
           </div>
 
           {/* 신뢰도 점수 */}
-          <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">신뢰도</h3>
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">신뢰도</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <TrustItem
                 icon={<CheckCircle size={16} />}
@@ -237,9 +237,9 @@ export default function TeamDetailPage() {
           </div>
 
           {/* 최근 경기 결과 */}
-          <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">최근 경기</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">최근 경기</h3>
               <Link href="/team-matches" className="text-sm text-blue-500 font-medium">전체보기</Link>
             </div>
             <div className="space-y-2">
@@ -275,8 +275,8 @@ export default function TeamDetailPage() {
           </div>
 
           {/* 활동 정보 */}
-          <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">활동 정보</h3>
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">활동 정보</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <InfoItem icon={<MapPin size={16} />} label="활동 지역" value={`${team.city || ''} ${team.district || ''}`} />
               <InfoItem icon={<Calendar size={16} />} label="정기 활동" value="매주 토요일" />
@@ -287,8 +287,8 @@ export default function TeamDetailPage() {
 
           {/* SNS & 링크 */}
           {hasSns && (
-            <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-              <h3 className="text-lg font-bold text-gray-900 mb-3">SNS & 링크</h3>
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">SNS & 링크</h3>
               <div className="grid grid-cols-2 gap-2">
                 {team.instagramUrl && (
                   <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gray-800 text-white" />
@@ -308,8 +308,8 @@ export default function TeamDetailPage() {
 
           {/* 홍보 영상 */}
           {team.shortsUrl && (
-            <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-              <h3 className="text-lg font-bold text-gray-900 mb-3">홍보 영상</h3>
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">홍보 영상</h3>
               <a href={team.shortsUrl} target="_blank" rel="noopener noreferrer"
                 className="block rounded-xl bg-gray-900 h-48 lg:h-64 flex items-center justify-center text-white/60 hover:text-white/80 transition-colors relative overflow-hidden">
                 <div className="text-center z-10">
@@ -324,7 +324,7 @@ export default function TeamDetailPage() {
 
           {/* 갤러리 — 실제 사진이 있을 때만 표시 */}
           {team.photos && team.photos.length > 0 && (
-            <div className="mt-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">갤러리</h3>
               <div className="grid grid-cols-3 gap-2">
                 {team.photos.map((photo: string, i: number) => (
@@ -341,7 +341,7 @@ export default function TeamDetailPage() {
         <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* 팀 참여 신청 */}
-          <div className="rounded-xl bg-white border border-gray-100 p-4">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {isAuthenticated ? (
               <button
                 onClick={async () => {
@@ -367,10 +367,10 @@ export default function TeamDetailPage() {
           </div>
 
           {/* CTA */}
-          <div className="rounded-xl bg-white border border-gray-100 p-4">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {team.isRecruiting ? (
               <div className="text-center mb-4">
-                <span className="inline-block rounded-full bg-blue-500 px-3 py-1 text-sm font-semibold text-white mb-2">팀원 모집중</span>
+                <span className="inline-block text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5 mb-2">팀원 모집중</span>
                 <p className="text-sm text-gray-500">아래 버튼으로 연락해보세요</p>
               </div>
             ) : (
@@ -391,7 +391,7 @@ export default function TeamDetailPage() {
           {/* 용병 모집 중 카드 */}
           {hasMercenaryPost && (
             <Link href="/mercenary" className="block">
-              <div className="rounded-xl bg-white border border-gray-100 p-4 transition-colors hover:bg-gray-50">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100">
                     <UserPlus size={18} className="text-gray-500" />
@@ -407,8 +407,8 @@ export default function TeamDetailPage() {
           )}
 
           {/* Owner */}
-          <div className="rounded-xl bg-white border border-gray-100 p-4">
-            <h3 className="text-base font-semibold text-gray-900 mb-3">운영자</h3>
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영자</h3>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-base font-bold text-gray-500">
                 {team.owner?.nickname?.charAt(0) || '?'}

@@ -316,7 +316,7 @@ export default function GuidePage() {
           <ScrollReveal>
             <div className="text-center mb-14">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                <Users size={13} />
+                <Users size={14} />
                 팀 매칭
               </span>
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
@@ -382,7 +382,7 @@ export default function GuidePage() {
           <ScrollReveal>
             <div className="text-center mb-14">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                <ShoppingBag size={13} />
+                <ShoppingBag size={14} />
                 용병 & 장터
               </span>
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">

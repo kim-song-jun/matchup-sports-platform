@@ -142,19 +142,19 @@ export default function ArrivalCheckPage() {
 
       <div className="px-5 lg:px-0 lg:max-w-2xl lg:mx-auto">
         {/* Match info header card */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <h2 className="text-md font-semibold text-gray-900 dark:text-white mb-3">{mockMatch.title}</h2>
           <div className="space-y-2">
             <div className="flex items-center gap-2.5 text-sm text-gray-600">
-              <Calendar size={15} className="text-gray-500 shrink-0" />
+              <Calendar size={14} className="text-gray-500 shrink-0" />
               <span>{mockMatch.matchDate}</span>
             </div>
             <div className="flex items-center gap-2.5 text-sm text-gray-600">
-              <Clock size={15} className="text-gray-500 shrink-0" />
+              <Clock size={14} className="text-gray-500 shrink-0" />
               <span>{mockMatch.startTime} ~ {mockMatch.endTime}</span>
             </div>
             <div className="flex items-center gap-2.5 text-sm text-gray-600">
-              <MapPin size={15} className="text-gray-500 shrink-0" />
+              <MapPin size={14} className="text-gray-500 shrink-0" />
               <span>{mockMatch.venueName}</span>
             </div>
           </div>

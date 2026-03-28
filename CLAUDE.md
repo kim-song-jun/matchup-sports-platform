@@ -84,6 +84,11 @@ npx playwright test            # E2E
 - 성능: `transition-all` 대신 `transition-colors`/`transition-transform` 사용, progress bar는 `transform:scaleX()` 사용
 - 폼: `<label htmlFor>` + `<input id>` 연결, placeholder만으로 라벨 대체 금지
 
+## Agent Team 운영
+
+글로벌 `~/.claude/CLAUDE.md`의 Agent Team 운영 섹션 참조.
+프로젝트별 에이전트 프롬프트가 필요하면 `.claude/agents/` 디렉토리에 추가.
+
 ## 구현 문서 위치
 구현 상세 문서는 별도 저장소에 있음. 주요 참조:
 - 01_ARCHITECTURE: 시스템 아키텍처

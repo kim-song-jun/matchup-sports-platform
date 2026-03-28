@@ -115,7 +115,7 @@ export default function TeamMatchDetailPage() {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
-        <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${status.className}`}>
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${status.className}`}>
           {status.label}
         </span>
       </header>
@@ -125,11 +125,11 @@ export default function TeamMatchDetailPage() {
           {/* 왼쪽: 경기 정보 */}
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">경기 정보</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
                     <Calendar size={16} />
                   </div>
                   <div>
@@ -139,7 +139,7 @@ export default function TeamMatchDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
                     <Clock size={16} />
                   </div>
                   <div>
@@ -152,7 +152,7 @@ export default function TeamMatchDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
                     <Trophy size={16} />
                   </div>
                   <div>
@@ -162,7 +162,7 @@ export default function TeamMatchDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
                     <MapPin size={16} />
                   </div>
                   <div>
@@ -175,7 +175,7 @@ export default function TeamMatchDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
                     <DollarSign size={16} />
                   </div>
                   <div>
@@ -192,7 +192,7 @@ export default function TeamMatchDetailPage() {
             </div>
 
             {/* 경기 조건 */}
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">경기 조건</h2>
 
               {/* 실력등급 배지 + 무료초청 태그 */}
@@ -200,13 +200,13 @@ export default function TeamMatchDetailPage() {
                 {match.skillGrade && (() => {
                   const grade = getGradeInfo(match.skillGrade);
                   return (
-                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${grade.color}`}>
+                    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
                 })()}
                 {match.isFreeInvitation && (
-                  <span className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-600">
+                  <span className="inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-semibold bg-green-50 text-green-600">
                     무료초청
                   </span>
                 )}
@@ -270,7 +270,7 @@ export default function TeamMatchDetailPage() {
 
             {/* 심판 배정 표 */}
             {match.hasReferee && refereeSchedule && refereeSchedule.length > 0 && (
-              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Shield size={16} className="text-blue-500" />
                   심판 배정표
@@ -298,7 +298,7 @@ export default function TeamMatchDetailPage() {
 
             {/* 호스트 팀 카드 */}
             {match.hostTeam && (
-              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">호스트 팀</h2>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-500 text-lg font-bold">
@@ -375,7 +375,7 @@ export default function TeamMatchDetailPage() {
 
             {/* 신청 목록 (호스트만) */}
             {isHost && applications.length > 0 && (
-              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                   <Users size={16} className="text-blue-500" />
                   신청 목록

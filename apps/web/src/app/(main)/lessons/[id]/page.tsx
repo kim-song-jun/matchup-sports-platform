@@ -19,8 +19,8 @@ const typeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
 };
 const typeColor: Record<string, string> = {
-  group_lesson: 'bg-gray-100 text-gray-700', practice_match: 'bg-gray-100 text-gray-700',
-  free_practice: 'bg-gray-100 text-gray-700', clinic: 'bg-gray-100 text-gray-700',
+  group_lesson: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', practice_match: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
+  free_practice: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', clinic: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
 };
 const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
@@ -94,9 +94,9 @@ export default function LessonDetailPage() {
           </div>
 
           {/* 타이틀 */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${typeColor[lesson.type]}`}>{typeLabel[lesson.type]}</span>
+              <span className={`rounded px-1.5 py-0.5 text-2xs font-semibold ${typeColor[lesson.type]}`}>{typeLabel[lesson.type]}</span>
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 leading-tight">{lesson.title}</h2>
@@ -105,7 +105,7 @@ export default function LessonDetailPage() {
 
           {/* 코치 */}
           {lesson.coachName && (
-            <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h3 className="text-lg font-bold text-gray-900 mb-3">코치 소개</h3>
               <div className="flex items-start gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500"><User size={28} /></div>
@@ -122,15 +122,15 @@ export default function LessonDetailPage() {
           )}
 
           {/* 일정 */}
-          <div className="mt-3 grid grid-cols-2 gap-3 lg:gap-5">
-            <InfoCard icon={<Calendar size={16} />} label="일시" value={formatFullDate(lesson.lessonDate)} sub={`${lesson.startTime} ~ ${lesson.endTime}`} />
-            <InfoCard icon={<MapPin size={16} />} label="장소" value={lesson.venueName || '장소 미정'} />
-            <InfoCard icon={<Users size={16} />} label="인원" value={`${lesson.currentParticipants}/${lesson.maxParticipants}명`} sub={`${levelLabel[lesson.levelMin]}~${levelLabel[lesson.levelMax]}`} />
-            <InfoCard icon={<CreditCard size={16} />} label="수강료" value={formatCurrency(lesson.fee)} />
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:gap-5">
+            <InfoCard icon={<Calendar size={18} />} label="일시" value={formatFullDate(lesson.lessonDate)} sub={`${lesson.startTime} ~ ${lesson.endTime}`} />
+            <InfoCard icon={<MapPin size={18} />} label="장소" value={lesson.venueName || '장소 미정'} />
+            <InfoCard icon={<Users size={18} />} label="인원" value={`${lesson.currentParticipants}/${lesson.maxParticipants}명`} sub={`${levelLabel[lesson.levelMin]}~${levelLabel[lesson.levelMax]}`} />
+            <InfoCard icon={<CreditCard size={18} />} label="수강료" value={formatCurrency(lesson.fee)} />
           </div>
 
           {/* 커리큘럼 */}
-          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen size={18} className="text-gray-500" />
               <h3 className="text-lg font-bold text-gray-900">커리큘럼</h3>
@@ -149,7 +149,7 @@ export default function LessonDetailPage() {
           </div>
 
           {/* 이런 분께 추천 */}
-          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-lg font-bold text-gray-900 mb-3">이런 분께 추천합니다</h3>
             {[
               `${sportLabel[lesson.sportType]}을(를) 처음 시작하시는 분`,
@@ -164,7 +164,7 @@ export default function LessonDetailPage() {
           </div>
 
           {/* 강좌 사진 */}
-          <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-5">
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-lg font-bold text-gray-900 mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3].map((i) => (
@@ -178,8 +178,8 @@ export default function LessonDetailPage() {
         {/* Right CTA — sidebar-sticky로 전체 오른쪽 컬럼이 sticky */}
         <div className="detail-sidebar px-5 lg:px-0 mt-4 lg:mt-0">
           <div className="sidebar-sticky space-y-3">
-            <div className="rounded-2xl bg-white border border-gray-100 p-5">
-              <p className="text-2xl font-black text-gray-900 text-center mb-3">{formatCurrency(lesson.fee)}</p>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <p className="text-2xl font-black text-gray-900 dark:text-white text-center mb-3">{formatCurrency(lesson.fee)}</p>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-500">참가 현황</span>
                 <span className="text-sm font-semibold text-blue-500">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
@@ -253,8 +253,8 @@ export default function LessonDetailPage() {
             </div>
 
             {/* 등록자 — CTA와 같은 sticky 그룹 안에 */}
-            <div className="rounded-2xl bg-white border border-gray-100 p-4">
-              <h3 className="text-base font-semibold text-gray-900 mb-3">등록자</h3>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">등록자</h3>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
                 <div>
@@ -267,7 +267,7 @@ export default function LessonDetailPage() {
             {isHost && (
               <Link
                 href={`/lessons/${lessonId}/edit`}
-                className="flex items-center justify-center gap-2 rounded-xl bg-white border border-gray-100 p-4 text-base font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center gap-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <Pencil size={16} />
                 강좌 수정
@@ -301,10 +301,10 @@ export default function LessonDetailPage() {
 
 function InfoCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl bg-white border border-gray-100 p-3.5">
-      <div className="flex items-center gap-2 mb-1.5">{icon}<span className="text-xs text-gray-500">{label}</span></div>
-      <p className="text-md font-semibold text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
+      <div className="flex items-center gap-2 mb-1.5"><span className="text-gray-400 dark:text-gray-500">{icon}</span><span className="text-xs text-gray-500 dark:text-gray-400">{label}</span></div>
+      <p className="text-md font-semibold text-gray-900 dark:text-white">{value}</p>
+      {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }

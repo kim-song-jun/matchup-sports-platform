@@ -230,7 +230,7 @@ export default function AboutPage() {
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                     <div className={`h-12 w-12 rounded-xl ${a.iconBg} flex items-center justify-center`}>
-                      <Icon size={22} className={a.iconColor} />
+                      <Icon size={20} className={a.iconColor} />
                     </div>
                   </div>
                   <div className="flex-1">

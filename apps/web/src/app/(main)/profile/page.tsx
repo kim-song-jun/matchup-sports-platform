@@ -44,7 +44,7 @@ export default function ProfilePage() {
                   {user.bio && <p className="text-sm text-gray-500 mt-0.5">{user.bio}</p>}
                   <div className="flex items-center gap-2 mt-1">
                     <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-500">
-                      <Star size={13} fill="currentColor" />
+                      <Star size={12} fill="currentColor" />
                       <span className="font-semibold">{user.mannerScore?.toFixed(1)}</span>
                     </div>
                     <span className="text-gray-200">|</span>
@@ -275,7 +275,7 @@ function UpcomingSchedule() {
                   <div className="flex-1 min-w-0">
                     <p className="text-base font-medium text-gray-900 dark:text-white truncate">{m.title}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                      <span className="flex items-center gap-0.5"><Clock size={11} /> {m.startTime}</span>
+                      <span className="flex items-center gap-0.5"><Clock size={12} /> {m.startTime}</span>
                       <span>({weekdays[d.getDay()]})</span>
                     </div>
                   </div>

@@ -104,7 +104,7 @@ export default function CreateListingPage() {
           <input type="file" id="file-upload" accept="image/*" multiple className="hidden" />
           <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
             <label htmlFor="file-upload" role="button" aria-label="사진 추가" className="flex h-[80px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:bg-gray-700 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors cursor-pointer">
-              <Camera size={22} />
+              <Camera size={20} />
               <span className="text-xs font-medium">0/10</span>
             </label>
             {/* Placeholder thumbnails */}

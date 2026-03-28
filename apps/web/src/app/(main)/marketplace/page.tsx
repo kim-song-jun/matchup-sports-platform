@@ -47,7 +47,7 @@ export default function MarketplacePage() {
       <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">장터</h1>
         <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-gray-700 transition-colors">
-          <Plus size={16} strokeWidth={2.5} />
+          <Plus size={14} strokeWidth={2.5} />
           상품 등록
         </Link>
       </header>
@@ -128,7 +128,7 @@ export default function MarketplacePage() {
 
                       {/* 하단: 타입 + 통계 */}
                       <div className="flex items-center justify-between mt-auto pt-1">
-                        <span className={`text-xs font-medium ${item.listingType === 'rent' ? 'text-gray-500 dark:text-gray-500' : 'text-gray-500 dark:text-gray-500'}`}>
+                        <span className="rounded px-1.5 py-0.5 text-2xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                           {item.listingType === 'rent' ? '대여' : '판매'}
                         </span>
                         <span className="text-xs text-gray-400 dark:text-gray-500">

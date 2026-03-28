@@ -21,7 +21,7 @@ export function LandingFooter() {
           </Link>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
             {FOOTER_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className="min-h-[44px] inline-flex items-center text-gray-500 hover:text-gray-200 active:text-white transition-colors">
+              <Link key={link.href} href={link.href} className="min-h-[44px] inline-flex items-center text-gray-500 hover:text-white active:text-white transition-colors">
                 {link.label}
               </Link>
             ))}
@@ -30,8 +30,8 @@ export function LandingFooter() {
         {/* Bottom: Legal + Copyright */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-6 border-t border-gray-800">
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            <a href="#" className="min-h-[44px] inline-flex items-center hover:text-gray-300 transition-colors">이용약관</a>
-            <a href="#" className="min-h-[44px] inline-flex items-center hover:text-gray-300 transition-colors">개인정보처리방침</a>
+            <a href="#" className="min-h-[44px] inline-flex items-center hover:text-white transition-colors">이용약관</a>
+            <a href="#" className="min-h-[44px] inline-flex items-center hover:text-white transition-colors">개인정보처리방침</a>
           </div>
           <p className="text-xs text-gray-500">&copy; 2026 TeamMeet. All rights reserved.</p>
         </div>

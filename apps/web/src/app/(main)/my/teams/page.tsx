@@ -146,15 +146,15 @@ export default function MyTeamsPage() {
 
               <div className="mt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center gap-1">
-                  <Users size={13} />
+                  <Users size={12} />
                   <span>{team.memberCount}/{team.maxMembers}명</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <MapPin size={13} />
+                  <MapPin size={12} />
                   <span>{team.region}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Trophy size={13} />
+                  <Trophy size={12} />
                   <span>{team.matchCount}전 {team.winCount}승</span>
                 </div>
               </div>

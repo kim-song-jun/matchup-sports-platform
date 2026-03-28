@@ -178,7 +178,7 @@ export default function HomePage() {
                       <p className="text-xs text-white/60 mt-1">{banner.desc}</p>
                     </div>
                     <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${banner.iconBg} shrink-0`}>
-                      <BannerIcon size={22} className={banner.iconColor} />
+                      <BannerIcon size={20} className={banner.iconColor} />
                     </div>
                   </div>
                 </Link>

@@ -120,7 +120,7 @@ export default function MatchDetailPage() {
         {/* Left: match info */}
         <div className="px-5 lg:px-0">
           {/* Title card */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 lg:p-6">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 lg:p-6">
             <div className="flex items-start gap-3">
               {SportIcon && (
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
@@ -146,7 +146,7 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Info grid */}
-          <div className="mt-3 grid grid-cols-2 gap-3 lg:gap-5">
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:gap-5">
             <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
             <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
             <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={isAlmostFull ? '마감 임박' : '모집중'} highlight={isAlmostFull} />
@@ -155,7 +155,7 @@ export default function MatchDetailPage() {
 
           {/* Venue card */}
           {match.venue && (
-            <div className="mt-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">시설 정보</h3>
               <div className="flex items-center gap-3">
                 <div className="h-16 w-16 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
@@ -180,7 +180,7 @@ export default function MatchDetailPage() {
         <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Action button */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">참가 현황</span>
@@ -262,7 +262,7 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Participants */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
@@ -326,7 +326,7 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   return (
     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-gray-500 dark:text-gray-400">{icon}</span>
+        <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
       </div>
       <p className={`text-md font-semibold ${highlight ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{value}</p>

@@ -15,19 +15,19 @@ const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중�
 const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
   return (
     <Link href={`/teams/${team.id}`}>
-      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
           <img src={getTeamImage(team.sportType, team.coverImageUrl)} alt={team.name} className="w-full h-full object-cover" loading="lazy" />
         </div>
         {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
+        <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</h3>
-            {team.isRecruiting && <span className="shrink-0 text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5">모집중</span>}
+            {team.isRecruiting && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>}
           </div>
           <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>
               {sportLabel[team.sportType] || team.sportType}
             </span>
             <span>Lv.{team.level} {levelLabel[team.level]} · {team.memberCount}명</span>

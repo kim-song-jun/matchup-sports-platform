@@ -80,18 +80,18 @@ export default function ProfilePage() {
             )}
 
             {/* 활동 통계 */}
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
+            <div className="mt-4 flex items-center divide-x divide-gray-100 dark:divide-gray-700">
+              <div className="flex-1 text-center py-2">
                 <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                <p className="text-xs text-gray-500 mt-0.5">총 매치</p>
+                <p className="text-xs text-gray-500 mt-1">총 매치</p>
               </div>
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
+              <div className="flex-1 text-center py-2">
                 <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">매너 점수</p>
+                <p className="text-xs text-gray-500 mt-1">매너 점수</p>
               </div>
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
+              <div className="flex-1 text-center py-2">
                 <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}개</p>
-                <p className="text-xs text-gray-500 mt-0.5">뱃지</p>
+                <p className="text-xs text-gray-500 mt-1">뱃지</p>
               </div>
             </div>
           </div>

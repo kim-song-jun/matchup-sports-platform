@@ -245,12 +245,12 @@ export default function HomePage() {
         {teams.length > 0 && (
           <section className="px-5 lg:px-0">
             <SectionHeader title="활동 중인 팀" href="/teams" showMore={teams.length > 3} />
-            <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
               {teams.map((t: SportTeam) => {
                 const accent = sportCardAccent[t.sportType];
                 return (
                   <Link key={t.id} href={`/teams/${t.id}`} className="shrink-0 w-[200px] lg:w-auto">
-                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`flex h-7 w-7 items-center justify-center rounded-full ${accent?.tint || 'bg-gray-100'} shrink-0`}>
@@ -258,10 +258,10 @@ export default function HomePage() {
                           </div>
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{t.name}</p>
                         </div>
-                        {t.isRecruiting && <span className="text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5 shrink-0 ml-1">모집중</span>}
+                        {t.isRecruiting && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 shrink-0 ml-1">모집중</span>}
                       </div>
                       <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
-                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>{sportLabel[t.sportType]}</span>
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>{sportLabel[t.sportType]}</span>
                         <span>{t.memberCount}명</span>
                       </p>
                       {t.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.description}</p>}
@@ -277,14 +277,14 @@ export default function HomePage() {
         {lessons.length > 0 && (
           <section className="mt-6 px-5 lg:px-0">
             <SectionHeader title="추천 강좌" href="/lessons" showMore={lessons.length > 3} />
-            <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
               {lessons.map((l: Lesson) => {
                 const accent = sportCardAccent[l.sportType];
                 return (
                   <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] lg:w-auto">
-                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
-                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>
                           {sportLabel[l.sportType]}
                         </span>
                         <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(l.fee)}</span>
@@ -308,10 +308,10 @@ export default function HomePage() {
         {listings.length > 0 && (
           <section className="mt-6 px-5 lg:px-0">
             <SectionHeader title="최신 장터" href="/marketplace" showMore={listings.length > 3} />
-            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-3">
               {listings.map((item: MarketplaceListing) => (
                 <Link key={item.id} href={`/marketplace/${item.id}`}>
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+                  <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                       <img src={getListingImage(item.imageUrls)} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
                     </div>
@@ -319,7 +319,7 @@ export default function HomePage() {
                       <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
                       <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
                       {item.listingType === 'rent' && (
-                        <span className="inline-block mt-1 text-2xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded px-1.5 py-0.5">대여</span>
+                        <span className="inline-block mt-1 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded-full px-2 py-0.5">대여</span>
                       )}
                     </div>
                   </div>
@@ -339,7 +339,7 @@ function SectionHeader({ title, count, href, showMore = true }: { title: string;
   return (
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-baseline gap-2">
-        <h2 className="text-md font-bold text-gray-900 dark:text-white">{title}</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h2>
         {count !== undefined && count > 0 && <span className="text-xs text-gray-500">{count}</span>}
       </div>
       {showMore && (
@@ -359,7 +359,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지: 정사각형 고정 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
@@ -368,25 +368,25 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
           )}
         </div>
         {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
+        <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
           <p className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
             {match.title}
           </p>
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
-            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 truncate">
+            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium shrink-0`}>
               {sportLabel[match.sportType]}
             </span>
-            {match.levelMin != null && match.levelMax != null && (
-              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
-            )}
-            <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
+            <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
+            {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
           </p>
-          {match.venue?.name && <p className="text-xs text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}
           <div className="flex items-center gap-2 mt-1.5">
             <span className={`text-xs font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
             <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
+            {match.levelMin != null && match.levelMax != null && (
+              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
+            )}
           </div>
         </div>
       </div>

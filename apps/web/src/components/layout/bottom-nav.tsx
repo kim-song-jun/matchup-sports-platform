@@ -42,7 +42,7 @@ export function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className={`text-2xs ${isActive ? 'font-semibold' : 'font-normal'}`}>{label}</span>
+              <span className={`text-xs ${isActive ? 'font-semibold' : 'font-normal'}`}>{label}</span>
             </Link>
           );
         })}

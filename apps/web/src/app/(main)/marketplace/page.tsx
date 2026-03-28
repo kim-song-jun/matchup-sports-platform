@@ -102,7 +102,7 @@ export default function MarketplacePage() {
         ) : (
           <div className="space-y-3 stagger-children">
             {listings.map((item: MarketplaceListing) => (
-                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
                     <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-300">
@@ -115,7 +115,7 @@ export default function MarketplacePage() {
 
                       {/* meta: 지역 · 종목 · 상태 */}
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+                        <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>
                           {sportLabel[item.sportType] || '기타'}
                         </span>
                         <span className="text-sm text-gray-500 truncate">
@@ -128,7 +128,7 @@ export default function MarketplacePage() {
 
                       {/* 하단: 타입 + 통계 */}
                       <div className="flex items-center justify-between mt-auto pt-1">
-                        <span className="rounded px-1.5 py-0.5 text-2xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                           {item.listingType === 'rent' ? '대여' : '판매'}
                         </span>
                         <span className="text-xs text-gray-400 dark:text-gray-500">

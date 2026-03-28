@@ -30,7 +30,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
@@ -39,25 +39,25 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
           )}
         </div>
         {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
+        <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
             {match.title}
           </h3>
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
-            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 truncate">
+            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium shrink-0`}>
               {sportLabel[match.sportType]}
             </span>
-            {match.levelMin != null && match.levelMax != null && (
-              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
-            )}
-            <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
+            <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
+            {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
           </p>
-          {match.venue?.name && <p className="text-xs text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}
           <div className="flex items-center gap-2 mt-1.5">
             <span className={`text-xs font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
             <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
+            {match.levelMin != null && match.levelMax != null && (
+              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
+            )}
             {isAlmostFull && <span className="text-2xs font-medium text-red-500">마감임박</span>}
           </div>
         </div>

@@ -138,7 +138,7 @@ export default function TeamDetailPage() {
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold text-gray-900">{team.name}</h2>
                 {team.isRecruiting && (
-                  <span className="text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5">모집중</span>
+                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>
                 )}
                 {hasMercenaryPost && (
                   <Link href="/mercenary" className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 flex items-center gap-1">
@@ -154,7 +154,7 @@ export default function TeamDetailPage() {
                 {team.skillGrade ? (() => {
                   const grade = getGradeInfo(team.skillGrade);
                   return (
-                    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-semibold ${grade.color}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
@@ -370,7 +370,7 @@ export default function TeamDetailPage() {
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {team.isRecruiting ? (
               <div className="text-center mb-4">
-                <span className="inline-block text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5 mb-2">팀원 모집중</span>
+                <span className="inline-block text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 mb-2">팀원 모집중</span>
                 <p className="text-sm text-gray-500">아래 버튼으로 연락해보세요</p>
               </div>
             ) : (

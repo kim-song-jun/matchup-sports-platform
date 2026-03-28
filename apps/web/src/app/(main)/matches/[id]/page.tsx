@@ -128,7 +128,7 @@ export default function MatchDetailPage() {
                 </div>
               )}
               <div>
-                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>{sportLabel[match.sportType]}</span>
+                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>{sportLabel[match.sportType]}</span>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
                   {match.title}
                 </h2>
@@ -276,7 +276,7 @@ export default function MatchDetailPage() {
                     <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
                       {p.user?.nickname}
                       {p.userId === match.hostId && (
-                        <span className="ml-1.5 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-2xs font-semibold text-gray-500 dark:text-gray-400">호스트</span>
+                        <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
                       )}
                     </p>
                   </div>

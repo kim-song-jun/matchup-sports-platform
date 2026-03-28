@@ -115,7 +115,7 @@ export default function TeamMatchDetailPage() {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${status.className}`}>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
           {status.label}
         </span>
       </header>
@@ -200,13 +200,13 @@ export default function TeamMatchDetailPage() {
                 {match.skillGrade && (() => {
                   const grade = getGradeInfo(match.skillGrade);
                   return (
-                    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold ${grade.color}`}>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
                 })()}
                 {match.isFreeInvitation && (
-                  <span className="inline-flex items-center rounded px-1.5 py-0.5 text-2xs font-semibold bg-green-50 text-green-600">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-50 text-green-600">
                     무료초청
                   </span>
                 )}

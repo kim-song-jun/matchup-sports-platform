@@ -108,12 +108,12 @@ export default function ListingDetailPage() {
           {/* Title + price */}
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded px-1.5 py-0.5 text-2xs font-semibold ${conditionColor[listing.condition]}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${conditionColor[listing.condition]}`}>
                 {conditionLabel[listing.condition]}
               </span>
               <span className="text-xs text-gray-500">{sportLabel[listing.sportType]}</span>
               {listing.listingType === 'rent' && (
-                <span className="rounded px-1.5 py-0.5 text-2xs font-semibold bg-blue-50 text-blue-600">대여</span>
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600">대여</span>
               )}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{listing.title}</h1>

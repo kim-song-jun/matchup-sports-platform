@@ -83,7 +83,7 @@ export default function LessonsPage() {
         <Link href="/lessons/new"
           className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
           <Plus size={14} strokeWidth={2.5} />
-          강좌 등록
+          강좌 만들기
         </Link>
       </header>
 
@@ -125,7 +125,8 @@ export default function LessonsPage() {
           <EmptyState
             icon={GraduationCap}
             title="아직 강좌가 없어요"
-            description="곧 다양한 강좌가 올라올 거예요!"
+            description="강좌를 직접 만들어보거나 다른 종목을 찾아보세요"
+            action={{ label: '강좌 만들기', href: '/lessons/new' }}
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">

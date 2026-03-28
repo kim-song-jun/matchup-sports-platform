@@ -12,7 +12,7 @@ export default function TeamsPage() {
         </div>
         <Link href="/teams/new" className="flex items-center gap-1.5 rounded-xl bg-gray-900 dark:bg-white px-4 py-2.5 text-sm font-bold text-white dark:text-gray-900 transition-colors">
           <Plus size={14} strokeWidth={2.5} />
-          팀 등록
+          팀 만들기
         </Link>
       </header>
 

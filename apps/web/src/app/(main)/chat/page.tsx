@@ -107,13 +107,12 @@ export default function ChatListPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">채팅</h1>
         </header>
         <div className="px-5 @3xl:px-0">
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-14 text-center">
-            <p className="text-base text-gray-500">로그인 후 채팅을 이용할 수 있어요</p>
-            <p className="text-xs text-gray-500 mt-1">팀 매칭이 성사되면 채팅방이 생성돼요</p>
-            <Link href="/login" className="inline-block mt-3 rounded-xl bg-blue-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors">
-              로그인
-            </Link>
-          </div>
+          <EmptyState
+            icon={MessageCircle}
+            title="채팅으로 팀과 대화해보세요"
+            description="매칭이 성사되면 팀과 직접 연락할 수 있어요"
+            action={{ label: '로그인', href: '/login' }}
+          />
         </div>
       </div>
     );

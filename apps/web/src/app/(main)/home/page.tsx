@@ -117,7 +117,7 @@ export default function HomePage() {
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{m.title}</p>
                         <p className="text-xs text-gray-500">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
                       </div>
-                      <span className={`shrink-0 text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-red-500' : 'text-gray-500'}`}>
+                      <span className={`shrink-0 text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-amber-500' : 'text-gray-500'}`}>
                         {m.currentPlayers}/{m.maxPlayers}
                       </span>
                     </div>
@@ -380,7 +380,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
             <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>

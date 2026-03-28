@@ -51,14 +51,14 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
             <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
             {match.levelMin != null && match.levelMax != null && (
               <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
             )}
-            {isAlmostFull && <span className="text-2xs font-medium text-red-500">마감임박</span>}
+            {isAlmostFull && <span className="text-2xs font-medium text-amber-500">마감임박</span>}
           </div>
         </div>
       </div>

@@ -184,12 +184,12 @@ export default function MatchDetailPage() {
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">참가 현황</span>
-              <span className={`text-sm font-semibold ${isAlmostFull ? 'text-red-500' : 'text-blue-500'}`}>
+              <span className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
                 {match.currentPlayers}/{match.maxPlayers}명
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-              <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
+              <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
 
             {!isAuthenticated ? (
@@ -329,8 +329,8 @@ function InfoCard({ icon, label, value, sub, highlight }: {
         <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
       </div>
-      <p className={`text-md font-semibold ${highlight ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{value}</p>
-      {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>{sub}</p>}
+      <p className={`text-md font-semibold ${highlight ? 'text-amber-500' : 'text-gray-900 dark:text-white'}`}>{value}</p>
+      {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>{sub}</p>}
     </div>
   );
 }

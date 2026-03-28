@@ -48,7 +48,7 @@ export default function MarketplacePage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">장터</h1>
         <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-gray-700 transition-colors">
           <Plus size={14} strokeWidth={2.5} />
-          상품 등록
+          상품 등록하기
         </Link>
       </header>
 

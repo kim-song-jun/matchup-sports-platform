@@ -94,7 +94,7 @@ export default function ListingDetailPage() {
       <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600">장터</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700 truncate">{listing.title}</span>
+        <span className="text-gray-700 dark:text-gray-300 truncate">{listing.title}</span>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
@@ -130,7 +130,7 @@ export default function ListingDetailPage() {
           {/* Description */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
             <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2">상품 설명</h3>
-            <p className="text-base text-gray-600 leading-relaxed whitespace-pre-line">{listing.description}</p>
+            <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
           </div>
 
           {/* Rental info */}
@@ -178,7 +178,7 @@ export default function ListingDetailPage() {
             <div className="flex items-start gap-2">
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-gray-700">안전거래 안내</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">안전거래 안내</p>
                 <p className="text-xs text-gray-500 mt-0.5">에스크로 결제로 안전하게 거래하세요</p>
               </div>
             </div>

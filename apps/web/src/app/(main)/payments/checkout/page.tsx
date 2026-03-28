@@ -146,11 +146,11 @@ export default function CheckoutPage() {
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">주문 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
-                <Tag size={20} className="text-blue-500" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
+                <Tag size={20} className="text-blue-500 dark:text-blue-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-500 mb-1">
+                <span className="inline-block rounded px-1.5 py-0.5 text-2xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 mb-1">
                   {order.type}
                 </span>
                 <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{order.name}</p>
@@ -237,9 +237,9 @@ export default function CheckoutPage() {
             </button>
           </div>
           {couponApplied && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
-              <CheckCircle size={14} className="text-green-500" />
-              <span className="text-sm text-green-600 font-medium">
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/30 px-3 py-2">
+              <CheckCircle size={14} className="text-green-500 dark:text-green-400" />
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">
                 신규 가입 쿠폰 ({formatAmount(order.couponDiscount)} 할인 적용됨)
               </span>
             </div>
@@ -252,7 +252,7 @@ export default function CheckoutPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-base text-gray-500">원가</span>
-              <span className="text-base text-gray-700 dark:text-gray-300">{formatAmount(order.originalPrice)}</span>
+              <span className="text-base font-medium text-gray-700 dark:text-gray-300">{formatAmount(order.originalPrice)}</span>
             </div>
             {couponApplied && (
               <div className="flex items-center justify-between">

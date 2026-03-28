@@ -106,7 +106,7 @@ export default function TeamMatchDetailPage() {
       <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6 px-5 lg:px-0 pt-4">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">상세</span>
+        <span className="text-gray-700 dark:text-gray-300">상세</span>
       </div>
 
       {/* Header */}
@@ -263,7 +263,7 @@ export default function TeamMatchDetailPage() {
               {match.notes && (
                 <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-1">추가 안내</p>
-                  <p className="text-base text-gray-700 whitespace-pre-wrap">{match.notes}</p>
+                  <p className="text-base text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{match.notes}</p>
                 </div>
               )}
             </div>
@@ -287,7 +287,7 @@ export default function TeamMatchDetailPage() {
                       {refereeSchedule.map((item: { quarter: number; teamName: string }, idx: number) => (
                         <tr key={idx} className="border-b border-gray-50 last:border-0">
                           <td className="py-2.5 px-3 font-medium text-gray-900 dark:text-white">{item.quarter}쿼터</td>
-                          <td className="py-2.5 px-3 text-gray-700">{item.teamName}</td>
+                          <td className="py-2.5 px-3 text-gray-700 dark:text-gray-300">{item.teamName}</td>
                         </tr>
                       ))}
                     </tbody>

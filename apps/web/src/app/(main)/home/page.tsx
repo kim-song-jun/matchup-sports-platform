@@ -376,6 +376,9 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
               {sportLabel[match.sportType]}
             </span>
+            {match.levelMin != null && match.levelMax != null && (
+              <span className="text-2xs text-gray-500 dark:text-gray-400">Lv.{match.levelMin}~{match.levelMax}</span>
+            )}
             <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
           </p>
           {match.venue?.name && <p className="text-xs text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}

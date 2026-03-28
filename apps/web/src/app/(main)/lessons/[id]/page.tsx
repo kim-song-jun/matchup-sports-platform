@@ -76,11 +76,11 @@ export default function LessonDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-lg font-semibold text-gray-900 truncate flex-1">{lesson.title}</h1>
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" /></button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{lesson.title}</h1>
       </header>
       <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/lessons" className="hover:text-gray-600">강좌</Link><ChevronRight size={14} /><span className="text-gray-700">{lesson.title}</span>
+        <Link href="/lessons" className="hover:text-gray-600">강좌</Link><ChevronRight size={14} /><span className="text-gray-700 dark:text-gray-300">{lesson.title}</span>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
@@ -99,18 +99,18 @@ export default function LessonDetailPage() {
               <span className={`rounded px-1.5 py-0.5 text-2xs font-semibold ${typeColor[lesson.type]}`}>{typeLabel[lesson.type]}</span>
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 leading-tight">{lesson.title}</h2>
-            {lesson.description && <p className="mt-3 text-base text-gray-600 leading-relaxed whitespace-pre-line">{lesson.description}</p>}
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>
+            {lesson.description && <p className="mt-3 text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{lesson.description}</p>}
           </div>
 
           {/* 코치 */}
           {lesson.coachName && (
             <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 mb-3">코치 소개</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">코치 소개</h3>
               <div className="flex items-start gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500"><User size={28} /></div>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"><User size={28} /></div>
                 <div>
-                  <p className="text-lg font-bold text-gray-900">{lesson.coachName}</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-sm text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
                   <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><Star size={12} className="text-amber-400" fill="currentColor" /> 4.8</span>
@@ -133,14 +133,14 @@ export default function LessonDetailPage() {
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen size={18} className="text-gray-500" />
-              <h3 className="text-lg font-bold text-gray-900">커리큘럼</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">커리큘럼</h3>
               <span className="text-xs text-gray-500 ml-auto">총 {sampleCurriculum.length}개 섹션</span>
             </div>
             {sampleCurriculum.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xs font-bold mt-0.5">{idx + 1}</div>
+              <div key={idx} className="flex items-start gap-3 py-3 border-b border-gray-50 dark:border-gray-700 last:border-0">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-bold mt-0.5">{idx + 1}</div>
                 <div className="flex-1">
-                  <p className="text-base font-semibold text-gray-900">{item.title}</p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">{item.title}</p>
                   <p className="text-sm text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
                 <span className="text-xs text-gray-500 shrink-0 mt-0.5"><Clock size={12} className="inline mr-0.5" />{item.duration}</span>
@@ -150,25 +150,25 @@ export default function LessonDetailPage() {
 
           {/* 이런 분께 추천 */}
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">이런 분께 추천합니다</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">이런 분께 추천합니다</h3>
             {[
               `${sportLabel[lesson.sportType]}을(를) 처음 시작하시는 분`,
               '체계적으로 기초를 배우고 싶은 분',
               '같은 레벨의 사람들과 함께 연습하고 싶은 분',
               '전문 코치의 피드백을 받고 싶은 분',
             ].map((text, i) => (
-              <div key={i} className="flex items-center gap-2 text-base text-gray-600 py-1">
-                <CheckCircle size={16} className="text-gray-500 shrink-0" />{text}
+              <div key={i} className="flex items-center gap-2 text-base text-gray-600 dark:text-gray-300 py-1">
+                <CheckCircle size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />{text}
               </div>
             ))}
           </div>
 
           {/* 강좌 사진 */}
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-lg font-bold text-gray-900 mb-3">강좌 사진</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="aspect-square rounded-xl bg-gray-50 flex items-center justify-center text-gray-300"><Image size={20} /></div>
+                <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center text-gray-300 dark:text-gray-500"><Image size={20} /></div>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-3 text-center">아직 등록된 사진이 없어요</p>
@@ -240,7 +240,7 @@ export default function LessonDetailPage() {
                   const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(lesson.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(lesson.venueName || '')}&details=${encodeURIComponent(lesson.description || '')}`;
                   window.open(url, '_blank');
                 }}
-                className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+                className="w-full mt-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
               >
                 <Calendar size={14} />
                 캘린더에 추가
@@ -258,7 +258,7 @@ export default function LessonDetailPage() {
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
                 <div>
-                  <p className="text-base font-semibold text-gray-900">{lesson.host?.nickname}</p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-white">{lesson.host?.nickname}</p>
                   <p className="text-xs text-gray-500">호스트</p>
                 </div>
               </div>

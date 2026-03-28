@@ -113,7 +113,7 @@ export default function MatchDetailPage() {
       <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">{match.title}</span>
+        <span className="text-gray-700 dark:text-gray-300">{match.title}</span>
       </div>
 
       <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-8">
@@ -167,7 +167,7 @@ export default function MatchDetailPage() {
                   {(match.venue.rating ?? 0) > 0 && (
                     <div className="flex items-center gap-1 mt-1">
                       <Star size={12} className="text-amber-400" fill="currentColor" />
-                      <span className="text-xs text-gray-600">{(match.venue.rating ?? 0).toFixed(1)}</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">{(match.venue.rating ?? 0).toFixed(1)}</span>
                     </div>
                   )}
                 </div>
@@ -204,7 +204,7 @@ export default function MatchDetailPage() {
               <button
                 onClick={() => leaveMutation.mutate()}
                 disabled={leaveMutation.isPending}
-                className="w-full rounded-xl border border-gray-200 bg-white py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
               >
                 {leaveMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
@@ -235,7 +235,7 @@ export default function MatchDetailPage() {
             )}
 
             {user?.id === match.hostId && (
-              <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-2">
+              <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors mt-2">
                 <Pencil size={14} />
                 매치 수정
               </Link>
@@ -254,7 +254,7 @@ export default function MatchDetailPage() {
                 const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(match.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(match.venue?.name || '')}&details=${encodeURIComponent(match.description || '')}`;
                 window.open(url, '_blank');
               }}
-              className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+              className="w-full mt-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
             >
               <Calendar size={14} />
               캘린더에 추가

@@ -81,15 +81,17 @@ export default function TeamDetailPage() {
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1 ml-3">{team.name}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 truncate flex-1 ml-3">{team.name}</h1>
         <button
           onClick={async () => {
-            if (navigator.share) {
-              await navigator.share({ title: team.name, url: window.location.href });
-            } else {
-              await navigator.clipboard.writeText(window.location.href);
-              toast('success', '링크가 복사되었어요');
-            }
+            try {
+              if (navigator.share) {
+                await navigator.share({ title: team.name, url: window.location.href });
+              } else {
+                await navigator.clipboard.writeText(window.location.href);
+                toast('success', '링크가 복사되었어요');
+              }
+            } catch { /* user cancelled share */ }
           }}
           aria-label="공유하기"
           className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
@@ -98,7 +100,7 @@ export default function TeamDetailPage() {
         </button>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/teams" className="hover:text-gray-600">팀&middot;클럽</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{team.name}</span>
@@ -116,12 +118,12 @@ export default function TeamDetailPage() {
               ) : (
                 <div className="text-center text-white/60">
                   <Image size={32} className="mx-auto mb-1" />
-                  <p className="text-[12px]">커버 이미지</p>
+                  <p className="text-xs">커버 이미지</p>
                 </div>
               )}
               {/* Logo overlay */}
               <div className="absolute -bottom-6 left-5">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white text-[20px] font-black border-2 border-white shadow-lg">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white text-xl font-black border-2 border-white shadow-lg">
                   {team.name?.charAt(0)}
                 </div>
               </div>
@@ -129,25 +131,25 @@ export default function TeamDetailPage() {
 
             <div className="pt-8 px-5 pb-5">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-[22px] font-bold text-gray-900">{team.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{team.name}</h2>
                 {team.isRecruiting && (
-                  <span className="rounded-full bg-blue-500 px-2.5 py-0.5 text-[11px] font-semibold text-white">모집중</span>
+                  <span className="rounded-full bg-blue-500 px-2.5 py-0.5 text-xs font-semibold text-white">모집중</span>
                 )}
                 {hasMercenaryPost && (
-                  <Link href="/mercenary" className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600 flex items-center gap-1">
+                  <Link href="/mercenary" className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 flex items-center gap-1">
                     <UserPlus size={10} />
                     용병 모집 중
                   </Link>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[13px] text-gray-500 flex-wrap">
+              <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
                 {SportIcon && <SportIcon size={14} />}
                 <span>{sportLabel[team.sportType]}</span>
                 <span className="text-gray-200">|</span>
                 {team.skillGrade ? (() => {
                   const grade = getGradeInfo(team.skillGrade);
                   return (
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-bold ${grade.color}`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
@@ -164,7 +166,7 @@ export default function TeamDetailPage() {
                 )}
               </div>
               {team.uniformColor && (
-                <p className="text-[12px] text-gray-500 mt-1">유니폼: {team.uniformColor}</p>
+                <p className="text-xs text-gray-500 mt-1">유니폼: {team.uniformColor}</p>
               )}
 
               {/* Badge display */}
@@ -173,14 +175,14 @@ export default function TeamDetailPage() {
               </div>
 
               {team.description && (
-                <p className="mt-4 text-[14px] text-gray-600 leading-relaxed whitespace-pre-line">{team.description}</p>
+                <p className="mt-4 text-base text-gray-600 leading-relaxed whitespace-pre-line">{team.description}</p>
               )}
             </div>
           </div>
 
           {/* 신뢰도 점수 */}
           <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-3">신뢰도</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-3">신뢰도</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <TrustItem
                 icon={<CheckCircle size={16} />}
@@ -211,17 +213,17 @@ export default function TeamDetailPage() {
             <div className="mt-4 rounded-xl bg-gray-50 p-3.5">
               <div className="flex items-center gap-1.5 text-gray-500 mb-2">
                 <Trophy size={14} />
-                <span className="text-[12px] font-medium">전적</span>
+                <span className="text-xs font-medium">전적</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-[18px] font-bold text-gray-900">{mockTrustScore.record.total}전</span>
-                <div className="flex items-center gap-2 text-[14px]">
+                <span className="text-xl font-bold text-gray-900">{mockTrustScore.record.total}전</span>
+                <div className="flex items-center gap-2 text-base">
                   <span className="font-semibold text-blue-500">{mockTrustScore.record.wins}승</span>
                   <span className="font-semibold text-gray-500">{mockTrustScore.record.draws}무</span>
                   <span className="font-semibold text-red-400">{mockTrustScore.record.losses}패</span>
                 </div>
                 <div className="ml-auto">
-                  <span className="text-[13px] font-semibold text-gray-600">
+                  <span className="text-sm font-semibold text-gray-600">
                     승률 {((mockTrustScore.record.wins / mockTrustScore.record.total) * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -232,8 +234,8 @@ export default function TeamDetailPage() {
           {/* 최근 경기 결과 */}
           <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-bold text-gray-900">최근 경기</h3>
-              <Link href="/team-matches" className="text-[13px] text-blue-500 font-medium">전체보기</Link>
+              <h3 className="text-lg font-bold text-gray-900">최근 경기</h3>
+              <Link href="/team-matches" className="text-sm text-blue-500 font-medium">전체보기</Link>
             </div>
             <div className="space-y-2">
               {mockRecentMatches.map((match) => {
@@ -247,17 +249,17 @@ export default function TeamDetailPage() {
 
                 return (
                   <div key={match.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3.5 py-3">
-                    <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold ${rs.className}`}>
+                    <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${rs.className}`}>
                       {rs.label}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium text-gray-900 truncate">vs {match.opponent}</p>
-                      <p className="text-[12px] text-gray-500">
+                      <p className="text-base font-medium text-gray-900 truncate">vs {match.opponent}</p>
+                      <p className="text-xs text-gray-500">
                         {d.getMonth() + 1}/{d.getDate()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="text-[16px] font-bold text-gray-900">
+                      <span className="text-lg font-bold text-gray-900">
                         {match.myScore} : {match.opponentScore}
                       </span>
                     </div>
@@ -269,7 +271,7 @@ export default function TeamDetailPage() {
 
           {/* 활동 정보 */}
           <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-3">활동 정보</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-3">활동 정보</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               <InfoItem icon={<MapPin size={16} />} label="활동 지역" value={`${team.city || ''} ${team.district || ''}`} />
               <InfoItem icon={<Calendar size={16} />} label="정기 활동" value="매주 토요일" />
@@ -281,7 +283,7 @@ export default function TeamDetailPage() {
           {/* SNS & 링크 */}
           {hasSns && (
             <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-3">SNS & 링크</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-3">SNS & 링크</h3>
               <div className="grid grid-cols-2 gap-2">
                 {team.instagramUrl && (
                   <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gray-800 text-white" />
@@ -302,31 +304,32 @@ export default function TeamDetailPage() {
           {/* 홍보 영상 */}
           {team.shortsUrl && (
             <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-3">홍보 영상</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-3">홍보 영상</h3>
               <a href={team.shortsUrl} target="_blank" rel="noopener noreferrer"
                 className="block rounded-xl bg-gray-900 h-48 lg:h-64 flex items-center justify-center text-white/60 hover:text-white/80 transition-colors relative overflow-hidden">
                 <div className="text-center z-10">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm mx-auto mb-2">
                     <Video size={24} />
                   </div>
-                  <p className="text-[13px] font-medium">영상 보기</p>
+                  <p className="text-sm font-medium">영상 보기</p>
                 </div>
               </a>
             </div>
           )}
 
-          {/* 갤러리 placeholder */}
-          <div className="mt-3 rounded-xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[16px] font-bold text-gray-900 mb-3">갤러리</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="aspect-square rounded-xl bg-gray-50 flex items-center justify-center text-gray-300">
-                  <Image size={20} />
-                </div>
-              ))}
+          {/* 갤러리 — 실제 사진이 있을 때만 표시 */}
+          {team.photos && team.photos.length > 0 && (
+            <div className="mt-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">갤러리</h3>
+              <div className="grid grid-cols-3 gap-2">
+                {team.photos.map((photo: string, i: number) => (
+                  <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                    <img src={photo} alt={`팀 사진 ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                ))}
+              </div>
             </div>
-            <p className="text-[12px] text-gray-500 mt-3 text-center">아직 등록된 사진이 없어요</p>
-          </div>
+          )}
         </div>
 
         {/* Right sidebar */}
@@ -344,14 +347,14 @@ export default function TeamDetailPage() {
                     toast('error', '신청에 실패했어요. 이미 신청했거나 권한이 없을 수 있어요');
                   }
                 }}
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors"
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors"
               >
                 팀 가입 신청
               </button>
             ) : (
               <Link
                 href="/login"
-                className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors"
+                className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
               >
                 로그인 후 가입 신청
               </Link>
@@ -362,21 +365,21 @@ export default function TeamDetailPage() {
           <div className="rounded-xl bg-white border border-gray-100 p-4">
             {team.isRecruiting ? (
               <div className="text-center mb-4">
-                <span className="inline-block rounded-full bg-blue-500 px-3 py-1 text-[13px] font-semibold text-white mb-2">팀원 모집중</span>
-                <p className="text-[13px] text-gray-500">아래 버튼으로 연락해보세요</p>
+                <span className="inline-block rounded-full bg-blue-500 px-3 py-1 text-sm font-semibold text-white mb-2">팀원 모집중</span>
+                <p className="text-sm text-gray-500">아래 버튼으로 연락해보세요</p>
               </div>
             ) : (
               <div className="text-center mb-4">
-                <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-[13px] font-semibold text-gray-500 mb-2">모집 마감</span>
-                <p className="text-[13px] text-gray-500">현재 팀원을 모집하고 있지 않습니다</p>
+                <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-500 mb-2">모집 마감</span>
+                <p className="text-sm text-gray-500">현재 팀원을 모집하고 있지 않습니다</p>
               </div>
             )}
-            <button className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
+            <button className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
               <MessageCircle size={18} />
               연락하기
             </button>
             {team.contactInfo && (
-              <p className="text-[12px] text-gray-500 text-center mt-2">{team.contactInfo}</p>
+              <p className="text-xs text-gray-500 text-center mt-2">{team.contactInfo}</p>
             )}
           </div>
 
@@ -389,8 +392,8 @@ export default function TeamDetailPage() {
                     <UserPlus size={18} className="text-gray-500" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[14px] font-semibold text-gray-900">용병 모집 중</p>
-                    <p className="text-[12px] text-gray-500 mt-0.5">다음 경기에 함께할 용병을 찾고 있어요</p>
+                    <p className="text-base font-semibold text-gray-900">용병 모집 중</p>
+                    <p className="text-xs text-gray-500 mt-0.5">다음 경기에 함께할 용병을 찾고 있어요</p>
                   </div>
                   <ChevronRight size={16} className="text-gray-500" />
                 </div>
@@ -400,15 +403,15 @@ export default function TeamDetailPage() {
 
           {/* Owner */}
           <div className="rounded-xl bg-white border border-gray-100 p-4">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">운영자</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">운영자</h3>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-[14px] font-bold text-gray-500">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-base font-bold text-gray-500">
                 {team.owner?.nickname?.charAt(0) || '?'}
               </div>
               <div className="flex-1">
-                <p className="text-[15px] font-semibold text-gray-900">{team.owner?.nickname || '알 수 없음'}</p>
+                <p className="text-md font-semibold text-gray-900">{team.owner?.nickname || '알 수 없음'}</p>
                 {team.owner?.mannerScore && (
-                  <div className="flex items-center gap-1 text-[13px] text-amber-500 mt-0.5">
+                  <div className="flex items-center gap-1 text-sm text-amber-500 mt-0.5">
                     <Star size={12} fill="currentColor" />
                     <span>{team.owner.mannerScore.toFixed(1)}</span>
                   </div>
@@ -429,9 +432,9 @@ function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string
     <div className="rounded-xl bg-gray-50 p-3">
       <div className="flex items-center gap-1.5 text-gray-500 mb-1">
         {icon}
-        <span className="text-[12px]">{label}</span>
+        <span className="text-xs">{label}</span>
       </div>
-      <p className="text-[14px] font-semibold text-gray-900">{value}</p>
+      <p className="text-base font-semibold text-gray-900">{value}</p>
     </div>
   );
 }
@@ -441,9 +444,9 @@ function TrustItem({ icon, label, value, color }: { icon: React.ReactNode; label
     <div className="rounded-xl bg-gray-50 p-3">
       <div className="flex items-center gap-1.5 text-gray-500 mb-1">
         {icon}
-        <span className="text-[12px]">{label}</span>
+        <span className="text-xs">{label}</span>
       </div>
-      <p className={`text-[16px] font-bold ${color}`}>{value}</p>
+      <p className={`text-lg font-bold ${color}`}>{value}</p>
     </div>
   );
 }
@@ -451,7 +454,7 @@ function TrustItem({ icon, label, value, color }: { icon: React.ReactNode; label
 function SnsButton({ href, icon, label, color }: { href: string; icon: React.ReactNode; label: string; color: string }) {
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-opacity hover:opacity-90 ${color}`}>
+      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 ${color}`}>
       {icon}
       {label}
     </a>

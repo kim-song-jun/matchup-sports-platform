@@ -54,9 +54,9 @@ export function BadgeDisplay({ badges, size = 'sm' }: BadgeDisplayProps) {
             {tooltip === badge.id && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 animate-fade-in">
                 <div className="rounded-lg bg-gray-900 px-3 py-2 text-center whitespace-nowrap shadow-lg">
-                  <p className="text-[12px] font-semibold text-white">{badge.name}</p>
+                  <p className="text-xs font-semibold text-white">{badge.name}</p>
                   {badge.description && (
-                    <p className="text-[11px] text-gray-500 mt-0.5">{badge.description}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{badge.description}</p>
                   )}
                 </div>
                 <div className="flex justify-center">

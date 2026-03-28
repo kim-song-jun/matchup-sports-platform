@@ -138,7 +138,7 @@ export default function EditMercenaryPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
@@ -147,11 +147,11 @@ export default function EditMercenaryPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white truncate flex-1">용병 모집 수정</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">용병 모집 수정</h1>
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/mercenary" className="hover:text-gray-600">용병</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-200">수정</span>
@@ -160,7 +160,7 @@ export default function EditMercenaryPage() {
       <div className="px-5 lg:px-0 max-w-2xl">
         {/* 팀명 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             팀명 <span className="text-red-400">*</span>
           </label>
           <input
@@ -174,7 +174,7 @@ export default function EditMercenaryPage() {
 
         {/* 경기 날짜 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
           <input
@@ -187,7 +187,7 @@ export default function EditMercenaryPage() {
 
         {/* 장소 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소 <span className="text-red-400">*</span>
           </label>
           <input
@@ -201,13 +201,13 @@ export default function EditMercenaryPage() {
 
         {/* 포지션 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">포지션</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">포지션</label>
           <div className="flex gap-2">
             {positionOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => update('position', opt.value)}
-                className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold text-center transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-all ${
                   form.position === opt.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -223,7 +223,7 @@ export default function EditMercenaryPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">모집 인원</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">모집 인원</label>
               <input
                 type="number"
                 value={form.count}
@@ -234,7 +234,7 @@ export default function EditMercenaryPage() {
               />
             </div>
             <div>
-              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">참가비 (원)</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">참가비 (원)</label>
               <input
                 type="number"
                 value={form.fee}
@@ -244,7 +244,7 @@ export default function EditMercenaryPage() {
                 className={inputClass}
               />
               {form.fee > 0 && (
-                <p className="text-[12px] text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   {new Intl.NumberFormat('ko-KR').format(form.fee)}원
                 </p>
               )}
@@ -254,13 +254,13 @@ export default function EditMercenaryPage() {
 
         {/* 요구 레벨 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">요구 레벨</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">요구 레벨</label>
           <div className="flex gap-2">
             {levelOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => update('level', opt.value)}
-                className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold text-center transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-all ${
                   form.level === opt.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -274,7 +274,7 @@ export default function EditMercenaryPage() {
 
         {/* 비고 */}
         <section className="mb-6">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
           <textarea
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
@@ -288,7 +288,7 @@ export default function EditMercenaryPage() {
         <div className="flex gap-3 mb-8">
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-[14px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 transition-colors"
           >
             <Trash2 size={16} />
             삭제
@@ -296,7 +296,7 @@ export default function EditMercenaryPage() {
           <button
             onClick={handleSave}
             disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
             {isSubmitting ? '저장 중...' : '수정 완료'}
@@ -311,19 +311,19 @@ export default function EditMercenaryPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
+            <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 돌아가기
               </button>
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 {isDeleting ? '삭제 중...' : '삭제하기'}
               </button>

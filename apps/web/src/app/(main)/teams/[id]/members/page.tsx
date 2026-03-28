@@ -58,11 +58,11 @@ export default function TeamMembersPage() {
           <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
             <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
           </button>
-          <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">멤버 관리</h1>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">멤버 관리</h1>
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-3 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-3 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
         >
           <UserPlus size={14} />
           초대
@@ -70,12 +70,12 @@ export default function TeamMembersPage() {
       </header>
       <div className="hidden lg:flex lg:items-center lg:justify-between mb-6 px-5 lg:px-0 pt-4">
         <div>
-          <h2 className="text-[24px] font-bold text-gray-900 dark:text-white">멤버 관리</h2>
-          <p className="text-[14px] text-gray-500 mt-1">팀 멤버 {members.length}명</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">멤버 관리</h2>
+          <p className="text-base text-gray-500 mt-1">팀 멤버 {members.length}명</p>
         </div>
         <button
           onClick={() => setShowInviteModal(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-blue-500 px-4 py-2.5 text-base font-bold text-white hover:bg-blue-600 transition-colors"
         >
           <UserPlus size={16} />
           초대하기
@@ -96,10 +96,10 @@ export default function TeamMembersPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[15px] font-semibold text-gray-900 dark:text-white">{member.nickname}</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${role.style}`}>{role.label}</span>
+                  <span className="text-md font-semibold text-gray-900 dark:text-white">{member.nickname}</span>
+                  <span className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${role.style}`}>{role.label}</span>
                 </div>
-                <div className="flex items-center gap-2 text-[12px] text-gray-500 mt-0.5">
+                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                   <span>{member.position}</span>
                   <span className="text-gray-200">|</span>
                   <span>{member.matchCount}경기</span>
@@ -121,7 +121,7 @@ export default function TeamMembersPage() {
                       {member.role === 'member' ? (
                         <button
                           onClick={() => handleRoleChange(member.id, 'admin')}
-                          className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
                         >
                           <Shield size={14} className="text-blue-500" />
                           운영자로 변경
@@ -129,7 +129,7 @@ export default function TeamMembersPage() {
                       ) : (
                         <button
                           onClick={() => handleRoleChange(member.id, 'member')}
-                          className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
                         >
                           <User size={14} className="text-gray-500" />
                           멤버로 변경
@@ -137,7 +137,7 @@ export default function TeamMembersPage() {
                       )}
                       <button
                         onClick={() => { setKickTarget({ id: member.id, name: member.nickname }); setMenuOpen(null); }}
-                        className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700"
                       >
                         <AlertTriangle size={14} />
                         추방
@@ -158,11 +158,11 @@ export default function TeamMembersPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">{kickTarget.name}님을 추방하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">추방된 멤버에게 알림이 발송됩니다.</p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">{kickTarget.name}님을 추방하시겠어요?</h3>
+            <p className="text-base text-gray-500 text-center mt-2">추방된 멤버에게 알림이 발송됩니다.</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setKickTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
-              <button onClick={() => handleKick(kickTarget.id)} className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors">추방하기</button>
+              <button onClick={() => setKickTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
+              <button onClick={() => handleKick(kickTarget.id)} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">추방하기</button>
             </div>
           </div>
         </div>
@@ -172,17 +172,17 @@ export default function TeamMembersPage() {
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
           <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center mb-3">멤버 초대</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center mb-3">멤버 초대</h3>
             <input
               type="text"
               value={inviteNickname}
               onChange={(e) => setInviteNickname(e.target.value)}
               placeholder="닉네임을 입력하세요"
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-[14px] text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors mb-4"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors mb-4"
             />
             <div className="flex gap-3">
-              <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
-              <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">초대하기</button>
+              <button onClick={() => { setShowInviteModal(false); setInviteNickname(''); }} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
+              <button onClick={handleInvite} className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">초대하기</button>
             </div>
           </div>
         </div>

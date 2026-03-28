@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Swords, ChevronRight } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { sportLabel } from '@/lib/constants';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
@@ -126,16 +127,16 @@ export default function AdminTeamMatchesPage() {
   return (
     <div className="animate-fade-in">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-[13px] text-gray-400 mb-4">
-        <Link href="/admin/dashboard" className="hover:text-gray-600 transition-colors">관리자</Link>
+      <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-4">
+        <Link href="/admin/dashboard" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">관리자</Link>
         <ChevronRight size={12} />
-        <span className="text-gray-700 font-medium">팀 매칭</span>
+        <span className="text-gray-700 dark:text-gray-300 font-medium">팀 매칭</span>
       </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">팀 매칭 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">팀 간 매칭 모집글을 관리하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 매칭 관리</h1>
+          <p className="text-base text-gray-400 mt-1">팀 간 매칭 모집글을 관리하세요</p>
         </div>
       </div>
 
@@ -150,48 +151,48 @@ export default function AdminTeamMatchesPage() {
       />
 
       {/* Table */}
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">ID</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">제목</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">호스트팀</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">종목</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">날짜</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">신청수</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap"></th>
+              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">ID</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">제목</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">호스트팀</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">종목</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">날짜</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">상태</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신청수</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {filtered.map((tm) => (
-                <tr key={tm.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 text-[13px] font-mono text-gray-500">{tm.id}</td>
+                <tr key={tm.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-mono text-gray-500 dark:text-gray-400">{tm.id}</td>
                   <td className="px-5 py-3.5">
-                    <p className="text-[14px] font-medium text-gray-900 truncate max-w-[220px]">{tm.title}</p>
+                    <p className="text-base font-medium text-gray-900 dark:text-white truncate max-w-[220px]">{tm.title}</p>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-white text-[11px] font-black">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-600 text-white text-xs font-black">
                         {tm.hostTeam.charAt(0)}
                       </div>
-                      <span className="text-[13px] text-gray-700 whitespace-nowrap">{tm.hostTeam}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{tm.hostTeam}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{sportLabel[tm.sportType] || tm.sportType}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{tm.matchDate}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{sportLabel[tm.sportType] || tm.sportType}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{tm.matchDate}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${statusColor[tm.status]}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[tm.status]}`}>
                       {statusLabel[tm.status]}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 text-center">{tm.applicationCount}건</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 text-center">{tm.applicationCount}건</td>
                   <td className="px-5 py-3.5">
                     <Link
-                      href={`/admin/team-matches/${tm.id}`}
-                      className="flex items-center gap-1 text-[13px] font-medium text-blue-500 hover:text-blue-600 whitespace-nowrap"
+                      href={`/team-matches/${tm.id}`}
+                      className="flex items-center gap-1 text-sm font-medium text-blue-500 hover:text-blue-600 whitespace-nowrap"
                     >
                       상세
                       <ChevronRight size={14} />
@@ -201,9 +202,13 @@ export default function AdminTeamMatchesPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
-                    <Swords size={24} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-[14px] text-gray-400">검색 조건에 맞는 팀 매칭이 없어요</p>
+                  <td colSpan={8}>
+                    <EmptyState
+                      icon={Swords}
+                      title="검색 조건에 맞는 팀 매칭이 없어요"
+                      description="다른 조건으로 다시 찾아보세요"
+                      size="sm"
+                    />
                   </td>
                 </tr>
               )}

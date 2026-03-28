@@ -33,9 +33,9 @@ export const useThemeStore = create<ThemeState>((set) => {
     : null) || 'light';
   const resolved = resolveTheme(savedTheme);
 
-  // 초기 적용
+  // 즉시 적용 (FOUC 방지 — layout.tsx head 스크립트가 1차 방어, 여기가 2차)
   if (typeof window !== 'undefined') {
-    setTimeout(() => applyTheme(resolved), 0);
+    applyTheme(resolved);
   }
 
   return {
@@ -49,3 +49,15 @@ export const useThemeStore = create<ThemeState>((set) => {
     },
   };
 });
+
+// Listen for OS theme changes when theme is 'system'
+if (typeof window !== 'undefined') {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const { theme } = useThemeStore.getState();
+    if (theme === 'system') {
+      const resolved = getSystemTheme();
+      applyTheme(resolved);
+      useThemeStore.setState({ resolvedTheme: resolved });
+    }
+  });
+}

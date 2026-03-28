@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ArrowLeft, Star, Clock, Shield, CheckCircle, Sparkles, Trophy, Flame, Heart, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAllBadgeTypes } from '@/hooks/use-api';
+import { formatDateCompact } from '@/lib/utils';
 
 interface BadgeInfo {
   id: string;
@@ -118,11 +119,6 @@ const allBadges: BadgeInfo[] = [
   },
 ];
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getDate().toString().padStart(2, '0')}`;
-}
-
 // 아이콘/색상 매핑 (API에서 제공하지 않는 UI 메타데이터)
 const badgeVisualConfig: Record<string, { icon: typeof Star; color: string; bg: string }> = {
   manner_player: { icon: Star, color: 'text-amber-500', bg: 'bg-amber-50' },
@@ -173,20 +169,20 @@ export default function BadgesPage() {
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 active:scale-[0.98] transition-all lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">뱃지</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">뱃지</h1>
       </header>
 
       {/* Summary */}
       <div className="px-5 lg:px-0 mb-4">
         <div className="rounded-xl bg-blue-500 p-5 text-white">
-          <p className="text-[13px] text-blue-100">획득한 뱃지</p>
+          <p className="text-sm text-blue-100">획득한 뱃지</p>
           <div className="flex items-end gap-1 mt-1">
-            <span className="text-[32px] font-black leading-none">{earnedBadges.length}</span>
-            <span className="text-[14px] text-blue-200 mb-0.5">/ {allBadges.length}</span>
+            <span className="text-4xl font-black leading-none">{earnedBadges.length}</span>
+            <span className="text-base text-blue-200 mb-0.5">/ {allBadges.length}</span>
           </div>
           <div className="mt-3 flex gap-1.5">
             {earnedBadges.map((badge, idx) => {
@@ -194,7 +190,7 @@ export default function BadgesPage() {
               return (
                 <div
                   key={badge.id || `earned-${idx}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-gray-800/20 backdrop-blur-sm"
                 >
                   <Icon size={14} />
                 </div>
@@ -208,7 +204,7 @@ export default function BadgesPage() {
       <div className="px-5 lg:px-0 mb-4 flex gap-2">
         <button
           onClick={() => setActiveTab('my')}
-          className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
             activeTab === 'my'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -218,7 +214,7 @@ export default function BadgesPage() {
         </button>
         <button
           onClick={() => setActiveTab('all')}
-          className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
             activeTab === 'all'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -254,35 +250,35 @@ export default function BadgesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3
-                        className={`text-[15px] font-semibold ${
-                          badge.earned ? 'text-gray-900' : 'text-gray-500'
+                        className={`text-md font-semibold ${
+                          badge.earned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
                         }`}
                       >
                         {badge.name}
                       </h3>
                       {badge.earned && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-semibold text-gray-500">
                           획득
                         </span>
                       )}
                     </div>
-                    <p className={`text-[13px] mt-0.5 ${badge.earned ? 'text-gray-500' : 'text-gray-500'}`}>
+                    <p className={`text-sm mt-0.5 ${badge.earned ? 'text-gray-500' : 'text-gray-500'}`}>
                       {badge.description}
                     </p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-[12px] text-gray-500">
+                      <span className="text-xs text-gray-500">
                         {badge.requirement}
                       </span>
                       {badge.earned && badge.earnedAt ? (
-                        <span className="text-[11px] text-gray-500">
-                          {formatDate(badge.earnedAt)} 획득
+                        <span className="text-xs text-gray-500">
+                          {formatDateCompact(badge.earnedAt)} 획득
                         </span>
                       ) : badge.progress ? (
-                        <span className="text-[11px] font-medium text-gray-500">
+                        <span className="text-xs font-medium text-gray-500">
                           {badge.progress}
                         </span>
                       ) : (
-                        <span className="text-[11px] text-gray-300">미달성</span>
+                        <span className="text-xs text-gray-300">미달성</span>
                       )}
                     </div>
                   </div>

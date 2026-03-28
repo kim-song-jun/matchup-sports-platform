@@ -36,19 +36,19 @@ export function AdminToolbar({
       <div className="flex items-center gap-2">
         {search && (
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={15} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400" size={15} />
             <input
               type="text"
               value={search.value}
               onChange={(e) => search.onChange(e.target.value)}
               placeholder={search.placeholder || '검색'}
-              className="w-full rounded-lg bg-gray-50 py-2 pl-9 pr-3 text-[13px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-all"
+              className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-700 transition-colors border border-transparent dark:border-gray-700"
             />
           </div>
         )}
         {onDownload && (
           <button onClick={onDownload}
-            className="flex items-center gap-1.5 rounded-lg bg-white border border-gray-200 px-3 py-2 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors shrink-0">
+            className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0">
             <Download size={13} />
             내보내기
           </button>
@@ -61,10 +61,10 @@ export function AdminToolbar({
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             {filters.map((f) => (
               <button key={f.key} onClick={() => onFilterChange?.(f.key)}
-                className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   activeFilter === f.key
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
                 }`}>
                 {f.label}
               </button>
@@ -72,7 +72,7 @@ export function AdminToolbar({
           </div>
         )}
         {count !== undefined && (
-          <p className="text-[11px] text-gray-500 shrink-0 ml-2">{count}{countLabel}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 shrink-0 ml-2">{count}{countLabel}</p>
         )}
       </div>
     </div>

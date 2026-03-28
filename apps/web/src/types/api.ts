@@ -192,6 +192,7 @@ export interface SportTeam {
   kakaoOpenChat?: string;
   websiteUrl?: string;
   shortsUrl?: string;
+  photos?: string[];
   mannerScore?: number;
   matchCount?: number;
   applicationCount?: number;
@@ -284,7 +285,7 @@ export interface AdminStats {
   todayMatches?: number;
 }
 
-// ── Chat ──
+// ── Chat (API contract — 프론트엔드는 현재 stores/chat-store.ts 타입 사용) ──
 export interface ChatRoom {
   id: string;
   name: string;
@@ -480,13 +481,6 @@ export interface ApplyMercenaryInput {
 
 export interface UpdateStatusInput {
   status: string;
-}
-
-export interface CheckoutInput {
-  orderId: string;
-  amount: number;
-  method: string;
-  itemName: string;
 }
 
 export interface CheckoutResult {

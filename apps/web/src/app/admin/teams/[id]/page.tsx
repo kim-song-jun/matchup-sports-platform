@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -101,63 +101,77 @@ export default function AdminTeamDetailPage() {
     );
   };
 
+  useEffect(() => {
+    if (!showSuspendModal) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSuspendModal(false); };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showSuspendModal]);
+
+  useEffect(() => {
+    if (!showBadgeModal) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowBadgeModal(false); };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showBadgeModal]);
+
   const wins = team.recentMatches.filter((m: { result: string }) => m.result === 'win').length;
   const draws = team.recentMatches.filter((m: { result: string }) => m.result === 'draw').length;
   const losses = team.recentMatches.filter((m: { result: string }) => m.result === 'loss').length;
 
   const inputClass =
-    'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white transition-all';
+    'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-all';
 
   return (
     <div className="animate-fade-in">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-gray-400 mb-6">
-        <Link href="/admin/teams" className="hover:text-gray-600 transition-colors">팀 관리</Link>
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+        <Link href="/admin/teams" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">팀 관리</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">{team.name}</span>
+        <span className="text-gray-700 dark:text-gray-300">{team.name}</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* Left column */}
         <div className="space-y-4">
           {/* Team header card */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-900 text-white text-[20px] font-black">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-900 dark:bg-gray-700 text-white text-xl font-black">
                   {team.name.charAt(0)}
                 </div>
                 <div>
                   {editing ? (
-                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className={`${inputClass} text-[18px] font-bold`} />
+                    <input id="team-name" type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className={`${inputClass} text-xl font-bold`} />
                   ) : (
-                    <h2 className="text-[20px] font-bold text-gray-900">{team.name}</h2>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">{team.name}</h2>
                   )}
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[13px] text-gray-500">{sportLabel[team.sportType]}</span>
-                    <span className="text-gray-200">|</span>
-                    <span className="flex items-center gap-1 text-[13px] text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{sportLabel[team.sportType]}</span>
+                    <span className="text-gray-200 dark:text-gray-600">|</span>
+                    <span className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
                       <MapPin size={12} />
                       {team.city} {team.district}
                     </span>
-                    <span className="text-gray-200">|</span>
-                    <span className="text-[13px] text-gray-500">Lv.{team.level}</span>
+                    <span className="text-gray-200 dark:text-gray-600">|</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Lv.{team.level}</span>
                   </div>
                 </div>
               </div>
               {suspended ? (
-                <span className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-[12px] font-semibold text-red-500">정지됨</span>
+                <span className="shrink-0 rounded-full bg-red-50 dark:bg-red-900/30 px-2.5 py-1 text-xs font-semibold text-red-500">정지됨</span>
               ) : team.isRecruiting ? (
-                <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[12px] font-semibold text-blue-500">모집중</span>
+                <span className="shrink-0 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-semibold text-blue-500">모집중</span>
               ) : (
-                <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[12px] font-semibold text-gray-500">마감</span>
+                <span className="shrink-0 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">마감</span>
               )}
             </div>
 
             {editing ? (
-              <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
+              <textarea id="team-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
             ) : (
-              <p className="text-[14px] text-gray-600 leading-relaxed">{team.description}</p>
+              <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">{team.description}</p>
             )}
 
             {/* Badges */}
@@ -165,7 +179,7 @@ export default function AdminTeamDetailPage() {
               {teamBadges.map((badge) => {
                 const b = badgeLabels[badge];
                 return b ? (
-                  <span key={badge} className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${b.color}`}>
+                  <span key={badge} className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${b.color}`}>
                     <Award size={12} />
                     {b.label}
                   </span>
@@ -175,51 +189,51 @@ export default function AdminTeamDetailPage() {
           </div>
 
           {/* Stats */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">팀 통계</h3>
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 통계</h3>
             <div className="grid grid-cols-4 gap-3">
-              <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-gray-900">{team.trustScore}</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">신뢰도</p>
+              <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5 text-center">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{team.trustScore}</p>
+                <p className="text-xs text-gray-400 mt-0.5">신뢰도</p>
               </div>
-              <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-green-500">{wins}</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">승</p>
+              <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5 text-center">
+                <p className="text-2xl font-bold text-green-500">{wins}</p>
+                <p className="text-xs text-gray-400 mt-0.5">승</p>
               </div>
-              <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-gray-500">{draws}</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">무</p>
+              <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5 text-center">
+                <p className="text-2xl font-bold text-gray-500 dark:text-gray-400">{draws}</p>
+                <p className="text-xs text-gray-400 mt-0.5">무</p>
               </div>
-              <div className="rounded-xl bg-gray-50 p-3.5 text-center">
-                <p className="text-[24px] font-bold text-red-500">{losses}</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">패</p>
+              <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5 text-center">
+                <p className="text-2xl font-bold text-red-500">{losses}</p>
+                <p className="text-xs text-gray-400 mt-0.5">패</p>
               </div>
             </div>
           </div>
 
           {/* Members */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
               멤버 ({team.members.length}명)
             </h3>
             <div className="space-y-2">
               {team.members.map((m: { id: string; nickname: string; role: string; mannerScore: number; joinedAt?: string }) => (
-                <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
+                <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[12px] font-bold text-blue-500">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-bold text-blue-500">
                       {m.nickname.charAt(0)}
                     </div>
                     <div>
-                      <p className="text-[14px] font-medium text-gray-900">{m.nickname}</p>
-                      <p className="text-[11px] text-gray-400">가입 {m.joinedAt}</p>
+                      <p className="text-base font-medium text-gray-900 dark:text-white">{m.nickname}</p>
+                      <p className="text-xs text-gray-400">가입 {m.joinedAt}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 text-[12px] text-amber-500">
+                    <div className="flex items-center gap-1 text-xs text-amber-500">
                       <Star size={12} fill="currentColor" />
                       <span>{m.mannerScore.toFixed(1)}</span>
                     </div>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${roleColor[m.role]}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleColor[m.role]}`}>
                       {roleLabel[m.role]}
                     </span>
                   </div>
@@ -229,21 +243,21 @@ export default function AdminTeamDetailPage() {
           </div>
 
           {/* Recent matches */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">최근 매치</h3>
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">최근 매치</h3>
             <div className="space-y-2">
               {team.recentMatches.map((m: { id: string; date: string; opponent: string; result: string; score: string }) => (
-                <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
+                <div key={m.id} className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-[12px] text-gray-400">
+                    <div className="flex items-center gap-1 text-xs text-gray-400">
                       <Calendar size={12} />
                       {m.date}
                     </div>
-                    <span className="text-[14px] text-gray-700">vs {m.opponent}</span>
+                    <span className="text-base text-gray-700 dark:text-gray-300">vs {m.opponent}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-semibold text-gray-900">{m.score}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${resultColor[m.result]}`}>
+                    <span className="text-base font-semibold text-gray-900 dark:text-white">{m.score}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${resultColor[m.result]}`}>
                       {resultLabel[m.result]}
                     </span>
                   </div>
@@ -256,44 +270,44 @@ export default function AdminTeamDetailPage() {
         {/* Right column */}
         <div className="space-y-4">
           {/* Owner info */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">운영자 정보</h3>
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영자 정보</h3>
             <div className="flex items-center gap-3 mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-[14px] font-bold text-blue-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-base font-bold text-blue-500">
                 {team.owner.nickname.charAt(0)}
               </div>
               <div>
-                <p className="text-[14px] font-semibold text-gray-900">{team.owner.nickname}</p>
-                <p className="text-[12px] text-gray-400">{team.owner.email}</p>
+                <p className="text-base font-semibold text-gray-900 dark:text-white">{team.owner.nickname}</p>
+                <p className="text-xs text-gray-400">{team.owner.email}</p>
               </div>
             </div>
-            <div className="space-y-2 border-t border-gray-100 pt-3">
-              <div className="flex items-center justify-between text-[13px]">
+            <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+              <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-400">매너점수</span>
                 <div className="flex items-center gap-1 text-amber-500">
                   <Star size={12} fill="currentColor" />
-                  <span className="text-gray-700">{team.owner.mannerScore.toFixed(1)}</span>
+                  <span className="text-gray-700 dark:text-gray-300">{team.owner.mannerScore.toFixed(1)}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[13px]">
+              <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-400">팀 생성일</span>
-                <span className="text-gray-700">{new Date(team.createdAt).toLocaleDateString('ko-KR')}</span>
+                <span className="text-gray-700 dark:text-gray-300">{new Date(team.createdAt).toLocaleDateString('ko-KR')}</span>
               </div>
             </div>
           </div>
 
           {/* Admin actions */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">관리 액션</h3>
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">관리 액션</h3>
             <div className="space-y-2">
               <button
                 onClick={() => { setEditing(!editing); }}
-                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100 transition-colors"
+                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 px-4 py-3 text-left hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
               >
                 <Edit3 size={18} className="text-blue-500 shrink-0" />
                 <div>
-                  <p className="text-[14px] font-medium text-blue-700">{editing ? '수정 취소' : '팀 정보 수정'}</p>
-                  <p className="text-[11px] text-blue-500">팀명, 설명을 수정합니다</p>
+                  <p className="text-base font-medium text-blue-700 dark:text-blue-400">{editing ? '수정 취소' : '팀 정보 수정'}</p>
+                  <p className="text-xs text-blue-500">팀명, 설명을 수정합니다</p>
                 </div>
               </button>
 
@@ -301,7 +315,7 @@ export default function AdminTeamDetailPage() {
                 <button
                   onClick={handleSaveEdit}
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   {saving ? '저장 중...' : '변경사항 저장'}
@@ -310,24 +324,24 @@ export default function AdminTeamDetailPage() {
 
               <button
                 onClick={() => setShowBadgeModal(true)}
-                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100 transition-colors"
+                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 px-4 py-3 text-left hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
               >
                 <Award size={18} className="text-blue-500 shrink-0" />
                 <div>
-                  <p className="text-[14px] font-medium text-blue-700">배지 관리</p>
-                  <p className="text-[11px] text-blue-500">팀 배지를 추가/제거합니다</p>
+                  <p className="text-base font-medium text-blue-700 dark:text-blue-400">배지 관리</p>
+                  <p className="text-xs text-blue-500">팀 배지를 추가/제거합니다</p>
                 </div>
               </button>
 
               <button
                 onClick={() => setShowSuspendModal(true)}
                 disabled={suspended}
-                className="w-full flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left hover:bg-red-100 transition-colors disabled:opacity-50"
+                className="w-full flex items-center gap-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-4 py-3 text-left hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors disabled:opacity-50"
               >
                 <Ban size={18} className="text-red-500 shrink-0" />
                 <div>
-                  <p className="text-[14px] font-medium text-red-700">{suspended ? '이미 정지됨' : '팀 활동 정지'}</p>
-                  <p className="text-[11px] text-red-500">팀의 매칭 활동을 정지합니다</p>
+                  <p className="text-base font-medium text-red-700 dark:text-red-400">{suspended ? '이미 정지됨' : '팀 활동 정지'}</p>
+                  <p className="text-xs text-red-500">팀의 매칭 활동을 정지합니다</p>
                 </div>
               </button>
             </div>
@@ -337,32 +351,32 @@ export default function AdminTeamDetailPage() {
 
       {/* Suspend confirmation modal */}
       {showSuspendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowSuspendModal(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="suspend-modal-title" className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/30">
                 <AlertTriangle size={20} className="text-red-500" />
               </div>
               <div>
-                <h3 className="text-[16px] font-bold text-gray-900">팀 활동 정지</h3>
-                <p className="text-[13px] text-gray-400">매칭 활동이 중단됩니다</p>
+                <h3 id="suspend-modal-title" className="text-lg font-bold text-gray-900 dark:text-white">팀 활동 정지</h3>
+                <p className="text-sm text-gray-400">매칭 활동이 중단됩니다</p>
               </div>
             </div>
-            <p className="text-[14px] text-gray-600 mb-6">
-              <span className="font-semibold text-gray-900">{team.name}</span> 팀의 활동을 정지하시겠습니까?
+            <p className="text-base text-gray-600 dark:text-gray-300 mb-6">
+              <span className="font-semibold text-gray-900 dark:text-white">{team.name}</span> 팀의 활동을 정지하시겠습니까?
               정지되면 새로운 매칭 신청이 불가능합니다.
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowSuspendModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleSuspend}
                 disabled={suspending}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50"
               >
                 {suspending ? <Loader2 size={14} className="animate-spin" /> : null}
                 {suspending ? '처리 중...' : '활동 정지'}
@@ -374,15 +388,15 @@ export default function AdminTeamDetailPage() {
 
       {/* Badge management modal */}
       {showBadgeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowBadgeModal(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="badge-modal-title" className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-bold text-gray-900">배지 관리</h3>
-              <button onClick={() => setShowBadgeModal(false)} className="text-gray-400 hover:text-gray-600">
+              <h3 id="badge-modal-title" className="text-lg font-bold text-gray-900 dark:text-white">배지 관리</h3>
+              <button onClick={() => setShowBadgeModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <X size={20} />
               </button>
             </div>
-            <p className="text-[13px] text-gray-500 mb-4">배지를 클릭하여 추가하거나 제거하세요</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">배지를 클릭하여 추가하거나 제거하세요</p>
             <div className="space-y-2">
               {availableBadges.map((badge) => {
                 const b = badgeLabels[badge];
@@ -392,15 +406,15 @@ export default function AdminTeamDetailPage() {
                     key={badge}
                     onClick={() => toggleBadge(badge)}
                     className={`w-full flex items-center justify-between rounded-xl px-4 py-3 text-left transition-all ${
-                      active ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-100 hover:bg-gray-100'
+                      active ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <Award size={16} className={active ? 'text-blue-500' : 'text-gray-400'} />
-                      <span className={`text-[14px] font-medium ${active ? 'text-blue-700' : 'text-gray-600'}`}>{b.label}</span>
+                      <span className={`text-base font-medium ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-300'}`}>{b.label}</span>
                     </div>
                     {active && (
-                      <span className="text-[12px] font-semibold text-blue-500">활성</span>
+                      <span className="text-xs font-semibold text-blue-500">활성</span>
                     )}
                   </button>
                 );
@@ -408,7 +422,7 @@ export default function AdminTeamDetailPage() {
             </div>
             <button
               onClick={() => setShowBadgeModal(false)}
-              className="w-full mt-4 rounded-xl bg-blue-500 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors"
+              className="w-full mt-4 rounded-xl bg-blue-500 py-2.5 text-base font-bold text-white hover:bg-blue-600 transition-colors"
             >
               완료
             </button>

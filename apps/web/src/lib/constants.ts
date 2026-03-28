@@ -37,6 +37,21 @@ export const sportIconColor: Record<string, string> = {
   volleyball: 'bg-blue-50 text-blue-500',
 };
 
+// Sport card accent — tint, badge, dot colors for card-level sport identity
+export const sportCardAccent: Record<string, { tint: string; badge: string; dot: string }> = {
+  soccer:         { tint: 'bg-green-50/40 dark:bg-green-900/10',  badge: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400',     dot: 'bg-green-400' },
+  futsal:         { tint: 'bg-blue-50/40 dark:bg-blue-900/10',   badge: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',       dot: 'bg-blue-400' },
+  basketball:     { tint: 'bg-amber-50/40 dark:bg-amber-900/10',  badge: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',    dot: 'bg-amber-400' },
+  badminton:      { tint: 'bg-cyan-50/40 dark:bg-cyan-900/10',   badge: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',       dot: 'bg-cyan-400' },
+  ice_hockey:     { tint: 'bg-blue-50/40 dark:bg-blue-900/10',   badge: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',       dot: 'bg-blue-400' },
+  tennis:         { tint: 'bg-red-50/40 dark:bg-red-900/10',    badge: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',          dot: 'bg-red-400' },
+  swimming:       { tint: 'bg-sky-50/40 dark:bg-sky-900/10',    badge: 'bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400',          dot: 'bg-sky-400' },
+  figure_skating: { tint: 'bg-purple-50/40 dark:bg-purple-900/10', badge: 'bg-purple-50 text-purple-500 dark:bg-purple-900/30 dark:text-purple-400', dot: 'bg-purple-300' },
+  short_track:    { tint: 'bg-slate-50/40 dark:bg-slate-900/10',  badge: 'bg-slate-50 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400',    dot: 'bg-slate-400' },
+  baseball:       { tint: 'bg-orange-50/40 dark:bg-orange-900/10', badge: 'bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400', dot: 'bg-orange-400' },
+  volleyball:     { tint: 'bg-indigo-50/40 dark:bg-indigo-900/10', badge: 'bg-indigo-50 text-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-400', dot: 'bg-indigo-400' },
+};
+
 // Match status
 export const matchStatusLabel: Record<string, string> = {
   recruiting: '모집중',

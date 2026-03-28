@@ -122,18 +122,18 @@ export default function PricingPage() {
       <section className="relative pt-32 pb-14 sm:pt-40 sm:pb-18 lg:pt-44 lg:pb-20">
         <div className="max-w-[1100px] mx-auto px-5 text-center">
           <ScrollReveal delay={0}>
-            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[13px] font-semibold px-4 py-2 rounded-full mb-6">
+            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
               <CreditCard size={14} />
               투명한 요금 정책
             </div>
           </ScrollReveal>
           <ScrollReveal delay={100}>
-            <h1 className="text-[28px] sm:text-[44px] lg:text-[56px] font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
               요금 안내
             </h1>
           </ScrollReveal>
           <ScrollReveal delay={200}>
-            <p className="text-[17px] lg:text-[18px] text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
+            <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
               투명하고 합리적인 가격.
               <br className="hidden sm:block" />
               필요한 만큼만 선택하세요.
@@ -155,7 +155,7 @@ export default function PricingPage() {
               return (
                 <ScrollReveal key={plan.id} delay={idx * 120}>
                   <div
-                    className={`relative bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-8 border h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                    className={`relative bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-8 border h-full flex flex-col transition-[colors,transform,shadow] duration-300 hover:shadow-xl hover:-translate-y-1 ${
                       plan.recommended
                         ? 'border-blue-500 shadow-xl shadow-blue-500/10 ring-1 ring-blue-500/20'
                         : 'border-gray-100 dark:border-gray-700'
@@ -164,7 +164,7 @@ export default function PricingPage() {
                     {/* Recommended badge */}
                     {plan.recommended && (
                       <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                        <span className="inline-flex items-center gap-1.5 bg-blue-500 text-white text-[12px] font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-blue-500/30">
+                        <span className="inline-flex items-center gap-1.5 bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-blue-500/30">
                           <Sparkles size={12} />
                           추천
                         </span>
@@ -176,23 +176,23 @@ export default function PricingPage() {
                       <div className={`h-11 w-11 rounded-xl ${plan.iconBg} flex items-center justify-center mb-4`}>
                         <Icon size={20} className={plan.iconColor} />
                       </div>
-                      <h3 className="text-[18px] font-bold text-gray-900 dark:text-white mb-1">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
                         {plan.name}
                       </h3>
-                      <p className="text-[13px] text-gray-500">{plan.description}</p>
+                      <p className="text-sm text-gray-500">{plan.description}</p>
                     </div>
 
                     {/* Price */}
                     <div className="mb-7">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-[36px] lg:text-[44px] font-black text-gray-900 dark:text-white tracking-tight leading-none">
+                        <span className="text-4xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
                           {plan.price}
                         </span>
-                        <span className="text-[15px] font-medium text-gray-500">
+                        <span className="text-md font-medium text-gray-500">
                           {plan.priceLabel}
                         </span>
                         {plan.period && (
-                          <span className="text-[14px] text-gray-500">{plan.period}</span>
+                          <span className="text-base text-gray-500">{plan.period}</span>
                         )}
                       </div>
                     </div>
@@ -218,7 +218,7 @@ export default function PricingPage() {
                               }
                             />
                           </div>
-                          <span className="text-[14px] text-gray-600 dark:text-gray-300 leading-snug">
+                          <span className="text-base text-gray-600 dark:text-gray-300 leading-snug">
                             {feature}
                           </span>
                         </li>
@@ -228,7 +228,7 @@ export default function PricingPage() {
                     {/* CTA */}
                     <Link
                       href="/login"
-                      className={`w-full inline-flex items-center justify-center font-semibold rounded-xl px-6 py-3.5 text-[14px] transition-all active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${plan.ctaStyle}`}
+                      className={`w-full inline-flex items-center justify-center font-semibold rounded-xl px-6 py-3.5 text-base transition-[colors,transform] active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${plan.ctaStyle}`}
                     >
                       {plan.cta}
                     </Link>
@@ -245,11 +245,11 @@ export default function PricingPage() {
         <div className="max-w-[760px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-10">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 <CreditCard size={13} />
                 매치 참가비
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 개별 매치 참가비 안내
               </h2>
             </div>
@@ -259,21 +259,21 @@ export default function PricingPage() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-10 border border-gray-100 dark:border-gray-700 shadow-lg shadow-gray-900/5 dark:shadow-black/20">
               <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
                 <div className="text-center">
-                  <div className="text-[13px] text-gray-500 font-medium mb-2">참가비 범위</div>
-                  <div className="text-[24px] lg:text-[28px] font-black text-gray-900 dark:text-white tracking-tight">
+                  <div className="text-sm text-gray-500 font-medium mb-2">참가비 범위</div>
+                  <div className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
                     5,000 ~ 30,000
-                    <span className="text-[14px] font-medium text-gray-500 ml-1">원</span>
+                    <span className="text-base font-medium text-gray-500 ml-1">원</span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-[13px] text-gray-500 font-medium mb-2">설정 주체</div>
-                  <div className="text-[24px] lg:text-[28px] font-black text-gray-900 dark:text-white tracking-tight">
+                  <div className="text-sm text-gray-500 font-medium mb-2">설정 주체</div>
+                  <div className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
                     호스트
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-[13px] text-gray-500 font-medium mb-2">플랫폼 수수료</div>
-                  <div className="text-[24px] lg:text-[28px] font-black text-blue-500 tracking-tight">
+                  <div className="text-sm text-gray-500 font-medium mb-2">플랫폼 수수료</div>
+                  <div className="text-2xl lg:text-3xl font-black text-blue-500 tracking-tight">
                     10%
                   </div>
                 </div>
@@ -289,7 +289,7 @@ export default function PricingPage() {
                   ].map((text) => (
                     <div key={text} className="flex items-start gap-2.5">
                       <Check size={14} strokeWidth={3} className="text-blue-500 shrink-0 mt-1" />
-                      <span className="text-[14px] text-gray-600 dark:text-gray-400 leading-relaxed">
+                      <span className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
                         {text}
                       </span>
                     </div>
@@ -306,10 +306,10 @@ export default function PricingPage() {
         <div className="max-w-[680px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-12">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 자주 묻는 질문
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 요금 관련 FAQ
               </h2>
             </div>
@@ -319,7 +319,7 @@ export default function PricingPage() {
             {FAQ_ITEMS.map((item, idx) => (
               <ScrollReveal key={item.q} delay={idx * 60}>
                 <div
-                  className={`bg-white dark:bg-gray-800 rounded-2xl border transition-all duration-200 ${
+                  className={`bg-white dark:bg-gray-800 rounded-2xl border transition-[colors,shadow] duration-200 ${
                     openFaq === idx
                       ? 'border-blue-200 dark:border-blue-800 shadow-lg shadow-blue-500/5'
                       : 'border-gray-100 dark:border-gray-700'
@@ -330,7 +330,7 @@ export default function PricingPage() {
                     className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 rounded-2xl"
                     aria-expanded={openFaq === idx}
                   >
-                    <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
+                    <span className="text-md font-semibold text-gray-900 dark:text-white">
                       {item.q}
                     </span>
                     <ChevronDown
@@ -341,12 +341,12 @@ export default function PricingPage() {
                     />
                   </button>
                   <div
-                    className={`overflow-hidden transition-all duration-300 ${
+                    className={`overflow-hidden transition-[max-height,opacity] duration-300 ${
                       openFaq === idx ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
                     }`}
                   >
                     <div className="px-6 pb-5">
-                      <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                      <p className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">
                         {item.a}
                       </p>
                     </div>
@@ -363,20 +363,20 @@ export default function PricingPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.12),transparent_60%)]" />
         <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center">
           <ScrollReveal>
-            <p className="text-[14px] text-blue-400 font-semibold mb-4">
+            <p className="text-base text-blue-400 font-semibold mb-4">
               가입은 무료, 업그레이드는 언제든
             </p>
-            <h2 className="text-[28px] lg:text-[36px] font-bold text-white mb-6 tracking-tight leading-tight">
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6 tracking-tight leading-tight">
               지금 무료로 시작하세요
             </h2>
-            <p className="text-[15px] lg:text-[17px] text-gray-400 mb-10 leading-relaxed">
+            <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
               무료 요금제로 매칭을 체험하고,
               <br className="hidden sm:block" />
               더 필요할 때 업그레이드하세요.
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-[16px] hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             >
               무료로 시작하기
               <ArrowRight size={18} strokeWidth={2.5} />

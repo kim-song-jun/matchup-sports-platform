@@ -3,14 +3,16 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Send, ChevronDown, ChevronUp,
-  Calendar, MapPin, DollarSign, Info,
+  Calendar, MapPin, DollarSign, Info, MessageCircle,
   MoreVertical, Flag, Ban, LogOut,
   Image as ImageIcon, Smile, Paperclip,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/stores/chat-store';
 import { useToast } from '@/components/ui/toast';
+import { formatMatchDate } from '@/lib/utils';
 import type { ChatMessage } from '@/stores/chat-store';
 
 function formatTime(dateStr: string): string {
@@ -32,12 +34,6 @@ function formatDateLabel(dateStr: string): string {
   if (diffDays === 0) return '오늘';
   if (diffDays === 1) return '어제';
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
-}
-
-function formatMatchDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}/${d.getDate()} (${weekdays[d.getDay()]})`;
 }
 
 function getDateKey(dateStr: string): string {
@@ -221,11 +217,13 @@ export default function ChatRoomEmbed({
 
   if (!room) {
     return (
-      <div className="flex-1 flex items-center justify-center px-5 py-20 text-center">
-        <div>
-          <Info size={32} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-[15px] text-gray-600 dark:text-gray-300">채팅방을 찾을 수 없어요</p>
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <EmptyState
+          icon={MessageCircle}
+          title="채팅방을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 채팅방이에요"
+          size="sm"
+        />
       </div>
     );
   }
@@ -241,6 +239,7 @@ export default function ChatRoomEmbed({
           {!embedded && onBack && (
             <button
               onClick={onBack}
+              aria-label="뒤로 가기"
               className="rounded-lg p-1.5 min-w-[44px] min-h-[44px] text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors lg:hidden"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -251,11 +250,11 @@ export default function ChatRoomEmbed({
           <div className="flex-1 min-w-0">
             <Link
               href={`/teams/${opponentTeamId}`}
-              className="text-[16px] font-bold text-gray-900 dark:text-white truncate block hover:text-blue-500 transition-colors"
+              className="text-lg font-bold text-gray-900 dark:text-white truncate block hover:text-blue-500 transition-colors"
             >
               {opponentName}
             </Link>
-            <p className="text-[11px] text-gray-500 truncate">
+            <p className="text-xs text-gray-500 truncate">
               {room.matchTitle}
             </p>
           </div>
@@ -279,21 +278,21 @@ export default function ChatRoomEmbed({
               <div className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-lg py-1 z-50 animate-fade-in">
                 <button
                   onClick={() => { setShowMenu(false); setShowReportModal(true); }}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <Flag size={14} className="text-gray-500" />
                   신고하기
                 </button>
                 <button
                   onClick={() => { setShowMenu(false); setShowBlockModal(true); }}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <Ban size={14} className="text-gray-500" />
                   차단하기
                 </button>
                 <button
                   onClick={() => { setShowMenu(false); setShowLeaveModal(true); }}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] text-red-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <LogOut size={14} className="text-red-400" />
                   나가기
@@ -307,15 +306,15 @@ export default function ChatRoomEmbed({
         {showMatchInfo && (
           <div className="px-4 pb-3 animate-fade-in">
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5 space-y-2">
-              <div className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-300">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                 <Calendar size={14} className="text-gray-500" />
                 <span>{formatMatchDate(room.matchDate)}</span>
               </div>
-              <div className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-300">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                 <MapPin size={14} className="text-gray-500" />
                 <span>{room.matchTitle}</span>
               </div>
-              <div className="flex items-center gap-2 text-[13px]">
+              <div className="flex items-center gap-2 text-sm">
                 <DollarSign size={14} className="text-gray-500" />
                 <span className="text-gray-600 dark:text-gray-300">
                   {room.homeTeamName} vs {room.awayTeamName}
@@ -327,12 +326,14 @@ export default function ChatRoomEmbed({
       </header>
 
       {/* Messages area */}
-      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 dark:bg-gray-900/50">
+      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 dark:bg-gray-900/50 min-h-0">
+        {/* Push messages to bottom when few messages */}
+        <div className="min-h-full flex flex-col justify-end">
         {groupedMessages.map((group) => (
           <div key={group.date}>
             {/* Date separator */}
             <div className="flex items-center justify-center my-4">
-              <span className="rounded-full bg-gray-200/60 px-3 py-1 text-[11px] text-gray-500">
+              <span className="rounded-full bg-gray-200/60 dark:bg-gray-700/60 px-3 py-1 text-xs text-gray-500 dark:text-gray-400">
                 {group.label}
               </span>
             </div>
@@ -342,7 +343,7 @@ export default function ChatRoomEmbed({
               if (msg.isSystem) {
                 return (
                   <div key={msg.id} className="flex justify-center my-3">
-                    <span className="text-[12px] text-gray-500 dark:text-gray-400 text-center max-w-[80%]">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-[80%]">
                       {msg.message}
                     </span>
                   </div>
@@ -365,7 +366,7 @@ export default function ChatRoomEmbed({
                     <div className="flex items-start gap-2 max-w-[75%] lg:max-w-[60%]">
                       {/* 아바타: 그룹 첫 메시지만 */}
                       {isFirstInGroup ? (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-[12px] font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
                           {msg.senderName.charAt(0)}
                         </div>
                       ) : (
@@ -375,19 +376,19 @@ export default function ChatRoomEmbed({
                         {/* 이름: 그룹 첫 메시지만 */}
                         {isFirstInGroup && (
                           <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-200">{msg.senderName}</span>
-                            <span className="text-[10px] text-gray-500">{msg.senderTeamName}</span>
+                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{msg.senderName}</span>
+                            <span className="text-2xs text-gray-500">{msg.senderTeamName}</span>
                           </div>
                         )}
                         <div className="flex items-end gap-1.5">
-                          <div className={`bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-[14px] text-gray-800 dark:text-gray-200 ${
+                          <div className={`bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-base text-gray-800 dark:text-gray-200 ${
                             isFirstInGroup ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl'
                           }`}>
                             {msg.message}
                           </div>
                           {/* 시간: 그룹 마지막만 */}
                           {isLastInGroup && (
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0 pb-0.5">
+                            <span className="text-2xs text-gray-400 dark:text-gray-500 shrink-0 pb-0.5">
                               {formatTime(msg.timestamp)}
                             </span>
                           )}
@@ -402,11 +403,11 @@ export default function ChatRoomEmbed({
                       {/* 시간 + 읽음: 그룹 마지막만 */}
                       {isLastInGroup && (
                         <div className="flex flex-col items-end shrink-0 pb-0.5">
-                          {msg.isRead === false && <span className="text-[9px] text-blue-500 font-medium">1</span>}
-                          <span className="text-[10px] text-gray-400 dark:text-gray-500">{formatTime(msg.timestamp)}</span>
+                          {msg.isRead === false && <span className="text-2xs text-blue-500 font-medium">1</span>}
+                          <span className="text-2xs text-gray-400 dark:text-gray-500">{formatTime(msg.timestamp)}</span>
                         </div>
                       )}
-                      <div className={`bg-blue-500 px-3.5 py-2 text-[14px] text-white ${
+                      <div className={`bg-blue-500 px-3.5 py-2 text-base text-white ${
                         isFirstInGroup ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'
                       }`}>
                         {msg.message}
@@ -429,6 +430,7 @@ export default function ChatRoomEmbed({
           </div>
         )}
         <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* 이모지 피커 (간단 버전) */}
@@ -437,7 +439,7 @@ export default function ChatRoomEmbed({
           <div className="flex flex-wrap gap-2">
             {['👍', '👏', '🔥', '⚽', '🏀', '🏒', '💪', '🎉', '😊', '😂', '🙏', '❤️'].map(emoji => (
               <button key={emoji} onClick={() => { setInput(prev => prev + emoji); setShowEmoji(false); }}
-                className="text-[22px] p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
                 {emoji}
               </button>
             ))}
@@ -447,12 +449,13 @@ export default function ChatRoomEmbed({
 
       {/* Quick Actions */}
       <div className="shrink-0 px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-50 dark:border-gray-800">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+          <span className="shrink-0 text-2xs font-semibold text-gray-400 dark:text-gray-500">빠른 메시지</span>
           {QUICK_ACTIONS.map((action) => (
             <button
               key={action.label}
               onClick={() => handleQuickAction(action.message)}
-              className="shrink-0 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-[12px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 transition-colors"
+              className="shrink-0 rounded-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors"
             >
               {action.label}
             </button>
@@ -482,7 +485,7 @@ export default function ChatRoomEmbed({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="메시지를 입력하세요"
-            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
           />
           {/* 전송 */}
           <button
@@ -500,7 +503,7 @@ export default function ChatRoomEmbed({
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-3">신고하기</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">신고하기</h3>
             <div className="space-y-2 mb-4">
               {['욕설/비매너', '허위정보', '스팸', '기타'].map((reason) => (
                 <label
@@ -519,7 +522,7 @@ export default function ChatRoomEmbed({
                     onChange={(e) => setReportReason(e.target.value)}
                     className="accent-blue-500"
                   />
-                  <span className="text-[14px] text-gray-700 dark:text-gray-200">{reason}</span>
+                  <span className="text-base text-gray-700 dark:text-gray-200">{reason}</span>
                 </label>
               ))}
             </div>
@@ -528,19 +531,19 @@ export default function ChatRoomEmbed({
               onChange={(e) => setReportDetail(e.target.value)}
               placeholder="상세 내용을 입력하세요 (선택)"
               rows={3}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-800 transition-all resize-none mb-4"
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-800 transition-all resize-none mb-4"
             />
             <div className="flex items-center gap-3">
               <button
                 onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetail(''); }}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-[14px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleReport}
                 disabled={!reportReason}
-                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 신고하기
               </button>
@@ -557,21 +560,21 @@ export default function ChatRoomEmbed({
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
                 <Ban size={20} className="text-red-500" />
               </div>
-              <h3 className="text-[16px] font-bold text-gray-900 dark:text-white">차단하기</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">차단하기</h3>
             </div>
-            <p className="text-[14px] text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-base text-gray-600 dark:text-gray-300 mb-6">
               이 팀을 차단하시겠어요? 차단하면 채팅이 비활성화됩니다.
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowBlockModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-[14px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleBlock}
-                className="flex-1 rounded-xl bg-red-500 py-2.5 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors"
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-base font-semibold text-white hover:bg-red-600 transition-colors"
               >
                 차단하기
               </button>
@@ -588,21 +591,21 @@ export default function ChatRoomEmbed({
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
                 <LogOut size={20} className="text-gray-500" />
               </div>
-              <h3 className="text-[16px] font-bold text-gray-900 dark:text-white">채팅방 나가기</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">채팅방 나가기</h3>
             </div>
-            <p className="text-[14px] text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-base text-gray-600 dark:text-gray-300 mb-6">
               채팅방을 나가시겠어요? 대화 내용은 삭제됩니다.
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowLeaveModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-[14px] font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleLeave}
-                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors"
+                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
               >
                 나가기
               </button>

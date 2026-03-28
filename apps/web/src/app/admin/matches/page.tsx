@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { Trophy, ChevronRight, Users, Calendar } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useState } from 'react';
 import { useAdminMatches } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import type { Match } from '@/types/api';
+import { formatDateShort } from '@/lib/utils';
 
 const matchFilters = [
   { key: '', label: '전체' },
@@ -29,10 +31,6 @@ const statusTextColor: Record<string, string> = {
   cancelled: 'text-red-500',
 };
 
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-}
-
 export default function AdminMatchesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -53,7 +51,7 @@ export default function AdminMatchesPage() {
       filtered.map((m: Match) => ({
         제목: m.title || '',
         종목: sportLabel[m.sportType] || m.sportType,
-        일시: `${formatDate(m.matchDate)} ${m.startTime || ''}`,
+        일시: `${formatDateShort(m.matchDate)} ${m.startTime || ''}`,
         인원: `${m.currentPlayers}/${m.maxPlayers}`,
         상태: statusLabel[m.status] || m.status,
         호스트: m.host?.nickname || '',
@@ -65,8 +63,8 @@ export default function AdminMatchesPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-[22px] font-bold text-gray-900">매치 관리</h1>
-        <p className="text-[14px] text-gray-400 mt-1">전체 매치를 관리하세요</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 관리</h1>
+        <p className="text-base text-gray-400 mt-1">전체 매치를 관리하세요</p>
       </div>
 
       <AdminToolbar
@@ -83,48 +81,51 @@ export default function AdminMatchesPage() {
       <div className="space-y-2">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-white border border-gray-100 p-4">
-              <div className="h-4 w-3/5 bg-gray-100 rounded animate-pulse mb-2" />
-              <div className="h-3 w-2/5 bg-gray-50 rounded animate-pulse" />
+            <div key={i} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              <div className="h-4 w-3/5 bg-gray-100 dark:bg-gray-700 rounded animate-pulse mb-2" />
+              <div className="h-3 w-2/5 bg-gray-50 dark:bg-gray-700 rounded animate-pulse" />
             </div>
           ))
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl bg-white border border-gray-100 py-16 text-center">
-            <Trophy size={24} className="mx-auto text-gray-400 mb-2" />
-            <p className="text-[14px] text-gray-400">아직 등록된 매치가 없어요</p>
-            <p className="text-[12px] text-gray-300 mt-1">첫 번째 매치를 만들어보세요</p>
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            <EmptyState
+              icon={Trophy}
+              title="아직 등록된 매치가 없어요"
+              description="첫 번째 매치를 만들어보세요"
+              size="sm"
+            />
           </div>
         ) : (
           filtered.map((m: Match) => (
             <Link
               key={m.id}
               href={`/admin/matches/${m.id}`}
-              className="flex items-center justify-between rounded-xl bg-white border border-gray-100 p-4 hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
               {/* Left — key info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[12px] text-gray-400">
+                  <span className="text-xs text-gray-400">
                     {sportLabel[m.sportType] || m.sportType}
                   </span>
-                  <span className={`text-[12px] font-medium ${statusTextColor[m.status] || 'text-gray-400'}`}>
+                  <span className={`text-xs font-medium ${statusTextColor[m.status] || 'text-gray-400'}`}>
                     {statusLabel[m.status] || m.status}
                   </span>
                 </div>
-                <p className="text-[15px] font-medium text-gray-900 truncate">
+                <p className="text-md font-medium text-gray-900 dark:text-white truncate">
                   {m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
                 </p>
                 <div className="flex items-center gap-3 mt-1.5">
-                  <span className="flex items-center gap-1 text-[12px] text-gray-400">
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
                     <Calendar size={12} className="text-gray-400" />
-                    {formatDate(m.matchDate)} {m.startTime}
+                    {formatDateShort(m.matchDate)} {m.startTime}
                   </span>
-                  <span className="flex items-center gap-1 text-[12px] text-gray-400">
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
                     <Users size={12} className="text-gray-400" />
                     {m.currentPlayers}/{m.maxPlayers}명
                   </span>
                   {m.host?.nickname && (
-                    <span className="text-[12px] text-gray-400">
+                    <span className="text-xs text-gray-400">
                       {m.host.nickname}
                     </span>
                   )}
@@ -132,7 +133,7 @@ export default function AdminMatchesPage() {
               </div>
 
               {/* Right — chevron */}
-              <ChevronRight size={16} className="text-gray-300 ml-3 shrink-0" />
+              <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 ml-3 shrink-0" />
             </Link>
           ))
         )}

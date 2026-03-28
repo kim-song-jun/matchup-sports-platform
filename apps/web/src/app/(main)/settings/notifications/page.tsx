@@ -59,11 +59,11 @@ export default function NotificationsPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-gray-50">알림 설정</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-50">알림 설정</h1>
       </header>
 
       {/* Header — desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-500">
+      <div className="hidden lg:flex items-center gap-2 mb-6 text-sm text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600 dark:hover:text-gray-300">
           설정
         </button>
@@ -74,7 +74,7 @@ export default function NotificationsPage() {
       <div className="px-5 lg:px-0 max-w-2xl lg:max-w-[600px] py-6 space-y-5">
         {/* ── 마스터 토글 ── */}
         <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
-          <h3 className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             알림 수신
           </h3>
           <ToggleRow
@@ -95,7 +95,7 @@ export default function NotificationsPage() {
 
         {/* ── 방해금지 시간 ── */}
         <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
-          <h3 className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             방해금지 시간
           </h3>
           <div className={`flex items-center gap-3.5 min-h-[44px] ${!pushMaster ? 'opacity-50' : ''}`}>
@@ -104,11 +104,11 @@ export default function NotificationsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-[15px] font-medium text-gray-900 dark:text-gray-50">
+                <p className="text-md font-medium text-gray-900 dark:text-gray-50">
                   {dndStart} ~ {dndEnd}
                 </p>
               </div>
-              <p className="text-[13px] text-gray-500 mt-0.5">
+              <p className="text-sm text-gray-500 mt-0.5">
                 이 시간에는 Push 알림이 무음 처리됩니다
               </p>
             </div>
@@ -123,13 +123,13 @@ export default function NotificationsPage() {
 
         {/* ── 카테고리별 알림 ── */}
         <section className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
-          <h3 className="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             카테고리별 알림
           </h3>
 
           {!pushMaster && (
             <div className="rounded-xl bg-yellow-50 dark:bg-yellow-900/20 px-4 py-3">
-              <p className="text-[13px] text-yellow-700 dark:text-yellow-400">
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">
                 Push 알림이 꺼져 있으면 아래 설정과 관계없이 알림을 받지 않습니다.
               </p>
             </div>
@@ -149,10 +149,10 @@ export default function NotificationsPage() {
                     <Icon size={18} className="text-blue-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-medium text-gray-900 dark:text-gray-50">
+                    <p className="text-md font-medium text-gray-900 dark:text-gray-50">
                       {cat.label}
                     </p>
-                    <p className="text-[13px] text-gray-500 mt-0.5">{cat.desc}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{cat.desc}</p>
                   </div>
                   <Toggle
                     enabled={cat.enabled}
@@ -166,7 +166,7 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        <p className="text-[12px] text-gray-500 text-center pb-2">
+        <p className="text-xs text-gray-500 text-center pb-2">
           알림 설정은 이 기기에만 적용됩니다.
         </p>
       </div>
@@ -193,8 +193,8 @@ function ToggleRow({
   return (
     <div className={`flex items-center gap-3.5 min-h-[44px] ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex-1 min-w-0">
-        <p className="text-[15px] font-medium text-gray-900 dark:text-gray-50">{label}</p>
-        <p className="text-[13px] text-gray-500 mt-0.5">{desc}</p>
+        <p className="text-md font-medium text-gray-900 dark:text-gray-50">{label}</p>
+        <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
       </div>
       <Toggle enabled={enabled} onToggle={onToggle} disabled={disabled} label={label} />
     </div>
@@ -227,7 +227,7 @@ function Toggle({
       } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
     >
       <span
-        className={`absolute top-[3px] left-[3px] h-[24px] w-[24px] rounded-full bg-white shadow-sm transition-transform duration-200 ${
+        className={`absolute top-[3px] left-[3px] h-[24px] w-[24px] rounded-full bg-white dark:bg-gray-800 shadow-sm transition-transform duration-200 ${
           enabled ? 'translate-x-[22px]' : 'translate-x-0'
         }`}
       />

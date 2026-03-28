@@ -17,6 +17,7 @@ import {
   Copy,
   RotateCcw,
 } from 'lucide-react';
+import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; color: string; bgColor: string }> = {
   completed: { label: '결제 완료', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50' },
@@ -70,20 +71,6 @@ const mockPayments: Record<string, any> = {
   },
 };
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
-
-function formatDateTime(d: string) {
-  return new Date(d).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function PaymentDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -115,51 +102,51 @@ export default function PaymentDetailPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">결제 상세</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제 상세</h1>
       </header>
       <div className="hidden lg:block mb-6">
-        <div className="flex items-center gap-2 text-[13px] text-gray-500 mb-4">
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <Link href="/payments" className="hover:text-gray-600 dark:hover:text-gray-400 transition-colors">결제 내역</Link>
           <ChevronRight size={14} />
           <span className="text-gray-700 dark:text-gray-300">상세</span>
         </div>
-        <h2 className="text-[24px] font-bold text-gray-900 dark:text-white">결제 상세</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제 상세</h2>
       </div>
 
       <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
         {/* Status Banner */}
         <div className={`rounded-2xl ${status.bgColor} p-5 flex items-center gap-4`}>
-          <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-white/80 ${status.color}`}>
+          <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${status.color}`}>
             <StatusIcon size={24} />
           </div>
           <div>
-            <p className={`text-[18px] font-bold ${status.color}`}>{status.label}</p>
-            <p className="text-[13px] text-gray-500 mt-0.5">{formatDateTime(payment.paidAt || payment.createdAt)}</p>
+            <p className={`text-xl font-bold ${status.color}`}>{status.label}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{formatDateTime(payment.paidAt || payment.createdAt)}</p>
           </div>
         </div>
 
         {/* Amount */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[14px] text-gray-500">원가</span>
-              <span className="text-[14px] text-gray-700 dark:text-gray-300">{formatCurrency(payment.originalAmount)}</span>
+              <span className="text-base text-gray-500">원가</span>
+              <span className="text-base text-gray-700 dark:text-gray-300">{formatAmount(payment.originalAmount)}</span>
             </div>
             {payment.couponDiscount > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-[14px] text-gray-500">쿠폰 할인</span>
-                <span className="text-[14px] text-red-500 font-medium">-{formatCurrency(payment.couponDiscount)}</span>
+                <span className="text-base text-gray-500">쿠폰 할인</span>
+                <span className="text-base text-red-500 font-medium">-{formatAmount(payment.couponDiscount)}</span>
               </div>
             )}
             <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
-              <span className="text-[15px] font-bold text-gray-900 dark:text-white">결제 금액</span>
-              <span className="text-[20px] font-bold text-blue-500">{formatCurrency(payment.amount)}</span>
+              <span className="text-md font-bold text-gray-900 dark:text-white">결제 금액</span>
+              <span className="text-xl font-bold text-blue-500">{formatAmount(payment.amount)}</span>
             </div>
             {payment.status === 'refunded' && (
               <div className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2">
-                <span className="text-[14px] text-red-500 font-medium">환불 금액</span>
-                <span className="text-[14px] font-bold text-red-500">{formatCurrency(payment.refundAmount)}</span>
+                <span className="text-base text-red-500 font-medium">환불 금액</span>
+                <span className="text-base font-bold text-red-500">{formatAmount(payment.refundAmount)}</span>
               </div>
             )}
           </div>
@@ -167,34 +154,34 @@ export default function PaymentDetailPage() {
 
         {/* Payment Method */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/50">
               <CreditCard size={20} className="text-gray-500" />
             </div>
             <div>
-              <p className="text-[14px] font-medium text-gray-900 dark:text-gray-100">{payment.method}</p>
-              <p className="text-[12px] text-gray-500">{payment.methodDetail}</p>
+              <p className="text-base font-medium text-gray-900 dark:text-gray-100">{payment.method}</p>
+              <p className="text-xs text-gray-500">{payment.methodDetail}</p>
             </div>
           </div>
         </div>
 
         {/* Related Match/Lesson */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">연결된 일정</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">연결된 일정</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500">
+              <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-500">
                 {payment.match.type}
               </span>
-              <p className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">{payment.match.name}</p>
+              <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{payment.match.name}</p>
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-[13px] text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
                 <Calendar size={14} className="text-gray-500 shrink-0" />
                 {payment.match.date}
               </div>
-              <div className="flex items-center gap-2 text-[13px] text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
                 <MapPin size={14} className="text-gray-500 shrink-0" />
                 {payment.match.venue}
               </div>
@@ -204,29 +191,29 @@ export default function PaymentDetailPage() {
 
         {/* Receipt */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">영수증 정보</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">영수증 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[13px] text-gray-500">주문번호</span>
-              <span className="text-[13px] font-mono text-gray-700 dark:text-gray-300">{payment.orderId}</span>
+              <span className="text-sm text-gray-500">주문번호</span>
+              <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{payment.orderId}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[13px] text-gray-500">영수증 번호</span>
-              <button onClick={handleCopyReceipt} className="flex items-center gap-1.5 text-[13px] font-mono text-gray-700 dark:text-gray-300 hover:text-blue-500 transition-colors">
+              <span className="text-sm text-gray-500">영수증 번호</span>
+              <button onClick={handleCopyReceipt} className="flex items-center gap-1.5 text-sm font-mono text-gray-700 dark:text-gray-300 hover:text-blue-500 transition-colors">
                 {payment.receiptNumber}
                 <Copy size={12} className={copied ? 'text-green-500' : 'text-gray-300'} />
               </button>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[13px] text-gray-500">결제수단 상세</span>
-              <span className="text-[13px] text-gray-700 dark:text-gray-300">{payment.methodDetail}</span>
+              <span className="text-sm text-gray-500">결제수단 상세</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">{payment.methodDetail}</span>
             </div>
           </div>
         </div>
 
         {/* Timeline */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100 dark:bg-gray-700" />
             {timelineSteps.map((step, i) => (
@@ -236,9 +223,9 @@ export default function PaymentDetailPage() {
                 }`}>
                   {step.done && <CheckCircle size={10} className="text-white" />}
                 </div>
-                <p className={`text-[14px] font-medium ${step.done ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>{step.label}</p>
+                <p className={`text-base font-medium ${step.done ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>{step.label}</p>
                 {step.time && (
-                  <p className="text-[12px] text-gray-500 mt-0.5">{formatDateTime(step.time)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{formatDateTime(step.time)}</p>
                 )}
               </div>
             ))}
@@ -248,24 +235,24 @@ export default function PaymentDetailPage() {
         {/* Refund Policy & Button */}
         {payment.isRefundable && payment.status === 'completed' && (
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
+            <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-2 mb-4">
               <div className="flex items-start gap-2">
                 <div className="mt-1.5 h-1 w-1 rounded-full bg-gray-400 shrink-0" />
-                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">24시간 전</strong>: 전액 환불</p>
+                <p className="text-sm text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">24시간 전</strong>: 전액 환불</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="mt-1.5 h-1 w-1 rounded-full bg-gray-400 shrink-0" />
-                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">1~24시간 전</strong>: 50% 환불</p>
+                <p className="text-sm text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">1~24시간 전</strong>: 50% 환불</p>
               </div>
               <div className="flex items-start gap-2">
                 <div className="mt-1.5 h-1 w-1 rounded-full bg-gray-400 shrink-0" />
-                <p className="text-[13px] text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">1시간 이내</strong>: 환불 불가</p>
+                <p className="text-sm text-gray-500">경기 시작 <strong className="text-gray-700 dark:text-gray-300">1시간 이내</strong>: 환불 불가</p>
               </div>
             </div>
             <Link
               href={`/payments/${payment.id}/refund`}
-              className="flex items-center justify-center gap-2 w-full rounded-2xl border-2 border-red-100 bg-red-50 py-3.5 text-[15px] font-semibold text-red-500 hover:bg-red-100 transition-colors"
+              className="flex items-center justify-center gap-2 w-full rounded-2xl border-2 border-red-100 bg-red-50 py-3.5 text-md font-semibold text-red-500 hover:bg-red-100 transition-colors"
             >
               <RotateCcw size={18} />
               환불 요청

@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { CreditCard } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAdminPayments } from '@/hooks/use-api';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
+import { formatAmount, formatDateTime } from '@/lib/utils';
 
 interface AdminPayment {
   id: string;
@@ -36,14 +38,6 @@ const statusColor: Record<string, string> = {
 const methodLabel: Record<string, string> = {
   card: '카드', tosspay: '토스페이', naverpay: '네이버페이', kakaopay: '카카오페이',
 };
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
-
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 const mockAdminPayments = [
   { id: 'pay_001', amount: 15000, status: 'completed', method: 'card', orderId: 'MU-20260320-001', createdAt: '2026-03-20T10:30:00', paidAt: '2026-03-20T10:30:00', userId: 'user-1', userName: '축구왕민수', type: 'match', itemName: '주말 풋살 매치' },
@@ -81,7 +75,7 @@ export default function AdminPaymentsPage() {
         금액: p.amount || 0,
         상태: statusLabel[p.status] || p.status,
         결제수단: p.method ? (methodLabel[p.method] || p.method) : '-',
-        일시: p.createdAt ? formatDate(p.createdAt) : '-',
+        일시: p.createdAt ? formatDateTime(p.createdAt) : '-',
         주문번호: p.orderId || '-',
       })),
       'payments',
@@ -92,8 +86,8 @@ export default function AdminPaymentsPage() {
     <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">결제 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">전체 결제 내역을 관리하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 관리</h1>
+          <p className="text-base text-gray-400 mt-1">전체 결제 내역을 관리하세요</p>
         </div>
       </div>
 
@@ -107,64 +101,66 @@ export default function AdminPaymentsPage() {
         onDownload={handleDownload}
       />
 
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         {isLoading ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-50" />
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-50 dark:bg-gray-700" />
             ))}
           </div>
         ) : payments.length === 0 ? (
-          <div className="p-16 text-center">
-            <CreditCard size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">결제 내역이 없어요</p>
-          </div>
+          <EmptyState
+            icon={CreditCard}
+            title="아직 결제 내역이 없어요"
+            description="매치에 참가하면 여기서 확인할 수 있어요"
+            size="sm"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">사용자</th>
-                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">금액</th>
-                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">상태</th>
-                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">결제수단</th>
-                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">일시</th>
-                  <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">주문번호</th>
+                <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">사용자</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">금액</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">상태</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">결제수단</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">일시</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">주문번호</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                 {payments.map((p: AdminPayment, idx: number) => {
                   const userName = p.userName || '알 수 없음';
                   const itemName = p.itemName || p.orderId || '';
                   return (
-                  <tr key={p.id || idx} className="hover:bg-gray-50 transition-colors">
+                  <tr key={p.id || idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-[12px] font-bold text-blue-500">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-bold text-blue-500 dark:text-blue-400">
                           {userName.charAt(0)}
                         </div>
                         <div>
-                          <p className="text-[14px] font-medium text-gray-900">{userName}</p>
-                          <p className="text-[11px] text-gray-400">{itemName}</p>
+                          <p className="text-base font-medium text-gray-900 dark:text-white">{userName}</p>
+                          <p className="text-xs text-gray-400">{itemName}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[14px] font-semibold text-gray-900">{formatCurrency(p.amount || 0)}</span>
+                      <span className="text-base font-semibold text-gray-900 dark:text-white">{formatAmount(p.amount || 0)}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusColor[p.status] || 'bg-gray-100 text-gray-400'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor[p.status] || 'bg-gray-100 text-gray-400'}`}>
                         {statusLabel[p.status] || p.status}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-[13px] text-gray-600">
+                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
                       {p.method ? methodLabel[p.method] || p.method : '-'}
                     </td>
-                    <td className="px-5 py-3.5 text-[13px] text-gray-500">
-                      {p.createdAt ? formatDate(p.createdAt) : '-'}
+                    <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400">
+                      {p.createdAt ? formatDateTime(p.createdAt) : '-'}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[12px] font-mono text-gray-400">{p.orderId || '-'}</span>
+                      <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{p.orderId || '-'}</span>
                     </td>
                   </tr>
                   );

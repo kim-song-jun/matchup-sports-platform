@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, Clock } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 
 type DisputeType = 'no_show' | 'late' | 'level_mismatch' | 'misconduct';
@@ -138,18 +139,18 @@ export default function AdminDisputesPage() {
     <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">신고/분쟁 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">팀 간 분쟁과 신고를 처리하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">신고/분쟁 관리</h1>
+          <p className="text-base text-gray-400 mt-1">팀 간 분쟁과 신고를 처리하세요</p>
         </div>
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-gray-100 border border-gray-200 px-3 py-1.5 text-[12px] font-semibold text-gray-600">
+            <span className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
               <Clock size={14} />
               대기 {pendingCount}건
             </span>
           )}
           {investigatingCount > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1.5 text-[12px] font-semibold text-blue-600">
+            <span className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
               <AlertCircle size={14} />
               조사중 {investigatingCount}건
             </span>
@@ -167,47 +168,47 @@ export default function AdminDisputesPage() {
         countLabel="건"
       />
 
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">ID</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">신고팀</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">피신고팀</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">매치일</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">유형</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">신고일</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap"></th>
+              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">ID</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신고팀</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">피신고팀</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매치일</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">유형</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">상태</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신고일</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {filtered.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 text-[13px] font-mono text-gray-500">{d.id}</td>
+                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-mono text-gray-500 dark:text-gray-400">{d.id}</td>
                   <td className="px-5 py-3.5">
-                    <p className="text-[14px] font-medium text-gray-900 whitespace-nowrap">{d.reporterTeam}</p>
+                    <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{d.reporterTeam}</p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="text-[14px] font-medium text-gray-900 whitespace-nowrap">{d.reportedTeam}</p>
+                    <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{d.reportedTeam}</p>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{d.matchDate}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{d.matchDate}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${typeColor[d.type]}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${typeColor[d.type]}`}>
                       {typeLabel[d.type]}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${statusColor[d.status]}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[d.status]}`}>
                       {statusLabel[d.status]}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{d.createdAt}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{d.createdAt}</td>
                   <td className="px-5 py-3.5">
                     <Link
                       href={`/admin/disputes/${d.id}`}
-                      className="flex items-center gap-1 text-[13px] font-medium text-blue-500 hover:text-blue-600 whitespace-nowrap"
+                      className="flex items-center gap-1 text-sm font-medium text-blue-500 hover:text-blue-600 whitespace-nowrap"
                     >
                       상세
                       <ChevronRight size={14} />
@@ -217,9 +218,13 @@ export default function AdminDisputesPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
-                    <AlertCircle size={24} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-[14px] text-gray-400">검색 조건에 맞는 신고가 없습니다</p>
+                  <td colSpan={8}>
+                    <EmptyState
+                      icon={AlertCircle}
+                      title="검색 조건에 맞는 신고가 없어요"
+                      description="다른 조건으로 다시 찾아보세요"
+                      size="sm"
+                    />
                   </td>
                 </tr>
               )}

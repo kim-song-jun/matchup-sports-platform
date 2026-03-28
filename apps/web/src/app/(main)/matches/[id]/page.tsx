@@ -10,20 +10,11 @@ import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import type { MatchParticipant } from '@/types/api';
 import { api } from '@/lib/api';
-import { sportLabel, levelLabel } from '@/lib/constants';
+import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
+import { formatFullDate, formatAmount } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 const CheckoutModal = dynamic(() => import('@/components/payment/checkout-modal').then(m => ({ default: m.CheckoutModal })), { ssr: false });
-
-function formatMatchDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
-}
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export default function MatchDetailPage() {
   const params = useParams();
@@ -39,7 +30,7 @@ export default function MatchDetailPage() {
     mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<unknown>,
     onSuccess: () => {
       toast('success', '참가 완료! \u{1F389} 경기에서 만나요');
-      queryClient.invalidateQueries({ queryKey: ['match', matchId] });
+      queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -51,7 +42,7 @@ export default function MatchDetailPage() {
     mutationFn: () => api.delete(`/matches/${matchId}/leave`) as Promise<unknown>,
     onSuccess: () => {
       toast('info', '매치에서 탈퇴했어요');
-      queryClient.invalidateQueries({ queryKey: ['match', matchId] });
+      queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -90,19 +81,21 @@ export default function MatchDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 truncate flex-1">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</h1>
         <button
           onClick={async () => {
-            if (navigator.share) {
-              await navigator.share({ title: match.title, url: window.location.href });
-            } else {
-              await navigator.clipboard.writeText(window.location.href);
-              toast('success', '링크가 복사되었어요');
-            }
+            try {
+              if (navigator.share) {
+                await navigator.share({ title: match.title, url: window.location.href });
+              } else {
+                await navigator.clipboard.writeText(window.location.href);
+                toast('success', '링크가 복사되었어요');
+              }
+            } catch { /* user cancelled share */ }
           }}
           aria-label="공유하기"
           className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
@@ -112,7 +105,7 @@ export default function MatchDetailPage() {
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</span>
@@ -122,19 +115,19 @@ export default function MatchDetailPage() {
         {/* Left: match info */}
         <div className="px-5 lg:px-0">
           {/* Title card */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-5 lg:p-6">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 lg:p-6">
             <div className="flex items-start gap-3">
               {SportIcon && (
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
                   <SportIcon size={24} />
                 </div>
               )}
               <div>
-                <span className="text-[12px] font-medium text-gray-500">{sportLabel[match.sportType]}</span>
-                <h2 className="text-[20px] font-bold text-gray-900 mt-0.5 leading-tight">
+                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>{sportLabel[match.sportType]}</span>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
                   {match.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
                 </h2>
-                <p className="text-[13px] text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 mt-1">
                   호스트: {match.host?.nickname}
                   <Star size={12} className="inline ml-1 text-amber-400" fill="currentColor" />
                   <span className="ml-0.5">{match.host?.mannerScore?.toFixed(1)}</span>
@@ -143,33 +136,33 @@ export default function MatchDetailPage() {
             </div>
 
             {match.description && (
-              <p className="mt-4 text-[14px] text-gray-600 leading-relaxed">{match.description}</p>
+              <p className="mt-4 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{match.description}</p>
             )}
           </div>
 
           {/* Info grid */}
           <div className="mt-3 grid grid-cols-2 gap-3 lg:gap-5">
-            <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatMatchDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
+            <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
             <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
             <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={isAlmostFull ? '마감 임박' : '모집중'} highlight={isAlmostFull} />
-            <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatCurrency(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
+            <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatAmount(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
           </div>
 
           {/* Venue card */}
           {match.venue && (
-            <div className="mt-3 rounded-2xl bg-white border border-gray-100 p-4">
-              <h3 className="text-[14px] font-semibold text-gray-900 mb-2">시설 정보</h3>
+            <div className="mt-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">시설 정보</h3>
               <div className="flex items-center gap-3">
-                <div className="h-16 w-16 rounded-xl bg-gray-100 flex items-center justify-center">
-                  <MapPin size={24} className="text-gray-300" />
+                <div className="h-16 w-16 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                  <MapPin size={24} className="text-gray-300 dark:text-gray-500" />
                 </div>
                 <div>
-                  <p className="text-[14px] font-medium text-gray-800">{match.venue.name}</p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">{match.venue.address}</p>
+                  <p className="text-base font-medium text-gray-800 dark:text-gray-200">{match.venue.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{match.venue.address}</p>
                   {(match.venue.rating ?? 0) > 0 && (
                     <div className="flex items-center gap-1 mt-1">
                       <Star size={12} className="text-amber-400" fill="currentColor" />
-                      <span className="text-[12px] text-gray-600">{(match.venue.rating ?? 0).toFixed(1)}</span>
+                      <span className="text-xs text-gray-600">{(match.venue.rating ?? 0).toFixed(1)}</span>
                     </div>
                   )}
                 </div>
@@ -182,31 +175,31 @@ export default function MatchDetailPage() {
         <div className="px-5 lg:px-0 mt-4 lg:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Action button */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[13px] text-gray-500">참가 현황</span>
-              <span className={`text-[13px] font-semibold ${isAlmostFull ? 'text-red-500' : 'text-blue-500'}`}>
+              <span className="text-sm text-gray-500">참가 현황</span>
+              <span className={`text-sm font-semibold ${isAlmostFull ? 'text-red-500' : 'text-blue-500'}`}>
                 {match.currentPlayers}/{match.maxPlayers}명
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-              <div className={`h-full rounded-full transition-all duration-300 ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`} style={{ width: `${filledPercent}%` }} />
+              <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-red-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
 
             {!isAuthenticated ? (
-              <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-[15px] font-semibold text-white hover:bg-blue-600 transition-colors">
+              <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
                 로그인 후 참가하기
               </Link>
             ) : isHost ? (
-              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-500 cursor-not-allowed">
+              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
                 내가 만든 매치
               </button>
             ) : isParticipant ? (
               <button
                 onClick={() => leaveMutation.mutate()}
                 disabled={leaveMutation.isPending}
-                className="w-full rounded-xl border border-gray-200 bg-white py-3.5 text-[15px] font-semibold text-red-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 bg-white py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {leaveMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
@@ -216,14 +209,14 @@ export default function MatchDetailPage() {
                 ) : '참가 취소하기'}
               </button>
             ) : isFull ? (
-              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-[15px] font-semibold text-gray-500 cursor-not-allowed">
+              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
                 마감되었습니다
               </button>
             ) : (
               <button
                 onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
                 disabled={joinMutation.isPending}
-                className="w-full rounded-xl bg-blue-500 py-4 text-[16px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
               >
                 {joinMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
@@ -231,13 +224,13 @@ export default function MatchDetailPage() {
                     처리 중...
                   </span>
                 ) : (
-                  `참가하기 · ${formatCurrency(match.fee)}`
+                  `참가하기 · ${formatAmount(match.fee)}`
                 )}
               </button>
             )}
 
             {user?.id === match.hostId && (
-              <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-2">
+              <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors mt-2">
                 <Pencil size={14} />
                 매치 수정
               </Link>
@@ -256,7 +249,7 @@ export default function MatchDetailPage() {
                 const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(match.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(match.venue?.name || '')}&details=${encodeURIComponent(match.description || '')}`;
                 window.open(url, '_blank');
               }}
-              className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+              className="w-full mt-2 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
             >
               <Calendar size={14} />
               캘린더에 추가
@@ -264,25 +257,25 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Participants */}
-          <div className="rounded-2xl bg-white border border-gray-100 p-4">
-            <h3 className="text-[14px] font-semibold text-gray-900 mb-3">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
             <div className="space-y-2.5">
               {match.participants?.map((p: MatchParticipant) => (
                 <div key={p.id} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[13px] font-bold text-gray-500">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
                     {p.user?.nickname?.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium text-gray-800 truncate">
+                    <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
                       {p.user?.nickname}
                       {p.userId === match.hostId && (
-                        <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">호스트</span>
+                        <span className="ml-1.5 rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-2xs font-semibold text-gray-500 dark:text-gray-400">호스트</span>
                       )}
                     </p>
                   </div>
-                  <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
+                  <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
                     p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
                   }`}>
                     {p.status === 'confirmed' ? '확정' : '대기'}
@@ -326,13 +319,13 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-white border border-gray-100 p-3.5">
+    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-gray-500">{icon}</span>
-        <span className="text-[12px] text-gray-500">{label}</span>
+        <span className="text-gray-500 dark:text-gray-400">{icon}</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
       </div>
-      <p className={`text-[15px] font-semibold ${highlight ? 'text-red-500' : 'text-gray-900'}`}>{value}</p>
-      {sub && <p className={`text-[12px] mt-0.5 ${highlight ? 'text-red-400' : 'text-gray-500'}`}>{sub}</p>}
+      <p className={`text-md font-semibold ${highlight ? 'text-red-500' : 'text-gray-900 dark:text-white'}`}>{value}</p>
+      {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>{sub}</p>}
     </div>
   );
 }

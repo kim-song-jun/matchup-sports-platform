@@ -178,7 +178,7 @@ export default function EditTeamMatchPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-all';
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
@@ -187,11 +187,11 @@ export default function EditTeamMatchPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/team-matches" className="hover:text-gray-600">팀 매칭</Link>
         <ChevronRight size={14} />
         <Link href={`/team-matches/${id}`} className="hover:text-gray-600">{match.title}</Link>
@@ -202,13 +202,13 @@ export default function EditTeamMatchPage() {
       <div className="px-5 lg:px-0 max-w-2xl">
         {/* 종목 선택 */}
         <section className="mb-6">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">종목 선택</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">종목 선택</label>
           <div className="grid grid-cols-2 gap-2">
             {sportOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => update('sportType', opt.value)}
-                className={`rounded-xl border-2 px-4 py-4 text-[15px] font-semibold text-center transition-all ${
+                className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-all ${
                   form.sportType === opt.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -222,7 +222,7 @@ export default function EditTeamMatchPage() {
 
         {/* 모집글 제목 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             모집글 제목 <span className="text-red-400">*</span>
           </label>
           <input
@@ -236,7 +236,7 @@ export default function EditTeamMatchPage() {
 
         {/* 경기 날짜 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
           <input
@@ -251,7 +251,7 @@ export default function EditTeamMatchPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 시작 시간 <span className="text-red-400">*</span>
               </label>
               <input
@@ -262,7 +262,7 @@ export default function EditTeamMatchPage() {
               />
             </div>
             <div>
-              <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 종료 시간 <span className="text-red-400">*</span>
               </label>
               <input
@@ -277,13 +277,13 @@ export default function EditTeamMatchPage() {
 
         {/* 쿼터 수 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">쿼터 수</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">쿼터 수</label>
           <div className="flex gap-2">
             {quarterOptions.map((q) => (
               <button
                 key={q}
                 onClick={() => update('quarterCount', q)}
-                className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                   form.quarterCount === q
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -297,7 +297,7 @@ export default function EditTeamMatchPage() {
 
         {/* 구장 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             구장명 <span className="text-red-400">*</span>
           </label>
           <input
@@ -310,7 +310,7 @@ export default function EditTeamMatchPage() {
         </section>
 
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">구장 주소 (선택)</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">구장 주소 (선택)</label>
           <input
             type="text"
             value={form.venueAddress}
@@ -322,7 +322,7 @@ export default function EditTeamMatchPage() {
 
         {/* 실력등급 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">실력등급</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">실력등급</label>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {SKILL_GRADES.map((g) => (
               <button
@@ -334,10 +334,10 @@ export default function EditTeamMatchPage() {
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
+                <p className={`text-base font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
                   {g.label}
                 </p>
-                <p className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
+                <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
               </button>
             ))}
           </div>
@@ -345,7 +345,7 @@ export default function EditTeamMatchPage() {
 
         {/* 선출선수 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">선출선수 (명)</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">선출선수 (명)</label>
           <input
             type="number"
             min={0}
@@ -355,18 +355,18 @@ export default function EditTeamMatchPage() {
             placeholder="0"
             className={inputClass}
           />
-          <p className="text-[12px] text-gray-500 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
+          <p className="text-xs text-gray-500 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
         </section>
 
         {/* 경기방식 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">경기방식</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">경기방식</label>
           <div className="flex gap-2">
             {gameFormatOptions.map((fmt) => (
               <button
                 key={fmt}
                 onClick={() => update('gameFormat', fmt)}
-                className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                   form.gameFormat === fmt
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
@@ -380,7 +380,7 @@ export default function EditTeamMatchPage() {
 
         {/* 매치 유형 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">매치 유형</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">매치 유형</label>
           <div className="space-y-2">
             {MATCH_TYPES.map((mt) => (
               <label
@@ -397,13 +397,13 @@ export default function EditTeamMatchPage() {
                   value={mt.value}
                   checked={form.matchType === mt.value}
                   onChange={() => update('matchType', mt.value as MatchType)}
-                  className="h-4 w-4 text-gray-900 border-gray-300 focus:ring-gray-500"
+                  className="h-4 w-4 text-gray-900 dark:text-white border-gray-300 focus:ring-gray-500"
                 />
                 <div>
-                  <p className={`text-[14px] font-semibold ${form.matchType === mt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
+                  <p className={`text-base font-semibold ${form.matchType === mt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
                     {mt.label}
                   </p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">{mt.desc}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{mt.desc}</p>
                 </div>
               </label>
             ))}
@@ -412,7 +412,7 @@ export default function EditTeamMatchPage() {
 
         {/* 경기 스타일 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-2 block">경기 스타일</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">경기 스타일</label>
           <div className="space-y-2">
             {matchStyleOptions.map((opt) => (
               <button
@@ -424,10 +424,10 @@ export default function EditTeamMatchPage() {
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-semibold ${form.matchStyle === opt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
+                <p className={`text-base font-semibold ${form.matchStyle === opt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
                   {opt.label}
                 </p>
-                <p className="text-[12px] text-gray-500 mt-0.5">{opt.desc}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
               </button>
             ))}
           </div>
@@ -435,7 +435,7 @@ export default function EditTeamMatchPage() {
 
         {/* 유니폼 색상 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">유니폼 색상</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">유니폼 색상</label>
           <input
             type="text"
             value={form.uniformColor}
@@ -461,7 +461,7 @@ export default function EditTeamMatchPage() {
 
         {/* 비용 */}
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             총 비용 (원) <span className="text-red-400">*</span>
           </label>
           <input
@@ -472,12 +472,12 @@ export default function EditTeamMatchPage() {
             className={inputClass}
           />
           {form.totalFee && (
-            <p className="text-[12px] text-gray-500 mt-1">{formatCurrency(form.totalFee)}</p>
+            <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.totalFee)}</p>
           )}
         </section>
 
         <section className="mb-5">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
           <input
             type="number"
             value={form.opponentFee}
@@ -486,13 +486,13 @@ export default function EditTeamMatchPage() {
             className={inputClass}
           />
           {form.opponentFee && (
-            <p className="text-[12px] text-gray-500 mt-1">{formatCurrency(form.opponentFee)}</p>
+            <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.opponentFee)}</p>
           )}
         </section>
 
         {/* 추가 안내 */}
         <section className="mb-6">
-          <label className="text-[13px] font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">추가 안내 (선택)</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">추가 안내 (선택)</label>
           <textarea
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
@@ -506,7 +506,7 @@ export default function EditTeamMatchPage() {
         <div className="flex gap-3 mb-8">
           <button
             onClick={() => setShowCancelModal(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-[14px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 transition-colors"
           >
             <XCircle size={16} />
             취소
@@ -514,7 +514,7 @@ export default function EditTeamMatchPage() {
           <button
             onClick={handleSave}
             disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
             {isSubmitting ? '저장 중...' : '수정 완료'}
@@ -529,19 +529,19 @@ export default function EditTeamMatchPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
+            <p className="text-base text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 돌아가기
               </button>
               <button
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 {isCancelling ? '취소 중...' : '취소하기'}
               </button>
@@ -556,14 +556,14 @@ export default function EditTeamMatchPage() {
 function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3.5 cursor-pointer">
-      <span className="text-[14px] font-medium text-gray-800 dark:text-gray-200">{label}</span>
+      <span className="text-base font-medium text-gray-800 dark:text-gray-200">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         className={`relative h-6 w-11 rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
       >
         <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : ''}`}
+          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-gray-800 shadow transition-transform ${checked ? 'translate-x-5' : ''}`}
         />
       </button>
     </label>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Search } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useTeamMatches } from '@/hooks/use-api';
 import { ErrorState } from '@/components/ui/error-state';
 import { getGradeInfo } from '@/lib/skill-grades';
@@ -51,10 +52,10 @@ export default function TeamMatchesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">팀 매칭</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 매칭</h1>
         <Link
           href="/team-matches/new"
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <Plus size={16} strokeWidth={2.5} />
           모집글 작성
@@ -67,7 +68,7 @@ export default function TeamMatchesPage() {
           <button
             key={f.key}
             onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeSport === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
@@ -84,7 +85,7 @@ export default function TeamMatchesPage() {
           type="date"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="rounded-lg border border-gray-200 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
         />
         {[
           { key: '', label: '전체' },
@@ -95,7 +96,7 @@ export default function TeamMatchesPage() {
           <button
             key={f.key}
             onClick={() => setLevelFilter(f.key)}
-            className={`shrink-0 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               levelFilter === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
@@ -108,7 +109,7 @@ export default function TeamMatchesPage() {
 
       {!isLoading && matches.length > 0 && (
         <div className="px-5 lg:px-0 mb-3">
-          <p className="text-[13px] text-gray-500">{matches.length}개의 모집글</p>
+          <p className="text-sm text-gray-500">{matches.length}개의 모집글</p>
         </div>
       )}
 
@@ -123,15 +124,12 @@ export default function TeamMatchesPage() {
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
         ) : matches.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 p-16 text-center">
-            <Search size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">
-              {activeSport ? `${sportLabel[activeSport]} 모집글이 없어요` : '모집글이 없어요'}
-            </p>
-            <p className="text-[13px] text-gray-500 mt-1">
-              직접 모집글을 작성해보세요
-            </p>
-          </div>
+          <EmptyState
+            icon={Search}
+            title={activeSport ? `${sportLabel[activeSport]} 모집글이 없어요` : '모집글이 없어요'}
+            description="직접 모집글을 작성해보세요"
+            action={{ label: '모집글 작성', href: '/team-matches/new' }}
+          />
         ) : (
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
             {matches.map((match: TeamMatch) => {
@@ -145,42 +143,42 @@ export default function TeamMatchesPage() {
 
               return (
                 <Link key={match.id} href={`/team-matches/${match.id}`}>
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-750 duration-200">
+                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 duration-200">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>
+                          <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${status.className}`}>
                             {status.label}
                           </span>
-                          <span className="text-[12px] text-gray-500">
+                          <span className="text-xs text-gray-500">
                             {sportLabel[match.sportType] ?? match.sportType}
                           </span>
                           {match.matchStyle && (
                             <>
                               <span className="text-gray-200">·</span>
-                              <span className="text-[12px] text-gray-500">
+                              <span className="text-xs text-gray-500">
                                 {matchStyleLabel[match.matchStyle] ?? match.matchStyle}
                               </span>
                             </>
                           )}
                           {match.isFreeInvitation && (
-                            <span className="text-[11px] font-semibold text-green-600 ml-1">
+                            <span className="text-xs font-semibold text-green-600 ml-1">
                               무료초청
                             </span>
                           )}
                         </div>
-                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">
+                        <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
                           {match.title}
                         </h3>
                       </div>
                     </div>
 
-                    <p className="mt-2.5 text-[13px] text-gray-500 leading-relaxed">
+                    <p className="mt-2.5 text-sm text-gray-500 leading-relaxed">
                       {formatMatchDate(match.matchDate)} {match.startTime}
                       <span className="text-gray-300 mx-1">·</span>
                       {match.venueName}
                     </p>
-                    <p className="mt-1 text-[13px] text-gray-500">
+                    <p className="mt-1 text-sm text-gray-500">
                       {match.quarterCount}쿼터
                       <span className="text-gray-300 mx-1">·</span>
                       {match.skillGrade ? getGradeInfo(match.skillGrade).label : (match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한없음')}
@@ -197,11 +195,11 @@ export default function TeamMatchesPage() {
                     </p>
 
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[12px] text-gray-500">
+                      <span className="text-xs text-gray-500">
                         신청 {String(match.applicationCount ?? 0)}팀
                       </span>
                       {match.hostTeam && (
-                        <span className="text-[12px] text-gray-500">
+                        <span className="text-xs text-gray-500">
                           {match.hostTeam.name}
                         </span>
                       )}

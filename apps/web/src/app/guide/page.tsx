@@ -181,20 +181,20 @@ export default function GuidePage() {
         <div className="max-w-[1100px] mx-auto px-5">
           <div className="max-w-[680px] mx-auto text-center">
             <ScrollReveal delay={0}>
-              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[13px] font-semibold px-4 py-2 rounded-full mb-6">
+              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
                 <BookOpen size={14} />
                 서비스 가이드
               </div>
             </ScrollReveal>
 
             <ScrollReveal delay={100}>
-              <h1 className="text-[28px] sm:text-[40px] lg:text-[44px] font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
+              <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
                 이용 가이드
               </h1>
             </ScrollReveal>
 
             <ScrollReveal delay={200}>
-              <p className="text-[16px] lg:text-[18px] text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
+              <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
                 가입부터 매칭, 경기, 평가까지.
                 <br className="hidden sm:block" />
                 TeamMeet 서비스 이용의 모든 것을 안내합니다.
@@ -212,13 +212,13 @@ export default function GuidePage() {
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-14">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 시작하기
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 6단계로 시작하는 스포츠 매칭
               </h2>
-              <p className="text-[15px] text-gray-500 dark:text-gray-400 mt-3 max-w-[400px] mx-auto leading-relaxed">
+              <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[400px] mx-auto leading-relaxed">
                 처음 사용하시는 분도 쉽게 따라할 수 있어요.
               </p>
             </div>
@@ -238,23 +238,23 @@ export default function GuidePage() {
                     {/* Text Content */}
                     <div className="flex-1 mb-6 lg:mb-0">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="h-10 w-10 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-[15px] shrink-0 shadow-lg shadow-blue-500/20">
+                        <div className="h-10 w-10 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md shrink-0 shadow-lg shadow-blue-500/20">
                           {step.num}
                         </div>
                         <div className="h-10 w-10 rounded-xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
                           <Icon size={20} className="text-gray-600 dark:text-gray-300" />
                         </div>
                       </div>
-                      <h3 className="text-[18px] lg:text-[22px] font-bold text-gray-900 dark:text-white mb-1">
+                      <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mb-1">
                         {step.title}
                       </h3>
-                      <p className="text-[13px] font-medium text-blue-500 mb-3">{step.subtitle}</p>
-                      <p className="text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed mb-5">
+                      <p className="text-sm font-medium text-blue-500 mb-3">{step.subtitle}</p>
+                      <p className="text-md text-gray-500 dark:text-gray-400 leading-relaxed mb-5">
                         {step.description}
                       </p>
                       <ul className="space-y-2">
                         {step.details.map((detail) => (
-                          <li key={detail} className="flex items-start gap-2.5 text-[14px] text-gray-600 dark:text-gray-400">
+                          <li key={detail} className="flex items-start gap-2.5 text-base text-gray-600 dark:text-gray-400">
                             <CheckCircle2
                               size={16}
                               className="text-blue-500 mt-0.5 shrink-0"
@@ -272,7 +272,7 @@ export default function GuidePage() {
                       >
                         <div className="flex items-center gap-2 mb-4">
                           <div className={`h-2 w-2 rounded-full ${step.mockAccent}`} />
-                          <div className="text-[12px] font-semibold text-gray-500 dark:text-gray-400">
+                          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">
                             {step.title}
                           </div>
                         </div>
@@ -280,7 +280,7 @@ export default function GuidePage() {
                           {step.mockItems.map((item, i) => (
                             <div
                               key={item}
-                              className={`bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-[13px] font-medium text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700 flex items-center justify-between ${
+                              className={`bg-white dark:bg-gray-800 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700 flex items-center justify-between ${
                                 i === 0 ? 'ring-2 ring-blue-500/20' : ''
                               }`}
                             >
@@ -299,7 +299,7 @@ export default function GuidePage() {
                             style={{ width: `${((step.num) / 6) * 100}%` }}
                           />
                         </div>
-                        <div className="mt-2 text-right text-[12px] text-gray-500 font-medium">
+                        <div className="mt-2 text-right text-xs text-gray-500 dark:text-gray-400 font-medium">
                           {step.num} / 6 단계
                         </div>
                       </div>
@@ -317,14 +317,14 @@ export default function GuidePage() {
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-14">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 <Users size={13} />
                 팀 매칭
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 팀 매칭 이용법
               </h2>
-              <p className="text-[15px] text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
+              <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
                 팀을 등록하고 비슷한 실력의 상대 팀과 매칭하세요.
                 <br className="hidden sm:block" />
                 AI가 팀 전체의 실력 균형을 분석해드려요.
@@ -337,14 +337,14 @@ export default function GuidePage() {
               const Icon = feature.icon;
               return (
                 <ScrollReveal key={feature.title} delay={idx * 100}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-[colors,transform,shadow] duration-300 h-full">
                     <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
                       <Icon size={20} className="text-blue-600 dark:text-blue-400" />
                     </div>
-                    <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
                       {feature.title}
                     </h3>
-                    <p className="text-[14px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                    <p className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">
                       {feature.description}
                     </p>
                   </div>
@@ -356,10 +356,10 @@ export default function GuidePage() {
           {/* Team Flow Summary */}
           <ScrollReveal delay={100}>
             <div className="mt-10 bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6 lg:p-8 border border-blue-100 dark:border-blue-800/30">
-              <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
                 팀 매칭 흐름 요약
               </h3>
-              <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
                 {['팀 등록', '매치 생성', 'AI 상대 매칭', '양 팀 확정', '경기 진행', '상호 평가'].map(
                   (item, i, arr) => (
                     <div key={item} className="flex items-center gap-2">
@@ -383,14 +383,14 @@ export default function GuidePage() {
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-14">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
                 <ShoppingBag size={13} />
                 용병 & 장터
               </span>
-              <h2 className="text-[26px] lg:text-[36px] font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 용병 / 장터 이용법
               </h2>
-              <p className="text-[15px] text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
+              <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
                 인원이 부족할 때 용병을 구하거나,
                 <br className="hidden sm:block" />
                 운동 장비를 사고팔 수 있어요.
@@ -404,7 +404,7 @@ export default function GuidePage() {
             <ScrollReveal delay={0}>
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden h-full">
                 <div className="bg-blue-500 px-6 py-4">
-                  <h3 className="text-[17px] font-bold text-white flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <Handshake size={18} />
                     용병 시스템
                   </h3>
@@ -418,10 +418,10 @@ export default function GuidePage() {
                           <Icon size={18} className="text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                          <h4 className="text-[15px] font-bold text-gray-900 dark:text-white mb-1">
+                          <h4 className="text-md font-bold text-gray-900 dark:text-white mb-1">
                             {feature.title}
                           </h4>
-                          <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                             {feature.description}
                           </p>
                         </div>
@@ -433,7 +433,7 @@ export default function GuidePage() {
                       {['포지션별 검색', '실력 레벨 필터', '매너 점수 표시', '즉시 채팅'].map((tag) => (
                         <span
                           key={tag}
-                          className="text-[12px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-lg"
+                          className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-lg"
                         >
                           {tag}
                         </span>
@@ -448,7 +448,7 @@ export default function GuidePage() {
             <ScrollReveal delay={100}>
               <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden h-full">
                 <div className="bg-blue-500 px-6 py-4">
-                  <h3 className="text-[17px] font-bold text-white flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <ShoppingBag size={18} />
                     장터
                   </h3>
@@ -462,10 +462,10 @@ export default function GuidePage() {
                           <Icon size={18} className="text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                          <h4 className="text-[15px] font-bold text-gray-900 dark:text-white mb-1">
+                          <h4 className="text-md font-bold text-gray-900 dark:text-white mb-1">
                             {feature.title}
                           </h4>
-                          <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                             {feature.description}
                           </p>
                         </div>
@@ -477,7 +477,7 @@ export default function GuidePage() {
                       {['종목별 카테고리', '가격 협상', '찜하기 알림', '거래 후 평가'].map((tag) => (
                         <span
                           key={tag}
-                          className="text-[12px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-lg"
+                          className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-lg"
                         >
                           {tag}
                         </span>
@@ -496,20 +496,20 @@ export default function GuidePage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.12),transparent_60%)]" />
         <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center">
           <ScrollReveal>
-            <p className="text-[14px] text-blue-400 font-semibold mb-4">
+            <p className="text-base text-blue-400 font-semibold mb-4">
               가입 3초, 첫 매칭 무료
             </p>
-            <h2 className="text-[26px] lg:text-[36px] font-bold text-white mb-5 tracking-tight leading-tight">
+            <h2 className="text-2xl lg:text-4xl font-bold text-white mb-5 tracking-tight leading-tight">
               이제 직접 경험해보세요
             </h2>
-            <p className="text-[15px] lg:text-[17px] text-gray-400 mb-10 leading-relaxed">
+            <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
               가이드를 다 읽으셨다면 준비 완료.
               <br className="hidden sm:block" />
               지금 가입하고 첫 매치를 시작하세요.
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-[16px] hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             >
               지금 시작하기
               <ArrowRight size={18} strokeWidth={2.5} />

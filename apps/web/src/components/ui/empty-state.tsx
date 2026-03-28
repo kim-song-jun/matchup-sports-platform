@@ -8,29 +8,41 @@ interface EmptyStateProps {
   title: string;
   description?: string;
   action?: { label: string; href: string };
+  secondaryAction?: { label: string; onClick: () => void };
+  size?: 'sm' | 'md';
 }
 
-export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, secondaryAction, size = 'md' }: EmptyStateProps) {
+  const isSm = size === 'sm';
+
   return (
-    <div className="flex flex-col items-center justify-center p-12 text-center">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30">
-        <Icon size={40} className="text-blue-400 dark:text-blue-300 animate-gentle-bounce" />
+    <div className={`flex flex-col items-center justify-center text-center ${isSm ? 'p-8' : 'p-12'}`}>
+      <div className={`flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30 ${isSm ? 'h-12 w-12' : 'h-20 w-20'}`}>
+        <Icon size={isSm ? 24 : 40} className="text-blue-400 dark:text-blue-300 animate-gentle-bounce" />
       </div>
-      <h3 className="mt-5 text-[16px] font-semibold text-gray-700 dark:text-gray-200">
+      <h3 className={`font-semibold text-gray-700 dark:text-gray-200 ${isSm ? 'mt-3 text-base' : 'mt-5 text-lg'}`}>
         {title}
       </h3>
       {description && (
-        <p className="mt-1.5 text-[14px] text-gray-500 dark:text-gray-400">
+        <p className={`text-gray-500 dark:text-gray-400 ${isSm ? 'mt-1 text-sm' : 'mt-1.5 text-base'}`}>
           {description}
         </p>
       )}
       {action && (
         <Link
           href={action.href}
-          className="mt-5 inline-flex items-center rounded-xl border border-blue-200 dark:border-blue-800 px-4 py-2 text-[14px] font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+          className="mt-5 inline-flex items-center rounded-xl border border-blue-200 dark:border-blue-800 px-4 py-2 text-base font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
         >
           {action.label}
         </Link>
+      )}
+      {secondaryAction && (
+        <button
+          onClick={secondaryAction.onClick}
+          className="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        >
+          {secondaryAction.label}
+        </button>
       )}
     </div>
   );

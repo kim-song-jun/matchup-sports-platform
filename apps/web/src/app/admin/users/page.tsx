@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Star, Users, ChevronRight } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useState } from 'react';
 import { useAdminUsers } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
@@ -32,8 +33,8 @@ export default function AdminUsersPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-[22px] font-bold text-gray-900">사용자 관리</h1>
-        <p className="text-[14px] text-gray-400 mt-1">등록된 사용자를 관리하세요</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">사용자 관리</h1>
+        <p className="text-base text-gray-400 mt-1">등록된 사용자를 관리하세요</p>
       </div>
 
       <AdminToolbar
@@ -47,53 +48,57 @@ export default function AdminUsersPage() {
       <div className="space-y-2">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-white border border-gray-100 p-4">
+            <div key={i} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gray-100 animate-pulse" />
+                <div className="h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-700 animate-pulse" />
                 <div className="flex-1">
-                  <div className="h-4 w-24 bg-gray-100 rounded animate-pulse mb-1.5" />
-                  <div className="h-3 w-32 bg-gray-50 rounded animate-pulse" />
+                  <div className="h-4 w-24 bg-gray-100 dark:bg-gray-700 rounded animate-pulse mb-1.5" />
+                  <div className="h-3 w-32 bg-gray-50 dark:bg-gray-700 rounded animate-pulse" />
                 </div>
               </div>
             </div>
           ))
         ) : users.length === 0 ? (
-          <div className="rounded-xl bg-white border border-gray-100 py-16 text-center">
-            <Users size={24} className="mx-auto text-gray-400 mb-2" />
-            <p className="text-[14px] text-gray-400">아직 등록된 사용자가 없습니다</p>
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            <EmptyState
+              icon={Users}
+              title="아직 등록된 사용자가 없어요"
+              description="사용자가 가입하면 여기에 표시돼요"
+              size="sm"
+            />
           </div>
         ) : (
           users.map((u: UserProfile) => (
             <Link
               key={u.id}
               href={`/admin/users/${u.id}`}
-              className="flex items-center justify-between rounded-xl bg-white border border-gray-100 p-4 hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
             >
               {/* Left — avatar + info */}
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-[13px] font-bold text-gray-500 shrink-0">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400 shrink-0">
                   {u.nickname?.charAt(0)}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-[15px] font-medium text-gray-900 truncate">{u.nickname}</p>
-                    <span className="flex items-center gap-0.5 text-[12px] text-amber-500 shrink-0">
+                    <p className="text-md font-medium text-gray-900 dark:text-white truncate">{u.nickname}</p>
+                    <span className="flex items-center gap-0.5 text-xs text-amber-500 shrink-0">
                       <Star size={11} fill="currentColor" />
                       {u.mannerScore?.toFixed(1)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[12px] text-gray-400">{u.totalMatches}경기</span>
+                    <span className="text-xs text-gray-400">{u.totalMatches}경기</span>
                     {u.locationCity && (
-                      <span className="text-[12px] text-gray-400">{u.locationCity}</span>
+                      <span className="text-xs text-gray-400">{u.locationCity}</span>
                     )}
                     {u.sportTypes?.slice(0, 2).map((s: string) => (
-                      <span key={s} className="text-[11px] text-gray-400">
+                      <span key={s} className="text-xs text-gray-400">
                         {sportLabel[s] || s}
                       </span>
                     ))}
                     {u.createdAt && (
-                      <span className="text-[11px] text-gray-300">
+                      <span className="text-xs text-gray-300 dark:text-gray-500">
                         {new Date(u.createdAt).toLocaleDateString('ko-KR')}
                       </span>
                     )}
@@ -102,7 +107,7 @@ export default function AdminUsersPage() {
               </div>
 
               {/* Right — chevron */}
-              <ChevronRight size={16} className="text-gray-300 ml-3 shrink-0" />
+              <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 ml-3 shrink-0" />
             </Link>
           ))
         )}

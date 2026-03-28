@@ -13,6 +13,8 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatAmount } from '@/lib/utils';
 
 const settlementFilters = [
   { key: 'all', label: '전체' },
@@ -52,10 +54,6 @@ const summaryCards = [
   { label: '정산 대기금', value: '396,000원', icon: Clock, color: 'text-gray-500 bg-gray-100', trend: null },
   { label: '환불 총액', value: '135,000원', icon: ArrowDownRight, color: 'text-red-500 bg-red-50', trend: '-2.1%' },
 ];
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export default function AdminSettlementsPage() {
   const { toast } = useToast();
@@ -123,27 +121,27 @@ export default function AdminSettlementsPage() {
     <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">정산 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">거래 정산 현황을 관리하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">정산 관리</h1>
+          <p className="text-base text-gray-400 mt-1">거래 정산 현황을 관리하세요</p>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {summaryCards.map((card) => (
-          <div key={card.label} className="rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+          <div key={card.label} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
             <div className="flex items-center justify-between mb-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.color}`}>
                 <card.icon size={20} />
               </div>
               {card.trend && (
-                <span className={`text-[12px] font-medium ${card.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`text-xs font-medium ${card.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
                   {card.trend}
                 </span>
               )}
             </div>
-            <p className="text-[22px] font-bold text-gray-900">{card.value}</p>
-            <p className="text-[13px] text-gray-400 mt-0.5">{card.label}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{card.value}</p>
+            <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
           </div>
         ))}
       </div>
@@ -160,10 +158,10 @@ export default function AdminSettlementsPage() {
 
       {/* Bulk Action */}
       {activeTab === 'pending' && selectedRows.length > 0 && (
-        <div className="flex items-center gap-3 mb-4 rounded-2xl bg-blue-50 border border-blue-100 px-5 py-3">
+        <div className="flex items-center gap-3 mb-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-5 py-3">
           <CheckCircle size={18} className="text-blue-500" />
-          <span className="text-[14px] font-medium text-blue-700">{selectedRows.length}건 선택됨</span>
-          <button onClick={handleProcessSettlements} disabled={isProcessing} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-[13px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+          <span className="text-base font-medium text-blue-700 dark:text-blue-300">{selectedRows.length}건 선택됨</span>
+          <button onClick={handleProcessSettlements} disabled={isProcessing} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
             <Wallet size={16} />
             정산 처리
           </button>
@@ -171,17 +169,17 @@ export default function AdminSettlementsPage() {
       )}
 
       {/* Table */}
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
+              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                 {activeTab === 'pending' && (
                   <th className="px-4 py-3 w-10">
                     <button onClick={toggleAll} className={`flex h-4.5 w-4.5 items-center justify-center rounded border-2 transition-colors ${
                       selectedRows.length === filtered.length && filtered.length > 0
                         ? 'bg-blue-500 border-blue-500'
-                        : 'border-gray-300'
+                        : 'border-gray-300 dark:border-gray-600'
                     }`}>
                       {selectedRows.length === filtered.length && filtered.length > 0 && (
                         <CheckCircle size={10} className="text-white" />
@@ -189,29 +187,29 @@ export default function AdminSettlementsPage() {
                     </button>
                   </th>
                 )}
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">거래 ID</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">유형</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">내용</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">판매자</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider text-right">금액</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider text-right">수수료</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider text-right">정산액</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">상태</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase tracking-wider">날짜</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">거래 ID</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">유형</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">내용</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">판매자</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">금액</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">수수료</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider text-right">정산액</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">상태</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">날짜</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {filtered.map((s) => {
                 const sType = typeLabel[s.type];
                 const sStatus = statusConfig[s.status];
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     {activeTab === 'pending' && (
                       <td className="px-4 py-3.5">
                         <button onClick={() => toggleRow(s.id)} className={`flex h-4.5 w-4.5 items-center justify-center rounded border-2 transition-colors ${
                           selectedRows.includes(s.id)
                             ? 'bg-blue-500 border-blue-500'
-                            : 'border-gray-300'
+                            : 'border-gray-300 dark:border-gray-600'
                         }`}>
                           {selectedRows.includes(s.id) && (
                             <CheckCircle size={10} className="text-white" />
@@ -220,40 +218,40 @@ export default function AdminSettlementsPage() {
                       </td>
                     )}
                     <td className="px-5 py-3.5">
-                      <span className="text-[12px] font-mono text-gray-400">{s.id}</span>
+                      <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{s.id}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${sType.color}`}>
+                      <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${sType.color}`}>
                         {sType.text}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[13px] font-medium text-gray-900 whitespace-nowrap">{s.description}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{s.description}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[11px] font-bold text-blue-500">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-bold text-blue-500 dark:text-blue-400">
                           {s.user.charAt(0)}
                         </div>
-                        <span className="text-[13px] text-gray-700">{s.user}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{s.user}</span>
                       </div>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <span className="text-[14px] font-semibold text-gray-900">{formatCurrency(s.amount)}</span>
+                      <span className="text-base font-semibold text-gray-900 dark:text-white">{formatAmount(s.amount)}</span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <span className="text-[13px] text-gray-500">{formatCurrency(s.fee)}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{formatAmount(s.fee)}</span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <span className="text-[14px] font-semibold text-blue-500">{formatCurrency(s.settled)}</span>
+                      <span className="text-base font-semibold text-blue-500">{formatAmount(s.settled)}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sStatus.color}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sStatus.color}`}>
                         {sStatus.label}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[13px] text-gray-500 whitespace-nowrap">{s.date}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{s.date}</span>
                     </td>
                   </tr>
                 );
@@ -262,10 +260,12 @@ export default function AdminSettlementsPage() {
           </table>
         </div>
         {filtered.length === 0 && (
-          <div className="p-16 text-center">
-            <Wallet size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">해당 상태의 정산 내역이 없어요</p>
-          </div>
+          <EmptyState
+            icon={Wallet}
+            title="해당 상태의 정산 내역이 없어요"
+            description="다른 필터를 선택해보세요"
+            size="sm"
+          />
         )}
       </div>
     </div>

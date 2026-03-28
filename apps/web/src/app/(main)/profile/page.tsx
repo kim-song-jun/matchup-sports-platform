@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, List, CalendarDays } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useChatStore } from '@/stores/chat-store';
+import { useNotificationStore } from '@/stores/notification-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
@@ -18,11 +21,13 @@ export default function ProfilePage() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const router = useRouter();
   const [showEditModal, setShowEditModal] = useState(false);
+  const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
+  const notifUnread = useNotificationStore((s) => s.getUnreadCount());
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 dark:bg-gray-900">
       <header className="px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">마이페이지</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">마이페이지</h1>
       </header>
 
       <div className={`px-5 lg:px-0 ${isAuthenticated ? 'lg:grid lg:grid-cols-[1fr_340px] lg:gap-8' : 'max-w-[600px] mx-auto'}`}>
@@ -35,19 +40,19 @@ export default function ProfilePage() {
                   {user.nickname?.charAt(0)}
                 </div>
                 <div>
-                  <h2 className="text-[16px] font-bold text-gray-900">{user.nickname}</h2>
-                  {user.bio && <p className="text-[13px] text-gray-500 mt-0.5">{user.bio}</p>}
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
+                  {user.bio && <p className="text-sm text-gray-500 mt-0.5">{user.bio}</p>}
                   <div className="flex items-center gap-2 mt-1">
-                    <div className="flex items-center gap-0.5 text-[13px] text-gray-500 dark:text-gray-500">
+                    <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-500">
                       <Star size={13} fill="currentColor" />
                       <span className="font-semibold">{user.mannerScore?.toFixed(1)}</span>
                     </div>
                     <span className="text-gray-200">|</span>
-                    <span className="text-[13px] text-gray-500">{user.totalMatches}매치</span>
+                    <span className="text-sm text-gray-500">{user.totalMatches}매치</span>
                   </div>
                 </div>
               </div>
-              <button aria-label="프로필 수정" onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <button aria-label="프로필 수정" onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
                 <Pencil size={16} />
               </button>
             </div>
@@ -57,15 +62,15 @@ export default function ProfilePage() {
                 {user.sportProfiles.map((sp: SportProfile) => {
                   const SportIcon = SportIconMap[sp.sportType];
                   return (
-                    <div key={sp.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3.5 py-2.5">
+                    <div key={sp.id} className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-2.5">
                       <div className="flex items-center gap-2.5">
                         {SportIcon && <SportIcon size={16} className="text-gray-500" />}
-                        <span className="text-[14px] font-medium text-gray-800">{sportLabel[sp.sportType]}</span>
-                        <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                        <span className="text-base font-medium text-gray-800 dark:text-gray-200">{sportLabel[sp.sportType]}</span>
+                        <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
                           Lv.{sp.level} {levelLabel[sp.level]}
                         </span>
                       </div>
-                      <div className="text-[12px] text-gray-500">
+                      <div className="text-xs text-gray-500">
                         {sp.matchCount}전 {sp.winCount}승 · ELO <span className="animate-scale-in inline-block font-semibold text-gray-900 dark:text-white">{sp.eloRating}</span>
                       </div>
                     </div>
@@ -75,26 +80,26 @@ export default function ProfilePage() {
             )}
 
             {/* 활동 통계 */}
-            <div className="mt-3 grid grid-cols-3 gap-3">
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
-                <p className="text-[18px] font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                <p className="text-[12px] text-gray-500 mt-0.5">총 매치</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
+                <p className="text-xs text-gray-500 mt-0.5">총 매치</p>
               </div>
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
-                <p className="text-[18px] font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                <p className="text-[12px] text-gray-500 mt-0.5">매너 점수</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
+                <p className="text-xs text-gray-500 mt-0.5">매너 점수</p>
               </div>
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3 text-center">
-                <p className="text-[18px] font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}개</p>
-                <p className="text-[12px] text-gray-500 mt-0.5">뱃지</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}개</p>
+                <p className="text-xs text-gray-500 mt-0.5">뱃지</p>
               </div>
             </div>
           </div>
         ) : (
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-8 text-center">
-            <h2 className="text-[18px] font-bold text-gray-900 dark:text-white">로그인하고 시작하세요</h2>
-            <p className="text-[13px] text-gray-500 mt-1.5">매치 참가, 팀 가입, 평가 확인 등<br/>모든 기능을 이용할 수 있어요</p>
-            <Link href="/login" className="inline-block mt-4 rounded-xl bg-blue-500 px-8 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">로그인하고 시작하세요</h2>
+            <p className="text-sm text-gray-500 mt-1.5">매치 참가, 팀 가입, 평가 확인 등<br/>모든 기능을 이용할 수 있어요</p>
+            <Link href="/login" className="inline-block mt-4 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
               로그인
             </Link>
           </div>
@@ -111,7 +116,41 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="mt-5 h-2 bg-gray-50 lg:hidden" />
+      <div className="mt-5 h-2 bg-gray-50 dark:bg-gray-800 lg:hidden" />
+
+      {/* 소통 바로가기 */}
+      {isAuthenticated && (
+        <div className="px-5 lg:px-0 pt-4 pb-2">
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/chat">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.98] transition-colors min-h-[44px]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
+                  <MessageCircle size={20} className="text-blue-500" />
+                </div>
+                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">채팅</span>
+                {chatUnread > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                    {chatUnread > 99 ? '99+' : chatUnread}
+                  </span>
+                )}
+              </div>
+            </Link>
+            <Link href="/notifications">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.98] transition-colors min-h-[44px]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-900/30">
+                  <Bell size={20} className="text-amber-500" />
+                </div>
+                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">알림</span>
+                {notifUnread > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                    {notifUnread > 99 ? '99+' : notifUnread}
+                  </span>
+                )}
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="px-5 lg:px-0 py-2 lg:mt-4">
         {[
@@ -127,14 +166,14 @@ export default function ProfilePage() {
           { label: '결제 내역', icon: CreditCard, href: '/payments', count: null },
         ].map((item) => (
           <Link key={item.label} href={isAuthenticated ? item.href : '/login'}>
-            <div className={`flex items-center justify-between py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 active:scale-[0.98] transition-all rounded-lg -mx-2 px-2 ${!isAuthenticated ? 'opacity-40 pointer-events-none' : ''}`}>
+            <div className={`flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] rounded-lg -mx-2 px-2 ${!isAuthenticated ? 'opacity-40 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-3">
                 <item.icon size={20} className="text-gray-500" />
-                <span className="text-[15px] font-medium text-gray-800">{item.label}</span>
+                <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
               </div>
               <div className="flex items-center gap-2">
                 {item.count !== null && item.count !== undefined && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[11px] font-bold text-white">
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white">
                     {item.count}
                   </span>
                 )}
@@ -145,19 +184,19 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      <div className="h-2 bg-gray-50 lg:hidden" />
+      <div className="h-2 bg-gray-50 dark:bg-gray-800 lg:hidden" />
 
       <div className="px-5 lg:px-0 py-2">
         <Link href="/settings">
           <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-[15px] font-medium text-gray-800">설정</span></div>
+            <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">설정</span></div>
             <ChevronRight size={18} className="text-gray-300" />
           </div>
         </Link>
         {isAuthenticated && (
           <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
             <LogOut size={20} className="text-gray-500" />
-            <span className="text-[15px] font-medium text-gray-500">로그아웃</span>
+            <span className="text-md font-medium text-gray-500">로그아웃</span>
           </button>
         )}
       </div>
@@ -187,9 +226,11 @@ function UpcomingSchedule() {
   return (
     <div className="mt-4 lg:mt-0 px-5 lg:px-0">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[16px] font-bold text-gray-900 dark:text-white">다가오는 일정</h3>
-        <div className="flex items-center gap-1">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">다가오는 일정</h3>
+        <div className="flex items-center gap-1" role="tablist">
           <button
+            role="tab"
+            aria-selected={view === 'list'}
             onClick={() => setView('list')}
             className={`p-1.5 rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
             aria-label="리스트 보기"
@@ -197,24 +238,28 @@ function UpcomingSchedule() {
             <List size={16} />
           </button>
           <button
+            role="tab"
+            aria-selected={view === 'calendar'}
             onClick={() => setView('calendar')}
             className={`p-1.5 rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
             aria-label="캘린더 보기"
           >
             <CalendarDays size={16} />
           </button>
-          <Link href="/matches" className="text-[13px] text-blue-500 font-medium ml-2">전체보기</Link>
+          <Link href="/matches" className="text-sm text-blue-500 font-medium ml-2">전체보기</Link>
         </div>
       </div>
 
       {view === 'calendar' ? (
         <MiniCalendar matches={calendarMatches} />
       ) : listMatches.length === 0 ? (
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 text-center">
-          <Calendar size={24} className="mx-auto text-gray-300 mb-2" />
-          <p className="text-[14px] text-gray-500">예정된 일정이 없어요</p>
-          <p className="text-[12px] text-gray-500 mt-0.5">매치나 강좌에 참가해보세요</p>
-        </div>
+        <EmptyState
+          icon={Calendar}
+          title="예정된 일정이 없어요"
+          description="매치나 강좌에 참가해보세요"
+          size="sm"
+          action={{ label: '매치 찾기', href: '/matches' }}
+        />
       ) : (
         <div className="space-y-2">
           {listMatches.map((m: Match) => {
@@ -222,14 +267,14 @@ function UpcomingSchedule() {
             const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
             return (
               <Link key={m.id} href={`/matches/${m.id}`}>
-                <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-all">
+                <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform]">
                   <div className="flex flex-col items-center justify-center h-12 w-12 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                    <span className="text-[11px] font-semibold">{d.getMonth() + 1}월</span>
-                    <span className="text-[16px] font-black leading-none">{d.getDate()}</span>
+                    <span className="text-xs font-semibold">{d.getMonth() + 1}월</span>
+                    <span className="text-lg font-black leading-none">{d.getDate()}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium text-gray-900 dark:text-white truncate">{m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
-                    <div className="flex items-center gap-2 text-[12px] text-gray-500 mt-0.5">
+                    <p className="text-base font-medium text-gray-900 dark:text-white truncate">{m.title?.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                       <span className="flex items-center gap-0.5"><Clock size={11} /> {m.startTime}</span>
                       <span>({weekdays[d.getDay()]})</span>
                     </div>

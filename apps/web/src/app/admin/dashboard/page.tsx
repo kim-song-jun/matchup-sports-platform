@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Users, Trophy, GraduationCap, Shield, type LucideIcon } from 'lucide-react';
 import { useAdminStats } from '@/hooks/use-api';
 
 export default function AdminDashboardPage() {
@@ -10,21 +11,21 @@ export default function AdminDashboardPage() {
     <div>
       {/* Greeting */}
       <div className="mb-8">
-        <h1 className="text-[22px] font-bold text-gray-900">안녕하세요, 관리자님</h1>
-        <p className="text-[13px] text-gray-400 mt-1">오늘 플랫폼 현황을 확인하세요</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">안녕하세요, 관리자님</h1>
+        <p className="text-sm text-gray-400 dark:text-gray-400 mt-1">오늘 플랫폼 현황을 확인하세요</p>
       </div>
 
       {/* 핵심 지표 — 토스 스타일 큰 숫자 카드 */}
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <MetricCard label="총 사용자" value={stats?.totalUsers} sub={stats?.todayNewUsers ? `오늘 +${stats.todayNewUsers}` : undefined} loading={isLoading} />
-        <MetricCard label="총 매치" value={stats?.totalMatches} sub={stats?.todayMatches ? `오늘 +${stats.todayMatches}` : undefined} loading={isLoading} />
-        <MetricCard label="강좌" value={stats?.totalLessons} loading={isLoading} />
-        <MetricCard label="팀" value={stats?.totalTeams} loading={isLoading} />
+        <MetricCard label="총 사용자" value={stats?.totalUsers} sub={stats?.todayNewUsers ? `오늘 +${stats.todayNewUsers}` : undefined} loading={isLoading} color="blue" icon={Users} />
+        <MetricCard label="총 매치" value={stats?.totalMatches} sub={stats?.todayMatches ? `오늘 +${stats.todayMatches}` : undefined} loading={isLoading} color="green" icon={Trophy} />
+        <MetricCard label="강좌" value={stats?.totalLessons} loading={isLoading} color="amber" icon={GraduationCap} />
+        <MetricCard label="팀" value={stats?.totalTeams} loading={isLoading} color="purple" icon={Shield} />
       </div>
 
       {/* 주의 항목 */}
       <section className="mb-8">
-        <h2 className="text-[14px] font-bold text-gray-900 mb-3">처리 필요</h2>
+        <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">처리 필요</h2>
         <div className="space-y-2.5">
           <ActionItem label="미처리 분쟁" count={2} href="/admin/disputes" />
           <ActionItem label="정산 대기" count={3} href="/admin/settlements" />
@@ -34,7 +35,7 @@ export default function AdminDashboardPage() {
 
       {/* 빠른 이동 */}
       <section>
-        <h2 className="text-[14px] font-bold text-gray-900 mb-3">관리 메뉴</h2>
+        <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">관리 메뉴</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: '매치 관리', href: '/admin/matches', desc: '매치 상태 관리' },
@@ -47,9 +48,9 @@ export default function AdminDashboardPage() {
             { label: '통계', href: '/admin/statistics', desc: '데이터 분석' },
           ].map((item) => (
             <Link key={item.href} href={item.href}>
-              <div className="rounded-xl bg-white border border-gray-100 p-4 hover:bg-gray-50 transition-colors">
-                <p className="text-[13px] font-semibold text-gray-900">{item.label}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">{item.desc}</p>
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.label}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-400 mt-0.5">{item.desc}</p>
               </div>
             </Link>
           ))}
@@ -60,16 +61,46 @@ export default function AdminDashboardPage() {
 }
 
 
-function MetricCard({ label, value, sub, loading }: { label: string; value?: number; sub?: string; loading: boolean }) {
+const metricBorderColor = {
+  blue: 'border-t-blue-400',
+  green: 'border-t-green-400',
+  amber: 'border-t-amber-400',
+  purple: 'border-t-purple-400',
+} as const;
+
+const metricIconBg = {
+  blue: 'bg-blue-50 dark:bg-blue-900/30',
+  green: 'bg-green-50 dark:bg-green-900/30',
+  amber: 'bg-amber-50 dark:bg-amber-900/30',
+  purple: 'bg-purple-50 dark:bg-purple-900/30',
+} as const;
+
+const metricIconColor = {
+  blue: 'text-blue-400',
+  green: 'text-green-400',
+  amber: 'text-amber-400',
+  purple: 'text-purple-400',
+} as const;
+
+function MetricCard({ label, value, sub, loading, color = 'blue', icon: Icon }: {
+  label: string; value?: number; sub?: string; loading: boolean;
+  color?: 'blue' | 'green' | 'amber' | 'purple';
+  icon?: LucideIcon;
+}) {
   return (
-    <div className="rounded-xl bg-white border border-gray-100 p-5">
-      <p className="text-[12px] text-gray-400 mb-1">{label}</p>
-      {loading ? (
-        <div className="h-8 w-16 bg-gray-50 rounded skeleton-shimmer" />
-      ) : (
-        <p className="text-[28px] font-bold text-gray-900 leading-tight tracking-tight">{value?.toLocaleString() ?? '-'}</p>
+    <div className={`relative rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 border-t-2 ${metricBorderColor[color]} p-5`}>
+      {Icon && (
+        <div className={`absolute top-3 right-3 h-8 w-8 rounded-lg ${metricIconBg[color]} flex items-center justify-center`}>
+          <Icon size={16} className={metricIconColor[color]} />
+        </div>
       )}
-      {sub && <p className="text-[11px] text-blue-500 font-medium mt-1">{sub}</p>}
+      <p className="text-xs text-gray-400 dark:text-gray-400 mb-1">{label}</p>
+      {loading ? (
+        <div className="h-8 w-16 bg-gray-50 dark:bg-gray-700 rounded skeleton-shimmer" />
+      ) : (
+        <p className="text-3xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight">{value != null && value > 0 ? value.toLocaleString() : value === 0 ? '-' : '-'}</p>
+      )}
+      {sub && <p className="text-xs text-blue-500 font-medium mt-1">{sub}</p>}
     </div>
   );
 }
@@ -77,9 +108,9 @@ function MetricCard({ label, value, sub, loading }: { label: string; value?: num
 function ActionItem({ label, count, href }: { label: string; count: number; href: string }) {
   return (
     <Link href={href}>
-      <div className="flex items-center justify-between rounded-xl bg-white border border-gray-100 px-4 py-3 hover:bg-gray-50 transition-colors">
-        <span className="text-[13px] text-gray-700">{label}</span>
-        <span className="text-[13px] font-bold text-gray-900">{count}건</span>
+      <div className="flex items-center justify-between rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+        <span className="text-sm font-bold text-gray-900 dark:text-white">{count}건</span>
       </div>
     </Link>
   );

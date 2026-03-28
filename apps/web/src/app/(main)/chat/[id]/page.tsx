@@ -19,8 +19,8 @@ export default function ChatRoomPage() {
         />
       </div>
 
-      {/* Mobile: full-screen chat */}
-      <div className="lg:hidden h-dvh flex flex-col bg-gray-50">
+      {/* Mobile: full-screen overlay — covers layout footer & bottom nav */}
+      <div className="lg:hidden fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
         <ChatRoomEmbed
           chatRoomId={chatRoomId}
           embedded={false}

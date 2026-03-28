@@ -98,9 +98,9 @@ export default function NewMercenaryPage() {
     return (
       <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">용병을 모집하려면</h2>
-          <p className="text-[13px] text-gray-500 mt-2">로그인 후 용병 모집 글을 작성할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">로그인</Link>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">용병을 모집하려면</h2>
+          <p className="text-sm text-gray-500 mt-2">로그인 후 용병 모집 글을 작성할 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">로그인</Link>
         </div>
       </div>
     );
@@ -113,8 +113,8 @@ export default function NewMercenaryPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50 mb-4">
             <Check size={28} className="text-green-500" />
           </div>
-          <h2 className="text-[18px] font-bold text-gray-900 mb-1">모집글이 등록되었어요</h2>
-          <p className="text-[14px] text-gray-500">용병 모집 목록에서 확인할 수 있습니다</p>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">모집글이 등록되었어요</h2>
+          <p className="text-base text-gray-500">용병 모집 목록에서 확인할 수 있습니다</p>
         </div>
       </div>
     );
@@ -127,14 +127,14 @@ export default function NewMercenaryPage() {
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
       </header>
 
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/mercenary" className="hover:text-gray-600 transition-colors">용병 모집</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">새 모집글</span>
@@ -144,13 +144,13 @@ export default function NewMercenaryPage() {
         <div className="space-y-5">
           {/* 팀 선택 */}
           <div>
-            <label htmlFor="merc-team" className="text-[13px] font-medium text-gray-700 mb-1.5 block">팀 선택</label>
+            <label htmlFor="merc-team" className="text-sm font-medium text-gray-700 mb-1.5 block">팀 선택</label>
             <div className="relative">
               <select
                 id="merc-team"
                 value={form.teamId}
                 onChange={(e) => update('teamId', e.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all bg-white"
+                className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all bg-white dark:bg-gray-800"
               >
                 <option value="">팀을 선택하세요</option>
                 {teams.map((t) => (
@@ -163,31 +163,31 @@ export default function NewMercenaryPage() {
 
           {/* 경기 날짜 */}
           <div>
-            <label htmlFor="merc-match-date" className="text-[13px] font-medium text-gray-700 mb-1.5 block">경기 날짜</label>
+            <label htmlFor="merc-match-date" className="text-sm font-medium text-gray-700 mb-1.5 block">경기 날짜</label>
             <input
               id="merc-match-date"
               type="date"
               value={form.matchDate}
               onChange={(e) => update('matchDate', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
             />
           </div>
 
           {/* 시작 시간 */}
           <div>
-            <label htmlFor="merc-start-time" className="text-[13px] font-medium text-gray-700 mb-1.5 block">시작 시간</label>
+            <label htmlFor="merc-start-time" className="text-sm font-medium text-gray-700 mb-1.5 block">시작 시간</label>
             <input
               id="merc-start-time"
               type="time"
               value={form.startTime}
               onChange={(e) => update('startTime', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
             />
           </div>
 
           {/* 장소 */}
           <div>
-            <label htmlFor="merc-venue" className="text-[13px] font-medium text-gray-700 mb-1.5 block">장소</label>
+            <label htmlFor="merc-venue" className="text-sm font-medium text-gray-700 mb-1.5 block">장소</label>
             <input
               id="merc-venue"
               type="text"
@@ -195,22 +195,22 @@ export default function NewMercenaryPage() {
               onChange={(e) => update('venue', e.target.value)}
               maxLength={200}
               placeholder="예: 난지천 풋살장 A"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
             />
           </div>
 
           {/* 포지션 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-2 block">필요 포지션</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">필요 포지션</label>
             <div className="flex gap-2 flex-wrap">
               {positionOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => update('position', opt.value)}
-                  className={`rounded-xl border-2 px-4 py-3 text-[13px] font-semibold transition-all ${
+                  className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${
                     form.position === opt.value
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                      : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                      : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
                   }`}
                 >
                   {opt.label}
@@ -221,16 +221,16 @@ export default function NewMercenaryPage() {
 
           {/* 모집 인원 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-2 block">모집 인원</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">모집 인원</label>
             <div className="flex gap-2">
               {countOptions.map((c) => (
                 <button
                   key={c}
                   onClick={() => update('count', c)}
-                  className={`flex-1 rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+                  className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                     form.count === c
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                      : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                      : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
                   }`}
                 >
                   {c}명
@@ -241,16 +241,16 @@ export default function NewMercenaryPage() {
 
           {/* 레벨 요구 */}
           <div>
-            <label className="text-[13px] font-medium text-gray-700 mb-2 block">레벨 요구</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">레벨 요구</label>
             <div className="flex gap-2 flex-wrap">
               {levelOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => update('levelRequired', opt.value)}
-                  className={`rounded-xl border-2 px-5 py-3 text-[14px] font-semibold transition-all ${
+                  className={`rounded-xl border-2 px-5 py-3 text-base font-semibold transition-all ${
                     form.levelRequired === opt.value
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                      : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                      : 'border-gray-100 dark:border-gray-700 text-gray-600 hover:border-gray-200'
                   }`}
                 >
                   Lv.{opt.value} {opt.label}
@@ -261,23 +261,23 @@ export default function NewMercenaryPage() {
 
           {/* 비용 */}
           <div>
-            <label htmlFor="merc-fee" className="text-[13px] font-medium text-gray-700 mb-1.5 block">참가비 (원)</label>
+            <label htmlFor="merc-fee" className="text-sm font-medium text-gray-700 mb-1.5 block">참가비 (원)</label>
             <input
               id="merc-fee"
               type="number"
               value={form.fee}
               onChange={(e) => update('fee', e.target.value)}
               placeholder="0 = 무료"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all"
             />
-            <p className="text-[12px] text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               {formatCurrency(form.fee)}
             </p>
           </div>
 
           {/* 요청사항 */}
           <div>
-            <label htmlFor="merc-notes" className="text-[13px] font-medium text-gray-700 mb-1.5 block">요청사항 (선택)</label>
+            <label htmlFor="merc-notes" className="text-sm font-medium text-gray-700 mb-1.5 block">요청사항 (선택)</label>
             <textarea
               id="merc-notes"
               value={form.notes}
@@ -285,7 +285,7 @@ export default function NewMercenaryPage() {
               maxLength={500}
               placeholder="유니폼 색상, 준비물, 기타 안내 등"
               rows={4}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
             />
           </div>
         </div>
@@ -296,7 +296,7 @@ export default function NewMercenaryPage() {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Check size={16} />
           모집글 등록

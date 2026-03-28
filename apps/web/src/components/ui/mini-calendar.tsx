@@ -122,17 +122,17 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
         <button
           onClick={goToPrevMonth}
           aria-label="이전 달"
-          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-all min-w-[36px] min-h-[36px] flex items-center justify-center"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-[36px] flex items-center justify-center"
         >
           <ChevronLeft size={18} />
         </button>
-        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-md font-semibold text-gray-900 dark:text-white">
           {year}년 {month + 1}월
         </h3>
         <button
           onClick={goToNextMonth}
           aria-label="다음 달"
-          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-all min-w-[36px] min-h-[36px] flex items-center justify-center"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-[36px] flex items-center justify-center"
         >
           <ChevronRight size={18} />
         </button>
@@ -143,7 +143,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
         {DAY_LABELS.map((label, i) => (
           <div
             key={label}
-            className={`text-center text-[12px] font-medium pb-1.5 ${
+            className={`text-center text-xs font-medium pb-1.5 ${
               i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400 dark:text-gray-500'
             }`}
           >
@@ -185,11 +185,11 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
               onClick={() => handleDayClick(date)}
               aria-label={`${month + 1}월 ${day}일${hasMatches ? `, 매치 ${dayMatches.length}건` : ''}`}
               className={`relative flex flex-col items-center justify-center h-10 rounded-lg transition-colors ${
-                hasMatches ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750' : 'cursor-default'
+                hasMatches ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : 'cursor-default'
               } ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
             >
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-[14px] leading-none transition-colors ${
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-base leading-none transition-colors ${
                   isToday
                     ? 'bg-blue-500 text-white font-bold'
                     : isSelected
@@ -220,7 +220,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
       {selectedDate && selectedMatches.length > 0 && (
         <div className="mt-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden motion-safe:animate-expand">
           <div className="px-3.5 py-2 border-b border-gray-50 dark:border-gray-700">
-            <p className="text-[12px] font-semibold text-gray-500 dark:text-gray-400">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
               {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 ({DAY_LABELS[selectedDate.getDay()]})
             </p>
           </div>
@@ -229,15 +229,15 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
               <li key={m.id}>
                 <Link
                   href={`/matches/${m.id}`}
-                  className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.99] transition-all"
+                  className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.99] transition-[colors,transform]"
                 >
-                  <span className="rounded-md bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 shrink-0">
+                  <span className="rounded-md bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 shrink-0">
                     {sportLabel[m.sportType] ?? m.sportType}
                   </span>
-                  <span className="text-[13px] font-medium text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0">
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate flex-1 min-w-0">
                     {m.title}
                   </span>
-                  <span className="text-[12px] text-gray-500 dark:text-gray-400 tabular-nums shrink-0">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums shrink-0">
                     {m.startTime}
                   </span>
                 </Link>
@@ -246,7 +246,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
           </ul>
           {extraCount > 0 && (
             <div className="px-3.5 py-2 border-t border-gray-50 dark:border-gray-700 text-center">
-              <span className="text-[12px] text-gray-400 dark:text-gray-500">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
                 외 {extraCount}건
               </span>
             </div>

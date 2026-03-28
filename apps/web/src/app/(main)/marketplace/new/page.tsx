@@ -68,9 +68,9 @@ export default function CreateListingPage() {
           <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
           </div>
-          <h2 className="text-[22px] font-bold text-gray-900">매물을 등록해보세요</h2>
-          <p className="text-[14px] text-gray-500 mt-2">로그인하면 장비를 등록하고 거래할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매물을 등록해보세요</h2>
+          <p className="text-base text-gray-500 mt-2">로그인하면 장비를 등록하고 거래할 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
           </Link>
         </div>
@@ -85,11 +85,11 @@ export default function CreateListingPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">매물 등록</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매물 등록</h1>
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600 transition-colors">장터</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">매물 등록</span>
@@ -98,14 +98,15 @@ export default function CreateListingPage() {
       <div className="px-5 lg:px-0 max-w-2xl">
         {/* 사진 추가 영역 */}
         <div className="mb-6">
-          <label className="block text-[13px] font-semibold text-gray-700 mb-2">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
             상품 이미지
           </label>
+          <input type="file" id="file-upload" accept="image/*" multiple className="hidden" />
           <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-            <button className="flex h-[80px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors">
+            <label htmlFor="file-upload" role="button" aria-label="사진 추가" className="flex h-[80px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:bg-gray-700 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors cursor-pointer">
               <Camera size={22} />
-              <span className="text-[11px] font-medium">0/10</span>
-            </button>
+              <span className="text-xs font-medium">0/10</span>
+            </label>
             {/* Placeholder thumbnails */}
             {[1, 2].map((i) => (
               <div key={i} className="relative h-[80px] w-[80px] shrink-0 rounded-xl bg-gray-100 flex items-center justify-center opacity-30">
@@ -113,7 +114,7 @@ export default function CreateListingPage() {
               </div>
             ))}
           </div>
-          <p className="text-[12px] text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다</p>
+          <p className="text-xs text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다</p>
         </div>
 
         {/* 제목 */}
@@ -136,10 +137,10 @@ export default function CreateListingPage() {
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    : 'bg-gray-50 dark:bg-gray-700 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {sportLabel[type] || type}
@@ -156,10 +157,10 @@ export default function CreateListingPage() {
                 key={cat}
                 type="button"
                 onClick={() => setForm({ ...form, category: cat })}
-                className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
                   form.category === cat
                     ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 border border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
                 {cat}
@@ -178,14 +179,14 @@ export default function CreateListingPage() {
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`w-full text-left rounded-xl border-2 p-3.5 transition-all ${
                   form.condition === c.value
-                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                    : 'border-gray-100 hover:border-gray-200'
+                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-semibold ${form.condition === c.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
+                <p className={`text-base font-semibold ${form.condition === c.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                   {c.label}
                 </p>
-                <p className="text-[12px] text-gray-500 mt-0.5">{c.desc}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{c.desc}</p>
               </button>
             ))}
           </div>
@@ -197,10 +198,10 @@ export default function CreateListingPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, listingType: 'sell' })}
-              className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                 form.listingType === 'sell'
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                  : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                  : 'border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-200'
               }`}
             >
               판매
@@ -208,10 +209,10 @@ export default function CreateListingPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, listingType: 'rent' })}
-              className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                 form.listingType === 'rent'
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                  : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                  : 'border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-200'
               }`}
             >
               대여
@@ -232,7 +233,7 @@ export default function CreateListingPage() {
               step={1000}
               className="input-field pr-10"
             />
-            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-500">원</span>
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500">원</span>
           </div>
         </Field>
 
@@ -249,7 +250,7 @@ export default function CreateListingPage() {
                   placeholder="0"
                   className="input-field pr-10"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-500">원</span>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500">원</span>
               </div>
             </Field>
             <Field label="보증금" id="mkt-deposit">
@@ -262,7 +263,7 @@ export default function CreateListingPage() {
                   placeholder="0"
                   className="input-field pr-10"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[14px] text-gray-500">원</span>
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500">원</span>
               </div>
             </Field>
           </div>
@@ -285,7 +286,7 @@ export default function CreateListingPage() {
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mt-2 mb-8"
+          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mt-2 mb-8"
         >
           {isSubmitting ? '등록 중...' : '매물 등록하기'}
         </button>
@@ -308,6 +309,15 @@ export default function CreateListingPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
+        :global(.dark) .input-field {
+          border-color: #374151;
+          background: #1F2937;
+          color: #F3F4F6;
+        }
+        :global(.dark) .input-field:focus {
+          border-color: #3182F6;
+          background: #111827;
+        }
       `}</style>
     </div>
   );
@@ -316,7 +326,7 @@ export default function CreateListingPage() {
 function Field({ label, required, children, id }: { label: string; required?: boolean; children: React.ReactNode; id?: string }) {
   return (
     <div className="mb-5">
-      <label htmlFor={id} className="block text-[13px] font-semibold text-gray-700 mb-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1.5">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}

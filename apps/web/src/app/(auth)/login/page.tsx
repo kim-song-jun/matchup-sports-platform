@@ -59,8 +59,8 @@ export default function LoginPage() {
     <div className="flex min-h-dvh flex-col bg-white dark:bg-gray-900">
       {/* 상단 — 브랜드 */}
       <div className="flex flex-col items-center justify-center px-6 pt-16 pb-8">
-        <h1 className="text-[28px] font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
-        <p className="mt-2 text-[14px] text-gray-500 leading-relaxed text-center">
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
+        <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
         </p>
       </div>
@@ -72,7 +72,7 @@ export default function LoginPage() {
           <div className="flex mb-5">
             {(['login', 'register'] as const).map(tab => (
               <button key={tab} onClick={() => setMode(tab)}
-                className={`flex-1 py-2.5 text-[14px] font-medium border-b-2 transition-colors ${
+                className={`flex-1 py-2.5 text-base font-medium border-b-2 transition-colors ${
                   mode === tab ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}>
                 {tab === 'login' ? '로그인' : '회원가입'}
@@ -82,19 +82,19 @@ export default function LoginPage() {
 
           {/* 폼 */}
           <div className="space-y-3">
-            <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all" />
-            <input type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)}
+            <input type="email" placeholder="이메일" aria-label="이메일 주소" value={email} onChange={e => setEmail(e.target.value)}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
+            <input type="password" placeholder="비밀번호 (6자 이상)" aria-label="비밀번호" value={password} onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleEmailSubmit()}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all" />
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
             {mode === 'register' && (
-              <input type="text" placeholder="닉네임" value={nickname} onChange={e => setNickname(e.target.value)}
+              <input type="text" placeholder="닉네임" aria-label="닉네임" value={nickname} onChange={e => setNickname(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleEmailSubmit()}
-                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-[14px] text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-all" />
+                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
             )}
             <button onClick={handleEmailSubmit} disabled={isLoading}
-              className="w-full rounded-xl bg-blue-500 py-3 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-all">
-              {isLoading ? '...' : mode === 'login' ? '로그인' : '가입하기'}
+              className="w-full rounded-xl bg-blue-500 py-3 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-[colors,transform]">
+              {isLoading ? (mode === 'login' ? '로그인 중...' : '가입 중...') : mode === 'login' ? '로그인' : '가입하기'}
             </button>
           </div>
 
@@ -102,14 +102,14 @@ export default function LoginPage() {
           <div className="mt-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-              <span className="text-[12px] text-gray-400">또는</span>
+              <span className="text-xs text-gray-400">또는</span>
               <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
             </div>
             <div className="space-y-2">
-              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-[14px] font-semibold text-[#191919] opacity-50 cursor-not-allowed">
+              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-base font-semibold text-[#191919] opacity-50 cursor-not-allowed">
                 카카오로 시작하기 (준비중)
               </button>
-              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-[14px] font-semibold text-white opacity-50 cursor-not-allowed">
+              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-base font-semibold text-white opacity-50 cursor-not-allowed">
                 네이버로 시작하기 (준비중)
               </button>
             </div>
@@ -117,27 +117,27 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* 개발 빠른 로그인 */}
-      <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6">
-        <p className="text-center text-[11px] text-gray-400 mb-3">개발 모드</p>
+      {/* 개발 빠른 로그인 — 개발 환경에서만 표시 */}
+      {process.env.NODE_ENV !== 'production' && <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6">
+        <p className="text-center text-xs text-gray-400 mb-3">개발 모드</p>
         <div className="flex gap-2 max-w-sm mx-auto">
-          <input type="text" placeholder="닉네임" value={devNickname} onChange={e => setDevNickname(e.target.value)}
+          <input type="text" placeholder="닉네임" aria-label="테스트 닉네임" value={devNickname} onChange={e => setDevNickname(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleDevLogin()}
-            className="flex-1 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 px-3 py-2.5 text-[13px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none" />
+            className="flex-1 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none" />
           <button onClick={() => handleDevLogin()} disabled={isLoading}
-            className="rounded-xl bg-gray-900 dark:bg-white px-5 py-2.5 text-[13px] font-bold text-white dark:text-gray-900 disabled:opacity-50 transition-colors">
+            className="rounded-xl bg-gray-900 dark:bg-white px-5 py-2.5 text-sm font-bold text-white dark:text-gray-900 disabled:opacity-50 transition-colors">
             입장
           </button>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
           {['축구왕민수', '농구러버지영', '하키마스터준호'].map(name => (
             <button key={name} onClick={() => handleDevLogin(name)} disabled={isLoading}
-              className="rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2.5 py-1 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-100 disabled:opacity-50 transition-colors">
+              className="rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 disabled:opacity-50 transition-colors">
               {name}
             </button>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -98,9 +98,9 @@ export default function EditMatchPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={18} className="text-gray-600 dark:text-gray-300" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">매치 수정</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 수정</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 text-[12px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={12} />
         <Link href={`/matches/${matchId}`} className="hover:text-gray-600 transition-colors">매치 상세</Link>
@@ -114,7 +114,7 @@ export default function EditMatchPage() {
           <div className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
               <button key={type} onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
                   form.sportType === type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                 }`}>
                 {sportLabel[type] || type}
@@ -126,13 +126,13 @@ export default function EditMatchPage() {
         {/* Title */}
         <FormSection label="제목" id="edit-title">
           <input id="edit-title" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-[14px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
         </FormSection>
 
         {/* Description */}
         <FormSection label="설명" id="edit-description">
           <textarea id="edit-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-[14px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
         </FormSection>
 
         {/* Images */}
@@ -149,7 +149,7 @@ export default function EditMatchPage() {
             {imageFiles.length < 5 && (
               <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex flex-col items-center justify-center w-20 h-20 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 <ImageIcon size={16} />
-                <span className="text-[10px] mt-1">{imageFiles.length}/5</span>
+                <span className="text-2xs mt-1">{imageFiles.length}/5</span>
               </button>
             )}
             <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
@@ -165,13 +165,13 @@ export default function EditMatchPage() {
                   className={`w-full text-left rounded-xl p-3 transition-all ${
                     form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}>
-                  <p className={`text-[13px] font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
-                  <p className={`text-[11px] mt-0.5 ${form.venueId === v.id ? 'opacity-60' : 'text-gray-500'}`}>{v.address}</p>
+                  <p className={`text-sm font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
+                  <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'opacity-60' : 'text-gray-500'}`}>{v.address}</p>
                 </button>
               ))}
             </div>
           ) : (
-            <p className="text-[12px] text-gray-500 py-2">종목을 선택하면 시설 목록이 나타나요</p>
+            <p className="text-xs text-gray-500 py-2">종목을 선택하면 시설 목록이 나타나요</p>
           )}
         </FormSection>
 
@@ -179,11 +179,11 @@ export default function EditMatchPage() {
         <FormSection label="일시" id="edit-matchDate">
           <div className="grid grid-cols-3 gap-3">
             <input id="edit-matchDate" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[13px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             <input id="edit-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[13px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             <input id="edit-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[13px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
           </div>
         </FormSection>
 
@@ -191,14 +191,14 @@ export default function EditMatchPage() {
         <FormSection label="인원 · 참가비" id="edit-maxPlayers">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="edit-maxPlayers" className="block text-[11px] text-gray-500 mb-1">최대 인원</label>
+              <label htmlFor="edit-maxPlayers" className="block text-xs text-gray-500 mb-1">최대 인원</label>
               <input id="edit-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: parseInt(e.target.value) || 0 })}
-                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             </div>
             <div>
-              <label htmlFor="edit-fee" className="block text-[11px] text-gray-500 mb-1">참가비 (원)</label>
+              <label htmlFor="edit-fee" className="block text-xs text-gray-500 mb-1">참가비 (원)</label>
               <input id="edit-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: parseInt(e.target.value) || 0 })}
-                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             </div>
           </div>
         </FormSection>
@@ -207,11 +207,11 @@ export default function EditMatchPage() {
         <FormSection label="레벨 범위" id="edit-levelMin">
           <div className="grid grid-cols-2 gap-3">
             <select id="edit-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: parseInt(e.target.value) })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[13px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
             </select>
             <select id="edit-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: parseInt(e.target.value) })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-[13px] text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
             </select>
           </div>
@@ -222,7 +222,7 @@ export default function EditMatchPage() {
           <div className="flex gap-2">
             {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
               <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
-                className={`rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all ${
                   form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                 }`}>
                 {g.label}
@@ -235,17 +235,17 @@ export default function EditMatchPage() {
         <FormSection label="추가 규칙 (선택)" id="edit-rules">
           <textarea id="edit-rules" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })}
             placeholder="참가자에게 알릴 규칙이나 공지사항" rows={2}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
         </FormSection>
 
         {/* Actions */}
         <div className="flex gap-3 mt-6">
           <button onClick={() => router.back()}
-            className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 py-3 text-[14px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+            className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 py-3 text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
             돌아가기
           </button>
           <button onClick={handleSave} disabled={isSaving}
-            className="flex-1 rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
             {isSaving ? '수정 중...' : '수정 완료'}
           </button>
         </div>
@@ -257,7 +257,7 @@ export default function EditMatchPage() {
 function FormSection({ label, id, children }: { label: string; id?: string; children: React.ReactNode }) {
   return (
     <div className="mb-5">
-      <label htmlFor={id} className="block text-[12px] font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       {children}
     </div>
   );

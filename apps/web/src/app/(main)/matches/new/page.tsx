@@ -80,9 +80,9 @@ export default function CreateMatchPage() {
     return (
       <div className="pt-[var(--safe-area-top)] lg:pt-0 px-5 lg:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">매치를 만들어보세요</h2>
-          <p className="text-[13px] text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치를 만들어보세요</h2>
+          <p className="text-sm text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
           </Link>
         </div>
@@ -94,14 +94,14 @@ export default function CreateMatchPage() {
     <div className="pt-[var(--safe-area-top)] lg:pt-0">
       {/* Header */}
       <header className="lg:hidden flex items-center gap-3 px-5 py-3">
-        <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 transition-colors">
+        <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={18} className="text-gray-600" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">매치 만들기</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 만들기</h1>
       </header>
 
       <div className="hidden lg:block mb-6">
-        <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">매치 만들기</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 만들기</h2>
       </div>
 
       {/* Step indicator */}
@@ -111,20 +111,20 @@ export default function CreateMatchPage() {
             <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`} />
           ))}
         </div>
-        <p className="text-[12px] text-gray-500 mt-2">Step {step + 1}. {steps[step]}</p>
+        <p className="text-xs text-gray-500 mt-2">Step {step + 1}. {steps[step]}</p>
       </div>
 
       <div className="px-5 lg:px-0 max-w-lg">
         {/* Step 0: Sport */}
         {step === 0 && (
           <div className="space-y-3 mt-2">
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
             <div className="flex flex-wrap gap-2">
               {sportTypes.map((type) => (
                 <button
                   key={type}
                   onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
-                  className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+                  className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
                     form.sportType === type
                       ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                       : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -140,7 +140,7 @@ export default function CreateMatchPage() {
         {/* Step 1: Match info */}
         {step === 1 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2">매치 정보</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">매치 정보</h3>
             <Field label="매치 제목" required id="match-title">
               <input id="match-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                 maxLength={100} placeholder="예: 주말 풋살 한판!" className="form-input" />
@@ -164,7 +164,7 @@ export default function CreateMatchPage() {
                 {imageFiles.length < 5 && (
                   <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex flex-col items-center justify-center w-20 h-20 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                     <ImageIcon size={16} />
-                    <span className="text-[10px] mt-1">{imageFiles.length}/5</span>
+                    <span className="text-2xs mt-1">{imageFiles.length}/5</span>
                   </button>
                 )}
                 <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
@@ -199,7 +199,7 @@ export default function CreateMatchPage() {
               <div className="flex gap-2">
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
                   <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
-                    className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
                       form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                     }`}>
                     {g.label}
@@ -216,7 +216,6 @@ export default function CreateMatchPage() {
 
             <button onClick={() => {
                 if (!form.title) { toast('error', '매치 제목을 입력해주세요'); return; }
-                if (!form.startTime) { toast('error', '시작 시간을 입력해주세요'); return; }
                 if (form.levelMin > form.levelMax) {
                   setForm(prev => ({ ...prev, levelMin: prev.levelMax, levelMax: prev.levelMin }));
                   toast('info', '최소/최대 레벨이 자동으로 교정되었어요');
@@ -224,7 +223,7 @@ export default function CreateMatchPage() {
                 }
                 setStep(2);
               }}
-              className="w-full rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors mt-2">
+              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
               다음
             </button>
           </div>
@@ -233,7 +232,7 @@ export default function CreateMatchPage() {
         {/* Step 2: Venue + Date */}
         {step === 2 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2">장소와 시간</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">장소와 시간</h3>
             <Field label="시설 선택" required>
               {Array.isArray(venues) && venues.length > 0 && (
                 <div className="space-y-2 mb-3">
@@ -242,14 +241,14 @@ export default function CreateMatchPage() {
                       className={`w-full text-left rounded-xl p-3 transition-all ${
                         form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}>
-                      <p className={`text-[13px] font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
-                      <p className={`text-[11px] mt-0.5 ${form.venueId === v.id ? 'text-white/60 dark:text-gray-900/60' : 'text-gray-500'}`}>{v.address}</p>
+                      <p className={`text-sm font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
+                      <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'text-white/60 dark:text-gray-900/60' : 'text-gray-500'}`}>{v.address}</p>
                     </button>
                   ))}
                 </div>
               )}
               <div className="mt-2">
-                <p className="text-[11px] text-gray-500 mb-1.5">또는 직접 입력</p>
+                <p className="text-xs text-gray-500 mb-1.5">또는 직접 입력</p>
                 <input
                   value={form.customVenue}
                   onChange={(e) => setForm({ ...form, customVenue: e.target.value, venueId: '' })}
@@ -273,11 +272,12 @@ export default function CreateMatchPage() {
             <button onClick={() => {
                 if (!form.venueId && !form.customVenue) { toast('error', '시설을 선택하거나 직접 입력해주세요'); return; }
                 if (!form.matchDate) { toast('error', '날짜를 선택해주세요'); return; }
+                if (!form.startTime) { toast('error', '시작 시간을 입력해주세요'); return; }
                 const today = new Date().toISOString().split('T')[0];
                 if (form.matchDate < today) { toast('error', '과거 날짜는 선택할 수 없어요'); return; }
                 setStep(3);
               }}
-              className="w-full rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors mt-2">
+              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
               다음
             </button>
           </div>
@@ -286,7 +286,7 @@ export default function CreateMatchPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2">확인</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">확인</h3>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-4 space-y-2.5">
               <ConfirmRow label="종목" value={sportLabel[form.sportType] || form.sportType} />
               {(form.venueId || form.customVenue) && (
@@ -303,7 +303,7 @@ export default function CreateMatchPage() {
               {imageFiles.length > 0 && <ConfirmRow label="이미지" value={`${imageFiles.length}장`} />}
             </div>
             <button onClick={handleSubmit} disabled={isSubmitting}
-              className="w-full rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
+              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
               {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
             </button>
           </div>
@@ -328,6 +328,15 @@ export default function CreateMatchPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
+        :global(.dark) .form-input {
+          border-color: #374151;
+          background: #1F2937;
+          color: #F3F4F6;
+        }
+        :global(.dark) .form-input:focus {
+          border-color: #3182F6;
+          background: #111827;
+        }
       `}</style>
     </div>
   );
@@ -336,7 +345,7 @@ export default function CreateMatchPage() {
 function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-[12px] font-semibold text-gray-500 dark:text-gray-500 mb-1.5">
+      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-500 mb-1.5">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}
@@ -347,8 +356,8 @@ function Field({ label, required, id, children }: { label: string; required?: bo
 function ConfirmRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between py-1">
-      <span className="text-[12px] text-gray-500 shrink-0">{label}</span>
-      <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100 text-right ml-4">{value}</span>
+      <span className="text-xs text-gray-500 shrink-0">{label}</span>
+      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 text-right ml-4">{value}</span>
     </div>
   );
 }

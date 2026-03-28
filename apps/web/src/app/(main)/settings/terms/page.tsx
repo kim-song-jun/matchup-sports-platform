@@ -55,7 +55,7 @@ export default function TermsPage() {
         </Section>
 
         <div className="text-center py-4 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-[13px] text-gray-500">최종 수정일: 2026년 1월 1일</p>
+          <p className="text-sm text-gray-500">최종 수정일: 2026년 1월 1일</p>
         </div>
       </div>
     </div>
@@ -65,8 +65,8 @@ export default function TermsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-3">{title}</h3>
-      <div className="space-y-3 text-[14px] leading-relaxed text-gray-600 dark:text-gray-400">
+      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{title}</h3>
+      <div className="space-y-3 text-base leading-relaxed text-gray-600 dark:text-gray-400">
         {children}
       </div>
     </div>

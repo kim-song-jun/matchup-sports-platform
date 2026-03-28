@@ -46,7 +46,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const icons = {
     success: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className="text-green-500">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="text-green-500">
         <circle cx="9" cy="9" r="8" stroke="currentColor" strokeWidth="1.5" />
         <path d="M5.5 9.5l2 2 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="animate-check-draw" />
       </svg>
@@ -66,7 +66,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             className={`flex items-center gap-3 rounded-xl bg-gray-900 px-4 py-3.5 text-white shadow-lg ${t.exiting ? 'animate-slide-up-out' : 'animate-fade-in-up'}`}
           >
             {icons[t.type]}
-            <span className="flex-1 text-[14px] font-medium">{t.message}</span>
+            <span className="flex-1 text-base font-medium">{t.message}</span>
             <button onClick={() => removeToast(t.id)} aria-label="알림 닫기" className="flex items-center justify-center min-w-[44px] min-h-[44px] -mr-2 text-gray-500 hover:text-white">
               <X size={16} />
             </button>

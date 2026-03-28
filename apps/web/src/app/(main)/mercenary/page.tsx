@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { UserPlus, Search, Star } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useMercenaryPosts } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { formatMatchDate, formatCurrency } from '@/lib/utils';
 
 const sportFilters = [
   { key: '', label: '전체' },
@@ -122,16 +124,6 @@ const mockPosts: MercenaryPost[] = [
   },
 ];
 
-function formatMatchDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}/${d.getDate()} (${weekdays[d.getDay()]})`;
-}
-
-function formatFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return new Intl.NumberFormat('ko-KR').format(fee) + '원';
-}
 
 export default function MercenaryPage() {
   const [activeSport, setActiveSport] = useState('');
@@ -161,14 +153,14 @@ export default function MercenaryPage() {
     <div className="pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
       <header className="px-5 lg:px-0 pt-4 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">용병 모집</h1>
-          <Link href="/my/mercenary" className="text-[13px] text-gray-500 hover:text-gray-600 transition-colors">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">용병 모집</h1>
+          <Link href="/my/mercenary" className="text-sm text-gray-500 hover:text-gray-600 transition-colors">
             내 모집/신청
           </Link>
         </div>
         <Link
           href="/mercenary/new"
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <UserPlus size={16} strokeWidth={2.5} />
           용병 모집하기
@@ -181,7 +173,7 @@ export default function MercenaryPage() {
           <button
             key={f.key}
             onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeSport === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
@@ -193,19 +185,18 @@ export default function MercenaryPage() {
       </div>
 
       <div className="px-5 lg:px-0 mb-3">
-        <p className="text-[13px] text-gray-500">{filtered.length}개의 모집글</p>
+        <p className="text-sm text-gray-500">{filtered.length}개의 모집글</p>
       </div>
 
       {/* 모집글 리스트 */}
       <div className="px-5 lg:px-0">
         {filtered.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 p-16 text-center">
-            <Search size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">
-              {activeSport ? `${sportLabel[activeSport]} 용병 모집이 없어요` : '용병 모집이 없어요'}
-            </p>
-            <p className="text-[13px] text-gray-500 mt-1">직접 용병을 모집해보세요</p>
-          </div>
+          <EmptyState
+            icon={Search}
+            title={activeSport ? `${sportLabel[activeSport]} 용병 모집이 없어요` : '용병 모집이 없어요'}
+            description="직접 용병을 모집해보세요"
+            action={{ label: '용병 모집하기', href: '/mercenary/new' }}
+          />
         ) : (
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
             {filtered.map((post) => {
@@ -214,11 +205,11 @@ export default function MercenaryPage() {
               return (
                 <div
                   key={post.id}
-                  className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-750 duration-200"
+                  className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 duration-200"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-1 text-[12px] text-gray-500">
+                      <div className="flex items-center gap-1.5 mb-1 text-xs text-gray-500">
                         <span>{sportLabel[post.sportType]}</span>
                         <span className="text-gray-200">·</span>
                         <span>{positionLabel[post.position]}</span>
@@ -229,41 +220,41 @@ export default function MercenaryPage() {
                           </>
                         )}
                       </div>
-                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">
+                      <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
                         {post.teamName}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-1 text-[12px] text-amber-500 shrink-0">
+                    <div className="flex items-center gap-1 text-xs text-amber-500 shrink-0">
                       <Star size={12} fill="currentColor" />
                       <span className="font-semibold">{(post.mannerScore ?? 0).toFixed(1)}</span>
                     </div>
                   </div>
 
-                  <p className="mt-2.5 text-[13px] text-gray-500 leading-relaxed">
+                  <p className="mt-2.5 text-sm text-gray-500 leading-relaxed">
                     {formatMatchDate(post.matchDate)} {post.startTime}
                     <span className="text-gray-300 mx-1">·</span>
                     {post.venue}
                   </p>
-                  <p className="mt-1 text-[13px] text-gray-500">
+                  <p className="mt-1 text-sm text-gray-500">
                     Lv.{post.levelRequired} {levelLabel[post.levelRequired]} 이상
                     <span className="text-gray-300 mx-1">·</span>
                     <span className={`font-semibold ${post.fee === 0 ? 'text-green-600' : 'text-gray-800 dark:text-gray-200'}`}>
-                      {formatFee(post.fee)}
+                      {formatCurrency(post.fee)}
                     </span>
                   </p>
 
                   {post.notes && (
-                    <p className="mt-2 text-[12px] text-gray-500 truncate">{post.notes}</p>
+                    <p className="mt-2 text-xs text-gray-500 truncate">{post.notes}</p>
                   )}
 
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-[12px] text-gray-500">
+                    <span className="text-xs text-gray-500">
                       {post.count}명 모집
                     </span>
                     <button
                       onClick={() => handleApply(post.id)}
                       disabled={isApplied}
-                      className={`rounded-xl px-5 py-2 text-[13px] font-bold transition-colors ${
+                      className={`rounded-xl px-5 py-2 text-sm font-bold transition-colors ${
                         isApplied
                           ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'

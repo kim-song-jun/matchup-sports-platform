@@ -6,7 +6,8 @@ import { Plus, Package, Search, ShoppingBag } from 'lucide-react';
 import { useListings } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
-import { sportLabel } from '@/lib/constants';
+import { EmptyState } from '@/components/ui/empty-state';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
 import type { MarketplaceListing } from '@/types/api';
 
@@ -44,10 +45,10 @@ export default function MarketplacePage() {
   return (
     <div className="pt-[var(--safe-area-top)]">
       <header className="flex items-center justify-between px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">장터</h1>
-        <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-blue-600 active:bg-gray-700 transition-colors">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">장터</h1>
+        <Link href="/marketplace/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-gray-700 transition-colors">
           <Plus size={16} strokeWidth={2.5} />
-          글쓰기
+          상품 등록
         </Link>
       </header>
 
@@ -60,7 +61,7 @@ export default function MarketplacePage() {
             placeholder="상품명, 종목 검색"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 dark:focus:bg-gray-900 dark:focus:border-blue-600 transition-all"
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white focus:border focus:border-blue-200 dark:focus:bg-gray-900 dark:focus:border-blue-600 transition-colors"
           />
         </div>
       </div>
@@ -71,7 +72,7 @@ export default function MarketplacePage() {
           <button
             key={cat.label}
             onClick={() => setActiveCategory(cat.label)}
-            className={`shrink-0 rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeCategory === cat.label
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-gray-50 text-gray-500 hover:bg-gray-100 active:bg-gray-150 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700'
@@ -93,39 +94,44 @@ export default function MarketplacePage() {
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
         ) : listings.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 p-16 text-center">
-            <Package size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[14px] text-gray-500">매물이 없어요</p>
-            <p className="text-[13px] text-gray-500 mt-1">첫 번째 판매자가 되어보세요!</p>
-          </div>
+          <EmptyState
+            icon={Package}
+            title="아직 등록된 매물이 없어요"
+            description="필요 없는 장비, 새 주인을 찾아주세요"
+          />
         ) : (
-          <div className="space-y-2 stagger-children">
+          <div className="space-y-3 stagger-children">
             {listings.map((item: MarketplaceListing) => (
-                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
-                    <div className="flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-300">
+                    <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-300">
                       <ShoppingBag size={20} />
                     </div>
 
                     {/* Content */}
                     <div className="flex flex-1 flex-col min-w-0 py-0.5">
-                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
+                      <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
 
                       {/* meta: 지역 · 종목 · 상태 */}
-                      <p className="text-[13px] text-gray-500 mt-1 truncate">
-                        {item.locationDistrict || item.locationCity || '지역 미정'} · {sportLabel[item.sportType] || '기타'} · {conditionLabel[item.condition]}
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+                          {sportLabel[item.sportType] || '기타'}
+                        </span>
+                        <span className="text-sm text-gray-500 truncate">
+                          {item.locationDistrict || item.locationCity || '지역 미정'} · {conditionLabel[item.condition]}
+                        </span>
+                      </div>
 
                       {/* 가격 */}
-                      <p className="text-[17px] font-bold text-gray-900 dark:text-gray-100 mt-1.5">{formatCurrency(item.price)}</p>
+                      <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-1.5">{formatCurrency(item.price)}</p>
 
                       {/* 하단: 타입 + 통계 */}
                       <div className="flex items-center justify-between mt-auto pt-1">
-                        <span className={`text-[12px] font-medium ${item.listingType === 'rent' ? 'text-gray-500 dark:text-gray-500' : 'text-gray-500 dark:text-gray-500'}`}>
+                        <span className={`text-xs font-medium ${item.listingType === 'rent' ? 'text-gray-500 dark:text-gray-500' : 'text-gray-500 dark:text-gray-500'}`}>
                           {item.listingType === 'rent' ? '대여' : '판매'}
                         </span>
-                        <span className="text-[12px] text-gray-300 dark:text-gray-500">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
                           관심 {item.likeCount} · 조회 {item.viewCount}
                         </span>
                       </div>

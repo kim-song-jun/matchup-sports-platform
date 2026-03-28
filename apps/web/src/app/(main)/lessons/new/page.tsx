@@ -99,7 +99,7 @@ export default function CreateLessonPage() {
   if (!isAuthenticated) {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-[15px] font-medium text-gray-700">로그인 후 강좌를 등록할 수 있어요</p>
+        <p className="text-md font-medium text-gray-700">로그인 후 강좌를 등록할 수 있어요</p>
         <button
           onClick={() => router.push('/login')}
           className="mt-4 rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
@@ -124,7 +124,7 @@ export default function CreateLessonPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[18px] font-bold text-gray-900">강좌 등록</h1>
+        <h1 className="text-xl font-bold text-gray-900">강좌 등록</h1>
       </header>
 
       {/* Progress */}
@@ -137,8 +137,8 @@ export default function CreateLessonPage() {
           ))}
         </div>
         <div className="flex items-center justify-between">
-          <p className="text-[14px] font-semibold text-gray-900">{STEPS[step]}</p>
-          <p className="text-[12px] text-gray-500">{step + 1} / {STEPS.length}</p>
+          <p className="text-base font-semibold text-gray-900">{STEPS[step]}</p>
+          <p className="text-xs text-gray-500">{step + 1} / {STEPS.length}</p>
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export default function CreateLessonPage() {
         {step === 0 && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-2 block">종목 선택</label>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">종목 선택</label>
               <div className="grid grid-cols-2 gap-3">
                 {sports.map((s) => {
                   const Icon = SportIconMap[s.type];
@@ -163,7 +163,7 @@ export default function CreateLessonPage() {
                       }`}
                     >
                       {Icon && <Icon size={28} />}
-                      <span className="text-[15px] font-semibold">{s.label}</span>
+                      <span className="text-md font-semibold">{s.label}</span>
                     </button>
                   );
                 })}
@@ -171,7 +171,7 @@ export default function CreateLessonPage() {
             </div>
 
             <div>
-              <label className="text-[13px] font-medium text-gray-700 mb-2 block">강좌 유형</label>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">강좌 유형</label>
               <div className="space-y-2">
                 {lessonTypes.map((t) => (
                   <button
@@ -183,10 +183,10 @@ export default function CreateLessonPage() {
                         : 'border-gray-100 hover:border-gray-200'
                     }`}
                   >
-                    <p className={`text-[14px] font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
+                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                       {t.label}
                     </p>
-                    <p className="text-[12px] text-gray-500 mt-0.5">{t.desc}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
                   </button>
                 ))}
               </div>
@@ -198,7 +198,7 @@ export default function CreateLessonPage() {
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label htmlFor="lesson-title" className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-title" className="text-sm font-medium text-gray-700 mb-1.5 block">
                 강좌 제목 <span className="text-red-400">*</span>
               </label>
               <input
@@ -208,12 +208,12 @@ export default function CreateLessonPage() {
                 onChange={(e) => update('title', e.target.value)}
                 maxLength={100}
                 placeholder="예: 초보자를 위한 풋살 기초 레슨"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
               />
             </div>
 
             <div>
-              <label htmlFor="lesson-description" className="text-[13px] font-medium text-gray-700 mb-1.5 block">강좌 설명</label>
+              <label htmlFor="lesson-description" className="text-sm font-medium text-gray-700 mb-1.5 block">강좌 설명</label>
               <textarea
                 id="lesson-description"
                 value={form.description}
@@ -221,12 +221,12 @@ export default function CreateLessonPage() {
                 maxLength={1000}
                 placeholder="강좌에 대한 자세한 설명을 입력해주세요"
                 rows={4}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all resize-none"
               />
             </div>
 
             <div>
-              <label htmlFor="lesson-coach-name" className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-coach-name" className="text-sm font-medium text-gray-700 mb-1.5 block">
                 코치명 <span className="text-red-400">*</span>
               </label>
               <input
@@ -236,12 +236,12 @@ export default function CreateLessonPage() {
                 onChange={(e) => update('coachName', e.target.value)}
                 maxLength={50}
                 placeholder="예: 김코치"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
               />
             </div>
 
             <div>
-              <label htmlFor="lesson-coach-bio" className="text-[13px] font-medium text-gray-700 mb-1.5 block">코치 소개</label>
+              <label htmlFor="lesson-coach-bio" className="text-sm font-medium text-gray-700 mb-1.5 block">코치 소개</label>
               <textarea
                 id="lesson-coach-bio"
                 value={form.coachBio}
@@ -249,7 +249,7 @@ export default function CreateLessonPage() {
                 maxLength={500}
                 placeholder="코치 경력 및 자격증 등을 입력해주세요"
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all resize-none"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all resize-none"
               />
             </div>
           </div>
@@ -259,7 +259,7 @@ export default function CreateLessonPage() {
         {step === 2 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label htmlFor="lesson-venue" className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-venue" className="text-sm font-medium text-gray-700 mb-1.5 block">
                 장소명 <span className="text-red-400">*</span>
               </label>
               <input
@@ -268,12 +268,12 @@ export default function CreateLessonPage() {
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
               />
             </div>
 
             <div>
-              <label htmlFor="lesson-date" className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-date" className="text-sm font-medium text-gray-700 mb-1.5 block">
                 날짜 <span className="text-red-400">*</span>
               </label>
               <input
@@ -281,13 +281,13 @@ export default function CreateLessonPage() {
                 type="date"
                 value={form.lessonDate}
                 onChange={(e) => update('lessonDate', e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="lesson-start-time" className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+                <label htmlFor="lesson-start-time" className="text-sm font-medium text-gray-700 mb-1.5 block">
                   시작 시간 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -295,11 +295,11 @@ export default function CreateLessonPage() {
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
                 />
               </div>
               <div>
-                <label htmlFor="lesson-end-time" className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+                <label htmlFor="lesson-end-time" className="text-sm font-medium text-gray-700 mb-1.5 block">
                   종료 시간 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -307,14 +307,14 @@ export default function CreateLessonPage() {
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="lesson-max-participants" className="text-[13px] font-medium text-gray-700 mb-1.5 block">최대 인원</label>
+                <label htmlFor="lesson-max-participants" className="text-sm font-medium text-gray-700 mb-1.5 block">최대 인원</label>
                 <input
                   id="lesson-max-participants"
                   type="number"
@@ -322,11 +322,11 @@ export default function CreateLessonPage() {
                   onChange={(e) => update('maxParticipants', +e.target.value)}
                   min={1}
                   max={50}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
                 />
               </div>
               <div>
-                <label htmlFor="lesson-fee" className="text-[13px] font-medium text-gray-700 mb-1.5 block">수강료 (원)</label>
+                <label htmlFor="lesson-fee" className="text-sm font-medium text-gray-700 mb-1.5 block">수강료 (원)</label>
                 <input
                   id="lesson-fee"
                   type="number"
@@ -334,10 +334,10 @@ export default function CreateLessonPage() {
                   onChange={(e) => update('fee', +e.target.value)}
                   min={0}
                   step={1000}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
                 />
                 {form.fee > 0 && (
-                  <p className="text-[12px] text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 mt-1">
                     {new Intl.NumberFormat('ko-KR').format(form.fee)}원
                   </p>
                 )}
@@ -346,12 +346,12 @@ export default function CreateLessonPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="lesson-level-min" className="text-[13px] font-medium text-gray-700 mb-1.5 block">최소 레벨</label>
+                <label htmlFor="lesson-level-min" className="text-sm font-medium text-gray-700 mb-1.5 block">최소 레벨</label>
                 <select
                   id="lesson-level-min"
                   value={form.levelMin}
                   onChange={(e) => update('levelMin', +e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
@@ -359,12 +359,12 @@ export default function CreateLessonPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="lesson-level-max" className="text-[13px] font-medium text-gray-700 mb-1.5 block">최대 레벨</label>
+                <label htmlFor="lesson-level-max" className="text-sm font-medium text-gray-700 mb-1.5 block">최대 레벨</label>
                 <select
                   id="lesson-level-max"
                   value={form.levelMax}
                   onChange={(e) => update('levelMax', +e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-[14px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-all"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
@@ -379,7 +379,7 @@ export default function CreateLessonPage() {
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
             <div className="rounded-xl bg-white border border-gray-100 p-5">
-              <h3 className="text-[16px] font-bold text-gray-900 mb-3">강좌 정보 확인</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-3">강좌 정보 확인</h3>
               <div className="space-y-3">
                 <SummaryRow label="종목" value={selectedSport?.label || ''} />
                 <SummaryRow label="유형" value={selectedType?.label || ''} />
@@ -408,7 +408,7 @@ export default function CreateLessonPage() {
           <button
             onClick={() => canProceed() ? setStep(step + 1) : toast('error', '필수 항목을 입력해주세요')}
             disabled={!canProceed()}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             다음
             <ArrowRight size={16} />
@@ -417,7 +417,7 @@ export default function CreateLessonPage() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Check size={16} />
             {isSubmitting ? '등록 중...' : '강좌 등록하기'}
@@ -431,8 +431,8 @@ export default function CreateLessonPage() {
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1">
-      <span className="text-[13px] text-gray-500 shrink-0">{label}</span>
-      <span className="text-[14px] font-medium text-gray-900 text-right">{value}</span>
+      <span className="text-sm text-gray-500 shrink-0">{label}</span>
+      <span className="text-base font-medium text-gray-900 text-right">{value}</span>
     </div>
   );
 }

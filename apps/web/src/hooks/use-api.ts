@@ -372,19 +372,6 @@ export function useCreateListing() {
   });
 }
 
-export function useCreateOrder() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
-      const res = await api.post(`/marketplace/listings/${id}/order`, data);
-      return extractData<{ id: string }>(res);
-    },
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.listings.detail(id) });
-    },
-  });
-}
-
 // ── Payments ──
 export function usePayments() {
   const { isAuthenticated } = useAuthStore();
@@ -443,8 +430,8 @@ export function useRefundPayment() {
       return extractData<Payment>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['payment', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.detail(id) });
     },
   });
 }
@@ -503,7 +490,7 @@ export function useApplyTeamMatch() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
     },
   });
 }
@@ -516,7 +503,7 @@ export function useRespondTeamMatchApplication() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
     },
   });
 }
@@ -529,7 +516,7 @@ export function useSubmitTeamMatchEvaluation() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
     },
   });
 }
@@ -542,7 +529,7 @@ export function useTeamMatchArrival() {
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['team-match', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
     },
   });
 }

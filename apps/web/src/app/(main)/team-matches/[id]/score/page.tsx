@@ -87,7 +87,7 @@ export default function ScoreInputPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[18px] font-bold text-gray-900 dark:text-white">스코어 입력</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">스코어 입력</h1>
       </header>
 
       <div className="px-5 lg:px-0 lg:max-w-2xl lg:mx-auto">
@@ -96,36 +96,36 @@ export default function ScoreInputPage() {
           <div className="flex items-center justify-between">
             {/* Home team */}
             <div className="flex-1 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/10 mx-auto mb-2">
-                <span className="text-[20px] font-bold text-white">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white dark:bg-gray-800/10 mx-auto mb-2">
+                <span className="text-xl font-bold text-white">
                   {mockMatch.homeTeam.name.charAt(0)}
                 </span>
               </div>
-              <p className="text-[14px] font-semibold text-white">{mockMatch.homeTeam.name}</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">홈</p>
+              <p className="text-base font-semibold text-white">{mockMatch.homeTeam.name}</p>
+              <p className="text-xs text-gray-500 mt-0.5">홈</p>
             </div>
 
             {/* Score display */}
             <div className="px-4">
               <div className="flex items-center gap-3">
-                <span className="text-[36px] font-bold text-white">{homeTotal}</span>
-                <span className="text-[20px] text-gray-500">:</span>
-                <span className="text-[36px] font-bold text-white">{awayTotal}</span>
+                <span className="text-4xl font-bold text-white">{homeTotal}</span>
+                <span className="text-xl text-gray-500">:</span>
+                <span className="text-4xl font-bold text-white">{awayTotal}</span>
               </div>
-              <p className="text-center text-[11px] text-gray-500 mt-1">
+              <p className="text-center text-xs text-gray-500 mt-1">
                 {homeTotal > awayTotal ? '홈 승' : homeTotal < awayTotal ? '원정 승' : '무승부'}
               </p>
             </div>
 
             {/* Away team */}
             <div className="flex-1 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/10 mx-auto mb-2">
-                <span className="text-[20px] font-bold text-white">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white dark:bg-gray-800/10 mx-auto mb-2">
+                <span className="text-xl font-bold text-white">
                   {mockMatch.awayTeam.name.charAt(0)}
                 </span>
               </div>
-              <p className="text-[14px] font-semibold text-white">{mockMatch.awayTeam.name}</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">원정</p>
+              <p className="text-base font-semibold text-white">{mockMatch.awayTeam.name}</p>
+              <p className="text-xs text-gray-500 mt-0.5">원정</p>
             </div>
           </div>
         </div>
@@ -144,12 +144,12 @@ export default function ScoreInputPage() {
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500">
                       <Hash size={14} />
                     </div>
-                    <span className="text-[14px] font-semibold text-gray-900 dark:text-white">
+                    <span className="text-base font-semibold text-gray-900 dark:text-white">
                       {idx + 1}쿼터
                     </span>
                   </div>
                   {score.home !== '' && score.away !== '' && (
-                    <span className="text-[12px] text-gray-500">
+                    <span className="text-xs text-gray-500">
                       {quarterHome} : {quarterAway}
                     </span>
                   )}
@@ -158,7 +158,7 @@ export default function ScoreInputPage() {
                 <div className="flex items-center gap-3">
                   {/* Home score */}
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-500 mb-1 block text-center">
+                    <label className="text-xs text-gray-500 mb-1 block text-center">
                       {mockMatch.homeTeam.name}
                     </label>
                     <input
@@ -168,15 +168,15 @@ export default function ScoreInputPage() {
                       onChange={(e) => updateScore(idx, 'home', e.target.value)}
                       placeholder="0"
                       disabled={submitted}
-                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 dark:text-white placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
                     />
                   </div>
 
-                  <span className="text-[18px] font-bold text-gray-300 mt-5">:</span>
+                  <span className="text-xl font-bold text-gray-300 mt-5">:</span>
 
                   {/* Away score */}
                   <div className="flex-1">
-                    <label className="text-[11px] text-gray-500 mb-1 block text-center">
+                    <label className="text-xs text-gray-500 mb-1 block text-center">
                       {mockMatch.awayTeam.name}
                     </label>
                     <input
@@ -186,14 +186,14 @@ export default function ScoreInputPage() {
                       onChange={(e) => updateScore(idx, 'away', e.target.value)}
                       placeholder="0"
                       disabled={submitted}
-                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-[20px] font-bold text-gray-900 dark:text-white placeholder:text-gray-300 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-all"
                     />
                   </div>
                 </div>
 
                 {/* Referee assignment */}
                 {ref && (
-                  <div className="mt-3 flex items-center gap-1.5 text-[12px] text-gray-500">
+                  <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
                     <Shield size={12} className="text-gray-300" />
                     <span>심판: {ref.teamName}</span>
                   </div>
@@ -205,12 +205,12 @@ export default function ScoreInputPage() {
 
         {/* Running total summary */}
         <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-          <h3 className="text-[14px] font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
             <Trophy size={16} className="text-amber-500" />
             쿼터별 누적 점수
           </h3>
           <div className="overflow-x-auto scrollbar-hide">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <th className="py-2 px-2 text-left font-semibold text-gray-500">팀</th>
@@ -256,13 +256,13 @@ export default function ScoreInputPage() {
             <button
               onClick={handleSubmit}
               disabled={!allFilled}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Trophy size={18} />
               경기 완료
             </button>
             {!allFilled && (
-              <p className="text-center text-[12px] text-gray-500 mt-2">
+              <p className="text-center text-xs text-gray-500 mt-2">
                 모든 쿼터의 점수를 입력해주세요
               </p>
             )}
@@ -270,13 +270,13 @@ export default function ScoreInputPage() {
         ) : (
           <div className="rounded-xl bg-green-50 border border-green-100 p-5 mb-8 text-center">
             <CheckCircle2 size={32} className="mx-auto text-green-500 mb-2" />
-            <p className="text-[16px] font-bold text-green-700">스코어가 기록되었습니다</p>
-            <p className="text-[13px] text-green-500 mt-1">
+            <p className="text-lg font-bold text-green-700">스코어가 기록되었습니다</p>
+            <p className="text-sm text-green-500 mt-1">
               최종 스코어: {mockMatch.homeTeam.name} {homeTotal} : {awayTotal} {mockMatch.awayTeam.name}
             </p>
             <button
               onClick={() => router.push(`/team-matches/${id}`)}
-              className="mt-4 rounded-xl bg-green-500 px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-green-600 transition-colors"
+              className="mt-4 rounded-xl bg-green-500 px-6 py-2.5 text-base font-semibold text-white hover:bg-green-600 transition-colors"
             >
               매치 상세로 돌아가기
             </button>

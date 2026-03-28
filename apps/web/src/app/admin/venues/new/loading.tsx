@@ -7,7 +7,7 @@ export default function Loading() {
     <div className="space-y-4 p-6 animate-pulse">
       <Skeleton className="h-4 w-48" />
       <Skeleton className="h-8 w-48" />
-      <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
         <div className="space-y-2">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-10 w-full rounded-lg" />

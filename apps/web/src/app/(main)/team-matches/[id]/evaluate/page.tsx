@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Star, Send } from 'lucide-react';
 import { useSubmitTeamMatchEvaluation } from '@/hooks/use-api';
+import { useToast } from '@/components/ui/toast';
 
 const evaluationItems = [
   { key: 'levelAccuracy', label: '수준 일치', desc: '모집글 레벨과 실제 실력이 일치했나요?' },
@@ -41,6 +42,7 @@ export default function TeamMatchEvaluatePage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { toast } = useToast();
   const submitMutation = useSubmitTeamMatchEvaluation();
 
   const [ratings, setRatings] = useState<Ratings>(
@@ -55,7 +57,10 @@ export default function TeamMatchEvaluatePage() {
   function handleSubmit() {
     submitMutation.mutate(
       { id, data: { ...ratings, comment } },
-      { onSuccess: () => router.push(`/team-matches/${id}`) },
+      {
+        onSuccess: () => router.push(`/team-matches/${id}`),
+        onError: () => toast('error', '평가 제출에 실패했어요. 다시 시도해주세요'),
+      },
     );
   }
 
@@ -66,30 +71,30 @@ export default function TeamMatchEvaluatePage() {
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-[18px] font-bold text-gray-900">경기 평가</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">경기 평가</h1>
       </header>
 
       <div className="px-5 lg:px-0">
         {/* 안내 */}
         <div className="rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3.5 mb-6">
-          <p className="text-[14px] font-medium text-blue-700">상대팀에 대한 솔직한 평가를 남겨주세요</p>
-          <p className="text-[12px] text-blue-500 mt-0.5">평가는 매너 점수에 반영됩니다</p>
+          <p className="text-base font-medium text-blue-700">상대팀에 대한 솔직한 평가를 남겨주세요</p>
+          <p className="text-xs text-blue-500 mt-0.5">평가는 매너 점수에 반영됩니다</p>
         </div>
 
         {/* 평가 항목 */}
         <div className="space-y-4">
           {evaluationItems.map((item) => (
-            <div key={item.key} className="rounded-2xl bg-white border border-gray-100 p-5">
+            <div key={item.key} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <p className="text-[15px] font-semibold text-gray-900">{item.label}</p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">{item.desc}</p>
+                  <p className="text-md font-semibold text-gray-900 dark:text-white">{item.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
                 </div>
-                <div className="text-[14px] font-bold text-amber-500">
+                <div className="text-base font-bold text-amber-500">
                   {ratings[item.key] > 0 ? ratings[item.key].toFixed(0) : '-'}
                 </div>
               </div>
@@ -106,23 +111,23 @@ export default function TeamMatchEvaluatePage() {
         {/* 평균 점수 */}
         {allRated && (
           <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-center">
-            <p className="text-[13px] text-gray-500">종합 평점</p>
+            <p className="text-sm text-gray-500">종합 평점</p>
             <div className="flex items-center justify-center gap-2 mt-1">
               <Star size={24} className="text-amber-400" fill="currentColor" />
-              <span className="text-[28px] font-bold text-white">{averageRating.toFixed(1)}</span>
+              <span className="text-3xl font-bold text-white">{averageRating.toFixed(1)}</span>
             </div>
           </div>
         )}
 
         {/* 코멘트 */}
         <div className="mt-4">
-          <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">한줄 코멘트 (선택)</label>
+          <label className="text-sm font-medium text-gray-700 mb-1.5 block">한줄 코멘트 (선택)</label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="상대팀에 대한 한마디를 남겨주세요"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
           />
         </div>
 
@@ -131,13 +136,13 @@ export default function TeamMatchEvaluatePage() {
           <button
             onClick={handleSubmit}
             disabled={!allRated || submitMutation.isPending}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Send size={16} />
             {submitMutation.isPending ? '제출 중...' : '평가 제출하기'}
           </button>
           {!allRated && (
-            <p className="text-center text-[12px] text-gray-500 mt-2">모든 항목을 평가해주세요</p>
+            <p className="text-center text-xs text-gray-500 mt-2">모든 항목을 평가해주세요</p>
           )}
         </div>
       </div>

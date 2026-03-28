@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, Users, Pencil, Trash2, AlertTriangle, Info, Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
@@ -110,8 +111,8 @@ export default function MyMatchesPage() {
   if (!isAuthenticated) {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-[15px] font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-bold text-white">로그인</Link>
+        <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
+        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
       </div>
     );
   }
@@ -143,11 +144,11 @@ export default function MyMatchesPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
       </header>
       <div className="hidden lg:block mb-2 px-5 lg:px-0 pt-4">
-        <h2 className="text-[22px] font-bold text-gray-900 dark:text-white">매치 히스토리</h2>
-        <p className="text-[14px] text-gray-500 mt-1">참가 기록과 내가 만든 매치를 확인하세요</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h2>
+        <p className="text-base text-gray-500 mt-1">참가 기록과 내가 만든 매치를 확인하세요</p>
       </div>
 
       {/* Tabs */}
@@ -160,7 +161,7 @@ export default function MyMatchesPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 rounded-lg py-2.5 text-[14px] font-semibold transition-all ${
+              className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-all ${
                 activeTab === tab.key
                   ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'
@@ -173,9 +174,9 @@ export default function MyMatchesPage() {
       </div>
 
       {usingMock && (
-        <div className="mx-5 lg:mx-0 mt-3 mb-1 flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-100 px-4 py-2.5">
+        <div className="mx-5 lg:mx-0 mt-3 mb-1 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
           <Info size={16} className="text-gray-500 shrink-0" />
-          <span className="text-[13px] text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
+          <span className="text-sm text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
         </div>
       )}
 
@@ -185,8 +186,8 @@ export default function MyMatchesPage() {
           {/* Stats bar */}
           <div className="mt-3 mb-4 flex items-center gap-3">
             <div className="flex-1 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3 text-center">
-              <p className="text-[11px] font-medium text-gray-500">전적</p>
-              <p className="text-[15px] font-bold text-gray-900 dark:text-white mt-0.5">
+              <p className="text-xs font-medium text-gray-500">전적</p>
+              <p className="text-md font-bold text-gray-900 dark:text-white mt-0.5">
                 <span className="text-blue-500">{totalWins}</span>
                 <span className="text-gray-300 mx-0.5">/</span>
                 <span className="text-red-400">{totalLosses}</span>
@@ -195,12 +196,12 @@ export default function MyMatchesPage() {
               </p>
             </div>
             <div className="flex-1 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3 text-center">
-              <p className="text-[11px] font-medium text-gray-500">총 매치</p>
-              <p className="text-[15px] font-bold text-gray-900 dark:text-white mt-0.5">{participatedData.length}경기</p>
+              <p className="text-xs font-medium text-gray-500">총 매치</p>
+              <p className="text-md font-bold text-gray-900 dark:text-white mt-0.5">{participatedData.length}경기</p>
             </div>
             <div className="flex-1 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3 text-center">
-              <p className="text-[11px] font-medium text-gray-500">ELO 변동</p>
-              <p className={`text-[15px] font-bold mt-0.5 ${totalElo >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+              <p className="text-xs font-medium text-gray-500">ELO 변동</p>
+              <p className={`text-md font-bold mt-0.5 ${totalElo >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
                 {totalElo >= 0 ? '+' : ''}{totalElo}
               </p>
             </div>
@@ -209,11 +210,12 @@ export default function MyMatchesPage() {
           {/* Participated match cards */}
           <div className="space-y-3 stagger-children">
             {participatedData.length === 0 ? (
-              <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 p-16 text-center">
-                <Trophy size={32} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-[14px] text-gray-500">참가한 매치가 없어요</p>
-                <p className="text-[13px] text-gray-500 mt-1">매치에 참가해보세요</p>
-              </div>
+              <EmptyState
+                icon={Trophy}
+                title="참가한 매치가 없어요"
+                description="매치에 참가해보세요"
+                action={{ label: '매치 찾기', href: '/matches' }}
+              />
             ) : (
               participatedData.map((match) => {
                 const rc = resultConfig[match.result];
@@ -223,20 +225,20 @@ export default function MyMatchesPage() {
                     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 transition-all active:scale-[0.995]">
                       <div className="flex items-start justify-between mb-2.5">
                         <div className="flex items-center gap-2">
-                          <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
+                          <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">
                             {sportLabel[match.sport] || match.sport}
                           </span>
-                          <span className="text-[12px] font-medium text-gray-500">{match.players}</span>
+                          <span className="text-xs font-medium text-gray-500">{match.players}</span>
                         </div>
-                        <span className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[12px] font-bold ${rc.style}`}>
+                        <span className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-bold ${rc.style}`}>
                           <ResultIcon size={13} />
                           {rc.text}
                         </span>
                       </div>
 
-                      <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
+                      <h3 className="text-md font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
 
-                      <div className="mt-2 flex items-center gap-3 text-[13px] text-gray-500">
+                      <div className="mt-2 flex items-center gap-3 text-sm text-gray-500">
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
                           {match.date} ({getDayLabel(match.date)})
@@ -250,8 +252,8 @@ export default function MyMatchesPage() {
                       {/* ELO change */}
                       <div className="mt-3 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
                         <Trophy size={14} className="text-gray-500" />
-                        <span className="text-[13px] text-gray-500">레이팅 변동</span>
-                        <span className={`ml-auto text-[14px] font-bold ${match.eloChange >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                        <span className="text-sm text-gray-500">레이팅 변동</span>
+                        <span className={`ml-auto text-base font-bold ${match.eloChange >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
                           {match.eloChange >= 0 ? '+' : ''}{match.eloChange} ELO
                         </span>
                       </div>
@@ -268,11 +270,12 @@ export default function MyMatchesPage() {
       {activeTab === 'created' && (
         <div className="px-5 lg:px-0 space-y-3 pb-8 mt-3 stagger-children">
           {matches.length === 0 ? (
-            <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/50 p-16 text-center">
-              <Calendar size={32} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-[14px] text-gray-500">만든 매치가 없어요</p>
-              <p className="text-[13px] text-gray-500 mt-1">첫 매치를 만들어보세요</p>
-            </div>
+            <EmptyState
+              icon={Calendar}
+              title="만든 매치가 없어요"
+              description="첫 매치를 만들어보세요"
+              action={{ label: '매치 만들기', href: '/matches/new' }}
+            />
           ) : (
             matches.map((match) => {
               const st = statusLabel[match.status] || statusLabel.open;
@@ -280,34 +283,34 @@ export default function MyMatchesPage() {
                 <div key={match.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
+                      <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">
                         {sportLabel[match.sportType]}
                       </span>
-                      <span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${st.style}`}>
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
                         {st.text}
                       </span>
                     </div>
-                    <span className="text-[13px] font-semibold text-gray-900 dark:text-white">{formatCurrency(match.fee)}</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(match.fee)}</span>
                   </div>
 
                   <Link href={`/matches/${match.id}`}>
-                    <h3 className="text-[15px] font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{match.title}</h3>
+                    <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{match.title}</h3>
                   </Link>
 
                   <div className="mt-2 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
                       <Calendar size={13} />
                       <span>{match.matchDate} ({getDayLabel(match.matchDate)})</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
                       <Clock size={13} />
                       <span>{match.startTime} ~ {match.endTime}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
                       <MapPin size={13} />
                       <span>{match.venue}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
                       <Users size={13} />
                       <span>{match.currentPlayers}/{match.maxPlayers}명</span>
                     </div>
@@ -317,14 +320,14 @@ export default function MyMatchesPage() {
                     <div className="mt-3 flex gap-2">
                       <Link
                         href={`/matches/${match.id}/edit`}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 py-2.5 text-[13px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       >
                         <Pencil size={14} />
                         수정
                       </Link>
                       <button
                         onClick={() => setDeleteTarget(match.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-100 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-100 transition-colors"
                       >
                         <Trash2 size={14} />
                         취소
@@ -345,18 +348,18 @@ export default function MyMatchesPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-[16px] font-bold text-gray-900 dark:text-white text-center">매치를 취소하시겠어요?</h3>
-            <p className="text-[14px] text-gray-500 text-center mt-2">취소하면 참가자들에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매치를 취소하시겠어요?</h3>
+            <p className="text-base text-gray-500 text-center mt-2">취소하면 참가자들에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-[14px] font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors"
+                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors"
               >
                 돌아가기
               </button>
               <button
                 onClick={() => handleDelete(deleteTarget)}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
               >
                 취소하기
               </button>

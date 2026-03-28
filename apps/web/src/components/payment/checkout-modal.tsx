@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { CreditCard, Wallet, Loader2, CheckCircle } from 'lucide-react';
 import type { ApiResponse, CheckoutResult } from '@/types/api';
+import { formatAmount } from '@/lib/utils';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -25,10 +26,6 @@ const paymentMethods = [
 ] as const;
 
 type PaymentMethod = typeof paymentMethods[number]['key'];
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSuccess, onError }: CheckoutModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('card');
@@ -62,14 +59,14 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
     <Modal isOpen={isOpen} onClose={onClose} title="결제하기" size="md">
       {/* 주문 요약 */}
       <div className="rounded-xl bg-gray-50 p-4 mb-5">
-        <p className="text-[12px] text-gray-500 mb-1">주문 내역</p>
-        <p className="text-[15px] font-semibold text-gray-900">{itemName}</p>
-        <p className="text-[20px] font-bold text-gray-900 mt-2">{formatCurrency(amount)}</p>
+        <p className="text-xs text-gray-500 mb-1">주문 내역</p>
+        <p className="text-md font-semibold text-gray-900">{itemName}</p>
+        <p className="text-xl font-bold text-gray-900 mt-2">{formatAmount(amount)}</p>
       </div>
 
       {/* 결제 수단 선택 */}
       <div className="mb-6">
-        <p className="text-[14px] font-semibold text-gray-900 mb-3">결제 수단</p>
+        <p className="text-base font-semibold text-gray-900 mb-3">결제 수단</p>
         <div className="space-y-2">
           {paymentMethods.map((method) => {
             const isSelected = selectedMethod === method.key;
@@ -78,7 +75,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
                 key={method.key}
                 onClick={() => setSelectedMethod(method.key)}
                 disabled={isProcessing}
-                className={`w-full flex items-center gap-3.5 rounded-xl border p-4 text-left transition-all ${
+                className={`w-full flex items-center gap-3.5 rounded-xl border p-4 text-left transition-colors ${
                   isSelected
                     ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/20'
                     : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
@@ -90,12 +87,12 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
                   <method.icon size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-[14px] font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
+                  <p className={`text-base font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
                     {method.label}
                   </p>
-                  <p className="text-[12px] text-gray-500">{method.description}</p>
+                  <p className="text-xs text-gray-500">{method.description}</p>
                 </div>
-                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                   isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
                 }`}>
                   {isSelected && <CheckCircle size={12} className="text-white" />}
@@ -110,7 +107,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
       <button
         onClick={handlePayment}
         disabled={isProcessing}
-        className={`w-full rounded-xl py-4 text-[15px] font-semibold text-white transition-all ${
+        className={`w-full rounded-xl py-4 text-md font-semibold text-white transition-[colors,transform] ${
           isProcessing
             ? 'bg-gray-400 cursor-not-allowed'
             : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.98]'
@@ -122,7 +119,7 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
             결제 처리 중...
           </span>
         ) : (
-          `결제하기 · ${formatCurrency(amount)}`
+          `결제하기 · ${formatAmount(amount)}`
         )}
       </button>
     </Modal>

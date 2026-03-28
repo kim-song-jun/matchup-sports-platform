@@ -19,9 +19,9 @@ const gradients = [
 ] as const;
 
 const sizeStyles = {
-  sm: 'h-8 w-8 text-[12px]',
-  md: 'h-10 w-10 text-[14px]',
-  lg: 'h-14 w-14 text-[18px]',
+  sm: 'h-8 w-8 text-xs',
+  md: 'h-10 w-10 text-base',
+  lg: 'h-14 w-14 text-xl',
 } as const;
 
 function hashName(name: string): number {

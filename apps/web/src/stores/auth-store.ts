@@ -29,6 +29,7 @@ interface User {
   district?: string | null;
   teamCount?: number;
   oauthProvider?: string;
+  role?: string;
   [key: string]: unknown;
 }
 
@@ -40,9 +41,21 @@ interface AuthState {
   logout: () => void;
 }
 
+function setAuthCookie(hasToken: boolean) {
+  if (typeof document === 'undefined') return;
+  if (hasToken) {
+    document.cookie = 'accessToken=1; path=/; max-age=604800; SameSite=Lax';
+  } else {
+    document.cookie = 'accessToken=; path=/; max-age=0';
+  }
+}
+
+// localStorage 토큰이 있으면 초기 상태를 인증됨으로 설정 (SSR 안전)
+const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
+  user: hasToken ? { id: '', nickname: '', email: null, profileImageUrl: null, mannerScore: 0, totalMatches: 0 } : null,
+  isAuthenticated: hasToken,
 
   setUser: (user) =>
     set({ user, isAuthenticated: !!user }),
@@ -51,6 +64,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
+      setAuthCookie(true);
     }
     set({ user, isAuthenticated: true });
   },
@@ -59,7 +73,19 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      setAuthCookie(false);
     }
     set({ user: null, isAuthenticated: false });
   },
 }));
+
+// Multi-tab auth sync: detect logout/login in other tabs
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'accessToken') {
+      if (!e.newValue) {
+        useAuthStore.getState().logout();
+      }
+    }
+  });
+}

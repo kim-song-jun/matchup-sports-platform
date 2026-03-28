@@ -47,7 +47,7 @@ export function MapPlaceholder({ lat, lng, address, name, height = 200 }: MapPla
 
       {/* Venue name tooltip above pin */}
       <div className="absolute top-[calc(50%-68px)] left-1/2 -translate-x-1/2 z-10">
-        <div className="rounded-lg bg-gray-900/80 px-3 py-1.5 text-[12px] font-medium text-white whitespace-nowrap backdrop-blur-sm">
+        <div className="rounded-lg bg-gray-900/80 px-3 py-1.5 text-xs font-medium text-white whitespace-nowrap backdrop-blur-sm">
           {name}
         </div>
       </div>
@@ -56,13 +56,13 @@ export function MapPlaceholder({ lat, lng, address, name, height = 200 }: MapPla
       <div className="absolute bottom-0 left-0 right-0 z-10 bg-white/90 backdrop-blur-sm border-t border-gray-100 px-4 py-2.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <MapPin size={14} className="text-gray-500 shrink-0" />
-          <span className="text-[13px] text-gray-600 truncate">{address}</span>
+          <span className="text-sm text-gray-600 truncate">{address}</span>
         </div>
         <a
           href={naverMapUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="shrink-0 flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="shrink-0 flex items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           <ExternalLink size={12} />
           지도 보기

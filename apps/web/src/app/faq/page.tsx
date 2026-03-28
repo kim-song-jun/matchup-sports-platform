@@ -149,10 +149,10 @@ function AccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: bool
         className="w-full flex items-center justify-between gap-4 py-5 px-1 text-left group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 rounded-lg"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <span className="shrink-0 text-[12px] font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
+          <span className="shrink-0 text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
             {item.category}
           </span>
-          <span className="text-[15px] sm:text-[16px] font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-500 transition-colors">
+          <span className="text-md sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-500 transition-colors">
             {item.question}
           </span>
         </div>
@@ -164,14 +164,14 @@ function AccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: bool
         />
       </button>
       <div
-        className="grid transition-all duration-300 ease-in-out"
+        className="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out"
         style={{
           gridTemplateRows: isOpen ? '1fr' : '0fr',
           opacity: isOpen ? 1 : 0,
         }}
       >
         <div className="overflow-hidden">
-          <p className="text-[14px] sm:text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed pb-5 pl-1 pr-4">
+          <p className="text-base sm:text-md text-gray-500 dark:text-gray-400 leading-relaxed pb-5 pl-1 pr-4">
             {item.answer}
           </p>
         </div>
@@ -208,20 +208,20 @@ export default function FaqPage() {
         <div className="max-w-[1100px] mx-auto px-5">
           <div className="max-w-[680px] mx-auto text-center">
             <ScrollReveal delay={0}>
-              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[13px] font-semibold px-4 py-2 rounded-full mb-6">
+              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
                 <MessageCircle size={14} />
                 도움이 필요하신가요?
               </div>
             </ScrollReveal>
 
             <ScrollReveal delay={100}>
-              <h1 className="text-[28px] sm:text-[40px] lg:text-[44px] font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
+              <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
                 자주 묻는 질문
               </h1>
             </ScrollReveal>
 
             <ScrollReveal delay={200}>
-              <p className="text-[16px] lg:text-[18px] text-gray-500 dark:text-gray-400 leading-relaxed max-w-[440px] mx-auto">
+              <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[440px] mx-auto">
                 TeamMeet 이용에 대해 궁금한 점을
                 <br className="hidden sm:block" />
                 빠르게 확인해보세요.
@@ -244,7 +244,7 @@ export default function FaqPage() {
                 <button
                   key={category}
                   onClick={() => handleCategoryChange(category)}
-                  className={`shrink-0 text-[14px] font-semibold px-5 py-2.5 rounded-xl transition-all duration-200 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${
+                  className={`shrink-0 text-base font-semibold px-5 py-2.5 rounded-xl transition-[colors,transform,shadow] duration-200 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${
                     activeCategory === category
                       ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300'
@@ -274,7 +274,7 @@ export default function FaqPage() {
                 ))
               ) : (
                 <div className="py-12 text-center">
-                  <p className="text-[15px] text-gray-400">해당 카테고리에 질문이 없습니다.</p>
+                  <p className="text-md text-gray-400">해당 카테고리에 질문이 없습니다.</p>
                 </div>
               )}
             </div>
@@ -290,22 +290,22 @@ export default function FaqPage() {
               <div className="h-14 w-14 rounded-2xl bg-blue-500 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/20">
                 <Mail size={24} className="text-white" />
               </div>
-              <h2 className="text-[18px] sm:text-[26px] font-bold text-gray-900 dark:text-white mb-3 tracking-tight leading-tight">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight leading-tight">
                 더 궁금한 점이 있나요?
               </h2>
-              <p className="text-[14px] sm:text-[15px] text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
+              <p className="text-base sm:text-md text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
                 FAQ에서 답을 찾지 못하셨다면
                 <br />
                 언제든 문의해주세요. 빠르게 답변드릴게요.
               </p>
               <a
                 href="mailto:support@teammeet.kr"
-                className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-7 py-3.5 rounded-xl text-[15px] hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/20 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-7 py-3.5 rounded-xl text-md hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/20 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
               >
                 <Mail size={16} />
                 이메일 문의하기
               </a>
-              <p className="text-[13px] text-gray-500 mt-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
                 support@teammeet.kr
               </p>
             </div>

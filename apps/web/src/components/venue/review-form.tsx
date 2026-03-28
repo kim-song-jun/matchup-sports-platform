@@ -35,7 +35,7 @@ function StarRating({
 
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[14px] text-gray-700 font-medium">{label}</span>
+      <span className="text-base text-gray-700 font-medium">{label}</span>
       <div className="flex items-center gap-1">
         <div className="flex gap-0.5">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -58,7 +58,7 @@ function StarRating({
             </button>
           ))}
         </div>
-        <span className="ml-2 w-5 text-right text-[14px] font-semibold text-amber-500">
+        <span className="ml-2 w-5 text-right text-base font-semibold text-amber-500">
           {value > 0 ? value : '-'}
         </span>
       </div>
@@ -117,11 +117,11 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
 
   return (
     <div className="rounded-2xl bg-white border border-gray-100 p-5">
-      <h3 className="text-[16px] font-bold text-gray-900 mb-5">리뷰 작성</h3>
+      <h3 className="text-lg font-bold text-gray-900 mb-5">리뷰 작성</h3>
 
       {/* Overall Rating - large */}
       <div className="mb-6 text-center">
-        <p className="text-[13px] text-gray-500 mb-2">전체 평점</p>
+        <p className="text-sm text-gray-500 mb-2">전체 평점</p>
         <div className="flex justify-center gap-1.5">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
@@ -140,7 +140,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
           ))}
         </div>
         {overallRating > 0 && (
-          <p className="text-[24px] font-bold text-amber-500 mt-1">{overallRating}.0</p>
+          <p className="text-2xl font-bold text-amber-500 mt-1">{overallRating}.0</p>
         )}
       </div>
 
@@ -178,7 +178,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
 
       {/* Comment */}
       <div className="mb-4">
-        <label className="text-[13px] font-medium text-gray-700 mb-1.5 block">
+        <label className="text-sm font-medium text-gray-700 mb-1.5 block">
           후기 작성
         </label>
         <textarea
@@ -186,13 +186,13 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
           onChange={(e) => setComment(e.target.value)}
           placeholder="이용 후기를 자유롭게 작성해주세요"
           rows={4}
-          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[14px] text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all resize-none"
+          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors resize-none"
         />
       </div>
 
       {/* Photo upload */}
       <div className="mb-6">
-        <label className="text-[13px] font-medium text-gray-700 mb-2 block">
+        <label className="text-sm font-medium text-gray-700 mb-2 block">
           사진 첨부
         </label>
         <div className="flex gap-2 flex-wrap">
@@ -202,7 +202,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
               className="relative h-20 w-20 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden"
             >
               <Camera size={20} className="text-gray-500" />
-              <span className="absolute bottom-1 text-[10px] text-gray-500">
+              <span className="absolute bottom-1 text-2xs text-gray-500">
                 사진 {idx + 1}
               </span>
               <button
@@ -221,11 +221,11 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
               className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors"
             >
               <Camera size={20} />
-              <span className="text-[10px]">추가</span>
+              <span className="text-2xs">추가</span>
             </button>
           )}
         </div>
-        <p className="text-[11px] text-gray-500 mt-1.5">최대 5장까지 첨부 가능</p>
+        <p className="text-xs text-gray-500 mt-1.5">최대 5장까지 첨부 가능</p>
       </div>
 
       {/* Actions */}
@@ -233,7 +233,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 rounded-xl border border-gray-200 py-3 text-[14px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+          className="flex-1 rounded-xl border border-gray-200 py-3 text-base font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
         >
           취소
         </button>
@@ -241,7 +241,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
           type="button"
           onClick={handleSubmit}
           disabled={!isValid || isSubmitting}
-          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-[14px] font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Send size={14} />
           {isSubmitting ? '제출 중...' : '리뷰 등록'}

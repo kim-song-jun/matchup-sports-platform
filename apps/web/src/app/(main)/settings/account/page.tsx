@@ -22,9 +22,9 @@ export default function AccountPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
       </header>
-      <div className="hidden lg:flex items-center gap-2 mb-6 text-[13px] text-gray-500">
+      <div className="hidden lg:flex items-center gap-2 mb-6 text-sm text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600 dark:hover:text-gray-400">설정</button>
         <ChevronRight size={14} />
         <span className="text-gray-900 dark:text-white font-medium">개인정보 관리</span>
@@ -33,44 +33,44 @@ export default function AccountPage() {
       <div className="px-5 lg:px-0 max-w-2xl py-6 space-y-6">
         {/* 닉네임 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>
+          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>
           <input
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-[15px] text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
             placeholder="닉네임을 입력하세요"
           />
-          <p className="text-[12px] text-gray-500 mt-2">2~12자, 한글/영문/숫자 사용 가능</p>
+          <p className="text-xs text-gray-500 mt-2">2~12자, 한글/영문/숫자 사용 가능</p>
         </div>
 
         {/* 이메일 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">이메일</label>
+          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">이메일</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-[15px] text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
             placeholder="이메일을 입력하세요"
           />
         </div>
 
         {/* 전화번호 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">전화번호</label>
+          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">전화번호</label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-[15px] text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:placeholder:text-gray-500"
             placeholder="전화번호를 입력하세요"
           />
         </div>
 
         {/* 비밀번호 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">비밀번호</label>
+          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">비밀번호</label>
           <div className="flex items-center gap-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 px-4 py-3.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
@@ -78,15 +78,15 @@ export default function AccountPage() {
               </svg>
             </div>
             <div>
-              <p className="text-[14px] font-medium text-blue-700">소셜 로그인 사용 중</p>
-              <p className="text-[12px] text-blue-500 mt-0.5">카카오 계정으로 로그인되어 있어 비밀번호 변경이 불가합니다.</p>
+              <p className="text-base font-medium text-blue-700">소셜 로그인 사용 중</p>
+              <p className="text-xs text-blue-500 mt-0.5">카카오 계정으로 로그인되어 있어 비밀번호 변경이 불가합니다.</p>
             </div>
           </div>
         </div>
 
         {/* 연결된 소셜 계정 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-3">연결된 소셜 계정</label>
+          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">연결된 소셜 계정</label>
           <div className="space-y-3">
             <SocialAccount provider="kakao" name="카카오" email="player@kakao.com" connected />
             <SocialAccount provider="naver" name="네이버" connected={false} />
@@ -104,7 +104,7 @@ export default function AccountPage() {
               toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요');
             }
           }}
-          className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-[15px] font-bold hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-md font-bold hover:bg-blue-600 active:bg-blue-700 transition-colors"
         >
           변경사항 저장
         </button>
@@ -113,11 +113,11 @@ export default function AccountPage() {
         <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="w-full rounded-2xl border-2 border-red-200 text-red-500 py-3.5 text-[15px] font-semibold hover:bg-red-50 active:bg-red-100 transition-colors"
+            className="w-full rounded-2xl border-2 border-red-200 text-red-500 py-3.5 text-md font-semibold hover:bg-red-50 active:bg-red-100 transition-colors"
           >
             회원 탈퇴
           </button>
-          <p className="text-[12px] text-gray-500 text-center mt-2">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
+          <p className="text-xs text-gray-500 text-center mt-2">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
         </div>
       </div>
 
@@ -138,18 +138,18 @@ export default function AccountPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 mb-4">
                 <AlertTriangle size={28} className="text-red-500" />
               </div>
-              <h3 className="text-[18px] font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
-              <p className="text-[14px] text-gray-500 dark:text-gray-400 mb-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
+              <p className="text-base text-gray-500 dark:text-gray-400 mb-6">
                 탈퇴하면 모든 매치 기록, 채팅 내역, 팀 정보가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.
               </p>
 
               <div className="w-full mb-4">
-                <p className="text-[13px] text-gray-500 mb-2 text-left">확인을 위해 &quot;탈퇴합니다&quot;를 입력하세요</p>
+                <p className="text-sm text-gray-500 mb-2 text-left">확인을 위해 &quot;탈퇴합니다&quot;를 입력하세요</p>
                 <input
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-[15px] text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all dark:placeholder:text-gray-500"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all dark:placeholder:text-gray-500"
                   placeholder="탈퇴합니다"
                 />
               </div>
@@ -157,13 +157,13 @@ export default function AccountPage() {
               <div className="flex gap-3 w-full">
                 <button
                   onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 rounded-2xl bg-gray-100 dark:bg-gray-700 py-3 text-[15px] font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="flex-1 rounded-2xl bg-gray-100 dark:bg-gray-700 py-3 text-md font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
                   취소
                 </button>
                 <button
                   disabled={deleteConfirmText !== '탈퇴합니다'}
-                  className="flex-1 rounded-2xl bg-red-500 py-3 text-[15px] font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 rounded-2xl bg-red-500 py-3 text-md font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   탈퇴하기
                 </button>
@@ -205,13 +205,13 @@ function SocialAccount({ provider, name, email, connected }: { provider: string;
     <div className="flex items-center gap-3.5 rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3">
       {icons[provider]}
       <div className="flex-1 min-w-0">
-        <p className="text-[15px] font-medium text-gray-900 dark:text-gray-100">{name}</p>
-        {email && <p className="text-[13px] text-gray-500 mt-0.5">{email}</p>}
+        <p className="text-md font-medium text-gray-900 dark:text-gray-100">{name}</p>
+        {email && <p className="text-sm text-gray-500 mt-0.5">{email}</p>}
       </div>
       {connected ? (
-        <span className="rounded-lg bg-green-50 px-2.5 py-1 text-[12px] font-medium text-green-600">연결됨</span>
+        <span className="rounded-lg bg-green-50 px-2.5 py-1 text-xs font-medium text-green-600">연결됨</span>
       ) : (
-        <button className="rounded-xl bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-[12px] font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+        <button className="rounded-xl bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
           연결하기
         </button>
       )}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { UserPlus, ChevronRight, Trash2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
@@ -120,16 +121,16 @@ export default function AdminMercenaryPage() {
   return (
     <div className="animate-fade-in">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-[13px] text-gray-400 mb-4">
-        <Link href="/admin/dashboard" className="hover:text-gray-600 transition-colors">관리자</Link>
+      <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-4">
+        <Link href="/admin/dashboard" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">관리자</Link>
         <ChevronRight size={12} />
-        <span className="text-gray-700 font-medium">용병</span>
+        <span className="text-gray-700 dark:text-gray-300 font-medium">용병</span>
       </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">용병 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">용병 모집글을 관리하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">용병 관리</h1>
+          <p className="text-base text-gray-400 mt-1">용병 모집글을 관리하세요</p>
         </div>
       </div>
 
@@ -144,50 +145,50 @@ export default function AdminMercenaryPage() {
       />
 
       {/* Table */}
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">ID</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">팀명</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">종목</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">포지션</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">날짜</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">신청수</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">상태</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">액션</th>
+              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">ID</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">팀명</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">종목</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">포지션</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">날짜</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신청수</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">상태</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">액션</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {filtered.map((m) => (
-                <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3.5 text-[13px] font-mono text-gray-500">{m.id}</td>
+                <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-mono text-gray-500 dark:text-gray-400">{m.id}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-white text-[11px] font-black">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 dark:bg-gray-600 text-white text-xs font-black">
                         {m.teamName.charAt(0)}
                       </div>
-                      <span className="text-[14px] font-medium text-gray-900 whitespace-nowrap">{m.teamName}</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{m.teamName}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{sportLabel[m.sportType] || m.sportType}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{sportLabel[m.sportType] || m.sportType}</td>
                   <td className="px-5 py-3.5">
-                    <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[12px] font-semibold text-gray-700">
+                    <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-700 dark:text-gray-300">
                       {m.position}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{m.matchDate}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 text-center">{m.applicationCount}건</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{m.matchDate}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 text-center">{m.applicationCount}건</td>
                   <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${statusColor[m.status]}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[m.status]}`}>
                       {statusLabel[m.status]}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
                     <button
                       onClick={() => handleDelete(m.id)}
-                      className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-red-500 hover:bg-red-50 transition-colors"
+                      className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 transition-colors"
                     >
                       <Trash2 size={14} />
                       삭제
@@ -197,9 +198,13 @@ export default function AdminMercenaryPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
-                    <UserPlus size={24} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-[14px] text-gray-400">아직 용병 모집글이 없어요</p>
+                  <td colSpan={8}>
+                    <EmptyState
+                      icon={UserPlus}
+                      title="아직 용병 모집글이 없어요"
+                      description="용병 모집이 등록되면 여기에 표시돼요"
+                      size="sm"
+                    />
                   </td>
                 </tr>
               )}

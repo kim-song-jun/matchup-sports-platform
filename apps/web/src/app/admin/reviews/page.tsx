@@ -97,10 +97,10 @@ function renderStars(score: number) {
         <Star
           key={s}
           size={14}
-          className={s <= score ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}
+          className={s <= score ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'}
         />
       ))}
-      <span className="ml-1 text-[12px] font-semibold text-gray-700">{score.toFixed(1)}</span>
+      <span className="ml-1 text-xs font-semibold text-gray-700 dark:text-gray-300">{score.toFixed(1)}</span>
     </div>
   );
 }
@@ -140,56 +140,56 @@ export default function AdminReviewsPage() {
   return (
     <div className="animate-fade-in">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-[13px] text-gray-400 mb-4">
-        <Link href="/admin/dashboard" className="hover:text-gray-600 transition-colors">관리자</Link>
+      <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-4">
+        <Link href="/admin/dashboard" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">관리자</Link>
         <ChevronRight size={12} />
-        <span className="text-gray-700 font-medium">평가</span>
+        <span className="text-gray-700 dark:text-gray-300 font-medium">평가</span>
       </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">평가 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">매치 후 평가 현황을 확인하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">평가 관리</h1>
+          <p className="text-base text-gray-400 mt-1">매치 후 평가 현황을 확인하세요</p>
         </div>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <TrendingUp size={20} />
             </div>
           </div>
-          <p className="text-[22px] font-bold text-gray-900">{totalReviews}</p>
-          <p className="text-[13px] text-gray-400 mt-0.5">총 평가수</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalReviews}</p>
+          <p className="text-sm text-gray-400 mt-0.5">총 평가수</p>
         </div>
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
               <Star size={20} />
             </div>
           </div>
-          <p className="text-[22px] font-bold text-gray-900">{avgTotal.toFixed(1)}</p>
-          <p className="text-[13px] text-gray-400 mt-0.5">전체 평균</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgTotal.toFixed(1)}</p>
+          <p className="text-sm text-gray-400 mt-0.5">전체 평균</p>
         </div>
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-500">
               <Star size={20} />
             </div>
           </div>
-          <p className="text-[22px] font-bold text-gray-900">{avgManner.toFixed(1)}</p>
-          <p className="text-[13px] text-gray-400 mt-0.5">평균 매너점수</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgManner.toFixed(1)}</p>
+          <p className="text-sm text-gray-400 mt-0.5">평균 매너점수</p>
         </div>
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Star size={20} />
             </div>
           </div>
-          <p className="text-[22px] font-bold text-gray-900">{avgSkill.toFixed(1)}</p>
-          <p className="text-[13px] text-gray-400 mt-0.5">평균 스킬점수</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgSkill.toFixed(1)}</p>
+          <p className="text-sm text-gray-400 mt-0.5">평균 스킬점수</p>
         </div>
       </div>
 
@@ -201,44 +201,44 @@ export default function AdminReviewsPage() {
       />
 
       {/* Table */}
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">매치</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">평가자</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">대상</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">매너점수</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">스킬점수</th>
-                <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase whitespace-nowrap">날짜</th>
+              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매치</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">평가자</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">대상</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매너점수</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">스킬점수</th>
+                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">날짜</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-5 py-3.5">
-                    <p className="text-[14px] font-medium text-gray-900 truncate max-w-[180px]">{r.matchTitle}</p>
+                    <p className="text-base font-medium text-gray-900 dark:text-white truncate max-w-[180px]">{r.matchTitle}</p>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[11px] font-bold text-blue-500">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-bold text-blue-500 dark:text-blue-400">
                         {r.reviewerName.charAt(0)}
                       </div>
-                      <span className="text-[13px] text-gray-700 whitespace-nowrap">{r.reviewerName}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{r.reviewerName}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-600">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300">
                         {r.targetName.charAt(0)}
                       </div>
-                      <span className="text-[13px] text-gray-700 whitespace-nowrap">{r.targetName}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{r.targetName}</span>
                     </div>
                   </td>
                   <td className="px-5 py-3.5">{renderStars(r.mannerScore)}</td>
                   <td className="px-5 py-3.5">{renderStars(r.skillScore)}</td>
-                  <td className="px-5 py-3.5 text-[13px] text-gray-600 whitespace-nowrap">{r.date}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{r.date}</td>
                 </tr>
               ))}
             </tbody>

@@ -4,8 +4,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { ChevronRight, Plus, Clock, ArrowRight } from 'lucide-react';
-import { sportLabel } from '@/lib/constants';
+import { ChevronRight, Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportImage, getTeamImage, getListingImage } from '@/lib/sport-image';
 import type { Match, SportTeam, Lesson, MarketplaceListing, TeamMatch } from '@/types/api';
@@ -16,9 +17,9 @@ const sportFilters = [
 ] as const;
 
 const banners = [
-  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches' },
-  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches' },
-  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary' },
+  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-emerald-900 dark:bg-emerald-950', iconBg: 'bg-emerald-700/50', iconColor: 'text-emerald-300' },
+  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-blue-900 dark:bg-blue-950', iconBg: 'bg-blue-700/50', iconColor: 'text-blue-300' },
+  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-amber-900 dark:bg-amber-950', iconBg: 'bg-amber-700/50', iconColor: 'text-amber-300' },
 ] as const;
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -71,10 +72,10 @@ export default function HomePage() {
       <section className="px-5 lg:px-0 pt-4 pb-1">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
               {isAuthenticated && user ? `${user.nickname}님` : 'TeamMeet'}
             </h1>
-            <p className="text-[13px] text-gray-500 mt-0.5">
+            <p className="text-sm text-gray-500 mt-0.5">
               {isAuthenticated
                 ? upcoming.length > 0 ? `다가오는 일정 ${upcoming.length}개` : '오늘 매치를 찾아보세요'
                 : '같이 운동할 사람을 찾아보세요'
@@ -82,12 +83,12 @@ export default function HomePage() {
             </p>
           </div>
           {isAuthenticated ? (
-            <Link href="/matches/new" className="flex items-center gap-1 rounded-xl bg-blue-500 px-3.5 py-2 text-[12px] font-bold text-white hover:bg-blue-600 transition-colors">
+            <Link href="/matches/new" className="flex items-center gap-1 rounded-xl bg-blue-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
               <Plus size={14} strokeWidth={2.5} />
               매치 만들기
             </Link>
           ) : (
-            <Link href="/login" className="rounded-xl bg-blue-500 px-4 py-2 text-[12px] font-bold text-white hover:bg-blue-600 transition-colors">
+            <Link href="/login" className="rounded-xl bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
               로그인
             </Link>
           )}
@@ -99,8 +100,8 @@ export default function HomePage() {
         <section className="mt-3 px-5 lg:px-0">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-bold text-gray-900 dark:text-white">다가오는 일정</h2>
-              <Link href="/my/matches" className="text-[11px] text-gray-500">전체 →</Link>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white">다가오는 일정</h2>
+              <Link href="/my/matches" className="text-xs text-gray-500 min-h-[44px] flex items-center">전체 →</Link>
             </div>
             <div className="space-y-2">
               {upcoming.map((m: Match) => {
@@ -109,14 +110,14 @@ export default function HomePage() {
                   <Link key={m.id} href={`/matches/${m.id}`}>
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
-                        <span className="text-[11px] font-bold text-blue-500">{d.getMonth()+1}/{d.getDate()}</span>
-                        <span className="text-[10px] text-gray-500">{weekdays[d.getDay()]}</span>
+                        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{d.getMonth()+1}/{d.getDate()}</span>
+                        <span className="text-2xs text-gray-500">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100 truncate">{m.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
-                        <p className="text-[11px] text-gray-500">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{m.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}</p>
+                        <p className="text-xs text-gray-500">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
                       </div>
-                      <span className={`shrink-0 text-[11px] font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-red-500' : 'text-gray-500'}`}>
+                      <span className={`shrink-0 text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-red-500' : 'text-gray-500'}`}>
                         {m.currentPlayers}/{m.maxPlayers}
                       </span>
                     </div>
@@ -129,12 +130,12 @@ export default function HomePage() {
                   <Link key={tm.id} href={`/team-matches/${tm.id}`}>
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
-                        <span className="text-[11px] font-bold text-blue-500">{d.getMonth()+1}/{d.getDate()}</span>
-                        <span className="text-[10px] text-gray-500">{weekdays[d.getDay()]}</span>
+                        <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{d.getMonth()+1}/{d.getDate()}</span>
+                        <span className="text-2xs text-gray-500">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-gray-900 dark:text-gray-100 truncate">{tm.title}</p>
-                        <p className="text-[11px] text-gray-500">{tm.startTime} · 팀 매치</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{tm.title}</p>
+                        <p className="text-xs text-gray-500">{tm.startTime} · 팀 매치</p>
                       </div>
                     </div>
                   </Link>
@@ -149,9 +150,9 @@ export default function HomePage() {
       {!isAuthenticated && (
         <section className="mt-3 px-5 lg:px-0">
           <div className="rounded-xl bg-gray-900 dark:bg-gray-800 p-5">
-            <p className="text-[16px] font-bold text-white">AI가 딱 맞는 상대를 찾아줘요</p>
-            <p className="text-[12px] text-gray-500 mt-1">11종목 · S~D 실력 등급 · 팀 매칭 · 용병 시스템</p>
-            <Link href="/login" className="inline-flex items-center gap-1 mt-3 rounded-lg bg-blue-500 px-4 py-2 text-[13px] font-bold text-white hover:bg-blue-600 transition-colors">
+            <p className="text-lg font-bold text-white">AI가 딱 맞는 상대를 찾아줘요</p>
+            <p className="text-xs text-gray-500 mt-1">실력에 맞는 상대, 5분이면 매칭 완료</p>
+            <Link href="/login" className="inline-flex items-center gap-1 mt-3 rounded-lg bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600 transition-colors">
               시작하기 <ArrowRight size={14} />
             </Link>
           </div>
@@ -161,30 +162,36 @@ export default function HomePage() {
       {/* 배너 (로그인 유저) */}
       {isAuthenticated && (
         <section className="mt-4 px-5 lg:px-0">
-          <div className="relative rounded-xl overflow-hidden h-[88px]" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
+          <div className="relative rounded-xl overflow-hidden h-[96px]" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
             {/* Crossfade layers */}
             {banners.map((banner, i) => {
+              const BannerIcon = banner.icon;
               return (
                 <Link key={i} href={banner.href}
                   className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${bannerIdx === i ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                   aria-hidden={bannerIdx !== i}
                   tabIndex={bannerIdx === i ? 0 : -1}
                 >
-                  <div className="h-full bg-gray-900 dark:bg-gray-800 px-5 py-4 flex items-center justify-between">
+                  <div className={`h-full ${banner.bg} px-5 py-4 flex items-center justify-between`}>
                     <div>
-                      <p className="text-[15px] font-bold text-white">{banner.title}</p>
-                      <p className="text-[12px] text-gray-400 mt-1">{banner.desc}</p>
+                      <p className="text-md font-bold text-white">{banner.title}</p>
+                      <p className="text-xs text-white/60 mt-1">{banner.desc}</p>
+                    </div>
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${banner.iconBg} shrink-0`}>
+                      <BannerIcon size={22} className={banner.iconColor} />
                     </div>
                   </div>
                 </Link>
               );
             })}
             {/* Indicator dots */}
-            <div className="absolute bottom-2.5 right-4 flex gap-1 z-20">
+            <div className="absolute bottom-0 right-2 flex gap-0 z-20">
               {banners.map((_, i) => (
                 <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
                   aria-label={`배너 ${i + 1}`}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
+                  className="relative flex items-center justify-center p-2.5">
+                  <span className={`block h-1.5 rounded-full transition-all duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
+                </button>
               ))}
             </div>
           </div>
@@ -196,9 +203,9 @@ export default function HomePage() {
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
             <button key={type} onClick={() => handleSportClick(type)}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`shrink-0 rounded-lg px-3 min-h-[44px] flex items-center text-sm font-medium transition-colors ${
                 activeSport === type
-                  ? 'bg-blue-500 text-white'
+                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
                   : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}>
               {type === 'all' ? '전체' : sportLabel[type]}
@@ -218,10 +225,13 @@ export default function HomePage() {
             {[1,2,3].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : filteredMatches.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-10 text-center">
-            <p className="text-[14px] text-gray-500">{activeSport === 'all' ? '매치가 없어요' : `${sportLabel[activeSport]} 매치가 없어요`}</p>
-            {activeSport !== 'all' && <button onClick={() => setActiveSport('all')} className="mt-1.5 text-[12px] text-blue-500">전체 보기</button>}
-          </div>
+          <EmptyState
+            icon={Calendar}
+            title="아직 매치가 없네요"
+            description="첫 매치를 만들어보는 건 어때요?"
+            size="sm"
+            secondaryAction={activeSport !== 'all' ? { label: '전체 보기', onClick: () => setActiveSport('all') } : undefined}
+          />
         ) : (
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2">
             {filteredMatches.slice(0, 6).map((m: Match) => <MatchCard key={m.id} match={m} />)}
@@ -236,18 +246,29 @@ export default function HomePage() {
           <section className="px-5 lg:px-0">
             <SectionHeader title="활동 중인 팀" href="/teams" showMore={teams.length > 3} />
             <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
-              {teams.map((t: SportTeam) => (
-                <Link key={t.id} href={`/teams/${t.id}`} className="shrink-0 w-[200px] lg:w-auto">
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors h-full">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate">{t.name}</p>
-                      {t.isRecruiting && <span className="text-[10px] font-medium text-blue-500 shrink-0 ml-1">모집중</span>}
+              {teams.map((t: SportTeam) => {
+                const accent = sportCardAccent[t.sportType];
+                return (
+                  <Link key={t.id} href={`/teams/${t.id}`} className="shrink-0 w-[200px] lg:w-auto">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className={`flex h-7 w-7 items-center justify-center rounded-full ${accent?.tint || 'bg-gray-100'} shrink-0`}>
+                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{t.name?.charAt(0)}</span>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{t.name}</p>
+                        </div>
+                        {t.isRecruiting && <span className="text-2xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-1.5 py-0.5 shrink-0 ml-1">모집중</span>}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>{sportLabel[t.sportType]}</span>
+                        <span>{t.memberCount}명</span>
+                      </p>
+                      {t.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.description}</p>}
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-1">{sportLabel[t.sportType]} · {t.memberCount}명</p>
-                    {t.description && <p className="text-[11px] text-gray-500 mt-1 line-clamp-1">{t.description}</p>}
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -257,15 +278,28 @@ export default function HomePage() {
           <section className="mt-6 px-5 lg:px-0">
             <SectionHeader title="추천 강좌" href="/lessons" showMore={lessons.length > 3} />
             <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 lg:grid lg:grid-cols-3 lg:gap-3">
-              {lessons.map((l: Lesson) => (
-                <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] lg:w-auto">
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors h-full">
-                    <p className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate">{l.title}</p>
-                    <p className="text-[11px] text-gray-500 mt-1">{sportLabel[l.sportType]} · {formatCurrency(l.fee)}</p>
-                    {l.coachName && <p className="text-[11px] text-gray-500 mt-0.5">코치 {l.coachName}</p>}
-                  </div>
-                </Link>
-              ))}
+              {lessons.map((l: Lesson) => {
+                const accent = sportCardAccent[l.sportType];
+                return (
+                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] lg:w-auto">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
+                      <div className="flex items-center justify-between">
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+                          {sportLabel[l.sportType]}
+                        </span>
+                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(l.fee)}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate mt-2">{l.title}</p>
+                      {l.coachName && (
+                        <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
+                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-2xs font-bold text-gray-500">{l.coachName.charAt(0)}</span>
+                          {l.coachName} 코치
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -277,13 +311,16 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
               {listings.map((item: MarketplaceListing) => (
                 <Link key={item.id} href={`/marketplace/${item.id}`}>
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors">
+                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                       <img src={getListingImage(item.imageUrls)} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
                     </div>
                     <div className="p-2.5">
-                      <p className="text-[12px] font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
-                      <p className="text-[13px] font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
+                      <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
+                      <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
+                      {item.listingType === 'rent' && (
+                        <span className="inline-block mt-1 text-2xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded px-1.5 py-0.5">대여</span>
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -302,11 +339,11 @@ function SectionHeader({ title, count, href, showMore = true }: { title: string;
   return (
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-baseline gap-2">
-        <h2 className="text-[15px] font-bold text-gray-900 dark:text-white">{title}</h2>
-        {count !== undefined && count > 0 && <span className="text-[12px] text-gray-500">{count}</span>}
+        <h2 className="text-md font-bold text-gray-900 dark:text-white">{title}</h2>
+        {count !== undefined && count > 0 && <span className="text-xs text-gray-500">{count}</span>}
       </div>
       {showMore && (
-        <Link href={href} className="text-[12px] text-gray-500 hover:text-gray-600 transition-colors flex items-center">
+        <Link href={href} className="text-xs text-gray-500 hover:text-gray-600 transition-colors flex items-center min-h-[44px]">
           더보기 <ChevronRight size={12} className="ml-0.5" />
         </Link>
       )}
@@ -322,28 +359,31 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors">
+      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지: 정사각형 고정 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
           {timeBadge && (
-            <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
+            <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
         </div>
         {/* 텍스트 */}
         <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
-          <p className="text-[14px] font-semibold text-gray-900 dark:text-gray-100 truncate">
+          <p className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
             {match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
           </p>
-          <p className="text-[11px] text-gray-500 mt-1">
-            {sportLabel[match.sportType]} · {formatMatchDate(match.matchDate)} {match.startTime}
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+              {sportLabel[match.sportType]}
+            </span>
+            <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
           </p>
-          {match.venue?.name && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}
+          {match.venue?.name && <p className="text-xs text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-[12px] font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
-            <span className="text-[11px] text-gray-500">{formatCurrency(match.fee)}</span>
+            <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
           </div>
         </div>
       </div>

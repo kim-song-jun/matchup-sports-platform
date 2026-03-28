@@ -64,9 +64,9 @@ export default function CreateTeamPage() {
           <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <Users size={28} />
           </div>
-          <h2 className="text-[22px] font-bold text-gray-900">팀을 만들어보세요</h2>
-          <p className="text-[14px] text-gray-500 mt-2">로그인하면 팀을 등록하고 팀원을 모집할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors">
+          <h2 className="text-2xl font-bold text-gray-900">팀을 만들어보세요</h2>
+          <p className="text-base text-gray-500 mt-2">로그인하면 팀을 등록하고 팀원을 모집할 수 있어요</p>
+          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
           </Link>
         </div>
@@ -81,11 +81,11 @@ export default function CreateTeamPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900">팀 등록</h1>
+        <h1 className="text-lg font-semibold text-gray-900">팀 등록</h1>
       </header>
 
       {/* Desktop breadcrumb */}
-      <div className="hidden lg:flex items-center gap-2 text-[13px] text-gray-500 mb-6">
+      <div className="hidden lg:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/teams" className="hover:text-gray-600 transition-colors">팀/클럽</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">팀 등록</span>
@@ -112,7 +112,7 @@ export default function CreateTeamPage() {
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-[13px] font-medium transition-all ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
@@ -175,10 +175,10 @@ export default function CreateTeamPage() {
                     : 'border-gray-100 hover:border-gray-200'
                 }`}
               >
-                <p className={`text-[14px] font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
+                <p className={`text-base font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
                   {g.label}
                 </p>
-                <p className="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
+                <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
               </button>
             ))}
           </div>
@@ -196,7 +196,7 @@ export default function CreateTeamPage() {
             placeholder="0"
             className="input-field"
           />
-          <p className="text-[12px] text-gray-500 mt-1">팀 내 선출 출신 선수 수 (0~10명)</p>
+          <p className="text-xs text-gray-500 mt-1">팀 내 선출 출신 선수 수 (0~10명)</p>
         </Field>
 
         {/* 유니폼 색상 */}
@@ -216,7 +216,7 @@ export default function CreateTeamPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, isRecruiting: true })}
-              className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                 form.isRecruiting
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
@@ -227,7 +227,7 @@ export default function CreateTeamPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, isRecruiting: false })}
-              className={`rounded-xl border-2 py-3 text-[14px] font-semibold transition-all ${
+              className={`rounded-xl border-2 py-3 text-base font-semibold transition-all ${
                 !form.isRecruiting
                   ? 'border-gray-800 bg-gray-50 text-gray-800'
                   : 'border-gray-100 text-gray-500 hover:border-gray-200'
@@ -253,11 +253,11 @@ export default function CreateTeamPage() {
         <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Globe size={16} className="text-gray-500" />
-            <h3 className="text-[14px] font-semibold text-gray-900">SNS 링크</h3>
+            <h3 className="text-base font-semibold text-gray-900">SNS 링크</h3>
           </div>
           <div className="space-y-3">
             <div>
-              <label htmlFor="team-instagram" className="block text-[12px] text-gray-500 mb-1">Instagram</label>
+              <label htmlFor="team-instagram" className="block text-xs text-gray-500 mb-1">Instagram</label>
               <input
                 id="team-instagram"
                 value={form.snsLinks.instagram}
@@ -267,7 +267,7 @@ export default function CreateTeamPage() {
               />
             </div>
             <div>
-              <label htmlFor="team-youtube" className="block text-[12px] text-gray-500 mb-1">YouTube</label>
+              <label htmlFor="team-youtube" className="block text-xs text-gray-500 mb-1">YouTube</label>
               <input
                 id="team-youtube"
                 value={form.snsLinks.youtube}
@@ -277,7 +277,7 @@ export default function CreateTeamPage() {
               />
             </div>
             <div>
-              <label htmlFor="team-kakaotalk" className="block text-[12px] text-gray-500 mb-1">카카오톡 오픈채팅</label>
+              <label htmlFor="team-kakaotalk" className="block text-xs text-gray-500 mb-1">카카오톡 오픈채팅</label>
               <input
                 id="team-kakaotalk"
                 value={form.snsLinks.kakaotalk}
@@ -293,7 +293,7 @@ export default function CreateTeamPage() {
         <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Video size={16} className="text-gray-500" />
-            <h3 className="text-[14px] font-semibold text-gray-900">홍보 영상 (Shorts)</h3>
+            <h3 className="text-base font-semibold text-gray-900">홍보 영상 (Shorts)</h3>
           </div>
           <input
             id="team-shortsUrl"
@@ -302,14 +302,14 @@ export default function CreateTeamPage() {
             placeholder="YouTube Shorts 또는 Instagram Reels URL"
             className="input-field"
           />
-          <p className="text-[12px] text-gray-500 mt-1.5">팀 활동을 보여주는 짧은 영상 링크를 등록하세요</p>
+          <p className="text-xs text-gray-500 mt-1.5">팀 활동을 보여주는 짧은 영상 링크를 등록하세요</p>
         </div>
 
         {/* 등록 버튼 */}
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-blue-500 py-3.5 text-[15px] font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mb-8"
+          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mb-8"
         >
           {isSubmitting ? '등록 중...' : '팀 등록하기'}
         </button>
@@ -340,7 +340,7 @@ export default function CreateTeamPage() {
 function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
   return (
     <div className="mb-5">
-      <label htmlFor={id} className="block text-[13px] font-semibold text-gray-700 mb-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1.5">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}

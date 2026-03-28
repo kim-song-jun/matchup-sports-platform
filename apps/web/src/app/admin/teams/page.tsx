@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Users, Plus, Pencil } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAdminTeams } from '@/hooks/use-api';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import type { SportTeam } from '@/types/api';
@@ -44,10 +45,10 @@ export default function AdminTeamsPage() {
     <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-gray-900">팀 관리</h1>
-          <p className="text-[14px] text-gray-400 mt-1">등록된 팀과 클럽을 관리하세요</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 관리</h1>
+          <p className="text-base text-gray-400 mt-1">등록된 팀과 클럽을 관리하세요</p>
         </div>
-        <Link href="/teams/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-[13px] font-bold text-white hover:bg-blue-600">
+        <Link href="/teams/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600">
           <Plus size={16} /> 팀 등록
         </Link>
       </div>
@@ -66,46 +67,46 @@ export default function AdminTeamsPage() {
         onDownload={handleDownload}
       />
 
-      <div className="rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">팀명</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">종목</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">인원</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">레벨</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">지역</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">모집</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">운영자</th>
-              <th className="px-5 py-3 text-[12px] font-medium text-gray-500 uppercase">관리</th>
+            <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">팀명</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">종목</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">인원</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">레벨</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">지역</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">모집</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">운영자</th>
+              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">관리</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
             {isLoading ? Array.from({length:2}).map((_,i) => (
-              <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td></tr>
+              <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" /></td></tr>
             )) : filtered.map((t: SportTeam) => (
-              <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 text-white text-[11px] font-black">{t.name.charAt(0)}</div>
-                    <p className="text-[14px] font-medium text-gray-900">{t.name}</p>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 dark:bg-gray-600 text-white text-xs font-black">{t.name.charAt(0)}</div>
+                    <p className="text-base font-medium text-gray-900 dark:text-white">{t.name}</p>
                   </div>
                 </td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{sportLabel[t.sportType] || t.sportType}</td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{t.memberCount}명</td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">Lv.{t.level}</td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{t.city} {t.district}</td>
+                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{sportLabel[t.sportType] || t.sportType}</td>
+                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.memberCount}명</td>
+                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">Lv.{t.level}</td>
+                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.city} {t.district}</td>
                 <td className="px-5 py-3.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.isRecruiting ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.isRecruiting ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                     {t.isRecruiting ? '모집중' : '마감'}
                   </span>
                 </td>
-                <td className="px-5 py-3.5 text-[13px] text-gray-600">{t.owner?.nickname}</td>
+                <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.owner?.nickname}</td>
                 <td className="px-5 py-3.5">
                   <Link
                     href={`/teams/${t.id}/edit`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 hover:text-blue-500 transition-colors"
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-blue-500 transition-colors"
                   >
                     <Pencil size={12} />
                     수정
@@ -115,9 +116,13 @@ export default function AdminTeamsPage() {
             ))}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center">
-                  <Users size={24} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-[14px] text-gray-400">아직 등록된 팀이 없어요</p>
+                <td colSpan={8}>
+                  <EmptyState
+                    icon={Users}
+                    title="아직 등록된 팀이 없어요"
+                    description="팀이 등록되면 여기에 표시돼요"
+                    size="sm"
+                  />
                 </td>
               </tr>
             )}

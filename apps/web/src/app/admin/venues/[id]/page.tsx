@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -177,32 +177,39 @@ export default function AdminVenueEditPage() {
     }
   };
 
+  useEffect(() => {
+    if (!showDeleteModal) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowDeleteModal(false); };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showDeleteModal]);
+
   const inputClass =
-    'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white transition-all';
-  const labelClass = 'block text-[13px] font-semibold text-gray-700 mb-1.5';
+    'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-all';
+  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
 
   return (
     <div className="animate-fade-in max-w-2xl">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-gray-400 mb-6">
-        <Link href="/admin/venues" className="hover:text-gray-600 transition-colors">시설 관리</Link>
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+        <Link href="/admin/venues" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">시설 관리</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">시설 수정</span>
+        <span className="text-gray-700 dark:text-gray-300">시설 수정</span>
       </div>
 
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
             <Building2 size={20} />
           </div>
           <div>
-            <h1 className="text-[24px] font-bold text-gray-900">시설 수정</h1>
-            <p className="text-[13px] text-gray-400">ID: {venueId}</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">시설 수정</h1>
+            <p className="text-sm text-gray-400">ID: {venueId}</p>
           </div>
         </div>
         <button
           onClick={() => setShowDeleteModal(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600 hover:bg-red-100 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
         >
           <Trash2 size={14} />
           삭제
@@ -211,17 +218,17 @@ export default function AdminVenueEditPage() {
 
       <div className="space-y-5">
         {/* Basic info */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">기본 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h3>
 
           <div>
-            <label className={labelClass}>시설명</label>
-            <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
+            <label htmlFor="venue-name" className={labelClass}>시설명</label>
+            <input id="venue-name" type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
           </div>
 
           <div>
-            <label className={labelClass}>시설 유형</label>
-            <select value={form.type} onChange={(e) => updateField('type', e.target.value)} className={inputClass}>
+            <label htmlFor="venue-type" className={labelClass}>시설 유형</label>
+            <select id="venue-type" value={form.type} onChange={(e) => updateField('type', e.target.value)} className={inputClass}>
               <option value="">유형 선택</option>
               {venueTypes.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -239,10 +246,10 @@ export default function AdminVenueEditPage() {
                     key={s.value}
                     type="button"
                     onClick={() => toggleSport(s.value)}
-                    className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
                       selected
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-gray-900 dark:bg-gray-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
                     {s.label}
@@ -253,8 +260,9 @@ export default function AdminVenueEditPage() {
           </div>
 
           <div>
-            <label className={labelClass}>설명</label>
+            <label htmlFor="venue-description" className={labelClass}>설명</label>
             <textarea
+              id="venue-description"
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               placeholder="시설의 특징, 편의시설 등을 소개해주세요"
@@ -265,39 +273,40 @@ export default function AdminVenueEditPage() {
         </div>
 
         {/* Location */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">위치 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">위치 정보</h3>
 
           <div>
-            <label className={labelClass}>주소</label>
-            <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
+            <label htmlFor="venue-address" className={labelClass}>주소</label>
+            <input id="venue-address" type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>시/도</label>
-              <input type="text" value={form.city} onChange={(e) => updateField('city', e.target.value)} placeholder="서울" className={inputClass} />
+              <label htmlFor="venue-city" className={labelClass}>시/도</label>
+              <input id="venue-city" type="text" value={form.city} onChange={(e) => updateField('city', e.target.value)} placeholder="서울" className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>구/군</label>
-              <input type="text" value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="강남구" className={inputClass} />
+              <label htmlFor="venue-district" className={labelClass}>구/군</label>
+              <input id="venue-district" type="text" value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="강남구" className={inputClass} />
             </div>
           </div>
 
           <div>
-            <label className={labelClass}>전화번호</label>
-            <input type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="02-1234-5678" className={inputClass} />
+            <label htmlFor="venue-phone" className={labelClass}>전화번호</label>
+            <input id="venue-phone" type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="02-1234-5678" className={inputClass} />
           </div>
         </div>
 
         {/* Facilities & Price */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">시설 & 요금</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">시설 & 요금</h3>
 
           <div>
-            <label className={labelClass}>부대시설</label>
+            <label htmlFor="venue-facility" className={labelClass}>부대시설</label>
             <div className="flex gap-2">
               <input
+                id="venue-facility"
                 type="text"
                 value={facilityInput}
                 onChange={(e) => setFacilityInput(e.target.value)}
@@ -308,7 +317,7 @@ export default function AdminVenueEditPage() {
               <button
                 type="button"
                 onClick={addFacility}
-                className="shrink-0 flex items-center justify-center rounded-xl bg-gray-900 px-3 text-white hover:bg-gray-800 transition-colors"
+                className="shrink-0 flex items-center justify-center rounded-xl bg-gray-900 dark:bg-gray-600 px-3 text-white hover:bg-gray-800 dark:hover:bg-gray-500 transition-colors"
               >
                 <Plus size={18} />
               </button>
@@ -316,7 +325,7 @@ export default function AdminVenueEditPage() {
             {form.facilities.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {form.facilities.map((f) => (
-                  <span key={f} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-[12px] font-medium text-blue-600">
+                  <span key={f} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                     {f}
                     <button type="button" onClick={() => removeFacility(f)} className="text-blue-400 hover:text-blue-600">
                       <X size={12} />
@@ -328,14 +337,14 @@ export default function AdminVenueEditPage() {
           </div>
 
           <div>
-            <label className={labelClass}>시간당 요금 (원)</label>
-            <input type="number" value={form.pricePerHour} onChange={(e) => updateField('pricePerHour', e.target.value)} placeholder="50000" className={inputClass} />
+            <label htmlFor="venue-price" className={labelClass}>시간당 요금 (원)</label>
+            <input id="venue-price" type="number" value={form.pricePerHour} onChange={(e) => updateField('pricePerHour', e.target.value)} placeholder="50000" className={inputClass} />
           </div>
         </div>
 
         {/* Operating hours */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">운영 시간</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>
             <label className={labelClass}>평일</label>
@@ -360,14 +369,14 @@ export default function AdminVenueEditPage() {
         <div className="flex items-center gap-3 pt-2">
           <Link
             href="/admin/venues"
-            className="rounded-xl border border-gray-200 px-6 py-3 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            className="rounded-xl border border-gray-200 dark:border-gray-700 px-6 py-3 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             취소
           </Link>
           <button
             onClick={handleSave}
             disabled={saving || !form.name}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold text-white transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold text-white transition-all ${
               saving || !form.name
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.98]'
@@ -393,7 +402,7 @@ export default function AdminVenueEditPage() {
         </div>
 
         {saved && (
-          <p className="text-[13px] text-green-500 text-center">시설 정보가 성공적으로 저장되었습니다.</p>
+          <p className="text-sm text-green-500 text-center">시설 정보가 성공적으로 저장되었습니다.</p>
         )}
       </div>
 
@@ -401,32 +410,32 @@ export default function AdminVenueEditPage() {
 
       {/* Delete confirmation modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 mx-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowDeleteModal(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/30">
                 <AlertTriangle size={20} className="text-red-500" />
               </div>
               <div>
-                <h3 className="text-[16px] font-bold text-gray-900">시설 삭제</h3>
-                <p className="text-[13px] text-gray-400">이 작업은 되돌릴 수 없습니다</p>
+                <h3 id="delete-modal-title" className="text-lg font-bold text-gray-900 dark:text-white">시설 삭제</h3>
+                <p className="text-sm text-gray-400">이 작업은 되돌릴 수 없습니다</p>
               </div>
             </div>
-            <p className="text-[14px] text-gray-600 mb-6">
-              <span className="font-semibold text-gray-900">{form.name}</span> 시설을 삭제할까요?
+            <p className="text-base text-gray-600 dark:text-gray-300 mb-6">
+              <span className="font-semibold text-gray-900 dark:text-white">{form.name}</span> 시설을 삭제할까요?
               관련된 예약과 리뷰 데이터도 함께 삭제됩니다.
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 돌아가기
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-[14px] font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-2.5 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50"
               >
                 {deleting ? (
                   <>

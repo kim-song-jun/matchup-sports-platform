@@ -55,7 +55,7 @@ function StarRating({ rating }: { rating: number }) {
         <Star
           key={i}
           size={14}
-          className={i <= rating ? 'text-amber-400' : 'text-gray-200'}
+          className={i <= rating ? 'text-amber-400' : 'text-gray-200 dark:text-gray-600'}
           fill={i <= rating ? 'currentColor' : 'none'}
         />
       ))}
@@ -70,8 +70,8 @@ export default function ReviewsReceivedPage() {
   if (!isAuthenticated) {
     return (
       <div className="px-5 lg:px-0 pt-[var(--safe-area-top)] lg:pt-0 text-center py-20">
-        <p className="text-[15px] font-medium text-gray-700">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-[14px] font-bold text-white">로그인</Link>
+        <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
+        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
       </div>
     );
   }
@@ -84,37 +84,37 @@ export default function ReviewsReceivedPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] lg:pt-0 animate-fade-in">
-      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="lg:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900">내가 받은 평가</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h1>
       </header>
       <div className="hidden lg:block mb-6 px-5 lg:px-0 pt-4">
-        <h2 className="text-[22px] font-bold text-gray-900">내가 받은 평가</h2>
-        <p className="text-[14px] text-gray-500 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h2>
+        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
       </div>
 
       <div className="px-5 lg:px-0 pb-8">
         {/* Summary */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 mb-4">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <div className="flex items-center gap-6">
             <div className="text-center">
-              <p className="text-[36px] font-black text-gray-900">{avgScore.toFixed(1)}</p>
+              <p className="text-4xl font-black text-gray-900 dark:text-white">{avgScore.toFixed(1)}</p>
               <StarRating rating={Math.round(avgScore)} />
-              <p className="text-[12px] text-gray-500 mt-1">{mockReviewsReceived.length}개 평가</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{mockReviewsReceived.length}개 평가</p>
             </div>
             <div className="flex-1 space-y-1.5">
               {ratingDistribution.map((d) => (
                 <div key={d.rating} className="flex items-center gap-2">
-                  <span className="text-[12px] text-gray-500 w-3">{d.rating}</span>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 w-3">{d.rating}</span>
+                  <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-amber-400 rounded-full"
                       style={{ width: `${(d.count / mockReviewsReceived.length) * 100}%` }}
                     />
                   </div>
-                  <span className="text-[12px] text-gray-500 w-4 text-right">{d.count}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 w-4 text-right">{d.count}</span>
                 </div>
               ))}
             </div>
@@ -124,21 +124,21 @@ export default function ReviewsReceivedPage() {
         {/* Review List */}
         <div className="space-y-3">
           {mockReviewsReceived.map((review) => (
-            <div key={review.id} className="rounded-2xl bg-white border border-gray-100 p-4">
+            <div key={review.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 shrink-0">
-                  <User size={18} className="text-gray-500" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 shrink-0">
+                  <User size={18} className="text-gray-500 dark:text-gray-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-[14px] font-semibold text-gray-900">{review.reviewerName}</span>
-                    <span className="text-[12px] text-gray-500">{review.date}</span>
+                    <span className="text-base font-semibold text-gray-900 dark:text-white">{review.reviewerName}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{review.date}</span>
                   </div>
                   <div className="mt-0.5">
                     <StarRating rating={review.rating} />
                   </div>
-                  <p className="text-[14px] text-gray-700 mt-2">{review.comment}</p>
-                  <p className="text-[12px] text-gray-500 mt-1.5">{review.matchTitle}</p>
+                  <p className="text-base text-gray-700 dark:text-gray-300 mt-2">{review.comment}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{review.matchTitle}</p>
                 </div>
               </div>
             </div>

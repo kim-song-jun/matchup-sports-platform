@@ -5,6 +5,8 @@ import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock, RotateCcw, Wallet, 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePayments } from '@/hooks/use-api';
+import { EmptyState } from '@/components/ui/empty-state';
+import { formatAmount } from '@/lib/utils';
 
 const tabs = [
   { id: 'all', label: '전체' },
@@ -90,10 +92,6 @@ const mockPayments = [
   },
 ];
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
-
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -139,11 +137,11 @@ export default function PaymentsPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">결제 내역</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
       </header>
       <div className="hidden lg:block px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">결제 내역</h1>
-        <p className="text-[13px] text-gray-500 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
+        <p className="text-sm text-gray-500 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
       </div>
 
       <div className="px-5 lg:px-0">
@@ -153,14 +151,14 @@ export default function PaymentsPage() {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
           />
-          <span className="text-[13px] text-gray-500">~</span>
+          <span className="text-sm text-gray-500">~</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
           />
         </div>
 
@@ -170,9 +168,9 @@ export default function PaymentsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all ${
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                 activeTab === tab.id
-                  ? 'bg-white text-gray-900 shadow-sm'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -183,11 +181,11 @@ export default function PaymentsPage() {
 
         {/* Payment List */}
         {filtered.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 p-16 text-center">
-            <CreditCard size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-[15px] font-medium text-gray-600">결제 내역이 없어요</p>
-            <p className="text-[13px] text-gray-500 mt-1">매치에 참가하면 여기서 확인할 수 있어요</p>
-          </div>
+          <EmptyState
+            icon={CreditCard}
+            title="아직 결제 내역이 없어요"
+            description="매치에 참가하면 여기서 확인할 수 있어요"
+          />
         ) : (
           <div className="space-y-3 stagger-children">
             {filtered.map((p) => {
@@ -201,7 +199,7 @@ export default function PaymentsPage() {
                 <Link
                   key={p.id}
                   href={`/payments/${p.id}`}
-                  className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors"
+                  className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
@@ -210,23 +208,23 @@ export default function PaymentsPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-[14px] font-semibold text-gray-900 truncate">{p.name}</p>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${s.color}`}>
+                          <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{p.name}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold ${s.color}`}>
                             {s.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-[12px] text-gray-500">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <MethodIcon size={12} />
                             {m.label}
                           </span>
-                          <span>·</span>
+                          <span aria-hidden="true">·</span>
                           <span>{formatDate(p.createdAt)}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className="text-[15px] font-bold text-gray-900">{formatCurrency(p.amount)}</span>
+                      <span className="text-md font-bold text-gray-900 dark:text-white">{formatAmount(p.amount)}</span>
                       <ChevronRight size={16} className="text-gray-300" />
                     </div>
                   </div>

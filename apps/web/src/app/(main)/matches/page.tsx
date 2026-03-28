@@ -6,7 +6,8 @@ import { Search, SlidersHorizontal } from 'lucide-react';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
-import { sportLabel, levelLabel } from '@/lib/constants';
+import { EmptyState } from '@/components/ui/empty-state';
+import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Match } from '@/types/api';
@@ -29,29 +30,32 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-[0.98] transition-colors">
+      <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
           {timeBadge && (
-            <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
+            <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
         </div>
         {/* 텍스트 */}
         <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
-          <h3 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100 truncate">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
             {match.title.replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim()}
           </h3>
-          <p className="text-[11px] text-gray-500 mt-1">
-            {sportLabel[match.sportType]} · {formatMatchDate(match.matchDate)} {match.startTime}
+          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded px-1.5 py-0.5 text-2xs font-semibold`}>
+              {sportLabel[match.sportType]}
+            </span>
+            <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
           </p>
-          {match.venue?.name && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}
+          {match.venue?.name && <p className="text-xs text-gray-500 mt-0.5 truncate">{match.venue.name}</p>}
           <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-[12px] font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+            <span className={`text-xs font-semibold ${isAlmostFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
-            <span className="text-[11px] text-gray-500">{formatCurrency(match.fee)}</span>
-            {isAlmostFull && <span className="text-[10px] font-medium text-red-500">마감임박</span>}
+            <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
+            {isAlmostFull && <span className="text-2xs font-medium text-red-500">마감임박</span>}
           </div>
         </div>
       </div>
@@ -92,7 +96,7 @@ export default function MatchesPage() {
   return (
     <div className="pt-[var(--safe-area-top)]">
       <header className="px-5 lg:px-0 pt-4 pb-3">
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white">매치 찾기</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 찾기</h1>
       </header>
 
       {/* 검색바 */}
@@ -102,7 +106,7 @@ export default function MatchesPage() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
             <input type="text" placeholder="지역, 시설명 검색" value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-[14px] text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-colors" />
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-colors" />
           </div>
           <button onClick={() => setShowFilters(!showFilters)} aria-label="필터 열기"
             className={`flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${showFilters ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 active:bg-gray-100'}`}>
@@ -115,7 +119,7 @@ export default function MatchesPage() {
       <div className="px-5 lg:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === f.key
                 ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                 : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -130,16 +134,16 @@ export default function MatchesPage() {
         <div className="px-5 lg:px-0 mb-4">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
             <div>
-              <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">날짜</label>
+              <label className="text-xs font-medium text-gray-500 mb-1.5 block">날짜</label>
               <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[14px] text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors" />
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-base text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors" />
             </div>
             <div>
-              <label className="text-[12px] font-medium text-gray-500 mb-1.5 block">정렬</label>
+              <label className="text-xs font-medium text-gray-500 mb-1.5 block">정렬</label>
               <div className="flex gap-2">
                 {(['latest', 'deadline'] as const).map((s) => (
                   <button key={s} onClick={() => setSortBy(s)}
-                    className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${sortBy === s ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${sortBy === s ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
                     {s === 'latest' ? '최신순' : '마감임박'}
                   </button>
                 ))}
@@ -151,7 +155,7 @@ export default function MatchesPage() {
 
       {!isLoading && matches.length > 0 && (
         <div className="px-5 lg:px-0 mb-3">
-          <p className="text-[13px] text-gray-500">{matches.length}개의 매치</p>
+          <p className="text-sm text-gray-500">{matches.length}개의 매치</p>
         </div>
       )}
 
@@ -166,12 +170,11 @@ export default function MatchesPage() {
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
         ) : matches.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 py-14 text-center">
-            <p className="text-[14px] text-gray-500">
-              {activeSport ? `${sportLabel[activeSport]} 매치가 없어요` : '매치가 없어요'}
-            </p>
-            <p className="text-[13px] text-gray-500 mt-1">직접 매치를 만들어보세요</p>
-          </div>
+          <EmptyState
+            icon={Search}
+            title="찾으시는 매치가 없어요"
+            description="다른 종목이나 날짜로 다시 찾아볼까요?"
+          />
         ) : (
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 stagger-children">
             {matches.map((match: Match) => (

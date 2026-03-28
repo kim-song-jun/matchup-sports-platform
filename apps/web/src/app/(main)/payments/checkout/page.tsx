@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { formatAmount } from '@/lib/utils';
 
 const paymentMethods = [
   { id: 'card', label: '신용/체크카드', icon: CreditCard, description: '모든 카드 가능' },
@@ -31,10 +32,6 @@ const defaultOrder = {
   originalPrice: 15000,
   couponDiscount: 500,
 };
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ko-KR').format(n) + '원';
-}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -125,9 +122,9 @@ export default function CheckoutPage() {
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle size={18} className="text-green-400" />
-            <span className="text-[14px] font-medium text-white">결제가 완료되었습니다</span>
+            <span className="text-base font-medium text-white">결제가 완료되었습니다</span>
           </div>
-          <span className="text-[12px] text-gray-500">{completedOrderName} - {formatCurrency(completedAmount)}</span>
+          <span className="text-xs text-gray-500">{completedOrderName} - {formatAmount(completedAmount)}</span>
         </div>
       )}
 
@@ -136,35 +133,35 @@ export default function CheckoutPage() {
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-[16px] font-semibold text-gray-900 dark:text-white">결제하기</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제하기</h1>
       </header>
       <div className="hidden lg:block mb-6">
-        <h2 className="text-[24px] font-bold text-gray-900 dark:text-white">결제하기</h2>
-        <p className="text-[14px] text-gray-500 mt-1">주문 내용을 확인하고 결제를 진행해 주세요</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제하기</h2>
+        <p className="text-base text-gray-500 mt-1">주문 내용을 확인하고 결제를 진행해 주세요</p>
       </div>
 
       <div className="px-5 lg:px-0 max-w-lg mx-auto lg:mx-0 space-y-4 mt-4 lg:mt-0">
         {/* Order Summary Card */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">주문 정보</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">주문 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
                 <Tag size={20} className="text-blue-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-500 mb-1">
+                <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-500 mb-1">
                   {order.type}
                 </span>
-                <p className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">{order.name}</p>
+                <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{order.name}</p>
               </div>
             </div>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5 space-y-2">
-              <div className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <Calendar size={14} className="text-gray-500 shrink-0" />
                 {order.date}
               </div>
-              <div className="flex items-center gap-2 text-[13px] text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <MapPin size={14} className="text-gray-500 shrink-0" />
                 {order.venue}
               </div>
@@ -174,7 +171,7 @@ export default function CheckoutPage() {
 
         {/* Payment Method */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="space-y-2">
             {paymentMethods.map((method) => {
               const Icon = method.icon;
@@ -198,13 +195,13 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex-1">
                     <p
-                      className={`text-[14px] font-semibold ${
+                      className={`text-base font-semibold ${
                         isSelected ? 'text-blue-600' : 'text-gray-900 dark:text-gray-100'
                       }`}
                     >
                       {method.label}
                     </p>
-                    <p className="text-[12px] text-gray-500">{method.description}</p>
+                    <p className="text-xs text-gray-500">{method.description}</p>
                   </div>
                   <div
                     className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
@@ -212,7 +209,7 @@ export default function CheckoutPage() {
                     }`}
                   >
                     {isSelected && (
-                      <div className="h-2 w-2 rounded-full bg-white" />
+                      <div className="h-2 w-2 rounded-full bg-white dark:bg-gray-800" />
                     )}
                   </div>
                 </button>
@@ -223,18 +220,18 @@ export default function CheckoutPage() {
 
         {/* Coupon */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">쿠폰</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">쿠폰</h3>
           <div className="flex gap-2">
             <input
               type="text"
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value)}
               placeholder="쿠폰 코드를 입력하세요"
-              className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-[14px] text-gray-900 dark:text-gray-100 bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-gray-100 bg-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
             />
             <button
               onClick={handleApplyCoupon}
-              className="shrink-0 rounded-xl bg-blue-500 px-5 py-3 text-[14px] font-semibold text-white hover:bg-blue-600 transition-colors"
+              className="shrink-0 rounded-xl bg-blue-500 px-5 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
             >
               적용
             </button>
@@ -242,8 +239,8 @@ export default function CheckoutPage() {
           {couponApplied && (
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
               <CheckCircle size={14} className="text-green-500" />
-              <span className="text-[13px] text-green-600 font-medium">
-                신규 가입 쿠폰 ({formatCurrency(order.couponDiscount)} 할인 적용됨)
+              <span className="text-sm text-green-600 font-medium">
+                신규 가입 쿠폰 ({formatAmount(order.couponDiscount)} 할인 적용됨)
               </span>
             </div>
           )}
@@ -251,21 +248,21 @@ export default function CheckoutPage() {
 
         {/* Price Breakdown */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[14px] text-gray-500">원가</span>
-              <span className="text-[14px] text-gray-700 dark:text-gray-300">{formatCurrency(order.originalPrice)}</span>
+              <span className="text-base text-gray-500">원가</span>
+              <span className="text-base text-gray-700 dark:text-gray-300">{formatAmount(order.originalPrice)}</span>
             </div>
             {couponApplied && (
               <div className="flex items-center justify-between">
-                <span className="text-[14px] text-gray-500">쿠폰 할인</span>
-                <span className="text-[14px] text-red-500 font-medium">-{formatCurrency(discount)}</span>
+                <span className="text-base text-gray-500">쿠폰 할인</span>
+                <span className="text-base text-red-500 font-medium">-{formatAmount(discount)}</span>
               </div>
             )}
             <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
-              <span className="text-[15px] font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
-              <span className="text-[20px] font-bold text-blue-500">{formatCurrency(finalPrice)}</span>
+              <span className="text-md font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
+              <span className="text-xl font-bold text-blue-500">{formatAmount(finalPrice)}</span>
             </div>
           </div>
         </div>
@@ -283,10 +280,10 @@ export default function CheckoutPage() {
             >
               {agreedToTerms && <CheckCircle size={12} className="text-white" />}
             </div>
-            <span className="text-[14px] text-gray-700 dark:text-gray-300">결제 및 취소 규정에 동의합니다</span>
+            <span className="text-base text-gray-700 dark:text-gray-300">결제 및 취소 규정에 동의합니다</span>
           </button>
           <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
-            <p className="text-[12px] text-gray-500 leading-relaxed">
+            <p className="text-xs text-gray-500 leading-relaxed">
               경기 시작 24시간 전: 전액 환불 / 1~24시간 전: 50% 환불 / 1시간 이내: 환불 불가.
               결제 완료 시 TeamMeet 이용약관 및 결제 취소 규정에 동의하는 것으로 간주합니다.
             </p>
@@ -297,13 +294,13 @@ export default function CheckoutPage() {
       {/* Fixed Bottom CTA */}
       <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] lg:bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 px-5 py-4 lg:relative lg:border-0 lg:px-0 lg:mt-4 lg:pb-4 max-w-lg mx-auto lg:mx-0">
         <div className="flex items-center justify-between mb-3 lg:hidden">
-          <span className="text-[13px] text-gray-500">최종 결제 금액</span>
-          <span className="text-[18px] font-bold text-blue-500">{formatCurrency(finalPrice)}</span>
+          <span className="text-sm text-gray-500">최종 결제 금액</span>
+          <span className="text-xl font-bold text-blue-500">{formatAmount(finalPrice)}</span>
         </div>
         <button
           onClick={handlePayment}
           disabled={!agreedToTerms || isProcessing}
-          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-[16px] font-bold transition-all ${
+          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-all ${
             agreedToTerms && !isProcessing
               ? 'bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98]'
               : 'bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
@@ -317,7 +314,7 @@ export default function CheckoutPage() {
           ) : (
             <>
               <CreditCard size={20} />
-              {formatCurrency(finalPrice)} 결제하기
+              {formatAmount(finalPrice)} 결제하기
             </>
           )}
         </button>

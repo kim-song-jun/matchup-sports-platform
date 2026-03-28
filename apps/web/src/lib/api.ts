@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useAuthStore } from '@/stores/auth-store';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || '/api/v1';
@@ -43,9 +44,10 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
       } catch {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        // Clear both localStorage and Zustand auth state
+        useAuthStore.getState().logout();
         window.location.href = '/login';
+        return Promise.reject(error);
       }
     }
 

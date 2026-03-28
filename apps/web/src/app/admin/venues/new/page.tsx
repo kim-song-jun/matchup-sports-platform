@@ -100,24 +100,24 @@ export default function AdminVenueNewPage() {
     }
   };
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white transition-all';
-  const labelClass = 'block text-[13px] font-semibold text-gray-700 mb-1.5';
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-all';
+  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
 
   return (
     <div className="animate-fade-in max-w-2xl">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-gray-400 mb-6">
-        <Link href="/admin/venues" className="hover:text-gray-600 transition-colors">시설 관리</Link>
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+        <Link href="/admin/venues" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">시설 관리</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">시설 등록</span>
+        <span className="text-gray-700 dark:text-gray-300">시설 등록</span>
       </div>
 
-      <h1 className="text-[24px] font-bold text-gray-900 mb-6">시설 등록</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">시설 등록</h1>
 
       <div className="space-y-5">
         {/* Name */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">기본 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h3>
 
           <div>
             <label className={labelClass}>시설명</label>
@@ -144,10 +144,10 @@ export default function AdminVenueNewPage() {
                     key={s.value}
                     type="button"
                     onClick={() => toggleSport(s.value)}
-                    className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all ${
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
                       selected
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-gray-900 dark:bg-gray-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
                     {s.label}
@@ -170,8 +170,8 @@ export default function AdminVenueNewPage() {
         </div>
 
         {/* Location */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">위치 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">위치 정보</h3>
 
           <div>
             <label className={labelClass}>주소</label>
@@ -196,8 +196,8 @@ export default function AdminVenueNewPage() {
         </div>
 
         {/* Facilities & Price */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">시설 & 요금</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">시설 & 요금</h3>
 
           <div>
             <label className={labelClass}>부대시설</label>
@@ -213,7 +213,7 @@ export default function AdminVenueNewPage() {
               <button
                 type="button"
                 onClick={addFacility}
-                className="shrink-0 flex items-center justify-center rounded-xl bg-gray-900 px-3 text-white hover:bg-gray-800 transition-colors"
+                className="shrink-0 flex items-center justify-center rounded-xl bg-gray-900 dark:bg-gray-600 px-3 text-white hover:bg-gray-800 dark:hover:bg-gray-500 transition-colors"
               >
                 <Plus size={18} />
               </button>
@@ -221,7 +221,7 @@ export default function AdminVenueNewPage() {
             {form.facilities.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {form.facilities.map((f) => (
-                  <span key={f} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-[12px] font-medium text-blue-600">
+                  <span key={f} className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                     {f}
                     <button type="button" onClick={() => removeFacility(f)} className="text-blue-400 hover:text-blue-600">
                       <X size={12} />
@@ -239,8 +239,8 @@ export default function AdminVenueNewPage() {
         </div>
 
         {/* Operating hours */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 space-y-4">
-          <h3 className="text-[15px] font-bold text-gray-900">운영 시간</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>
             <label className={labelClass}>평일</label>
@@ -265,14 +265,14 @@ export default function AdminVenueNewPage() {
         <div className="flex items-center gap-3 pt-2">
           <Link
             href="/admin/venues"
-            className="rounded-xl border border-gray-200 px-6 py-3 text-[14px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            className="rounded-xl border border-gray-200 dark:border-gray-700 px-6 py-3 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             취소
           </Link>
           <button
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending || !form.name}
-            className={`flex-1 rounded-xl py-3 text-[14px] font-semibold text-white transition-all ${
+            className={`flex-1 rounded-xl py-3 text-base font-semibold text-white transition-all ${
               mutation.isPending || !form.name
                 ? 'bg-gray-300 cursor-not-allowed'
                 : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.98]'
@@ -290,7 +290,7 @@ export default function AdminVenueNewPage() {
         </div>
 
         {mutation.isError && (
-          <p className="text-[13px] text-red-500 text-center">시설 등록에 실패했습니다. 다시 시도해주세요.</p>
+          <p className="text-sm text-red-500 text-center">시설 등록에 실패했습니다. 다시 시도해주세요.</p>
         )}
       </div>
 

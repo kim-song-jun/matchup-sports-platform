@@ -39,7 +39,8 @@
     "matching": "Matching",
     "explore": "Explore",
     "communication": "Social",
-    "findMatch": "Find Match"
+    "findMatch": "Find Match",
+    "createMatch": "Create Match"
   },
   "sports": {
     "all": "All",

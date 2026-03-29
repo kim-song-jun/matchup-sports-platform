@@ -61,13 +61,6 @@ export default function AdminDashboardPage() {
 }
 
 
-const metricBorderColor = {
-  blue: 'border-t-blue-400',
-  green: 'border-t-green-400',
-  amber: 'border-t-amber-400',
-  purple: 'border-t-purple-400',
-} as const;
-
 const metricIconBg = {
   blue: 'bg-blue-50 dark:bg-blue-900/30',
   green: 'bg-green-50 dark:bg-green-900/30',
@@ -88,10 +81,10 @@ function MetricCard({ label, value, sub, loading, color = 'blue', icon: Icon }: 
   icon?: LucideIcon;
 }) {
   return (
-    <div className={`relative rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 border-t-2 ${metricBorderColor[color]} p-5`}>
+    <div className="relative rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
       {Icon && (
-        <div className={`absolute top-3 right-3 h-8 w-8 rounded-lg ${metricIconBg[color]} flex items-center justify-center`}>
-          <Icon size={16} className={metricIconColor[color]} />
+        <div className={`absolute top-3 right-3 h-10 w-10 rounded-xl ${metricIconBg[color]} flex items-center justify-center`}>
+          <Icon size={18} className={metricIconColor[color]} />
         </div>
       )}
       <p className="text-xs text-gray-400 dark:text-gray-400 mb-1">{label}</p>

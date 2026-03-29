@@ -69,7 +69,7 @@ export function Sidebar() {
         <Link href="/matches/new"
           className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-blue-500 px-4 py-3 text-base font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
           <Plus size={16} strokeWidth={2.5} />
-          {t('findMatch')}
+          {t('createMatch')}
         </Link>
       </div>
 

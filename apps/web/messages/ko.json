@@ -39,7 +39,8 @@
     "matching": "매칭",
     "explore": "탐색",
     "communication": "소통",
-    "findMatch": "매치 찾기"
+    "findMatch": "매치 찾기",
+    "createMatch": "매치 만들기"
   },
   "sports": {
     "all": "전체",

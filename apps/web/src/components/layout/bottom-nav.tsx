@@ -6,6 +6,7 @@ import { Home, Search, GraduationCap, ShoppingBag, User } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChatStore } from '@/stores/chat-store';
 import { useNotificationStore } from '@/stores/notification-store';
+import { cn } from '@/lib/utils';
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -23,8 +24,8 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg shadow-[0_-1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_-1px_3px_rgba(0,0,0,0.2)] pb-[var(--safe-area-bottom)]">
-      <div className="flex items-center justify-around px-2 pt-1.5 pb-1">
+    <nav className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(var(--safe-area-bottom)+0.75rem)]">
+      <div className="floating-bottom-nav flex w-full max-w-xl items-center justify-between rounded-[28px] px-2 py-2">
         {navItems.map(({ href, icon: Icon, label }) => {
           const isActive = pathname.startsWith(href);
           const isProfile = href === '/profile';
@@ -32,19 +33,20 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center gap-0 min-w-[44px] min-h-[44px] px-3 py-1 transition-colors ${
-                isActive ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'
-              }`}
+              className={cn(
+                'bottom-nav-link flex min-h-[56px] min-w-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-3 py-2 text-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
+                isActive ? 'is-active text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',
+              )}
             >
               <div className="relative">
-                <Icon size={22} strokeWidth={isActive ? 1.8 : 1.5} />
+                <Icon size={22} strokeWidth={isActive ? 1.9 : 1.6} />
                 {isProfile && totalUnread > 0 && (
                   <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold text-white animate-badge-pulse">
                     {totalUnread > 99 ? '99+' : totalUnread}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-normal">{label}</span>
+              <span className={cn('text-[10px] font-semibold tracking-[0.01em]', isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400')}>{label}</span>
             </Link>
           );
         })}

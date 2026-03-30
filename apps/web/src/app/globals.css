@@ -199,7 +199,37 @@ button:not(:disabled):active, a:active {
   }
 }
 
-.pb-safe { padding-bottom: calc(var(--safe-area-bottom) + 4.5rem); }
+.pb-safe { padding-bottom: calc(var(--safe-area-bottom) + 6.25rem); }
+
+/* ── Floating Bottom Nav ── */
+.floating-bottom-nav {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(28px) saturate(165%);
+  -webkit-backdrop-filter: blur(28px) saturate(165%);
+}
+.dark .floating-bottom-nav {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 17, 20, 0.82);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.bottom-nav-link {
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.bottom-nav-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.dark .bottom-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.bottom-nav-link.is-active {
+  background: rgba(49, 130, 246, 0.08);
+}
+.dark .bottom-nav-link.is-active {
+  background: rgba(49, 130, 246, 0.12);
+}
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 

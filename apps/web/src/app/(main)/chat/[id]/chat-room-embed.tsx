@@ -1,45 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Send, ChevronDown, ChevronUp,
-  Calendar, MapPin, DollarSign, Info, MessageCircle,
+  Calendar, MapPin, DollarSign, MessageCircle,
   MoreVertical, Flag, Ban, LogOut,
-  Image as ImageIcon, Smile, Paperclip,
+  Smile, Paperclip,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import {
+  ChatBubble, DateSeparator, SystemMessage, TypingIndicator,
+  formatDateLabel, getDateKey,
+} from '@/components/chat/chat-bubble';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/stores/chat-store';
 import { useToast } from '@/components/ui/toast';
 import { formatMatchDate } from '@/lib/utils';
 import type { ChatMessage } from '@/stores/chat-store';
-
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, '0');
-  const period = h < 12 ? '오전' : '오후';
-  const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${period} ${displayH}:${m}`;
-}
-
-function formatDateLabel(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
-  if (diffDays === 0) return '오늘';
-  if (diffDays === 1) return '어제';
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
-}
-
-function getDateKey(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-}
 
 function groupMessagesByDate(messages: ChatMessage[]): { date: string; label: string; messages: ChatMessage[] }[] {
   const groups: Map<string, { label: string; messages: ChatMessage[] }> = new Map();
@@ -87,7 +65,7 @@ export default function ChatRoomEmbed({
 
   const room = chatRooms.find((r) => r.id === chatRoomId);
   const messages = getChatMessages(chatRoomId);
-  const groupedMessages = groupMessagesByDate(messages);
+  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages]);
 
   const [input, setInput] = useState('');
   const [showMatchInfo, setShowMatchInfo] = useState(false);
@@ -166,6 +144,21 @@ export default function ChatRoomEmbed({
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
+
+  // ESC key to close modals
+  useEffect(() => {
+    const anyModal = showReportModal || showBlockModal || showLeaveModal;
+    if (!anyModal) return;
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setShowReportModal(false);
+        setShowBlockModal(false);
+        setShowLeaveModal(false);
+      }
+    }
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showReportModal, showBlockModal, showLeaveModal]);
 
   // Reset input on room switch
   useEffect(() => {
@@ -331,23 +324,11 @@ export default function ChatRoomEmbed({
         <div className="min-h-full flex flex-col justify-end">
         {groupedMessages.map((group) => (
           <div key={group.date}>
-            {/* Date separator */}
-            <div className="flex items-center justify-center my-4">
-              <span className="rounded-full bg-gray-200/60 dark:bg-gray-700/60 px-3 py-1 text-xs text-gray-500 dark:text-gray-400">
-                {group.label}
-              </span>
-            </div>
+            <DateSeparator label={group.label} />
 
-            {/* Messages — 그루핑 적용 */}
             {group.messages.map((msg, idx, arr) => {
               if (msg.isSystem) {
-                return (
-                  <div key={msg.id} className="flex justify-center my-3">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-[80%]">
-                      {msg.message}
-                    </span>
-                  </div>
-                );
+                return <SystemMessage key={msg.id} text={msg.message} />;
               }
 
               const isMine = msg.senderId === currentUserId;
@@ -357,78 +338,22 @@ export default function ChatRoomEmbed({
               const isLastInGroup = !next || next.isSystem || next.senderId !== msg.senderId;
 
               return (
-                <div
+                <ChatBubble
                   key={msg.id}
-                  className={`flex ${isLastInGroup ? 'mb-3' : 'mb-0.5'} ${isMine ? 'justify-end' : 'justify-start'}`}
-                >
-                  {/* ── 상대방 메시지 ── */}
-                  {!isMine && (
-                    <div className="flex items-start gap-2 max-w-[75%] lg:max-w-[60%]">
-                      {/* 아바타: 그룹 첫 메시지만 */}
-                      {isFirstInGroup ? (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
-                          {msg.senderName.charAt(0)}
-                        </div>
-                      ) : (
-                        <div className="w-8 shrink-0" /> /* 들여쓰기 공간 */
-                      )}
-                      <div>
-                        {/* 이름: 그룹 첫 메시지만 */}
-                        {isFirstInGroup && (
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{msg.senderName}</span>
-                            <span className="text-2xs text-gray-500">{msg.senderTeamName}</span>
-                          </div>
-                        )}
-                        <div className="flex items-end gap-1.5">
-                          <div className={`bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-base text-gray-800 dark:text-gray-200 ${
-                            isFirstInGroup ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl'
-                          }`}>
-                            {msg.message}
-                          </div>
-                          {/* 시간: 그룹 마지막만 */}
-                          {isLastInGroup && (
-                            <span className="text-2xs text-gray-400 dark:text-gray-500 shrink-0 pb-0.5">
-                              {formatTime(msg.timestamp)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── 내 메시지 ── */}
-                  {isMine && (
-                    <div className="flex items-end gap-1.5 max-w-[75%] lg:max-w-[60%]">
-                      {/* 시간 + 읽음: 그룹 마지막만 */}
-                      {isLastInGroup && (
-                        <div className="flex flex-col items-end shrink-0 pb-0.5">
-                          {msg.isRead === false && <span className="text-2xs text-blue-500 font-medium">1</span>}
-                          <span className="text-2xs text-gray-400 dark:text-gray-500">{formatTime(msg.timestamp)}</span>
-                        </div>
-                      )}
-                      <div className={`bg-blue-500 px-3.5 py-2 text-base text-white ${
-                        isFirstInGroup ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'
-                      }`}>
-                        {msg.message}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  message={msg.message}
+                  timestamp={msg.timestamp}
+                  isMine={isMine}
+                  senderName={msg.senderName}
+                  senderTeamName={msg.senderTeamName}
+                  isFirstInGroup={isFirstInGroup}
+                  isLastInGroup={isLastInGroup}
+                  isRead={msg.isRead}
+                />
               );
             })}
           </div>
         ))}
-        {/* 타이핑 인디케이터 */}
-        {isTyping && (
-          <div className="flex items-center gap-2 mb-2 ml-10">
-            <div className="flex gap-1 rounded-2xl rounded-tl-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
-            </div>
-          </div>
-        )}
+        {isTyping && <TypingIndicator senderName={opponentName} />}
         <div ref={messagesEndRef} />
         </div>
       </div>
@@ -455,7 +380,7 @@ export default function ChatRoomEmbed({
             <button
               key={action.label}
               onClick={() => handleQuickAction(action.message)}
-              className="shrink-0 rounded-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors"
+              className="shrink-0 rounded-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 min-h-[44px] text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors"
             >
               {action.label}
             </button>
@@ -468,13 +393,13 @@ export default function ChatRoomEmbed({
         <div className="flex items-center gap-1.5">
           {/* 첨부 */}
           <button aria-label="파일 첨부" onClick={() => { fileInputRef.current?.click(); toast('info', '파일 첨부 기능을 준비 중이에요'); }}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0">
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0">
             <Paperclip size={18} />
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={() => toast('info', '이미지 전송 기능을 준비 중이에요')} />
           {/* 이모지 */}
           <button aria-label="이모지" onClick={() => setShowEmoji(!showEmoji)}
-            className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors shrink-0 ${showEmoji ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+            className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors shrink-0 ${showEmoji ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
             <Smile size={18} />
           </button>
           {/* 입력 */}
@@ -492,7 +417,7 @@ export default function ChatRoomEmbed({
             aria-label="메시지 보내기"
             onClick={handleSend}
             disabled={!input.trim()}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
           >
             <Send size={16} />
           </button>
@@ -501,7 +426,7 @@ export default function ChatRoomEmbed({
 
       {/* Report Modal */}
       {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true">
           <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">신고하기</h3>
             <div className="space-y-2 mb-4">
@@ -554,7 +479,7 @@ export default function ChatRoomEmbed({
 
       {/* Block Modal */}
       {showBlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true">
           <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
@@ -585,7 +510,7 @@ export default function ChatRoomEmbed({
 
       {/* Leave Modal */}
       {showLeaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true">
           <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">

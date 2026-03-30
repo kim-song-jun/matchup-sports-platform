@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell } from 'lucide-react';
@@ -15,6 +16,8 @@ export function Sidebar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const t = useTranslations('nav');
   const tc = useTranslations('common');
 
@@ -128,7 +131,7 @@ export function Sidebar() {
 
       {/* User */}
       <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-4">
-        {isAuthenticated && user ? (
+        {mounted && isAuthenticated && user ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-sm font-bold text-gray-600 dark:text-gray-300">

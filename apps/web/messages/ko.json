@@ -130,7 +130,8 @@
     "typeAll": "전체",
     "typeGroupLesson": "그룹 레슨",
     "typePracticeMatch": "연습 경기",
-    "typeFreePractice": "자유 연습"
+    "typeFreePractice": "자유 연습",
+    "lessonCount": "{count}개의 강좌"
   },
   "marketplace": {
     "title": "장터",

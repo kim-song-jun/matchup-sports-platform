@@ -130,7 +130,8 @@
     "typeAll": "All",
     "typeGroupLesson": "Group Lesson",
     "typePracticeMatch": "Practice Match",
-    "typeFreePractice": "Free Practice"
+    "typeFreePractice": "Free Practice",
+    "lessonCount": "{count} lessons"
   },
   "marketplace": {
     "title": "Marketplace",

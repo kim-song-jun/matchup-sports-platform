@@ -15,6 +15,9 @@ import { api } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sportLabel } from '@/lib/constants';
 import { formatFullDate, formatCurrency } from '@/lib/utils';
+import { TicketPlanSelector } from '@/components/lesson/ticket-plan-selector';
+import { LessonCalendar } from '@/components/lesson/lesson-calendar';
+import type { LessonTicketPlan, LessonSchedule } from '@/types/api';
 const typeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
 };
@@ -39,6 +42,7 @@ export default function LessonDetailPage() {
   const queryClient = useQueryClient();
   const lessonId = params.id as string;
   const [showCheckout, setShowCheckout] = useState(false);
+  const [selectedTicketPlan, setSelectedTicketPlan] = useState<LessonTicketPlan | null>(null);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
 
@@ -146,6 +150,36 @@ export default function LessonDetailPage() {
                 <span className="text-xs text-gray-500 shrink-0 mt-0.5"><Clock size={12} className="inline mr-0.5" />{item.duration}</span>
               </div>
             ))}
+          </div>
+
+          {/* 수강권 선택 */}
+          <div className="mt-4">
+            <TicketPlanSelector
+              plans={lesson.ticketPlans}
+              onSelect={(plan) => setSelectedTicketPlan(plan)}
+              onPurchase={(plan) => {
+                setSelectedTicketPlan(plan);
+                if (plan.price > 0) {
+                  setShowCheckout(true);
+                } else {
+                  enrollMutation.mutate();
+                }
+              }}
+            />
+          </div>
+
+          {/* 수업 일정 캘린더 */}
+          <div className="mt-4">
+            <LessonCalendar
+              schedules={lesson.upcomingSchedules as LessonSchedule[] | undefined}
+              onReserve={(scheduleId) => {
+                if (!isAuthenticated) {
+                  toast('info', '로그인 후 예약할 수 있어요');
+                  return;
+                }
+                toast('info', `수업 예약 기능을 준비 중이에요 (scheduleId: ${scheduleId})`);
+              }}
+            />
           </div>
 
           {/* 이런 분께 추천 */}
@@ -282,9 +316,13 @@ export default function LessonDetailPage() {
         <CheckoutModal
           isOpen={showCheckout}
           onClose={() => setShowCheckout(false)}
-          amount={lesson.fee}
-          itemName={lesson.title}
-          orderId={`lesson-${lessonId}-${Date.now()}`}
+          amount={selectedTicketPlan?.price ?? lesson.fee}
+          itemName={
+            selectedTicketPlan
+              ? `${lesson.title} — ${selectedTicketPlan.name}`
+              : lesson.title
+          }
+          orderId={`lesson-${lessonId}-${selectedTicketPlan?.id ?? 'default'}-${Date.now()}`}
           onSuccess={() => {
             setShowCheckout(false);
             enrollMutation.mutate();

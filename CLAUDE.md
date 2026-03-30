@@ -69,13 +69,16 @@ npx playwright test            # E2E
 - **종목 아이콘**: `components/icons/sport-icons.tsx`의 `SportIconMap` — 11종목 SVG 컴포넌트
 - **컬러**: 블루(#3182F6) 단일 액센트, Pretendard 폰트. 다크모드 전체 페이지 지원
 - **모션**: `globals.css`에 fade-in/slide-up/scale-in/badge-pulse 등 정의, `prefers-reduced-motion` 대응 완료
+- **내비게이션**: 모바일 하단 플로팅 pill 바 (`floating-bottom-nav` CSS), 활성 탭은 blue-500 액센트
 
 ## 공유 UI 컴포넌트
 - `components/ui/empty-state.tsx` — 빈 상태 표시 (icon, title, description, action, size='sm'|'md')
 - `components/ui/error-state.tsx` — 에러 + 재시도 버튼
 - `components/ui/modal.tsx` — 공유 모달 (ESC, backdrop, focus trap, aria-modal)
 - `components/ui/toast.tsx` — 토스트 알림
+- `components/chat/chat-bubble.tsx` — 채팅 버블 시스템 (ChatBubble, DateSeparator, SystemMessage, TypingIndicator)
 - 인라인 빈 상태 대신 반드시 `<EmptyState />` 사용할 것
+- 채팅 메시지 렌더링은 반드시 `<ChatBubble />` 컴포넌트 사용할 것
 
 ## 프론트엔드 품질 기준
 - 다크모드: 모든 `bg-white`에 `dark:bg-gray-800`, `text-gray-900`에 `dark:text-white`, `border-gray-100`에 `dark:border-gray-700`

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
@@ -57,8 +58,22 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-white dark:bg-gray-900">
+      {/* 상단 — 뒤로가기 */}
+      <div className="flex items-center px-4 pt-4">
+        <Link
+          href="/home"
+          className="inline-flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          aria-label="홈으로 돌아가기"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+            <path d="M11 14L6 9L11 4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>홈으로</span>
+        </Link>
+      </div>
+
       {/* 상단 — 브랜드 */}
-      <div className="flex flex-col items-center justify-center px-6 pt-16 pb-8">
+      <div className="flex flex-col items-center justify-center px-6 pt-8 pb-8">
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
         <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
@@ -113,6 +128,19 @@ export default function LoginPage() {
                 네이버로 시작하기 (준비중)
               </button>
             </div>
+          </div>
+
+          {/* 둘러보기 — 로그인 없이 홈으로 */}
+          <div className="mt-5 text-center">
+            <Link
+              href="/home"
+              className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors min-h-[44px]"
+            >
+              로그인 없이 둘러보기
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M3 7H11M8 4L11 7L8 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
           </div>
         </div>
       </div>

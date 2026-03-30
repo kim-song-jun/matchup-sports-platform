@@ -65,12 +65,24 @@ export default function OnboardingPage() {
             <div className={`h-1 rounded-full transition-[width,colors] duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
             <div className={`h-1 rounded-full transition-[width,colors] duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
           </div>
-          <button
-            onClick={finish}
-            className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors min-h-[44px] flex items-center"
-          >
-            건너뛰기
-          </button>
+          {step === 'sport' ? (
+            <button
+              onClick={() => router.push('/home')}
+              aria-label="온보딩 닫기"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={finish}
+              className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors min-h-[44px] flex items-center"
+            >
+              건너뛰기
+            </button>
+          )}
         </div>
 
         {/* Step 1: 종목 선택 */}
@@ -92,7 +104,7 @@ export default function OnboardingPage() {
                   <button
                     key={sport.key}
                     onClick={() => toggleSport(sport.key)}
-                    className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-[colors,transform] duration-200 active:scale-[0.96] ${
+                    className={`relative flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-[colors,transform] duration-200 active:scale-[0.96] ${
                       isSelected
                         ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800'
                         : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 dark:hover:border-gray-700'

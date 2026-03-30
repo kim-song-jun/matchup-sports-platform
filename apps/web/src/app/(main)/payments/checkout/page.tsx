@@ -12,7 +12,6 @@ import {
   Tag,
   CheckCircle,
   Loader2,
-  ChevronRight,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';

@@ -258,7 +258,7 @@ export default function HomePage() {
                 const accent = sportCardAccent[team.sportType];
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`flex h-7 w-7 items-center justify-center rounded-full ${accent?.tint || 'bg-gray-100'} shrink-0`}>
@@ -290,7 +290,7 @@ export default function HomePage() {
                 const accent = sportCardAccent[l.sportType];
                 return (
                   <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
                           {sportLabel[l.sportType]}
@@ -319,7 +319,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-3 @5xl:grid-cols-4 @3xl:gap-3">
               {listings.map((item: MarketplaceListing) => (
                 <Link key={item.id} href={`/marketplace/${item.id}`}>
-                  <div className="rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                       <img src={getListingImage(item.imageUrls)} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
                     </div>

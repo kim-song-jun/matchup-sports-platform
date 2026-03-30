@@ -13,19 +13,15 @@ import { useLesson } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, lessonTypeLabel, levelLabel } from '@/lib/constants';
 import { formatFullDate, formatCurrency } from '@/lib/utils';
 import { TicketPlanSelector } from '@/components/lesson/ticket-plan-selector';
 import { LessonCalendar } from '@/components/lesson/lesson-calendar';
 import type { LessonTicketPlan, LessonSchedule } from '@/types/api';
-const typeLabel: Record<string, string> = {
-  group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
-};
 const typeColor: Record<string, string> = {
   group_lesson: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', practice_match: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
   free_practice: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', clinic: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
 };
-const levelLabel: Record<number, string> = { 1: '입문', 2: '초급', 3: '중급', 4: '상급', 5: '고수' };
 
 const sampleCurriculum = [
   { title: '오리엔테이션', desc: '기초 스트레칭 및 장비 점검', duration: '15분' },
@@ -93,14 +89,14 @@ export default function LessonDetailPage() {
           <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 @3xl:h-56 flex items-center justify-center mb-4 overflow-hidden">
             <div className="text-center text-white/80">
               {SportIcon && <SportIcon size={48} className="mx-auto mb-2 text-white/60" />}
-              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm">{typeLabel[lesson.type]}</span>
+              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
 
           {/* 타이틀 */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-normal ${typeColor[lesson.type]}`}>{typeLabel[lesson.type]}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-normal ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>

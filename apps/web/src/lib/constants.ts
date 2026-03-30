@@ -61,14 +61,6 @@ export const matchStatusLabel: Record<string, string> = {
   cancelled: '취소',
 };
 
-export const matchStatusColor: Record<string, string> = {
-  recruiting: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-  full: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-  in_progress: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  completed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  cancelled: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
-};
-
 // Lesson type
 export const lessonTypeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨',
@@ -83,10 +75,3 @@ export const ticketTypeLabel: Record<string, string> = {
   unlimited: '무제한',
 };
 
-export const attendanceStatusLabel: Record<string, string> = {
-  scheduled: '예약',
-  attended: '출석',
-  absent: '결석',
-  late: '지각',
-  cancelled: '취소',
-};

@@ -109,7 +109,7 @@ export default function MarketplacePage() {
         ) : (
           <div className="space-y-3 @3xl:grid @3xl:grid-cols-2 @3xl:gap-3 @3xl:space-y-0 stagger-children">
             {listings.map((item: MarketplaceListing) => (
-                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
                     <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-300">

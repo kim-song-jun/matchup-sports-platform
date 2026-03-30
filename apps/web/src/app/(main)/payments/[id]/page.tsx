@@ -6,13 +6,10 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   CheckCircle,
-  XCircle,
   Clock,
   CreditCard,
-  Receipt,
   Calendar,
   MapPin,
-  AlertTriangle,
   ChevronRight,
   Copy,
   RotateCcw,

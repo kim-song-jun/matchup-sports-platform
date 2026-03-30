@@ -2,6 +2,26 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
+// Fields that must never be exposed in API responses
+const SAFE_USER_SELECT = {
+  id: true,
+  email: true,
+  nickname: true,
+  profileImageUrl: true,
+  phone: true,
+  gender: true,
+  birthYear: true,
+  bio: true,
+  sportTypes: true,
+  locationCity: true,
+  locationDistrict: true,
+  mannerScore: true,
+  totalMatches: true,
+  createdAt: true,
+  updatedAt: true,
+  sportProfiles: true,
+} as const;
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -9,7 +29,10 @@ export class UsersService {
   async findById(id: string) {
     const user = await this.prisma.user.findFirst({
       where: { id, deletedAt: null },
-      include: { sportProfiles: true },
+      select: {
+        ...SAFE_USER_SELECT,
+        sportProfiles: true,
+      },
     });
 
     if (!user) {
@@ -44,7 +67,10 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id },
       data: dto,
-      include: { sportProfiles: true },
+      select: {
+        ...SAFE_USER_SELECT,
+        sportProfiles: true,
+      },
     });
   }
 

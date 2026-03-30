@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Delete, UseGuards, Get } from '@nestjs/common';
+import { Controller, Post, Body, Delete, UseGuards, Get, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -31,6 +31,9 @@ export class AuthController {
     },
   })
   async devLogin(@Body('nickname') nickname: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Dev login is not available in production');
+    }
     return this.authService.devLogin(nickname || '테스트유저');
   }
 

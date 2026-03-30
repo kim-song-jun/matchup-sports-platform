@@ -2,13 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, MapPin, Clock, Users } from 'lucide-react';
+import { Search, SlidersHorizontal, Clock, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Match } from '@/types/api';

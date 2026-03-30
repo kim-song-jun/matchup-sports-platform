@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNotificationStore } from '@/stores/notification-store';
@@ -31,7 +32,10 @@ export default function NotificationsPage() {
   const te = useTranslations('empty');
   const tc = useTranslations('common');
   const { isAuthenticated } = useAuthStore();
+  const [mounted, setMounted] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => { setMounted(true); }, []);
   const { notifications, getUnreadCount, markAsRead, markAllAsRead } = useNotificationStore();
   const unreadCount = getUnreadCount();
 
@@ -52,7 +56,7 @@ export default function NotificationsPage() {
             <p className="text-xs text-blue-500 mt-0.5">{t('unreadCount', { count: unreadCount })}</p>
           )}
         </div>
-        {isAuthenticated && unreadCount > 0 && (
+        {mounted && isAuthenticated && unreadCount > 0 && (
           <button onClick={markAllRead} aria-label={t('markAllReadLabel')} className="text-xs text-gray-500 font-medium min-h-[44px] min-w-[44px] px-3 py-2 flex items-center hover:text-gray-600 transition-colors">
             {t('markAllRead')}
           </button>
@@ -60,7 +64,7 @@ export default function NotificationsPage() {
       </header>
 
       <div className="px-5 @3xl:px-0">
-        {!isAuthenticated ? (
+        {!mounted || !isAuthenticated ? (
           <EmptyState
             icon={Bell}
             title={t('loginPromptTitle')}

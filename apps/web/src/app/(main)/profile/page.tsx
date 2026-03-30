@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -24,7 +24,10 @@ export default function ProfilePage() {
   const tc = useTranslations('common');
   const { user, isAuthenticated, logout } = useAuthStore();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
   const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
 
@@ -48,9 +51,9 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
       </header>
 
-      <div className={`px-5 @3xl:px-0 ${isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
+      <div className={`px-5 @3xl:px-0 ${mounted && isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
         <div>
-        {isAuthenticated && user ? (
+        {mounted && isAuthenticated && user ? (
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
@@ -124,20 +127,20 @@ export default function ProfilePage() {
         )}
         {/* 다가오는 일정 — mobile only */}
         <div className="@3xl:hidden">
-          {isAuthenticated && <UpcomingSchedule />}
+          {mounted && isAuthenticated && <UpcomingSchedule />}
         </div>
         </div>
 
         {/* 다가오는 일정 — desktop only, appears as right column */}
         <div className="hidden @3xl:block">
-          {isAuthenticated && <UpcomingSchedule />}
+          {mounted && isAuthenticated && <UpcomingSchedule />}
         </div>
       </div>
 
       <div className="mt-5 h-2 bg-gray-50 dark:bg-gray-800 @3xl:hidden" />
 
       {/* 소통 바로가기 */}
-      {isAuthenticated && (
+      {mounted && isAuthenticated && (
         <div className="px-5 @3xl:px-0 pt-4 pb-2">
           <div className="grid grid-cols-2 gap-3">
             <Link href="/chat">
@@ -171,11 +174,11 @@ export default function ProfilePage() {
       )}
 
       <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
-        {!isAuthenticated && (
+        {mounted && !isAuthenticated && (
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 px-2">로그인 필요</p>
         )}
         {menuItems.map((item) => (
-          <Link key={item.label} href={isAuthenticated ? item.href : '/login'}>
+          <Link key={item.label} href={mounted && isAuthenticated ? item.href : '/login'}>
             <div className="flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] rounded-lg -mx-2 px-2">
               <div className="flex items-center gap-3">
                 <item.icon size={20} className="text-gray-500" />
@@ -203,7 +206,7 @@ export default function ProfilePage() {
             <ChevronRight size={18} className="text-gray-300" />
           </div>
         </Link>
-        {isAuthenticated && (
+        {mounted && isAuthenticated && (
           <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
             <LogOut size={20} className="text-gray-500" />
             <span className="text-md font-medium text-gray-500">{tc('logout')}</span>

@@ -102,8 +102,12 @@ export interface Lesson {
   coachBio: string | null;
   imageUrl?: string;
   createdAt?: string;
+  isRecurring?: boolean;
+  recurringDays?: number[];
   host?: { id: string; nickname: string; profileImageUrl: string | null };
   participants?: LessonParticipant[];
+  ticketPlans?: LessonTicketPlan[];
+  upcomingSchedules?: LessonSchedule[];
 }
 
 export interface LessonParticipant {
@@ -111,6 +115,69 @@ export interface LessonParticipant {
   userId: string;
   nickname?: string;
   joinedAt?: string;
+  user?: { id: string; nickname: string; profileImageUrl: string | null };
+}
+
+// ── Ticket types ──
+export type TicketType = 'single' | 'multi' | 'unlimited';
+export type TicketStatus = 'active' | 'expired' | 'exhausted' | 'refunded' | 'cancelled';
+export type AttendanceStatus = 'scheduled' | 'attended' | 'absent' | 'late' | 'cancelled';
+
+// Ticket plan — product that coach creates
+export interface LessonTicketPlan {
+  id: string;
+  lessonId: string;
+  name: string;
+  type: TicketType;
+  price: number;
+  originalPrice?: number;
+  totalSessions?: number; // for multi type
+  validDays?: number; // for unlimited type
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+// Purchased ticket instance
+export interface LessonTicket {
+  id: string;
+  planId: string;
+  userId: string;
+  lessonId: string;
+  status: TicketStatus;
+  totalSessions?: number;
+  usedSessions: number;
+  startDate?: string;
+  expiresAt?: string;
+  paidAmount: number;
+  purchasedAt: string;
+  plan?: LessonTicketPlan;
+  lesson?: Lesson;
+  attendances?: LessonAttendance[];
+}
+
+// Individual session in a lesson schedule
+export interface LessonSchedule {
+  id: string;
+  lessonId: string;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  maxParticipants?: number;
+  note?: string;
+  isCancelled: boolean;
+  cancelReason?: string;
+  attendeeCount?: number;
+}
+
+// Attendance record
+export interface LessonAttendance {
+  id: string;
+  scheduleId: string;
+  ticketId: string;
+  userId: string;
+  status: AttendanceStatus;
+  checkedInAt?: string;
   user?: { id: string; nickname: string; profileImageUrl: string | null };
 }
 

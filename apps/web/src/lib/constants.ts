@@ -76,3 +76,17 @@ export const lessonTypeLabel: Record<string, string> = {
   free_practice: '자유 연습',
   clinic: '클리닉',
 };
+
+export const ticketTypeLabel: Record<string, string> = {
+  single: '1일 체험',
+  multi: '정기수강',
+  unlimited: '무제한',
+};
+
+export const attendanceStatusLabel: Record<string, string> = {
+  scheduled: '예약',
+  attended: '출석',
+  absent: '결석',
+  late: '지각',
+  cancelled: '취소',
+};

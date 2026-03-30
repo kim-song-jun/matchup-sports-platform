@@ -173,6 +173,8 @@ model User {
   marketplaceReviews  MarketplaceReview[]  @relation("MarketplaceReviewAuthor")
   receivedMarketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewTarget")
   hostedLessons       Lesson[]             @relation("LessonHost")
+  lessonTickets       LessonTicket[]       @relation("UserLessonTickets")
+  lessonAttendances   LessonAttendance[]   @relation("UserLessonAttendances")
   ownedTeams          SportTeam[]          @relation("TeamOwner")
   favorites           Favorite[]
 
@@ -491,6 +493,28 @@ enum LessonStatus {
   completed
 }
 
+enum TicketType {
+  single      // 1회권
+  multi       // 다회권 (N회)
+  unlimited   // 기간권 (무제한)
+}
+
+enum TicketStatus {
+  active      // 사용중
+  expired     // 기간 만료
+  exhausted   // 횟수 소진
+  refunded    // 환불됨
+  cancelled   // 취소됨
+}
+
+enum AttendanceStatus {
+  scheduled   // 예약됨
+  attended    // 출석
+  absent      // 결석
+  late        // 지각
+  cancelled   // 취소됨
+}
+
 model Lesson {
   id            String       @id @default(uuid())
   hostId        String       @map("host_id")
@@ -516,14 +540,112 @@ model Lesson {
   coachBio      String?      @map("coach_bio")
   coachImageUrl String?      @map("coach_image_url")
 
+  // Recurring schedule
+  isRecurring    Boolean      @default(false) @map("is_recurring")
+  recurringDays  Int[]        @map("recurring_days") // e.g. [1,3,5] for Mon/Wed/Fri (0=Sun)
+  recurringUntil DateTime?    @map("recurring_until") @db.Date
+
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
-  host          User         @relation("LessonHost", fields: [hostId], references: [id])
+  host          User               @relation("LessonHost", fields: [hostId], references: [id])
+  ticketPlans   LessonTicketPlan[]
+  tickets       LessonTicket[]
+  schedules     LessonSchedule[]
 
   @@index([sportType, status])
   @@index([lessonDate])
   @@map("lessons")
+}
+
+model LessonTicketPlan {
+  id            String     @id @default(uuid())
+  lessonId      String     @map("lesson_id")
+  name          String                          // e.g. "10회권", "1개월 무제한"
+  type          TicketType
+  price         Int
+  originalPrice Int?       @map("original_price") // for displaying discounts
+  totalSessions Int?       @map("total_sessions")  // required for multi type
+  validDays     Int?       @map("valid_days")       // required for unlimited type
+  description   String?
+  isActive      Boolean    @default(true) @map("is_active")
+  sortOrder     Int        @default(0) @map("sort_order")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  lesson  Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  tickets LessonTicket[]
+
+  @@index([lessonId, isActive])
+  @@map("lesson_ticket_plans")
+}
+
+model LessonTicket {
+  id            String       @id @default(uuid())
+  planId        String       @map("plan_id")
+  userId        String       @map("user_id")
+  lessonId      String       @map("lesson_id")
+  status        TicketStatus @default(active)
+  totalSessions Int?         @map("total_sessions") // snapshot from plan at purchase time
+  usedSessions  Int          @default(0) @map("used_sessions")
+  startDate     DateTime?    @map("start_date") @db.Date
+  expiresAt     DateTime?    @map("expires_at") @db.Date
+  paymentId     String?      @unique @map("payment_id")
+  paidAmount    Int          @map("paid_amount")
+  purchasedAt   DateTime     @default(now()) @map("purchased_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  plan        LessonTicketPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user        User               @relation("UserLessonTickets", fields: [userId], references: [id])
+  lesson      Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attendances LessonAttendance[]
+
+  @@index([userId, status])
+  @@index([lessonId])
+  @@index([expiresAt])
+  @@map("lesson_tickets")
+}
+
+model LessonSchedule {
+  id              String    @id @default(uuid())
+  lessonId        String    @map("lesson_id")
+  sessionDate     DateTime  @map("session_date") @db.Date
+  startTime       String    @map("start_time")   // HH:mm
+  endTime         String    @map("end_time")     // HH:mm
+  maxParticipants Int?      @map("max_participants")
+  note            String?
+  isCancelled     Boolean   @default(false) @map("is_cancelled")
+  cancelReason    String?   @map("cancel_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  lesson      Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attendances LessonAttendance[]
+
+  @@index([lessonId, sessionDate])
+  @@index([sessionDate])
+  @@map("lesson_schedules")
+}
+
+model LessonAttendance {
+  id           String           @id @default(uuid())
+  scheduleId   String           @map("schedule_id")
+  ticketId     String           @map("ticket_id")
+  userId       String           @map("user_id")
+  status       AttendanceStatus @default(scheduled)
+  checkedInAt  DateTime?        @map("checked_in_at")
+  checkedInBy  String?          @map("checked_in_by") // userId of coach or staff who checked in
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  schedule LessonSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  ticket   LessonTicket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user     User           @relation("UserLessonAttendances", fields: [userId], references: [id])
+
+  @@unique([scheduleId, userId])
+  @@index([ticketId])
+  @@index([userId])
+  @@map("lesson_attendances")
 }
 
 // ─── 팀/클럽 홍보 ───────────────────────────────────────

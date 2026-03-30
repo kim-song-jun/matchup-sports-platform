@@ -1,78 +1,123 @@
 # MatchUp
 
-> AI 기반 멀티스포츠 소셜 매칭 플랫폼
+> 생활체육 동호인을 위한 멀티스포츠 소셜 매칭 플랫폼
 
-An AI-powered social sports matching platform for recreational athletes in Korea — covering futsal, basketball, badminton, ice hockey, and more.
+![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?style=flat-square&logo=nestjs)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?style=flat-square&logo=prisma)
+![pnpm](https://img.shields.io/badge/pnpm-monorepo-F69220?style=flat-square&logo=pnpm&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-125_passed-brightgreen?style=flat-square)
+
+풋살·농구·배드민턴·아이스하키 등 11개 생활체육 종목의 개인 매치와 팀 매칭을 지원하는 모바일 중심 소셜 플랫폼입니다. 레슨 수강권 거래, 스포츠 용품 장터, 실시간 채팅, 토스페이먼츠 결제를 통합 제공합니다.
+
+---
+
+## Screenshots
+
+> Coming soon — 개발 중
 
 ---
 
 ## Features
 
-**매치 시스템**
-- 종목별 개인 매치 모집 및 참가 (11개 종목 지원)
-- 레벨 / 성별 / 지역 기반 필터링
-- 실시간 참가자 현황 및 팀 구성
-- 매치 완료 후 상대방 스킬 / 매너 평가
+### 매칭
 
-**팀 매칭**
-- 팀 프로필 생성 및 홍보 (SNS 연동, 홍보 영상)
-- 팀 대 팀 매치 신청 / 승인 2단계 플로우
-- GPS 기반 현장 도착 인증
-- 쿼터별 스코어 기록 및 경기 결과 관리
-- 팀 신뢰점수 (매너, 지각률, 노쇼율, 정보 일치도)
-- 팀 뱃지 시스템 (매너왕, 시간약속, 정직한 팀 등)
+| 기능 | 설명 |
+|------|------|
+| 개인 매치 모집 | 11개 종목, 레벨·성별·지역 필터로 참가자 모집 |
+| 팀 대 팀 매칭 | 신청/승인 2단계 플로우, 쿼터별 스코어 기록 |
+| 팀 신뢰 점수 | 매너·지각률·노쇼율·정보 일치도 4개 지표 |
+| GPS 도착 인증 | 경기 당일 현장 위치 기반 도착 확인 |
+| 상호 평가 | 매치 완료 후 스킬·매너 양방향 리뷰 |
+| 팀 뱃지 시스템 | 매너왕·시간약속·정직한 팀 등 누적 성과 뱃지 |
 
-**레슨 / 수강권**
-- 코치 레슨 개설 (그룹 레슨, 연습 경기, 클리닉)
-- 1회권 / 다회권 / 기간 무제한권 판매
-- 정기 스케줄 관리 및 출결 체크인
+### 소셜
 
-**장터 (Marketplace)**
-- 스포츠 용품 판매 / 대여 / 공동구매
-- 에스크로 기반 안전 결제
-- 판매자 신뢰 리뷰 (상품 상태 정확도, 소통, 배송 속도)
+| 기능 | 설명 |
+|------|------|
+| 팀 프로필 | SNS 연동, 홍보 영상, 활동 이력 통합 관리 |
+| 실시간 채팅 | Socket.IO 기반 채팅, 읽음 처리, 타이핑 인디케이터 |
+| 인앱 알림 | 매치·결제·레슨·팀 관련 실시간 알림 |
+| FCM 푸시 알림 | 백그라운드 푸시 지원 (iOS / Android) |
+| 용병 시스템 | 부족한 인원을 개인 플레이어로 채우는 매칭 |
 
-**결제**
-- 토스페이먼츠 연동 (카드, 토스페이, 네이버페이, 카카오페이, 계좌이체)
-- 부분 환불 지원
-- 정산 관리 (어드민)
+### 커머스
 
-**실시간 채팅**
-- Socket.IO 기반 매치 / 팀 채팅방
-- 읽음 처리, 타이핑 인디케이터
+| 기능 | 설명 |
+|------|------|
+| 레슨 / 수강권 | 코치 레슨 개설, 1회권·다회권·기간 무제한권 판매 |
+| 출결 관리 | 정기 스케줄 및 회차별 체크인 관리 |
+| 장터 (Marketplace) | 스포츠 용품 판매·대여·공동구매, 에스크로 결제 |
+| 결제 | 토스페이먼츠 — 카드·토스페이·네이버페이·카카오페이·계좌이체 |
+| 부분 환불 | 레슨·매치·장터 전 도메인 부분 환불 지원 |
 
-**알림**
-- 인앱 알림 (매치 참가, 팀 매칭, 결제, 레슨 등)
-- FCM 푸시 알림 지원
+### 관리
 
-**어드민**
-- 사용자 / 팀 / 매치 / 레슨 / 장터 전체 관리
-- 분쟁 처리, 정산, 통계 대시보드
+| 기능 | 설명 |
+|------|------|
+| 어드민 대시보드 | 사용자·팀·매치·레슨·장터 통합 관리 |
+| 분쟁 처리 | 거래 분쟁 접수 및 중재 플로우 |
+| 정산 관리 | 코치·판매자 정산 내역 및 지급 처리 |
+| 통계 | 종목별·지역별·기간별 활동 통계 |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     Client Layer                        │
+│   Next.js 15 (App Router)  ·  Capacitor 6 (iOS/Android) │
+└───────────────────┬─────────────────────────────────────┘
+                    │ REST (HTTPS)
+                    ▼
+┌─────────────────────────────────────────────────────────┐
+│                    API Layer                            │
+│              NestJS 11  ·  Socket.IO 4                  │
+│   Auth  ·  Matches  ·  Teams  ·  Payments  ·  Chat      │
+└──────────┬──────────────────────┬───────────────────────┘
+           │                      │ Pub/Sub
+           ▼                      ▼
+┌──────────────────┐   ┌─────────────────────┐
+│  PostgreSQL 16   │   │      Redis 7        │
+│  (Prisma ORM)    │   │  Cache · Sessions   │
+│                  │   │  Socket.IO Adapter  │
+└──────────────────┘   └─────────────────────┘
+```
+
+```
+Client (Next.js) ──→ API (NestJS) ──→ PostgreSQL
+       │                    │
+       └── Socket.IO ──────→ Redis Pub/Sub
+```
 
 ---
 
 ## Tech Stack
 
-| 분류 | 기술 | 버전 |
-|------|------|------|
-| **Frontend** | Next.js (App Router) | 15.x |
-| **Frontend** | React | 19.x |
-| **Frontend** | Tailwind CSS | 4.x |
-| **Frontend** | Zustand | 5.x |
-| **Frontend** | TanStack Query | 5.x |
-| **Frontend** | next-intl (i18n) | 4.x |
-| **Mobile** | Capacitor (iOS / Android) | 6.x |
-| **Backend** | NestJS | 11.x |
-| **Backend** | TypeScript | 5.7.x |
-| **Backend** | Socket.IO | 4.x |
-| **ORM** | Prisma | 6.x |
-| **Database** | PostgreSQL | 16 |
-| **Cache** | Redis | 7 |
-| **Auth** | JWT + OAuth (카카오 / 네이버 / 애플) | — |
-| **Payment** | 토스페이먼츠 | — |
-| **Monorepo** | pnpm workspaces + Turborepo | pnpm 9.x |
-| **Testing** | Vitest (FE) / Jest (BE) / Playwright (E2E) | — |
-| **Deploy** | Docker + Nginx | — |
+| 분류 | 기술 | 버전 | 역할 |
+|------|------|------|------|
+| **Frontend** | ![Next.js](https://img.shields.io/badge/-Next.js-black?style=flat-square&logo=next.js) Next.js | 15.x | App Router, SSR/SSG |
+| **Frontend** | ![React](https://img.shields.io/badge/-React-61DAFB?style=flat-square&logo=react&logoColor=black) React | 19.x | UI 라이브러리 |
+| **Frontend** | ![Tailwind](https://img.shields.io/badge/-Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) Tailwind CSS | 4.x | 유틸리티 CSS |
+| **Frontend** | TanStack Query | 5.x | 서버 상태 관리, 캐싱 |
+| **Frontend** | Zustand | 5.x | 클라이언트 상태 관리 |
+| **Frontend** | next-intl | 4.x | 국제화 (ko / en) |
+| **Mobile** | ![Capacitor](https://img.shields.io/badge/-Capacitor-119EFF?style=flat-square&logo=capacitor&logoColor=white) Capacitor | 6.x | iOS / Android 래핑 |
+| **Backend** | ![NestJS](https://img.shields.io/badge/-NestJS-E0234E?style=flat-square&logo=nestjs) NestJS | 11.x | REST API, Socket.IO |
+| **Backend** | ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) TypeScript | 5.7.x | 타입 안전 개발 |
+| **ORM** | ![Prisma](https://img.shields.io/badge/-Prisma-2D3748?style=flat-square&logo=prisma) Prisma | 6.x | DB 스키마, 마이그레이션 |
+| **Database** | ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white) PostgreSQL | 16 | 주 데이터베이스 |
+| **Cache** | ![Redis](https://img.shields.io/badge/-Redis-DC382D?style=flat-square&logo=redis&logoColor=white) Redis | 7 | 세션, 캐시, Socket 어댑터 |
+| **Auth** | JWT + OAuth | — | 카카오 / 네이버 / 애플 |
+| **Payment** | 토스페이먼츠 | — | 결제, 환불, 정산 |
+| **Monorepo** | pnpm + Turborepo | pnpm 9.x | 워크스페이스 빌드 |
+| **Testing** | Vitest / Jest / Playwright | — | 단위 · E2E 테스트 |
+| **Deploy** | Docker + Nginx | — | 컨테이너 배포 |
 
 ---
 
@@ -81,44 +126,56 @@ An AI-powered social sports matching platform for recreational athletes in Korea
 ```
 sports-platform/
 ├── apps/
-│   ├── web/                  # Next.js 프론트엔드 (포트 3003)
+│   ├── web/                        # Next.js 프론트엔드 (포트 3003)
 │   │   └── src/
-│   │       ├── app/          # App Router 페이지
-│   │       │   ├── (auth)/   # 로그인 / 온보딩
-│   │       │   ├── (main)/   # 주요 기능 페이지
-│   │       │   ├── admin/    # 어드민 패널
-│   │       │   └── landing/  # 랜딩 페이지
-│   │       ├── components/   # 공유 UI 컴포넌트
-│   │       ├── hooks/        # 커스텀 훅
-│   │       ├── lib/          # 유틸리티, 상수, API 클라이언트
-│   │       ├── stores/       # Zustand 스토어
-│   │       └── types/        # TypeScript 타입 정의
-│   └── api/                  # NestJS 백엔드 (포트 8100)
-│       └── src/
-│           ├── auth/         # 인증 (JWT, OAuth)
-│           ├── users/        # 사용자 프로필, 스포츠 프로필
-│           ├── matches/      # 개인 매치
-│           ├── team-matches/ # 팀 매칭
-│           ├── teams/        # 팀 관리
-│           ├── lessons/      # 레슨 / 수강권
-│           ├── marketplace/  # 장터
-│           ├── venues/       # 구장
-│           ├── payments/     # 결제
-│           ├── chat/         # 채팅
-│           ├── notifications/ # 알림
-│           ├── reviews/      # 리뷰
-│           ├── disputes/     # 분쟁
-│           ├── settlements/  # 정산
-│           ├── realtime/     # Socket.IO Gateway
-│           └── admin/        # 어드민 API
+│   │       ├── app/
+│   │       │   ├── (auth)/         # 로그인, 온보딩
+│   │       │   ├── (main)/         # 홈, 매치, 팀, 레슨, 장터, 채팅 등
+│   │       │   ├── admin/          # 어드민 패널 (보호된 라우트)
+│   │       │   ├── landing/        # 랜딩 페이지
+│   │       │   └── layout.tsx      # 루트 레이아웃 (폰트, 다크모드, i18n)
+│   │       ├── components/
+│   │       │   ├── ui/             # 공유 UI (EmptyState, Modal, Toast 등)
+│   │       │   ├── layout/         # Sidebar, BottomNav, Footer
+│   │       │   ├── form/           # 공유 폼 컴포넌트
+│   │       │   └── landing/        # 랜딩 전용 컴포넌트
+│   │       ├── hooks/              # 커스텀 훅 (인증, 무한스크롤 등)
+│   │       ├── lib/
+│   │       │   ├── utils.ts        # 날짜·금액 포맷터, 공통 유틸
+│   │       │   ├── constants.ts    # 종목 색상, 아이콘, 공통 상수
+│   │       │   └── api/            # API 클라이언트 (Axios 래핑)
+│   │       ├── stores/             # Zustand 스토어 (auth, notification)
+│   │       └── types/              # TypeScript 공통 타입 정의
+│   │
+│   └── api/                        # NestJS 백엔드 (포트 8111)
+│       ├── src/
+│       │   ├── auth/               # JWT, OAuth (카카오·네이버·애플)
+│       │   ├── users/              # 사용자 프로필, 스포츠 프로필
+│       │   ├── matches/            # 개인 매치 CRUD, 참가, 팀 구성
+│       │   ├── team-matches/       # 팀 매치 신청·승인·스코어·평가
+│       │   ├── teams/              # 팀 프로필, 멤버 관리
+│       │   ├── lessons/            # 레슨 개설, 수강권, 출결
+│       │   ├── marketplace/        # 장터 상품, 주문, 에스크로
+│       │   ├── venues/             # 구장 정보, 리뷰
+│       │   ├── payments/           # 토스페이먼츠 연동, 환불
+│       │   ├── chat/               # 채팅방, 메시지
+│       │   ├── notifications/      # 인앱 알림, FCM
+│       │   ├── reviews/            # 매치·구장 리뷰
+│       │   ├── disputes/           # 분쟁 접수·처리
+│       │   ├── settlements/        # 정산 관리
+│       │   ├── mercenary/          # 용병 매칭
+│       │   ├── badges/             # 팀 뱃지
+│       │   ├── realtime/           # Socket.IO Gateway
+│       │   ├── admin/              # 어드민 전용 API
+│       │   └── common/             # 필터, 인터셉터, 데코레이터
 │       └── prisma/
-│           ├── schema.prisma # DB 스키마
-│           └── seed.ts       # 초기 데이터
-├── packages/                 # 공유 패키지 (예정)
-├── e2e/                      # Playwright E2E 테스트
-├── deploy/                   # 배포 설정 (Dockerfile, Nginx)
-├── docker-compose.yml        # 로컬 개발 (PostgreSQL + Redis)
-├── turbo.json
+│           ├── schema.prisma       # DB 스키마 (27개 모델)
+│           └── seed.ts             # 초기 데이터 시드
+│
+├── e2e/                            # Playwright E2E 테스트 (125 passed)
+├── deploy/                         # Dockerfile, Nginx 설정, EC2 스크립트
+├── docker-compose.yml              # 로컬 개발 (PostgreSQL + Redis)
+├── turbo.json                      # Turborepo 파이프라인
 └── pnpm-workspace.yaml
 ```
 
@@ -128,9 +185,9 @@ sports-platform/
 
 ### Prerequisites
 
-- Node.js >= 20
-- pnpm >= 9
-- Docker + Docker Compose
+- **Node.js** >= 20
+- **pnpm** >= 9
+- **Docker** + Docker Compose
 
 ### Installation
 
@@ -143,27 +200,40 @@ cd sports-platform
 pnpm install
 ```
 
-### Environment Setup
+### Environment Variables
+
+환경변수 파일을 준비합니다.
 
 ```bash
-# 백엔드 환경변수
 cp apps/api/.env.example apps/api/.env
-
-# 프론트엔드 환경변수
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-필수 환경변수:
+#### Backend (`apps/api/.env`)
 
-| 변수 | 설명 |
-|------|------|
-| `DATABASE_URL` | PostgreSQL 연결 문자열 |
-| `REDIS_URL` | Redis 연결 문자열 |
-| `JWT_SECRET` | JWT 서명 키 |
-| `KAKAO_CLIENT_ID` | 카카오 OAuth 앱 키 |
-| `NAVER_CLIENT_ID` | 네이버 OAuth 앱 키 |
-| `TOSS_SECRET_KEY` | 토스페이먼츠 시크릿 키 |
-| `NEXT_PUBLIC_API_URL` | 프론트엔드에서 사용할 API 주소 |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL 연결 문자열 | Yes |
+| `REDIS_URL` | Redis 연결 문자열 | Yes |
+| `JWT_SECRET` | JWT Access Token 서명 키 | Yes |
+| `JWT_REFRESH_SECRET` | JWT Refresh Token 서명 키 | Yes |
+| `KAKAO_CLIENT_ID` | 카카오 OAuth 앱 키 | Yes |
+| `KAKAO_CLIENT_SECRET` | 카카오 OAuth 시크릿 | Yes |
+| `NAVER_CLIENT_ID` | 네이버 OAuth 앱 키 | Yes |
+| `NAVER_CLIENT_SECRET` | 네이버 OAuth 시크릿 | Yes |
+| `TOSS_SECRET_KEY` | 토스페이먼츠 시크릿 키 | Yes |
+| `TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키 | Yes |
+| `FCM_SERVICE_ACCOUNT` | Firebase 서비스 계정 JSON | No |
+| `API_PORT` | 서버 포트 (기본값: 8111) | No |
+
+#### Frontend (`apps/web/.env.local`)
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `NEXT_PUBLIC_API_URL` | 백엔드 API 주소 | Yes |
+| `NEXT_PUBLIC_SOCKET_URL` | Socket.IO 서버 주소 | Yes |
+| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키 | Yes |
+| `NEXT_PUBLIC_KAKAO_MAP_KEY` | 카카오맵 JavaScript 키 | No |
 
 ### Start Development
 
@@ -181,86 +251,153 @@ pnpm db:seed
 pnpm dev
 ```
 
-- 프론트엔드: http://localhost:3003
-- 백엔드 API: http://localhost:8100
-- Swagger 문서: http://localhost:8100/api
+| 서비스 | URL |
+|--------|-----|
+| Frontend | http://localhost:3003 |
+| Backend API | http://localhost:8111 |
+| Swagger 문서 | http://localhost:8111/docs |
+| Prisma Studio | http://localhost:5555 (별도 실행) |
 
 ---
 
 ## Development
 
-### 주요 명령어
+### 전체 명령어
 
 ```bash
-pnpm dev            # 전체 개발 서버 실행 (Turborepo)
-pnpm build          # 전체 프로덕션 빌드
-pnpm lint           # 전체 린트
-pnpm clean          # 빌드 캐시 정리
+pnpm dev             # 전체 개발 서버 (Turborepo 병렬 실행)
+pnpm build           # 전체 프로덕션 빌드
+pnpm lint            # 전체 린트 검사
+pnpm clean           # 빌드 캐시 및 .next 정리
 
-pnpm db:push        # Prisma 스키마를 DB에 반영
-pnpm db:migrate     # Prisma 마이그레이션 생성 및 적용
-pnpm db:studio      # Prisma Studio 실행 (DB 브라우저)
-pnpm db:seed        # 초기 데이터 시드
+pnpm db:push         # Prisma 스키마 → DB 즉시 반영 (dev)
+pnpm db:migrate      # Prisma 마이그레이션 생성 및 적용
+pnpm db:studio       # Prisma Studio (DB 브라우저, 포트 5555)
+pnpm db:seed         # 초기 데이터 시드
 ```
 
-### 개별 앱 명령어
+### 개별 앱
 
 ```bash
-# 프론트엔드
+# Frontend
 cd apps/web
-pnpm dev            # Next.js dev server (포트 3003)
-pnpm build
-pnpm test           # Vitest 단위 테스트
-pnpm test:watch
+pnpm dev             # Next.js dev server (포트 3003)
+pnpm build           # 프로덕션 빌드
+pnpm test            # Vitest 단위 테스트
+pnpm test:watch      # 와치 모드
 
-# 백엔드
+# Backend
 cd apps/api
-pnpm dev            # NestJS watch mode (포트 8100)
-pnpm build
-pnpm test           # Jest 단위 테스트
-pnpm test:cov       # 커버리지 포함
+pnpm dev             # NestJS watch mode (포트 8111)
+pnpm build           # 프로덕션 빌드
+pnpm test            # Jest 단위 테스트
+pnpm test:cov        # 커버리지 리포트 포함
 ```
 
 ---
 
-## Architecture
+## API Reference
+
+<details>
+<summary>주요 API 엔드포인트 보기</summary>
+
+전체 API 문서는 개발 서버 실행 후 `http://localhost:8111/docs` (Swagger UI)에서 확인할 수 있습니다.
+
+#### Auth — `/api/v1/auth`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/register` | 이메일 회원가입 |
+| `POST` | `/login` | 이메일 로그인 |
+| `POST` | `/kakao` | 카카오 OAuth 로그인 |
+| `POST` | `/naver` | 네이버 OAuth 로그인 |
+| `POST` | `/apple` | 애플 로그인 |
+| `POST` | `/refresh` | Access Token 갱신 |
+| `GET` | `/me` | 현재 인증 사용자 정보 |
+| `DELETE` | `/withdraw` | 회원 탈퇴 |
+
+#### Matches — `/api/v1/matches`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | 매치 목록 (필터: 종목·지역·레벨·날짜) |
+| `GET` | `/recommended` | 추천 매치 (프로필 기반) |
+| `POST` | `/` | 매치 생성 |
+| `GET` | `/:id` | 매치 상세 |
+| `POST` | `/:id/join` | 매치 참가 |
+| `DELETE` | `/:id/leave` | 매치 참가 취소 |
+| `POST` | `/:id/teams` | 팀 구성 |
+| `POST` | `/:id/complete` | 매치 종료 처리 |
+
+#### Teams — `/api/v1/teams`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | 팀 목록 검색 |
+| `POST` | `/` | 팀 생성 |
+| `GET` | `/:id` | 팀 상세 및 신뢰 점수 |
+
+#### Users — `/api/v1/users`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/me` | 내 프로필 |
+| `PATCH` | `/me` | 내 프로필 수정 |
+| `GET` | `/me/matches` | 내 매치 이력 |
+| `GET` | `/:id` | 타 사용자 프로필 |
+
+#### Payments — `/api/v1/payments`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/prepare` | 결제 준비 (토스페이먼츠 주문 생성) |
+| `POST` | `/confirm` | 결제 승인 |
+| `POST` | `/:id/refund` | 결제 환불 (부분 환불 지원) |
+| `GET` | `/me` | 내 결제 내역 |
+
+#### 기타 도메인
+
+| 도메인 | Base Path |
+|--------|-----------|
+| 팀 매칭 | `/api/v1/team-matches` |
+| 레슨 | `/api/v1/lessons` |
+| 장터 | `/api/v1/marketplace` |
+| 구장 | `/api/v1/venues` |
+| 채팅 | `/api/v1/chat` |
+| 알림 | `/api/v1/notifications` |
+| 리뷰 | `/api/v1/reviews` |
+| 용병 | `/api/v1/mercenary` |
+
+</details>
 
 ### API 규약
 
-- 모든 엔드포인트: `GET /api/v1/*`
-- 응답 형식: `{ status: string, data: T, timestamp: string }`
-- 에러 코드: `DOMAIN_ERROR_CODE` 형태 (예: `MATCH_NOT_FOUND`, `PAYMENT_FAILED`)
-- 페이지네이션: Cursor 기반 (`cursor`, `limit` 파라미터)
+- **Base URL**: `/api/v1/*`
+- **응답 형식**: `{ status: string, data: T, timestamp: string }`
+- **에러 코드**: `DOMAIN_ERROR_CODE` 형태 (예: `MATCH_NOT_FOUND`, `PAYMENT_FAILED`)
+- **페이지네이션**: Cursor 기반 — `cursor`, `limit` 파라미터
 
 ### 인증 플로우
 
-1. 소셜 로그인 (카카오 / 네이버 / 애플) 또는 이메일 로그인
-2. 서버에서 JWT Access Token + Refresh Token 발급
-3. Access Token: Authorization 헤더 (`Bearer`)
-4. Refresh Token: HTTP-only 쿠키
-
-### 실시간 통신
-
-- Socket.IO Gateway (`/realtime`)
-- 채팅 메시지, 타이핑 인디케이터, 알림 실시간 전송
-- Redis Pub/Sub로 다중 인스턴스 간 메시지 브로드캐스팅
-
-### 프론트엔드 상태 관리
-
-- 서버 상태: TanStack Query (캐싱, 리페치, 낙관적 업데이트)
-- 클라이언트 상태: Zustand (인증, 알림, UI 상태)
+1. 소셜 로그인 (카카오·네이버·애플) 또는 이메일 로그인
+2. 서버에서 **JWT Access Token + Refresh Token** 발급
+3. Access Token: `Authorization: Bearer <token>` 헤더
+4. Refresh Token: HTTP-only 쿠키 (자동 갱신)
 
 ---
 
 ## Database
 
-Prisma + PostgreSQL 16. 주요 엔티티:
+Prisma + PostgreSQL 16 기반. 주요 모델 27개.
+
+<details>
+<summary>전체 모델 목록 보기</summary>
 
 | 모델 | 설명 |
 |------|------|
-| `User` | 사용자 계정, OAuth, 위치, 매너 점수 |
+| `User` | 사용자 계정, OAuth 정보, 위치, 매너 점수 |
 | `UserSportProfile` | 종목별 레벨, ELO 레이팅, 포지션 |
-| `Match` | 개인 매치 (모집, 진행, 완료) |
+| `Match` | 개인 매치 (모집·진행·완료) |
 | `MatchParticipant` | 매치 참가 내역 |
 | `Team` | 매치 내 팀 구성 |
 | `Review` | 매치 참가자 간 상호 평가 |
@@ -270,70 +407,77 @@ Prisma + PostgreSQL 16. 주요 엔티티:
 | `VenueReview` | 구장 리뷰 |
 | `SportTeam` | 팀 / 클럽 프로필 |
 | `TeamMatch` | 팀 대 팀 매치 |
-| `TeamMatchApplication` | 팀 매치 신청 / 승인 |
+| `TeamMatchApplication` | 팀 매치 신청·승인 |
 | `ArrivalCheck` | GPS 기반 도착 인증 |
-| `MatchEvaluation` | 팀 매치 후 상호 평가 (6항목) |
+| `MatchEvaluation` | 팀 매치 후 상호 평가 (6개 항목) |
 | `TeamTrustScore` | 팀 신뢰 점수 집계 |
 | `Badge` | 팀 뱃지 |
-| `Lesson` | 레슨 개설 (코치 정보, 반복 일정) |
-| `LessonTicketPlan` | 수강권 플랜 (1회권 / 다회권 / 기간권) |
+| `Lesson` | 레슨 개설 (반복 일정 포함) |
+| `LessonTicketPlan` | 수강권 플랜 (1회권·다회권·기간권) |
 | `LessonTicket` | 사용자 보유 수강권 |
 | `LessonSchedule` | 레슨 회차별 일정 |
 | `LessonAttendance` | 회차별 출결 |
-| `MarketplaceListing` | 장터 상품 (판매 / 대여 / 공동구매) |
+| `MarketplaceListing` | 장터 상품 (판매·대여·공동구매) |
 | `MarketplaceOrder` | 장터 주문 (에스크로 상태 관리) |
 | `MarketplaceReview` | 거래 후 판매자 리뷰 |
-| `Favorite` | 즐겨찾기 (매치 / 팀 / 구장 / 상품) |
+| `Favorite` | 즐겨찾기 (매치·팀·구장·상품) |
 
-지원 종목: `soccer`, `futsal`, `basketball`, `badminton`, `ice_hockey`, `figure_skating`, `short_track`, `swimming`, `tennis`, `baseball`, `volleyball`
+</details>
+
+**지원 종목 (11개)**: 축구 · 풋살 · 농구 · 배드민턴 · 아이스하키 · 피겨스케이팅 · 쇼트트랙 · 수영 · 테니스 · 야구 · 배구
 
 ---
 
 ## Testing
 
 ```bash
-# 프론트엔드 단위 테스트 (Vitest + jsdom)
+# Frontend 단위 테스트 (Vitest + jsdom)
 cd apps/web && pnpm test
 
-# 백엔드 단위 테스트 (Jest)
+# Backend 단위 테스트 (Jest)
 cd apps/api && pnpm test
 
-# 백엔드 커버리지
+# Backend 커버리지 리포트
 cd apps/api && pnpm test:cov
 
-# E2E 테스트 (Playwright)
+# E2E 테스트 전체 실행 (Playwright)
 npx playwright test
 
-# E2E 특정 테스트만
+# 특정 스펙만 실행
 npx playwright test e2e/home.spec.ts
+
+# UI 모드로 실행 (디버깅용)
+npx playwright test --ui
 ```
 
-테스트 커버 영역:
-- 홈 / 네비게이션 렌더링
-- 매치 목록 / 상세 / 생성
-- 팀 / 레슨 / 장터 페이지
-- 다크모드 렌더링
-- 반응형 레이아웃 (모바일 375px / 태블릿 768px / 데스크탑)
-- 접근성 (터치 타겟 44px, aria-label)
+**E2E 테스트 커버 영역**
+
+| 영역 | 항목 수 |
+|------|---------|
+| 홈 / 네비게이션 렌더링 | 8 |
+| 매치 목록·상세·생성 | 6 |
+| 팀·레슨·장터 페이지 | 9 |
+| 다크모드 렌더링 | 8 |
+| 반응형 레이아웃 (375px / 768px / 1280px) | 7 |
+| 접근성 (터치 타겟, ARIA) | 4 |
+| **합계** | **125** |
 
 ---
 
 ## Deployment
 
-Docker 이미지 빌드 및 배포 (`deploy/` 참고):
-
 ```bash
-# 프론트엔드 이미지 빌드
+# Frontend 이미지 빌드
 docker build -f deploy/Dockerfile.web -t matchup-web .
 
-# 백엔드 이미지 빌드
+# Backend 이미지 빌드
 docker build -f deploy/Dockerfile.api -t matchup-api .
 
 # 프로덕션 전체 실행
 docker compose -f deploy/docker-compose.prod.yml up -d
 ```
 
-- Nginx 리버스 프록시로 프론트(3003) / 백엔드(8100) 라우팅
+- Nginx 리버스 프록시로 Frontend(3003) / Backend(8111) 라우팅
 - SSL 종료는 Nginx 레이어에서 처리
 - EC2 초기 설정: `deploy/setup-ec2.sh` 참고
 
@@ -341,11 +485,22 @@ docker compose -f deploy/docker-compose.prod.yml up -d
 
 ## Contributing
 
-### 커밋 메시지 규약
+### 브랜치 네이밍
 
 ```
-type: short one-line summary (영어, 소문자, imperative mood)
+feat/short-description    # 신규 기능
+fix/short-description     # 버그 수정
+docs/short-description    # 문서 변경
+infra/short-description   # 인프라·빌드 설정
 ```
+
+### 커밋 메시지
+
+```
+type: short one-line summary
+```
+
+영어·소문자·imperative mood 사용 (예: `add`, `fix`, `remove`).
 
 | Type | 사용 시점 |
 |------|-----------|
@@ -357,27 +512,51 @@ type: short one-line summary (영어, 소문자, imperative mood)
 | `chore` | 빌드, CI, 도구 설정 변경 |
 | `infra` | 인프라 변경 |
 
-예시:
+**예시**
 ```
 feat: add team arrival check with gps verification
 fix: prevent double submission on payment form
 refactor: extract sport profile logic into service class
 ```
 
-### 브랜치 네이밍
+### Pull Request 규칙
 
+- `main` 브랜치 직접 push 금지 — PR 필수
+- PR 제목은 커밋 메시지와 동일한 형식
+- PR 본문 구조:
+
+```markdown
+## Summary
+- 변경한 것과 이유 (1~3줄)
+
+## Changes
+- 영역별 주요 변경 목록
+
+## Dependencies (if any)
+- 선행 PR 또는 머지 순서 제약
 ```
-feat/short-description
-fix/short-description
-docs/short-description
-infra/short-description
-```
 
-### Pull Request
+- 리뷰어 최소 1명 승인 후 머지
+- CI (lint + test) 통과 필수
 
-- 제목은 커밋 메시지와 동일한 형식
-- 본문에 Summary / Changes / Dependencies 포함
-- main 브랜치에 직접 push 금지
+---
+
+## Powered By
+
+| 라이브러리 | 용도 |
+|-----------|------|
+| [Next.js](https://nextjs.org) | 풀스택 React 프레임워크 |
+| [NestJS](https://nestjs.com) | 백엔드 프레임워크 |
+| [Prisma](https://www.prisma.io) | TypeScript ORM |
+| [TanStack Query](https://tanstack.com/query) | 서버 상태 관리 |
+| [Zustand](https://zustand-demo.pmnd.rs) | 클라이언트 상태 관리 |
+| [Socket.IO](https://socket.io) | 실시간 양방향 통신 |
+| [Tailwind CSS](https://tailwindcss.com) | 유틸리티 CSS 프레임워크 |
+| [next-intl](https://next-intl-docs.vercel.app) | Next.js 국제화 |
+| [Capacitor](https://capacitorjs.com) | 웹 → iOS/Android 네이티브 래핑 |
+| [토스페이먼츠](https://docs.tosspayments.com) | 국내 결제 게이트웨이 |
+| [Turborepo](https://turbo.build) | 모노레포 빌드 오케스트레이션 |
+| [Playwright](https://playwright.dev) | E2E 테스트 자동화 |
 
 ---
 

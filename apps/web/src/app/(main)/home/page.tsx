@@ -29,6 +29,8 @@ const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 export default function HomePage() {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const t = useTranslations('home');
   const te = useTranslations('empty');
   const ts = useTranslations('sports');
@@ -78,10 +80,10 @@ export default function HomePage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              {isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'TeamMeet'}
+              {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'MatchUp'}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {isAuthenticated
+              {mounted && isAuthenticated
                 ? upcoming.length > 0 ? `${t('upcomingSchedule')} ${t('upcomingCount', { count: upcoming.length })}` : t('findMatchToday')
                 : t('findPartner')
               }

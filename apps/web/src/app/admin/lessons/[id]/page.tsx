@@ -5,14 +5,50 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { ChevronRight, Calendar, MapPin, Users, CreditCard, User, GraduationCap, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Users, CreditCard, User, GraduationCap, AlertCircle, CheckCircle, Ticket } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLesson } from '@/hooks/use-api';
 import type { LessonParticipant } from '@/types/api';
-import { sportLabel, levelLabel } from '@/lib/constants';
-import { formatFullDate, formatCurrency } from '@/lib/utils';
+import { sportLabel, levelLabel, ticketTypeLabel } from '@/lib/constants';
+import { formatFullDate, formatCurrency, formatDateCompact } from '@/lib/utils';
+import type { TicketType, TicketStatus } from '@/types/api';
+
+// ── Ticket mock data scoped to this lesson ───────────────────────────────────
+
+interface MockLessonTicket {
+  id: string;
+  ticketType: TicketType;
+  buyerName: string;
+  status: TicketStatus;
+  usedSessions: number;
+  totalSessions: number | null;
+  purchasedAt: string;
+}
+
+const LESSON_MOCK_TICKETS: MockLessonTicket[] = [
+  { id: 'lt-001', ticketType: 'multi',     buyerName: '김민준', status: 'active',    usedSessions: 4, totalSessions: 10, purchasedAt: '2026-03-01' },
+  { id: 'lt-002', ticketType: 'single',    buyerName: '이서연', status: 'exhausted', usedSessions: 1, totalSessions: 1,  purchasedAt: '2026-03-05' },
+  { id: 'lt-003', ticketType: 'unlimited', buyerName: '박지호', status: 'active',    usedSessions: 7, totalSessions: null, purchasedAt: '2026-03-10' },
+  { id: 'lt-004', ticketType: 'multi',     buyerName: '최수아', status: 'expired',   usedSessions: 6, totalSessions: 10, purchasedAt: '2026-01-15' },
+];
+
+const lessonTicketStatusLabel: Record<TicketStatus, string> = {
+  active: '활성', expired: '만료', exhausted: '소진', refunded: '환불', cancelled: '취소',
+};
+const lessonTicketStatusColor: Record<TicketStatus, string> = {
+  active:    'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+  expired:   'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+  exhausted: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+  refunded:  'bg-rose-50 text-rose-500 dark:bg-rose-900/30 dark:text-rose-400',
+  cancelled: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+};
+const lessonTicketTypeColor: Record<TicketType, string> = {
+  single:    'bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400',
+  multi:     'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+  unlimited: 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+};
 
 const typeLabel: Record<string, string> = {
   group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉',
@@ -199,6 +235,91 @@ export default function AdminLessonDetailPage() {
                 icon={Users}
                 title="아직 참가자가 없어요"
                 description="수강 신청이 들어오면 여기에 표시돼요"
+                size="sm"
+              />
+            )}
+          </div>
+
+          {/* Issued tickets */}
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Ticket size={18} className="text-gray-400" aria-hidden="true" />
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">발급 수강권</h3>
+              <span className="ml-auto rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                {LESSON_MOCK_TICKETS.length}건
+              </span>
+            </div>
+
+            {LESSON_MOCK_TICKETS.length > 0 ? (
+              <div className="overflow-x-auto -mx-5 px-5">
+                <table className="w-full min-w-[480px] text-left">
+                  <thead>
+                    <tr className="border-b border-gray-100 dark:border-gray-700">
+                      <th className="pb-2.5 pr-4 text-xs font-medium text-gray-400 uppercase">구매자</th>
+                      <th className="pb-2.5 pr-4 text-xs font-medium text-gray-400 uppercase">유형</th>
+                      <th className="pb-2.5 pr-4 text-xs font-medium text-gray-400 uppercase">상태</th>
+                      <th className="pb-2.5 pr-4 text-xs font-medium text-gray-400 uppercase">사용현황</th>
+                      <th className="pb-2.5 text-xs font-medium text-gray-400 uppercase">구매일</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                    {LESSON_MOCK_TICKETS.map((t) => (
+                      <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                        {/* Buyer */}
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-500 dark:text-gray-400">
+                              {t.buyerName.charAt(0)}
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{t.buyerName}</span>
+                          </div>
+                        </td>
+
+                        {/* Type */}
+                        <td className="py-3 pr-4">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${lessonTicketTypeColor[t.ticketType]}`}>
+                            {ticketTypeLabel[t.ticketType]}
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3 pr-4">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${lessonTicketStatusColor[t.status]}`}>
+                            {lessonTicketStatusLabel[t.status]}
+                          </span>
+                        </td>
+
+                        {/* Usage */}
+                        <td className="py-3 pr-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                            {t.totalSessions === null
+                              ? `${t.usedSessions}회 사용`
+                              : `${t.usedSessions} / ${t.totalSessions}회`}
+                          </p>
+                          {t.totalSessions !== null && (
+                            <div className="mt-1 h-[3px] w-16 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-blue-500"
+                                style={{ width: `${Math.min(100, (t.usedSessions / t.totalSessions) * 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Purchased at */}
+                        <td className="py-3 text-sm text-gray-400 whitespace-nowrap">
+                          {formatDateCompact(t.purchasedAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                icon={Ticket}
+                title="발급된 수강권이 없어요"
+                description="수강권이 구매되면 여기에 표시돼요"
                 size="sm"
               />
             )}

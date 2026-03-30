@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
@@ -99,13 +100,21 @@ export default function CreateLessonPage() {
   if (!isAuthenticated) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700">로그인 후 강좌를 등록할 수 있어요</p>
-        <button
-          onClick={() => router.push('/login')}
-          className="mt-4 rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
-        >
-          로그인
-        </button>
+        <p className="text-md font-medium text-gray-700 dark:text-gray-300">로그인 후 강좌를 등록할 수 있어요</p>
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <button
+            onClick={() => router.push('/login')}
+            className="rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
+          >
+            로그인
+          </button>
+          <Link
+            href="/lessons"
+            className="rounded-lg bg-gray-100 dark:bg-gray-800 px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            강좌 목록
+          </Link>
+        </div>
       </div>
     );
   }
@@ -124,7 +133,7 @@ export default function CreateLessonPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold text-gray-900">강좌 등록</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">강좌 등록</h1>
       </header>
 
       {/* Progress */}
@@ -137,7 +146,7 @@ export default function CreateLessonPage() {
           ))}
         </div>
         <div className="flex items-center justify-between">
-          <p className="text-base font-semibold text-gray-900">{STEPS[step]}</p>
+          <p className="text-base font-semibold text-gray-900 dark:text-white">{STEPS[step]}</p>
           <p className="text-xs text-gray-500">{step + 1} / {STEPS.length}</p>
         </div>
       </div>
@@ -147,7 +156,7 @@ export default function CreateLessonPage() {
         {step === 0 && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">종목 선택</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">종목 선택</label>
               <div className="grid grid-cols-2 gap-3">
                 {sports.map((s) => {
                   const Icon = SportIconMap[s.type];
@@ -159,7 +168,7 @@ export default function CreateLessonPage() {
                       className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-colors ${
                         selected
                           ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                          : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
+                          : 'border-gray-100 bg-white dark:bg-gray-800 dark:border-gray-700 hover:border-gray-200 text-gray-700 dark:text-gray-300'
                       }`}
                     >
                       {Icon && <Icon size={28} />}
@@ -171,7 +180,7 @@ export default function CreateLessonPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">강좌 유형</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">강좌 유형</label>
               <div className="space-y-2">
                 {lessonTypes.map((t) => (
                   <button
@@ -180,10 +189,10 @@ export default function CreateLessonPage() {
                     className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
                       form.type === t.value
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                        : 'border-gray-100 hover:border-gray-200'
+                        : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 dark:bg-gray-800'
                     }`}
                   >
-                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
+                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-gray-100'}`}>
                       {t.label}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
@@ -198,7 +207,7 @@ export default function CreateLessonPage() {
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label htmlFor="lesson-title" className="text-sm font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-title" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                 강좌 제목 <span className="text-red-400">*</span>
               </label>
               <input
@@ -213,7 +222,7 @@ export default function CreateLessonPage() {
             </div>
 
             <div>
-              <label htmlFor="lesson-description" className="text-sm font-medium text-gray-700 mb-1.5 block">강좌 설명</label>
+              <label htmlFor="lesson-description" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">강좌 설명</label>
               <textarea
                 id="lesson-description"
                 value={form.description}
@@ -226,7 +235,7 @@ export default function CreateLessonPage() {
             </div>
 
             <div>
-              <label htmlFor="lesson-coach-name" className="text-sm font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-coach-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                 코치명 <span className="text-red-400">*</span>
               </label>
               <input
@@ -241,7 +250,7 @@ export default function CreateLessonPage() {
             </div>
 
             <div>
-              <label htmlFor="lesson-coach-bio" className="text-sm font-medium text-gray-700 mb-1.5 block">코치 소개</label>
+              <label htmlFor="lesson-coach-bio" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">코치 소개</label>
               <textarea
                 id="lesson-coach-bio"
                 value={form.coachBio}
@@ -259,7 +268,7 @@ export default function CreateLessonPage() {
         {step === 2 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label htmlFor="lesson-venue" className="text-sm font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-venue" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                 장소명 <span className="text-red-400">*</span>
               </label>
               <input
@@ -273,7 +282,7 @@ export default function CreateLessonPage() {
             </div>
 
             <div>
-              <label htmlFor="lesson-date" className="text-sm font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="lesson-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                 날짜 <span className="text-red-400">*</span>
               </label>
               <input
@@ -287,7 +296,7 @@ export default function CreateLessonPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="lesson-start-time" className="text-sm font-medium text-gray-700 mb-1.5 block">
+                <label htmlFor="lesson-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                   시작 시간 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -299,7 +308,7 @@ export default function CreateLessonPage() {
                 />
               </div>
               <div>
-                <label htmlFor="lesson-end-time" className="text-sm font-medium text-gray-700 mb-1.5 block">
+                <label htmlFor="lesson-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
                   종료 시간 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -314,7 +323,7 @@ export default function CreateLessonPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="lesson-max-participants" className="text-sm font-medium text-gray-700 mb-1.5 block">최대 인원</label>
+                <label htmlFor="lesson-max-participants" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최대 인원</label>
                 <input
                   id="lesson-max-participants"
                   type="number"
@@ -326,7 +335,7 @@ export default function CreateLessonPage() {
                 />
               </div>
               <div>
-                <label htmlFor="lesson-fee" className="text-sm font-medium text-gray-700 mb-1.5 block">수강료 (원)</label>
+                <label htmlFor="lesson-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">수강료 (원)</label>
                 <input
                   id="lesson-fee"
                   type="number"
@@ -346,7 +355,7 @@ export default function CreateLessonPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="lesson-level-min" className="text-sm font-medium text-gray-700 mb-1.5 block">최소 레벨</label>
+                <label htmlFor="lesson-level-min" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최소 레벨</label>
                 <select
                   id="lesson-level-min"
                   value={form.levelMin}
@@ -359,7 +368,7 @@ export default function CreateLessonPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="lesson-level-max" className="text-sm font-medium text-gray-700 mb-1.5 block">최대 레벨</label>
+                <label htmlFor="lesson-level-max" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최대 레벨</label>
                 <select
                   id="lesson-level-max"
                   value={form.levelMax}
@@ -378,8 +387,8 @@ export default function CreateLessonPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-xl bg-white border border-gray-100 p-5">
-              <h3 className="text-lg font-bold text-gray-900 mb-3">강좌 정보 확인</h3>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 정보 확인</h3>
               <div className="space-y-3">
                 <SummaryRow label="종목" value={selectedSport?.label || ''} />
                 <SummaryRow label="유형" value={selectedType?.label || ''} />
@@ -431,8 +440,8 @@ export default function CreateLessonPage() {
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1">
-      <span className="text-sm text-gray-500 shrink-0">{label}</span>
-      <span className="text-base font-medium text-gray-900 text-right">{value}</span>
+      <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">{label}</span>
+      <span className="text-base font-medium text-gray-900 dark:text-gray-100 text-right">{value}</span>
     </div>
   );
 }

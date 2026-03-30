@@ -81,14 +81,14 @@ export default function CreateTeamPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900">팀 등록</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">팀 등록</h1>
       </header>
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/teams" className="hover:text-gray-600 transition-colors">팀/클럽</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">팀 등록</span>
+        <span className="text-gray-700 dark:text-gray-200">팀 등록</span>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-2xl">
@@ -250,10 +250,10 @@ export default function CreateTeamPage() {
         </Field>
 
         {/* SNS 링크 */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Globe size={16} className="text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900">SNS 링크</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">SNS 링크</h3>
           </div>
           <div className="space-y-3">
             <div>
@@ -290,10 +290,10 @@ export default function CreateTeamPage() {
         </div>
 
         {/* 홍보 영상(Shorts) */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Video size={16} className="text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900">홍보 영상 (Shorts)</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
           </div>
           <input
             id="team-shortsUrl"
@@ -332,6 +332,15 @@ export default function CreateTeamPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
+        :global(.dark) .input-field {
+          border-color: #374151;
+          background: #1F2937;
+          color: #F3F4F6;
+        }
+        :global(.dark) .input-field:focus {
+          border-color: #3182F6;
+          background: #111827;
+        }
       `}</style>
     </div>
   );
@@ -340,7 +349,7 @@ export default function CreateTeamPage() {
 function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
   return (
     <div className="mb-5">
-      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
         {label} {required && <span className="text-red-400">*</span>}
       </label>
       {children}

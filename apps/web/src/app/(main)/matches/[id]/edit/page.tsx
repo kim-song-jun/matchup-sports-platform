@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, ChevronRight, Image as ImageIcon, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Image as ImageIcon, X, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useMatch, useVenues } from '@/hooks/use-api';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { api } from '@/lib/api';
@@ -17,7 +18,7 @@ export default function EditMatchPage() {
   const params = useParams();
   const { toast } = useToast();
   const matchId = params.id as string;
-  const { data: apiMatch } = useMatch(matchId);
+  const { data: apiMatch, isLoading } = useMatch(matchId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -91,6 +92,33 @@ export default function EditMatchPage() {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0 pb-8 max-w-lg">
+        <div className="h-11 w-32 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse mb-6" />
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="mb-5">
+            <div className="h-3 w-16 rounded bg-gray-100 dark:bg-gray-800 animate-pulse mb-2" />
+            <div className="h-11 w-full rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!apiMatch) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-10">
+        <EmptyState
+          icon={SearchX}
+          title="매치를 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 매치예요"
+          action={{ label: '매치 목록으로', href: '/matches' }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">

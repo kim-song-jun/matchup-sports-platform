@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -25,6 +25,15 @@ interface NotificationCategory {
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const markSaved = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus('saved');
+    saveTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000);
+  }, []);
+
   const [pushMaster, setPushMaster] = useState(true);
   const [emailNotif, setEmailNotif] = useState(true);
 
@@ -46,6 +55,7 @@ export default function NotificationsPage() {
     setCategories((prev) =>
       prev.map((cat) => (cat.key === key ? { ...cat, enabled: !cat.enabled } : cat))
     );
+    markSaved();
   };
 
   return (
@@ -81,14 +91,14 @@ export default function NotificationsPage() {
             label="Push 알림"
             desc="앱 푸시 알림을 받습니다"
             enabled={pushMaster}
-            onToggle={() => setPushMaster(!pushMaster)}
+            onToggle={() => { setPushMaster(!pushMaster); markSaved(); }}
           />
           <div className="border-t border-gray-50 dark:border-gray-700 pt-4">
             <ToggleRow
               label="이메일 알림"
               desc="이메일로 주요 알림을 받습니다"
               enabled={emailNotif}
-              onToggle={() => setEmailNotif(!emailNotif)}
+              onToggle={() => { setEmailNotif(!emailNotif); markSaved(); }}
             />
           </div>
         </section>
@@ -114,7 +124,7 @@ export default function NotificationsPage() {
             </div>
             <Toggle
               enabled={dndEnabled}
-              onToggle={() => setDndEnabled(!dndEnabled)}
+              onToggle={() => { setDndEnabled(!dndEnabled); markSaved(); }}
               disabled={!pushMaster}
               label="방해금지 시간"
             />
@@ -166,9 +176,17 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        <p className="text-xs text-gray-500 text-center pb-2">
-          알림 설정은 이 기기에만 적용됩니다.
-        </p>
+        <div className="flex items-center justify-center gap-1.5 pb-2 min-h-[20px]">
+          {saveStatus === 'saved' ? (
+            <p className="text-xs text-blue-500 dark:text-blue-400 animate-fade-in">
+              ✓ 자동 저장됨
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              알림 설정은 이 기기에만 적용됩니다.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

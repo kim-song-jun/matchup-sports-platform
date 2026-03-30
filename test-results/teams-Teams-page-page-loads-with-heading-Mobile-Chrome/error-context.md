@@ -1,0 +1,102 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]:
+            - heading "팀·클럽" [level=1] [ref=e9]
+            - paragraph [ref=e10]: 동호회와 팀을 찾아보세요
+          - link "팀 만들기" [ref=e11] [cursor=pointer]:
+            - /url: /teams/new
+            - img [ref=e12]
+            - text: 팀 만들기
+        - generic [ref=e14]:
+          - link "잠실 아이스베어스 잠실 아이스베어스 모집중 아이스하키 상급 · 18명 송파구 기반 아이스하키 동호회. 주 1회 정기전. 서울 송파구" [ref=e15] [cursor=pointer]:
+            - /url: /teams/73e82aaf-94f3-4b62-b8e3-ffdca54a760a
+            - generic [ref=e16]:
+              - img "잠실 아이스베어스" [ref=e18]
+              - generic [ref=e19]:
+                - generic [ref=e20]:
+                  - heading "잠실 아이스베어스" [level=3] [ref=e21]
+                  - generic [ref=e22]: 모집중
+                - paragraph [ref=e23]:
+                  - generic [ref=e24]: 아이스하키
+                  - generic [ref=e25]: 상급 · 18명
+                - paragraph [ref=e26]: 송파구 기반 아이스하키 동호회. 주 1회 정기전.
+                - paragraph [ref=e27]: 서울 송파구
+          - link "FC 마포 FC 마포 모집중 풋살 중급 · 15명 마포구 직장인 풋살 동호회. 매주 토요일 저녁. 서울 마포구" [ref=e28] [cursor=pointer]:
+            - /url: /teams/c957d3ee-9924-4b64-a705-ebbe429b27d2
+            - generic [ref=e29]:
+              - img "FC 마포" [ref=e31]
+              - generic [ref=e32]:
+                - generic [ref=e33]:
+                  - heading "FC 마포" [level=3] [ref=e34]
+                  - generic [ref=e35]: 모집중
+                - paragraph [ref=e36]:
+                  - generic [ref=e37]: 풋살
+                  - generic [ref=e38]: 중급 · 15명
+                - paragraph [ref=e39]: 마포구 직장인 풋살 동호회. 매주 토요일 저녁.
+                - paragraph [ref=e40]: 서울 마포구
+          - link "강남 슬래머즈 강남 슬래머즈 모집중 농구 중급 · 12명 강남 농구 동호회. 주 2회 정기 모임. 서울 강남구" [ref=e41] [cursor=pointer]:
+            - /url: /teams/4fd2ea48-ae24-4f1b-bab8-d5dcba27f07c
+            - generic [ref=e42]:
+              - img "강남 슬래머즈" [ref=e44]
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - heading "강남 슬래머즈" [level=3] [ref=e47]
+                  - generic [ref=e48]: 모집중
+                - paragraph [ref=e49]:
+                  - generic [ref=e50]: 농구
+                  - generic [ref=e51]: 중급 · 12명
+                - paragraph [ref=e52]: 강남 농구 동호회. 주 2회 정기 모임.
+                - paragraph [ref=e53]: 서울 강남구
+          - link "셔틀콕 파이터즈 셔틀콕 파이터즈 배드민턴 초급 · 20명 서초/강남 배드민턴 동호회. 매주 수/토 모임. 서울 서초구" [ref=e54] [cursor=pointer]:
+            - /url: /teams/fe6be1e8-0a3c-4cc8-9558-ef2ad1d19804
+            - generic [ref=e55]:
+              - img "셔틀콕 파이터즈" [ref=e57]
+              - generic [ref=e58]:
+                - heading "셔틀콕 파이터즈" [level=3] [ref=e60]
+                - paragraph [ref=e61]:
+                  - generic [ref=e62]: 배드민턴
+                  - generic [ref=e63]: 초급 · 20명
+                - paragraph [ref=e64]: 서초/강남 배드민턴 동호회. 매주 수/토 모임.
+                - paragraph [ref=e65]: 서울 서초구
+      - generic [ref=e67]:
+        - paragraph [ref=e68]: © 2026 TeamMeet. All rights reserved.
+        - generic [ref=e69]:
+          - link "이용약관" [ref=e70] [cursor=pointer]:
+            - /url: /settings/terms
+          - generic [ref=e71]: ·
+          - link "개인정보처리방침" [ref=e72] [cursor=pointer]:
+            - /url: /settings/privacy
+    - navigation [ref=e73]:
+      - generic [ref=e74]:
+        - link "홈" [ref=e75] [cursor=pointer]:
+          - /url: /home
+          - img [ref=e77]
+          - generic [ref=e80]: 홈
+        - link "매치" [ref=e81] [cursor=pointer]:
+          - /url: /matches
+          - img [ref=e83]
+          - generic [ref=e86]: 매치
+        - link "강좌" [ref=e87] [cursor=pointer]:
+          - /url: /lessons
+          - img [ref=e89]
+          - generic [ref=e92]: 강좌
+        - link "장터" [ref=e93] [cursor=pointer]:
+          - /url: /marketplace
+          - img [ref=e95]
+          - generic [ref=e98]: 장터
+        - link "5 프로필" [ref=e99] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=e100]:
+            - img [ref=e101]
+            - generic [ref=e104]: "5"
+          - generic [ref=e105]: 프로필
+  - button "Open Next.js Dev Tools" [ref=e111] [cursor=pointer]:
+    - img [ref=e112]
+  - alert [ref=e115]
+```

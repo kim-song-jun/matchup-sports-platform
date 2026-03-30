@@ -342,7 +342,7 @@ export default function TeamMatchDetailPage() {
                 <button
                   onClick={handleArrival}
                   disabled={arrivalMutation.isPending}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-md font-semibold text-white hover:bg-green-600 active:bg-green-700 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   <MapPinCheck size={18} />
                   도착 인증

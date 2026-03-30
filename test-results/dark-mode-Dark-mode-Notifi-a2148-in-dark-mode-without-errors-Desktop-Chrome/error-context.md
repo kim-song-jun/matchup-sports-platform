@@ -7,10 +7,10 @@
       - link "TeamMeet" [ref=e6] [cursor=pointer]:
         - /url: /home
         - heading "TeamMeet" [level=1] [ref=e7]
-      - link "매치 찾기" [ref=e9] [cursor=pointer]:
+      - link "매치 만들기" [ref=e9] [cursor=pointer]:
         - /url: /matches/new
         - img [ref=e10]
-        - text: 매치 찾기
+        - text: 매치 만들기
       - navigation [ref=e11]:
         - link "홈" [ref=e14] [cursor=pointer]:
           - /url: /home
@@ -63,23 +63,27 @@
           - /url: /admin/dashboard
           - img [ref=e81]
           - text: Admin
-      - button "Switch language" [ref=e85]:
-        - img [ref=e86]
-        - text: English
-      - link "로그인" [ref=e90] [cursor=pointer]:
+      - generic [ref=e84]:
+        - button "언어 변경" [ref=e85]:
+          - img [ref=e86]
+          - text: English
+        - button "다크모드 전환" [ref=e89]:
+          - img [ref=e90]
+          - text: 다크
+      - link "로그인" [ref=e93] [cursor=pointer]:
         - /url: /login
-    - main [ref=e91]:
-      - generic [ref=e93]:
-        - generic [ref=e95]:
-          - heading "알림" [level=1] [ref=e96]
-          - paragraph [ref=e97]: 읽지 않은 알림 2개
-        - generic [ref=e99]:
-          - img [ref=e101]
-          - heading "알림이 기다리고 있어요" [level=3] [ref=e104]
-          - paragraph [ref=e105]: 로그인하면 매치 소식을 받아볼 수 있어요
-          - link "로그인" [ref=e106] [cursor=pointer]:
+    - main [ref=e94]:
+      - generic [ref=e96]:
+        - generic [ref=e98]:
+          - heading "알림" [level=1] [ref=e99]
+          - paragraph [ref=e100]: 읽지 않은 알림 2개
+        - generic [ref=e102]:
+          - img [ref=e104]
+          - heading "알림이 기다리고 있어요" [level=3] [ref=e107]
+          - paragraph [ref=e108]: 로그인하면 매치 소식을 받아볼 수 있어요
+          - link "로그인" [ref=e109] [cursor=pointer]:
             - /url: /login
-  - button "Open Next.js Dev Tools" [ref=e112] [cursor=pointer]:
-    - img [ref=e113]
-  - alert [ref=e116]
+  - button "Open Next.js Dev Tools" [ref=e115] [cursor=pointer]:
+    - img [ref=e116]
+  - alert [ref=e119]
 ```

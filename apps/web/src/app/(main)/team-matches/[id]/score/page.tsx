@@ -276,7 +276,7 @@ export default function ScoreInputPage() {
             </p>
             <button
               onClick={() => router.push(`/team-matches/${id}`)}
-              className="mt-4 rounded-xl bg-green-500 px-6 py-2.5 text-base font-semibold text-white hover:bg-green-600 transition-colors"
+              className="mt-4 rounded-xl bg-blue-500 px-6 py-2.5 text-base font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
             >
               매치 상세로 돌아가기
             </button>

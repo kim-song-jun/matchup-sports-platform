@@ -75,8 +75,8 @@ export default function NotificationsPage() {
           />
         ) : (
           <div className="space-y-2 stagger-children">
-            {notifications.map((n) => (
-              <Link key={n.id} href={n.link || '#'} onClick={() => markAsRead(n.id)}>
+            {notifications.map((n) => {
+              const inner = (
                 <div className={`rounded-xl p-4 transition-colors active:scale-[0.98] ${n.isRead ? 'hover:bg-gray-50 dark:hover:bg-gray-800' : 'bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-50/90'}`}>
                   <div className="flex items-start gap-3">
                     {(() => { const TypeIcon = typeConfig[n.type]?.icon || Bell; return (
@@ -96,8 +96,17 @@ export default function NotificationsPage() {
                     </div>
                   </div>
                 </div>
-              </Link>
-            ))}
+              );
+              return n.link ? (
+                <Link key={n.id} href={n.link} onClick={() => markAsRead(n.id)}>
+                  {inner}
+                </Link>
+              ) : (
+                <div key={n.id} role="button" tabIndex={0} onClick={() => markAsRead(n.id)} onKeyDown={(e) => e.key === 'Enter' && markAsRead(n.id)} className="cursor-default">
+                  {inner}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

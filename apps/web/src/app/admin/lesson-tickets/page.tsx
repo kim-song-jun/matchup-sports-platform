@@ -542,14 +542,14 @@ function BulkToolbar({ count, onExpire, onStatusChange, onClear }: BulkToolbarPr
         <button
           type="button"
           onClick={onExpire}
-          className="min-h-[36px] rounded-xl border border-rose-200 dark:border-rose-800 bg-white dark:bg-gray-800 px-3 text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors whitespace-nowrap"
+          className="min-h-[44px] rounded-xl border border-rose-200 dark:border-rose-800 bg-white dark:bg-gray-800 px-3 text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors whitespace-nowrap"
         >
           일괄 만료 처리
         </button>
         <button
           type="button"
           onClick={onStatusChange}
-          className="min-h-[36px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
+          className="min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
         >
           일괄 상태 변경
         </button>
@@ -557,7 +557,7 @@ function BulkToolbar({ count, onExpire, onStatusChange, onClear }: BulkToolbarPr
           type="button"
           onClick={onClear}
           aria-label="선택 해제"
-          className="flex items-center justify-center min-h-[36px] min-w-[36px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           <X size={14} />
         </button>
@@ -883,13 +883,13 @@ export default function AdminLessonTicketsPage() {
                     type="button"
                     onClick={toggleAll}
                     aria-label={allOnPageSelected ? '이 페이지 전체 선택 해제' : '이 페이지 전체 선택'}
-                    className="flex items-center justify-center w-5 h-5 rounded border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-1 ${
+                    className={`flex items-center justify-center w-5 h-5 rounded border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-1 ${
                       allOnPageSelected
                         ? 'bg-blue-500 border-blue-500'
                         : someOnPageSelected
                           ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-400'
                           : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
-                    }"
+                    }`}
                   >
                     {allOnPageSelected && (
                       <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-none stroke-white stroke-2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

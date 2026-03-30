@@ -1,0 +1,47 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - main [ref=e5]:
+      - generic [ref=e7]:
+        - heading "매치를 만들어보세요" [level=2] [ref=e8]
+        - paragraph [ref=e9]: 로그인하면 매치를 만들고 참가자를 모집할 수 있어요
+        - link "로그인하고 시작하기" [ref=e10] [cursor=pointer]:
+          - /url: /login
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: © 2026 TeamMeet. All rights reserved.
+        - generic [ref=e14]:
+          - link "이용약관" [ref=e15] [cursor=pointer]:
+            - /url: /settings/terms
+          - generic [ref=e16]: ·
+          - link "개인정보처리방침" [ref=e17] [cursor=pointer]:
+            - /url: /settings/privacy
+    - navigation [ref=e18]:
+      - generic [ref=e19]:
+        - link "홈" [ref=e20] [cursor=pointer]:
+          - /url: /home
+          - img [ref=e22]
+          - generic [ref=e25]: 홈
+        - link "매치" [ref=e26] [cursor=pointer]:
+          - /url: /matches
+          - img [ref=e28]
+          - generic [ref=e31]: 매치
+        - link "강좌" [ref=e32] [cursor=pointer]:
+          - /url: /lessons
+          - img [ref=e34]
+          - generic [ref=e37]: 강좌
+        - link "장터" [ref=e38] [cursor=pointer]:
+          - /url: /marketplace
+          - img [ref=e40]
+          - generic [ref=e43]: 장터
+        - link "5 프로필" [ref=e44] [cursor=pointer]:
+          - /url: /profile
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - generic [ref=e49]: "5"
+          - generic [ref=e50]: 프로필
+  - button "Open Next.js Dev Tools" [ref=e56] [cursor=pointer]:
+    - img [ref=e57]
+  - alert [ref=e60]
+```

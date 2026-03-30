@@ -42,7 +42,7 @@ export default function CheckoutPage() {
 
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [couponCode, setCouponCode] = useState('');
-  const [couponApplied, setCouponApplied] = useState(true);
+  const [couponApplied, setCouponApplied] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);

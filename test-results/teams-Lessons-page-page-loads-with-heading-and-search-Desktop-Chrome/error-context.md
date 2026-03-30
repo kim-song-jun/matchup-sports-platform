@@ -7,10 +7,10 @@
       - link "TeamMeet" [ref=e6] [cursor=pointer]:
         - /url: /home
         - heading "TeamMeet" [level=1] [ref=e7]
-      - link "매치 찾기" [ref=e9] [cursor=pointer]:
+      - link "매치 만들기" [ref=e9] [cursor=pointer]:
         - /url: /matches/new
         - img [ref=e10]
-        - text: 매치 찾기
+        - text: 매치 만들기
       - navigation [ref=e11]:
         - link "홈" [ref=e14] [cursor=pointer]:
           - /url: /home
@@ -63,97 +63,101 @@
           - /url: /admin/dashboard
           - img [ref=e81]
           - text: Admin
-      - button "Switch language" [ref=e85]:
-        - img [ref=e86]
-        - text: English
-      - link "로그인" [ref=e90] [cursor=pointer]:
+      - generic [ref=e84]:
+        - button "언어 변경" [ref=e85]:
+          - img [ref=e86]
+          - text: English
+        - button "다크모드 전환" [ref=e89]:
+          - img [ref=e90]
+          - text: 다크
+      - link "로그인" [ref=e93] [cursor=pointer]:
         - /url: /login
-    - main [ref=e91]:
-      - generic [ref=e93]:
-        - generic [ref=e94]:
-          - generic [ref=e95]:
-            - heading "강좌" [level=1] [ref=e96]
-            - paragraph [ref=e97]: 레슨, 연습경기, 자유연습을 찾아보세요
-          - link "강좌 만들기" [ref=e98] [cursor=pointer]:
+    - main [ref=e94]:
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - generic [ref=e98]:
+            - heading "강좌" [level=1] [ref=e99]
+            - paragraph [ref=e100]: 레슨, 연습경기, 자유연습을 찾아보세요
+          - link "강좌 만들기" [ref=e101] [cursor=pointer]:
             - /url: /lessons/new
-            - img [ref=e99]
+            - img [ref=e102]
             - text: 강좌 만들기
-        - generic [ref=e101]:
-          - img [ref=e102]
-          - textbox "강좌명, 코치, 장소 검색" [ref=e105]
-        - generic [ref=e106]:
-          - button "전체" [ref=e107]
-          - button "그룹 레슨" [ref=e108]
-          - button "연습 경기" [ref=e109]
-          - button "자유 연습" [ref=e110]
-        - generic [ref=e112]:
-          - link "배드민턴 입문 클래스 배드민턴 입문 클래스 그룹 레슨 배드민턴 · 코치 박소희 코치 3/25 (수) 18:00 2/6명 20,000원" [ref=e113] [cursor=pointer]:
+        - generic [ref=e104]:
+          - img [ref=e105]
+          - textbox "강좌명, 코치, 장소 검색" [ref=e108]
+        - generic [ref=e109]:
+          - button "전체" [ref=e110]
+          - button "그룹 레슨" [ref=e111]
+          - button "연습 경기" [ref=e112]
+          - button "자유 연습" [ref=e113]
+        - generic [ref=e115]:
+          - link "배드민턴 입문 클래스 배드민턴 입문 클래스 그룹 레슨 배드민턴 · 코치 박소희 코치 3/25 (수) 18:00 2/6명 20,000원" [ref=e116] [cursor=pointer]:
             - /url: /lessons/d7ca4bca-494d-407b-a586-793bc0309627
-            - generic [ref=e114]:
-              - img "배드민턴 입문 클래스" [ref=e116]
-              - generic [ref=e117]:
-                - generic [ref=e118]:
-                  - heading "배드민턴 입문 클래스" [level=3] [ref=e119]
-                  - generic [ref=e120]: 그룹 레슨
-                - paragraph [ref=e121]:
-                  - generic [ref=e122]: 배드민턴
+            - generic [ref=e117]:
+              - img "배드민턴 입문 클래스" [ref=e119]
+              - generic [ref=e120]:
+                - generic [ref=e121]:
+                  - heading "배드민턴 입문 클래스" [level=3] [ref=e122]
+                  - generic [ref=e123]: 그룹 레슨
+                - paragraph [ref=e124]:
+                  - generic [ref=e125]: 배드민턴
                   - text: · 코치 박소희 코치
-                - generic [ref=e123]:
-                  - generic [ref=e124]: 3/25 (수) 18:00
-                  - generic [ref=e125]: ·
-                  - generic [ref=e126]: 2/6명
-                  - generic [ref=e127]: ·
-                  - generic [ref=e128]: 20,000원
-          - link "농구 자유 연습 (코트 대여) 농구 자유 연습 (코트 대여) 자유 연습 농구 3/26 (목) 16:00 4/12명 5,000원" [ref=e129] [cursor=pointer]:
+                - generic [ref=e126]:
+                  - generic [ref=e127]: 3/25 (수) 18:00
+                  - generic [ref=e128]: ·
+                  - generic [ref=e129]: 2/6명
+                  - generic [ref=e130]: ·
+                  - generic [ref=e131]: 20,000원
+          - link "농구 자유 연습 (코트 대여) 농구 자유 연습 (코트 대여) 자유 연습 농구 3/26 (목) 16:00 4/12명 5,000원" [ref=e132] [cursor=pointer]:
             - /url: /lessons/5ad4444c-abce-4c4a-8818-b5b04a07cafd
-            - generic [ref=e130]:
-              - img "농구 자유 연습 (코트 대여)" [ref=e132]
-              - generic [ref=e133]:
-                - generic [ref=e134]:
-                  - heading "농구 자유 연습 (코트 대여)" [level=3] [ref=e135]
-                  - generic [ref=e136]: 자유 연습
-                - paragraph [ref=e137]:
-                  - generic [ref=e138]: 농구
-                - generic [ref=e139]:
-                  - generic [ref=e140]: 3/26 (목) 16:00
-                  - generic [ref=e141]: ·
-                  - generic [ref=e142]: 4/12명
-                  - generic [ref=e143]: ·
-                  - generic [ref=e144]: 5,000원
-          - link "아이스하키 기초 레슨 아이스하키 기초 레슨 그룹 레슨 아이스하키 · 코치 김준호 코치 3/27 (금) 14:00 3/8명 35,000원" [ref=e145] [cursor=pointer]:
+            - generic [ref=e133]:
+              - img "농구 자유 연습 (코트 대여)" [ref=e135]
+              - generic [ref=e136]:
+                - generic [ref=e137]:
+                  - heading "농구 자유 연습 (코트 대여)" [level=3] [ref=e138]
+                  - generic [ref=e139]: 자유 연습
+                - paragraph [ref=e140]:
+                  - generic [ref=e141]: 농구
+                - generic [ref=e142]:
+                  - generic [ref=e143]: 3/26 (목) 16:00
+                  - generic [ref=e144]: ·
+                  - generic [ref=e145]: 4/12명
+                  - generic [ref=e146]: ·
+                  - generic [ref=e147]: 5,000원
+          - link "아이스하키 기초 레슨 아이스하키 기초 레슨 그룹 레슨 아이스하키 · 코치 김준호 코치 3/27 (금) 14:00 3/8명 35,000원" [ref=e148] [cursor=pointer]:
             - /url: /lessons/3d16fcf9-578d-4e76-8ca5-43bef40738ee
-            - generic [ref=e146]:
-              - img "아이스하키 기초 레슨" [ref=e148]
-              - generic [ref=e149]:
-                - generic [ref=e150]:
-                  - heading "아이스하키 기초 레슨" [level=3] [ref=e151]
-                  - generic [ref=e152]: 그룹 레슨
-                - paragraph [ref=e153]:
-                  - generic [ref=e154]: 아이스하키
+            - generic [ref=e149]:
+              - img "아이스하키 기초 레슨" [ref=e151]
+              - generic [ref=e152]:
+                - generic [ref=e153]:
+                  - heading "아이스하키 기초 레슨" [level=3] [ref=e154]
+                  - generic [ref=e155]: 그룹 레슨
+                - paragraph [ref=e156]:
+                  - generic [ref=e157]: 아이스하키
                   - text: · 코치 김준호 코치
-                - generic [ref=e155]:
-                  - generic [ref=e156]: 3/27 (금) 14:00
-                  - generic [ref=e157]: ·
-                  - generic [ref=e158]: 3/8명
-                  - generic [ref=e159]: ·
-                  - generic [ref=e160]: 35,000원
-          - link "풋살 연습 경기 풋살 연습 경기 연습 경기 풋살 3/28 (토) 10:00 6/10명 12,000원" [ref=e161] [cursor=pointer]:
+                - generic [ref=e158]:
+                  - generic [ref=e159]: 3/27 (금) 14:00
+                  - generic [ref=e160]: ·
+                  - generic [ref=e161]: 3/8명
+                  - generic [ref=e162]: ·
+                  - generic [ref=e163]: 35,000원
+          - link "풋살 연습 경기 풋살 연습 경기 연습 경기 풋살 3/28 (토) 10:00 6/10명 12,000원" [ref=e164] [cursor=pointer]:
             - /url: /lessons/e80d68dc-2eda-419c-9dbc-1f2b94381727
-            - generic [ref=e162]:
-              - img "풋살 연습 경기" [ref=e164]
-              - generic [ref=e165]:
-                - generic [ref=e166]:
-                  - heading "풋살 연습 경기" [level=3] [ref=e167]
-                  - generic [ref=e168]: 연습 경기
-                - paragraph [ref=e169]:
-                  - generic [ref=e170]: 풋살
-                - generic [ref=e171]:
-                  - generic [ref=e172]: 3/28 (토) 10:00
-                  - generic [ref=e173]: ·
-                  - generic [ref=e174]: 6/10명
-                  - generic [ref=e175]: ·
-                  - generic [ref=e176]: 12,000원
-  - button "Open Next.js Dev Tools" [ref=e182] [cursor=pointer]:
-    - img [ref=e183]
-  - alert [ref=e186]
+            - generic [ref=e165]:
+              - img "풋살 연습 경기" [ref=e167]
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - heading "풋살 연습 경기" [level=3] [ref=e170]
+                  - generic [ref=e171]: 연습 경기
+                - paragraph [ref=e172]:
+                  - generic [ref=e173]: 풋살
+                - generic [ref=e174]:
+                  - generic [ref=e175]: 3/28 (토) 10:00
+                  - generic [ref=e176]: ·
+                  - generic [ref=e177]: 6/10명
+                  - generic [ref=e178]: ·
+                  - generic [ref=e179]: 12,000원
+  - button "Open Next.js Dev Tools" [ref=e185] [cursor=pointer]:
+    - img [ref=e186]
+  - alert [ref=e189]
 ```

@@ -7,10 +7,10 @@
       - link "TeamMeet" [ref=e6] [cursor=pointer]:
         - /url: /home
         - heading "TeamMeet" [level=1] [ref=e7]
-      - link "매치 찾기" [ref=e9] [cursor=pointer]:
+      - link "매치 만들기" [ref=e9] [cursor=pointer]:
         - /url: /matches/new
         - img [ref=e10]
-        - text: 매치 찾기
+        - text: 매치 만들기
       - navigation [ref=e11]:
         - link "홈" [ref=e14] [cursor=pointer]:
           - /url: /home
@@ -63,73 +63,77 @@
           - /url: /admin/dashboard
           - img [ref=e81]
           - text: Admin
-      - button "Switch language" [ref=e85]:
-        - img [ref=e86]
-        - text: English
-      - link "로그인" [ref=e90] [cursor=pointer]:
+      - generic [ref=e84]:
+        - button "언어 변경" [ref=e85]:
+          - img [ref=e86]
+          - text: English
+        - button "다크모드 전환" [ref=e89]:
+          - img [ref=e90]
+          - text: 다크
+      - link "로그인" [ref=e93] [cursor=pointer]:
         - /url: /login
-    - main [ref=e91]:
-      - generic [ref=e93]:
-        - generic [ref=e94]:
-          - generic [ref=e95]:
-            - heading "팀·클럽" [level=1] [ref=e96]
-            - paragraph [ref=e97]: 동호회와 팀을 찾아보세요
-          - link "팀 만들기" [ref=e98] [cursor=pointer]:
+    - main [ref=e94]:
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - generic [ref=e98]:
+            - heading "팀·클럽" [level=1] [ref=e99]
+            - paragraph [ref=e100]: 동호회와 팀을 찾아보세요
+          - link "팀 만들기" [ref=e101] [cursor=pointer]:
             - /url: /teams/new
-            - img [ref=e99]
+            - img [ref=e102]
             - text: 팀 만들기
-        - generic [ref=e101]:
-          - link "잠실 아이스베어스 잠실 아이스베어스 모집중 아이스하키 상급 · 18명 송파구 기반 아이스하키 동호회. 주 1회 정기전. 서울 송파구" [ref=e102] [cursor=pointer]:
+        - generic [ref=e104]:
+          - link "잠실 아이스베어스 잠실 아이스베어스 모집중 아이스하키 상급 · 18명 송파구 기반 아이스하키 동호회. 주 1회 정기전. 서울 송파구" [ref=e105] [cursor=pointer]:
             - /url: /teams/73e82aaf-94f3-4b62-b8e3-ffdca54a760a
-            - generic [ref=e103]:
-              - img "잠실 아이스베어스" [ref=e105]
-              - generic [ref=e106]:
-                - generic [ref=e107]:
-                  - heading "잠실 아이스베어스" [level=3] [ref=e108]
-                  - generic [ref=e109]: 모집중
-                - paragraph [ref=e110]:
-                  - generic [ref=e111]: 아이스하키
-                  - generic [ref=e112]: 상급 · 18명
-                - paragraph [ref=e113]: 송파구 기반 아이스하키 동호회. 주 1회 정기전.
-                - paragraph [ref=e114]: 서울 송파구
-          - link "FC 마포 FC 마포 모집중 풋살 중급 · 15명 마포구 직장인 풋살 동호회. 매주 토요일 저녁. 서울 마포구" [ref=e115] [cursor=pointer]:
+            - generic [ref=e106]:
+              - img "잠실 아이스베어스" [ref=e108]
+              - generic [ref=e109]:
+                - generic [ref=e110]:
+                  - heading "잠실 아이스베어스" [level=3] [ref=e111]
+                  - generic [ref=e112]: 모집중
+                - paragraph [ref=e113]:
+                  - generic [ref=e114]: 아이스하키
+                  - generic [ref=e115]: 상급 · 18명
+                - paragraph [ref=e116]: 송파구 기반 아이스하키 동호회. 주 1회 정기전.
+                - paragraph [ref=e117]: 서울 송파구
+          - link "FC 마포 FC 마포 모집중 풋살 중급 · 15명 마포구 직장인 풋살 동호회. 매주 토요일 저녁. 서울 마포구" [ref=e118] [cursor=pointer]:
             - /url: /teams/c957d3ee-9924-4b64-a705-ebbe429b27d2
-            - generic [ref=e116]:
-              - img "FC 마포" [ref=e118]
-              - generic [ref=e119]:
-                - generic [ref=e120]:
-                  - heading "FC 마포" [level=3] [ref=e121]
-                  - generic [ref=e122]: 모집중
-                - paragraph [ref=e123]:
-                  - generic [ref=e124]: 풋살
-                  - generic [ref=e125]: 중급 · 15명
-                - paragraph [ref=e126]: 마포구 직장인 풋살 동호회. 매주 토요일 저녁.
-                - paragraph [ref=e127]: 서울 마포구
-          - link "강남 슬래머즈 강남 슬래머즈 모집중 농구 중급 · 12명 강남 농구 동호회. 주 2회 정기 모임. 서울 강남구" [ref=e128] [cursor=pointer]:
+            - generic [ref=e119]:
+              - img "FC 마포" [ref=e121]
+              - generic [ref=e122]:
+                - generic [ref=e123]:
+                  - heading "FC 마포" [level=3] [ref=e124]
+                  - generic [ref=e125]: 모집중
+                - paragraph [ref=e126]:
+                  - generic [ref=e127]: 풋살
+                  - generic [ref=e128]: 중급 · 15명
+                - paragraph [ref=e129]: 마포구 직장인 풋살 동호회. 매주 토요일 저녁.
+                - paragraph [ref=e130]: 서울 마포구
+          - link "강남 슬래머즈 강남 슬래머즈 모집중 농구 중급 · 12명 강남 농구 동호회. 주 2회 정기 모임. 서울 강남구" [ref=e131] [cursor=pointer]:
             - /url: /teams/4fd2ea48-ae24-4f1b-bab8-d5dcba27f07c
-            - generic [ref=e129]:
-              - img "강남 슬래머즈" [ref=e131]
-              - generic [ref=e132]:
-                - generic [ref=e133]:
-                  - heading "강남 슬래머즈" [level=3] [ref=e134]
-                  - generic [ref=e135]: 모집중
-                - paragraph [ref=e136]:
-                  - generic [ref=e137]: 농구
-                  - generic [ref=e138]: 중급 · 12명
-                - paragraph [ref=e139]: 강남 농구 동호회. 주 2회 정기 모임.
-                - paragraph [ref=e140]: 서울 강남구
-          - link "셔틀콕 파이터즈 셔틀콕 파이터즈 배드민턴 초급 · 20명 서초/강남 배드민턴 동호회. 매주 수/토 모임. 서울 서초구" [ref=e141] [cursor=pointer]:
+            - generic [ref=e132]:
+              - img "강남 슬래머즈" [ref=e134]
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - heading "강남 슬래머즈" [level=3] [ref=e137]
+                  - generic [ref=e138]: 모집중
+                - paragraph [ref=e139]:
+                  - generic [ref=e140]: 농구
+                  - generic [ref=e141]: 중급 · 12명
+                - paragraph [ref=e142]: 강남 농구 동호회. 주 2회 정기 모임.
+                - paragraph [ref=e143]: 서울 강남구
+          - link "셔틀콕 파이터즈 셔틀콕 파이터즈 배드민턴 초급 · 20명 서초/강남 배드민턴 동호회. 매주 수/토 모임. 서울 서초구" [ref=e144] [cursor=pointer]:
             - /url: /teams/fe6be1e8-0a3c-4cc8-9558-ef2ad1d19804
-            - generic [ref=e142]:
-              - img "셔틀콕 파이터즈" [ref=e144]
-              - generic [ref=e145]:
-                - heading "셔틀콕 파이터즈" [level=3] [ref=e147]
-                - paragraph [ref=e148]:
-                  - generic [ref=e149]: 배드민턴
-                  - generic [ref=e150]: 초급 · 20명
-                - paragraph [ref=e151]: 서초/강남 배드민턴 동호회. 매주 수/토 모임.
-                - paragraph [ref=e152]: 서울 서초구
-  - button "Open Next.js Dev Tools" [ref=e158] [cursor=pointer]:
-    - img [ref=e159]
-  - alert [ref=e162]
+            - generic [ref=e145]:
+              - img "셔틀콕 파이터즈" [ref=e147]
+              - generic [ref=e148]:
+                - heading "셔틀콕 파이터즈" [level=3] [ref=e150]
+                - paragraph [ref=e151]:
+                  - generic [ref=e152]: 배드민턴
+                  - generic [ref=e153]: 초급 · 20명
+                - paragraph [ref=e154]: 서초/강남 배드민턴 동호회. 매주 수/토 모임.
+                - paragraph [ref=e155]: 서울 서초구
+  - button "Open Next.js Dev Tools" [ref=e161] [cursor=pointer]:
+    - img [ref=e162]
+  - alert [ref=e165]
 ```

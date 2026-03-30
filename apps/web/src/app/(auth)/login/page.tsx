@@ -36,10 +36,11 @@ export default function LoginPage() {
       if (mode === 'register') {
         await emailRegister.mutateAsync({ email, password, nickname });
         toast('success', '가입 완료! 환영합니다');
+        router.push('/onboarding');
       } else {
         await emailLogin.mutateAsync({ email, password });
+        router.push('/home');
       }
-      router.push('/home');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast('error', msg || (mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));

@@ -7,10 +7,10 @@
       - link "TeamMeet" [ref=e6] [cursor=pointer]:
         - /url: /home
         - heading "TeamMeet" [level=1] [ref=e7]
-      - link "매치 찾기" [ref=e9] [cursor=pointer]:
+      - link "매치 만들기" [ref=e9] [cursor=pointer]:
         - /url: /matches/new
         - img [ref=e10]
-        - text: 매치 찾기
+        - text: 매치 만들기
       - navigation [ref=e11]:
         - link "홈" [ref=e14] [cursor=pointer]:
           - /url: /home
@@ -63,175 +63,179 @@
           - /url: /admin/dashboard
           - img [ref=e81]
           - text: Admin
-      - button "Switch language" [ref=e85]:
-        - img [ref=e86]
-        - text: English
-      - link "로그인" [ref=e90] [cursor=pointer]:
+      - generic [ref=e84]:
+        - button "언어 변경" [ref=e85]:
+          - img [ref=e86]
+          - text: English
+        - button "다크모드 전환" [ref=e89]:
+          - img [ref=e90]
+          - text: 다크
+      - link "로그인" [ref=e93] [cursor=pointer]:
         - /url: /login
-    - main [ref=e91]:
-      - generic [ref=e93]:
-        - generic [ref=e94]:
-          - heading "장터" [level=1] [ref=e95]
-          - link "상품 등록하기" [ref=e96] [cursor=pointer]:
+    - main [ref=e94]:
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - heading "장터" [level=1] [ref=e98]
+          - link "상품 등록하기" [ref=e99] [cursor=pointer]:
             - /url: /marketplace/new
-            - img [ref=e97]
+            - img [ref=e100]
             - text: 상품 등록하기
-        - generic [ref=e99]:
-          - img [ref=e100]
-          - textbox "상품명, 종목 검색" [ref=e103]
-        - generic [ref=e104]:
-          - button "전체" [ref=e105]
-          - button "풋살화" [ref=e106]
-          - button "하키장비" [ref=e107]
-          - button "농구화" [ref=e108]
-          - button "라켓" [ref=e109]
-          - button "유니폼" [ref=e110]
-          - button "보호장비" [ref=e111]
-        - generic [ref=e113]:
-          - link "아디다스 축구화 270mm (프레데터) 축구 마포구 · 거의 새 것 95,000원 판매 관심 18 · 조회 67" [ref=e114] [cursor=pointer]:
+        - generic [ref=e102]:
+          - img [ref=e103]
+          - textbox "상품명, 종목 검색" [ref=e106]
+        - generic [ref=e107]:
+          - button "전체" [ref=e108]
+          - button "풋살화" [ref=e109]
+          - button "하키장비" [ref=e110]
+          - button "농구화" [ref=e111]
+          - button "라켓" [ref=e112]
+          - button "유니폼" [ref=e113]
+          - button "보호장비" [ref=e114]
+        - generic [ref=e116]:
+          - link "아디다스 축구화 270mm (프레데터) 축구 마포구 · 거의 새 것 95,000원 판매 관심 18 · 조회 67" [ref=e117] [cursor=pointer]:
             - /url: /marketplace/38fe28d5-a6fc-4a19-8a11-57de5cac9ba0
-            - generic [ref=e115]:
-              - img [ref=e117]
-              - generic [ref=e120]:
-                - heading "아디다스 축구화 270mm (프레데터)" [level=3] [ref=e121]
-                - generic [ref=e122]:
-                  - generic [ref=e123]: 축구
-                  - generic [ref=e124]: 마포구 · 거의 새 것
-                - paragraph [ref=e125]: 95,000원
-                - generic [ref=e126]:
-                  - generic [ref=e127]: 판매
-                  - generic [ref=e128]: 관심 18 · 조회 67
-          - link "나이키 농구화 275mm (에어조던) 농구 강남구 · 양호 65,000원 판매 관심 8 · 조회 34" [ref=e129] [cursor=pointer]:
+            - generic [ref=e118]:
+              - img [ref=e120]
+              - generic [ref=e123]:
+                - heading "아디다스 축구화 270mm (프레데터)" [level=3] [ref=e124]
+                - generic [ref=e125]:
+                  - generic [ref=e126]: 축구
+                  - generic [ref=e127]: 마포구 · 거의 새 것
+                - paragraph [ref=e128]: 95,000원
+                - generic [ref=e129]:
+                  - generic [ref=e130]: 판매
+                  - generic [ref=e131]: 관심 18 · 조회 67
+          - link "나이키 농구화 275mm (에어조던) 농구 강남구 · 양호 65,000원 판매 관심 8 · 조회 34" [ref=e132] [cursor=pointer]:
             - /url: /marketplace/27f31503-1f7f-498c-814f-2233074fdc38
-            - generic [ref=e130]:
-              - img [ref=e132]
-              - generic [ref=e135]:
-                - heading "나이키 농구화 275mm (에어조던)" [level=3] [ref=e136]
-                - generic [ref=e137]:
-                  - generic [ref=e138]: 농구
-                  - generic [ref=e139]: 강남구 · 양호
-                - paragraph [ref=e140]: 65,000원
-                - generic [ref=e141]:
-                  - generic [ref=e142]: 판매
-                  - generic [ref=e143]: 관심 8 · 조회 34
-          - link "바우어 아이스하키 스틱 (좌타) 아이스하키 송파구 · 양호 120,000원 판매 관심 4 · 조회 19" [ref=e144] [cursor=pointer]:
+            - generic [ref=e133]:
+              - img [ref=e135]
+              - generic [ref=e138]:
+                - heading "나이키 농구화 275mm (에어조던)" [level=3] [ref=e139]
+                - generic [ref=e140]:
+                  - generic [ref=e141]: 농구
+                  - generic [ref=e142]: 강남구 · 양호
+                - paragraph [ref=e143]: 65,000원
+                - generic [ref=e144]:
+                  - generic [ref=e145]: 판매
+                  - generic [ref=e146]: 관심 8 · 조회 34
+          - link "바우어 아이스하키 스틱 (좌타) 아이스하키 송파구 · 양호 120,000원 판매 관심 4 · 조회 19" [ref=e147] [cursor=pointer]:
             - /url: /marketplace/00c904ca-bb55-4441-81fc-59a000ec1187
-            - generic [ref=e145]:
-              - img [ref=e147]
-              - generic [ref=e150]:
-                - heading "바우어 아이스하키 스틱 (좌타)" [level=3] [ref=e151]
-                - generic [ref=e152]:
-                  - generic [ref=e153]: 아이스하키
-                  - generic [ref=e154]: 송파구 · 양호
-                - paragraph [ref=e155]: 120,000원
-                - generic [ref=e156]:
-                  - generic [ref=e157]: 판매
-                  - generic [ref=e158]: 관심 4 · 조회 19
-          - link "빅터 배드민턴 라켓 (쓰러스터 K) 배드민턴 서초구 · 새 상품 150,000원 판매 관심 15 · 조회 52" [ref=e159] [cursor=pointer]:
+            - generic [ref=e148]:
+              - img [ref=e150]
+              - generic [ref=e153]:
+                - heading "바우어 아이스하키 스틱 (좌타)" [level=3] [ref=e154]
+                - generic [ref=e155]:
+                  - generic [ref=e156]: 아이스하키
+                  - generic [ref=e157]: 송파구 · 양호
+                - paragraph [ref=e158]: 120,000원
+                - generic [ref=e159]:
+                  - generic [ref=e160]: 판매
+                  - generic [ref=e161]: 관심 4 · 조회 19
+          - link "빅터 배드민턴 라켓 (쓰러스터 K) 배드민턴 서초구 · 새 상품 150,000원 판매 관심 15 · 조회 52" [ref=e162] [cursor=pointer]:
             - /url: /marketplace/c6bc2717-641a-47bd-92fa-4682ac87be5b
-            - generic [ref=e160]:
-              - img [ref=e162]
-              - generic [ref=e165]:
-                - heading "빅터 배드민턴 라켓 (쓰러스터 K)" [level=3] [ref=e166]
-                - generic [ref=e167]:
-                  - generic [ref=e168]: 배드민턴
-                  - generic [ref=e169]: 서초구 · 새 상품
-                - paragraph [ref=e170]: 150,000원
-                - generic [ref=e171]:
-                  - generic [ref=e172]: 판매
-                  - generic [ref=e173]: 관심 15 · 조회 52
-          - link "윌슨 테니스 라켓 대여 테니스 영등포구 · 양호 10,000원 대여 관심 6 · 조회 28" [ref=e174] [cursor=pointer]:
+            - generic [ref=e163]:
+              - img [ref=e165]
+              - generic [ref=e168]:
+                - heading "빅터 배드민턴 라켓 (쓰러스터 K)" [level=3] [ref=e169]
+                - generic [ref=e170]:
+                  - generic [ref=e171]: 배드민턴
+                  - generic [ref=e172]: 서초구 · 새 상품
+                - paragraph [ref=e173]: 150,000원
+                - generic [ref=e174]:
+                  - generic [ref=e175]: 판매
+                  - generic [ref=e176]: 관심 15 · 조회 52
+          - link "윌슨 테니스 라켓 대여 테니스 영등포구 · 양호 10,000원 대여 관심 6 · 조회 28" [ref=e177] [cursor=pointer]:
             - /url: /marketplace/eee1d9ac-77b9-41e7-bad9-6fab2d25e16f
-            - generic [ref=e175]:
-              - img [ref=e177]
-              - generic [ref=e180]:
-                - heading "윌슨 테니스 라켓 대여" [level=3] [ref=e181]
-                - generic [ref=e182]:
-                  - generic [ref=e183]: 테니스
-                  - generic [ref=e184]: 영등포구 · 양호
-                - paragraph [ref=e185]: 10,000원
-                - generic [ref=e186]:
-                  - generic [ref=e187]: 대여
-                  - generic [ref=e188]: 관심 6 · 조회 28
-          - link "데상트 풋살화 260mm 풋살 마포구 · 양호 45,000원 판매 관심 9 · 조회 31" [ref=e189] [cursor=pointer]:
+            - generic [ref=e178]:
+              - img [ref=e180]
+              - generic [ref=e183]:
+                - heading "윌슨 테니스 라켓 대여" [level=3] [ref=e184]
+                - generic [ref=e185]:
+                  - generic [ref=e186]: 테니스
+                  - generic [ref=e187]: 영등포구 · 양호
+                - paragraph [ref=e188]: 10,000원
+                - generic [ref=e189]:
+                  - generic [ref=e190]: 대여
+                  - generic [ref=e191]: 관심 6 · 조회 28
+          - link "데상트 풋살화 260mm 풋살 마포구 · 양호 45,000원 판매 관심 9 · 조회 31" [ref=e192] [cursor=pointer]:
             - /url: /marketplace/3c25a109-f587-427f-8926-5361723e2e4f
-            - generic [ref=e190]:
-              - img [ref=e192]
-              - generic [ref=e195]:
-                - heading "데상트 풋살화 260mm" [level=3] [ref=e196]
-                - generic [ref=e197]:
-                  - generic [ref=e198]: 풋살
-                  - generic [ref=e199]: 마포구 · 양호
-                - paragraph [ref=e200]: 45,000원
-                - generic [ref=e201]:
-                  - generic [ref=e202]: 판매
-                  - generic [ref=e203]: 관심 9 · 조회 31
-          - link "하키 보호대 풀세트 (대) 아이스하키 송파구 · 사용감 80,000원 판매 관심 2 · 조회 11" [ref=e204] [cursor=pointer]:
+            - generic [ref=e193]:
+              - img [ref=e195]
+              - generic [ref=e198]:
+                - heading "데상트 풋살화 260mm" [level=3] [ref=e199]
+                - generic [ref=e200]:
+                  - generic [ref=e201]: 풋살
+                  - generic [ref=e202]: 마포구 · 양호
+                - paragraph [ref=e203]: 45,000원
+                - generic [ref=e204]:
+                  - generic [ref=e205]: 판매
+                  - generic [ref=e206]: 관심 9 · 조회 31
+          - link "하키 보호대 풀세트 (대) 아이스하키 송파구 · 사용감 80,000원 판매 관심 2 · 조회 11" [ref=e207] [cursor=pointer]:
             - /url: /marketplace/76e2b467-d781-48e2-9af3-efb99bced254
-            - generic [ref=e205]:
-              - img [ref=e207]
-              - generic [ref=e210]:
-                - heading "하키 보호대 풀세트 (대)" [level=3] [ref=e211]
-                - generic [ref=e212]:
-                  - generic [ref=e213]: 아이스하키
-                  - generic [ref=e214]: 송파구 · 사용감
-                - paragraph [ref=e215]: 80,000원
-                - generic [ref=e216]:
-                  - generic [ref=e217]: 판매
-                  - generic [ref=e218]: 관심 2 · 조회 11
-          - link "동호회 유니폼 세트 (10벌) 농구 강남구 · 거의 새 것 5,000원 판매 관심 22 · 조회 88" [ref=e219] [cursor=pointer]:
+            - generic [ref=e208]:
+              - img [ref=e210]
+              - generic [ref=e213]:
+                - heading "하키 보호대 풀세트 (대)" [level=3] [ref=e214]
+                - generic [ref=e215]:
+                  - generic [ref=e216]: 아이스하키
+                  - generic [ref=e217]: 송파구 · 사용감
+                - paragraph [ref=e218]: 80,000원
+                - generic [ref=e219]:
+                  - generic [ref=e220]: 판매
+                  - generic [ref=e221]: 관심 2 · 조회 11
+          - link "동호회 유니폼 세트 (10벌) 농구 강남구 · 거의 새 것 5,000원 판매 관심 22 · 조회 88" [ref=e222] [cursor=pointer]:
             - /url: /marketplace/84b94938-b572-4c09-94c5-f71a06a6c6ed
-            - generic [ref=e220]:
-              - img [ref=e222]
-              - generic [ref=e225]:
-                - heading "동호회 유니폼 세트 (10벌)" [level=3] [ref=e226]
-                - generic [ref=e227]:
-                  - generic [ref=e228]: 농구
-                  - generic [ref=e229]: 강남구 · 거의 새 것
-                - paragraph [ref=e230]: 5,000원
-                - generic [ref=e231]:
-                  - generic [ref=e232]: 판매
-                  - generic [ref=e233]: 관심 22 · 조회 88
-          - link "CCM 아이스하키 스틱 (우타) 아이스하키 송파구 · 양호 80,000원 판매 관심 5 · 조회 24" [ref=e234] [cursor=pointer]:
+            - generic [ref=e223]:
+              - img [ref=e225]
+              - generic [ref=e228]:
+                - heading "동호회 유니폼 세트 (10벌)" [level=3] [ref=e229]
+                - generic [ref=e230]:
+                  - generic [ref=e231]: 농구
+                  - generic [ref=e232]: 강남구 · 거의 새 것
+                - paragraph [ref=e233]: 5,000원
+                - generic [ref=e234]:
+                  - generic [ref=e235]: 판매
+                  - generic [ref=e236]: 관심 22 · 조회 88
+          - link "CCM 아이스하키 스틱 (우타) 아이스하키 송파구 · 양호 80,000원 판매 관심 5 · 조회 24" [ref=e237] [cursor=pointer]:
             - /url: /marketplace/03e70db6-7950-41ef-8be0-b0bb22747719
-            - generic [ref=e235]:
-              - img [ref=e237]
-              - generic [ref=e240]:
-                - heading "CCM 아이스하키 스틱 (우타)" [level=3] [ref=e241]
-                - generic [ref=e242]:
-                  - generic [ref=e243]: 아이스하키
-                  - generic [ref=e244]: 송파구 · 양호
-                - paragraph [ref=e245]: 80,000원
-                - generic [ref=e246]:
-                  - generic [ref=e247]: 판매
-                  - generic [ref=e248]: 관심 5 · 조회 24
-          - link "요넥스 배드민턴 라켓 대여 배드민턴 강남구 · 양호 5,000원 대여 관심 3 · 조회 16" [ref=e249] [cursor=pointer]:
+            - generic [ref=e238]:
+              - img [ref=e240]
+              - generic [ref=e243]:
+                - heading "CCM 아이스하키 스틱 (우타)" [level=3] [ref=e244]
+                - generic [ref=e245]:
+                  - generic [ref=e246]: 아이스하키
+                  - generic [ref=e247]: 송파구 · 양호
+                - paragraph [ref=e248]: 80,000원
+                - generic [ref=e249]:
+                  - generic [ref=e250]: 판매
+                  - generic [ref=e251]: 관심 5 · 조회 24
+          - link "요넥스 배드민턴 라켓 대여 배드민턴 강남구 · 양호 5,000원 대여 관심 3 · 조회 16" [ref=e252] [cursor=pointer]:
             - /url: /marketplace/47ffd6b4-25e4-416a-82b8-81a3e57c47b8
-            - generic [ref=e250]:
-              - img [ref=e252]
-              - generic [ref=e255]:
-                - heading "요넥스 배드민턴 라켓 대여" [level=3] [ref=e256]
-                - generic [ref=e257]:
-                  - generic [ref=e258]: 배드민턴
-                  - generic [ref=e259]: 강남구 · 양호
-                - paragraph [ref=e260]: 5,000원
-                - generic [ref=e261]:
-                  - generic [ref=e262]: 대여
-                  - generic [ref=e263]: 관심 3 · 조회 16
-          - link "나이키 풋살화 265mm 풋살 마포구 · 거의 새 것 55,000원 판매 관심 12 · 조회 46" [ref=e264] [cursor=pointer]:
+            - generic [ref=e253]:
+              - img [ref=e255]
+              - generic [ref=e258]:
+                - heading "요넥스 배드민턴 라켓 대여" [level=3] [ref=e259]
+                - generic [ref=e260]:
+                  - generic [ref=e261]: 배드민턴
+                  - generic [ref=e262]: 강남구 · 양호
+                - paragraph [ref=e263]: 5,000원
+                - generic [ref=e264]:
+                  - generic [ref=e265]: 대여
+                  - generic [ref=e266]: 관심 3 · 조회 16
+          - link "나이키 풋살화 265mm 풋살 마포구 · 거의 새 것 55,000원 판매 관심 12 · 조회 46" [ref=e267] [cursor=pointer]:
             - /url: /marketplace/7949e6e2-f8ae-4bd5-85d3-213ea6b5434c
-            - generic [ref=e265]:
-              - img [ref=e267]
-              - generic [ref=e270]:
-                - heading "나이키 풋살화 265mm" [level=3] [ref=e271]
-                - generic [ref=e272]:
-                  - generic [ref=e273]: 풋살
-                  - generic [ref=e274]: 마포구 · 거의 새 것
-                - paragraph [ref=e275]: 55,000원
-                - generic [ref=e276]:
-                  - generic [ref=e277]: 판매
-                  - generic [ref=e278]: 관심 12 · 조회 46
-  - button "Open Next.js Dev Tools" [ref=e284] [cursor=pointer]:
-    - img [ref=e285]
-  - alert [ref=e288]
+            - generic [ref=e268]:
+              - img [ref=e270]
+              - generic [ref=e273]:
+                - heading "나이키 풋살화 265mm" [level=3] [ref=e274]
+                - generic [ref=e275]:
+                  - generic [ref=e276]: 풋살
+                  - generic [ref=e277]: 마포구 · 거의 새 것
+                - paragraph [ref=e278]: 55,000원
+                - generic [ref=e279]:
+                  - generic [ref=e280]: 판매
+                  - generic [ref=e281]: 관심 12 · 조회 46
+  - button "Open Next.js Dev Tools" [ref=e287] [cursor=pointer]:
+    - img [ref=e288]
+  - alert [ref=e291]
 ```

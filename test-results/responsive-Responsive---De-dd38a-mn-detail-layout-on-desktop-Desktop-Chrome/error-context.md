@@ -7,10 +7,10 @@
       - link "TeamMeet" [ref=e6] [cursor=pointer]:
         - /url: /home
         - heading "TeamMeet" [level=1] [ref=e7]
-      - link "매치 찾기" [ref=e9] [cursor=pointer]:
+      - link "매치 만들기" [ref=e9] [cursor=pointer]:
         - /url: /matches/new
         - img [ref=e10]
-        - text: 매치 찾기
+        - text: 매치 만들기
       - navigation [ref=e11]:
         - link "홈" [ref=e14] [cursor=pointer]:
           - /url: /home
@@ -63,19 +63,23 @@
           - /url: /admin/dashboard
           - img [ref=e81]
           - text: Admin
-      - button "Switch language" [ref=e85]:
-        - img [ref=e86]
-        - text: English
-      - link "로그인" [ref=e90] [cursor=pointer]:
+      - generic [ref=e84]:
+        - button "언어 변경" [ref=e85]:
+          - img [ref=e86]
+          - text: English
+        - button "다크모드 전환" [ref=e89]:
+          - img [ref=e90]
+          - text: 다크
+      - link "로그인" [ref=e93] [cursor=pointer]:
         - /url: /login
-    - main [ref=e91]:
-      - generic [ref=e94]:
-        - img [ref=e96]
-        - heading "매치를 찾을 수 없어요" [level=3] [ref=e102]
-        - paragraph [ref=e103]: 삭제되었거나 존재하지 않는 매치예요
-        - link "목록으로" [ref=e104] [cursor=pointer]:
+    - main [ref=e94]:
+      - generic [ref=e97]:
+        - img [ref=e99]
+        - heading "매치를 찾을 수 없어요" [level=3] [ref=e105]
+        - paragraph [ref=e106]: 삭제되었거나 존재하지 않는 매치예요
+        - link "목록으로" [ref=e107] [cursor=pointer]:
           - /url: /matches
-  - button "Open Next.js Dev Tools" [ref=e110] [cursor=pointer]:
-    - img [ref=e111]
-  - alert [ref=e114]
+  - button "Open Next.js Dev Tools" [ref=e113] [cursor=pointer]:
+    - img [ref=e114]
+  - alert [ref=e117]
 ```

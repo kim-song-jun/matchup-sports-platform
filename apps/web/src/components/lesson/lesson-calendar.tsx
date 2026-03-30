@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Clock, Users, CalendarX, CircleCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, CalendarX, CircleCheck } from 'lucide-react';
 import { LessonSchedule } from '@/types/api';
 
 // Stable mock schedules — generated once at module level to avoid re-renders
@@ -341,18 +341,14 @@ export function LessonCalendar({ schedules, onReserve }: LessonCalendarProps) {
                         )}
                       </div>
 
-                      <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} aria-hidden="true" />
-                          {session.startTime} – {session.endTime}
-                        </span>
-                        {session.maxParticipants !== undefined && (
+                      {session.maxParticipants !== undefined && (
+                        <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                           <span className="flex items-center gap-1">
                             <Users size={12} aria-hidden="true" />
                             {session.attendeeCount ?? 0}/{session.maxParticipants}명
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {session.note && (
                         <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">

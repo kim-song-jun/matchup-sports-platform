@@ -71,74 +71,74 @@
                     - generic [ref=e68]: 5/6명
                     - generic [ref=e69]: 12,000원
                     - generic [ref=e70]: 초급~상급
-            - link "퇴근 후 풋살 ⚡ 오늘 퇴근 후 풋살 ⚡ 풋살 3/26 (목) 20:00 · 마포 풋살파크 6/10명 15,000원 초급~고수" [ref=e71] [cursor=pointer]:
-              - /url: /matches/5471b5ec-6590-49a6-bc1d-86be94659b7d
+            - link "초보 환영 배드민턴 오늘 초보 환영 배드민턴 배드민턴 3/26 (목) 10:00 · 서초 배드민턴아레나 3/8명 8,000원 입문~초급" [ref=e71] [cursor=pointer]:
+              - /url: /matches/6129e706-afd1-42b9-b46e-c1bb1dbd5f11
               - generic [ref=e72]:
                 - generic [ref=e73]:
-                  - img "퇴근 후 풋살 ⚡" [ref=e74]
+                  - img "초보 환영 배드민턴" [ref=e74]
                   - generic [ref=e75]: 오늘
                 - generic [ref=e76]:
-                  - paragraph [ref=e77]: 퇴근 후 풋살 ⚡
+                  - paragraph [ref=e77]: 초보 환영 배드민턴
                   - paragraph [ref=e78]:
-                    - generic [ref=e79]: 풋살
-                    - generic [ref=e80]: 3/26 (목) 20:00
+                    - generic [ref=e79]: 배드민턴
+                    - generic [ref=e80]: 3/26 (목) 10:00
                     - generic [ref=e81]: ·
-                    - generic [ref=e82]: 마포 풋살파크
+                    - generic [ref=e82]: 서초 배드민턴아레나
                   - generic [ref=e83]:
-                    - generic [ref=e84]: 6/10명
-                    - generic [ref=e85]: 15,000원
-                    - generic [ref=e86]: 초급~고수
-            - link "초보 환영 배드민턴 오늘 초보 환영 배드민턴 배드민턴 3/26 (목) 10:00 · 서초 배드민턴아레나 3/8명 8,000원 입문~초급" [ref=e87] [cursor=pointer]:
-              - /url: /matches/6129e706-afd1-42b9-b46e-c1bb1dbd5f11
+                    - generic [ref=e84]: 3/8명
+                    - generic [ref=e85]: 8,000원
+                    - generic [ref=e86]: 입문~초급
+            - link "퇴근 후 풋살 ⚡ 오늘 퇴근 후 풋살 ⚡ 풋살 3/26 (목) 20:00 · 마포 풋살파크 6/10명 15,000원 초급~고수" [ref=e87] [cursor=pointer]:
+              - /url: /matches/5471b5ec-6590-49a6-bc1d-86be94659b7d
               - generic [ref=e88]:
                 - generic [ref=e89]:
-                  - img "초보 환영 배드민턴" [ref=e90]
+                  - img "퇴근 후 풋살 ⚡" [ref=e90]
                   - generic [ref=e91]: 오늘
                 - generic [ref=e92]:
-                  - paragraph [ref=e93]: 초보 환영 배드민턴
+                  - paragraph [ref=e93]: 퇴근 후 풋살 ⚡
                   - paragraph [ref=e94]:
-                    - generic [ref=e95]: 배드민턴
-                    - generic [ref=e96]: 3/26 (목) 10:00
+                    - generic [ref=e95]: 풋살
+                    - generic [ref=e96]: 3/26 (목) 20:00
                     - generic [ref=e97]: ·
-                    - generic [ref=e98]: 서초 배드민턴아레나
+                    - generic [ref=e98]: 마포 풋살파크
                   - generic [ref=e99]:
-                    - generic [ref=e100]: 3/8명
-                    - generic [ref=e101]: 8,000원
-                    - generic [ref=e102]: 입문~초급
-            - link "테니스 단식 매치 오늘 테니스 단식 매치 테니스 3/27 (금) 18:00 · 강남 스포츠센터 3/4명 15,000원 초급~중급" [ref=e103] [cursor=pointer]:
-              - /url: /matches/ee1b87d2-b9d3-4bb1-b924-19ef6b9791db
+                    - generic [ref=e100]: 6/10명
+                    - generic [ref=e101]: 15,000원
+                    - generic [ref=e102]: 초급~고수
+            - link "축구 11:11 팀매칭 오늘 축구 11:11 팀매칭 축구 3/27 (금) 14:00 · 노원 축구전용구장 9/14명 20,000원 중급~고수" [ref=e103] [cursor=pointer]:
+              - /url: /matches/91bd1539-7fff-4555-8320-ac1934c29ea2
               - generic [ref=e104]:
                 - generic [ref=e105]:
-                  - img "테니스 단식 매치" [ref=e106]
+                  - img "축구 11:11 팀매칭" [ref=e106]
                   - generic [ref=e107]: 오늘
                 - generic [ref=e108]:
-                  - paragraph [ref=e109]: 테니스 단식 매치
+                  - paragraph [ref=e109]: 축구 11:11 팀매칭
                   - paragraph [ref=e110]:
-                    - generic [ref=e111]: 테니스
-                    - generic [ref=e112]: 3/27 (금) 18:00
+                    - generic [ref=e111]: 축구
+                    - generic [ref=e112]: 3/27 (금) 14:00
                     - generic [ref=e113]: ·
-                    - generic [ref=e114]: 강남 스포츠센터
+                    - generic [ref=e114]: 노원 축구전용구장
                   - generic [ref=e115]:
-                    - generic [ref=e116]: 3/4명
-                    - generic [ref=e117]: 15,000원
-                    - generic [ref=e118]: 초급~중급
-            - link "수영 자유형 연습 모임 오늘 수영 자유형 연습 모임 수영 3/27 (금) 07:00 · 강남 스포츠센터 2/6명 무료 입문~고수" [ref=e119] [cursor=pointer]:
-              - /url: /matches/84c01c27-72d3-46be-a802-eb1a9dadcf31
+                    - generic [ref=e116]: 9/14명
+                    - generic [ref=e117]: 20,000원
+                    - generic [ref=e118]: 중급~고수
+            - link "아이스하키 픽업게임 🏒 오늘 아이스하키 픽업게임 🏒 아이스하키 3/27 (금) 10:00 · 잠실 아이스링크 7/12명 25,000원 중급~고수" [ref=e119] [cursor=pointer]:
+              - /url: /matches/2f4605bf-397a-49d2-800a-393eb976513c
               - generic [ref=e120]:
                 - generic [ref=e121]:
-                  - img "수영 자유형 연습 모임" [ref=e122]
+                  - img "아이스하키 픽업게임 🏒" [ref=e122]
                   - generic [ref=e123]: 오늘
                 - generic [ref=e124]:
-                  - paragraph [ref=e125]: 수영 자유형 연습 모임
+                  - paragraph [ref=e125]: 아이스하키 픽업게임 🏒
                   - paragraph [ref=e126]:
-                    - generic [ref=e127]: 수영
-                    - generic [ref=e128]: 3/27 (금) 07:00
+                    - generic [ref=e127]: 아이스하키
+                    - generic [ref=e128]: 3/27 (금) 10:00
                     - generic [ref=e129]: ·
-                    - generic [ref=e130]: 강남 스포츠센터
+                    - generic [ref=e130]: 잠실 아이스링크
                   - generic [ref=e131]:
-                    - generic [ref=e132]: 2/6명
-                    - generic [ref=e133]: 무료
-                    - generic [ref=e134]: 입문~고수
+                    - generic [ref=e132]: 7/12명
+                    - generic [ref=e133]: 25,000원
+                    - generic [ref=e134]: 중급~고수
         - generic [ref=e135]:
           - generic [ref=e136]:
             - generic [ref=e137]:

@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, Plus, Image as ImageIcon, X } from 'lucide-react';
+import { ArrowLeft, Check, Plus, Image as ImageIcon, X, ChevronRight } from 'lucide-react';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
@@ -100,8 +100,10 @@ export default function CreateMatchPage() {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 만들기</h1>
       </header>
 
-      <div className="hidden @3xl:block mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 만들기</h2>
+      <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
+        <Link href="/matches" className="hover:text-gray-600 transition-colors">매치</Link>
+        <ChevronRight size={12} />
+        <span className="text-gray-700 dark:text-gray-300">새 매치 만들기</span>
       </div>
 
       {/* Step indicator */}

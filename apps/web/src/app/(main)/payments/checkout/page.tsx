@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  AlertCircle,
   ArrowLeft,
   CreditCard,
   Wallet,
@@ -14,6 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
+import { EmptyState } from '@/components/ui/empty-state';
 import { api } from '@/lib/api';
 import { formatAmount } from '@/lib/utils';
 
@@ -38,16 +40,6 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  // Build order from URL search params, falling back to defaults
-  const order = {
-    type: searchParams.get('type') || defaultOrder.type,
-    name: searchParams.get('name') || defaultOrder.name,
-    date: searchParams.get('date') || defaultOrder.date,
-    venue: searchParams.get('venue') || defaultOrder.venue,
-    originalPrice: Number(searchParams.get('price')) || defaultOrder.originalPrice,
-    couponDiscount: Number(searchParams.get('discount')) || defaultOrder.couponDiscount,
-  };
-
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(true);
@@ -56,6 +48,32 @@ export default function CheckoutPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [completedOrderName, setCompletedOrderName] = useState('');
   const [completedAmount, setCompletedAmount] = useState(0);
+
+  // Validate required params — name and a non-zero price must be present
+  const paramName = searchParams.get('name');
+  const paramPrice = Number(searchParams.get('price'));
+  if (!paramName || !paramPrice) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-5">
+        <EmptyState
+          icon={AlertCircle}
+          title="결제 정보가 없어요"
+          description="올바른 경로로 접근해주세요"
+          action={{ label: '홈으로 돌아가기', href: '/home' }}
+        />
+      </div>
+    );
+  }
+
+  // Build order from URL search params
+  const order = {
+    type: searchParams.get('type') || defaultOrder.type,
+    name: paramName,
+    date: searchParams.get('date') || defaultOrder.date,
+    venue: searchParams.get('venue') || defaultOrder.venue,
+    originalPrice: paramPrice,
+    couponDiscount: Number(searchParams.get('discount')) || defaultOrder.couponDiscount,
+  };
 
   const discount = couponApplied ? order.couponDiscount : 0;
   const finalPrice = order.originalPrice - discount;

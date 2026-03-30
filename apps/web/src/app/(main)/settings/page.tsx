@@ -9,7 +9,7 @@ export default function SettingsPage() {
         <SettingsBackButton />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
       </header>
-      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
+      <div className="hidden @3xl:block mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
       </div>
 

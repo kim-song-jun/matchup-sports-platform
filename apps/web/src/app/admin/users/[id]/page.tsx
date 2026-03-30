@@ -56,7 +56,7 @@ export default function AdminUserDetailPage() {
         {/* Left column */}
         <div className="space-y-4">
           {/* Profile card */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start gap-4">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-xl font-bold text-blue-500">
                 {user.nickname?.charAt(0)}
@@ -87,7 +87,7 @@ export default function AdminUserDetailPage() {
           </div>
 
           {/* Sport profiles */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">종목별 프로필</h3>
             {user.sportProfiles && user.sportProfiles.length > 0 ? (
               <div className="space-y-2">
@@ -120,7 +120,7 @@ export default function AdminUserDetailPage() {
           </div>
 
           {/* Match history summary */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">매치 히스토리</h3>
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5 text-center">
@@ -142,7 +142,7 @@ export default function AdminUserDetailPage() {
         {/* Right column - Admin actions & stats */}
         <div className="space-y-4">
           {/* Activity stats */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">활동 통계</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
@@ -165,7 +165,7 @@ export default function AdminUserDetailPage() {
           </div>
 
           {/* Admin actions */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">관리 액션</h3>
             <div className="space-y-2">
               <button onClick={async () => {

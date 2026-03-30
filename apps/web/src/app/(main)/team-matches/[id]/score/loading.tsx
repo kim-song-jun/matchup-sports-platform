@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <div className="space-y-4 p-4">
       <Skeleton className="h-8 w-28" />
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 space-y-4">
+      <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-center space-y-2">
             <Skeleton className="h-10 w-10 rounded-full mx-auto" />

@@ -215,7 +215,7 @@ export default function LessonDetailPage() {
                     }
                   }}
                   disabled={enrollMutation.isPending}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {enrollMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">

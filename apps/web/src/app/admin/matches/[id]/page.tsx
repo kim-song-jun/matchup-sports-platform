@@ -104,7 +104,7 @@ export default function AdminMatchDetailPage() {
         {/* Left column */}
         <div className="space-y-4">
           {/* Match info card */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 {SportIcon && (
@@ -166,7 +166,7 @@ export default function AdminMatchDetailPage() {
 
           {/* Host info */}
           {match.host && (
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">호스트</h3>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-base font-bold text-blue-500">
@@ -186,7 +186,7 @@ export default function AdminMatchDetailPage() {
           )}
 
           {/* Participants */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">참가자 ({match.participants?.length || 0}명)</h3>
             {match.participants && match.participants.length > 0 ? (
               <div className="space-y-2">
@@ -222,7 +222,7 @@ export default function AdminMatchDetailPage() {
 
         {/* Right column - Admin controls */}
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 sticky top-6">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 sticky top-6">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">관리</h3>
 
             {/* Status change */}

@@ -38,7 +38,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = process.env.API_PORT || 8000;
+  const port = process.env.API_PORT || 8111;
   await app.listen(port);
   console.log(`🚀 TeamMeet API running on http://localhost:${port}`);
   console.log(`📚 Swagger docs: http://localhost:${port}/docs`);

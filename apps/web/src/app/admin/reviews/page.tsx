@@ -155,7 +155,7 @@ export default function AdminReviewsPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <TrendingUp size={20} />
@@ -164,7 +164,7 @@ export default function AdminReviewsPage() {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalReviews}</p>
           <p className="text-sm text-gray-400 mt-0.5">총 평가수</p>
         </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
               <Star size={20} />
@@ -173,7 +173,7 @@ export default function AdminReviewsPage() {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgTotal.toFixed(1)}</p>
           <p className="text-sm text-gray-400 mt-0.5">전체 평균</p>
         </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-500">
               <Star size={20} />
@@ -182,7 +182,7 @@ export default function AdminReviewsPage() {
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgManner.toFixed(1)}</p>
           <p className="text-sm text-gray-400 mt-0.5">평균 매너점수</p>
         </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Star size={20} />
@@ -201,7 +201,7 @@ export default function AdminReviewsPage() {
       />
 
       {/* Table */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>

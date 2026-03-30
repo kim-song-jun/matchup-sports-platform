@@ -89,7 +89,7 @@ export default function RefundRequestPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
       {/* Success Toast */}
       {showSuccess && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
           <CheckCircle size={18} className="text-green-400" />
           <span className="text-base font-medium text-white">환불 요청이 완료되었습니다</span>
         </div>
@@ -131,7 +131,7 @@ export default function RefundRequestPage() {
               <button
                 onClick={handleRefundSubmit}
                 disabled={isProcessing}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isProcessing ? (
                   <>
@@ -163,7 +163,7 @@ export default function RefundRequestPage() {
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
         {/* Payment Summary */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 정보</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -196,7 +196,7 @@ export default function RefundRequestPage() {
         </div>
 
         {/* Refund Policy */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
           <div className="space-y-2">
             <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${refundInfo.percentage === 100 ? 'bg-green-50 ring-2 ring-green-200' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
@@ -224,7 +224,7 @@ export default function RefundRequestPage() {
         </div>
 
         {/* Refund Amount */}
-        <div className={`rounded-2xl border p-5 ${refundInfo.bgColor} border-transparent`}>
+        <div className={`rounded-xl border p-5 ${refundInfo.bgColor} border-transparent`}>
           <div className="flex items-center gap-3 mb-3">
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${refundInfo.color}`}>
               <RotateCcw size={20} />
@@ -240,7 +240,7 @@ export default function RefundRequestPage() {
         </div>
 
         {/* Reason Selection */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 사유</h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {refundReasons.map((reason) => (
@@ -262,7 +262,7 @@ export default function RefundRequestPage() {
             onChange={(e) => setAdditionalReason(e.target.value)}
             placeholder="추가 사유를 입력해 주세요 (선택)"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 resize-none focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
       </div>
@@ -273,13 +273,20 @@ export default function RefundRequestPage() {
           <span className="text-sm text-gray-500">환불 예상 금액</span>
           <span className={`text-xl font-bold ${refundInfo.color}`}>{formatAmount(refundAmount)}</span>
         </div>
+        {refundInfo.percentage === 0 && (
+          <div className="rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 p-4 text-center mb-3">
+            <p className="text-sm font-medium text-red-600 dark:text-red-400">
+              경기 시작 1시간 이내라 환불이 불가능해요
+            </p>
+          </div>
+        )}
         <button
           onClick={() => {
             if (refundInfo.percentage === 0) return;
             setShowModal(true);
           }}
           disabled={!selectedReason || refundInfo.percentage === 0}
-          className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-colors ${
+          className={`w-full flex items-center justify-center gap-2 rounded-xl py-4 text-lg font-bold transition-colors ${
             selectedReason && refundInfo.percentage > 0
               ? 'bg-red-500 text-white hover:bg-red-600 active:scale-[0.98]'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'

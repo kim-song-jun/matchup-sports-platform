@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, MessageCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -197,14 +197,17 @@ export default function MatchDetailPage() {
                 로그인 후 참가하기
               </Link>
             ) : isHost ? (
-              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
-                내가 만든 매치
-              </button>
+              <div className="relative group">
+                <button disabled aria-describedby="host-hint" className="w-full rounded-xl bg-gray-100 dark:bg-gray-700 py-3.5 text-md font-semibold text-gray-500 dark:text-gray-400 cursor-not-allowed focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                  내가 만든 매치
+                </button>
+                <p id="host-hint" className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 text-center">본인이 만든 매치에는 참가할 수 없어요</p>
+              </div>
             ) : isParticipant ? (
               <button
                 onClick={() => leaveMutation.mutate()}
                 disabled={leaveMutation.isPending}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {leaveMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
@@ -214,14 +217,17 @@ export default function MatchDetailPage() {
                 ) : '참가 취소하기'}
               </button>
             ) : isFull ? (
-              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
-                마감되었습니다
-              </button>
+              <div className="relative group">
+                <button disabled aria-describedby="full-hint" className="w-full rounded-xl bg-gray-100 dark:bg-gray-700 py-3.5 text-md font-semibold text-gray-500 dark:text-gray-400 cursor-not-allowed focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                  마감되었습니다
+                </button>
+                <p id="full-hint" className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 text-center">인원이 가득 차서 참가할 수 없어요</p>
+              </div>
             ) : (
               <button
                 onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
                 disabled={joinMutation.isPending}
-                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
+                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {joinMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
@@ -238,6 +244,17 @@ export default function MatchDetailPage() {
               <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors mt-2">
                 <Pencil size={14} />
                 매치 수정
+              </Link>
+            )}
+
+            {/* Host contact */}
+            {isAuthenticated && !isHost && (
+              <Link
+                href={`/chat/match-${matchId}`}
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors mt-3"
+              >
+                <MessageCircle size={16} />
+                호스트에게 문의하기
               </Link>
             )}
 

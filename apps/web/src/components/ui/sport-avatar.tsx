@@ -48,7 +48,7 @@ export function SportAvatar({ name, sportType, size = 'md', className = '' }: Sp
       </div>
       {SportIcon && (
         <div className="absolute -bottom-0.5 -right-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700">
-          <SportIcon size={10} className="text-gray-600 dark:text-gray-300" />
+          <SportIcon size={12} className="text-gray-600 dark:text-gray-300" />
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useTeams } from '@/hooks/use-api';
@@ -17,25 +18,33 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
 
   return (
     <Link href={`/teams/${team.id}`}>
-      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
-        {/* 이미지 */}
-        <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <img src={getTeamImage(team.sportType, team.coverImageUrl)} alt={team.name} className="w-full h-full object-cover" loading="lazy" />
-        </div>
-        {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</h3>
-            {team.isRecruiting && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">{t('recruiting')}</span>}
+      <div className="soft-panel group overflow-hidden rounded-[24px] transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-white/85 dark:hover:bg-slate-900/80">
+        <div className="flex">
+          <div className="relative w-28 shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
+            <Image src={getTeamImage(team.sportType, team.coverImageUrl)} alt={team.name} fill className="object-cover" sizes="112px" unoptimized />
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
-              {sportLabel[team.sportType] || team.sportType}
-            </span>
-            <span>{tl(String(team.level) as any)} · {t('memberCount', { count: team.memberCount })}</span>
-          </p>
-          {team.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{team.description}</p>}
-          {team.city && <p className="text-2xs text-gray-500 mt-0.5">{team.city} {team.district}</p>}
+          <div className="flex flex-1 min-w-0 flex-col justify-center p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-bold text-gray-900 dark:text-gray-100">{team.name}</h3>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {sportLabel[team.sportType] || team.sportType} · {tl(String(team.level) as any)}
+                </p>
+              </div>
+              {team.isRecruiting && (
+                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+                  {t('recruiting')}
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                {t('memberCount', { count: team.memberCount })}
+              </span>
+              {team.city && <span>{team.city}{team.district ? ` · ${team.district}` : ''}</span>}
+            </div>
+            {team.description && <p className="mt-2 line-clamp-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{team.description}</p>}
+          </div>
         </div>
       </div>
     </Link>
@@ -50,7 +59,7 @@ export function TeamList() {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
-        {[1, 2].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
+        {[1, 2].map(i => <div key={i} className="h-[112px] rounded-[24px] bg-gray-100/70 dark:bg-gray-800 skeleton-shimmer" />)}
       </div>
     );
   }

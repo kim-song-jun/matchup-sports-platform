@@ -168,7 +168,7 @@ export default function ScoreInputPage() {
                       onChange={(e) => updateScore(idx, 'home', e.target.value)}
                       placeholder="0"
                       disabled={submitted}
-                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-colors"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-colors"
                     />
                   </div>
 
@@ -186,7 +186,7 @@ export default function ScoreInputPage() {
                       onChange={(e) => updateScore(idx, 'away', e.target.value)}
                       placeholder="0"
                       disabled={submitted}
-                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-colors"
+                      className="w-full rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 py-3 text-center text-xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 disabled:opacity-50 transition-colors"
                     />
                   </div>
                 </div>

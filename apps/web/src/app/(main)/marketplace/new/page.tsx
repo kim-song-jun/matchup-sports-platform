@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
+import { Field } from '@/components/form/field';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -65,7 +66,7 @@ export default function CreateListingPage() {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
+          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매물을 등록해보세요</h2>
@@ -131,16 +132,18 @@ export default function CreateListingPage() {
 
         {/* 종목 */}
         <Field label="종목" required>
-          <div className="flex flex-wrap gap-2">
+          <div role="radiogroup" aria-label="종목 선택" className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
               <button
                 key={type}
                 type="button"
+                role="radio"
+                aria-checked={form.sportType === type}
                 onClick={() => setForm({ ...form, sportType: type })}
                 className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-50 dark:bg-gray-700 text-gray-600 hover:bg-gray-100'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                    : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {sportLabel[type] || type}
@@ -151,16 +154,18 @@ export default function CreateListingPage() {
 
         {/* 카테고리 */}
         <Field label="카테고리" required>
-          <div className="flex flex-wrap gap-2">
+          <div role="radiogroup" aria-label="카테고리 선택" className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button
                 key={cat}
                 type="button"
+                role="radio"
+                aria-checked={form.category === cat}
                 onClick={() => setForm({ ...form, category: cat })}
                 className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.category === cat
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 border border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                    : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {cat}
@@ -171,11 +176,13 @@ export default function CreateListingPage() {
 
         {/* 상품 상태 */}
         <Field label="상품 상태" required>
-          <div className="space-y-2">
+          <div role="radiogroup" aria-label="상품 상태" className="space-y-2">
             {conditions.map((c) => (
               <button
                 key={c.value}
                 type="button"
+                role="radio"
+                aria-checked={form.condition === c.value}
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`w-full text-left rounded-xl border-2 p-3.5 transition-colors ${
                   form.condition === c.value
@@ -194,9 +201,11 @@ export default function CreateListingPage() {
 
         {/* 거래 방식 */}
         <Field label="거래 방식">
-          <div className="grid grid-cols-2 gap-2">
+          <div role="radiogroup" aria-label="거래 방식" className="grid grid-cols-2 gap-2">
             <button
               type="button"
+              role="radio"
+              aria-checked={form.listingType === 'sell'}
               onClick={() => setForm({ ...form, listingType: 'sell' })}
               className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'sell'
@@ -208,6 +217,8 @@ export default function CreateListingPage() {
             </button>
             <button
               type="button"
+              role="radio"
+              aria-checked={form.listingType === 'rent'}
               onClick={() => setForm({ ...form, listingType: 'rent' })}
               className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'rent'
@@ -286,7 +297,7 @@ export default function CreateListingPage() {
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mt-2 mb-8"
+          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 mb-8"
         >
           {isSubmitting ? '등록 중...' : '매물 등록하기'}
         </button>
@@ -323,13 +334,3 @@ export default function CreateListingPage() {
   );
 }
 
-function Field({ label, required, children, id }: { label: string; required?: boolean; children: React.ReactNode; id?: string }) {
-  return (
-    <div className="mb-5">
-      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}

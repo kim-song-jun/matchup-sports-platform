@@ -161,13 +161,13 @@ export default function ArrivalCheckPage() {
         </div>
 
         {/* Timer */}
-        <div className="rounded-2xl bg-gray-900 p-5 mb-4 text-center">
+        <div className="rounded-xl bg-gray-900 p-5 mb-4 text-center">
           <p className="text-xs text-gray-500 mb-1">경기 시작까지</p>
           <p className="text-3xl font-bold text-white tracking-wide">{timeUntilMatch || '--:--'}</p>
         </div>
 
         {/* GPS Status */}
-        <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 mb-4 ${gps.className}`}>
+        <div className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 mb-4 ${gps.className}`}>
           {gps.icon}
           <span className="text-base font-medium">{gps.text}</span>
         </div>
@@ -183,7 +183,7 @@ export default function ArrivalCheckPage() {
             도착 완료
           </button>
         ) : (
-          <div className="rounded-2xl bg-green-50 border border-green-100 p-5 mb-4 text-center">
+          <div className="rounded-xl bg-green-50 border border-green-100 p-5 mb-4 text-center">
             <CheckCircle2 size={32} className="mx-auto text-green-500 mb-2" />
             <p className="text-lg font-bold text-green-700">도착 인증 완료</p>
             <p className="text-sm text-green-500 mt-0.5">
@@ -193,7 +193,7 @@ export default function ArrivalCheckPage() {
         )}
 
         {/* Photo upload */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">현장 사진</h3>
           {!photoTaken ? (
             <button
@@ -213,7 +213,7 @@ export default function ArrivalCheckPage() {
         </div>
 
         {/* Opponent Status */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">상대팀 도착 확인</h3>
           <div className="space-y-2.5">
             {[
@@ -271,7 +271,7 @@ export default function ArrivalCheckPage() {
         </div>
 
         {/* Timeline */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-8">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-8">
           <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
             <Radio size={16} className="text-blue-500" />
             도착 현황

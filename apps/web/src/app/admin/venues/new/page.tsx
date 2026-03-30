@@ -116,7 +116,7 @@ export default function AdminVenueNewPage() {
 
       <div className="space-y-5">
         {/* Name */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h3>
 
           <div>
@@ -170,7 +170,7 @@ export default function AdminVenueNewPage() {
         </div>
 
         {/* Location */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">위치 정보</h3>
 
           <div>
@@ -196,7 +196,7 @@ export default function AdminVenueNewPage() {
         </div>
 
         {/* Facilities & Price */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">시설 & 요금</h3>
 
           <div>
@@ -239,7 +239,7 @@ export default function AdminVenueNewPage() {
         </div>
 
         {/* Operating hours */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>

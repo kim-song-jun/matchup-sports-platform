@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Search, Plus, Star, MapPin } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -64,7 +65,7 @@ export default function VenuesPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">시설 찾기</h1>
           <p className="text-sm text-gray-500 mt-0.5">내 주변 스포츠 시설을 찾아보세요</p>
         </div>
-        <button onClick={() => toast('info', '시설 등록 요청이 접수되면 검토 후 추가됩니다. teammeet@support.com으로 시설 정보를 보내주세요.')}
+        <button onClick={() => toast('info', '시설 등록 요청이 접수되면 검토 후 추가됩니다. support@matchup.kr로 시설 정보를 보내주세요.')}
           className="flex items-center gap-1 rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <Plus size={12} /> 시설 등록 요청
         </button>
@@ -125,8 +126,8 @@ export default function VenuesPage() {
                 <Link key={venue.id} href={`/venues/${venue.id}`}>
                   <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     {/* 이미지 */}
-                    <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <img src={venue.imageUrls?.[0] || getSportImage(primarySport)} alt={venue.name} className="w-full h-full object-cover" loading="lazy" />
+                    <div className="relative w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                      <Image src={venue.imageUrls?.[0] || getSportImage(primarySport)} alt={venue.name} fill className="object-cover" sizes="112px" unoptimized />
                     </div>
                     {/* 텍스트 */}
                     <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
@@ -134,7 +135,7 @@ export default function VenuesPage() {
                         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
                         {venue.rating > 0 && (
                           <span className="shrink-0 flex items-center gap-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100">
-                            <Star size={10} fill="currentColor" className="text-amber-400" />
+                            <Star size={12} fill="currentColor" className="text-amber-400" />
                             {venue.rating.toFixed(1)}
                           </span>
                         )}

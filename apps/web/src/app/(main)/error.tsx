@@ -10,7 +10,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    // Error is already captured by Next.js error boundary
   }, [error]);
 
   return (

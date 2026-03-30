@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { ComponentType } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star, Info, ChevronRight, ListChecks, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, BookOpen, Star, Info, ListChecks, GraduationCap, Plus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
@@ -11,6 +12,12 @@ import { api } from '@/lib/api';
 import { useLessons } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
+
+const surfaceCard =
+  'rounded-[28px] border border-slate-200/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-black/20';
+
+const softCard =
+  'rounded-[24px] border border-slate-200/60 bg-white/90 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/78 dark:shadow-black/10';
 
 const mockMyLessons = [
   {
@@ -54,7 +61,7 @@ const mockMyLessons = [
 ];
 
 function getDayLabel(dateStr: string) {
-  return ['일','월','화','수','목','금','토'][new Date(dateStr).getDay()];
+  return ['일', '월', '화', '수', '목', '금', '토'][new Date(dateStr).getDay()];
 }
 
 function daysUntil(dateStr: string) {
@@ -71,38 +78,45 @@ export default function MyLessonsPage() {
   const { isAuthenticated } = useAuthStore();
   const { data: apiData } = useLessons();
   const usingMock = !apiData?.items;
-  const apiLessons = apiData?.items?.map((l) => ({
-    id: l.id,
-    title: l.title,
-    sportType: l.sportType,
-    schedule: `${l.lessonDate} ${l.startTime}~${l.endTime}`,
-    venue: l.venueName || '',
-    price: l.fee,
-    maxStudents: l.maxParticipants,
-    currentStudents: l.currentParticipants,
-    status: l.status === 'active' ? 'active' : l.status,
+  const apiLessons = apiData?.items?.map((lesson) => ({
+    id: lesson.id,
+    title: lesson.title,
+    sportType: lesson.sportType,
+    schedule: `${lesson.lessonDate} ${lesson.startTime}~${lesson.endTime}`,
+    venue: lesson.venueName || '',
+    price: lesson.fee,
+    maxStudents: lesson.maxParticipants,
+    currentStudents: lesson.currentParticipants,
+    status: lesson.status === 'active' ? 'active' : lesson.status,
     rating: 0,
     reviewCount: 0,
-    nextDate: l.lessonDate || '',
+    nextDate: lesson.lessonDate || '',
     curriculum: [] as string[],
   }));
   const [localLessons, setLocalLessons] = useState(mockMyLessons);
   const lessons = apiLessons ?? (process.env.NODE_ENV === 'development' ? localLessons : []);
-  const setLessons = setLocalLessons;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!deleteTarget) return;
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setDeleteTarget(null); };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDeleteTarget(null);
+    };
+
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [deleteTarget]);
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={GraduationCap}
+          title="로그인 후 등록 강좌를 관리할 수 있어요"
+          description="개설한 강좌의 일정, 수강생, 가격 흐름을 이 화면에서 확인합니다."
+          action={{ label: '로그인', href: '/login' }}
+        />
       </div>
     );
   }
@@ -110,183 +124,264 @@ export default function MyLessonsPage() {
   const handleDelete = async (id: string) => {
     try {
       await api.patch(`/lessons/${id}`, { status: 'cancelled' });
-      setLessons(prev => prev.map(l => l.id === id ? { ...l, status: 'cancelled' } : l));
+      setLocalLessons((previous) => previous.map((lesson) => (lesson.id === id ? { ...lesson, status: 'cancelled' } : lesson)));
       toast('success', '강좌가 취소되었어요');
     } catch {
       toast('error', '취소하지 못했어요. 다시 시도해주세요');
     }
+
     setDeleteTarget(null);
   };
 
+  const averageRating = lessons.length
+    ? (lessons.reduce((sum, lesson) => sum + lesson.rating, 0) / lessons.length).toFixed(1)
+    : '0.0';
+
+  const summary = [
+    { label: '운영 강좌', value: `${lessons.length}개` },
+    { label: '활성 강좌', value: `${lessons.filter((lesson) => lesson.status === 'active').length}개` },
+    { label: '평균 평점', value: averageRating },
+  ];
+
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h1>
-      </header>
-      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h2>
-        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">등록한 강좌를 관리하세요</p>
-      </div>
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <section className="px-5 @3xl:px-0 pt-4">
+        <div className={`${surfaceCard} overflow-hidden p-6 sm:p-7`}>
+          <div className="flex flex-col gap-5 @3xl:flex-row @3xl:items-end @3xl:justify-between">
+            <div className="max-w-2xl">
+              <div className="eyebrow-chip">
+                <GraduationCap size={14} />
+                MatchUp Lesson Management
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                강좌 운영 정보도 과하지 않게 정리합니다.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300 sm:text-base">
+                다음 수업 일정, 현재 수강생, 커리큘럼 요약과 편집 액션을 하나의 관리 화면으로 묶었습니다.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => router.back()}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-slate-200/70 bg-white/70 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <ArrowLeft size={14} />
+                이전 화면
+              </button>
+              <Link
+                href="/lessons/new"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-950/20 dark:bg-white dark:text-slate-950"
+              >
+                <Plus size={14} />
+                강좌 열기
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {summary.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+                <p className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {usingMock && (
-        <div className="mx-5 @3xl:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
-          <Info size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />
-          <span className="text-sm text-gray-500 dark:text-gray-400">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
-        </div>
+        <section className="px-5 @3xl:px-0 mt-4">
+          <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/30 dark:bg-amber-400/10 dark:text-amber-200">
+            <div className="flex items-center gap-2">
+              <Info size={15} className="shrink-0" />
+              API 연동 전 샘플 데이터가 표시되고 있습니다.
+            </div>
+          </div>
+        </section>
       )}
 
-      <div className="px-5 @3xl:px-0 space-y-4 pb-8 stagger-children">
+      <section className="px-5 @3xl:px-0 mt-4 pb-8">
         {lessons.length === 0 ? (
           <EmptyState
             icon={GraduationCap}
             title="등록한 강좌가 없어요"
-            description="가르칠 준비가 되셨다면 강좌를 열어보세요"
+            description="가르칠 준비가 되셨다면 첫 강좌를 열어보세요."
+            action={{ label: '강좌 열기', href: '/lessons/new' }}
           />
-        ) : lessons.map((lesson) => {
-          const fillPercent = Math.round((lesson.currentStudents / lesson.maxStudents) * 100);
-          const isFull = lesson.currentStudents >= lesson.maxStudents;
-          return (
-            <div key={lesson.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:border-gray-200 transition-colors">
-              {/* Card header */}
-              <div className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-semibold text-gray-500">
-                      {sportLabel[lesson.sportType]}
-                    </span>
-                    <span className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                      lesson.status === 'active' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' :
-                      lesson.status === 'cancelled' ? 'bg-red-50 dark:bg-red-900/30 text-red-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                    }`}>
-                      {lesson.status === 'active' ? '진행중' : lesson.status === 'cancelled' ? '취소됨' : '마감'}
-                    </span>
-                  </div>
-                  <span className="text-md font-bold text-gray-900 dark:text-white">{formatCurrency(lesson.price)}</span>
-                </div>
+        ) : (
+          <div className="space-y-4 stagger-children">
+            {lessons.map((lesson) => {
+              const fillPercent = lesson.maxStudents ? Math.round((lesson.currentStudents / lesson.maxStudents) * 100) : 0;
+              const isFull = lesson.currentStudents >= lesson.maxStudents;
+              const statusText =
+                lesson.status === 'active' ? '진행중' : lesson.status === 'cancelled' ? '취소됨' : '마감';
 
-                <Link href={`/lessons/${lesson.id}`}>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{lesson.title}</h3>
-                </Link>
-
-                {/* Info rows */}
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                    <Calendar size={12} className="shrink-0" /><span>{lesson.schedule}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                    <MapPin size={12} className="shrink-0" /><span>{lesson.venue}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-amber-500">
-                      <Star size={12} fill="currentColor" />
-                      <span className="text-sm font-semibold">{lesson.rating}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">({lesson.reviewCount})</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Next lesson date */}
-                {lesson.status === 'active' && lesson.nextDate && (
-                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
-                    <Clock size={14} className="text-blue-400" />
-                    <span className="text-sm text-blue-600 font-medium">다음 수업</span>
-                    <span className="text-sm text-blue-700 font-semibold ml-auto">
-                      {lesson.nextDate} ({getDayLabel(lesson.nextDate)})
-                    </span>
-                    <span className="text-xs text-blue-400">{daysUntil(lesson.nextDate)}</span>
-                  </div>
-                )}
-
-                {/* Progress bar */}
-                <div className="mt-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                      <Users size={12} />
-                      <span>수강생</span>
-                    </div>
-                    <span className={`text-sm font-semibold ${isFull ? 'text-red-500' : 'text-gray-700 dark:text-gray-200'}`}>
-                      {lesson.currentStudents}/{lesson.maxStudents}명
-                      {isFull && <span className="ml-1 text-xs text-red-400">마감</span>}
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-[width,colors] ${isFull ? 'bg-red-400' : 'bg-blue-400'}`}
-                      style={{ width: `${fillPercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Curriculum section */}
-              {lesson.curriculum && lesson.curriculum.length > 0 && (
-                <div className="border-t border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <ListChecks size={12} className="text-gray-500" />
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">커리큘럼 요약</span>
-                  </div>
-                  <ul className="space-y-1.5">
-                    {lesson.curriculum.map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
-                        <span className="shrink-0 mt-0.5 w-[18px] h-[18px] rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center text-2xs font-bold">
-                          {idx + 1}
+              return (
+                <div key={lesson.id} className={`${softCard} overflow-hidden`}>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {sportLabel[lesson.sportType]}
                         </span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            lesson.status === 'active'
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-200'
+                              : lesson.status === 'cancelled'
+                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
+                        >
+                          {statusText}
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold text-slate-950 dark:text-white">{formatCurrency(lesson.price)}</span>
+                    </div>
 
-              {/* Action buttons */}
-              {lesson.status === 'active' && (
-                <div className="border-t border-gray-50 dark:border-gray-800 px-5 py-3 flex gap-2">
-                  <Link
-                    href={`/lessons/${lesson.id}/edit`}
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <Pencil size={14} />
-                    수정
-                  </Link>
-                  <Link
-                    href={`/lessons/${lesson.id}`}
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                  >
-                    <BookOpen size={14} />
-                    수강생목록
-                  </Link>
-                  <button
-                    onClick={() => setDeleteTarget(lesson.id)}
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 py-2.5 text-sm font-semibold text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                    취소
-                  </button>
+                    <Link href={`/lessons/${lesson.id}`}>
+                      <h3 className="mt-3 text-lg font-bold text-slate-950 transition-colors hover:text-blue-600 dark:text-white dark:hover:text-blue-300">
+                        {lesson.title}
+                      </h3>
+                    </Link>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      <LessonInfo icon={Calendar} label="일정" value={lesson.schedule} />
+                      <LessonInfo icon={MapPin} label="장소" value={lesson.venue} />
+                      <LessonInfo icon={Users} label="수강생" value={`${lesson.currentStudents}/${lesson.maxStudents}명`} />
+                      <LessonInfo icon={Star} label="평점" value={`${lesson.rating} (${lesson.reviewCount})`} />
+                    </div>
+
+                    {lesson.status === 'active' && lesson.nextDate && (
+                      <div className="mt-4 rounded-[20px] bg-blue-50 px-4 py-3 dark:bg-blue-400/10">
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                          <span className="font-semibold text-blue-700 dark:text-blue-200">다음 수업</span>
+                          <span className="text-blue-600 dark:text-blue-300">
+                            {lesson.nextDate} ({getDayLabel(lesson.nextDate)})
+                          </span>
+                          <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-slate-950/50 dark:text-blue-200">
+                            {daysUntil(lesson.nextDate)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-sm text-slate-500 dark:text-slate-400">모집 현황</span>
+                        <span className={`text-sm font-semibold ${isFull ? 'text-rose-600 dark:text-rose-300' : 'text-slate-700 dark:text-slate-200'}`}>
+                          {fillPercent}% {isFull ? '마감' : '진행중'}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className={`h-full rounded-full ${isFull ? 'bg-rose-400' : 'bg-blue-500'}`}
+                          style={{ width: `${fillPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {lesson.curriculum.length > 0 && (
+                    <div className="border-t border-slate-200/70 bg-slate-50/80 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/70">
+                      <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                        <ListChecks size={12} />
+                        커리큘럼 요약
+                      </div>
+                      <ul className="space-y-2">
+                        {lesson.curriculum.map((item, index) => (
+                          <li key={item} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[11px] font-semibold text-blue-700 dark:bg-blue-400/10 dark:text-blue-200">
+                              {index + 1}
+                            </span>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {lesson.status === 'active' && (
+                    <div className="border-t border-slate-200/70 px-5 py-4 dark:border-slate-800">
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/lessons/${lesson.id}/edit`}
+                          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full border border-slate-200/70 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-900"
+                        >
+                          <Pencil size={14} />
+                          수정
+                        </Link>
+                        <Link
+                          href={`/lessons/${lesson.id}`}
+                          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-400/10 dark:text-blue-200 dark:hover:bg-blue-400/15"
+                        >
+                          <BookOpen size={14} />
+                          수강생 목록
+                        </Link>
+                        <button
+                          onClick={() => setDeleteTarget(lesson.id)}
+                          className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-100 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                        >
+                          <Trash2 size={14} />
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5" onClick={() => setDeleteTarget(null)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="delete-lesson-modal-title" className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
+          <div className="w-full max-w-sm rounded-[28px] bg-white p-6 shadow-xl dark:bg-slate-950">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-400/10">
+              <AlertTriangle size={24} className="text-rose-500" />
             </div>
-            <h3 id="delete-lesson-modal-title" className="text-lg font-bold text-gray-900 dark:text-white text-center">강좌를 취소하시겠어요?</h3>
-            <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">취소하면 수강생들에게 알림이 발송돼요.</p>
+            <h3 className="text-center text-lg font-bold text-slate-950 dark:text-white">강좌를 취소하시겠어요?</h3>
+            <p className="mt-2 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+              취소하면 수강생들에게 알림이 발송되며, 이후 일정은 복구되지 않습니다.
+            </p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors">돌아가기</button>
-              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">취소하기</button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 rounded-full bg-slate-100 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                돌아가기
+              </button>
+              <button
+                onClick={() => handleDelete(deleteTarget)}
+                className="flex-1 rounded-full bg-rose-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-rose-600"
+              >
+                취소하기
+              </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LessonInfo({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-slate-200/70 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+        <Icon size={12} />
+        {label}
+      </div>
+      <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">{value}</p>
     </div>
   );
 }

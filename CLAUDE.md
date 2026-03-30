@@ -35,6 +35,10 @@ cd apps/api && pnpm test       # 백엔드 (jest)
 npx playwright test            # E2E
 ```
 
+## 환경 파일 접근 허용
+- `.env`, `.env.local`, `.env.dev` — 읽기/수정 허용 (포트, URL 등 개발 설정 변경용)
+- 단, 시크릿 값(SECRET_KEY, API_KEY, PASSWORD 등)은 출력하지 않음
+
 ## 코드 컨벤션
 - 한국어 사용자 대상이므로 UI 텍스트는 한국어
 - API 응답은 `{ status, data, timestamp }` 형태

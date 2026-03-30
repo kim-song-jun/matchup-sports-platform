@@ -519,7 +519,7 @@ export default function EditTeamMatchPage() {
           <button
             onClick={handleSave}
             disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save size={16} />
             {isSubmitting ? '저장 중...' : '수정 완료'}
@@ -546,7 +546,7 @@ export default function EditTeamMatchPage() {
               <button
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isCancelling ? '취소 중...' : '취소하기'}
               </button>

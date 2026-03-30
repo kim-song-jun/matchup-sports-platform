@@ -208,7 +208,7 @@ export default function AdminDisputeDetailPage() {
         {/* Left column */}
         <div className="space-y-4">
           {/* Header card */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -265,7 +265,7 @@ export default function AdminDisputeDetailPage() {
           </div>
 
           {/* Match info */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">매치 정보</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5">
@@ -288,7 +288,7 @@ export default function AdminDisputeDetailPage() {
           </div>
 
           {/* Arrival check data */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">도착 체크 데이터</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className={`rounded-xl p-3.5 ${dispute.arrivalCheck.reporterCheckedIn ? 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800'}`}>
@@ -315,7 +315,7 @@ export default function AdminDisputeDetailPage() {
           </div>
 
           {/* Evaluation / Report content */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">신고 내용</h3>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -327,7 +327,7 @@ export default function AdminDisputeDetailPage() {
           </div>
 
           {/* Photos */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">첨부 자료</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {dispute.photos.map((photo: { id: string; description: string }) => (
@@ -340,7 +340,7 @@ export default function AdminDisputeDetailPage() {
           </div>
 
           {/* Timeline */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">타임라인</h3>
             <div className="space-y-0">
               {dispute.timeline.map((event: TimelineEvent, idx: number) => (
@@ -369,7 +369,7 @@ export default function AdminDisputeDetailPage() {
         {/* Right column */}
         <div className="space-y-4">
           {/* Admin notes */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3"><label htmlFor="admin-notes">관리자 메모</label></h3>
             <textarea
               id="admin-notes"
@@ -382,7 +382,7 @@ export default function AdminDisputeDetailPage() {
           </div>
 
           {/* Admin actions */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 sticky top-6">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 sticky top-6">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">처리 액션</h3>
             <div className="space-y-2">
               <button

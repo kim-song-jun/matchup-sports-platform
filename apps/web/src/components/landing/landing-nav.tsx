@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ArrowRight } from 'lucide-react';
 
 const NAV_LINKS = [
   { href: '/guide', label: '이용 가이드' },
@@ -18,82 +18,100 @@ export function LandingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
+    const onScroll = () => setScrolled(window.scrollY > 18);
     window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  return (
-    <>
-      <nav aria-label="메인 네비게이션" className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,box-shadow] duration-300 ${
-        scrolled || mobileOpen
-          ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-sm'
-          : 'bg-transparent'
-      }`}>
-        <div className="max-w-[1100px] mx-auto px-5 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
-              <span className="text-white font-black text-sm">M</span>
-            </div>
-            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">TeamMeet</span>
-          </Link>
+  const shellClass = scrolled || mobileOpen
+    ? 'border-b border-slate-200/80 bg-white/82 backdrop-blur-2xl shadow-[0_12px_40px_rgba(2,6,23,0.08)] dark:border-white/10 dark:bg-slate-950/78'
+    : 'border-b border-slate-200/60 bg-white/68 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/68';
 
-          {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-1">
+  return (
+    <nav aria-label="메인 네비게이션" className={`fixed left-0 right-0 top-0 z-50 transition-[background-color,box-shadow,border-color] duration-300 ${shellClass}`}>
+      <div className="mx-auto flex h-[72px] max-w-[1180px] items-center justify-between px-5">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(145deg,#3182F6,#1B64DA_60%,#0C2B63)] shadow-lg shadow-sky-500/15">
+            <span className="text-sm font-black tracking-[0.22em] text-white">MU</span>
+          </div>
+          <div className="leading-tight">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-blue-600 dark:text-sky-200/80">MatchUp</p>
+            <p className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">스포츠 매칭 플랫폼</p>
+          </div>
+        </Link>
+
+        <div className="hidden items-center gap-1 md:flex">
+          {NAV_LINKS.map((link) => {
+            const isActive = pathname === link.href;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 ${
+                  isActive
+                    ? 'bg-slate-950/6 text-slate-950 dark:bg-white/10 dark:text-white'
+                    : 'text-slate-600 hover:bg-slate-950/6 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/login"
+            className="hidden rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950 dark:text-slate-200 dark:hover:text-white sm:inline-flex"
+          >
+            로그인
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-400 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-500/20 transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60"
+          >
+            시작하기
+            <ArrowRight size={16} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((prev) => !prev)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/70 text-slate-700 transition-colors hover:bg-white md:hidden dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+            aria-label={mobileOpen ? '메뉴 닫기' : '메뉴 열기'}
+          >
+            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </div>
+
+      {mobileOpen && (
+        <div className="border-t border-slate-200/70 bg-white/92 px-5 py-4 backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/90 md:hidden">
+          <div className="mx-auto max-w-[1180px] space-y-2">
             {NAV_LINKS.map((link) => {
               const isActive = pathname === link.href;
               return (
-                <Link key={link.href} href={link.href} className={`text-base font-medium px-3 py-2 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${
-                  isActive ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-500 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}>{link.label}</Link>
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-slate-950/6 text-slate-950 dark:bg-white/10 dark:text-white'
+                      : 'text-slate-600 hover:bg-slate-950/6 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
+                  }`}
+                >
+                  <span>{link.label}</span>
+                  <span className="text-xs text-blue-500/70 dark:text-sky-200/70">{isActive ? '현재' : '보기'}</span>
+                </Link>
               );
             })}
           </div>
-
-          {/* Right: actions + mobile hamburger */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Link href="/login" className="text-base font-medium text-gray-500 hover:text-gray-900 active:scale-[0.97] transition-colors px-3 py-2.5 rounded-lg hidden sm:block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
-              로그인
-            </Link>
-            <Link href="/login" className="text-base font-semibold bg-blue-500 text-white px-5 py-2.5 rounded-xl transition-[colors,transform,shadow] active:scale-[0.97] hover:bg-blue-600 shadow-sm shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
-              시작하기
-            </Link>
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label={mobileOpen ? '메뉴 닫기' : '메뉴 열기'}
-            >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
         </div>
-
-        {/* Mobile dropdown */}
-        {mobileOpen && (
-          <div className="md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 animate-fade-in">
-            <div className="max-w-[1100px] mx-auto px-5 py-3 space-y-1">
-              {NAV_LINKS.map((link) => {
-                const isActive = pathname === link.href;
-                return (
-                  <Link key={link.href} href={link.href} className={`block text-md font-medium px-4 py-3 rounded-xl transition-colors ${
-                    isActive ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}>{link.label}</Link>
-                );
-              })}
-              <Link href="/login" className="block text-md font-medium px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 sm:hidden">
-                로그인
-              </Link>
-            </div>
-          </div>
-        )}
-      </nav>
-    </>
+      )}
+    </nav>
   );
 }

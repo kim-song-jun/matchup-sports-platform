@@ -16,7 +16,7 @@ export function EmptyState({ icon: Icon, title, description, action, secondaryAc
   const isSm = size === 'sm';
 
   return (
-    <div className={`flex flex-col items-center justify-center text-center ${isSm ? 'p-8' : 'p-12'}`}>
+    <div className={`solid-panel rounded-[28px] flex flex-col items-center justify-center text-center ${isSm ? 'p-8' : 'p-12'}`}>
       <div className={`flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30 ${isSm ? 'h-12 w-12' : 'h-20 w-20'}`}>
         <Icon size={isSm ? 24 : 40} className="text-blue-400 dark:text-blue-300 animate-gentle-bounce" />
       </div>
@@ -31,7 +31,7 @@ export function EmptyState({ icon: Icon, title, description, action, secondaryAc
       {action && (
         <Link
           href={action.href}
-          className="mt-5 inline-flex items-center rounded-xl border border-blue-200 dark:border-blue-800 px-4 py-2 text-base font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+          className="mt-5 inline-flex min-h-[44px] items-center rounded-full border border-blue-200 dark:border-blue-800 px-4 py-2 text-base font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
         >
           {action.label}
         </Link>

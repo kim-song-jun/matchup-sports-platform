@@ -122,7 +122,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
         <button
           onClick={goToPrevMonth}
           aria-label="이전 달"
-          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-[36px] flex items-center justify-center"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           <ChevronLeft size={18} />
         </button>
@@ -132,7 +132,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
         <button
           onClick={goToNextMonth}
           aria-label="다음 달"
-          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-[36px] flex items-center justify-center"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           <ChevronRight size={18} />
         </button>
@@ -184,7 +184,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
               type="button"
               onClick={() => handleDayClick(date)}
               aria-label={`${month + 1}월 ${day}일${hasMatches ? `, 매치 ${dayMatches.length}건` : ''}`}
-              className={`relative flex flex-col items-center justify-center h-10 rounded-lg transition-colors ${
+              className={`relative flex flex-col items-center justify-center min-h-[44px] min-w-[44px] rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                 hasMatches ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700' : 'cursor-default'
               } ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
             >

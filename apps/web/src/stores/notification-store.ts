@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export interface NotificationItem {
   id: string;
-  type: 'match' | 'team' | 'chat' | 'system';
+  type: string;
   title: string;
   body: string;
   isRead: boolean;
@@ -13,8 +13,10 @@ export interface NotificationItem {
 interface NotificationState {
   notifications: NotificationItem[];
   getUnreadCount: () => number;
+  setNotifications: (notifications: NotificationItem[]) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
+  resetNotifications: () => void;
 }
 
 const mockNotifications: NotificationItem[] = [
@@ -32,20 +34,28 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: mockNotifications,
 
   getUnreadCount: () => {
-    return get().notifications.filter(n => !n.isRead && n.type !== 'chat').length;
+    return get().notifications.filter((notification) => !notification.isRead).length;
+  },
+
+  setNotifications: (notifications) => {
+    set({ notifications });
   },
 
   markAsRead: (id: string) => {
     set((state) => ({
-      notifications: state.notifications.map(n =>
-        n.id === id ? { ...n, isRead: true } : n
+      notifications: state.notifications.map((notification) =>
+        notification.id === id ? { ...notification, isRead: true } : notification
       ),
     }));
   },
 
   markAllAsRead: () => {
     set((state) => ({
-      notifications: state.notifications.map(n => ({ ...n, isRead: true })),
+      notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
     }));
+  },
+
+  resetNotifications: () => {
+    set({ notifications: [] });
   },
 }));

@@ -129,7 +129,7 @@ export default function AdminSettlementsPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4 mb-6">
         {summaryCards.map((card) => (
-          <div key={card.label} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
+          <div key={card.label} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
             <div className="flex items-center justify-between mb-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.color}`}>
                 <card.icon size={20} />
@@ -158,7 +158,7 @@ export default function AdminSettlementsPage() {
 
       {/* Bulk Action */}
       {activeTab === 'pending' && selectedRows.length > 0 && (
-        <div className="flex items-center gap-3 mb-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-5 py-3">
+        <div className="flex items-center gap-3 mb-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-5 py-3">
           <CheckCircle size={18} className="text-blue-500" />
           <span className="text-base font-medium text-blue-700 dark:text-blue-300">{selectedRows.length}건 선택됨</span>
           <button onClick={handleProcessSettlements} disabled={isProcessing} className="ml-auto flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
@@ -169,7 +169,7 @@ export default function AdminSettlementsPage() {
       )}
 
       {/* Table */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -182,7 +182,7 @@ export default function AdminSettlementsPage() {
                         : 'border-gray-300 dark:border-gray-600'
                     }`}>
                       {selectedRows.length === filtered.length && filtered.length > 0 && (
-                        <CheckCircle size={10} className="text-white" />
+                        <CheckCircle size={12} className="text-white" />
                       )}
                     </button>
                   </th>
@@ -212,7 +212,7 @@ export default function AdminSettlementsPage() {
                             : 'border-gray-300 dark:border-gray-600'
                         }`}>
                           {selectedRows.includes(s.id) && (
-                            <CheckCircle size={10} className="text-white" />
+                            <CheckCircle size={12} className="text-white" />
                           )}
                         </button>
                       </td>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -117,9 +118,9 @@ export default function TeamDetailPage() {
           {/* Cover + Team header */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
-            <div className="h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center relative">
+            <div className="relative h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center">
               {team.coverImageUrl ? (
-                <img src={team.coverImageUrl} alt="" className="w-full h-full object-cover" />
+                <NextImage src={team.coverImageUrl} alt="" fill className="object-cover" aria-hidden="true" unoptimized />
               ) : (
                 <div className="text-center text-white/60">
                   <Image size={32} className="mx-auto mb-1" />
@@ -142,7 +143,7 @@ export default function TeamDetailPage() {
                 )}
                 {hasMercenaryPost && (
                   <Link href="/mercenary" className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 flex items-center gap-1">
-                    <UserPlus size={10} />
+                    <UserPlus size={12} />
                     용병 모집 중
                   </Link>
                 )}
@@ -285,22 +286,34 @@ export default function TeamDetailPage() {
             </div>
           </div>
 
-          {/* SNS & 링크 */}
+          {/* 소셜 & 연락처 */}
           {hasSns && (
             <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">SNS & 링크</h3>
-              <div className="grid grid-cols-2 gap-2">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">소셜 & 연락처</h3>
+              <div className="space-y-2">
                 {team.instagramUrl && (
-                  <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gray-800 text-white" />
+                  <a href={team.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors min-h-[44px]">
+                    <Instagram size={18} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                    <span className="truncate">{team.instagramUrl.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  </a>
                 )}
                 {team.youtubeUrl && (
-                  <SnsButton href={team.youtubeUrl} icon={<Youtube size={16} />} label="YouTube" color="bg-gray-800 text-white" />
+                  <a href={team.youtubeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors min-h-[44px]">
+                    <Youtube size={18} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                    <span className="truncate">{team.youtubeUrl.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  </a>
                 )}
                 {team.kakaoOpenChat && (
-                  <SnsButton href={team.kakaoOpenChat} icon={<MessageCircle size={16} />} label="오픈채팅" color="bg-gray-700 text-white" />
+                  <a href={team.kakaoOpenChat} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors min-h-[44px]">
+                    <MessageCircle size={18} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                    <span className="truncate">{team.kakaoOpenChat.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  </a>
                 )}
                 {team.websiteUrl && (
-                  <SnsButton href={team.websiteUrl} icon={<Globe size={16} />} label="웹사이트" color="bg-gray-700 text-white" />
+                  <a href={team.websiteUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-500 dark:hover:text-blue-400 transition-colors min-h-[44px]">
+                    <Globe size={18} className="text-gray-400 dark:text-gray-500 shrink-0" />
+                    <span className="truncate">{team.websiteUrl.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                  </a>
                 )}
               </div>
             </div>
@@ -328,8 +341,8 @@ export default function TeamDetailPage() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">갤러리</h3>
               <div className="grid grid-cols-3 gap-2">
                 {team.photos.map((photo: string, i: number) => (
-                  <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
-                    <img src={photo} alt={`팀 사진 ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                  <div key={i} className="relative aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                    <NextImage src={photo} alt={`팀 사진 ${i + 1}`} fill className="object-cover" sizes="33vw" unoptimized />
                   </div>
                 ))}
               </div>
@@ -456,12 +469,3 @@ function TrustItem({ icon, label, value, color }: { icon: React.ReactNode; label
   );
 }
 
-function SnsButton({ href, icon, label, color }: { href: string; icon: React.ReactNode; label: string; color: string }) {
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 ${color}`}>
-      {icon}
-      {label}
-    </a>
-  );
-}

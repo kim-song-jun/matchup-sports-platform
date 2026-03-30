@@ -15,7 +15,7 @@ export default function Loading() {
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-24 w-full rounded-lg" />
         </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
           <div className="flex justify-between">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-4 w-24" />

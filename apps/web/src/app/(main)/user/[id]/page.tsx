@@ -70,7 +70,7 @@ export default function UserProfilePage() {
 
       <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* Profile header */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-5 @3xl:p-6 mb-3">
+        <div className="rounded-xl bg-white border border-gray-100 p-5 @3xl:p-6 mb-3">
           <div className="flex items-center gap-4">
             <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-gray-100 text-3xl font-black text-blue-500">
               {user.nickname?.charAt(0)}
@@ -120,7 +120,7 @@ export default function UserProfilePage() {
 
         {/* Sport profiles */}
         {sportProfiles.length > 0 && (
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+          <div className="rounded-xl bg-white border border-gray-100 p-4 mb-3">
             <h3 className="text-base font-semibold text-gray-900 mb-3">
               <TrendingUp size={16} className="inline mr-1.5 text-gray-500" />
               종목별 프로필
@@ -162,7 +162,7 @@ export default function UserProfilePage() {
         )}
 
         {/* Manner score detail */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-3">
+        <div className="rounded-xl bg-white border border-gray-100 p-4 mb-3">
           <h3 className="text-base font-semibold text-gray-900 mb-3">
             <Shield size={16} className="inline mr-1.5 text-gray-500" />
             매너 정보

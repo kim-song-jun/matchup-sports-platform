@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import NextImage from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, ChevronRight, Image as ImageIcon, X } from 'lucide-react';
 import Link from 'next/link';
@@ -59,6 +60,13 @@ export default function EditMatchPage() {
         gender: apiMatch.gender || 'any',
         rules: '',
       });
+      // Prefill images if available
+      const images = (apiMatch as unknown as { images?: string[] }).images;
+      if (images && images.length > 0) {
+        setImagePreviews(images);
+      } else if (apiMatch.imageUrl) {
+        setImagePreviews([apiMatch.imageUrl]);
+      }
     }
   }, [apiMatch]);
 
@@ -108,12 +116,12 @@ export default function EditMatchPage() {
         <span className="text-gray-700 dark:text-gray-300">수정</span>
       </div>
 
-      <div className="px-5 @3xl:px-0 pb-8 max-w-lg">
+      <div className="px-5 @3xl:px-0 pb-8 max-w-2xl">
         {/* Sport Type */}
         <FormSection label="종목">
-          <div className="flex flex-wrap gap-2">
+          <div role="radiogroup" aria-label="종목 선택" className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
-              <button key={type} onClick={() => setForm({ ...form, sportType: type })}
+              <button key={type} role="radio" aria-checked={form.sportType === type} onClick={() => setForm({ ...form, sportType: type })}
                 className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   form.sportType === type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                 }`}>
@@ -140,16 +148,16 @@ export default function EditMatchPage() {
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {imagePreviews.map((src, i) => (
               <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
-                <img src={src} alt="" className="w-full h-full object-cover" />
+                <NextImage src={src} alt="" fill className="object-cover" aria-hidden="true" unoptimized />
                 <button onClick={() => removeImage(i)} aria-label="이미지 삭제" className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900/60 text-white">
-                  <X size={10} />
+                  <X size={12} />
                 </button>
               </div>
             ))}
-            {imageFiles.length < 5 && (
+            {imagePreviews.length < 5 && (
               <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex flex-col items-center justify-center w-20 h-20 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 <ImageIcon size={16} />
-                <span className="text-2xs mt-1">{imageFiles.length}/5</span>
+                <span className="text-2xs mt-1">{imagePreviews.length}/5</span>
               </button>
             )}
             <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
@@ -219,9 +227,9 @@ export default function EditMatchPage() {
 
         {/* Gender */}
         <FormSection label="성별 제한">
-          <div className="flex gap-2">
+          <div role="radiogroup" aria-label="성별 제한" className="flex gap-2">
             {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
-              <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
+              <button key={g.value} role="radio" aria-checked={form.gender === g.value} onClick={() => setForm({ ...form, gender: g.value })}
                 className={`min-h-[44px] rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
                   form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                 }`}>
@@ -245,7 +253,7 @@ export default function EditMatchPage() {
             돌아가기
           </button>
           <button onClick={handleSave} disabled={isSaving}
-            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {isSaving ? '수정 중...' : '수정 완료'}
           </button>
         </div>

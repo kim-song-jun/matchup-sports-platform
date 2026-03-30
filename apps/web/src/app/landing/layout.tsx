@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'TeamMeet - AI 스포츠 매칭 플랫폼 | 내 수준에 맞는 운동 메이트',
-  description: '축구, 풋살, 농구, 배드민턴 등 11개 종목. 실력·위치·매너를 AI가 분석해 딱 맞는 상대를 매칭해드려요. 가입 3초, 첫 매칭 무료.',
+  title: 'MatchUp - 신뢰 기반 스포츠 매칭 플랫폼 | 실력과 매너로 연결되는 경기',
+  description: '실력, 활동 지역, 매너 데이터를 바탕으로 믿을 수 있는 스포츠 상대를 연결합니다. 개인 매치, 팀 매칭, 프로필 관리까지 한 곳에서.',
   openGraph: {
-    title: 'TeamMeet - 내 수준에 딱 맞는 운동 메이트, AI가 찾아드려요',
-    description: '실력 기반 스포츠 매칭 플랫폼. 11개 종목 지원, 2,400+ 매칭 완료.',
+    title: 'MatchUp - 실력과 매너로 연결되는 스포츠 매칭',
+    description: '매칭, 신뢰, 프로필을 중심으로 설계된 스포츠 매칭 플랫폼.',
     type: 'website',
   },
 };

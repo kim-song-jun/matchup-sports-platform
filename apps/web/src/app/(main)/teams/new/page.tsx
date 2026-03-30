@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
+import { Field } from '@/components/form/field';
 import { SKILL_GRADES } from '@/lib/skill-grades';
 import type { SkillGrade } from '@/lib/skill-grades';
 
@@ -61,7 +62,7 @@ export default function CreateTeamPage() {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
         <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
+          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-xl bg-gray-100 text-gray-500 mb-4">
             <Users size={28} />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">팀을 만들어보세요</h2>
@@ -77,11 +78,11 @@ export default function CreateTeamPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700" />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900">팀 등록</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">팀 등록</h1>
       </header>
 
       {/* Desktop breadcrumb */}
@@ -106,16 +107,18 @@ export default function CreateTeamPage() {
 
         {/* 종목 */}
         <Field label="종목" required>
-          <div className="flex flex-wrap gap-2">
+          <div role="radiogroup" aria-label="종목 선택" className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
               <button
                 key={type}
                 type="button"
+                role="radio"
+                aria-checked={form.sportType === type}
                 onClick={() => setForm({ ...form, sportType: type })}
                 className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                    : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {sportLabel[type] || type}
@@ -250,14 +253,13 @@ export default function CreateTeamPage() {
         </Field>
 
         {/* SNS 링크 */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Globe size={16} className="text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900">SNS 링크</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">SNS 링크</h3>
           </div>
           <div className="space-y-3">
-            <div>
-              <label htmlFor="team-instagram" className="block text-xs text-gray-500 mb-1">Instagram</label>
+            <Field label="Instagram" id="team-instagram" className="mb-0">
               <input
                 id="team-instagram"
                 value={form.snsLinks.instagram}
@@ -265,9 +267,8 @@ export default function CreateTeamPage() {
                 placeholder="https://instagram.com/..."
                 className="input-field"
               />
-            </div>
-            <div>
-              <label htmlFor="team-youtube" className="block text-xs text-gray-500 mb-1">YouTube</label>
+            </Field>
+            <Field label="YouTube" id="team-youtube" className="mb-0">
               <input
                 id="team-youtube"
                 value={form.snsLinks.youtube}
@@ -275,9 +276,8 @@ export default function CreateTeamPage() {
                 placeholder="https://youtube.com/..."
                 className="input-field"
               />
-            </div>
-            <div>
-              <label htmlFor="team-kakaotalk" className="block text-xs text-gray-500 mb-1">카카오톡 오픈채팅</label>
+            </Field>
+            <Field label="카카오톡 오픈채팅" id="team-kakaotalk" className="mb-0">
               <input
                 id="team-kakaotalk"
                 value={form.snsLinks.kakaotalk}
@@ -285,15 +285,15 @@ export default function CreateTeamPage() {
                 placeholder="https://open.kakao.com/..."
                 className="input-field"
               />
-            </div>
+            </Field>
           </div>
         </div>
 
         {/* 홍보 영상(Shorts) */}
-        <div className="rounded-2xl bg-white border border-gray-100 p-4 mb-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-5">
           <div className="flex items-center gap-2 mb-3">
             <Video size={16} className="text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900">홍보 영상 (Shorts)</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
           </div>
           <input
             id="team-shortsUrl"
@@ -309,7 +309,7 @@ export default function CreateTeamPage() {
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mb-8"
+          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-8"
         >
           {isSubmitting ? '등록 중...' : '팀 등록하기'}
         </button>
@@ -332,18 +332,17 @@ export default function CreateTeamPage() {
           background: white;
           box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
         }
+        :global(.dark) .input-field {
+          border-color: #374151;
+          background: #1F2937;
+          color: #F3F4F6;
+        }
+        :global(.dark) .input-field:focus {
+          border-color: #3182F6;
+          background: #111827;
+        }
       `}</style>
     </div>
   );
 }
 
-function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-5">
-      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}

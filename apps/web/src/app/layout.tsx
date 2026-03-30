@@ -6,8 +6,8 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getLocale } from 'next-intl/server';
 
 export const metadata: Metadata = {
-  title: 'TeamMeet - 스포츠 매칭 플랫폼',
-  description: 'AI 기반 멀티스포츠 소셜 매칭 플랫폼',
+  title: 'MatchUp - 신뢰 기반 스포츠 매칭 플랫폼',
+  description: '매칭, 신뢰, 프로필을 중심으로 연결하는 스포츠 매칭 플랫폼',
   manifest: '/manifest.json',
 };
 
@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#3182F6',
+  themeColor: '#0B1220',
 };
 
 export default async function RootLayout({
@@ -44,7 +44,7 @@ export default async function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body className="min-h-dvh bg-background">
+      <body className="app-shell min-h-dvh bg-background">
         <NextIntlClientProvider messages={messages}>
           <ProgressBar />
           <Providers>{children}</Providers>

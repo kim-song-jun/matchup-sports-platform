@@ -342,7 +342,7 @@ export default function TeamMatchDetailPage() {
                 <button
                   onClick={handleArrival}
                   disabled={arrivalMutation.isPending}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-md font-semibold text-white hover:bg-green-600 active:bg-green-700 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-md font-semibold text-white hover:bg-green-600 active:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <MapPinCheck size={18} />
                   도착 인증
@@ -411,7 +411,7 @@ export default function TeamMatchDetailPage() {
                             <button
                               onClick={() => handleRespond(app.id, 'approve')}
                               disabled={respondMutation.isPending}
-                              className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-blue-50 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                              className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-blue-50 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <CheckCircle2 size={14} />
                               승인
@@ -419,7 +419,7 @@ export default function TeamMatchDetailPage() {
                             <button
                               onClick={() => handleRespond(app.id, 'reject')}
                               disabled={respondMutation.isPending}
-                              className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-gray-50 dark:bg-gray-700 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors"
+                              className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-gray-50 dark:bg-gray-700 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <XCircle size={14} />
                               거절

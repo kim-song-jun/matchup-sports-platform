@@ -382,7 +382,7 @@ export default function ChatRoomEmbed({
                         )}
                         <div className="flex items-end gap-1.5">
                           <div className={`bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-base text-gray-800 dark:text-gray-200 ${
-                            isFirstInGroup ? 'rounded-2xl rounded-tl-md' : 'rounded-2xl'
+                            isFirstInGroup ? 'rounded-xl rounded-tl-md' : 'rounded-xl'
                           }`}>
                             {msg.message}
                           </div>
@@ -408,7 +408,7 @@ export default function ChatRoomEmbed({
                         </div>
                       )}
                       <div className={`bg-blue-500 px-3.5 py-2 text-base text-white ${
-                        isFirstInGroup ? 'rounded-2xl rounded-tr-md' : 'rounded-2xl'
+                        isFirstInGroup ? 'rounded-xl rounded-tr-md' : 'rounded-xl'
                       }`}>
                         {msg.message}
                       </div>
@@ -422,7 +422,7 @@ export default function ChatRoomEmbed({
         {/* 타이핑 인디케이터 */}
         {isTyping && (
           <div className="flex items-center gap-2 mb-2 ml-10">
-            <div className="flex gap-1 rounded-2xl rounded-tl-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2.5">
+            <div className="flex gap-1 rounded-xl rounded-tl-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2.5">
               <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
               <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
               <span className="h-1.5 w-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
@@ -502,7 +502,7 @@ export default function ChatRoomEmbed({
       {/* Report Modal */}
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">신고하기</h3>
             <div className="space-y-2 mb-4">
               {['욕설/비매너', '허위정보', '스팸', '기타'].map((reason) => (
@@ -555,7 +555,7 @@ export default function ChatRoomEmbed({
       {/* Block Modal */}
       {showBlockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
                 <Ban size={20} className="text-red-500" />
@@ -586,7 +586,7 @@ export default function ChatRoomEmbed({
       {/* Leave Modal */}
       {showLeaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
                 <LogOut size={20} className="text-gray-500" />

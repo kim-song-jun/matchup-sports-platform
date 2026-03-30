@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Check, Plus, Image as ImageIcon, X } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { api } from '@/lib/api';
+import { Field } from '@/components/form/field';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -22,6 +24,7 @@ export default function CreateMatchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [touchedSteps, setTouchedSteps] = useState<Set<number>>(new Set());
 
   const [form, setForm] = useState({
     sportType: '',
@@ -114,15 +117,17 @@ export default function CreateMatchPage() {
         <p className="text-xs text-gray-500 mt-2">Step {step + 1}. {steps[step]}</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-lg">
+      <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* Step 0: Sport */}
         {step === 0 && (
           <div className="space-y-3 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
-            <div className="flex flex-wrap gap-2">
+            <div role="radiogroup" aria-label="종목 선택" className="flex flex-wrap gap-2">
               {sportTypes.map((type) => (
                 <button
                   key={type}
+                  role="radio"
+                  aria-checked={form.sportType === type}
                   onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
                   className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                     form.sportType === type
@@ -141,23 +146,23 @@ export default function CreateMatchPage() {
         {step === 1 && (
           <div className="space-y-4 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">매치 정보</h3>
-            <Field label="매치 제목" required id="match-title">
+            <Field label="매치 제목" required id="match-title" className="">
               <input id="match-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
                 maxLength={100} placeholder="예: 주말 풋살 한판!" className="form-input" />
             </Field>
-            <Field label="설명" id="match-description">
+            <Field label="설명" id="match-description" className="">
               <textarea id="match-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                 maxLength={1000} placeholder="매치에 대한 설명을 적어주세요" rows={3} className="form-input resize-none" />
             </Field>
 
             {/* Image upload */}
-            <Field label="이미지 (선택)">
+            <Field label="이미지 (선택)" className="">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {imagePreviews.map((src, i) => (
                   <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <NextImage src={src} alt="" fill className="object-cover" aria-hidden="true" unoptimized />
                     <button onClick={() => removeImage(i)} aria-label="이미지 삭제" className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900/60 text-white">
-                      <X size={10} />
+                      <X size={12} />
                     </button>
                   </div>
                 ))}
@@ -172,22 +177,22 @@ export default function CreateMatchPage() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="최대 인원" id="match-maxPlayers">
+              <Field label="최대 인원" id="match-maxPlayers" className="">
                 <input id="match-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: +e.target.value })}
                   min={2} max={30} className="form-input" />
               </Field>
-              <Field label="참가비 (원)" id="match-fee">
+              <Field label="참가비 (원)" id="match-fee" className="">
                 <input id="match-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: +e.target.value })}
                   min={0} step={1000} className="form-input" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="최소 레벨" id="match-levelMin">
+              <Field label="최소 레벨" id="match-levelMin" className="">
                 <select id="match-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: +e.target.value })} className="form-input">
                   {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
                 </select>
               </Field>
-              <Field label="최대 레벨" id="match-levelMax">
+              <Field label="최대 레벨" id="match-levelMax" className="">
                 <select id="match-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: +e.target.value })} className="form-input">
                   {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
                 </select>
@@ -195,10 +200,10 @@ export default function CreateMatchPage() {
             </div>
 
             {/* Gender */}
-            <Field label="성별 제한">
-              <div className="flex gap-2">
+            <Field label="성별 제한" className="">
+              <div role="radiogroup" aria-label="성별 제한" className="flex gap-2">
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
-                  <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
+                  <button key={g.value} role="radio" aria-checked={form.gender === g.value} onClick={() => setForm({ ...form, gender: g.value })}
                     className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                     }`}>
@@ -209,7 +214,7 @@ export default function CreateMatchPage() {
             </Field>
 
             {/* Rules */}
-            <Field label="추가 규칙 (선택)" id="match-rules">
+            <Field label="추가 규칙 (선택)" id="match-rules" className="">
               <textarea id="match-rules" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })}
                 maxLength={500} placeholder="참가자에게 알릴 규칙이나 공지사항" rows={2} className="form-input resize-none" />
             </Field>
@@ -221,9 +226,10 @@ export default function CreateMatchPage() {
                   toast('info', '최소/최대 레벨이 자동으로 교정되었어요');
                   return;
                 }
+                setTouchedSteps(prev => new Set(prev).add(2));
                 setStep(2);
               }}
-              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
+              className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
               다음
             </button>
           </div>
@@ -233,7 +239,7 @@ export default function CreateMatchPage() {
         {step === 2 && (
           <div className="space-y-4 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">장소와 시간</h3>
-            <Field label="시설 선택" required>
+            <Field label="시설 선택" required className="">
               {Array.isArray(venues) && venues.length > 0 && (
                 <div className="space-y-2 mb-3">
                   {venues.map((v: Venue) => (
@@ -257,15 +263,18 @@ export default function CreateMatchPage() {
                   className="form-input"
                 />
               </div>
+              {!form.venueId && !form.customVenue && touchedSteps.has(2) && (
+                <p className="text-xs text-red-500 mt-1">시설을 선택하거나 직접 입력해주세요</p>
+              )}
             </Field>
             <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-3">
-              <Field label="날짜" id="match-date">
+              <Field label="날짜" id="match-date" className="">
                 <input id="match-date" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} className="form-input" />
               </Field>
-              <Field label="시작 시간" id="match-startTime">
+              <Field label="시작 시간" id="match-startTime" className="">
                 <input id="match-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} className="form-input" />
               </Field>
-              <Field label="종료 시간" id="match-endTime">
+              <Field label="종료 시간" id="match-endTime" className="">
                 <input id="match-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} className="form-input" />
               </Field>
             </div>
@@ -277,7 +286,7 @@ export default function CreateMatchPage() {
                 if (form.matchDate < today) { toast('error', '과거 날짜는 선택할 수 없어요'); return; }
                 setStep(3);
               }}
-              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
+              className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
               다음
             </button>
           </div>
@@ -303,7 +312,7 @@ export default function CreateMatchPage() {
               {imageFiles.length > 0 && <ConfirmRow label="이미지" value={`${imageFiles.length}장`} />}
             </div>
             <button onClick={handleSubmit} disabled={isSubmitting}
-              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
+              className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
               {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
             </button>
           </div>
@@ -338,17 +347,6 @@ export default function CreateMatchPage() {
           background: #111827;
         }
       `}</style>
-    </div>
-  );
-}
-
-function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-500 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      {children}
     </div>
   );
 }

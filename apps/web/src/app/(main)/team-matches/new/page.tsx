@@ -169,10 +169,12 @@ export default function NewTeamMatchPage() {
           <div className="space-y-5 animate-fade-in">
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">종목 선택</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div role="radiogroup" aria-label="종목 선택" className="grid grid-cols-2 gap-2">
                 {sportOptions.map((opt) => (
                   <button
                     key={opt.value}
+                    role="radio"
+                    aria-checked={form.sportType === opt.value}
                     onClick={() => update('sportType', opt.value)}
                     className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-colors ${
                       form.sportType === opt.value
@@ -246,10 +248,12 @@ export default function NewTeamMatchPage() {
 
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">쿼터 수</label>
-              <div className="flex gap-2">
+              <div role="radiogroup" aria-label="쿼터 수" className="flex gap-2">
                 {quarterOptions.map((q) => (
                   <button
                     key={q}
+                    role="radio"
+                    aria-checked={form.quarterCount === q}
                     onClick={() => update('quarterCount', q)}
                     className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                       form.quarterCount === q
@@ -331,10 +335,12 @@ export default function NewTeamMatchPage() {
             {/* 경기방식 */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">경기방식</label>
-              <div className="flex gap-2">
+              <div role="radiogroup" aria-label="경기방식" className="flex gap-2">
                 {gameFormatOptions.map((fmt) => (
                   <button
                     key={fmt}
+                    role="radio"
+                    aria-checked={form.gameFormat === fmt}
                     onClick={() => update('gameFormat', fmt)}
                     className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
                       form.gameFormat === fmt
@@ -383,10 +389,12 @@ export default function NewTeamMatchPage() {
             {/* 경기 스타일 */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">경기 스타일</label>
-              <div className="space-y-2">
+              <div role="radiogroup" aria-label="경기 스타일" className="space-y-2">
                 {matchStyleOptions.map((opt) => (
                   <button
                     key={opt.value}
+                    role="radio"
+                    aria-checked={form.matchStyle === opt.value}
                     onClick={() => update('matchStyle', opt.value)}
                     className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
                       form.matchStyle === opt.value
@@ -533,7 +541,7 @@ export default function NewTeamMatchPage() {
           <button
             onClick={handleSubmit}
             disabled={createMutation.isPending}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Check size={16} />
             {createMutation.isPending ? '등록 중...' : '모집글 등록'}

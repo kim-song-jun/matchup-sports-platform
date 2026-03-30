@@ -210,7 +210,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
                 onClick={() => removePhoto(idx)}
                 className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900/60 text-white"
               >
-                <X size={10} />
+                <X size={12} />
               </button>
             </div>
           ))}

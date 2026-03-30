@@ -1,9 +1,14 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Star, User } from 'lucide-react';
+import { ArrowLeft, Star, User, MessageSquareQuote } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { EmptyState } from '@/components/ui/empty-state';
+
+const surfaceCard =
+  'rounded-[28px] border border-slate-200/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-black/20';
+
+const softCard =
+  'rounded-[24px] border border-slate-200/60 bg-white/90 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/78 dark:shadow-black/10';
 
 const mockReviewsReceived = [
   {
@@ -51,12 +56,12 @@ const mockReviewsReceived = [
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((i) => (
+      {[1, 2, 3, 4, 5].map((score) => (
         <Star
-          key={i}
+          key={score}
           size={14}
-          className={i <= rating ? 'text-amber-400' : 'text-gray-200 dark:text-gray-600'}
-          fill={i <= rating ? 'currentColor' : 'none'}
+          className={score <= rating ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700'}
+          fill={score <= rating ? 'currentColor' : 'none'}
         />
       ))}
     </div>
@@ -69,82 +74,116 @@ export default function ReviewsReceivedPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={Star}
+          title="로그인 후 받은 평가를 확인할 수 있어요"
+          description="매치가 끝나면 다른 참가자들이 남긴 피드백이 이곳에 정리됩니다."
+          action={{ label: '로그인', href: '/login' }}
+        />
       </div>
     );
   }
 
-  const avgScore = mockReviewsReceived.reduce((sum, r) => sum + r.rating, 0) / mockReviewsReceived.length;
-  const ratingDistribution = [5, 4, 3, 2, 1].map((r) => ({
-    rating: r,
-    count: mockReviewsReceived.filter((rev) => rev.rating === r).length,
+  const avgScore = mockReviewsReceived.reduce((sum, review) => sum + review.rating, 0) / mockReviewsReceived.length;
+  const ratingDistribution = [5, 4, 3, 2, 1].map((rating) => ({
+    rating,
+    count: mockReviewsReceived.filter((review) => review.rating === rating).length,
   }));
 
-  return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h1>
-      </header>
-      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h2>
-        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
-      </div>
+  const summary = [
+    { label: '평균 평점', value: avgScore.toFixed(1) },
+    { label: '누적 평가', value: `${mockReviewsReceived.length}개` },
+    { label: '5점 비율', value: `${Math.round((ratingDistribution[0].count / mockReviewsReceived.length) * 100)}%` },
+  ];
 
-      <div className="px-5 @3xl:px-0 pb-8">
-        {/* Summary */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-4xl font-black text-gray-900 dark:text-white">{avgScore.toFixed(1)}</p>
+  return (
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <section className="px-5 @3xl:px-0 pt-4">
+        <div className={`${surfaceCard} overflow-hidden p-6 sm:p-7`}>
+          <div className="flex flex-col gap-5 @3xl:flex-row @3xl:items-end @3xl:justify-between">
+            <div className="max-w-2xl">
+              <div className="eyebrow-chip">
+                <MessageSquareQuote size={14} />
+                MatchUp Reputation
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                받은 평가는 신뢰 지표로 축적됩니다.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300 sm:text-base">
+                다른 참가자들이 남긴 코멘트와 평점을 한눈에 확인하고, 운영자와 플레이어로서의 인상을 관리할 수 있습니다.
+              </p>
+            </div>
+            <button
+              onClick={() => router.back()}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-slate-200/70 bg-white/70 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-900"
+            >
+              <ArrowLeft size={14} />
+              이전 화면
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {summary.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+                <p className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 @3xl:px-0 mt-4 grid gap-4 @3xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="solid-panel rounded-[24px] p-5">
+          <div className="text-center">
+            <p className="text-5xl font-black tracking-tight text-slate-950 dark:text-white">{avgScore.toFixed(1)}</p>
+            <div className="mt-3 flex justify-center">
               <StarRating rating={Math.round(avgScore)} />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{mockReviewsReceived.length}개 평가</p>
             </div>
-            <div className="flex-1 space-y-1.5">
-              {ratingDistribution.map((d) => (
-                <div key={d.rating} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 w-3">{d.rating}</span>
-                  <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-amber-400 rounded-full"
-                      style={{ width: `${(d.count / mockReviewsReceived.length) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 w-4 text-right">{d.count}</span>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{mockReviewsReceived.length}개 평가</p>
+          </div>
+
+          <div className="mt-6 space-y-2">
+            {ratingDistribution.map((item) => (
+              <div key={item.rating} className="flex items-center gap-2">
+                <span className="w-3 text-xs text-slate-500 dark:text-slate-400">{item.rating}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-amber-400"
+                    style={{ width: `${(item.count / mockReviewsReceived.length) * 100}%` }}
+                  />
                 </div>
-              ))}
-            </div>
+                <span className="w-4 text-right text-xs text-slate-500 dark:text-slate-400">{item.count}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Review List */}
-        <div className="space-y-3">
+        <div className="space-y-3 stagger-children">
           {mockReviewsReceived.map((review) => (
-            <div key={review.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <div key={review.id} className={`${softCard} p-4`}>
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 shrink-0">
-                  <User size={18} className="text-gray-500 dark:text-gray-400" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/70 dark:border-slate-800 dark:bg-slate-900/70">
+                  <User size={18} className="text-slate-500 dark:text-slate-300" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-base font-semibold text-gray-900 dark:text-white">{review.reviewerName}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{review.date}</span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-base font-semibold text-slate-950 dark:text-white">{review.reviewerName}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{review.date}</span>
                   </div>
-                  <div className="mt-0.5">
+                  <div className="mt-2">
                     <StarRating rating={review.rating} />
                   </div>
-                  <p className="text-base text-gray-700 dark:text-gray-300 mt-2">{review.comment}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{review.matchTitle}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{review.comment}</p>
+                  <p className="mt-2 text-xs font-medium text-slate-400 dark:text-slate-500">{review.matchTitle}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock, RotateCcw, Wallet, ShoppingBag, Trophy, GraduationCap, ChevronRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock, RotateCcw, Wallet, ShoppingBag, Trophy, GraduationCap, ChevronRight, Receipt, CalendarDays } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { usePayments } from '@/hooks/use-api';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatAmount, formatFullDate } from '@/lib/utils';
@@ -13,13 +13,13 @@ const tabs = [
   { id: 'match', label: '매치' },
   { id: 'lesson', label: '강좌' },
   { id: 'market', label: '장터' },
-];
+] as const;
 
-const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; color: string }> = {
-  completed: { label: '결제 완료', icon: CheckCircle, color: 'text-green-600 bg-green-50' },
-  pending: { label: '대기중', icon: Clock, color: 'text-amber-500 bg-amber-50' },
-  refunded: { label: '환불됨', icon: RotateCcw, color: 'text-red-500 bg-red-50' },
-  failed: { label: '실패', icon: XCircle, color: 'text-gray-500 bg-gray-100' },
+const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; badgeClass: string }> = {
+  completed: { label: '결제 완료', icon: CheckCircle, badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200' },
+  pending: { label: '대기중', icon: Clock, badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200' },
+  refunded: { label: '환불됨', icon: RotateCcw, badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200' },
+  failed: { label: '실패', icon: XCircle, badgeClass: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
 };
 
 const methodConfig: Record<string, { label: string; icon: typeof CreditCard }> = {
@@ -29,11 +29,17 @@ const methodConfig: Record<string, { label: string; icon: typeof CreditCard }> =
   kakaopay: { label: '카카오페이', icon: Wallet },
 };
 
-const typeConfig: Record<string, { label: string; icon: typeof Trophy; color: string }> = {
-  match: { label: '매치', icon: Trophy, color: 'bg-gray-100 text-gray-500' },
-  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-gray-100 text-gray-500' },
-  market: { label: '장터', icon: ShoppingBag, color: 'bg-gray-100 text-gray-600' },
+const typeConfig: Record<string, { label: string; icon: typeof Trophy; chipClass: string }> = {
+  match: { label: '매치', icon: Trophy, chipClass: 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200' },
+  lesson: { label: '강좌', icon: GraduationCap, chipClass: 'bg-sky-50 text-sky-700 dark:bg-sky-400/10 dark:text-sky-200' },
+  market: { label: '장터', icon: ShoppingBag, chipClass: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
 };
+
+const surfaceCard =
+  'rounded-[28px] border border-slate-200/70 bg-white/90 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-black/20';
+
+const softCard =
+  'rounded-[24px] border border-slate-200/60 bg-white/90 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/78 dark:shadow-black/10';
 
 const mockPayments = [
   {
@@ -94,130 +100,175 @@ const mockPayments = [
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const { data: apiPayments } = usePayments();
 
-  // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
-  // API Payment 타입과 목업 타입이 다르므로 공통 형태로 변환
   const payments = apiPayments
-    ? apiPayments.map((p) => ({
-        id: p.id,
+    ? apiPayments.map((payment) => ({
+        id: payment.id,
         type: 'match' as string,
-        name: p.orderId || '결제',
-        amount: p.amount,
-        status: p.status,
-        method: p.method || 'card',
-        createdAt: p.createdAt,
+        name: payment.orderId || '결제',
+        amount: payment.amount,
+        status: payment.status,
+        method: payment.method || 'card',
+        createdAt: payment.createdAt,
       }))
     : mockPayments;
 
-  const tabFiltered = activeTab === 'all'
-    ? payments
-    : payments.filter((p) => p.type === activeTab);
-  const filtered = tabFiltered.filter((p) => {
-    if (dateFrom && p.createdAt < dateFrom) return false;
-    if (dateTo && p.createdAt > dateTo + 'T23:59:59') return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    const tabFiltered = activeTab === 'all'
+      ? payments
+      : payments.filter((payment) => payment.type === activeTab);
+
+    return tabFiltered.filter((payment) => {
+      if (dateFrom && payment.createdAt < dateFrom) return false;
+      if (dateTo && payment.createdAt > `${dateTo}T23:59:59`) return false;
+      return true;
+    });
+  }, [activeTab, dateFrom, dateTo, payments]);
+
+  const summary = [
+    { label: '건수', value: `${filtered.length}건` },
+    { label: '완료 금액', value: formatAmount(filtered.filter((payment) => payment.status === 'completed').reduce((sum, payment) => sum + payment.amount, 0)) },
+    { label: '환불/실패', value: `${filtered.filter((payment) => ['refunded', 'failed'].includes(payment.status)).length}건` },
+  ];
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
-      {/* Header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
-      </header>
-      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
-        <p className="text-sm text-gray-500 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
-      </div>
-
-      <div className="px-5 @3xl:px-0">
-        {/* 기간 필터 */}
-        <div className="flex items-center gap-2 mb-4">
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-          <span className="text-sm text-gray-500">~</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="flex items-center gap-1 mb-5 rounded-xl bg-gray-100 p-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      <section className="px-5 @3xl:px-0 pt-4">
+        <div className={`${surfaceCard} overflow-hidden p-6 sm:p-7`}>
+          <div className="flex flex-col gap-5 @3xl:flex-row @3xl:items-end @3xl:justify-between">
+            <div className="max-w-2xl">
+              <div className="eyebrow-chip">
+                <Receipt size={14} />
+                MatchUp Ledger
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                결제 이력도 같은 톤으로 정리합니다.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300 sm:text-base">
+                매치, 강좌, 장터 결제를 한곳에서 확인하고 상태와 결제 수단을 빠르게 구분할 수 있도록 구성했습니다.
+              </p>
+            </div>
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              onClick={() => router.back()}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-slate-200/70 bg-white/70 px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:bg-slate-900"
             >
-              {tab.label}
+              <ArrowLeft size={14} />
+              이전 화면
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* Payment List */}
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {summary.map((item) => (
+              <div key={item.label} className="rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+                <p className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 @3xl:px-0 mt-4">
+        <div className="solid-panel rounded-[24px] p-4">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+            <label className="relative">
+              <span className="sr-only">시작일</span>
+              <CalendarDays className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(event) => setDateFrom(event.target.value)}
+                className="input-surface py-3.5 pl-11 pr-4 text-base outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </label>
+
+            <span className="hidden text-sm font-medium text-slate-500 sm:block">~</span>
+
+            <label className="relative">
+              <span className="sr-only">종료일</span>
+              <CalendarDays className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(event) => setDateTo(event.target.value)}
+                className="input-surface py-3.5 pl-11 pr-4 text-base outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 segmented-control scrollbar-hide overflow-x-auto pb-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`segmented-pill shrink-0 ${activeTab === tab.id ? 'is-active' : ''}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 @3xl:px-0 mt-4">
         {filtered.length === 0 ? (
           <EmptyState
             icon={CreditCard}
             title="아직 결제 내역이 없어요"
-            description="매치에 참가하면 여기서 확인할 수 있어요"
+            description="매치나 강좌를 신청하면 여기서 상태를 확인할 수 있어요"
           />
         ) : (
           <div className="space-y-3 stagger-children">
-            {filtered.map((p) => {
-              const s = statusConfig[p.status] || statusConfig.pending;
-              const m = methodConfig[p.method] || methodConfig.card;
-              const t = typeConfig[p.type] || typeConfig.match;
-              const StatusIcon = s.icon;
-              const MethodIcon = m.icon;
-              const TypeIcon = t.icon;
+            {filtered.map((payment) => {
+              const status = statusConfig[payment.status] || statusConfig.pending;
+              const method = methodConfig[payment.method] || methodConfig.card;
+              const type = typeConfig[payment.type] || typeConfig.match;
+              const StatusIcon = status.icon;
+              const MethodIcon = method.icon;
+              const TypeIcon = type.icon;
+
               return (
                 <Link
-                  key={p.id}
-                  href={`/payments/${p.id}`}
-                  className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors"
+                  key={payment.id}
+                  href={`/payments/${payment.id}`}
+                  className={`${softCard} block p-4 transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:hover:bg-slate-900`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${t.color} shrink-0`}>
-                        <TypeIcon size={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{p.name}</p>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold ${s.color}`}>
-                            {s.label}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <MethodIcon size={12} />
-                            {m.label}
-                          </span>
-                          <span aria-hidden="true">·</span>
-                          <span>{formatFullDate(p.createdAt)}</span>
-                        </div>
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/70 dark:border-slate-800 dark:bg-slate-900/70">
+                      <TypeIcon size={20} className="text-slate-600 dark:text-slate-200" />
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className="text-md font-bold text-gray-900 dark:text-white">{formatAmount(p.amount)}</span>
-                      <ChevronRight size={16} className="text-gray-300" />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${type.chipClass}`}>{type.label}</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.badgeClass}`}>
+                          <StatusIcon size={12} />
+                          {status.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-semibold text-slate-950 dark:text-white">{payment.name}</h3>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center gap-1">
+                              <MethodIcon size={12} />
+                              {method.label}
+                            </span>
+                            <span>·</span>
+                            <span>{formatFullDate(payment.createdAt)}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-base font-black tracking-tight text-slate-950 dark:text-white">{formatAmount(payment.amount)}</span>
+                          <ChevronRight size={16} className="text-slate-300 dark:text-slate-600" />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -225,7 +276,7 @@ export default function PaymentsPage() {
             })}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

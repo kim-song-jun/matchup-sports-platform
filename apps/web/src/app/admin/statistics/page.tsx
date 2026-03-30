@@ -84,7 +84,7 @@ export default function AdminStatisticsPage() {
 
       {/* User growth cards */}
       <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Users size={20} />
@@ -98,7 +98,7 @@ export default function AdminStatisticsPage() {
           <p className="text-sm text-gray-400 mt-0.5">전체 사용자</p>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <UserPlus size={20} />
@@ -108,7 +108,7 @@ export default function AdminStatisticsPage() {
           <p className="text-sm text-gray-400 mt-0.5">이번 달 신규</p>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Trophy size={20} />
@@ -118,7 +118,7 @@ export default function AdminStatisticsPage() {
           <p className="text-sm text-gray-400 mt-0.5">활성 사용자</p>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
               <Users size={20} />
@@ -131,7 +131,7 @@ export default function AdminStatisticsPage() {
 
       <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-6 mb-6">
         {/* Monthly match count bar chart */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 size={16} className="text-blue-500" />
             <h3 className="text-md font-bold text-gray-900 dark:text-white">월별 매치 수</h3>
@@ -154,7 +154,7 @@ export default function AdminStatisticsPage() {
         </div>
 
         {/* Revenue trend bar chart */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-4">
             <DollarSign size={16} className="text-blue-500" />
             <h3 className="text-md font-bold text-gray-900 dark:text-white">매출 추이</h3>
@@ -179,7 +179,7 @@ export default function AdminStatisticsPage() {
 
       <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-6">
         {/* Sport distribution horizontal bars */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Trophy size={16} className="text-blue-500" />
             <h3 className="text-md font-bold text-gray-900 dark:text-white">종목별 매치 분포</h3>
@@ -206,7 +206,7 @@ export default function AdminStatisticsPage() {
         </div>
 
         {/* Top venues table */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Building2 size={16} className="text-blue-500" />
             <h3 className="text-md font-bold text-gray-900 dark:text-white">인기 시설 TOP 5</h3>

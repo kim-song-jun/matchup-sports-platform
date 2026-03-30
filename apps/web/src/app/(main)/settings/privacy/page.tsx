@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-8">
         <Section title="1. 수집하는 정보">
           <p>
-            TeamMeet(이하 &quot;회사&quot;)은 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다. 회원가입 시 필수적으로 수집하는 정보는 이메일 주소, 닉네임이며, 소셜 로그인(카카오, 네이버, Apple)을 통해 가입하는 경우 해당 플랫폼에서 제공하는 프로필 정보(이름, 이메일, 프로필 사진)가 수집됩니다.
+            MatchUp(이하 &quot;회사&quot;)은 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다. 회원가입 시 필수적으로 수집하는 정보는 이메일 주소, 닉네임이며, 소셜 로그인(카카오, 네이버, Apple)을 통해 가입하는 경우 해당 플랫폼에서 제공하는 프로필 정보(이름, 이메일, 프로필 사진)가 수집됩니다.
           </p>
           <p>
             서비스 이용 과정에서 자동으로 수집되는 정보에는 기기 정보(기기 종류, OS 버전, 앱 버전), 접속 로그(접속 일시, IP 주소), 서비스 이용 기록(매치 참여 기록, 채팅 기록, 결제 기록) 등이 포함됩니다. 위치 기반 서비스 이용 시 이용자의 동의 하에 위치 정보가 수집될 수 있습니다.
@@ -62,12 +62,12 @@ export default function PrivacyPage() {
             이용자는 회원 탈퇴를 통해 개인정보의 수집 및 이용에 대한 동의를 철회할 수 있습니다. 탈퇴 요청은 서비스 내 &quot;설정 &gt; 개인정보 관리 &gt; 회원 탈퇴&quot;에서 직접 처리할 수 있으며, 탈퇴 즉시 개인정보가 파기됩니다. 다만, 법령에 의해 보관이 필요한 정보는 해당 기간 동안 보관 후 파기됩니다.
           </p>
           <p>
-            이용자는 개인정보 보호와 관련하여 불만이 있는 경우 개인정보 보호위원회(국번없이 182), 한국인터넷진흥원(국번없이 118) 등에 상담 또는 구제를 신청할 수 있습니다. 회사의 개인정보 보호책임자에게 직접 문의할 수도 있으며, 연락처는 support@teammeet.kr입니다.
+            이용자는 개인정보 보호와 관련하여 불만이 있는 경우 개인정보 보호위원회(국번없이 182), 한국인터넷진흥원(국번없이 118) 등에 상담 또는 구제를 신청할 수 있습니다. 회사의 개인정보 보호책임자에게 직접 문의할 수도 있으며, 연락처는 support@matchup.kr입니다.
           </p>
         </Section>
 
-        <div className="text-center py-4 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-sm text-gray-500">최종 수정일: 2026년 1월 1일</p>
+        <div className="border-t border-gray-100 py-4 text-center dark:border-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">최종 수정일: 2026년 1월 1일</p>
         </div>
       </div>
     </div>
@@ -76,8 +76,8 @@ export default function PrivacyPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{title}</h3>
+    <div className="solid-panel rounded-[24px] p-5">
+      <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
       <div className="space-y-3 text-base leading-relaxed text-gray-600 dark:text-gray-400">
         {children}
       </div>

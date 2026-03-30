@@ -135,7 +135,7 @@ export default function AdminTeamDetailPage() {
         {/* Left column */}
         <div className="space-y-4">
           {/* Team header card */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-4">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gray-900 dark:bg-gray-700 text-white text-xl font-black">
@@ -189,7 +189,7 @@ export default function AdminTeamDetailPage() {
           </div>
 
           {/* Stats */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 통계</h3>
             <div className="grid grid-cols-4 gap-3">
               <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5 text-center">
@@ -212,7 +212,7 @@ export default function AdminTeamDetailPage() {
           </div>
 
           {/* Members */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
               멤버 ({team.members.length}명)
             </h3>
@@ -243,7 +243,7 @@ export default function AdminTeamDetailPage() {
           </div>
 
           {/* Recent matches */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">최근 매치</h3>
             <div className="space-y-2">
               {team.recentMatches.map((m: { id: string; date: string; opponent: string; result: string; score: string }) => (
@@ -270,7 +270,7 @@ export default function AdminTeamDetailPage() {
         {/* Right column */}
         <div className="space-y-4">
           {/* Owner info */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영자 정보</h3>
             <div className="flex items-center gap-3 mb-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-base font-bold text-blue-500">
@@ -297,7 +297,7 @@ export default function AdminTeamDetailPage() {
           </div>
 
           {/* Admin actions */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">관리 액션</h3>
             <div className="space-y-2">
               <button

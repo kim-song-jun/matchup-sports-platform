@@ -407,7 +407,7 @@ export default function EditLessonPage() {
           <button
             onClick={handleSave}
             disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save size={16} />
             {isSubmitting ? '저장 중...' : '수정 완료'}
@@ -434,7 +434,7 @@ export default function EditLessonPage() {
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isDeleting ? '삭제 중...' : '삭제하기'}
               </button>

@@ -56,7 +56,7 @@ const mockVenues: Record<string, any> = {
 
 function getVenueData(id: string) {
   return mockVenues[id] || {
-    id, name: 'TeamMeet 스포츠센터', type: 'gym',
+    id, name: 'MatchUp 스포츠센터', type: 'gym',
     sportTypes: ['futsal', 'badminton'],
     address: '서울시 마포구 월드컵로 100', city: '서울', district: '마포구',
     phone: '02-5555-1234', description: '다목적 체육관입니다.',
@@ -218,7 +218,7 @@ export default function AdminVenueEditPage() {
 
       <div className="space-y-5">
         {/* Basic info */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h3>
 
           <div>
@@ -273,7 +273,7 @@ export default function AdminVenueEditPage() {
         </div>
 
         {/* Location */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">위치 정보</h3>
 
           <div>
@@ -299,7 +299,7 @@ export default function AdminVenueEditPage() {
         </div>
 
         {/* Facilities & Price */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">시설 & 요금</h3>
 
           <div>
@@ -343,7 +343,7 @@ export default function AdminVenueEditPage() {
         </div>
 
         {/* Operating hours */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>

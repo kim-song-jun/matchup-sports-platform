@@ -8,7 +8,7 @@ export default function TermsPage() {
       <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-8">
         <Section title="제1장 서비스 이용약관">
           <p>
-            본 약관은 TeamMeet(이하 &quot;회사&quot;)이 제공하는 스포츠 매칭 플랫폼 서비스(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 규정합니다. 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있으며, 회사는 관련 법령에 따라 약관의 내용을 변경할 수 있습니다.
+            본 약관은 MatchUp(이하 &quot;회사&quot;)이 제공하는 스포츠 매칭 플랫폼 서비스(이하 &quot;서비스&quot;)의 이용에 관한 기본적인 사항을 규정합니다. 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있으며, 회사는 관련 법령에 따라 약관의 내용을 변경할 수 있습니다.
           </p>
           <p>
             서비스 이용자는 본 약관을 충분히 읽고 이해한 후 동의하여야 합니다. 서비스에 가입하거나 이용을 시작하는 경우, 본 약관에 동의한 것으로 간주됩니다. 이용자는 약관 변경 시 변경된 내용을 확인할 의무가 있으며, 변경된 약관에 동의하지 않는 경우 서비스 이용을 중단하고 탈퇴할 수 있습니다.
@@ -54,8 +54,8 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <div className="text-center py-4 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-sm text-gray-500">최종 수정일: 2026년 1월 1일</p>
+        <div className="border-t border-gray-100 py-4 text-center dark:border-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">최종 수정일: 2026년 1월 1일</p>
         </div>
       </div>
     </div>
@@ -64,8 +64,8 @@ export default function TermsPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{title}</h3>
+    <div className="solid-panel rounded-[24px] p-5">
+      <h3 className="mb-3 text-lg font-bold text-gray-900 dark:text-white">{title}</h3>
       <div className="space-y-3 text-base leading-relaxed text-gray-600 dark:text-gray-400">
         {children}
       </div>

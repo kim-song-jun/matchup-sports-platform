@@ -80,7 +80,7 @@ export default function TeamMatchEvaluatePage() {
 
       <div className="px-5 @3xl:px-0">
         {/* 안내 */}
-        <div className="rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3.5 mb-6">
+        <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3.5 mb-6">
           <p className="text-base font-medium text-blue-700">상대팀에 대한 솔직한 평가를 남겨주세요</p>
           <p className="text-xs text-blue-500 mt-0.5">평가는 매너 점수에 반영됩니다</p>
         </div>
@@ -88,7 +88,7 @@ export default function TeamMatchEvaluatePage() {
         {/* 평가 항목 */}
         <div className="space-y-4">
           {evaluationItems.map((item) => (
-            <div key={item.key} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <div key={item.key} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="text-md font-semibold text-gray-900 dark:text-white">{item.label}</p>
@@ -110,7 +110,7 @@ export default function TeamMatchEvaluatePage() {
 
         {/* 평균 점수 */}
         {allRated && (
-          <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-center">
+          <div className="mt-4 rounded-xl bg-gray-900 p-5 text-center">
             <p className="text-sm text-gray-500">종합 평점</p>
             <div className="flex items-center justify-center gap-2 mt-1">
               <Star size={24} className="text-amber-400" fill="currentColor" />

@@ -417,7 +417,7 @@ export default function CreateLessonPage() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Check size={16} />
             {isSubmitting ? '등록 중...' : '강좌 등록하기'}

@@ -80,7 +80,7 @@ export default function HomePage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'MatchUp'}
+              {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'TeamMeet'}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {mounted && isAuthenticated

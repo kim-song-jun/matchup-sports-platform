@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, MapPin, Clock, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -13,42 +13,97 @@ import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Match } from '@/types/api';
 
-const MatchCard = React.memo(function MatchCard({ match, almostFullLabel }: { match: Match; almostFullLabel: string }) {
+function friendlyLevel(min?: number | null, max?: number | null): string {
+  if (min == null || max == null) return '누구나';
+  if (min <= 1 && max >= 5) return '누구나';
+  if (min <= 1 && max <= 2) return '초심자';
+  if (min <= 2 && max <= 3) return '초급~중급';
+  if (min >= 3 && max <= 4) return '중급 이상';
+  if (min >= 4) return '상급자';
+  return '누구나';
+}
+
+const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const filled = match.currentPlayers / match.maxPlayers;
-  const isAlmostFull = filled >= 0.7;
+  const isAlmostFull = filled >= 0.7 && filled < 1;
+  const isFull = filled >= 1;
   const timeBadge = getTimeBadge(match.matchDate);
+  const accent = sportCardAccent[match.sportType];
+  const dotColor = accent?.dot || 'bg-gray-400';
+  const remaining = match.maxPlayers - match.currentPlayers;
 
   return (
-    <Link href={`/matches/${match.id}`}>
-      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
-        {/* 이미지 */}
-        <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
-          <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
-          {timeBadge && (
-            <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
-          )}
-        </div>
-        {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
-            {match.title}
-          </h3>
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 truncate">
-            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}>
+    <Link href={`/matches/${match.id}`} className="block">
+      <div className="group rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
+        {/* Image — 16:9 top banner */}
+        <div className="relative aspect-[16/9] bg-gray-100 dark:bg-gray-800 overflow-hidden">
+          <img
+            src={getSportImage(match.sportType, match.imageUrl)}
+            alt=""
+            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+            loading="lazy"
+          />
+          {/* Gradient overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+
+          {/* Top-left: sport + time */}
+          <div className="absolute top-3 left-3 flex items-center gap-1.5">
+            <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} />
+            <span className="text-2xs font-semibold text-white/90 drop-shadow-sm">
               {sportLabel[match.sportType]}
             </span>
-            <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
-            {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs font-normal ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
-              {match.currentPlayers}/{match.maxPlayers}
-            </span>
-            <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
-            {match.levelMin != null && match.levelMax != null && (
-              <span className="text-2xs text-gray-500 dark:text-gray-400">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
+            {timeBadge && (
+              <span className="text-2xs font-bold text-white bg-white/20 backdrop-blur-sm rounded-md px-1.5 py-0.5 leading-none">
+                {timeBadge.text}
+              </span>
             )}
-            {isAlmostFull && <span className="text-2xs font-medium text-amber-500">{almostFullLabel}</span>}
+          </div>
+
+          {/* Bottom-left overlay: price */}
+          <div className="absolute bottom-3 left-3">
+            <span className="text-sm font-bold text-white drop-shadow-sm">
+              {formatCurrency(match.fee)}
+            </span>
+          </div>
+
+          {/* Bottom-right overlay: fill status */}
+          <div className="absolute bottom-3 right-3">
+            {isFull ? (
+              <span className="text-2xs font-bold text-white/70 bg-white/15 backdrop-blur-sm rounded-md px-2 py-1 leading-none">
+                마감
+              </span>
+            ) : isAlmostFull ? (
+              <span className="text-2xs font-bold text-amber-300 bg-amber-500/20 backdrop-blur-sm rounded-md px-2 py-1 leading-none">
+                {remaining}자리 남음
+              </span>
+            ) : (
+              <span className="text-2xs font-semibold text-white/80 bg-white/15 backdrop-blur-sm rounded-md px-2 py-1 leading-none">
+                <Users size={10} className="inline -mt-px mr-0.5" />
+                {match.currentPlayers}/{match.maxPlayers}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Text content */}
+        <div className="px-3.5 py-3">
+          {/* Title */}
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate leading-snug">
+            {match.title}
+          </h3>
+
+          {/* Meta row */}
+          <div className="flex items-center gap-1 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <Clock size={11} className="opacity-40 shrink-0" />
+            <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
+            {match.venue?.name && (
+              <>
+                <span className="opacity-30 shrink-0">·</span>
+                <span className="truncate">{match.venue.name}</span>
+              </>
+            )}
+            <span className="opacity-30 shrink-0">·</span>
+            <span className="shrink-0">{friendlyLevel(match.levelMin, match.levelMax)}</span>
           </div>
         </div>
       </div>
@@ -171,7 +226,13 @@ export default function MatchesPage() {
         {isLoading ? (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />
+              <div key={i} className="rounded-2xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer">
+                <div className="aspect-[16/9]" />
+                <div className="p-3.5 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-700" />
+                  <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-700" />
+                </div>
+              </div>
             ))}
           </div>
         ) : error ? (
@@ -186,7 +247,7 @@ export default function MatchesPage() {
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {matches.map((match: Match) => (
-              <MatchCard key={match.id} match={match} almostFullLabel={t('almostFull')} />
+              <MatchCard key={match.id} match={match} />
             ))}
           </div>
         )}

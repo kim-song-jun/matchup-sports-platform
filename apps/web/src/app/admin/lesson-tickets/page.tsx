@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { formatAmount, formatDateCompact } from '@/lib/utils';
 import { ticketTypeLabel } from '@/lib/constants';
 import { useToast } from '@/components/ui/toast';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { TicketStatus, TicketType } from '@/types/api';
 
 // ── Mock data ────────────────────────────────────────────────────────────────
@@ -901,25 +902,27 @@ export default function AdminLessonTicketsPage() {
                     )}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">구매자</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">강좌명</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">유형</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">상태</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">사용현황</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">결제금액</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">구매일</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">만료일</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">관리</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">구매자</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">강좌명</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">유형</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">상태</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">사용현황</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">결제금액</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">구매일</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">만료일</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <Ticket size={32} className="text-gray-300 dark:text-gray-600" aria-hidden="true" />
-                      <p className="text-sm text-gray-400">검색 결과가 없어요</p>
-                    </div>
+                  <td colSpan={10}>
+                    <EmptyState
+                      icon={Ticket}
+                      title="수강권이 없어요"
+                      description="검색 조건과 일치하는 수강권이 없습니다"
+                      size="sm"
+                    />
                   </td>
                 </tr>
               ) : paginated.map((t) => {

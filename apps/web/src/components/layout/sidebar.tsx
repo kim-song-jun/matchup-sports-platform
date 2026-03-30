@@ -93,7 +93,7 @@ export function Sidebar() {
                   <Link key={href} href={href}
                     className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                        ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
                         : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
                     }`}>
                     <Icon size={16} strokeWidth={isActive ? 2 : 1.5} />
@@ -115,7 +115,7 @@ export function Sidebar() {
           <Link href="/admin/dashboard"
             className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
               pathname.startsWith('/admin')
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
                 : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <ShieldCheck size={16} strokeWidth={pathname.startsWith('/admin') ? 2 : 1.5} />

@@ -43,7 +43,7 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <header className="px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
       </header>
@@ -155,8 +155,8 @@ export default function ProfilePage() {
             </Link>
             <Link href="/notifications">
               <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.98] transition-colors min-h-[44px]">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-900/30">
-                  <Bell size={20} className="text-amber-500" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
+                  <Bell size={20} className="text-blue-500" />
                 </div>
                 <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">{t('notificationsLabel')}</span>
                 {notifUnread > 0 && (
@@ -171,9 +171,12 @@ export default function ProfilePage() {
       )}
 
       <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
+        {!isAuthenticated && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 px-2">로그인 필요</p>
+        )}
         {menuItems.map((item) => (
           <Link key={item.label} href={isAuthenticated ? item.href : '/login'}>
-            <div className={`flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] rounded-lg -mx-2 px-2 ${!isAuthenticated ? 'opacity-40 pointer-events-none' : ''}`}>
+            <div className="flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] rounded-lg -mx-2 px-2">
               <div className="flex items-center gap-3">
                 <item.icon size={20} className="text-gray-500" />
                 <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>

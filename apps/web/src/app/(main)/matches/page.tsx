@@ -9,19 +9,9 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
-import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
+import { formatCurrency, formatMatchDate, getTimeBadge, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Match } from '@/types/api';
-
-function friendlyLevel(min?: number | null, max?: number | null): string {
-  if (min == null || max == null) return '누구나';
-  if (min <= 1 && max >= 5) return '누구나';
-  if (min <= 1 && max <= 2) return '초심자';
-  if (min <= 2 && max <= 3) return '초급~중급';
-  if (min >= 3 && max <= 4) return '중급 이상';
-  if (min >= 4) return '상급자';
-  return '누구나';
-}
 
 const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const filled = match.currentPlayers / match.maxPlayers;
@@ -47,7 +37,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 
           {/* Top-left: sport + time */}
-          <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          <div className="absolute top-3 left-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} />
             <span className="text-2xs font-semibold text-white/90 drop-shadow-sm">
               {sportLabel[match.sportType]}
@@ -60,7 +50,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
           </div>
 
           {/* Bottom-left overlay: price */}
-          <div className="absolute bottom-3 left-3">
+          <div className="absolute bottom-3 left-3.5">
             <span className="text-sm font-bold text-white drop-shadow-sm">
               {formatCurrency(match.fee)}
             </span>
@@ -171,7 +161,7 @@ export default function MatchesPage() {
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-colors" />
           </div>
           <button onClick={() => setShowFilters(!showFilters)} aria-label={t('openFilters')}
-            className={`flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${showFilters ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 active:bg-gray-100'}`}>
+            className={`flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${showFilters ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 active:bg-gray-100'}`}>
             <SlidersHorizontal size={16} />
           </button>
         </div>
@@ -183,7 +173,7 @@ export default function MatchesPage() {
           <button key={f.key} onClick={() => setActiveSport(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === f.key
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}>
             {f.label}
@@ -205,7 +195,7 @@ export default function MatchesPage() {
               <div className="flex gap-2">
                 {(['latest', 'deadline'] as const).map((s) => (
                   <button key={s} onClick={() => setSortBy(s)}
-                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${sortBy === s ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
+                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${sortBy === s ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
                     {s === 'latest' ? t('latest') : t('deadline')}
                   </button>
                 ))}
@@ -225,7 +215,7 @@ export default function MatchesPage() {
       <div className="px-5 @3xl:px-0">
         {isLoading ? (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="rounded-2xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer">
                 <div className="aspect-[16/9]" />
                 <div className="p-3.5 space-y-2">

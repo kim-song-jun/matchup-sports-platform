@@ -98,15 +98,20 @@ export default function LoginPage() {
 
           {/* 폼 */}
           <div className="space-y-3">
-            <input type="email" placeholder="이메일" aria-label="이메일 주소" value={email} onChange={e => setEmail(e.target.value)}
+            <label htmlFor="login-email" className="sr-only">이메일 주소</label>
+            <input id="login-email" type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
-            <input type="password" placeholder="비밀번호 (6자 이상)" aria-label="비밀번호" value={password} onChange={e => setPassword(e.target.value)}
+            <label htmlFor="login-password" className="sr-only">비밀번호</label>
+            <input id="login-password" type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleEmailSubmit()}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
             {mode === 'register' && (
-              <input type="text" placeholder="닉네임" aria-label="닉네임" value={nickname} onChange={e => setNickname(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleEmailSubmit()}
-                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
+              <>
+                <label htmlFor="login-nickname" className="sr-only">닉네임</label>
+                <input id="login-nickname" type="text" placeholder="닉네임" value={nickname} onChange={e => setNickname(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleEmailSubmit()}
+                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
+              </>
             )}
             <button onClick={handleEmailSubmit} disabled={isLoading}
               className="w-full rounded-xl bg-blue-500 py-3 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-[colors,transform]">
@@ -122,11 +127,13 @@ export default function LoginPage() {
               <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
             </div>
             <div className="space-y-2">
-              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-base font-semibold text-[#191919] opacity-50 cursor-not-allowed">
-                카카오로 시작하기 (준비중)
+              <button disabled aria-disabled="true" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-base font-semibold text-[#191919] opacity-50 cursor-not-allowed">
+                카카오로 시작하기
+                <span className="text-xs font-normal opacity-70">(준비 중)</span>
               </button>
-              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-base font-semibold text-white opacity-50 cursor-not-allowed">
-                네이버로 시작하기 (준비중)
+              <button disabled aria-disabled="true" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-base font-semibold text-white opacity-50 cursor-not-allowed">
+                네이버로 시작하기
+                <span className="text-xs font-normal opacity-70">(준비 중)</span>
               </button>
             </div>
           </div>

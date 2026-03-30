@@ -67,7 +67,7 @@ export default function CreateMatchPage() {
     try {
       await api.post('/matches', form);
       toast('success', '매치가 만들어졌어요!');
-      router.push('/matches');
+      router.push('/matches?created=true');
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       toast('error', axiosErr?.response?.data?.message || '생성에 실패했어요. 잠시 후 다시 시도해주세요');

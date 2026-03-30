@@ -635,7 +635,7 @@ export default function MyLessonTicketsPage() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
+                className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-colors min-h-[44px] ${
                   activeTab === tab.key
                     ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'

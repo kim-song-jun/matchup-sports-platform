@@ -18,9 +18,9 @@ const sportFilters = [
 ] as const;
 
 const banners = [
-  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-emerald-900 dark:bg-emerald-950', iconBg: 'bg-emerald-700/50', iconColor: 'text-emerald-300' },
-  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-blue-900 dark:bg-blue-950', iconBg: 'bg-blue-700/50', iconColor: 'text-blue-300' },
-  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-amber-900 dark:bg-amber-950', iconBg: 'bg-amber-700/50', iconColor: 'text-amber-300' },
+  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-slate-800 dark:bg-slate-900', iconBg: 'bg-white/10', iconColor: 'text-emerald-300' },
+  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-gray-900 dark:bg-gray-950', iconBg: 'bg-white/10', iconColor: 'text-blue-300' },
+  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-slate-900 dark:bg-slate-950', iconBg: 'bg-white/10', iconColor: 'text-amber-300' },
 ] as const;
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -210,7 +210,7 @@ export default function HomePage() {
             <button key={type} onClick={() => handleSportClick(type)}
               className={`shrink-0 rounded-lg px-3 min-h-[44px] flex items-center text-sm font-medium transition-colors ${
                 activeSport === type
-                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
+                  ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                   : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}>
               {type === 'all' ? ts('all') : sportLabel[type]}
@@ -365,7 +365,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
         {/* 이미지: 정사각형 고정 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />

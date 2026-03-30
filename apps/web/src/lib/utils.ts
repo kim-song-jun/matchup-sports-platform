@@ -64,6 +64,17 @@ export function formatDateTime(dateStr: string): string {
   });
 }
 
+/** Converts levelMin/levelMax numeric range into a human-readable skill label. */
+export function friendlyLevel(min?: number | null, max?: number | null): string {
+  if (min == null || max == null) return '누구나';
+  if (min <= 1 && max >= 5) return '누구나';
+  if (min <= 1 && max <= 2) return '초심자';
+  if (min <= 2 && max <= 3) return '초급~중급';
+  if (min >= 3 && max <= 4) return '중급 이상';
+  if (min >= 4) return '상급자';
+  return '누구나';
+}
+
 export function getTimeBadge(dateStr: string): { text: string; color: string } | null {
   const d = new Date(dateStr);
   const now = new Date();

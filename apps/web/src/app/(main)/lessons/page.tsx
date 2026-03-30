@@ -9,7 +9,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { sportLabel, sportCardAccent, lessonTypeLabel, ticketTypeLabel } from '@/lib/constants';
-import { formatCurrency, formatMatchDate } from '@/lib/utils';
+import { formatCurrency, formatMatchDate, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Lesson, LessonTicketPlan } from '@/types/api';
 
@@ -19,17 +19,6 @@ const typeFilterKeys = [
   { key: 'practice_match', labelKey: 'typePracticeMatch' as const },
   { key: 'free_practice', labelKey: 'typeFreePractice' as const },
 ];
-
-/** Converts levelMin/levelMax range into a human-readable label. */
-function friendlyLevel(min?: number | null, max?: number | null): string {
-  if (min == null || max == null) return '누구나';
-  if (min <= 1 && max >= 5) return '누구나';
-  if (min <= 1 && max <= 2) return '초심자';
-  if (min <= 2 && max <= 3) return '초급~중급';
-  if (min >= 3 && max <= 4) return '중급 이상';
-  if (min >= 4) return '상급자';
-  return '누구나';
-}
 
 /** Returns a ticket summary string from ticketPlans or falls back to lesson.fee. */
 function ticketSummary(lesson: Lesson): string {
@@ -73,7 +62,7 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 
           {/* Top-left: sport dot + name */}
-          <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          <div className="absolute top-3 left-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} />
             <span className="text-2xs font-semibold text-white/90 drop-shadow-sm">
               {sportLabel[lesson.sportType]}
@@ -88,7 +77,7 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
           </div>
 
           {/* Bottom-left: price */}
-          <div className="absolute bottom-3 left-3">
+          <div className="absolute bottom-3 left-3.5">
             <span className="text-sm font-bold text-white drop-shadow-sm">
               {formatCurrency(lesson.fee)}
             </span>
@@ -222,7 +211,7 @@ export default function LessonsPage() {
             onClick={() => setActiveType(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeType === f.key
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >

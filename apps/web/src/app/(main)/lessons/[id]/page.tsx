@@ -224,14 +224,19 @@ export default function LessonDetailPage() {
               {!isAuthenticated ? (
                 <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white active:bg-blue-600 hover:bg-blue-600 transition-colors">로그인 후 신청하기</Link>
               ) : isEnrolled ? (
-                <button
-                  onClick={() => {
-                    toast('info', '수강 취소 기능은 준비 중입니다');
-                  }}
-                  className="w-full rounded-xl bg-red-50 border border-red-200 py-3.5 text-md font-bold text-red-500 hover:bg-red-100 active:bg-red-200 transition-colors"
-                >
-                  수강 취소
-                </button>
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => {
+                      toast('info', '수강 취소는 결제 내역에서 환불 신청해주세요');
+                    }}
+                    className="w-full rounded-xl bg-red-50 border border-red-200 py-3.5 text-md font-bold text-red-500 hover:bg-red-100 active:bg-red-200 transition-colors"
+                  >
+                    수강 취소
+                  </button>
+                  <Link href="/payments" className="block text-center text-xs text-gray-400 hover:text-blue-500 transition-colors py-0.5">
+                    결제 내역 →
+                  </Link>
+                </div>
               ) : isFull ? (
                 <button
                   disabled

@@ -221,7 +221,7 @@ export function TicketPlanSelector({ plans, onSelect, onPurchase }: TicketPlanSe
         disabled={!selectedPlan}
         className={[
           'mt-4 w-full flex items-center justify-center gap-2',
-          'rounded-2xl py-3.5 text-base font-bold transition-colors',
+          'rounded-2xl py-3 text-base font-bold transition-colors',
           selectedPlan
             ? 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
             : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed',

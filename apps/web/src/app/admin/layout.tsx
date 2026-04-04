@@ -28,26 +28,51 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const isAdmin = user?.role === 'admin';
+  const isAuthLoading = isAuthenticated && (!user || !user.id || !user.role);
 
   // Admin access guard — redirect non-admin users
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (isAuthLoading) return;
+
     if (!isAuthenticated) {
       router.replace('/login');
+      return;
     }
-  }, [isAuthenticated, router]);
+
+    if (!isAdmin) {
+      router.replace('/home');
+    }
+  }, [isAdmin, isAuthenticated, isAuthLoading, mounted, router]);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
 
-  if (!isAuthenticated) {
+  if (!mounted || isAuthLoading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center text-gray-500 dark:text-gray-400 text-base">권한 정보를 확인하는 중입니다</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !isAdmin) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <ShieldCheck size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
           <p className="text-gray-500 dark:text-gray-400 text-base">관리자 권한이 필요합니다</p>
-          <Link href="/login" className="mt-3 inline-block text-blue-500 text-base font-medium hover:underline">로그인</Link>
+          <Link href={isAuthenticated ? "/home" : "/login"} className="mt-3 inline-block text-blue-500 text-base font-medium hover:underline">
+            {isAuthenticated ? '홈으로 이동' : '로그인'}
+          </Link>
         </div>
       </div>
     );

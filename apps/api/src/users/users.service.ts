@@ -7,6 +7,7 @@ const SAFE_USER_SELECT = {
   id: true,
   email: true,
   nickname: true,
+  role: true,
   profileImageUrl: true,
   phone: true,
   gender: true,

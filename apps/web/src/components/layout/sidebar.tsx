@@ -14,6 +14,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
   const [mounted, setMounted] = useState(false);
@@ -110,18 +111,19 @@ export function Sidebar() {
           </div>
         ))}
 
-        {/* Admin */}
-        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
-          <Link href="/admin/dashboard"
-            className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-              pathname.startsWith('/admin')
-                ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-            }`}>
-            <ShieldCheck size={16} strokeWidth={pathname.startsWith('/admin') ? 2 : 1.5} />
-            {t('admin')}
-          </Link>
-        </div>
+        {isAdmin && (
+          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <Link href="/admin/dashboard"
+              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                pathname.startsWith('/admin')
+                  ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+              <ShieldCheck size={16} strokeWidth={pathname.startsWith('/admin') ? 2 : 1.5} />
+              {t('admin')}
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Locale Switcher */}

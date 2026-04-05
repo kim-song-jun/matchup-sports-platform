@@ -71,6 +71,11 @@ enum OAuthProvider {
   email
 }
 
+enum UserRole {
+  user
+  admin
+}
+
 enum Gender {
   male
   female
@@ -133,6 +138,7 @@ model User {
   email           String?  @unique
   passwordHash    String?  @map("password_hash")
   nickname        String   @unique
+  role            UserRole @default(user)
   profileImageUrl String?  @map("profile_image_url")
   phone           String?
   gender          Gender?

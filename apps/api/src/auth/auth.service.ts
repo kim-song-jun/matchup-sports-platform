@@ -7,12 +7,27 @@ import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
+  private readonly adminEmail = 'test2@gmail.com';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
   ) {}
+
+  private getRoleForEmail(email?: string | null) {
+    return email === this.adminEmail ? 'admin' : 'user';
+  }
+
+  private async syncFixedAdminRole(userId: string, email?: string | null) {
+    const role = this.getRoleForEmail(email);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role },
+    });
+  }
 
   /** 이메일 회원가입 */
   async emailRegister(email: string, password: string, nickname: string) {
@@ -32,6 +47,7 @@ export class AuthService {
         email,
         passwordHash,
         nickname,
+        role: this.getRoleForEmail(email),
         oauthProvider: 'email',
         oauthId: `email_${email}`,
         sportTypes: [],
@@ -58,6 +74,7 @@ export class AuthService {
       throw new BadRequestException('이메일 또는 비밀번호가 올바르지 않아요');
     }
 
+    await this.syncFixedAdminRole(user.id, user.email);
     const tokens = this.generateTokens(user.id);
     const fullUser = await this.usersService.findById(user.id);
     return { ...tokens, user: fullUser };
@@ -85,6 +102,7 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           nickname,
+          role: 'user',
           oauthProvider: 'kakao',
           oauthId: `dev_${nickname}_${Date.now()}`,
           sportTypes: ['futsal', 'basketball'],

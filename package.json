@@ -9,7 +9,9 @@
     "db:push": "pnpm --filter api db:push",
     "db:migrate": "pnpm --filter api db:migrate",
     "db:studio": "pnpm --filter api db:studio",
-    "db:seed": "pnpm --filter api db:seed"
+    "db:seed": "pnpm --filter api db:seed",
+    "test:e2e": "cd e2e && npx playwright test",
+    "test:all": "pnpm --filter api test && pnpm --filter web test && cd e2e && npx playwright test"
   },
   "packageManager": "pnpm@9.15.4",
   "engines": {
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@types/node": "^22.0.0",
     "turbo": "^2.8.19"
   },
   "dependencies": {

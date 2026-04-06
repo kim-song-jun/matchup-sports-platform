@@ -7,6 +7,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
   use: {
     baseURL: 'http://localhost:3003',
     trace: 'on-first-retry',
@@ -20,6 +22,6 @@ export default defineConfig({
     command: 'pnpm --filter web dev',
     url: 'http://localhost:3003',
     reuseExistingServer: !process.env.CI,
-    timeout: 30000,
+    timeout: 60000,
   },
 });

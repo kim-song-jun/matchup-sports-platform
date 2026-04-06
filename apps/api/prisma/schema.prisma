@@ -97,12 +97,50 @@ enum NotificationType {
   marketplace_message
 }
 
+enum ChatRoomType {
+  team_match
+  direct
+  team
+}
+
+enum ChatMessageType {
+  text
+  system
+}
+
 enum ListingStatus {
   active
   sold
   reserved
   expired
   deleted
+}
+
+enum TeamRole {
+  owner
+  manager
+  member
+}
+
+enum TeamMembershipStatus {
+  active
+  pending
+  left
+  removed
+}
+
+enum MercenaryPostStatus {
+  open
+  closed
+  filled
+  cancelled
+}
+
+enum MercenaryApplicationStatus {
+  pending
+  accepted
+  rejected
+  withdrawn
 }
 
 enum ListingType {
@@ -156,9 +194,6 @@ model User {
   oauthProvider   OAuthProvider @map("oauth_provider")
   oauthId         String   @map("oauth_id")
 
-  // FCM
-  fcmToken        String?  @map("fcm_token")
-
   // Timestamps
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -183,6 +218,12 @@ model User {
   lessonAttendances   LessonAttendance[]   @relation("UserLessonAttendances")
   ownedTeams          SportTeam[]          @relation("TeamOwner")
   favorites           Favorite[]
+  teamMemberships     TeamMembership[]     @relation("TeamMemberships")
+  mercenaryApplications MercenaryApplication[] @relation("UserMercenaryApplications")
+  authoredMercenaryPosts MercenaryPost[]  @relation("MercenaryAuthor")
+  chatParticipations     ChatRoomParticipant[]
+  sentMessages           ChatMessage[]        @relation("MessageSender")
+  pushSubscriptions      PushSubscription[]
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -685,9 +726,79 @@ model SportTeam {
 
   teamMatches         TeamMatch[]         @relation("TeamMatchHost")
   teamApplications    TeamMatchApplication[] @relation("TeamAppApplicant")
+  memberships         TeamMembership[]
+  mercenaryPosts      MercenaryPost[]
 
   @@index([sportType])
   @@map("sport_teams")
+}
+
+// ─── Team Membership ────────────────────────────────────
+
+model TeamMembership {
+  id            String               @id @default(uuid())
+  teamId        String               @map("team_id")
+  userId        String               @map("user_id")
+  role          TeamRole             @default(member)
+  status        TeamMembershipStatus @default(active)
+  joinedAt      DateTime             @default(now()) @map("joined_at")
+  leftAt        DateTime?            @map("left_at")
+  invitedBy     String?              @map("invited_by")
+  roleChangedAt DateTime?            @map("role_changed_at")
+
+  team SportTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User      @relation("TeamMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId, status])
+  @@index([teamId, role])
+  @@map("team_memberships")
+}
+
+// ─── Mercenary Posts ─────────────────────────────────────
+
+model MercenaryPost {
+  id          String              @id @default(uuid())
+  teamId      String              @map("team_id")
+  authorId    String              @map("author_id")
+  sportType   SportType           @map("sport_type")
+  matchDate   DateTime            @map("match_date")
+  venue       String
+  position    String
+  count       Int                 @default(1)
+  level       Int                 @default(3)
+  fee         Int                 @default(0)
+  notes       String?
+  status      MercenaryPostStatus @default(open)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  team         SportTeam              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  author       User                   @relation("MercenaryAuthor", fields: [authorId], references: [id])
+  applications MercenaryApplication[]
+
+  @@index([sportType, status])
+  @@index([teamId])
+  @@index([matchDate])
+  @@map("mercenary_posts")
+}
+
+model MercenaryApplication {
+  id        String                     @id @default(uuid())
+  postId    String                     @map("post_id")
+  userId    String                     @map("user_id")
+  message   String?
+  status    MercenaryApplicationStatus @default(pending)
+  appliedAt DateTime                   @default(now()) @map("applied_at")
+  decidedAt DateTime?                  @map("decided_at")
+  decidedBy String?                    @map("decided_by")
+
+  post MercenaryPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation("UserMercenaryApplications", fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([userId, status])
+  @@map("mercenary_applications")
 }
 
 // ─── 팀 매칭 시스템 ─────────────────────────────────────
@@ -773,6 +884,7 @@ model TeamMatch {
   applications    TeamMatchApplication[]
   arrivalChecks   ArrivalCheck[]
   evaluations     MatchEvaluation[]
+  chatRoom        ChatRoom?
 
   @@index([sportType, status])
   @@index([matchDate])
@@ -907,4 +1019,68 @@ model Favorite {
   @@unique([userId, targetType, targetId])
   @@index([userId])
   @@map("favorites")
+}
+
+// ─── Chat ────────────────────────────────────────────────
+
+model ChatRoom {
+  id            String       @id @default(uuid())
+  type          ChatRoomType
+  teamMatchId   String?      @unique @map("team_match_id")
+  lastMessageAt DateTime?    @map("last_message_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  teamMatch    TeamMatch?           @relation(fields: [teamMatchId], references: [id], onDelete: SetNull)
+  participants ChatRoomParticipant[]
+  messages     ChatMessage[]
+
+  @@index([lastMessageAt])
+  @@map("chat_rooms")
+}
+
+model ChatRoomParticipant {
+  roomId     String    @map("room_id")
+  userId     String    @map("user_id")
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+  lastReadAt DateTime? @map("last_read_at")
+
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+  @@index([userId])
+  @@map("chat_room_participants")
+}
+
+model ChatMessage {
+  id        String          @id @default(uuid())
+  roomId    String          @map("room_id")
+  senderId  String          @map("sender_id")
+  content   String          @db.VarChar(2000)
+  type      ChatMessageType @default(text)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User     @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([roomId, createdAt])
+  @@map("chat_messages")
+}
+
+// ─── Web Push Subscriptions ──────────────────────────────
+
+model PushSubscription {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

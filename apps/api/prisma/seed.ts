@@ -6,6 +6,9 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // ── Cleanup (order matters for FK constraints) ──
+  await prisma.mercenaryApplication.deleteMany();
+  await prisma.mercenaryPost.deleteMany();
+  await prisma.teamMembership.deleteMany();
   await prisma.badge.deleteMany();
   await prisma.teamTrustScore.deleteMany();
   await prisma.teamMatchApplication.deleteMany();
@@ -994,62 +997,156 @@ async function main() {
   console.log('  ✅ 4 lessons created');
 
   // ── Sport Teams ──
-  await prisma.sportTeam.createMany({
-    data: [
-      {
-        ownerId: users[2].id,
-        name: '잠실 아이스베어스',
-        sportType: 'ice_hockey',
-        description: '송파구 기반 아이스하키 동호회. 주 1회 정기전.',
-        city: '서울',
-        district: '송파구',
-        memberCount: 18,
-        level: 4,
-        isRecruiting: true,
-        contactInfo: '오픈카톡: icebears2024',
-      },
-      {
-        ownerId: users[0].id,
-        name: 'FC 마포',
-        sportType: 'futsal',
-        description: '마포구 직장인 풋살 동호회. 매주 토요일 저녁.',
-        city: '서울',
-        district: '마포구',
-        memberCount: 15,
-        level: 3,
-        isRecruiting: true,
-        contactInfo: '카카오톡: fcmapo',
-      },
-      {
-        ownerId: users[1].id,
-        name: '강남 슬래머즈',
-        sportType: 'basketball',
-        description: '강남 농구 동호회. 주 2회 정기 모임.',
-        city: '서울',
-        district: '강남구',
-        memberCount: 12,
-        level: 3,
-        isRecruiting: true,
-        contactInfo: '오픈카톡: slammers_gn',
-      },
-      {
-        ownerId: users[3].id,
-        name: '셔틀콕 파이터즈',
-        sportType: 'badminton',
-        description: '서초/강남 배드민턴 동호회. 매주 수/토 모임.',
-        city: '서울',
-        district: '서초구',
-        memberCount: 20,
-        level: 2,
-        isRecruiting: false,
-        contactInfo: '카카오톡: shuttle_fighters',
-      },
-    ],
-  });
-  console.log('  ✅ 4 sport teams created');
+  const teamData = [
+    {
+      ownerId: users[2].id,
+      name: '잠실 아이스베어스',
+      sportType: 'ice_hockey' as const,
+      description: '송파구 기반 아이스하키 동호회. 주 1회 정기전.',
+      city: '서울',
+      district: '송파구',
+      memberCount: 18,
+      level: 4,
+      isRecruiting: true,
+      contactInfo: '오픈카톡: icebears2024',
+    },
+    {
+      ownerId: users[0].id,
+      name: 'FC 마포',
+      sportType: 'futsal' as const,
+      description: '마포구 직장인 풋살 동호회. 매주 토요일 저녁.',
+      city: '서울',
+      district: '마포구',
+      memberCount: 15,
+      level: 3,
+      isRecruiting: true,
+      contactInfo: '카카오톡: fcmapo',
+    },
+    {
+      ownerId: users[1].id,
+      name: '강남 슬래머즈',
+      sportType: 'basketball' as const,
+      description: '강남 농구 동호회. 주 2회 정기 모임.',
+      city: '서울',
+      district: '강남구',
+      memberCount: 12,
+      level: 3,
+      isRecruiting: true,
+      contactInfo: '오픈카톡: slammers_gn',
+    },
+    {
+      ownerId: users[3].id,
+      name: '셔틀콕 파이터즈',
+      sportType: 'badminton' as const,
+      description: '서초/강남 배드민턴 동호회. 매주 수/토 모임.',
+      city: '서울',
+      district: '서초구',
+      memberCount: 20,
+      level: 2,
+      isRecruiting: false,
+      contactInfo: '카카오톡: shuttle_fighters',
+    },
+  ];
+
+  const createdTeams = await Promise.all(
+    teamData.map((data) => prisma.sportTeam.create({ data })),
+  );
+  console.log(`  ✅ ${createdTeams.length} sport teams created`);
+
+  // ── Team Memberships (owner backfill) ──
+  await Promise.all(
+    createdTeams.map((team) =>
+      prisma.teamMembership.upsert({
+        where: { teamId_userId: { teamId: team.id, userId: team.ownerId } },
+        update: {},
+        create: {
+          teamId: team.id,
+          userId: team.ownerId,
+          role: 'owner',
+          status: 'active',
+          joinedAt: team.createdAt,
+        },
+      }),
+    ),
+  );
+  console.log('  ✅ owner team memberships seeded');
+
+  // ── Mercenary Posts ──
+  const mercenarySeedData = [
+    {
+      teamId: createdTeams[0].id,
+      authorId: createdTeams[0].ownerId,
+      sportType: 'ice_hockey' as const,
+      matchDate: nextSat,
+      venue: '잠실 아이스링크',
+      position: 'FW',
+      count: 2,
+      level: 3,
+      fee: 25000,
+      notes: '장비 풀장착 필수입니다.',
+      status: 'open' as const,
+    },
+    {
+      teamId: createdTeams[1].id,
+      authorId: createdTeams[1].ownerId,
+      sportType: 'futsal' as const,
+      matchDate: nextSun,
+      venue: '마포 풋살파크',
+      position: 'MF',
+      count: 1,
+      level: 3,
+      fee: 15000,
+      notes: '실내화 지참 필수.',
+      status: 'open' as const,
+    },
+    {
+      teamId: createdTeams[2].id,
+      authorId: createdTeams[2].ownerId,
+      sportType: 'basketball' as const,
+      matchDate: nextNextSat,
+      venue: '강남 스포츠센터',
+      position: 'PG',
+      count: 1,
+      level: 3,
+      fee: 12000,
+      notes: '농구화 필수.',
+      status: 'open' as const,
+    },
+    {
+      teamId: createdTeams[0].id,
+      authorId: createdTeams[0].ownerId,
+      sportType: 'ice_hockey' as const,
+      matchDate: dayAfter,
+      venue: '잠실 아이스링크',
+      position: 'DF',
+      count: 1,
+      level: 4,
+      fee: 25000,
+      notes: '레벨 4 이상 우선.',
+      status: 'open' as const,
+    },
+    {
+      teamId: createdTeams[1].id,
+      authorId: createdTeams[1].ownerId,
+      sportType: 'futsal' as const,
+      matchDate: in3Days,
+      venue: '마포 풋살파크',
+      position: 'GK',
+      count: 1,
+      level: 2,
+      fee: 15000,
+      notes: '골키퍼 자리 급구.',
+      status: 'open' as const,
+    },
+  ];
+
+  await Promise.all(
+    mercenarySeedData.map((data) => prisma.mercenaryPost.create({ data })),
+  );
+  console.log(`  ✅ ${mercenarySeedData.length} mercenary posts seeded`);
 
   // ── Team Matching ──
-  const existingTeams = await prisma.sportTeam.findMany();
+  const existingTeams = createdTeams;
 
   const teamMatches = await Promise.all([
     prisma.teamMatch.create({

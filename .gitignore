@@ -20,8 +20,7 @@ dist/
 postgres_data/
 redis_data/
 
-# Prisma
-apps/api/prisma/migrations/
+# Prisma (migrations tracked — required for production deploy)
 
 # Capacitor
 apps/web/ios/
@@ -31,3 +30,6 @@ apps/web/android/
 out/
 build/
 coverage/
+
+# Load test secrets
+infra/load/tokens.txt

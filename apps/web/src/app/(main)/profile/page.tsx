@@ -8,15 +8,15 @@ import { MiniCalendar } from '@/components/ui/mini-calendar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
-import { useChatStore } from '@/stores/chat-store';
 import { useNotificationStore } from '@/stores/notification-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
-import { useMyMatches } from '@/hooks/use-api';
+import { useMyMatches, useMyTeams, useChatUnreadTotal } from '@/hooks/use-api';
 import type { SportProfile, Match } from '@/types/api';
 
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { Plus } from 'lucide-react';
 
 export default function ProfilePage() {
   const t = useTranslations('profile');
@@ -28,12 +28,15 @@ export default function ProfilePage() {
   const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
-  const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
+  const chatUnread = useChatUnreadTotal();
   const notifUnread = useNotificationStore((s) => s.getUnreadCount());
 
+  const { data: myTeams } = useMyTeams();
+  const hasTeams = myTeams && myTeams.length > 0;
+
   const menuItems = [
-    { label: t('matchHistory'), icon: History, href: '/matches', count: null },
-    { label: t('myMatches'), icon: Swords, href: '/my/matches', count: null },
+    { label: t('matchHistory'), icon: History, href: '/my/matches?tab=history', count: null },
+    { label: t('myMatches'), icon: Swords, href: '/my/matches?tab=created', count: null },
     { label: t('myTeamMatches'), icon: Users, href: '/my/team-matches', count: null },
     { label: t('myTeams'), icon: Users, href: '/my/teams', count: null },
     { label: t('myLessons'), icon: BookOpen, href: '/my/lessons', count: null },
@@ -197,6 +200,39 @@ export default function ProfilePage() {
         ))}
       </div>
 
+      {/* 내 용병 모집 섹션 */}
+      {mounted && isAuthenticated && (
+        <div className="px-5 @3xl:px-0 py-3">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <UserCheck size={16} className="text-gray-500" />
+                <span className="text-base font-semibold text-gray-800 dark:text-gray-200">내 용병 모집</span>
+              </div>
+              <Link href="/my/mercenary" className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors">
+                내 모집글 보기
+              </Link>
+            </div>
+            {hasTeams ? (
+              <Link
+                href="/mercenary/new"
+                className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-blue-50 dark:bg-blue-900/20 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors min-h-[44px]"
+              >
+                <Plus size={16} />
+                모집글 등록
+              </Link>
+            ) : (
+              <div className="mt-2 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-3">
+                <p className="text-sm text-gray-500">팀이 있어야 용병 모집이 가능합니다</p>
+                <Link href="/teams/new" className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors">
+                  팀 만들기
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="h-2 bg-gray-50 dark:bg-gray-800 @3xl:hidden" />
 
       <div className="px-5 @3xl:px-0 py-2">
@@ -262,7 +298,7 @@ function UpcomingSchedule() {
           >
             <CalendarDays size={16} />
           </button>
-          <Link href="/matches" className="text-sm text-blue-500 font-medium ml-2">{tc('viewAll')}</Link>
+          <Link href="/matches" className="text-sm text-blue-500 font-medium ml-2">매칭 찾기</Link>
         </div>
       </div>
 

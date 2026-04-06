@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog, Star, Trophy, Info } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { useTeams } from '@/hooks/use-api';
 import { sportLabel, levelLabel } from '@/lib/constants';
@@ -43,7 +43,7 @@ const mockMyTeams = [
 export default function MyTeamsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
+  useRequireAuth();
   const { data: apiData } = useTeams();
   const usingMock = !apiData?.items;
   const apiTeams = apiData?.items?.map((t) => ({
@@ -70,15 +70,6 @@ export default function MyTeamsPage() {
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [deleteTarget]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
-      </div>
-    );
-  }
 
   const handleDelete = async (id: string) => {
     try {

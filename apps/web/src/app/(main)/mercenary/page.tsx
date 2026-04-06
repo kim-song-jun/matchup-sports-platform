@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { UserPlus, Search, Star } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useMercenaryPosts } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { formatMatchDate, formatCurrency } from '@/lib/utils';
@@ -24,7 +26,7 @@ const positionLabel: Record<string, string> = {
   ALL: '포지션 무관',
 };
 
-interface MercenaryPost {
+interface LocalMercenaryPost {
   id: string;
   teamName: string;
   sportType: string;
@@ -39,7 +41,7 @@ interface MercenaryPost {
   mannerScore: number;
 }
 
-const mockPosts: MercenaryPost[] = [
+const mockPosts: LocalMercenaryPost[] = [
   {
     id: 'merc-1',
     teamName: 'FC 한강',
@@ -129,17 +131,23 @@ export default function MercenaryPage() {
   const [activeSport, setActiveSport] = useState('');
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const router = useRouter();
+  const { isAuthenticated } = useAuthStore();
   const { data: apiData } = useMercenaryPosts();
 
   // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
-  // API MercenaryPost 타입과 로컬 인터페이스가 다를 수 있으므로 any로 캐스팅
-  const posts: MercenaryPost[] = (apiData?.items as unknown as MercenaryPost[]) ?? mockPosts;
+  // API shape differs from local display shape; use mock until API returns matching fields
+  const posts: LocalMercenaryPost[] = (apiData?.items as unknown as LocalMercenaryPost[]) ?? mockPosts;
 
   const filtered = activeSport
     ? posts.filter((p) => p.sportType === activeSport)
     : posts;
 
   async function handleApply(id: string) {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
     try {
       await api.post(`/mercenary/${id}/apply`);
       setAppliedIds((prev) => new Set(prev).add(id));
@@ -150,7 +158,7 @@ export default function MercenaryPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
+    <div className="pt-[var(--safe-area-top)] animate-fade-in">
       <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">용병 모집</h1>
@@ -199,7 +207,7 @@ export default function MercenaryPage() {
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-            {filtered.map((post) => {
+            {filtered.map((post: LocalMercenaryPost) => {
               const isApplied = appliedIds.has(post.id);
 
               return (
@@ -254,7 +262,7 @@ export default function MercenaryPage() {
                     <button
                       onClick={() => handleApply(post.id)}
                       disabled={isApplied}
-                      className={`rounded-xl px-5 py-2 text-sm font-bold transition-colors ${
+                      className={`rounded-xl px-5 py-2.5 min-h-[44px] text-sm font-bold transition-colors ${
                         isApplied
                           ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                           : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'

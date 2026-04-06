@@ -36,6 +36,7 @@ interface User {
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  accessToken: string | null;
   setUser: (user: User | null) => void;
   login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
@@ -52,10 +53,12 @@ function setAuthCookie(hasToken: boolean) {
 
 // localStorage 토큰이 있으면 초기 상태를 인증됨으로 설정 (SSR 안전)
 const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+const storedToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: hasToken ? { id: '', nickname: '', email: null, profileImageUrl: null, mannerScore: 0, totalMatches: 0 } : null,
   isAuthenticated: hasToken,
+  accessToken: storedToken,
 
   setUser: (user) =>
     set({ user, isAuthenticated: !!user }),
@@ -66,7 +69,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.setItem('refreshToken', refreshToken);
       setAuthCookie(true);
     }
-    set({ user, isAuthenticated: true });
+    set({ user, isAuthenticated: true, accessToken });
   },
 
   logout: () => {
@@ -75,7 +78,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       localStorage.removeItem('refreshToken');
       setAuthCookie(false);
     }
-    set({ user: null, isAuthenticated: false });
+    set({ user: null, isAuthenticated: false, accessToken: null });
   },
 }));
 

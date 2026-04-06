@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Globe, Video, Users } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Globe, Video } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
 import { SKILL_GRADES } from '@/lib/skill-grades';
@@ -20,7 +20,7 @@ const cities = ['서울', '경기', '인천', '부산', '대구', '대전', '광
 export default function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
+  useRequireAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -56,23 +56,6 @@ export default function CreateTeamPage() {
       setIsSubmitting(false);
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
-        <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
-            <Users size={28} />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900">팀을 만들어보세요</h2>
-          <p className="text-base text-gray-500 mt-2">로그인하면 팀을 등록하고 팀원을 모집할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors">
-            로그인하고 시작하기
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">

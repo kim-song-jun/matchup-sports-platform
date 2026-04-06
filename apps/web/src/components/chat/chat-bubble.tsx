@@ -101,7 +101,7 @@ export function ChatBubble({
             <div className="flex items-end gap-1.5">
               <div
                 className={cn(
-                  'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-[15px] text-gray-800 dark:text-gray-200',
+                  'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-3.5 py-2 text-md text-gray-800 dark:text-gray-200',
                   isFirstInGroup ? 'rounded-xl rounded-tl-md' : 'rounded-xl',
                 )}
               >
@@ -132,7 +132,7 @@ export function ChatBubble({
           )}
           <div
             className={cn(
-              'bg-blue-500 dark:bg-blue-600 px-3.5 py-2 text-[15px] text-white',
+              'bg-blue-500 dark:bg-blue-600 px-3.5 py-2 text-md text-white',
               isFirstInGroup ? 'rounded-xl rounded-tr-md' : 'rounded-xl',
             )}
           >

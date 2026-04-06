@@ -3,29 +3,35 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Send, ChevronDown, ChevronUp,
-  Calendar, MapPin, DollarSign, MessageCircle,
+  Calendar, MapPin, MessageCircle,
   MoreVertical, Flag, Ban, LogOut,
   Smile, Paperclip,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { Modal } from '@/components/ui/modal';
 import {
-  ChatBubble, DateSeparator, SystemMessage, TypingIndicator,
+  ChatBubble, DateSeparator, SystemMessage,
   formatDateLabel, getDateKey,
 } from '@/components/chat/chat-bubble';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useChatStore } from '@/stores/chat-store';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/toast';
+import { useAuthStore } from '@/stores/auth-store';
+import { useChatMessages, useSendMessage, useMarkChatRead, queryKeys } from '@/hooks/use-api';
+import { useChatRoomSocket } from '@/hooks/use-realtime';
 import { formatMatchDate } from '@/lib/utils';
-import type { ChatMessage } from '@/stores/chat-store';
+import type { ChatMessage, ChatRoom } from '@/types/api';
+import type { ChatMessagePayload } from '@/lib/realtime-client';
 
 function groupMessagesByDate(messages: ChatMessage[]): { date: string; label: string; messages: ChatMessage[] }[] {
   const groups: Map<string, { label: string; messages: ChatMessage[] }> = new Map();
 
   for (const msg of messages) {
-    const key = getDateKey(msg.timestamp);
+    const key = getDateKey(msg.createdAt);
     if (!groups.has(key)) {
-      groups.set(key, { label: formatDateLabel(msg.timestamp), messages: [] });
+      groups.set(key, { label: formatDateLabel(msg.createdAt), messages: [] });
     }
     groups.get(key)!.messages.push(msg);
   }
@@ -45,38 +51,34 @@ const QUICK_ACTIONS = [
 
 interface ChatRoomEmbedProps {
   chatRoomId: string;
-  /** If true, header is shown inline (no back button). Used in desktop embed mode. */
+  room?: ChatRoom;
+  /** If true, back button is hidden. Used in desktop embed mode. */
   embedded?: boolean;
-  /** Callback for back navigation. Only used when not embedded. */
   onBack?: () => void;
 }
 
 export default function ChatRoomEmbed({
   chatRoomId,
+  room,
   embedded = true,
   onBack,
 }: ChatRoomEmbedProps) {
-  const {
-    chatRooms, getChatMessages, sendMessage, markAsRead,
-    currentUserId, currentTeamId,
-  } = useChatStore();
+  const { user } = useAuthStore();
   const { toast } = useToast();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const room = chatRooms.find((r) => r.id === chatRoomId);
-  const messages = getChatMessages(chatRoomId);
-  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages]);
+  const { data: messagesData, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useChatMessages(chatRoomId);
+  const messages = useMemo(() => (messagesData?.pages.flat() ?? []).slice().reverse(), [messagesData]);
+  const sendMessageMutation = useSendMessage();
+  const markReadMutation = useMarkChatRead();
 
   const [input, setInput] = useState('');
   const [showMatchInfo, setShowMatchInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showBlockModal, setShowBlockModal] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDetail, setReportDetail] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -85,37 +87,60 @@ export default function ChatRoomEmbed({
   const isNearBottom = useRef(true);
   const isFirstLoad = useRef(true);
 
-  const opponentName = room
-    ? room.homeTeamId === currentTeamId
-      ? room.awayTeamName
-      : room.homeTeamName
-    : '';
-
-  const opponentTeamId = room
-    ? room.homeTeamId === currentTeamId
-      ? room.awayTeamId
-      : room.homeTeamId
-    : '';
-
-  // Mark as read on mount / room change
+  // Mark as read on mount
   useEffect(() => {
     if (chatRoomId) {
-      markAsRead(chatRoomId);
+      markReadMutation.mutate(chatRoomId);
     }
-  }, [chatRoomId, markAsRead]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatRoomId]);
 
-  // Mock 타이핑 인디케이터
+  // Reset state on room change
   useEffect(() => {
-    if (messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    if (last.senderId !== currentUserId) return;
-    const delay = 2000 + Math.random() * 2000;
-    const t1 = setTimeout(() => setIsTyping(true), delay);
-    const t2 = setTimeout(() => setIsTyping(false), delay + 3000);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [messages.length, currentUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+    setInput('');
+    setShowMatchInfo(false);
+    setShowMenu(false);
+    setShowLeaveModal(false);
+    setOptimisticMessages([]);
+    isFirstLoad.current = true;
+  }, [chatRoomId]);
 
-  // Auto-scroll: 첫 로드는 instant, 이후는 하단 근처일 때만
+  // Realtime: receive new messages via WebSocket
+  const handleWsMessage = useCallback((payload: ChatMessagePayload) => {
+    const newMsg: ChatMessage = {
+      id: payload.id,
+      roomId: payload.roomId,
+      senderId: payload.senderId,
+      content: payload.content,
+      createdAt: payload.createdAt,
+      sender: payload.sender,
+    };
+
+    // Insert into the first page of the infinite query cache (newest messages)
+    queryClient.setQueryData(
+      queryKeys.chat.messages(chatRoomId),
+      (prev: { pages: ChatMessage[][]; pageParams: unknown[] } | undefined) => {
+        if (!prev) return { pages: [[newMsg]], pageParams: [undefined] };
+        const [firstPage, ...rest] = prev.pages;
+        // Avoid duplicates from optimistic inserts
+        if (firstPage.some((m: ChatMessage) => m.id === newMsg.id)) return prev;
+        return { ...prev, pages: [[...firstPage, newMsg], ...rest] };
+      },
+    );
+
+    // Remove matching optimistic message
+    setOptimisticMessages((prev) => prev.filter((m) => m.id !== newMsg.id));
+    queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatRoomId, queryClient]);
+
+  useChatRoomSocket(chatRoomId, handleWsMessage);
+
+  // All messages: persisted + optimistic
+  const allMessages = useMemo(() => [...messages, ...optimisticMessages], [messages, optimisticMessages]);
+  const groupedMessages = useMemo(() => groupMessagesByDate(allMessages), [allMessages]);
+
+  // Auto-scroll
   useEffect(() => {
     if (isFirstLoad.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
@@ -123,63 +148,53 @@ export default function ChatRoomEmbed({
     } else if (isNearBottom.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages.length, chatRoomId]);
+  }, [allMessages.length, chatRoomId]);
 
-  // 스크롤 위치 감지
   const handleScroll = () => {
     const el = messagesContainerRef.current;
     if (!el) return;
     isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
       }
     }
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    if (showMenu) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  // ESC key to close modals
-  useEffect(() => {
-    const anyModal = showReportModal || showBlockModal || showLeaveModal;
-    if (!anyModal) return;
-    function handleEsc(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setShowReportModal(false);
-        setShowBlockModal(false);
-        setShowLeaveModal(false);
-      }
-    }
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [showReportModal, showBlockModal, showLeaveModal]);
-
-  // Reset input on room switch
-  useEffect(() => {
-    setInput('');
-    setShowMatchInfo(false);
-    setShowMenu(false);
-    setShowReportModal(false);
-    setShowBlockModal(false);
-    setShowLeaveModal(false);
-  }, [chatRoomId]);
+  // ESC handling is delegated to Modal component
 
   function handleSend() {
     const trimmed = input.trim();
     if (!trimmed) return;
-    sendMessage(chatRoomId, trimmed);
-    setInput('');
-    inputRef.current?.focus();
-  }
 
-  function handleQuickAction(message: string) {
-    sendMessage(chatRoomId, message);
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: ChatMessage = {
+      id: tempId,
+      roomId: chatRoomId,
+      senderId: user?.id ?? '',
+      content: trimmed,
+      createdAt: new Date().toISOString(),
+      sender: { id: user?.id ?? '', nickname: user?.nickname ?? '', profileImageUrl: user?.profileImageUrl ?? null },
+    };
+
+    setOptimisticMessages((prev) => [...prev, optimistic]);
+    setInput('');
+
+    sendMessageMutation.mutate(
+      { roomId: chatRoomId, data: { content: trimmed } },
+      {
+        onError: () => {
+          setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
+          toast('error', '메시지 전송에 실패했어요');
+        },
+      },
+    );
+    inputRef.current?.focus();
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -189,34 +204,20 @@ export default function ChatRoomEmbed({
     }
   }
 
-  function handleReport() {
-    if (!reportReason) return;
-    setShowReportModal(false);
-    setReportReason('');
-    setReportDetail('');
-    toast('success', '신고가 접수되었어요. 운영팀이 검토할게요');
-  }
-
-  function handleBlock() {
-    setShowBlockModal(false);
-    toast('success', '차단되었어요');
-  }
-
   function handleLeave() {
     setShowLeaveModal(false);
     toast('info', '채팅방을 나갔어요');
     router.push('/chat');
   }
 
-  if (!room) {
+  function handleLoadMore() {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }
+
+  if (isError) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <EmptyState
-          icon={MessageCircle}
-          title="채팅방을 찾을 수 없어요"
-          description="삭제되었거나 존재하지 않는 채팅방이에요"
-          size="sm"
-        />
+      <div className="flex-1 flex items-center justify-center p-6">
+        <ErrorState onRetry={refetch} message="채팅을 불러오지 못했어요" />
       </div>
     );
   }
@@ -233,7 +234,7 @@ export default function ChatRoomEmbed({
             <button
               onClick={onBack}
               aria-label="뒤로 가기"
-              className="rounded-lg p-1.5 min-w-[44px] min-h-[44px] text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors lg:hidden"
+              className="rounded-lg p-1.5 min-w-[44px] min-h-[44px] text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -241,24 +242,17 @@ export default function ChatRoomEmbed({
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <Link
-              href={`/teams/${opponentTeamId}`}
-              className="text-lg font-bold text-gray-900 dark:text-white truncate block hover:text-blue-500 transition-colors"
-            >
-              {opponentName}
-            </Link>
-            <p className="text-xs text-gray-500 truncate">
-              {room.matchTitle}
-            </p>
+            <span className="text-lg font-bold text-gray-900 dark:text-white truncate block">
+              {room?.name ?? '채팅방'}
+            </span>
           </div>
           <button
-            aria-label={showMatchInfo ? '매치 정보 닫기' : '매치 정보 보기'}
+            aria-label={showMatchInfo ? '정보 닫기' : '정보 보기'}
             onClick={() => setShowMatchInfo(!showMatchInfo)}
             className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             {showMatchInfo ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
-          {/* More menu */}
           <div className="relative" ref={menuRef}>
             <button
               aria-label="더보기 메뉴"
@@ -270,14 +264,14 @@ export default function ChatRoomEmbed({
             {showMenu && (
               <div className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-lg py-1 z-50 animate-fade-in">
                 <button
-                  onClick={() => { setShowMenu(false); setShowReportModal(true); }}
+                  onClick={() => { setShowMenu(false); toast('info', '신고 기능을 준비 중이에요'); }}
                   className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <Flag size={14} className="text-gray-500" />
                   신고하기
                 </button>
                 <button
-                  onClick={() => { setShowMenu(false); setShowBlockModal(true); }}
+                  onClick={() => { setShowMenu(false); toast('info', '차단 기능을 준비 중이에요'); }}
                   className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <Ban size={14} className="text-gray-500" />
@@ -295,23 +289,16 @@ export default function ChatRoomEmbed({
           </div>
         </div>
 
-        {/* Collapsible Match Info */}
-        {showMatchInfo && (
+        {showMatchInfo && room && (
           <div className="px-4 pb-3 animate-fade-in">
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5 space-y-2">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <Calendar size={14} className="text-gray-500" />
-                <span>{formatMatchDate(room.matchDate)}</span>
+                <Calendar size={14} className="text-gray-500" aria-hidden="true" />
+                <span>{room.lastMessageAt ? formatMatchDate(room.lastMessageAt) : '—'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <MapPin size={14} className="text-gray-500" />
-                <span>{room.matchTitle}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <DollarSign size={14} className="text-gray-500" />
-                <span className="text-gray-600 dark:text-gray-300">
-                  {room.homeTeamName} vs {room.awayTeamName}
-                </span>
+                <MapPin size={14} className="text-gray-500" aria-hidden="true" />
+                <span>{room.name}</span>
               </div>
             </div>
           </div>
@@ -319,52 +306,82 @@ export default function ChatRoomEmbed({
       </header>
 
       {/* Messages area */}
-      <div ref={messagesContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 dark:bg-gray-900/50 min-h-0">
-        {/* Push messages to bottom when few messages */}
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50 dark:bg-gray-900/50 min-h-0"
+      >
         <div className="min-h-full flex flex-col justify-end">
-        {groupedMessages.map((group) => (
-          <div key={group.date}>
-            <DateSeparator label={group.label} />
+          {/* Load more older messages */}
+          {hasNextPage && (
+            <div className="flex justify-center py-2">
+              <button
+                onClick={handleLoadMore}
+                disabled={isFetchingNextPage}
+                className="rounded-full border border-gray-200 dark:border-gray-600 px-4 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px] disabled:opacity-50"
+              >
+                {isFetchingNextPage ? '불러오는 중...' : '더 보기'}
+              </button>
+            </div>
+          )}
 
-            {group.messages.map((msg, idx, arr) => {
-              if (msg.isSystem) {
-                return <SystemMessage key={msg.id} text={msg.message} />;
-              }
+          {isLoading ? (
+            <div className="space-y-3 py-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className={`h-10 rounded-xl animate-pulse bg-gray-200 dark:bg-gray-700 ${i % 2 === 0 ? 'w-2/3 ml-auto' : 'w-2/3'}`} />
+              ))}
+            </div>
+          ) : allMessages.length === 0 ? (
+            <EmptyState
+              icon={MessageCircle}
+              title="아직 메시지가 없어요"
+              description="첫 메시지를 보내보세요"
+              size="sm"
+            />
+          ) : (
+            groupedMessages.map((group) => (
+              <div key={group.date}>
+                <DateSeparator label={group.label} />
+                {group.messages.map((msg, idx, arr) => {
+                  const isMine = msg.senderId === user?.id;
+                  const prev = idx > 0 ? arr[idx - 1] : null;
+                  const next = idx < arr.length - 1 ? arr[idx + 1] : null;
+                  const isFirstInGroup = !prev || prev.senderId !== msg.senderId;
+                  const isLastInGroup = !next || next.senderId !== msg.senderId;
 
-              const isMine = msg.senderId === currentUserId;
-              const prev = idx > 0 ? arr[idx - 1] : null;
-              const next = idx < arr.length - 1 ? arr[idx + 1] : null;
-              const isFirstInGroup = !prev || prev.isSystem || prev.senderId !== msg.senderId;
-              const isLastInGroup = !next || next.isSystem || next.senderId !== msg.senderId;
+                  if (msg.content.startsWith('[system]')) {
+                    return <SystemMessage key={msg.id} text={msg.content.replace('[system]', '')} />;
+                  }
 
-              return (
-                <ChatBubble
-                  key={msg.id}
-                  message={msg.message}
-                  timestamp={msg.timestamp}
-                  isMine={isMine}
-                  senderName={msg.senderName}
-                  senderTeamName={msg.senderTeamName}
-                  isFirstInGroup={isFirstInGroup}
-                  isLastInGroup={isLastInGroup}
-                  isRead={msg.isRead}
-                />
-              );
-            })}
-          </div>
-        ))}
-        {isTyping && <TypingIndicator senderName={opponentName} />}
-        <div ref={messagesEndRef} />
+                  return (
+                    <ChatBubble
+                      key={msg.id}
+                      message={msg.content}
+                      timestamp={msg.createdAt}
+                      isMine={isMine}
+                      senderName={msg.sender?.nickname ?? ''}
+                      isFirstInGroup={isFirstInGroup}
+                      isLastInGroup={isLastInGroup}
+                    />
+                  );
+                })}
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* 이모지 피커 (간단 버전) */}
+      {/* Emoji picker */}
       {showEmoji && (
         <div className="shrink-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-2">
           <div className="flex flex-wrap gap-2">
-            {['👍', '👏', '🔥', '⚽', '🏀', '🏒', '💪', '🎉', '😊', '😂', '🙏', '❤️'].map(emoji => (
-              <button key={emoji} onClick={() => { setInput(prev => prev + emoji); setShowEmoji(false); }}
-                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+            {['👍', '👏', '🔥', '⚽', '🏀', '🏒', '💪', '🎉', '😊', '😂', '🙏', '❤️'].map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => { setInput((prev) => prev + emoji); setShowEmoji(false); }}
+                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
                 {emoji}
               </button>
             ))}
@@ -373,13 +390,13 @@ export default function ChatRoomEmbed({
       )}
 
       {/* Quick Actions */}
-      <div className="shrink-0 px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-50 dark:border-gray-800">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="shrink-0 px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <span className="shrink-0 text-2xs font-semibold text-gray-400 dark:text-gray-500">빠른 메시지</span>
           {QUICK_ACTIONS.map((action) => (
             <button
               key={action.label}
-              onClick={() => handleQuickAction(action.message)}
+              onClick={() => { setInput(action.message); inputRef.current?.focus(); }}
               className="shrink-0 rounded-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 min-h-[44px] text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600 transition-colors"
             >
               {action.label}
@@ -391,18 +408,21 @@ export default function ChatRoomEmbed({
       {/* Input Bar */}
       <div className={`shrink-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-3 ${!embedded ? 'pb-[calc(0.75rem+var(--safe-area-bottom))] lg:pb-3' : ''}`}>
         <div className="flex items-center gap-1.5">
-          {/* 첨부 */}
-          <button aria-label="파일 첨부" onClick={() => { fileInputRef.current?.click(); toast('info', '파일 첨부 기능을 준비 중이에요'); }}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0">
+          <button
+            aria-label="파일 첨부"
+            onClick={() => { fileInputRef.current?.click(); toast('info', '파일 첨부 기능을 준비 중이에요'); }}
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0"
+          >
             <Paperclip size={18} />
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={() => toast('info', '이미지 전송 기능을 준비 중이에요')} />
-          {/* 이모지 */}
-          <button aria-label="이모지" onClick={() => setShowEmoji(!showEmoji)}
-            className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors shrink-0 ${showEmoji ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>
+          <button
+            aria-label="이모지"
+            onClick={() => setShowEmoji(!showEmoji)}
+            className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors shrink-0 ${showEmoji ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          >
             <Smile size={18} />
           </button>
-          {/* 입력 */}
           <input
             ref={inputRef}
             type="text"
@@ -410,13 +430,13 @@ export default function ChatRoomEmbed({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="메시지를 입력하세요"
+            maxLength={2000}
             className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
           />
-          {/* 전송 */}
           <button
             aria-label="메시지 보내기"
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!input.trim() || sendMessageMutation.isPending}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
           >
             <Send size={16} />
@@ -424,120 +444,29 @@ export default function ChatRoomEmbed({
         </div>
       </div>
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">신고하기</h3>
-            <div className="space-y-2 mb-4">
-              {['욕설/비매너', '허위정보', '스팸', '기타'].map((reason) => (
-                <label
-                  key={reason}
-                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
-                    reportReason === reason
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
-                      : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="reportReason"
-                    value={reason}
-                    checked={reportReason === reason}
-                    onChange={(e) => setReportReason(e.target.value)}
-                    className="accent-blue-500"
-                  />
-                  <span className="text-base text-gray-700 dark:text-gray-200">{reason}</span>
-                </label>
-              ))}
-            </div>
-            <textarea
-              value={reportDetail}
-              onChange={(e) => setReportDetail(e.target.value)}
-              placeholder="상세 내용을 입력하세요 (선택)"
-              rows={3}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-800 transition-colors resize-none mb-4"
-            />
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetail(''); }}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleReport}
-                disabled={!reportReason}
-                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                신고하기
-              </button>
-            </div>
-          </div>
+      {/* Leave Confirmation Modal */}
+      <Modal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} title="채팅방 나가기">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 mx-auto mb-4">
+          <LogOut size={24} className="text-gray-500" />
         </div>
-      )}
-
-      {/* Block Modal */}
-      {showBlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
-                <Ban size={20} className="text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">차단하기</h3>
-            </div>
-            <p className="text-base text-gray-600 dark:text-gray-300 mb-6">
-              이 팀을 차단하시겠어요? 차단하면 채팅이 비활성화됩니다.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowBlockModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleBlock}
-                className="flex-1 rounded-xl bg-red-500 py-2.5 text-base font-semibold text-white hover:bg-red-600 transition-colors"
-              >
-                차단하기
-              </button>
-            </div>
-          </div>
+        <p className="text-base text-gray-600 dark:text-gray-300 text-center mb-6">
+          채팅방을 나가시겠어요?
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowLeaveModal(false)}
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={handleLeave}
+            className="flex-1 rounded-xl bg-blue-500 py-2.5 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
+          >
+            나가기
+          </button>
         </div>
-      )}
-
-      {/* Leave Modal */}
-      {showLeaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 mx-4 animate-fade-in">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                <LogOut size={20} className="text-gray-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">채팅방 나가기</h3>
-            </div>
-            <p className="text-base text-gray-600 dark:text-gray-300 mb-6">
-              채팅방을 나가시겠어요? 대화 내용은 삭제됩니다.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowLeaveModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-base font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleLeave}
-                className="flex-1 rounded-xl bg-blue-500 py-2.5 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
-              >
-                나가기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

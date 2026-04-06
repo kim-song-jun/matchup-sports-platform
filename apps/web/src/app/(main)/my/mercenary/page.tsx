@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, MapPin, Pencil, Trash2, AlertTriangle, UserCheck, Info } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { useMercenaryPosts } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
@@ -42,7 +42,7 @@ const mockMercenaryPosts = [
 export default function MyMercenaryPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
+  useRequireAuth();
   const { data: apiData } = useMercenaryPosts();
   const usingMock = !apiData?.items;
   const apiPosts = apiData?.items?.map((p) => ({
@@ -61,15 +61,6 @@ export default function MyMercenaryPage() {
   const posts = apiPosts ?? localPosts;
   const setPosts = setLocalPosts;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
-      </div>
-    );
-  }
 
   const handleDelete = async (id: string) => {
     try {

@@ -16,7 +16,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { ticketTypeLabel } from '@/lib/constants';
 import {
   formatAmount,
@@ -517,7 +517,7 @@ function SortToggle({
 
 export default function MyLessonTicketsPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  useRequireAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [sort, setSort] = useState<SortKey>('recent');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -559,20 +559,6 @@ export default function MyLessonTicketsPage() {
     }, 80);
   }, []);
 
-  // Auth guard
-  if (!isAuthenticated) {
-    return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
-        <EmptyState
-          icon={Ticket}
-          title="로그인이 필요해요"
-          description="수강권을 확인하려면 먼저 로그인해주세요"
-          action={{ label: '로그인하기', href: '/login' }}
-          size="md"
-        />
-      </div>
-    );
-  }
 
   // Tickets expiring within 7 days (active only)
   const expiringSoonTickets = MOCK_TICKETS.filter((t) => {

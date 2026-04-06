@@ -5,6 +5,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Trash2, AlertTriangle, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useTeam } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 
 const sports = [
@@ -38,12 +41,18 @@ export default function EditTeamPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  useRequireAuth();
+  const { user } = useAuthStore();
   const teamId = params.id as string;
+  const { data: teamData } = useTeam(teamId);
 
   const initialData = mockTeamData[teamId] || mockTeamData['team-1'];
   const [form, setForm] = useState(initialData);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Guard: only owner can edit (checked against API data when available)
+  const isOwner = !teamData || teamData.owner?.id === user?.id;
 
   const handleSave = async () => {
     if (!form.name) return toast('error', '팀 이름을 입력해주세요');
@@ -211,10 +220,10 @@ export default function EditTeamPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !isOwner}
             className="flex-1 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
-            {isSaving ? '저장 중...' : '저장'}
+            {isSaving ? '저장 중...' : !isOwner ? '권한 없음' : '저장'}
           </button>
         </div>
       </div>

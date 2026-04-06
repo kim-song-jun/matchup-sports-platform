@@ -6,8 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
-import { useChatStore } from '@/stores/chat-store';
-import { useNotificationStore } from '@/stores/notification-store';
+import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 
 export function Sidebar() {
@@ -15,8 +14,9 @@ export function Sidebar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
-  const notifUnread = useNotificationStore((s) => s.getUnreadCount());
+  const chatUnread = useChatUnreadTotal();
+  const { data: unreadData } = useUnreadCount();
+  const notifUnread = unreadData?.count ?? 0;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const t = useTranslations('nav');

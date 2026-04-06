@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Search, GraduationCap, ShoppingBag, User } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useChatStore } from '@/stores/chat-store';
-import { useNotificationStore } from '@/stores/notification-store';
+import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import { cn } from '@/lib/utils';
 
 export function BottomNav() {
   const pathname = usePathname();
-  const chatUnread = useChatStore((s) => s.getTotalUnreadCount());
-  const notifUnread = useNotificationStore((s) => s.getUnreadCount());
+  const chatUnread = useChatUnreadTotal();
+  const { data: unreadData } = useUnreadCount();
+  const notifUnread = unreadData?.count ?? 0;
   const totalUnread = chatUnread + notifUnread;
   const t = useTranslations('nav');
 

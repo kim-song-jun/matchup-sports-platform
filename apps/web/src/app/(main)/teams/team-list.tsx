@@ -3,7 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useTeams } from '@/hooks/use-api';
+import { useTeams, useMyTeams } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Users as UsersIcon } from 'lucide-react';
@@ -44,8 +45,14 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
 
 export function TeamList() {
   const te = useTranslations('empty');
+  const { isAuthenticated } = useAuthStore();
   const { data, isLoading, error, refetch } = useTeams();
-  const teams = data?.items ?? [];
+  const { data: myTeams } = useMyTeams();
+
+  const allTeams = data?.items ?? [];
+  const myTeamList = myTeams ?? [];
+  const myTeamIds = new Set(myTeamList.map((t: SportTeam) => t.id));
+  const otherTeams = isAuthenticated ? allTeams.filter((t: SportTeam) => !myTeamIds.has(t.id)) : allTeams;
 
   if (isLoading) {
     return (
@@ -59,21 +66,37 @@ export function TeamList() {
     return <ErrorState onRetry={() => refetch()} />;
   }
 
-  if (teams.length === 0) {
-    return (
-      <EmptyState
-        icon={UsersIcon}
-        title={te('noTeams')}
-        description={te('noTeamsDesc')}
-      />
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-      {teams.map((team: SportTeam) => (
-        <TeamCard key={team.id} team={team} />
-      ))}
+    <div className="space-y-6">
+      {isAuthenticated && myTeamList.length > 0 && (
+        <div>
+          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀</h2>
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
+            {myTeamList.map((team: SportTeam) => (
+              <TeamCard key={team.id} team={team} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        {isAuthenticated && myTeamList.length > 0 && (
+          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀</h2>
+        )}
+        {otherTeams.length === 0 && !isLoading ? (
+          <EmptyState
+            icon={UsersIcon}
+            title={te('noTeams')}
+            description={te('noTeamsDesc')}
+          />
+        ) : (
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
+            {otherTeams.map((team: SportTeam) => (
+              <TeamCard key={team.id} team={team} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

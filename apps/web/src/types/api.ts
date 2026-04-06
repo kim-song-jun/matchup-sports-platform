@@ -352,7 +352,7 @@ export interface AdminStats {
   todayMatches?: number;
 }
 
-// ── Chat (API contract — 프론트엔드는 현재 stores/chat-store.ts 타입 사용) ──
+// ── Chat (API contract) ──
 export interface ChatRoom {
   id: string;
   name: string;

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, Users, Pencil, Trash2, AlertTriangle, Info, Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { useMyMatches } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
@@ -85,8 +85,9 @@ type Tab = 'participated' | 'created';
 
 export default function MyMatchesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
+  useRequireAuth();
   const { data: apiData } = useMyMatches();
   const usingMock = !apiData?.items;
   const apiMatches = apiData?.items?.map((m) => ({
@@ -106,16 +107,11 @@ export default function MyMatchesPage() {
   const matches = apiMatches ?? (process.env.NODE_ENV === 'development' ? localMatches : []);
   const setMatches = setLocalMatches;
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('participated');
 
-  if (!isAuthenticated) {
-    return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700 dark:text-gray-200">로그인이 필요합니다</p>
-        <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-bold text-white">로그인</Link>
-      </div>
-    );
-  }
+  // Support ?tab=created|history URL param — map to internal tab keys
+  const tabParam = searchParams.get('tab');
+  const resolvedTab: Tab = tabParam === 'created' ? 'created' : tabParam === 'history' ? 'participated' : 'participated';
+  const [activeTab, setActiveTab] = useState<Tab>(resolvedTab);
 
   const handleDelete = async (id: string) => {
     try {

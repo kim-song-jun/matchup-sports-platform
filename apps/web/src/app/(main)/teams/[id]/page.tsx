@@ -46,7 +46,7 @@ export default function TeamDetailPage() {
   const teamId = params.id as string;
 
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const { data: team, isLoading } = useTeam(teamId);
   const { data: apiBadges } = useTeamBadges(teamId);
 
@@ -78,15 +78,16 @@ export default function TeamDetailPage() {
     );
   }
 
+  const isMyTeam = !!user?.id && user.id === team.owner?.id;
   const SportIcon = SportIconMap[team.sportType];
   const hasSns = team.instagramUrl || team.youtubeUrl || team.kakaoOpenChat || team.websiteUrl;
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10 border-b border-gray-50">
+      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-700">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-lg font-semibold text-gray-900 truncate flex-1 ml-3">{team.name}</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1 ml-3">{team.name}</h1>
         <button
           onClick={async () => {
             try {
@@ -136,12 +137,12 @@ export default function TeamDetailPage() {
 
             <div className="pt-8 px-5 pb-5">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold text-gray-900">{team.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{team.name}</h2>
                 {team.isRecruiting && (
                   <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>
                 )}
                 {hasMercenaryPost && (
-                  <Link href="/mercenary" className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 flex items-center gap-1">
+                  <Link href={`/mercenary?teamId=${teamId}`} className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 flex items-center gap-1">
                     <UserPlus size={10} />
                     용병 모집 중
                   </Link>
@@ -215,20 +216,20 @@ export default function TeamDetailPage() {
               />
             </div>
             {/* 전적 */}
-            <div className="mt-4 rounded-xl bg-gray-50 p-3.5">
-              <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+            <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-700 p-3.5">
+              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-2">
                 <Trophy size={14} />
                 <span className="text-xs font-medium">전적</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xl font-bold text-gray-900">{mockTrustScore.record.total}전</span>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">{mockTrustScore.record.total}전</span>
                 <div className="flex items-center gap-2 text-base">
                   <span className="font-semibold text-blue-500">{mockTrustScore.record.wins}승</span>
-                  <span className="font-semibold text-gray-500">{mockTrustScore.record.draws}무</span>
+                  <span className="font-semibold text-gray-500 dark:text-gray-400">{mockTrustScore.record.draws}무</span>
                   <span className="font-semibold text-red-400">{mockTrustScore.record.losses}패</span>
                 </div>
                 <div className="ml-auto">
-                  <span className="text-sm font-semibold text-gray-600">
+                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
                     승률 {((mockTrustScore.record.wins / mockTrustScore.record.total) * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -240,7 +241,7 @@ export default function TeamDetailPage() {
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">최근 경기</h3>
-              <Link href="/team-matches" className="text-sm text-blue-500 font-medium">전체보기</Link>
+              <Link href={`/team-matches?teamId=${teamId}`} className="text-sm text-blue-500 font-medium">전체보기</Link>
             </div>
             <div className="space-y-2">
               {mockRecentMatches.map((match) => {
@@ -253,18 +254,18 @@ export default function TeamDetailPage() {
                 const rs = resultStyle[match.result];
 
                 return (
-                  <div key={match.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3.5 py-3">
+                  <div key={match.id} className="flex items-center gap-3 rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                     <span className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${rs.className}`}>
                       {rs.label}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-base font-medium text-gray-900 truncate">vs {match.opponent}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-base font-medium text-gray-900 dark:text-white truncate">vs {match.opponent}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         {d.getMonth() + 1}/{d.getDate()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="text-lg font-bold text-gray-900">
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
                         {match.myScore} : {match.opponentScore}
                       </span>
                     </div>
@@ -341,63 +342,91 @@ export default function TeamDetailPage() {
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* 팀 참여 신청 */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            {isAuthenticated ? (
-              <button
-                onClick={async () => {
-                  try {
-                    await api.post(`/teams/${teamId}/apply`);
-                    toast('success', '팀 가입 신청이 완료되었어요');
-                  } catch {
-                    toast('error', '신청에 실패했어요. 이미 신청했거나 권한이 없을 수 있어요');
-                  }
-                }}
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors"
-              >
-                팀 가입 신청
-              </button>
-            ) : (
-              <Link
-                href="/login"
-                className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
-              >
-                로그인 후 가입 신청
-              </Link>
-            )}
-          </div>
+          {!isMyTeam && (
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              {isAuthenticated ? (
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.post(`/teams/${teamId}/apply`);
+                      toast('success', '팀 가입 신청이 완료되었어요');
+                    } catch {
+                      toast('error', '신청에 실패했어요. 이미 신청했거나 권한이 없을 수 있어요');
+                    }
+                  }}
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors"
+                >
+                  팀 가입 신청
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
+                >
+                  로그인 후 가입 신청
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* CTA */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            {team.isRecruiting ? (
-              <div className="text-center mb-4">
-                <span className="inline-block text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 mb-2">팀원 모집중</span>
-                <p className="text-sm text-gray-500">아래 버튼으로 연락해보세요</p>
-              </div>
-            ) : (
-              <div className="text-center mb-4">
-                <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-500 mb-2">모집 마감</span>
-                <p className="text-sm text-gray-500">현재 팀원을 모집하고 있지 않습니다</p>
-              </div>
-            )}
-            <button className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
-              <MessageCircle size={18} />
-              연락하기
-            </button>
-            {team.contactInfo && (
-              <p className="text-xs text-gray-500 text-center mt-2">{team.contactInfo}</p>
-            )}
-          </div>
+          {isMyTeam ? (
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
+              <Link
+                href={`/teams/${teamId}/edit`}
+                className="block w-full text-center rounded-xl bg-gray-900 dark:bg-white py-3.5 text-base font-bold text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors"
+              >
+                팀 설정
+              </Link>
+              <Link
+                href={`/teams/${teamId}/members`}
+                className="block w-full text-center rounded-xl bg-gray-50 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+              >
+                멤버 관리
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              {team.isRecruiting ? (
+                <div className="text-center mb-4">
+                  <span className="inline-block text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 mb-2">팀원 모집중</span>
+                  <p className="text-sm text-gray-500">아래 버튼으로 연락해보세요</p>
+                </div>
+              ) : (
+                <div className="text-center mb-4">
+                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-500 mb-2">모집 마감</span>
+                  <p className="text-sm text-gray-500">현재 팀원을 모집하고 있지 않습니다</p>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    router.push('/login');
+                    return;
+                  }
+                  toast('info', '연락처 정보를 확인해주세요');
+                }}
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <MessageCircle size={18} />
+                연락하기
+              </button>
+              {team.contactInfo && (
+                <p className="text-xs text-gray-500 text-center mt-2">{team.contactInfo}</p>
+              )}
+            </div>
+          )}
 
           {/* 용병 모집 중 카드 */}
           {hasMercenaryPost && (
-            <Link href="/mercenary" className="block">
+            <Link href={`/mercenary?teamId=${teamId}`} className="block">
               <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700">
                     <UserPlus size={18} className="text-gray-500" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-base font-semibold text-gray-900">용병 모집 중</p>
+                    <p className="text-base font-semibold text-gray-900 dark:text-white">용병 모집 중</p>
                     <p className="text-xs text-gray-500 mt-0.5">다음 경기에 함께할 용병을 찾고 있어요</p>
                   </div>
                   <ChevronRight size={16} className="text-gray-500" />
@@ -414,7 +443,7 @@ export default function TeamDetailPage() {
                 {team.owner?.nickname?.charAt(0) || '?'}
               </div>
               <div className="flex-1">
-                <p className="text-md font-semibold text-gray-900">{team.owner?.nickname || '알 수 없음'}</p>
+                <p className="text-base font-semibold text-gray-900 dark:text-white">{team.owner?.nickname || '알 수 없음'}</p>
                 {team.owner?.mannerScore && (
                   <div className="flex items-center gap-1 text-sm text-amber-500 mt-0.5">
                     <Star size={12} fill="currentColor" />
@@ -434,20 +463,20 @@ export default function TeamDetailPage() {
 
 function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-3">
-      <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+    <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3">
+      <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-1">
         {icon}
         <span className="text-xs">{label}</span>
       </div>
-      <p className="text-base font-semibold text-gray-900">{value}</p>
+      <p className="text-base font-semibold text-gray-900 dark:text-white">{value}</p>
     </div>
   );
 }
 
 function TrustItem({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-3">
-      <div className="flex items-center gap-1.5 text-gray-500 mb-1">
+    <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3">
+      <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-1">
         {icon}
         <span className="text-xs">{label}</span>
       </div>

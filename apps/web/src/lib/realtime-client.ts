@@ -1,0 +1,83 @@
+'use client';
+import { io, Socket } from 'socket.io-client';
+
+// Event payload types for typed subscriptions
+export interface ChatMessagePayload {
+  id: string;
+  roomId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  sender?: { id: string; nickname: string; profileImageUrl: string | null };
+}
+
+export interface NotificationPayload {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ServerToClientEvents {
+  'chat:message': (payload: ChatMessagePayload) => void;
+  'notification:new': (payload: NotificationPayload) => void;
+}
+
+export interface ClientToServerEvents {
+  'chat:join': (roomId: string) => void;
+  'chat:leave': (roomId: string) => void;
+  'chat:message': (payload: { roomId: string; content: string }) => void;
+}
+
+export type RealtimeSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+let _socket: RealtimeSocket | null = null;
+
+/**
+ * Creates (or returns existing) a singleton Socket.IO connection authenticated with the given JWT.
+ * Disconnects and recreates if the token has changed.
+ */
+export function createRealtimeSocket(token: string): RealtimeSocket {
+  const existingAuth = _socket?.auth as Record<string, string> | undefined;
+  if (_socket && existingAuth?.token === token) {
+    if (!_socket.connected) {
+      _socket.connect();
+    }
+    return _socket;
+  }
+
+  // Token changed or no socket yet — disconnect previous
+  if (_socket) {
+    _socket.disconnect();
+    _socket = null;
+  }
+
+  const url = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8100';
+
+  _socket = io(url, {
+    auth: { token },
+    autoConnect: false,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    transports: ['websocket', 'polling'],
+  }) as RealtimeSocket;
+
+  return _socket;
+}
+
+/** Returns the current singleton socket without creating a new one. */
+export function getSocket(): RealtimeSocket | null {
+  return _socket;
+}
+
+/** Disconnects and clears the singleton socket. Call on logout. */
+export function disconnectSocket(): void {
+  if (_socket) {
+    _socket.disconnect();
+    _socket = null;
+  }
+}

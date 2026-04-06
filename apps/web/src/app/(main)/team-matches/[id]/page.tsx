@@ -5,18 +5,19 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Calendar, Clock, MapPin, Trophy, DollarSign,
-  Users, Shield, CheckCircle2, XCircle, AlertCircle, Star,
+  Users, Shield, AlertCircle, Star,
   ChevronRight, MapPinCheck, ClipboardCheck, Pencil,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
+import { ApplicationsSection } from '@/components/team-matches/applications-section';
 import {
   useTeamMatch, useTeamMatchRefereeSchedule,
-  useApplyTeamMatch, useRespondTeamMatchApplication,
-  useTeamMatchArrival,
+  useApplyTeamMatch,
+  useTeamMatchArrival, useMyTeams,
 } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo, MATCH_TYPES } from '@/lib/skill-grades';
-import type { TeamMatchApplication } from '@/types/api';
 import { sportLabel } from '@/lib/constants';
 import { formatDateDot, formatAmount } from '@/lib/utils';
 
@@ -31,16 +32,18 @@ export default function TeamMatchDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { data: match, isLoading } = useTeamMatch(id);
   const { data: refereeSchedule } = useTeamMatchRefereeSchedule(id);
+  const { data: myTeams } = useMyTeams();
   const applyMutation = useApplyTeamMatch();
-  const respondMutation = useRespondTeamMatchApplication();
+
   const arrivalMutation = useTeamMatchArrival();
 
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyMessage, setApplyMessage] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
 
   if (isLoading) {
     return (
@@ -69,7 +72,9 @@ export default function TeamMatchDetailPage() {
     );
   }
 
-  const isHost = user?.id === match.hostUserId;
+  // isHost: direct owner check OR user belongs to host team with manager+ role
+  const isHostTeamMember = myTeams?.some((t) => t.id === match.hostTeam?.id);
+  const isHost = user?.id === match.hostUserId || !!isHostTeamMember;
   const isMatchDay = new Date(match.matchDate).toDateString() === new Date().toDateString();
   const isCompleted = match.status === 'completed';
   const isRecruiting = match.status === 'recruiting';
@@ -86,14 +91,11 @@ export default function TeamMatchDetailPage() {
 
   function handleApply() {
     if (!confirmed) return;
+    const teamId = myTeams && myTeams.length > 0 ? (selectedTeamId || myTeams[0].id) : undefined;
     applyMutation.mutate(
-      { id, data: { message: applyMessage } },
+      { id, data: { message: applyMessage, ...(teamId ? { teamId } : {}) } },
       { onSuccess: () => setShowApplyModal(false) },
     );
-  }
-
-  function handleRespond(applicationId: string, action: 'approve' | 'reject') {
-    respondMutation.mutate({ id, applicationId, action });
   }
 
   function handleArrival() {
@@ -314,7 +316,7 @@ export default function TeamMatchDetailPage() {
                         </div>
                       )}
                       {match.hostTeam.matchCount != null && (
-                        <span className="text-xs text-gray-500">{String(match.hostTeam.matchCount)}경기</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{String(match.hostTeam.matchCount)}경기</span>
                       )}
                     </div>
                   </div>
@@ -331,7 +333,13 @@ export default function TeamMatchDetailPage() {
             <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-3">
               {isRecruiting && !isHost && (
                 <button
-                  onClick={() => setShowApplyModal(true)}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      router.push('/login');
+                      return;
+                    }
+                    setShowApplyModal(true);
+                  }}
                   className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
                   <span className="flex items-center justify-center gap-2">경기 신청하기</span>
@@ -359,7 +367,7 @@ export default function TeamMatchDetailPage() {
                 </Link>
               )}
 
-              {isHost && isRecruiting && (
+              {isAuthenticated && isHost && isRecruiting && (
                 <>
                   <Link
                     href={`/team-matches/${id}/edit`}
@@ -373,73 +381,9 @@ export default function TeamMatchDetailPage() {
               )}
             </div>
 
-            {/* 신청 목록 (호스트만) */}
-            {isHost && applications.length > 0 && (
-              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Users size={16} className="text-blue-500" />
-                  신청 목록
-                  <span className="ml-auto text-sm font-normal text-gray-500">{applications.length}팀</span>
-                </h2>
-                <div className="space-y-3">
-                  {applications.map((app: TeamMatchApplication) => {
-                    const appStatusMap: Record<string, { label: string; className: string }> = {
-                      pending: { label: '대기중', className: 'bg-amber-50 text-amber-600' },
-                      approved: { label: '승인', className: 'bg-green-50 text-green-600' },
-                      rejected: { label: '거절', className: 'bg-red-50 text-red-500' },
-                    };
-                    const appStatus = appStatusMap[app.status] ?? appStatusMap.pending;
-
-                    return (
-                      <div key={app.id} className="rounded-xl border border-gray-100 dark:border-gray-700 p-3.5">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-700 text-sm font-bold text-gray-600">
-                              {app.teamName?.charAt(0)}
-                            </div>
-                            <span className="text-base font-semibold text-gray-900 dark:text-white">{app.teamName}</span>
-                          </div>
-                          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${appStatus.className}`}>
-                            {appStatus.label}
-                          </span>
-                        </div>
-                        {app.message && (
-                          <p className="text-sm text-gray-500 mb-3 pl-10">{app.message}</p>
-                        )}
-                        {app.status === 'pending' && (
-                          <div className="flex gap-2 pl-10">
-                            <button
-                              onClick={() => handleRespond(app.id, 'approve')}
-                              disabled={respondMutation.isPending}
-                              className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-blue-50 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
-                            >
-                              <CheckCircle2 size={14} />
-                              승인
-                            </button>
-                            <button
-                              onClick={() => handleRespond(app.id, 'reject')}
-                              disabled={respondMutation.isPending}
-                              className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-gray-50 dark:bg-gray-700 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors"
-                            >
-                              <XCircle size={14} />
-                              거절
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {isHost && applications.length === 0 && isRecruiting && (
-              <EmptyState
-                icon={Users}
-                title="아직 신청한 팀이 없어요"
-                description="상대 팀의 신청을 기다리고 있어요"
-                size="sm"
-              />
+            {/* 신청 현황 (호스트 팀 매니저+ 전용) */}
+            {isHost && (
+              <ApplicationsSection matchId={id} isRecruiting={isRecruiting} />
             )}
             </div>
           </div>
@@ -448,61 +392,71 @@ export default function TeamMatchDetailPage() {
 
 
       {/* 신청 모달 */}
-      {showApplyModal && (
-        <div className="fixed inset-0 z-50 flex items-end @3xl:items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowApplyModal(false)} />
-          <div className="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-t-2xl @3xl:rounded-2xl p-6 pb-[calc(1.5rem+var(--safe-area-bottom))] animate-fade-in">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">경기 신청</h3>
-
-            <label className="flex items-start gap-3 rounded-xl bg-gray-50 dark:bg-gray-700 p-4 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500"
-              />
-              <div>
-                <p className="text-base font-medium text-gray-900 dark:text-white">상호 확인 동의</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  경기 조건, 비용, 규정을 확인했으며 상대팀과 상호 존중하겠습니다.
-                </p>
-              </div>
-            </label>
-
-            <div className="mb-4">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">메시지 (선택)</label>
-              <textarea
-                value={applyMessage}
-                onChange={(e) => setApplyMessage(e.target.value)}
-                placeholder="호스트에게 전달할 메시지를 작성하세요"
-                rows={3}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowApplyModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-3 text-base font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleApply}
-                disabled={!confirmed || applyMutation.isPending}
-                className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {applyMutation.isPending ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      처리 중...
-                    </span>
-                  ) : '신청하기'}
-              </button>
-            </div>
+      <Modal isOpen={showApplyModal} onClose={() => setShowApplyModal(false)} title="경기 신청">
+        <label className="flex items-start gap-3 rounded-xl bg-gray-50 dark:bg-gray-700 p-4 mb-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            className="mt-0.5 h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-500 focus:ring-blue-500"
+          />
+          <div>
+            <p className="text-base font-medium text-gray-900 dark:text-white">상호 확인 동의</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              경기 조건, 비용, 규정을 확인했으며 상대팀과 상호 존중하겠습니다.
+            </p>
           </div>
+        </label>
+
+        {myTeams && myTeams.length > 1 && (
+          <div className="mb-4">
+            <label htmlFor="team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">신청 팀 선택</label>
+            <select
+              id="team-select"
+              value={selectedTeamId}
+              onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
+            >
+              {myTeams.map((team) => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="mb-4">
+          <label htmlFor="apply-message" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">메시지 (선택)</label>
+          <textarea
+            id="apply-message"
+            value={applyMessage}
+            onChange={(e) => setApplyMessage(e.target.value)}
+            placeholder="호스트에게 전달할 메시지를 작성하세요"
+            rows={3}
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
+          />
         </div>
-      )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowApplyModal(false)}
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 py-3 text-base font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={handleApply}
+            disabled={!confirmed || applyMutation.isPending}
+            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {applyMutation.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  처리 중...
+                </span>
+              ) : '신청하기'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

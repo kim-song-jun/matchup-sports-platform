@@ -1,0 +1,110 @@
+# Agent Team Workflow — Execution Guide
+
+## Commands
+
+- `@build` → Production team (backend-dev + frontend-dev + infra-dev)
+- `@review` → Review team (backend/frontend/infra review)
+- `@design` → Design team (design-main + ux-manager + ui-manager)
+- `@plan` → Planning team (project-director + tech-planner)
+- `@QA` → QA team (4 personas)
+- `@all` → Full pipeline (plan → build → review → design → QA)
+
+### Individual Agent
+- `@backend-dev [task]` → Backend only
+- `@frontend-dev [task]` → Frontend only
+- `@qa-beginner [page/feature]` → Beginner QA only
+- etc.
+
+---
+
+## Pipeline Patterns
+
+### New Feature
+```
+1. @plan → project-director + tech-planner (direction + technical review)
+   ↓ approved
+2. @build → backend-dev + frontend-dev + infra-dev (parallel)
+   ↓ complete
+3. @review → backend-review + frontend-review + infra-review (parallel)
+   ↓ fixes applied
+4. @design → design-main + ux-manager + ui-manager (design review)
+   ↓ fixes applied
+5. @QA → qa-beginner + qa-regular + qa-power + qa-uiux (quality check)
+   ↓ final fixes
+6. Done
+```
+
+### Bug Fix
+```
+1. @build → relevant dev only (backend-dev or frontend-dev)
+2. @review → relevant reviewer only
+3. @QA → qa-regular + qa-uiux
+```
+
+### Design Refactoring
+```
+1. @design → design-main (current state audit)
+2. @build → frontend-dev (fixes)
+3. @design → ux-manager + ui-manager (re-review)
+4. @QA → qa-beginner + qa-uiux
+```
+
+---
+
+## Execution Rules
+
+1. **Builders always parallel** — backend/frontend/infra work simultaneously if independent
+2. **Review after build** — never review incomplete code
+3. **QA after review passes** — only enter QA when review OK
+4. **Planning for large changes only** — skip for small fixes
+5. **Consolidated reports** — combine each agent's result into one summary
+
+---
+
+## Review-Fix Iteration
+
+```
+Builders → Reviewers → [Critical/Warning found] → Builders fix → Reviewers re-check → ... → [Critical 0, Warning 0] → OK
+```
+
+- Max 3 iterations, then escalate to user
+- Re-check verifies only previous findings (not full re-review)
+- Suggestions are optional, don't block the pipeline
+
+---
+
+## Report Formats
+
+### Build Report
+```
+## Build Report
+### Backend
+- Changed files: [list]
+- Tests: [results]
+### Frontend
+- Changed files: [list]
+- Tests: [results]
+### Infra
+- Changed files: [list]
+- Tests: [results]
+```
+
+### Review Report
+```
+## Code Review Report
+Critical(N) / Warning(N) / Good(N) / Suggestion(N)
+
+### Critical
+- [file:line] description
+
+### Warning
+- [file:line] description
+```
+
+### QA Report
+```
+## QA Report
+Pass: N/M scenarios
+Fail: [failed scenarios + reproduction steps]
+Improvements: [list]
+```

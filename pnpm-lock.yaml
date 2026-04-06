@@ -225,12 +225,6 @@ importers:
         specifier: 1.6.0
         version: 1.6.0(@types/node@22.19.15)(jsdom@24.1.0)(lightningcss@1.32.0)(terser@5.46.1)
 
-  packages/shared:
-    devDependencies:
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
 packages:
 
   '@adobe/css-tools@4.4.4':

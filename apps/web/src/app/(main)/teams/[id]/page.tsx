@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo } from '@/lib/skill-grades';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { getTeamImage, getTeamImageSet } from '@/lib/sport-image';
 
 // Mock trust score data (폴백 — API 연동 시 교체 필요)
 const mockTrustScore = {
@@ -81,6 +82,8 @@ export default function TeamDetailPage() {
   const isMyTeam = !!user?.id && user.id === team.owner?.id;
   const SportIcon = SportIconMap[team.sportType];
   const hasSns = team.instagramUrl || team.youtubeUrl || team.kakaoOpenChat || team.websiteUrl;
+  const coverImage = getTeamImage(team.sportType, team.coverImageUrl, team.id);
+  const teamGallery = getTeamImageSet(team.sportType, team.photos, team.id, 3);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -119,14 +122,15 @@ export default function TeamDetailPage() {
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
             <div className="h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center relative">
-              {team.coverImageUrl ? (
-                <img src={team.coverImageUrl} alt="" className="w-full h-full object-cover" />
+              {coverImage ? (
+                <img src={coverImage} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="text-center text-white/60">
                   <Image size={32} className="mx-auto mb-1" />
                   <p className="text-xs">커버 이미지</p>
                 </div>
               )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               {/* Logo overlay */}
               <div className="absolute -bottom-6 left-5">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white text-xl font-black border-2 border-white shadow-lg">
@@ -324,11 +328,11 @@ export default function TeamDetailPage() {
           )}
 
           {/* 갤러리 — 실제 사진이 있을 때만 표시 */}
-          {team.photos && team.photos.length > 0 && (
+          {teamGallery.length > 0 && (
             <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">갤러리</h3>
               <div className="grid grid-cols-3 gap-2">
-                {team.photos.map((photo: string, i: number) => (
+                {teamGallery.map((photo: string, i: number) => (
                   <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
                     <img src={photo} alt={`팀 사진 ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                   </div>

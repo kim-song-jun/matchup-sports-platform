@@ -1,6 +1,6 @@
 # MatchUp - AI 스포츠 매칭 플랫폼 프로젝트 현황
 
-> 최종 업데이트: 2026-03-25 | 스크린샷: v4 (Playwright 자동 캡처)
+> 최종 업데이트: 2026-04-06 | 스크린샷: v4 (Playwright 자동 캡처)
 
 ---
 
@@ -139,6 +139,7 @@ sports-platform/
 - **LandingFooter**: 페이지 간 네비게이션 + 법적 링크
 - **ScrollReveal**: 스크롤 입장 애니메이션 (IntersectionObserver)
 - **CountUp**: 숫자 카운트업 애니메이션
+- **로컬 mock 이미지 팩**: 리스트/상세 카드에 외부 이미지 대신 `/mock/*` 생성 자산 + SVG fallback 사용
 - 블루 단일 액센트 + 화이트 베이스 + gray-50 교차 배경
 
 ---

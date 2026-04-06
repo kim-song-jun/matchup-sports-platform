@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -13,6 +13,7 @@ import { MapPlaceholder } from '@/components/ui/map-placeholder';
 import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
 import { useVenue } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
+import { getVenueImageSet } from '@/lib/sport-image';
 import { formatMatchDate } from '@/lib/utils';
 
 const dayLabels: Record<string, string> = {
@@ -122,6 +123,7 @@ export default function VenueDetailPage() {
   const router = useRouter();
   const venueId = params.id as string;
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Use API hook with mock data fallback
   const { data: apiVenue } = useVenue(venueId);
@@ -135,6 +137,13 @@ export default function VenueDetailPage() {
   const venueDescription = venue.description || null;
   const venuePricePerHour = venue.pricePerHour ?? null;
   const operatingHours = venue.operatingHours as Record<string, { open: string; close: string }> | null;
+  const primarySport = venue.sportType || venue.sportTypes?.[0] || 'soccer';
+  const venueImages = getVenueImageSet(primarySport, venue.imageUrls, venue.id, 3);
+  const heroImage = selectedImage || venueImages[0];
+
+  useEffect(() => {
+    setSelectedImage(venueImages[0] ?? null);
+  }, [venueId, venueImages[0]]);
 
   function handleReviewSubmit(data: ReviewData) {
     // In real implementation, this would call an API
@@ -164,8 +173,30 @@ export default function VenueDetailPage() {
       <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left: Venue info */}
         <div className="px-5 @3xl:px-0">
-          {/* Map Placeholder */}
           <div className="mb-4">
+            {heroImage && (
+              <div className="mb-2 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                <img src={heroImage} alt={venue.name} className="h-[220px] w-full object-cover" />
+              </div>
+            )}
+            {venueImages.length > 1 && (
+              <div className="mb-2 grid grid-cols-3 gap-2">
+                {venueImages.map((image, index) => (
+                  <button
+                    key={`${image}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedImage(image)}
+                    className={`overflow-hidden rounded-xl border transition-colors ${
+                      heroImage === image
+                        ? 'border-blue-500'
+                        : 'border-gray-100 dark:border-gray-700'
+                    }`}
+                  >
+                    <img src={image} alt={`${venue.name} 이미지 ${index + 1}`} className="aspect-[4/3] h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
             <MapPlaceholder
               lat={venue.lat ?? 37.5665}
               lng={venue.lng ?? 126.978}

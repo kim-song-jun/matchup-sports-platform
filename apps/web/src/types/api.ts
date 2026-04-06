@@ -101,6 +101,7 @@ export interface Lesson {
   coachName: string | null;
   coachBio: string | null;
   imageUrl?: string;
+  imageUrls?: string[];
   createdAt?: string;
   isRecurring?: boolean;
   recurringDays?: number[];

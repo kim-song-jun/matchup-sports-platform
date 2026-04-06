@@ -1,37 +1,137 @@
 /**
- * 종목별 플레이스홀더 이미지 (Unsplash 무료 이미지)
- * 실 서비스에서는 S3 업로드 이미지로 교체
+ * Local mock image catalog used across cards and detail pages.
+ * The selection is deterministic, so repeated lists still feel varied.
  */
-const sportImages: Record<string, string> = {
-  soccer: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=400&h=300&fit=crop',
-  futsal: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=300&fit=crop',
-  basketball: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=400&h=300&fit=crop',
-  badminton: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=400&h=300&fit=crop',
-  ice_hockey: 'https://images.unsplash.com/photo-1580748142073-f52d2e816e89?w=400&h=300&fit=crop',
-  swimming: 'https://images.unsplash.com/photo-1530549387789-4c1017266635?w=400&h=300&fit=crop',
-  tennis: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=300&fit=crop',
-  baseball: 'https://images.unsplash.com/photo-1508344928928-7165b67de128?w=400&h=300&fit=crop',
-  volleyball: 'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=400&h=300&fit=crop',
-  figure_skating: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop',
-  short_track: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop',
+const sportImages: Record<string, string[]> = {
+  soccer: [
+    '/mock/sports/soccer-sunrise.svg',
+    '/mock/sports/soccer-midnight.svg',
+  ],
+  futsal: [
+    '/mock/generated/futsal-rooftop.webp',
+    '/mock/sports/futsal-rooftop.svg',
+  ],
+  basketball: [
+    '/mock/generated/basketball-hardwood.webp',
+    '/mock/sports/basketball-fastbreak.svg',
+  ],
+  badminton: [
+    '/mock/generated/badminton-club.webp',
+    '/mock/sports/badminton-service.svg',
+  ],
+  ice_hockey: [
+    '/mock/generated/ice-hockey-arena.webp',
+    '/mock/sports/ice-hockey-tunnel.svg',
+  ],
+  swimming: ['/mock/sports/swimming-lanes.svg'],
+  tennis: ['/mock/sports/tennis-baseline.svg'],
+  baseball: ['/mock/sports/baseball-diamond.svg'],
+  volleyball: ['/mock/sports/volleyball-sand.svg'],
+  figure_skating: ['/mock/sports/figure-skating-glide.svg'],
+  short_track: ['/mock/sports/figure-skating-glide.svg'],
 };
 
-const marketplaceImage = 'https://images.unsplash.com/photo-1461896836934-bd45ba14ab07?w=400&h=300&fit=crop';
+const teamFallbackImages = [
+  '/mock/generated/team-huddle.webp',
+  '/mock/generated/team-training.webp',
+  '/mock/generic/team-huddle.svg',
+  '/mock/generic/team-training.svg',
+];
 
-/** 종목 기반 이미지 URL 반환. imageUrl이 있으면 그걸 사용 */
-export function getSportImage(sportType: string, imageUrl?: string | null): string {
+const venueFallbackImages = [
+  '/mock/generated/venue-lights.webp',
+  '/mock/generated/venue-clubhouse.webp',
+  '/mock/generic/venue-lights.svg',
+  '/mock/generic/venue-clubhouse.svg',
+];
+
+const marketplaceImages = [
+  '/mock/generated/gear-flatlay.webp',
+  '/mock/generated/shoes-display.webp',
+  '/mock/generated/racket-stack.webp',
+  '/mock/marketplace/gear-flatlay.svg',
+  '/mock/marketplace/shoes-display.svg',
+  '/mock/marketplace/racket-stack.svg',
+];
+
+function hashKey(key: string) {
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function rotate<T>(items: T[], key: string): T[] {
+  if (items.length <= 1) return items;
+  const offset = hashKey(key) % items.length;
+  return [...items.slice(offset), ...items.slice(0, offset)];
+}
+
+function unique(items: string[]) {
+  return Array.from(new Set(items));
+}
+
+function getSportCatalog(sportType: string) {
+  return sportImages[sportType] || sportImages.soccer;
+}
+
+function pickFromCatalog(items: string[], key: string) {
+  return rotate(items, key)[0];
+}
+
+function buildGallery(primary: string[], fallback: string[], key: string, limit: number) {
+  const ordered = unique([
+    ...rotate(primary, key),
+    ...rotate(fallback, `${key}-fallback`),
+  ]);
+  return ordered.slice(0, limit);
+}
+
+/** Returns a deterministic sport image, unless a custom image is provided. */
+export function getSportImage(sportType: string, imageUrl?: string | null, key = ''): string {
   if (imageUrl) return imageUrl;
-  return sportImages[sportType] || sportImages.soccer;
+  const catalog = getSportCatalog(sportType);
+  return pickFromCatalog(catalog, key || sportType);
 }
 
-/** 장터 아이템 이미지 */
-export function getListingImage(imageUrls?: string[]): string {
+/** Returns a small gallery for sport-driven detail views. */
+export function getSportImageSet(sportType: string, key = '', limit = 3): string[] {
+  return buildGallery(getSportCatalog(sportType), venueFallbackImages, key || sportType, limit);
+}
+
+/** Returns a marketplace thumbnail, preferring uploaded images. */
+export function getListingImage(imageUrls?: string[], key = ''): string {
   if (imageUrls && imageUrls.length > 0) return imageUrls[0];
-  return marketplaceImage;
+  return pickFromCatalog(marketplaceImages, key || 'marketplace');
 }
 
-/** 팀 커버 이미지 */
-export function getTeamImage(sportType: string, coverImageUrl?: string | null): string {
+/** Returns a gallery for marketplace listings. */
+export function getListingImageSet(imageUrls?: string[], key = '', limit = 3): string[] {
+  if (imageUrls && imageUrls.length > 0) {
+    return buildGallery(imageUrls, marketplaceImages, key || 'marketplace', limit);
+  }
+  return buildGallery(marketplaceImages, venueFallbackImages, key || 'marketplace', limit);
+}
+
+/** Returns a team cover image, preferring uploaded images. */
+export function getTeamImage(sportType: string, coverImageUrl?: string | null, key = ''): string {
   if (coverImageUrl) return coverImageUrl;
-  return sportImages[sportType] || sportImages.soccer;
+  return buildGallery(getSportCatalog(sportType), teamFallbackImages, key || sportType, 1)[0];
+}
+
+/** Returns a small gallery for team detail pages. */
+export function getTeamImageSet(sportType: string, photos?: string[], key = '', limit = 3): string[] {
+  if (photos && photos.length > 0) {
+    return buildGallery(photos, teamFallbackImages, key || sportType, limit);
+  }
+  return buildGallery(getSportCatalog(sportType), teamFallbackImages, key || sportType, limit);
+}
+
+/** Returns a small gallery for venue detail pages. */
+export function getVenueImageSet(sportType: string, imageUrls?: string[], key = '', limit = 3): string[] {
+  if (imageUrls && imageUrls.length > 0) {
+    return buildGallery(imageUrls, venueFallbackImages, key || sportType, limit);
+  }
+  return buildGallery(getSportCatalog(sportType), venueFallbackImages, key || sportType, limit);
 }

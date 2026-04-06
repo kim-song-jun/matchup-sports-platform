@@ -21,7 +21,7 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
       <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <img src={getTeamImage(team.sportType, team.coverImageUrl)} alt={team.name} className="w-full h-full object-cover" loading="lazy" />
+          <img src={getTeamImage(team.sportType, team.coverImageUrl, team.id)} alt={team.name} className="w-full h-full object-cover" loading="lazy" />
         </div>
         {/* 텍스트 */}
         <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">

@@ -321,7 +321,7 @@ export default function HomePage() {
                 <Link key={item.id} href={`/marketplace/${item.id}`}>
                   <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                      <img src={getListingImage(item.imageUrls)} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={getListingImage(item.imageUrls, item.id)} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
                     </div>
                     <div className="p-2.5">
                       <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
@@ -370,7 +370,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
       <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
         {/* 이미지: 정사각형 고정 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
-          <img src={getSportImage(match.sportType, match.imageUrl)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
+          <img src={getSportImage(match.sportType, match.imageUrl, match.id)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
           {timeBadge && (
             <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}

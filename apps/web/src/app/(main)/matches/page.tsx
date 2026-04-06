@@ -28,7 +28,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
         {/* Image — 16:9 top banner */}
         <div className="relative aspect-[16/9] bg-gray-100 dark:bg-gray-800 overflow-hidden">
           <img
-            src={getSportImage(match.sportType, match.imageUrl)}
+            src={getSportImage(match.sportType, match.imageUrl, match.id)}
             alt=""
             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
             loading="lazy"

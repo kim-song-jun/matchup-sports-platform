@@ -126,7 +126,7 @@ export default function VenuesPage() {
                   <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     {/* 이미지 */}
                     <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <img src={venue.imageUrls?.[0] || getSportImage(primarySport)} alt={venue.name} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={getSportImage(primarySport, venue.imageUrls?.[0], venue.id)} alt={venue.name} className="w-full h-full object-cover" loading="lazy" />
                     </div>
                     {/* 텍스트 */}
                     <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">

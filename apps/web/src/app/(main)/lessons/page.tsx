@@ -53,7 +53,7 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
         {/* Image — 16:9 top banner */}
         <div className="relative aspect-[16/9] bg-gray-100 dark:bg-gray-800 overflow-hidden">
           <img
-            src={getSportImage(lesson.sportType, lesson.imageUrl)}
+            src={getSportImage(lesson.sportType, lesson.imageUrls?.[0] ?? lesson.imageUrl, lesson.id)}
             alt=""
             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
             loading="lazy"

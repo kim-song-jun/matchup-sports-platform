@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
@@ -11,6 +11,7 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import { useListing } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
+import { getListingImageSet } from '@/lib/sport-image';
 import { formatAmount } from '@/lib/utils';
 
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
@@ -26,6 +27,7 @@ export default function ListingDetailPage() {
   const { toast } = useToast();
   const [liked, setLiked] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const listingId = params.id as string;
 
   const { data: listing, isLoading } = useListing(listingId);
@@ -55,6 +57,12 @@ export default function ListingDetailPage() {
   }
 
   const SportIcon = SportIconMap[listing.sportType];
+  const galleryImages = getListingImageSet(listing.imageUrls, listing.id, 3);
+  const heroImage = selectedImage || galleryImages[0];
+
+  useEffect(() => {
+    setSelectedImage(galleryImages[0] ?? null);
+  }, [listingId, galleryImages[0]]);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -100,9 +108,34 @@ export default function ListingDetailPage() {
       <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left: product info */}
         <div className="px-5 @3xl:px-0">
-          {/* Image placeholder */}
-          <div className="h-64 @3xl:h-80 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-            {SportIcon ? <SportIcon size={64} className="text-gray-300" /> : <div className="text-6xl text-gray-300">📦</div>}
+          <div className="mb-4">
+            <div className="h-64 @3xl:h-80 rounded-xl bg-gray-100 dark:bg-gray-700 overflow-hidden">
+              {heroImage ? (
+                <img src={heroImage} alt={listing.title} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  {SportIcon ? <SportIcon size={64} className="text-gray-300" /> : <div className="text-6xl text-gray-300">📦</div>}
+                </div>
+              )}
+            </div>
+            {galleryImages.length > 1 && (
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {galleryImages.map((image, index) => (
+                  <button
+                    key={`${image}-${index}`}
+                    type="button"
+                    onClick={() => setSelectedImage(image)}
+                    className={`overflow-hidden rounded-xl border transition-colors ${
+                      heroImage === image
+                        ? 'border-blue-500'
+                        : 'border-gray-100 dark:border-gray-700'
+                    }`}
+                  >
+                    <img src={image} alt={`${listing.title} 썸네일 ${index + 1}`} className="aspect-[4/3] h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Title + price */}

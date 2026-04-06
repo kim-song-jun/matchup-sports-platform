@@ -7,12 +7,22 @@ describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: PrismaService;
 
+  // $transaction mock: executes the callback with the same mock object
+  const mockTx = {
+    sportTeam: { create: jest.fn() },
+    teamMembership: { create: jest.fn() },
+  };
+
   const mockPrismaService = {
     sportTeam: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    teamMembership: {
+      create: jest.fn(),
+    },
+    $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   };
 
   beforeEach(async () => {
@@ -209,13 +219,16 @@ describe('TeamsService', () => {
       createdAt: new Date(),
     };
 
-    it('should create a team and link owner', async () => {
-      mockPrismaService.sportTeam.create.mockResolvedValue(createdTeam);
+    beforeEach(() => {
+      mockTx.sportTeam.create.mockResolvedValue(createdTeam);
+      mockTx.teamMembership.create.mockResolvedValue({});
+    });
 
+    it('should create a team and auto-create owner membership inside a transaction', async () => {
       const result = await service.create('user-1', createData);
 
       expect(result).toEqual(createdTeam);
-      expect(prisma.sportTeam.create).toHaveBeenCalledWith({
+      expect(mockTx.sportTeam.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           ownerId: 'user-1',
           name: 'FC 새팀',
@@ -231,13 +244,26 @@ describe('TeamsService', () => {
       });
     });
 
+    it('should auto-create owner membership with role=owner and status=active', async () => {
+      await service.create('user-1', createData);
+
+      expect(mockTx.teamMembership.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          teamId: 'team-new',
+          userId: 'user-1',
+          role: 'owner',
+          status: 'active',
+        }),
+      });
+    });
+
     it('should use default values for optional fields', async () => {
       const minimalData = {
         name: '최소 팀',
         sportType: 'BASKETBALL',
       };
 
-      mockPrismaService.sportTeam.create.mockResolvedValue({
+      mockTx.sportTeam.create.mockResolvedValue({
         id: 'team-min',
         ownerId: 'user-1',
         ...minimalData,
@@ -245,7 +271,7 @@ describe('TeamsService', () => {
 
       await service.create('user-1', minimalData);
 
-      expect(prisma.sportTeam.create).toHaveBeenCalledWith({
+      expect(mockTx.sportTeam.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           ownerId: 'user-1',
           name: '최소 팀',

@@ -1,13 +1,95 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { MercenaryService } from './mercenary.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { TeamMembershipService } from '../teams/team-membership.service';
+import { CreateMercenaryPostDto } from './dto/create-mercenary-post.dto';
+import { ApplyMercenaryDto } from './dto/apply-mercenary.dto';
+import { MercenaryQueryDto } from './dto/mercenary-query.dto';
+import { SportType } from '@prisma/client';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const mockPost = (overrides = {}) => ({
+  id: 'post-1',
+  teamId: 'team-1',
+  authorId: 'user-1',
+  sportType: 'FUTSAL' as SportType,
+  matchDate: new Date('2026-04-10T14:00:00Z'),
+  venue: '강남 풋살파크',
+  position: '공격수',
+  count: 2,
+  level: 3,
+  fee: 10000,
+  notes: null,
+  status: 'open',
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  ...overrides,
+});
+
+const mockApp = (overrides = {}) => ({
+  id: 'app-1',
+  postId: 'post-1',
+  userId: 'user-99',
+  message: null,
+  status: 'pending',
+  appliedAt: new Date(),
+  decidedAt: null,
+  decidedBy: null,
+  ...overrides,
+});
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+const prismaMock = {
+  mercenaryPost: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  mercenaryApplication: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    count: jest.fn(),
+  },
+};
+
+const teamMembershipMock = {
+  assertRole: jest.fn(),
+  getMembership: jest.fn(),
+};
+
+// ---------------------------------------------------------------------------
+// Test suite
+// ---------------------------------------------------------------------------
 
 describe('MercenaryService', () => {
   let service: MercenaryService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [MercenaryService],
+      providers: [
+        MercenaryService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: TeamMembershipService, useValue: teamMembershipMock },
+      ],
     }).compile();
 
     service = module.get<MercenaryService>(MercenaryService);
@@ -17,166 +99,259 @@ describe('MercenaryService', () => {
     expect(service).toBeDefined();
   });
 
+  // -------------------------------------------------------------------------
+  // findAll
+  // -------------------------------------------------------------------------
   describe('findAll', () => {
-    it('should return all posts when no filter is applied', () => {
-      const result = service.findAll({});
+    it('returns items and null nextCursor when result fits within limit', async () => {
+      const posts = [mockPost({ id: 'p1' }), mockPost({ id: 'p2' })];
+      prismaMock.mercenaryPost.findMany.mockResolvedValue(posts);
 
-      expect(result.items).toBeDefined();
-      expect(result.items.length).toBe(5);
+      const query: MercenaryQueryDto = { limit: 20 };
+      const result = await service.findAll(query);
+
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBeNull();
     });
 
-    it('should filter by sportType', () => {
-      const result = service.findAll({ sportType: 'FUTSAL' });
+    it('returns nextCursor when there are more items than limit', async () => {
+      // limit=2, but prisma returns 3 (limit+1) items → hasMore=true
+      const posts = [
+        mockPost({ id: 'p1' }),
+        mockPost({ id: 'p2' }),
+        mockPost({ id: 'p3' }),
+      ];
+      prismaMock.mercenaryPost.findMany.mockResolvedValue(posts);
 
-      expect(result.items.length).toBe(2);
-      result.items.forEach((post) => {
-        expect(post.sportType).toBe('FUTSAL');
-      });
+      const query: MercenaryQueryDto = { limit: 2 };
+      const result = await service.findAll(query);
+
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBe('p2');
     });
 
-    it('should filter by status', () => {
-      const result = service.findAll({ status: 'open' });
+    it('passes sportType and status filters to prisma', async () => {
+      prismaMock.mercenaryPost.findMany.mockResolvedValue([]);
 
-      expect(result.items.length).toBe(4);
-      result.items.forEach((post) => {
-        expect(post.status).toBe('open');
-      });
-    });
+      await service.findAll({ sportType: 'FUTSAL' as SportType, status: 'open' as any });
 
-    it('should filter by both sportType and status', () => {
-      const result = service.findAll({ sportType: 'FUTSAL', status: 'closed' });
-
-      expect(result.items.length).toBe(1);
-      expect(result.items[0].id).toBe('merc-005');
-      expect(result.items[0].sportType).toBe('FUTSAL');
-      expect(result.items[0].status).toBe('closed');
-    });
-
-    it('should return empty items when no posts match filter', () => {
-      const result = service.findAll({ sportType: 'TENNIS' });
-
-      expect(result.items).toEqual([]);
-    });
-  });
-
-  describe('findById', () => {
-    it('should return a post by id', () => {
-      const result = service.findById('merc-001');
-
-      expect(result).toBeDefined();
-      expect(result.id).toBe('merc-001');
-      expect(result.teamName).toBe('FC 서울 유나이티드');
-      expect(result.sportType).toBe('FUTSAL');
-    });
-
-    it('should throw NotFoundException when post does not exist', () => {
-      expect(() => service.findById('non-existent')).toThrow(
-        NotFoundException,
-      );
-      expect(() => service.findById('non-existent')).toThrow(
-        '용병 모집글을 찾을 수 없습니다.',
+      expect(prismaMock.mercenaryPost.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            sportType: 'FUTSAL',
+            status: 'open',
+          }),
+        }),
       );
     });
   });
 
+  // -------------------------------------------------------------------------
+  // create
+  // -------------------------------------------------------------------------
   describe('create', () => {
-    const createData = {
-      teamId: 'team-010',
+    const dto: CreateMercenaryPostDto = {
+      teamId: 'team-1',
+      sportType: 'FUTSAL' as SportType,
       matchDate: '2026-04-10T14:00:00Z',
-      venue: '잠실 운동장',
-      position: '미드필더',
+      venue: '강남 풋살파크',
+      position: '공격수',
       count: 2,
       level: 3,
-      fee: 20000,
-      notes: '즐겁게 합시다',
+      fee: 10000,
     };
 
-    it('should create a new mercenary post', () => {
-      const result = service.create('user-100', createData);
+    it('creates post successfully when user is manager+', async () => {
+      teamMembershipMock.assertRole.mockResolvedValue({ role: 'manager' });
+      prismaMock.mercenaryPost.create.mockResolvedValue(mockPost());
 
+      const result = await service.create('user-1', dto);
+
+      expect(teamMembershipMock.assertRole).toHaveBeenCalledWith('team-1', 'user-1', 'manager');
+      expect(prismaMock.mercenaryPost.create).toHaveBeenCalled();
       expect(result).toBeDefined();
-      expect(result.id).toMatch(/^merc-\d{3}$/);
-      expect(result.teamId).toBe('team-010');
-      expect(result.venue).toBe('잠실 운동장');
-      expect(result.position).toBe('미드필더');
-      expect(result.count).toBe(2);
-      expect(result.level).toBe(3);
-      expect(result.fee).toBe(20000);
-      expect(result.notes).toBe('즐겁게 합시다');
-      expect(result.status).toBe('open');
-      expect(result.applicants).toEqual([]);
-      expect(result.createdBy).toBe('user-100');
     });
 
-    it('should set notes to null when not provided', () => {
-      const dataWithoutNotes = {
-        teamId: 'team-011',
-        matchDate: '2026-04-11T10:00:00Z',
-        venue: '마포 체육관',
-        position: '가드',
-        count: 1,
-        level: 2,
-        fee: 10000,
-      };
+    it('throws ForbiddenException when user is not manager+', async () => {
+      teamMembershipMock.assertRole.mockRejectedValue(
+        new ForbiddenException('팀 권한이 부족합니다'),
+      );
 
-      const result = service.create('user-101', dataWithoutNotes);
-
-      expect(result.notes).toBeNull();
-    });
-
-    it('should increment id for each new post', () => {
-      const first = service.create('user-100', createData);
-      const second = service.create('user-100', createData);
-
-      expect(first.id).not.toBe(second.id);
-    });
-
-    it('should add the new post to findAll results', () => {
-      const beforeCount = service.findAll({}).items.length;
-
-      service.create('user-100', createData);
-
-      const afterCount = service.findAll({}).items.length;
-      expect(afterCount).toBe(beforeCount + 1);
+      await expect(service.create('user-99', dto)).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.mercenaryPost.create).not.toHaveBeenCalled();
     });
   });
 
+  // -------------------------------------------------------------------------
+  // apply
+  // -------------------------------------------------------------------------
   describe('apply', () => {
-    it('should create a new application', () => {
-      const result = service.apply('merc-002', 'user-200');
+    const dto: ApplyMercenaryDto = { message: '잘 부탁드립니다' };
 
-      expect(result).toEqual({ message: '용병 지원이 완료되었습니다.' });
+    it('creates application successfully when post is open and user is not a team member', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open' }));
+      teamMembershipMock.getMembership.mockResolvedValue(null);
+      prismaMock.mercenaryApplication.findUnique.mockResolvedValue(null);
+      prismaMock.mercenaryApplication.create.mockResolvedValue(mockApp());
 
-      const post = service.findById('merc-002');
-      expect(post.applicants).toHaveLength(1);
-      expect(post.applicants[0].userId).toBe('user-200');
-      expect(post.applicants[0].status).toBe('pending');
+      const result = await service.apply('post-1', 'user-99', dto);
+
+      expect(result).toBeDefined();
+      expect(prismaMock.mercenaryApplication.create).toHaveBeenCalled();
     });
 
-    it('should return already-applied message when user applies again', () => {
-      // merc-001 already has user-010 as applicant
-      const result = service.apply('merc-001', 'user-010');
+    it('throws ConflictException on duplicate application', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open' }));
+      teamMembershipMock.getMembership.mockResolvedValue(null);
+      prismaMock.mercenaryApplication.findUnique.mockResolvedValue(mockApp());
 
-      expect(result).toEqual({ message: '이미 지원한 모집글입니다.' });
+      await expect(service.apply('post-1', 'user-99', dto)).rejects.toThrow(ConflictException);
     });
 
-    it('should throw NotFoundException when post does not exist', () => {
-      expect(() => service.apply('non-existent', 'user-200')).toThrow(
-        NotFoundException,
+    it('throws BadRequestException when user is a member of the host team', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open' }));
+      teamMembershipMock.getMembership.mockResolvedValue({ role: 'member' });
+
+      await expect(service.apply('post-1', 'user-1', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when post is not open', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'filled' }));
+
+      await expect(service.apply('post-1', 'user-99', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws NotFoundException when post does not exist', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(null);
+
+      await expect(service.apply('non-existent', 'user-99', dto)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // acceptApplication
+  // -------------------------------------------------------------------------
+  describe('acceptApplication', () => {
+    it('accepts application and marks post as filled when count is reached', async () => {
+      const post = mockPost({ count: 1 });
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(post);
+      teamMembershipMock.assertRole.mockResolvedValue({ role: 'manager' });
+      prismaMock.mercenaryApplication.findFirst.mockResolvedValue(mockApp());
+      prismaMock.mercenaryApplication.update.mockResolvedValue(mockApp({ status: 'accepted' }));
+      prismaMock.mercenaryApplication.count.mockResolvedValue(1); // equals post.count
+      prismaMock.mercenaryPost.update.mockResolvedValue({ ...post, status: 'filled' });
+
+      const result = await service.acceptApplication('post-1', 'app-1', 'user-1');
+
+      expect(result.status).toBe('accepted');
+      expect(prismaMock.mercenaryPost.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'filled' } }),
       );
-      expect(() => service.apply('non-existent', 'user-200')).toThrow(
-        '용병 모집글을 찾을 수 없습니다.',
+    });
+
+    it('does not mark post as filled when count is not yet reached', async () => {
+      const post = mockPost({ count: 3 });
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(post);
+      teamMembershipMock.assertRole.mockResolvedValue({ role: 'manager' });
+      prismaMock.mercenaryApplication.findFirst.mockResolvedValue(mockApp());
+      prismaMock.mercenaryApplication.update.mockResolvedValue(mockApp({ status: 'accepted' }));
+      prismaMock.mercenaryApplication.count.mockResolvedValue(1); // less than post.count
+
+      await service.acceptApplication('post-1', 'app-1', 'user-1');
+
+      expect(prismaMock.mercenaryPost.update).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when user is not manager+', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost());
+      teamMembershipMock.assertRole.mockRejectedValue(new ForbiddenException('팀 권한이 부족합니다'));
+
+      await expect(service.acceptApplication('post-1', 'app-1', 'user-99')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // rejectApplication
+  // -------------------------------------------------------------------------
+  describe('rejectApplication', () => {
+    it('rejects application successfully when user is manager+', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost());
+      teamMembershipMock.assertRole.mockResolvedValue({ role: 'manager' });
+      prismaMock.mercenaryApplication.findFirst.mockResolvedValue(mockApp());
+      prismaMock.mercenaryApplication.update.mockResolvedValue(mockApp({ status: 'rejected' }));
+
+      const result = await service.rejectApplication('post-1', 'app-1', 'user-1');
+
+      expect(result.status).toBe('rejected');
+      expect(prismaMock.mercenaryApplication.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'rejected' }) }),
       );
     });
 
-    it('should allow multiple different users to apply', () => {
-      service.apply('merc-004', 'user-300');
-      service.apply('merc-004', 'user-301');
+    it('throws ForbiddenException when user is not manager+', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost());
+      teamMembershipMock.assertRole.mockRejectedValue(new ForbiddenException('팀 권한이 부족합니다'));
 
-      const post = service.findById('merc-004');
-      expect(post.applicants).toHaveLength(2);
-      expect(post.applicants[0].userId).toBe('user-300');
-      expect(post.applicants[1].userId).toBe('user-301');
+      await expect(service.rejectApplication('post-1', 'app-1', 'user-99')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // withdrawApplication
+  // -------------------------------------------------------------------------
+  describe('withdrawApplication', () => {
+    it('withdraws own pending application successfully', async () => {
+      prismaMock.mercenaryApplication.findUnique.mockResolvedValue(mockApp({ status: 'pending' }));
+      prismaMock.mercenaryApplication.update.mockResolvedValue(mockApp({ status: 'withdrawn' }));
+
+      const result = await service.withdrawApplication('post-1', 'user-99');
+
+      expect(result.status).toBe('withdrawn');
+    });
+
+    it('throws NotFoundException when application does not exist', async () => {
+      prismaMock.mercenaryApplication.findUnique.mockResolvedValue(null);
+
+      await expect(service.withdrawApplication('post-1', 'user-99')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException when application is not pending', async () => {
+      prismaMock.mercenaryApplication.findUnique.mockResolvedValue(mockApp({ status: 'accepted' }));
+
+      await expect(service.withdrawApplication('post-1', 'user-99')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // findMyApplications
+  // -------------------------------------------------------------------------
+  describe('findMyApplications', () => {
+    it('returns all applications for a user without status filter', async () => {
+      const apps = [mockApp({ userId: 'user-99' }), mockApp({ id: 'app-2', userId: 'user-99', status: 'accepted' })];
+      prismaMock.mercenaryApplication.findMany.mockResolvedValue(apps);
+
+      const result = await service.findMyApplications('user-99');
+
+      expect(result).toHaveLength(2);
+      expect(prismaMock.mercenaryApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 'user-99' } }),
+      );
+    });
+
+    it('filters by status when provided', async () => {
+      prismaMock.mercenaryApplication.findMany.mockResolvedValue([mockApp({ status: 'accepted' })]);
+
+      await service.findMyApplications('user-99', 'accepted' as any);
+
+      expect(prismaMock.mercenaryApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-99', status: 'accepted' },
+        }),
+      );
     });
   });
 });

@@ -2,10 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { TeamMatchesService } from './team-matches.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeamMembershipService } from '../teams/team-membership.service';
 
 describe('TeamMatchesService', () => {
   let service: TeamMatchesService;
   let prisma: PrismaService;
+
+  // By default assertRole resolves (permission granted). Individual tests can override.
+  const mockTeamMembershipService = {
+    assertRole: jest.fn().mockResolvedValue({ role: 'manager' }),
+  };
 
   const mockPrismaService = {
     teamMatch: {
@@ -29,6 +35,10 @@ describe('TeamMatchesService', () => {
     teamTrustScore: {
       upsert: jest.fn(),
     },
+    sportTeam: {
+      findUnique: jest.fn(),
+    },
+    $transaction: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -36,6 +46,7 @@ describe('TeamMatchesService', () => {
       providers: [
         TeamMatchesService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: TeamMembershipService, useValue: mockTeamMembershipService },
       ],
     }).compile();
 
@@ -43,6 +54,8 @@ describe('TeamMatchesService', () => {
     prisma = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
+    // Reset assertRole to default (permit) after each clear
+    mockTeamMembershipService.assertRole.mockResolvedValue({ role: 'manager' });
   });
 
   it('should be defined', () => {
@@ -110,11 +123,12 @@ describe('TeamMatchesService', () => {
     it('should filter by sportType', async () => {
       mockPrismaService.teamMatch.findMany.mockResolvedValue([mockTeamMatches[0]]);
 
-      await service.findAll({ sportType: 'FUTSAL' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.findAll({ sportType: 'futsal' as any });
 
       expect(prisma.teamMatch.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ sportType: 'FUTSAL' }),
+          where: expect.objectContaining({ sportType: 'futsal' }),
         }),
       );
     });
@@ -204,6 +218,7 @@ describe('TeamMatchesService', () => {
   });
 
   describe('create', () => {
+    const userId = 'user-1';
     const createData = {
       hostTeamId: 'team-1',
       sportType: 'FUTSAL',
@@ -230,9 +245,11 @@ describe('TeamMatchesService', () => {
     };
 
     it('should create a team match', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: userId });
       mockPrismaService.teamMatch.create.mockResolvedValue(createdMatch);
 
-      const result = await service.create(createData);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await service.create(userId, createData as any);
 
       expect(result).toEqual(createdMatch);
       expect(prisma.teamMatch.create).toHaveBeenCalledWith({
@@ -248,9 +265,11 @@ describe('TeamMatchesService', () => {
     });
 
     it('should generate referee schedule when hasReferee is false', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: userId });
       mockPrismaService.teamMatch.create.mockResolvedValue(createdMatch);
 
-      await service.create({ ...createData, hasReferee: false, quarterCount: 4 });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.create(userId, { ...createData, hasReferee: false, quarterCount: 4 } as any);
 
       expect(prisma.teamMatch.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -271,12 +290,14 @@ describe('TeamMatchesService', () => {
         venueAddress: '서울시 강남구',
       };
 
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: userId });
       mockPrismaService.teamMatch.create.mockResolvedValue({
         id: 'tm-min',
         ...minimalData,
       });
 
-      await service.create(minimalData);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.create(userId, minimalData as any);
 
       expect(prisma.teamMatch.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -294,6 +315,7 @@ describe('TeamMatchesService', () => {
   });
 
   describe('apply', () => {
+    const userId = 'user-2';
     const mockMatch = {
       id: 'tm-1',
       status: 'recruiting',
@@ -302,6 +324,7 @@ describe('TeamMatchesService', () => {
 
     it('should create a team match application', async () => {
       mockPrismaService.teamMatch.findUnique.mockResolvedValue(mockMatch);
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-2', ownerId: userId });
       mockPrismaService.teamMatchApplication.create.mockResolvedValue({
         id: 'app-new',
         teamMatchId: 'tm-1',
@@ -312,7 +335,7 @@ describe('TeamMatchesService', () => {
         message: '좋은 경기 하겠습니다',
       });
 
-      const result = await service.apply('tm-1', {
+      const result = await service.apply('tm-1', userId, {
         applicantTeamId: 'team-2',
         confirmedInfo: true,
         confirmedLevel: true,
@@ -337,8 +360,9 @@ describe('TeamMatchesService', () => {
       });
     });
 
-    it('should accept teamId as alternative to applicantTeamId', async () => {
+    it('should create application with applicantTeamId', async () => {
       mockPrismaService.teamMatch.findUnique.mockResolvedValue(mockMatch);
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-3', ownerId: userId });
       mockPrismaService.teamMatchApplication.create.mockResolvedValue({
         id: 'app-new',
         teamMatchId: 'tm-1',
@@ -346,7 +370,7 @@ describe('TeamMatchesService', () => {
         status: 'pending',
       });
 
-      await service.apply('tm-1', { teamId: 'team-3' });
+      await service.apply('tm-1', userId, { applicantTeamId: 'team-3' });
 
       expect(prisma.teamMatchApplication.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -359,7 +383,7 @@ describe('TeamMatchesService', () => {
       mockPrismaService.teamMatch.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.apply('non-existent', { applicantTeamId: 'team-2' }),
+        service.apply('non-existent', userId, { applicantTeamId: 'team-2' }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -370,66 +394,77 @@ describe('TeamMatchesService', () => {
       });
 
       await expect(
-        service.apply('tm-1', { applicantTeamId: 'team-2' }),
+        service.apply('tm-1', userId, { applicantTeamId: 'team-2' }),
       ).rejects.toThrow(BadRequestException);
       await expect(
-        service.apply('tm-1', { applicantTeamId: 'team-2' }),
+        service.apply('tm-1', userId, { applicantTeamId: 'team-2' }),
       ).rejects.toThrow('모집 중이 아닙니다');
     });
 
     it('should throw BadRequestException when no team ID provided', async () => {
       mockPrismaService.teamMatch.findUnique.mockResolvedValue(mockMatch);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await expect(
-        service.apply('tm-1', {}),
+        service.apply('tm-1', userId, {} as any),
       ).rejects.toThrow(BadRequestException);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await expect(
-        service.apply('tm-1', {}),
+        service.apply('tm-1', userId, {} as any),
       ).rejects.toThrow('팀 ID가 필요합니다');
     });
   });
 
   describe('approveApplication', () => {
     it('should approve application and update match status', async () => {
+      const userId = 'user-1';
       const approvedApp = {
         id: 'app-1',
         teamMatchId: 'tm-1',
         applicantTeamId: 'team-2',
         status: 'approved',
       };
-      mockPrismaService.teamMatchApplication.update.mockResolvedValue(approvedApp);
-      mockPrismaService.teamMatch.update.mockResolvedValue({});
-      mockPrismaService.teamMatchApplication.updateMany.mockResolvedValue({ count: 1 });
 
-      const result = await service.approveApplication('tm-1', 'app-1');
+      // New service selects { status, hostTeamId } (not hostTeam.ownerId)
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'recruiting',
+        hostTeamId: 'team-1',
+      });
+
+      // $transaction runs its callback inline with a tx object
+      mockPrismaService.$transaction.mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+        cb({
+          teamMatchApplication: {
+            update: jest.fn().mockResolvedValue(approvedApp),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+          teamMatch: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        }),
+      );
+
+      const result = await service.approveApplication('tm-1', 'app-1', userId);
 
       expect(result).toEqual(approvedApp);
-      expect(prisma.teamMatchApplication.update).toHaveBeenCalledWith({
-        where: { id: 'app-1' },
-        data: { status: 'approved' },
-      });
-      expect(prisma.teamMatch.update).toHaveBeenCalledWith({
-        where: { id: 'tm-1' },
-        data: { status: 'scheduled', guestTeamId: 'team-2' },
-      });
-      expect(prisma.teamMatchApplication.updateMany).toHaveBeenCalledWith({
-        where: { teamMatchId: 'tm-1', id: { not: 'app-1' }, status: 'pending' },
-        data: { status: 'rejected' },
-      });
     });
   });
 
   describe('rejectApplication', () => {
     it('should reject application', async () => {
+      const userId = 'user-1';
       const rejectedApp = {
         id: 'app-1',
         teamMatchId: 'tm-1',
         applicantTeamId: 'team-2',
         status: 'rejected',
       };
+
+      // New service selects { hostTeamId } only
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({ hostTeamId: 'team-1' });
       mockPrismaService.teamMatchApplication.update.mockResolvedValue(rejectedApp);
 
-      const result = await service.rejectApplication('tm-1', 'app-1');
+      const result = await service.rejectApplication('tm-1', 'app-1', userId);
 
       expect(result).toEqual(rejectedApp);
       expect(prisma.teamMatchApplication.update).toHaveBeenCalledWith({

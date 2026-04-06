@@ -1,306 +1,234 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-
-export interface ChatMessage {
-  id: string;
-  chatRoomId: string;
-  senderId: string;
-  senderName: string;
-  message: string;
-  timestamp: string;
-  isSystem: boolean;
-}
-
-export interface ChatRoom {
-  id: string;
-  teamMatchId: string;
-  homeTeamId: string;
-  awayTeamId: string;
-  homeTeamName: string;
-  awayTeamName: string;
-  createdAt: string;
-  lastMessage: string | null;
-  lastMessageAt: string | null;
-}
+import { Injectable, ForbiddenException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateRoomDto } from './dto/create-room.dto';
+import { PostMessageDto } from './dto/post-message.dto';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class ChatService {
-  private rooms: ChatRoom[] = [
-    {
-      id: 'room-1',
-      teamMatchId: 'tm-001',
-      homeTeamId: 'team-001',
-      awayTeamId: 'team-002',
-      homeTeamName: 'FC 서울 유나이티드',
-      awayTeamName: '강남 풋살클럽',
-      createdAt: '2026-03-15T09:00:00Z',
-      lastMessage: '경기장에서 뵙겠습니다!',
-      lastMessageAt: '2026-03-20T14:30:00Z',
-    },
-    {
-      id: 'room-2',
-      teamMatchId: 'tm-002',
-      homeTeamId: 'team-003',
-      awayTeamId: 'team-004',
-      homeTeamName: '판교 농구단',
-      awayTeamName: '수원 슬래머즈',
-      createdAt: '2026-03-16T10:00:00Z',
-      lastMessage: '유니폼 색상 겹치는데 저희가 바꿀게요',
-      lastMessageAt: '2026-03-20T16:00:00Z',
-    },
-    {
-      id: 'room-3',
-      teamMatchId: 'tm-003',
-      homeTeamId: 'team-005',
-      awayTeamId: 'team-006',
-      homeTeamName: '홍대 배드민턴',
-      awayTeamName: '마포 셔틀콕',
-      createdAt: '2026-03-18T11:00:00Z',
-      lastMessage: '셔틀콕은 저희가 준비할게요',
-      lastMessageAt: '2026-03-21T09:15:00Z',
-    },
-  ];
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => RealtimeGateway))
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
 
-  private messages: ChatMessage[] = [
-    // Room 1 messages
-    {
-      id: 'msg-101',
-      chatRoomId: 'room-1',
-      senderId: 'system',
-      senderName: '시스템',
-      message: '채팅방이 생성되었습니다. FC 서울 유나이티드 vs 강남 풋살클럽',
-      timestamp: '2026-03-15T09:00:00Z',
-      isSystem: true,
-    },
-    {
-      id: 'msg-102',
-      chatRoomId: 'room-1',
-      senderId: 'user-001',
-      senderName: '김주장',
-      message: '안녕하세요! 이번 주 토요일 경기 잘 부탁드립니다.',
-      timestamp: '2026-03-18T10:00:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-103',
-      chatRoomId: 'room-1',
-      senderId: 'user-002',
-      senderName: '이캡틴',
-      message: '네 반갑습니다! 혹시 경기장 주차 가능한가요?',
-      timestamp: '2026-03-18T10:05:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-104',
-      chatRoomId: 'room-1',
-      senderId: 'user-001',
-      senderName: '김주장',
-      message: '네 지하주차장 이용 가능합니다. 무료에요.',
-      timestamp: '2026-03-18T10:10:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-105',
-      chatRoomId: 'room-1',
-      senderId: 'user-002',
-      senderName: '이캡틴',
-      message: '좋습니다! 저희 인원은 10명 확정입니다.',
-      timestamp: '2026-03-19T08:00:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-106',
-      chatRoomId: 'room-1',
-      senderId: 'user-001',
-      senderName: '김주장',
-      message: '경기장에서 뵙겠습니다!',
-      timestamp: '2026-03-20T14:30:00Z',
-      isSystem: false,
-    },
-    // Room 2 messages
-    {
-      id: 'msg-201',
-      chatRoomId: 'room-2',
-      senderId: 'system',
-      senderName: '시스템',
-      message: '채팅방이 생성되었습니다. 판교 농구단 vs 수원 슬래머즈',
-      timestamp: '2026-03-16T10:00:00Z',
-      isSystem: true,
-    },
-    {
-      id: 'msg-202',
-      chatRoomId: 'room-2',
-      senderId: 'user-003',
-      senderName: '박가드',
-      message: '안녕하세요, 이번 매치 관련해서 몇 가지 확인 부탁드려요.',
-      timestamp: '2026-03-17T14:00:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-203',
-      chatRoomId: 'room-2',
-      senderId: 'user-004',
-      senderName: '최센터',
-      message: '네 말씀하세요!',
-      timestamp: '2026-03-17T14:10:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-204',
-      chatRoomId: 'room-2',
-      senderId: 'user-003',
-      senderName: '박가드',
-      message: '심판은 어떻게 할까요? 저희 쪽에서 한 분 섭외 가능합니다.',
-      timestamp: '2026-03-18T09:00:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-205',
-      chatRoomId: 'room-2',
-      senderId: 'user-004',
-      senderName: '최센터',
-      message: '좋습니다. 비용은 반반 할까요?',
-      timestamp: '2026-03-18T09:30:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-206',
-      chatRoomId: 'room-2',
-      senderId: 'user-003',
-      senderName: '박가드',
-      message: '유니폼 색상 겹치는데 저희가 바꿀게요',
-      timestamp: '2026-03-20T16:00:00Z',
-      isSystem: false,
-    },
-    // Room 3 messages
-    {
-      id: 'msg-301',
-      chatRoomId: 'room-3',
-      senderId: 'system',
-      senderName: '시스템',
-      message: '채팅방이 생성되었습니다. 홍대 배드민턴 vs 마포 셔틀콕',
-      timestamp: '2026-03-18T11:00:00Z',
-      isSystem: true,
-    },
-    {
-      id: 'msg-302',
-      chatRoomId: 'room-3',
-      senderId: 'user-005',
-      senderName: '정스매시',
-      message: '반갑습니다! 복식 위주로 진행할까요?',
-      timestamp: '2026-03-19T10:00:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-303',
-      chatRoomId: 'room-3',
-      senderId: 'user-006',
-      senderName: '한드롭',
-      message: '네 복식으로 하면 좋을 것 같아요. 코트 4면 예약했습니다.',
-      timestamp: '2026-03-19T10:15:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-304',
-      chatRoomId: 'room-3',
-      senderId: 'user-005',
-      senderName: '정스매시',
-      message: '혹시 셔틀콕은 어떤 걸로 쓸까요?',
-      timestamp: '2026-03-20T11:00:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-305',
-      chatRoomId: 'room-3',
-      senderId: 'user-006',
-      senderName: '한드롭',
-      message: '요넥스 마비스로 준비하겠습니다.',
-      timestamp: '2026-03-20T11:30:00Z',
-      isSystem: false,
-    },
-    {
-      id: 'msg-306',
-      chatRoomId: 'room-3',
-      senderId: 'user-006',
-      senderName: '한드롭',
-      message: '셔틀콕은 저희가 준비할게요',
-      timestamp: '2026-03-21T09:15:00Z',
-      isSystem: false,
-    },
-  ];
+  /** List rooms the user participates in, cursor-paginated by lastMessageAt desc. */
+  async listRooms(userId: string, cursor?: string, limit = 20) {
+    const take = Math.min(limit, 100);
+    const rooms = await this.prisma.chatRoom.findMany({
+      where: {
+        participants: { some: { userId } },
+      },
+      orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(cursor
+        ? { skip: 1, cursor: { id: cursor } }
+        : {}),
+      include: {
+        participants: {
+          include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+        },
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true, content: true, type: true, createdAt: true, senderId: true },
+        },
+      },
+    });
 
-  private nextRoomId = 4;
-  private nextMsgId = 400;
+    const hasMore = rooms.length > take;
+    const data = hasMore ? rooms.slice(0, take) : rooms;
+    const nextCursor = hasMore ? data[data.length - 1].id : null;
 
-  getRooms(): ChatRoom[] {
-    return this.rooms;
+    return { data, nextCursor, hasMore };
   }
 
-  getMessages(roomId: string): ChatMessage[] {
-    const room = this.rooms.find((r) => r.id === roomId);
-    if (!room) {
-      throw new NotFoundException('채팅방을 찾을 수 없습니다.');
-    }
-    return this.messages.filter((m) => m.chatRoomId === roomId);
+  /** Get a single room with last 30 messages. Asserts user is a participant. */
+  async getRoom(roomId: string, userId: string) {
+    await this.assertParticipant(roomId, userId);
+
+    return this.prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      include: {
+        participants: {
+          include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+        },
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+          include: {
+            sender: { select: { id: true, nickname: true, profileImageUrl: true } },
+          },
+        },
+      },
+    });
   }
 
-  sendMessage(
-    roomId: string,
-    senderId: string,
-    message: string,
-  ): ChatMessage {
-    const room = this.rooms.find((r) => r.id === roomId);
-    if (!room) {
-      throw new NotFoundException('채팅방을 찾을 수 없습니다.');
+  /** List messages for a room with cursor pagination. */
+  async listMessages(roomId: string, userId: string, before?: string, limit = 30) {
+    await this.assertParticipant(roomId, userId);
+
+    const take = Math.min(limit, 100);
+    const messages = await this.prisma.chatMessage.findMany({
+      where: { roomId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(before
+        ? { skip: 1, cursor: { id: before } }
+        : {}),
+      include: {
+        sender: { select: { id: true, nickname: true, profileImageUrl: true } },
+      },
+    });
+
+    const hasMore = messages.length > take;
+    const data = hasMore ? messages.slice(0, take) : messages;
+    const nextCursor = hasMore ? data[data.length - 1].id : null;
+
+    return { data, nextCursor, hasMore };
+  }
+
+  /**
+   * Persist a message, update room.lastMessageAt, and broadcast to the room via Socket.IO.
+   * Single source of truth — RealtimeGateway calls this; REST controller calls this.
+   */
+  async postMessage(roomId: string, userId: string, dto: PostMessageDto) {
+    await this.assertParticipant(roomId, userId);
+
+    const [message] = await this.prisma.$transaction([
+      this.prisma.chatMessage.create({
+        data: {
+          roomId,
+          senderId: userId,
+          content: dto.content,
+        },
+        include: {
+          sender: { select: { id: true, nickname: true, profileImageUrl: true } },
+        },
+      }),
+      this.prisma.chatRoom.update({
+        where: { id: roomId },
+        data: { lastMessageAt: new Date() },
+      }),
+    ]);
+
+    this.realtimeGateway.emitToRoom(roomId, 'chat:message', {
+      id: message.id,
+      senderId: message.senderId,
+      sender: (message as unknown as { sender: unknown }).sender,
+      roomId,
+      content: message.content,
+      type: message.type,
+      createdAt: message.createdAt,
+    });
+
+    return message;
+  }
+
+  /** Create a new chat room (get-or-create for team_match type). */
+  async createRoom(userId: string, dto: CreateRoomDto) {
+    if (dto.type === 'team_match') {
+      if (!dto.teamMatchId) {
+        throw new Error('teamMatchId is required for team_match room type');
+      }
+
+      // Return existing room if already created for this match (idempotent)
+      const existing = await this.prisma.chatRoom.findUnique({
+        where: { teamMatchId: dto.teamMatchId },
+        include: {
+          participants: {
+            include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+          },
+        },
+      });
+      if (existing) return existing;
+
+      // Derive participants server-side from TeamMatch
+      const match = await this.prisma.teamMatch.findUnique({
+        where: { id: dto.teamMatchId },
+        include: {
+          hostTeam: { select: { ownerId: true } },
+          applications: {
+            where: { status: 'approved' },
+            include: { applicantTeam: { select: { ownerId: true } } },
+          },
+        },
+      });
+
+      if (!match) {
+        throw new NotFoundException('팀 매치를 찾을 수 없습니다.');
+      }
+
+      const participantIds = Array.from(new Set([
+        match.hostTeam.ownerId,
+        ...match.applications.map((a) => a.applicantTeam.ownerId),
+      ]));
+
+      return this.prisma.chatRoom.create({
+        data: {
+          type: dto.type,
+          teamMatchId: dto.teamMatchId,
+          participants: {
+            create: participantIds.map((pid) => ({ userId: pid })),
+          },
+        },
+        include: {
+          participants: {
+            include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+          },
+        },
+      });
     }
 
-    const newMessage: ChatMessage = {
-      id: `msg-${this.nextMsgId++}`,
-      chatRoomId: roomId,
-      senderId,
-      senderName: '사용자',
-      message,
-      timestamp: new Date().toISOString(),
-      isSystem: false,
-    };
+    // For direct/team types: use client-supplied participantIds
+    if (!dto.participantIds || dto.participantIds.length === 0) {
+      throw new Error('participantIds is required for non-team_match room types');
+    }
+    const allParticipantIds = Array.from(new Set([userId, ...dto.participantIds]));
 
-    this.messages.push(newMessage);
-    room.lastMessage = message;
-    room.lastMessageAt = newMessage.timestamp;
-
-    return newMessage;
+    return this.prisma.chatRoom.create({
+      data: {
+        type: dto.type,
+        participants: {
+          create: allParticipantIds.map((pid) => ({ userId: pid })),
+        },
+      },
+      include: {
+        participants: {
+          include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+        },
+      },
+    });
   }
 
-  createRoom(data: {
-    teamMatchId: string;
-    homeTeamId: string;
-    awayTeamId: string;
-  }): ChatRoom {
-    const room: ChatRoom = {
-      id: `room-${this.nextRoomId++}`,
-      teamMatchId: data.teamMatchId,
-      homeTeamId: data.homeTeamId,
-      awayTeamId: data.awayTeamId,
-      homeTeamName: '홈팀',
-      awayTeamName: '어웨이팀',
-      createdAt: new Date().toISOString(),
-      lastMessage: null,
-      lastMessageAt: null,
-    };
+  /** Mark the user's read position up to messageId. */
+  async markRead(roomId: string, userId: string, messageId: string) {
+    await this.assertParticipant(roomId, userId);
 
-    this.rooms.push(room);
+    const message = await this.prisma.chatMessage.findUnique({
+      where: { id: messageId },
+    });
 
-    // Add system message
-    const systemMsg: ChatMessage = {
-      id: `msg-${this.nextMsgId++}`,
-      chatRoomId: room.id,
-      senderId: 'system',
-      senderName: '시스템',
-      message: `채팅방이 생성되었습니다. ${room.homeTeamName} vs ${room.awayTeamName}`,
-      timestamp: room.createdAt,
-      isSystem: true,
-    };
-    this.messages.push(systemMsg);
+    if (!message || message.roomId !== roomId) {
+      throw new NotFoundException('메시지를 찾을 수 없습니다.');
+    }
 
-    return room;
+    return this.prisma.chatRoomParticipant.update({
+      where: { roomId_userId: { roomId, userId } },
+      data: { lastReadAt: message.createdAt },
+    });
+  }
+
+  /** Asserts that userId is a participant of roomId. Throws 403 CHAT_FORBIDDEN otherwise. */
+  async assertParticipant(roomId: string, userId: string) {
+    const participant = await this.prisma.chatRoomParticipant.findUnique({
+      where: { roomId_userId: { roomId, userId } },
+    });
+
+    if (!participant) {
+      throw new ForbiddenException({ code: 'CHAT_FORBIDDEN', message: '채팅방 접근 권한이 없습니다.' });
+    }
+
+    return participant;
   }
 }

@@ -1,48 +1,84 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { MercenaryApplicationStatus } from '@prisma/client';
 import { MercenaryService } from './mercenary.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateMercenaryPostDto } from './dto/create-mercenary-post.dto';
+import { UpdateMercenaryPostDto } from './dto/update-mercenary-post.dto';
+import { ApplyMercenaryDto } from './dto/apply-mercenary.dto';
+import { MercenaryQueryDto } from './dto/mercenary-query.dto';
 
-@ApiTags('용병')
+@ApiTags('mercenary')
 @Controller('mercenary')
 export class MercenaryController {
   constructor(private readonly mercenaryService: MercenaryService) {}
 
   @Get()
-  @ApiOperation({ summary: '용병 모집글 목록' })
-  async findAll(
-    @Query('sportType') sportType?: string,
-    @Query('status') status?: string,
+  @ApiOperation({ summary: '용병 모집글 목록 (커서 페이지네이션)' })
+  async findAll(@Query() query: MercenaryQueryDto) {
+    return this.mercenaryService.findAll(query);
+  }
+
+  @Get('me/applications')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '내 용병 신청 목록' })
+  async findMyApplications(
+    @CurrentUser('id') userId: string,
+    @Query('status') status?: MercenaryApplicationStatus,
   ) {
-    return this.mercenaryService.findAll({ sportType, status });
+    return this.mercenaryService.findMyApplications(userId, status);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '용병 모집글 상세' })
-  async findById(@Param('id') id: string) {
-    return this.mercenaryService.findById(id);
+  async findOne(@Param('id') id: string, @CurrentUser('id') userId?: string) {
+    return this.mercenaryService.findOne(id, userId);
   }
 
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '용병 모집글 생성' })
+  @ApiOperation({ summary: '용병 모집글 생성 (팀 매니저+)' })
   async create(
     @CurrentUser('id') userId: string,
-    @Body()
-    body: {
-      teamId: string;
-      matchDate: string;
-      venue: string;
-      position: string;
-      count: number;
-      level: number;
-      fee: number;
-      notes?: string;
-    },
+    @Body() dto: CreateMercenaryPostDto,
   ) {
-    return this.mercenaryService.create(userId, body);
+    return this.mercenaryService.create(userId, dto);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '용병 모집글 수정 (작성자 또는 팀 매니저+)' })
+  async update(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateMercenaryPostDto,
+  ) {
+    return this.mercenaryService.update(id, userId, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '용병 모집글 삭제 (작성자 또는 팀 매니저+)' })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.mercenaryService.remove(id, userId);
   }
 
   @Post(':id/apply')
@@ -50,9 +86,45 @@ export class MercenaryController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 지원' })
   async apply(
-    @Param('id') id: string,
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ApplyMercenaryDto,
+  ) {
+    return this.mercenaryService.apply(postId, userId, dto);
+  }
+
+  @Patch(':id/applications/:appId/accept')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '용병 신청 승인 (팀 매니저+)' })
+  async acceptApplication(
+    @Param('id') postId: string,
+    @Param('appId') appId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.mercenaryService.apply(id, userId);
+    return this.mercenaryService.acceptApplication(postId, appId, userId);
+  }
+
+  @Patch(':id/applications/:appId/reject')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '용병 신청 거절 (팀 매니저+)' })
+  async rejectApplication(
+    @Param('id') postId: string,
+    @Param('appId') appId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.mercenaryService.rejectApplication(postId, appId, userId);
+  }
+
+  @Delete(':id/applications/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '내 용병 신청 취소' })
+  async withdrawApplication(
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.mercenaryService.withdrawApplication(postId, userId);
   }
 }

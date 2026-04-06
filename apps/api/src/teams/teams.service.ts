@@ -5,12 +5,25 @@ import { PrismaService } from '../prisma/prisma.service';
 export class TeamsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string }) {
+  async findByOwner(ownerId: string) {
+    return this.prisma.sportTeam.findMany({
+      where: { ownerId },
+      include: {
+        owner: {
+          select: { id: true, nickname: true, profileImageUrl: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string }) {
     const limit = 20;
     const where: Record<string, unknown> = {};
     if (filter.sportType) where.sportType = filter.sportType;
     if (filter.city) where.city = filter.city;
     if (filter.recruiting === 'true') where.isRecruiting = true;
+    if (filter.ownerId) where.ownerId = filter.ownerId;
 
     const items = await this.prisma.sportTeam.findMany({
       where,
@@ -53,21 +66,34 @@ export class TeamsService {
   }
 
   async create(ownerId: string, data: Record<string, unknown>) {
-    return this.prisma.sportTeam.create({
-      data: {
-        ownerId,
-        name: data.name as string,
-        sportType: data.sportType as never,
-        description: data.description as string | undefined,
-        logoUrl: data.logoUrl as string | undefined,
-        coverImageUrl: data.coverImageUrl as string | undefined,
-        city: data.city as string | undefined,
-        district: data.district as string | undefined,
-        memberCount: (data.memberCount as number) || 1,
-        level: (data.level as number) || 3,
-        isRecruiting: data.isRecruiting !== false,
-        contactInfo: data.contactInfo as string | undefined,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const team = await tx.sportTeam.create({
+        data: {
+          ownerId,
+          name: data.name as string,
+          sportType: data.sportType as never,
+          description: data.description as string | undefined,
+          logoUrl: data.logoUrl as string | undefined,
+          coverImageUrl: data.coverImageUrl as string | undefined,
+          city: data.city as string | undefined,
+          district: data.district as string | undefined,
+          memberCount: (data.memberCount as number) || 1,
+          level: (data.level as number) || 3,
+          isRecruiting: data.isRecruiting !== false,
+          contactInfo: data.contactInfo as string | undefined,
+        },
+      });
+
+      await tx.teamMembership.create({
+        data: {
+          teamId: team.id,
+          userId: ownerId,
+          role: 'owner',
+          status: 'active',
+        },
+      });
+
+      return team;
     });
   }
 }

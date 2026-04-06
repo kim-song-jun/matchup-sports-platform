@@ -13,7 +13,10 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: true, // 개발 중 모든 origin 허용
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? process.env.FRONTEND_URL || 'https://matchup.kr'
+        : true,
     credentials: true,
   });
 
@@ -23,6 +26,7 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());

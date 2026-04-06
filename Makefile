@@ -123,11 +123,12 @@ _init-docker:
 .PHONY: _init-db
 _init-db:
 	@echo ""
-	@echo "▸ Initializing database..."
-	@cd $(API_DIR) && pnpm prisma generate >/dev/null 2>&1 && echo "  ✓ Prisma client generated"
-	@cd $(API_DIR) && pnpm prisma migrate deploy 2>&1 | grep -E "(Applying|migration|already|No pending)" | sed 's/^/    /' || true
+	@echo "▸ Initializing database (via api container, internal network)..."
+	@$(DOCKER_DEV) run --rm api pnpm --filter api db:generate >/dev/null 2>&1 && echo "  ✓ Prisma client generated"
+	@$(DOCKER_DEV) run --rm api pnpm --filter api exec prisma migrate deploy 2>&1 \
+		| grep -E "(Applying|migration|already|No pending|All migrations)" | sed 's/^/    /' || true
 	@echo "  ✓ Migrations applied"
-	@cd $(API_DIR) && pnpm prisma db seed 2>&1 | tail -10 | sed 's/^/    /' || true
+	@$(DOCKER_DEV) run --rm api pnpm --filter api db:seed 2>&1 | tail -15 | sed 's/^/    /' || true
 	@echo "  ✓ Seed data inserted"
 
 .PHONY: dev-local
@@ -193,9 +194,18 @@ db-seed: ## Insert seed data inside the api container
 	@$(DOCKER_DEV) run --rm api sh -c "pnpm --filter api db:generate && pnpm --filter api db:seed"
 
 .PHONY: db-studio
-db-studio: ## Open Prisma Studio
-	@$(DOCKER_DEV) run --rm -p 5555:5555 api \
+db-studio: ## Open Prisma Studio (exposes port 5555 only while running)
+	@echo "Prisma Studio will be available at http://localhost:5555"
+	@$(DOCKER_DEV) run --rm -p 127.0.0.1:5555:5555 api \
 		pnpm --filter api exec prisma studio --browser none --hostname 0.0.0.0 --port 5555
+
+.PHONY: db-shell
+db-shell: ## Open psql shell inside postgres container
+	@$(DOCKER_DEV) exec postgres psql -U matchup_user -d matchup_dev
+
+.PHONY: redis-shell
+redis-shell: ## Open redis-cli inside redis container
+	@$(DOCKER_DEV) exec redis redis-cli
 
 .PHONY: db-reset
 db-reset: ## DESTRUCTIVE: reset DB, re-migrate, re-seed
@@ -219,8 +229,12 @@ test-api: ## Backend unit tests only
 test-web: ## Frontend tests only (Vitest)
 	@pnpm --filter web test
 
+.PHONY: test-integration
+test-integration: ## Backend integration tests (runs in api container, needs db)
+	@$(DOCKER_DEV) run --rm api pnpm --filter api test:integration
+
 .PHONY: test-e2e
-test-e2e: ## Playwright E2E tests
+test-e2e: ## Playwright E2E tests (assumes `make dev` is running)
 	@npx playwright test
 
 .PHONY: test-load

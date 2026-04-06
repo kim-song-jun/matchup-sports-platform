@@ -288,6 +288,53 @@ vapid-keys: ## Generate new VAPID keys for Web Push
 		console.log('VAPID_PUBLIC_KEY=' + k.publicKey); \
 		console.log('VAPID_PRIVATE_KEY=' + k.privateKey);"
 
+.PHONY: clear
+clear: ## Find and kill processes blocking MatchUp dev ports (interactive y/N)
+	@printf "\n▸ Checking MatchUp dev ports (3003, 8111, 5433, 6380, 5555)...\n"
+	@command -v lsof >/dev/null 2>&1 || { printf "  ✗ lsof not found\n"; exit 1; }
+	@found=0; docker_detected=0; \
+	for port in 3003 8111 5433 6380 5555; do \
+		pids=$$(lsof -ti :$$port -sTCP:LISTEN 2>/dev/null); \
+		if [ -z "$$pids" ]; then \
+			printf "  \033[32m✓\033[0m Port %-5s free\n" "$$port"; \
+			continue; \
+		fi; \
+		found=1; \
+		for pid in $$pids; do \
+			cmd=$$(ps -p $$pid -o comm= 2>/dev/null | sed 's:^.*/::'); \
+			args=$$(ps -p $$pid -o args= 2>/dev/null | cut -c1-90); \
+			printf "\n  \033[33m⚠\033[0m Port \033[1m%s\033[0m is in use:\n" "$$port"; \
+			printf "    PID:  %s\n" "$$pid"; \
+			printf "    CMD:  %s\n" "$$cmd"; \
+			printf "    ARGS: %s\n" "$$args"; \
+			case "$$cmd" in \
+				*docker*|*Docker*|*com.docke*) \
+					printf "    \033[36mℹ\033[0m Docker process detected — prefer 'make down' to stop containers cleanly.\n"; \
+					docker_detected=1; \
+				;; \
+			esac; \
+			printf "    Kill PID %s? [y/N] " "$$pid"; \
+			if [ -t 0 ]; then read confirm; else read confirm < /dev/tty 2>/dev/null || confirm=n; fi; \
+			if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+				if kill -9 $$pid 2>/dev/null; then \
+					printf "    \033[32m✓\033[0m killed %s\n" "$$pid"; \
+				else \
+					printf "    \033[31m✗\033[0m kill failed (try: sudo kill -9 %s)\n" "$$pid"; \
+				fi; \
+			else \
+				printf "    ⊘ skipped\n"; \
+			fi; \
+		done; \
+	done; \
+	printf "\n"; \
+	if [ "$$found" = "0" ]; then \
+		printf "  \033[32m✓ All MatchUp dev ports are free.\033[0m\n"; \
+	fi; \
+	if [ "$$docker_detected" = "1" ]; then \
+		printf "\n  \033[36mHint:\033[0m run \033[1mmake down\033[0m to stop Docker containers cleanly.\n"; \
+	fi
+	@printf "\n"
+
 .PHONY: help
 help: ## Show this help
 	@echo ""

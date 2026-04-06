@@ -5,6 +5,18 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      reset_db:
+        description: 'DANGER: Drop all tables, re-run migrations, re-seed'
+        required: false
+        default: false
+        type: boolean
+      run_seed:
+        description: 'Run seed data (append, no drop)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # ── Test job: runs on every push and PR ─────────────────────────────────────
@@ -77,11 +89,13 @@ jobs:
       - name: Test web
         run: pnpm --filter web test
 
-  # ── Deploy job: runs only on push to main, after tests pass ─────────────────
+  # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
   deploy:
     name: Deploy
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -110,18 +124,31 @@ jobs:
 
       - name: Build and deploy
         timeout-minutes: 20
+        env:
+          RESET_DB: ${{ inputs.reset_db }}
+          RUN_SEED: ${{ inputs.run_seed }}
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
-            'cd ~/matchup && \
+            "cd ~/matchup && \
              sudo docker build -f deploy/Dockerfile.api -t matchup-api . && \
              sudo docker build -f deploy/Dockerfile.web -t matchup-web . && \
              cd deploy && \
              sudo docker compose -f docker-compose.prod.yml --env-file .env down && \
              sudo docker compose -f docker-compose.prod.yml --env-file .env up -d && \
              sleep 10 && \
-             sudo docker exec matchup_api npx prisma migrate deploy && \
+             if [ \"${RESET_DB}\" = \"true\" ]; then \
+               echo '[DANGER] Resetting database...' && \
+               sudo docker exec matchup_api npx prisma migrate reset --force --skip-seed && \
+               sudo docker exec matchup_api npx prisma db seed; \
+             else \
+               sudo docker exec matchup_api npx prisma migrate deploy; \
+               if [ \"${RUN_SEED}\" = \"true\" ]; then \
+                 echo '[INFO] Running seed (append mode)...' && \
+                 sudo docker exec matchup_api npx prisma db seed; \
+               fi; \
+             fi && \
              sudo docker exec matchup_nginx nginx -s reload && \
-             sudo docker image prune -f'
+             sudo docker image prune -f"
 
       - name: Health check
         run: |

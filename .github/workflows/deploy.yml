@@ -1,29 +1,89 @@
-name: Deploy to EC2
+name: CI / Deploy
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
+  # ── Test job: runs on every push and PR ─────────────────────────────────────
   test:
     name: Test
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: matchup_test
+          POSTGRES_PASSWORD: matchup_test
+          POSTGRES_DB: matchup_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchup_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://matchup_test:matchup_test@localhost:5432/matchup_test
+      JWT_SECRET: ci-test-secret
+      NODE_ENV: test
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: cd apps/api && npx prisma generate
-      - run: pnpm --filter web test
-      - run: cd apps/api && npx jest --config jest.config.ts
 
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: cd apps/api && pnpm prisma generate
+
+      - name: Lint (all packages)
+        run: pnpm lint
+
+      - name: Type-check api
+        run: cd apps/api && npx tsc --noEmit
+
+      - name: Type-check web
+        run: cd apps/web && npx tsc --noEmit
+
+      - name: Test api
+        run: pnpm --filter api test
+
+      - name: Test web
+        run: pnpm --filter web test
+
+  # ── Deploy job: runs only on push to main, after tests pass ─────────────────
   deploy:
     name: Deploy
     needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -51,9 +111,19 @@ jobs:
       - name: Build and deploy
         timeout-minutes: 20
         run: |
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 'cd ~/matchup && sudo docker build -f deploy/Dockerfile.api -t matchup-api . && sudo docker build -f deploy/Dockerfile.web -t matchup-web . && cd deploy && sudo docker-compose -f docker-compose.prod.yml --env-file .env down && sudo docker-compose -f docker-compose.prod.yml --env-file .env up -d && sleep 10 && sudo docker exec matchup_api npx prisma db push --accept-data-loss && sudo docker exec matchup_nginx nginx -s reload && sudo docker image prune -f'
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
+            'cd ~/matchup && \
+             sudo docker build -f deploy/Dockerfile.api -t matchup-api . && \
+             sudo docker build -f deploy/Dockerfile.web -t matchup-web . && \
+             cd deploy && \
+             sudo docker compose -f docker-compose.prod.yml --env-file .env down && \
+             sudo docker compose -f docker-compose.prod.yml --env-file .env up -d && \
+             sleep 10 && \
+             sudo docker exec matchup_api npx prisma migrate deploy && \
+             sudo docker exec matchup_nginx nginx -s reload && \
+             sudo docker image prune -f'
 
       - name: Health check
         run: |
           sleep 10
-          ssh ec2 'curl -sf http://localhost > /dev/null && echo "Deploy OK" || echo "Deploy FAILED"'
+          ssh ec2 'curl -sf http://localhost > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'

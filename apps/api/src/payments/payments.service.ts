@@ -266,7 +266,10 @@ export class PaymentsService {
       },
     });
 
-    // Fire-and-forget: settlement record creation must not block payment confirmation
+    // Fire-and-forget: settlement record creation must not block payment confirmation.
+    // Match participation fees are platform revenue (no third-party recipient),
+    // so recipientId is intentionally null. Marketplace/lesson settlements in
+    // their respective services set recipientId to the seller/instructor.
     this.settlementsService
       .recordSettlement({
         type: 'match',

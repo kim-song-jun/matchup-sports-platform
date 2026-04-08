@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { ReportStatus } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ReportStatus, ReportTargetType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto, UpdateReportStatusDto } from './dto/report.dto';
 
@@ -7,7 +7,41 @@ import { CreateReportDto, UpdateReportStatusDto } from './dto/report.dto';
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Verifies that the report target exists. Throws NotFound when targetId does
+   * not correspond to a row of the declared targetType. Protects the admin
+   * queue from spam/DoS via forged targetIds.
+   */
+  private async assertTargetExists(targetType: ReportTargetType, targetId: string) {
+    switch (targetType) {
+      case ReportTargetType.user: {
+        const exists = await this.prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
+        if (!exists) throw new NotFoundException('REPORT_TARGET_NOT_FOUND');
+        return;
+      }
+      case ReportTargetType.message: {
+        const exists = await this.prisma.chatMessage.findUnique({ where: { id: targetId }, select: { id: true } });
+        if (!exists) throw new NotFoundException('REPORT_TARGET_NOT_FOUND');
+        return;
+      }
+      case ReportTargetType.listing: {
+        const exists = await this.prisma.marketplaceListing.findUnique({ where: { id: targetId }, select: { id: true } });
+        if (!exists) throw new NotFoundException('REPORT_TARGET_NOT_FOUND');
+        return;
+      }
+      case ReportTargetType.review: {
+        const exists = await this.prisma.review.findUnique({ where: { id: targetId }, select: { id: true } });
+        if (!exists) throw new NotFoundException('REPORT_TARGET_NOT_FOUND');
+        return;
+      }
+      default:
+        throw new BadRequestException('INVALID_REPORT_TARGET_TYPE');
+    }
+  }
+
   async createReport(reporterId: string, dto: CreateReportDto) {
+    await this.assertTargetExists(dto.targetType, dto.targetId);
+
     return this.prisma.report.create({
       data: {
         reporterId,

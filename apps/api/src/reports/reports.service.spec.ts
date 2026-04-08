@@ -11,6 +11,10 @@ const mockPrisma = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  user: { findUnique: jest.fn() },
+  chatMessage: { findUnique: jest.fn() },
+  marketplaceListing: { findUnique: jest.fn() },
+  review: { findUnique: jest.fn() },
 };
 
 describe('ReportsService', () => {
@@ -29,7 +33,8 @@ describe('ReportsService', () => {
   });
 
   describe('createReport', () => {
-    it('creates a report and returns selected fields', async () => {
+    it('creates a report after verifying the target exists', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user-2' });
       const expected = {
         id: 'report-1',
         targetType: ReportTargetType.user,
@@ -47,17 +52,24 @@ describe('ReportsService', () => {
         reason: 'spam',
       });
 
-      expect(mockPrisma.report.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            reporterId: 'reporter-1',
-            targetType: ReportTargetType.user,
-            targetId: 'user-2',
-            reason: 'spam',
-          }),
-        }),
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user-2' } }),
       );
+      expect(mockPrisma.report.create).toHaveBeenCalled();
       expect(result).toEqual(expected);
+    });
+
+    it('throws NotFoundException when target does not exist', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.createReport('reporter-1', {
+          targetType: ReportTargetType.user,
+          targetId: 'ghost',
+          reason: 'spam',
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockPrisma.report.create).not.toHaveBeenCalled();
     });
   });
 

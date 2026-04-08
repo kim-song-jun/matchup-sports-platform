@@ -13,7 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MatchesService } from './matches.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
+import { ArriveMatchDto, CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
 
 @ApiTags('매치')
 @Controller('matches')
@@ -119,5 +119,17 @@ export class MatchesController {
     @CurrentUser('id') userId: string,
   ) {
     return this.matchesService.complete(id, userId);
+  }
+
+  @Post(':id/arrive')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '도착 인증 (참가자 전용)' })
+  async arrive(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ArriveMatchDto,
+  ) {
+    return this.matchesService.arrive(id, userId, dto);
   }
 }

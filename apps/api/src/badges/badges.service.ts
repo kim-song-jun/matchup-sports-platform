@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 const BADGE_TYPES = [
   {
@@ -41,10 +43,48 @@ const BADGE_TYPES = [
 
 @Injectable()
 export class BadgesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(BadgesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   getBadgeTypes() {
     return BADGE_TYPES;
+  }
+
+  /**
+   * Award a user-level badge if not already granted.
+   * Uses the Notification table as the source of truth for awarded badges,
+   * since the current Badge model is team-scoped. A dedicated UserBadge model
+   * would be preferred long-term.
+   */
+  async awardIfEligible(
+    userId: string,
+    type: string,
+    meta: { name: string; description?: string },
+  ): Promise<boolean> {
+    // Check notification history for prior award of this badge type
+    const existing = await this.prisma.notification.findFirst({
+      where: {
+        userId,
+        type: NotificationType.badge_earned,
+        data: { path: ['badgeType'], equals: type },
+      },
+      select: { id: true },
+    });
+    if (existing) return false;
+
+    await this.notifications.create({
+      userId,
+      type: NotificationType.badge_earned,
+      title: `뱃지 획득: ${meta.name}`,
+      body: meta.description ?? '',
+      data: { badgeType: type },
+    });
+    this.logger.log(`Badge awarded: user=${userId} type=${type}`);
+    return true;
   }
 
   async getTeamBadges(teamId: string) {

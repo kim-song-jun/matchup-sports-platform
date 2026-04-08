@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LessonsService } from './lessons.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('LessonsService', () => {
   let service: LessonsService;
@@ -13,13 +14,28 @@ describe('LessonsService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    lessonTicketPlan: {
+      findUnique: jest.fn(),
+    },
+    lessonTicket: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+
+  const notificationsServiceMock = {
+    create: jest.fn(),
   };
 
   beforeEach(async () => {
+    delete process.env.TOSS_SECRET_KEY;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LessonsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: NotificationsService, useValue: notificationsServiceMock },
       ],
     }).compile();
 
@@ -27,6 +43,7 @@ describe('LessonsService', () => {
     prisma = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
+    notificationsServiceMock.create.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -279,6 +296,130 @@ describe('LessonsService', () => {
           imageUrls: [],
         }),
       });
+    });
+  });
+
+  // ── purchaseTicket ──────────────────────────────────────────────────────────
+
+  describe('purchaseTicket', () => {
+    const mockPlan = {
+      id: 'plan-1',
+      lessonId: 'lesson-1',
+      name: '10회권',
+      type: 'multi',
+      price: 80000,
+      totalSessions: 10,
+      validDays: null,
+      isActive: true,
+      lesson: { id: 'lesson-1', title: '풋살 기초 레슨', hostId: 'instructor-1' },
+    };
+
+    const mockTicket = {
+      id: 'ticket-1',
+      planId: 'plan-1',
+      userId: 'user-1',
+      lessonId: 'lesson-1',
+      status: 'active',
+      totalSessions: 10,
+      usedSessions: 0,
+      paidAmount: 80000,
+      paymentId: null,
+      purchasedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('creates a ticket and returns ticket + payment prepare info', async () => {
+      mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue(mockPlan);
+      mockPrismaService.lessonTicket.create.mockResolvedValue(mockTicket);
+
+      const result = await service.purchaseTicket('user-1', 'plan-1');
+
+      expect(result).toHaveProperty('ticket');
+      expect(result).toHaveProperty('payment');
+      expect(result.payment).toHaveProperty('orderId');
+      expect(result.payment.orderId).toMatch(/^MU-LESSON-/);
+      expect(result.payment).toHaveProperty('amount', 80000);
+      expect(result.payment).toHaveProperty('ticketId', 'ticket-1');
+    });
+
+    it('throws NotFoundException when plan does not exist', async () => {
+      mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue(null);
+
+      await expect(service.purchaseTicket('user-1', 'no-such-plan')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException when plan is inactive', async () => {
+      mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue({ ...mockPlan, isActive: false });
+
+      await expect(service.purchaseTicket('user-1', 'plan-1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ── confirmTicketPayment ────────────────────────────────────────────────────
+
+  describe('confirmTicketPayment (mock Toss mode)', () => {
+    const mockTicketWithRelations = {
+      id: 'ticket-1',
+      planId: 'plan-1',
+      userId: 'user-1',
+      lessonId: 'lesson-1',
+      status: 'active',
+      paidAmount: 80000,
+      paymentId: null,
+      plan: { price: 80000 },
+      lesson: { title: '풋살 기초 레슨', hostId: 'instructor-1' },
+    };
+
+    it('updates ticket with paymentId and notifies instructor', async () => {
+      const updated = { ...mockTicketWithRelations, paymentId: 'pk-mock' };
+      mockPrismaService.lessonTicket.findUnique.mockResolvedValue(mockTicketWithRelations);
+      mockPrismaService.lessonTicket.update.mockResolvedValue(updated);
+
+      const result = await service.confirmTicketPayment('ticket-1', 'pk-mock', 'user-1');
+
+      expect(result.paymentId).toBe('pk-mock');
+      expect(mockPrismaService.lessonTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ paymentId: 'pk-mock', status: 'active' }),
+        }),
+      );
+      expect(notificationsServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'instructor-1',
+          type: 'marketplace_order',
+        }),
+      );
+    });
+
+    it('throws NotFoundException when ticket does not exist', async () => {
+      mockPrismaService.lessonTicket.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.confirmTicketPayment('no-such', 'pk-mock', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when user does not own the ticket', async () => {
+      mockPrismaService.lessonTicket.findUnique.mockResolvedValue({
+        ...mockTicketWithRelations,
+        userId: 'other-user',
+      });
+
+      await expect(
+        service.confirmTicketPayment('ticket-1', 'pk-mock', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when ticket is already paid', async () => {
+      mockPrismaService.lessonTicket.findUnique.mockResolvedValue({
+        ...mockTicketWithRelations,
+        paymentId: 'existing-key',
+      });
+
+      await expect(
+        service.confirmTicketPayment('ticket-1', 'pk-mock', 'user-1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

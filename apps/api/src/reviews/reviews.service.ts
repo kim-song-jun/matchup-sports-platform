@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScoringService } from '../scoring/scoring.service';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scoring: ScoringService,
+  ) {}
 
   async create(authorId: string, data: Record<string, unknown>) {
     const review = await this.prisma.review.create({
@@ -29,6 +33,9 @@ export class ReviewsService {
         data: { mannerScore: avg._avg.mannerRating },
       });
     }
+
+    // Fire-and-forget: update ELO ratings for all participants of this match
+    void this.scoring.updateEloAfterMatch(data.matchId as string);
 
     return review;
   }

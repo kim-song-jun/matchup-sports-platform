@@ -13,6 +13,11 @@ export interface PaginatedResponse<T> {
 // ── Match types ──
 export type MatchStatus = 'recruiting' | 'full' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 
+export interface RecommendationReason {
+  type: 'level' | 'distance' | 'popularity' | 'urgency' | 'new';
+  label: string;
+}
+
 export interface Match {
   id: string;
   hostId: string;
@@ -37,6 +42,8 @@ export interface Match {
   host?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore?: number; totalMatches?: number };
   participants?: MatchParticipant[];
   teams?: Team[];
+  score?: number;
+  reasons?: RecommendationReason[];
 }
 
 export interface MatchParticipant {
@@ -48,6 +55,8 @@ export interface MatchParticipant {
   paymentStatus: string;
   joinedAt?: string;
   nickname?: string;
+  arrivedAt?: string | null;
+  arrivalPhotoUrl?: string | null;
   user?: { id: string; nickname: string; profileImageUrl: string | null };
 }
 
@@ -722,4 +731,10 @@ export interface UpdateStatusInput {
 
 export interface CheckoutResult {
   paymentKey: string;
+}
+
+export interface ArriveMatchInput {
+  lat: number;
+  lng: number;
+  photoUrl: string;
 }

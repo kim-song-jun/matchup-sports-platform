@@ -8,6 +8,46 @@ import { Prisma, NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MatchingEngineService, RecommendationReason } from './matching-engine.service';
+
+const recommendedMatchSelect = {
+  id: true,
+  hostId: true,
+  sportType: true,
+  title: true,
+  description: true,
+  venueId: true,
+  matchDate: true,
+  startTime: true,
+  endTime: true,
+  maxPlayers: true,
+  currentPlayers: true,
+  fee: true,
+  levelMin: true,
+  levelMax: true,
+  gender: true,
+  status: true,
+  teamConfig: true,
+  createdAt: true,
+  venue: {
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      district: true,
+      imageUrls: true,
+      lat: true,
+      lng: true,
+    },
+  },
+  host: {
+    select: {
+      id: true,
+      nickname: true,
+      profileImageUrl: true,
+    },
+  },
+} satisfies Prisma.MatchSelect;
 
 const matchListSelect = {
   id: true,
@@ -118,6 +158,7 @@ export class MatchesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly matchingEngine: MatchingEngineService,
   ) {}
 
   async findAll(filter: MatchFilterDto) {
@@ -212,15 +253,60 @@ export class MatchesService {
     };
   }
 
-  async getRecommended(userId: string) {
-    // TODO: AI 매칭 엔진 연동
-    // 현재는 최신 recruiting 매치 반환
-    return this.prisma.match.findMany({
-      where: { status: 'recruiting' },
-      select: matchListSelect,
-      orderBy: { createdAt: 'desc' },
-      take: 10,
+  async getRecommended(userId: string | null) {
+    const candidates = await this.prisma.match.findMany({
+      where: { status: { in: ['recruiting', 'full'] } },
+      select: recommendedMatchSelect,
+      orderBy: [{ currentPlayers: 'desc' }, { createdAt: 'desc' }],
+      take: 50,
     });
+
+    if (!userId) {
+      // Unauthenticated: return top 10 sorted by urgency + freshness
+      return candidates
+        .sort((a, b) => {
+          const fillA = a.maxPlayers > 0 ? a.currentPlayers / a.maxPlayers : 0;
+          const fillB = b.maxPlayers > 0 ? b.currentPlayers / b.maxPlayers : 0;
+          return fillB - fillA || b.createdAt.getTime() - a.createdAt.getTime();
+        })
+        .slice(0, 10);
+    }
+
+    const [user, sportProfiles] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          locationLat: true,
+          locationLng: true,
+          locationCity: true,
+          locationDistrict: true,
+          sportTypes: true,
+        },
+      }),
+      this.prisma.userSportProfile.findMany({
+        where: { userId },
+        select: { sportType: true, level: true },
+      }),
+    ]);
+
+    if (!user) {
+      return candidates.slice(0, 10);
+    }
+
+    const profileBySport = new Map(
+      sportProfiles.map((p) => [p.sportType as string, p]),
+    );
+
+    const scored = candidates.map((match) => {
+      const profile = profileBySport.get(match.sportType as string) ?? null;
+      const score = this.matchingEngine.calculateMatchScore(user, match, profile);
+      const reasons = this.matchingEngine.calculateReasons(user, match, score);
+      return { ...match, score, reasons };
+    });
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
   }
 
   async findOne(id: string) {
@@ -638,6 +724,77 @@ export class MatchesService {
     });
 
     return completed;
+  }
+
+  async arrive(
+    matchId: string,
+    userId: string,
+    dto: { lat: number; lng: number; photoUrl: string },
+  ) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        matchDate: true,
+        startTime: true,
+        endTime: true,
+        status: true,
+        venue: {
+          select: { lat: true, lng: true },
+        },
+      },
+    });
+
+    if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
+
+    // Verify participant
+    const participant = await this.prisma.matchParticipant.findUnique({
+      where: { matchId_userId: { matchId, userId } },
+      select: { id: true, arrivedAt: true },
+    });
+    if (!participant) throw new ForbiddenException('참가 중인 매치가 아닙니다.');
+    if (participant.arrivedAt) throw new BadRequestException('이미 도착 인증을 완료했습니다.');
+
+    // Time window check: 30 minutes before start ~ 30 minutes after end
+    const matchDateStr = match.matchDate instanceof Date
+      ? match.matchDate.toISOString().split('T')[0]
+      : String(match.matchDate).split('T')[0];
+    const [sh, sm] = match.startTime.split(':').map(Number);
+    const [eh, em] = match.endTime.split(':').map(Number);
+    const startMs = new Date(`${matchDateStr}T${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}:00`).getTime() - 30 * 60 * 1000;
+    const endMs = new Date(`${matchDateStr}T${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`).getTime() + 30 * 60 * 1000;
+    const now = Date.now();
+    if (now < startMs || now > endMs) {
+      throw new BadRequestException('도착 인증은 매치 시작 30분 전부터 종료 30분 후까지만 가능합니다.');
+    }
+
+    // Distance check (Haversine) — 200m radius
+    if (match.venue?.lat != null && match.venue?.lng != null) {
+      const R = 6371000; // Earth radius in metres
+      const toRad = (deg: number) => (deg * Math.PI) / 180;
+      const dLat = toRad(dto.lat - match.venue.lat);
+      const dLng = toRad(dto.lng - match.venue.lng);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(match.venue.lat)) * Math.cos(toRad(dto.lat)) * Math.sin(dLng / 2) ** 2;
+      const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (distance > 200) {
+        throw new BadRequestException('구장에서 너무 멀어요. 200m 이내에서만 인증할 수 있어요.');
+      }
+    }
+
+    const updated = await this.prisma.matchParticipant.update({
+      where: { id: participant.id },
+      data: {
+        arrivedAt: new Date(),
+        arrivalPhotoUrl: dto.photoUrl,
+        arrivalLat: dto.lat,
+        arrivalLng: dto.lng,
+      },
+      select: { id: true, arrivedAt: true },
+    });
+
+    return { arrivedAt: updated.arrivedAt };
   }
 
   private async notifyParticipants(

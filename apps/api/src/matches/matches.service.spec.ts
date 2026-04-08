@@ -7,6 +7,7 @@ import {
 import { MatchesService } from './matches.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MatchingEngineService } from './matching-engine.service';
 
 describe('MatchesService', () => {
   let service: MatchesService;
@@ -25,10 +26,23 @@ describe('MatchesService', () => {
       findMany: jest.fn(),
       delete: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+    },
+    userSportProfile: {
+      findMany: jest.fn(),
+    },
   };
 
   const mockNotificationsService = {
     create: jest.fn(),
+  };
+
+  const mockMatchingEngineService = {
+    calculateMatchScore: jest.fn().mockReturnValue(80),
+    calculateReasons: jest.fn().mockReturnValue([
+      { type: 'level', label: '내 레벨에 맞는 경기' },
+    ]),
   };
 
   beforeEach(async () => {
@@ -37,6 +51,7 @@ describe('MatchesService', () => {
         MatchesService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: MatchingEngineService, useValue: mockMatchingEngineService },
       ],
     }).compile();
 
@@ -46,10 +61,113 @@ describe('MatchesService', () => {
     jest.clearAllMocks();
     mockNotificationsService.create.mockResolvedValue({});
     mockPrismaService.matchParticipant.findMany.mockResolvedValue([]);
+    mockMatchingEngineService.calculateMatchScore.mockReturnValue(80);
+    mockMatchingEngineService.calculateReasons.mockReturnValue([
+      { type: 'level', label: '내 레벨에 맞는 경기' },
+    ]);
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getRecommended', () => {
+    const candidateMatch = {
+      id: 'match-1',
+      hostId: 'host-1',
+      sportType: 'futsal',
+      title: '주말 풋살',
+      description: null,
+      venueId: 'venue-1',
+      matchDate: new Date(Date.now() + 86_400_000 * 2),
+      startTime: '18:00',
+      endTime: '20:00',
+      maxPlayers: 10,
+      currentPlayers: 5,
+      fee: 0,
+      levelMin: 1,
+      levelMax: 5,
+      gender: 'any',
+      status: 'recruiting',
+      teamConfig: null,
+      createdAt: new Date(),
+      venue: {
+        id: 'venue-1',
+        name: '서울 풋살장',
+        city: '서울',
+        district: '강남구',
+        imageUrls: [],
+        lat: 37.5,
+        lng: 127.0,
+      },
+      host: { id: 'host-1', nickname: '호스트', profileImageUrl: null },
+    };
+
+    it('should return scored matches for authenticated user', async () => {
+      mockPrismaService.match.findMany.mockResolvedValue([candidateMatch]);
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        locationLat: 37.5,
+        locationLng: 127.0,
+        locationCity: '서울',
+        locationDistrict: '강남구',
+        sportTypes: ['futsal'],
+      });
+      mockPrismaService.userSportProfile.findMany.mockResolvedValue([
+        { sportType: 'futsal', level: 3 },
+      ]);
+
+      const results = await service.getRecommended('user-1');
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toHaveProperty('score');
+      expect(results[0]).toHaveProperty('reasons');
+      expect(mockMatchingEngineService.calculateMatchScore).toHaveBeenCalledTimes(1);
+      expect(mockMatchingEngineService.calculateReasons).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return urgency-sorted matches for unauthenticated user (null userId)', async () => {
+      const almostFullMatch = { ...candidateMatch, currentPlayers: 9, maxPlayers: 10 };
+      const halfFullMatch = { ...candidateMatch, id: 'match-2', currentPlayers: 5, maxPlayers: 10 };
+      mockPrismaService.match.findMany.mockResolvedValue([halfFullMatch, almostFullMatch]);
+
+      const results = await service.getRecommended(null);
+
+      expect(results).toHaveLength(2);
+      // almost-full match should rank first
+      expect(results[0].id).toBe('match-1'); // almostFullMatch was first in sorted order
+    });
+
+    it('should fall back gracefully when user is not found in DB', async () => {
+      mockPrismaService.match.findMany.mockResolvedValue([candidateMatch]);
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.userSportProfile.findMany.mockResolvedValue([]);
+
+      const results = await service.getRecommended('ghost-user');
+
+      expect(results).toHaveLength(1);
+      // No score/reasons when user not found
+      expect(results[0]).not.toHaveProperty('score');
+    });
+
+    it('should return at most 10 matches', async () => {
+      const manyMatches = Array.from({ length: 20 }, (_, i) => ({
+        ...candidateMatch,
+        id: `match-${i}`,
+      }));
+      mockPrismaService.match.findMany.mockResolvedValue(manyMatches);
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        locationLat: null,
+        locationLng: null,
+        locationCity: '서울',
+        locationDistrict: '강남구',
+        sportTypes: ['futsal'],
+      });
+      mockPrismaService.userSportProfile.findMany.mockResolvedValue([]);
+
+      const results = await service.getRecommended('user-1');
+
+      expect(results.length).toBeLessThanOrEqual(10);
+    });
   });
 
   describe('findAll', () => {

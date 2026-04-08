@@ -3,16 +3,16 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, AlertTriangle, CheckCircle2, Camera } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { Modal } from '@/components/ui/modal';
-import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch } from '@/hooks/use-api';
+import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch, useArriveMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import type { ApiResponse, MatchParticipant, Payment } from '@/types/api';
+import type { ApiResponse, MatchParticipant, Payment, Upload } from '@/types/api';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportDetailImageSet, getVenueImageSet } from '@/lib/sport-image';
@@ -32,7 +32,12 @@ export default function MatchDetailPage() {
   const updateMatchMutation = useUpdateMatch();
   const cancelMutation = useCancelMatch(matchId);
   const closeMutation = useCloseMatch(matchId);
+  const arriveMutation = useArriveMatch(matchId);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showArrivalModal, setShowArrivalModal] = useState(false);
+  const [arrivalPhoto, setArrivalPhoto] = useState<File | null>(null);
+  const [arrivalPhotoPreview, setArrivalPhotoPreview] = useState<string | null>(null);
+  const [isArriving, setIsArriving] = useState(false);
   const [pendingParticipantId, setPendingParticipantId] = useState<string | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
@@ -112,6 +117,16 @@ export default function MatchDetailPage() {
   const hasPendingPayment = currentParticipant?.paymentStatus === 'pending';
   const isFull = match.currentPlayers >= match.maxPlayers;
   const isRecruitingOpen = match.status === 'recruiting';
+
+  // Arrival window: match start - 30min ~ match end + 30min
+  const matchDateStr = match.matchDate.split('T')[0];
+  const [arrSH, arrSM] = match.startTime.split(':').map(Number);
+  const [arrEH, arrEM] = match.endTime.split(':').map(Number);
+  const arrivalWindowStart = new Date(`${matchDateStr}T${String(arrSH).padStart(2, '0')}:${String(arrSM).padStart(2, '0')}:00`).getTime() - 30 * 60 * 1000;
+  const arrivalWindowEnd = new Date(`${matchDateStr}T${String(arrEH).padStart(2, '0')}:${String(arrEM).padStart(2, '0')}:00`).getTime() + 30 * 60 * 1000;
+  const now = Date.now();
+  const isInArrivalWindow = now >= arrivalWindowStart && now <= arrivalWindowEnd;
+  const hasArrived = !!currentParticipant?.arrivedAt;
   const matchImages = getSportDetailImageSet(
     match.sportType,
     [match.imageUrl, ...(match.venue?.imageUrls ?? [])],
@@ -197,6 +212,71 @@ export default function MatchDetailPage() {
     } catch (error) {
       const axiosErr = error as { response?: { data?: { message?: string } } };
       toast('error', axiosErr?.response?.data?.message || '취소에 실패했어요');
+    }
+  }
+
+  async function handleArrivalConfirm() {
+    if (!arrivalPhoto) {
+      toast('error', '도착 사진을 선택해주세요');
+      return;
+    }
+    setIsArriving(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
+      ).catch(() => null);
+
+      if (!position) {
+        toast('error', '위치 정보를 가져올 수 없어요. 위치 권한을 허용해주세요.');
+        setIsArriving(false);
+        return;
+      }
+
+      const { latitude: lat, longitude: lng } = position.coords;
+
+      // Client-side distance pre-check
+      if (match?.venue?.lat != null && match?.venue?.lng != null) {
+        const R = 6371000;
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const dLat = toRad(lat - match.venue.lat);
+        const dLng = toRad(lng - match.venue.lng);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(match.venue.lat)) *
+            Math.cos(toRad(lat)) *
+            Math.sin(dLng / 2) ** 2;
+        const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (distance > 200) {
+          toast('error', '구장에서 너무 멀어요. 200m 이내에서만 인증할 수 있어요.');
+          setIsArriving(false);
+          return;
+        }
+      }
+
+      // Upload photo
+      const formData = new FormData();
+      formData.append('files', arrivalPhoto);
+      const uploadRes = await api.post('/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const uploads = (uploadRes as unknown as ApiResponse<Upload[]>).data;
+      const photoUrl = uploads[0]?.path;
+      if (!photoUrl) {
+        toast('error', '사진 업로드에 실패했어요. 다시 시도해주세요.');
+        setIsArriving(false);
+        return;
+      }
+
+      await arriveMutation.mutateAsync({ lat, lng, photoUrl });
+      toast('success', '도착 인증이 완료되었어요!');
+      setShowArrivalModal(false);
+      setArrivalPhoto(null);
+      setArrivalPhotoPreview(null);
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '도착 인증에 실패했어요.');
+    } finally {
+      setIsArriving(false);
     }
   }
 
@@ -446,6 +526,25 @@ export default function MatchDetailPage() {
                   </button>
                 ) : null}
 
+                {/* Arrival check-in button */}
+                {isInArrivalWindow && (
+                  hasArrived ? (
+                    <div className="flex items-center justify-center gap-2 rounded-xl bg-green-50 dark:bg-green-950/30 py-3 text-sm font-semibold text-green-600 dark:text-green-400">
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                      도착 완료
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowArrivalModal(true)}
+                      data-testid="match-arrive-button"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3 text-sm font-semibold text-white hover:bg-green-600 transition-colors min-h-[44px]"
+                    >
+                      <Camera size={16} aria-hidden="true" />
+                      도착 인증
+                    </button>
+                  )
+                )}
+
                 <button
                   onClick={() => leaveMutation.mutate()}
                   disabled={leaveMutation.isPending}
@@ -525,11 +624,16 @@ export default function MatchDetailPage() {
                       )}
                     </p>
                   </div>
-                  <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
-                    p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {p.status === 'confirmed' ? '확정' : '대기'}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {p.arrivedAt && (
+                      <CheckCircle2 size={14} className="text-green-500" aria-label="도착 완료" />
+                    )}
+                    <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
+                      p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {p.status === 'confirmed' ? '확정' : '대기'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -627,6 +731,99 @@ export default function MatchDetailPage() {
                   처리 중...
                 </span>
               ) : '취소하기'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 도착 인증 모달 */}
+      <Modal
+        isOpen={showArrivalModal}
+        onClose={() => {
+          if (!isArriving) {
+            setShowArrivalModal(false);
+            setArrivalPhoto(null);
+            setArrivalPhotoPreview(null);
+          }
+        }}
+        title="도착 인증"
+        size="sm"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            구장에 도착했나요? 사진을 찍어 도착을 인증해주세요.
+          </p>
+          <div>
+            <label htmlFor="arrival-photo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              도착 사진
+            </label>
+            {arrivalPhotoPreview ? (
+              <div className="relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={arrivalPhotoPreview}
+                  alt="도착 인증 사진 미리보기"
+                  className="w-full h-48 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setArrivalPhoto(null); setArrivalPhotoPreview(null); }}
+                  aria-label="사진 제거"
+                  className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <label
+                htmlFor="arrival-photo"
+                className="flex flex-col items-center justify-center gap-2 h-36 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Camera size={24} className="text-gray-400" aria-hidden="true" />
+                <span className="text-sm text-gray-500">사진을 선택해주세요</span>
+              </label>
+            )}
+            <input
+              id="arrival-photo"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setArrivalPhoto(file);
+                  setArrivalPhotoPreview(URL.createObjectURL(file));
+                }
+              }}
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setShowArrivalModal(false);
+                setArrivalPhoto(null);
+                setArrivalPhotoPreview(null);
+              }}
+              disabled={isArriving}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 min-h-[44px]"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleArrivalConfirm}
+              disabled={isArriving || !arrivalPhoto}
+              data-testid="match-arrive-confirm-button"
+              className="flex-1 rounded-xl bg-green-500 py-3 text-base font-semibold text-white hover:bg-green-600 transition-colors disabled:opacity-50 min-h-[44px]"
+            >
+              {isArriving ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  인증 중...
+                </span>
+              ) : '인증하기'}
             </button>
           </div>
         </div>

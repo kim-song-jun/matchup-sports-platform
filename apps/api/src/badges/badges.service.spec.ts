@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadgesService } from './badges.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -11,6 +12,13 @@ const prismaMock = {
     findMany: jest.fn(),
     create: jest.fn(),
   },
+  notification: {
+    findFirst: jest.fn(),
+  },
+};
+
+const notificationsMock = {
+  create: jest.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -27,6 +35,7 @@ describe('BadgesService', () => {
       providers: [
         BadgesService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: NotificationsService, useValue: notificationsMock },
       ],
     }).compile();
 
@@ -87,6 +96,49 @@ describe('BadgesService', () => {
 
       expect(result.teamId).toBe('team-1');
       expect(result.type).toBe('newcomer');
+    });
+  });
+
+  // ── awardIfEligible ─────────────────────────────────────────────────────────
+
+  describe('awardIfEligible', () => {
+    it('awards badge and sends notification on first call', async () => {
+      prismaMock.notification.findFirst.mockResolvedValue(null);
+      notificationsMock.create.mockResolvedValue({});
+
+      const result = await service.awardIfEligible('user-1', 'match_10', {
+        name: '10경기 달성',
+        description: '10경기를 완료한 사용자',
+      });
+
+      expect(result).toBe(true);
+      expect(notificationsMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          type: 'badge_earned',
+        }),
+      );
+    });
+
+    it('returns false and sends no notification when badge already awarded', async () => {
+      prismaMock.notification.findFirst.mockResolvedValue({ id: 'notif-existing' });
+
+      const result = await service.awardIfEligible('user-2', 'match_10', { name: '10경기 달성' });
+
+      expect(result).toBe(false);
+      expect(notificationsMock.create).not.toHaveBeenCalled();
+    });
+
+    it('awards different badge types independently for same user', async () => {
+      prismaMock.notification.findFirst.mockResolvedValue(null);
+      notificationsMock.create.mockResolvedValue({});
+
+      const r1 = await service.awardIfEligible('user-3', 'match_10', { name: '10경기 달성' });
+      const r2 = await service.awardIfEligible('user-3', 'match_50', { name: '50경기 달성' });
+
+      expect(r1).toBe(true);
+      expect(r2).toBe(true);
+      expect(notificationsMock.create).toHaveBeenCalledTimes(2);
     });
   });
 

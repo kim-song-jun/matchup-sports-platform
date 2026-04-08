@@ -225,3 +225,15 @@ export class CancelMatchDto {
   @IsOptional()
   reason?: string;
 }
+
+export class ArriveMatchDto {
+  @ApiProperty({ description: 'GPS 위도' })
+  lat: number;
+
+  @ApiProperty({ description: 'GPS 경도' })
+  lng: number;
+
+  @ApiProperty({ description: '도착 인증 사진 URL' })
+  @IsString()
+  photoUrl: string;
+}

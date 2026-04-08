@@ -21,6 +21,8 @@ import { ChatModule } from './chat/chat.module';
 import { MercenaryModule } from './mercenary/mercenary.module';
 import { BadgesModule } from './badges/badges.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { ScoringModule } from './scoring/scoring.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -50,6 +52,8 @@ import configuration from './config/configuration';
     MercenaryModule,
     BadgesModule,
     UploadsModule,
+    ScoringModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

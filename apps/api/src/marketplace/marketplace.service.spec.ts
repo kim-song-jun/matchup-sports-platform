@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { MarketplaceService } from './marketplace.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,6 +29,25 @@ const mockListing = (overrides = {}) => ({
   ...overrides,
 });
 
+const mockOrder = (overrides = {}) => ({
+  id: 'order-1',
+  listingId: 'listing-1',
+  buyerId: 'user-2',
+  sellerId: 'user-1',
+  amount: 50000,
+  commission: 5000,
+  orderId: 'MU-MKT-abc123',
+  status: 'pending',
+  paymentKey: null,
+  paidAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  listing: { title: 'Test Listing' },
+  seller: { id: 'user-1', nickname: 'seller' },
+  buyer: { id: 'user-2' },
+  ...overrides,
+});
+
 const prismaMock = {
   marketplaceListing: {
     findMany: jest.fn(),
@@ -37,7 +57,13 @@ const prismaMock = {
   },
   marketplaceOrder: {
     create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
   },
+};
+
+const notificationsServiceMock = {
+  create: jest.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -49,15 +75,18 @@ describe('MarketplaceService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    delete process.env.TOSS_SECRET_KEY;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MarketplaceService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: NotificationsService, useValue: notificationsServiceMock },
       ],
     }).compile();
 
     service = module.get<MarketplaceService>(MarketplaceService);
+    notificationsServiceMock.create.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -151,32 +180,112 @@ describe('MarketplaceService', () => {
   // ── createOrder ─────────────────────────────────────────────────────────────
 
   describe('createOrder', () => {
-    it('creates an order for an active listing', async () => {
-      const listing = mockListing({ price: 50000, status: 'active' });
-      const order = {
-        id: 'order-1',
-        listingId: listing.id,
-        buyerId: 'user-2',
-        sellerId: 'user-1',
-        amount: 50000,
-        commission: 7500,
-        orderId: 'MK-123',
-        status: 'pending',
-      };
+    it('creates an order and returns order + payment prepare info', async () => {
+      const listing = mockListing({ price: 50000, sellerId: 'user-1' });
+      const order = mockOrder();
       prismaMock.marketplaceListing.findUnique.mockResolvedValue(listing);
       prismaMock.marketplaceOrder.create.mockResolvedValue(order);
 
       const result = await service.createOrder('listing-1', 'user-2');
 
-      expect(result.listingId).toBe('listing-1');
-      expect(result.buyerId).toBe('user-2');
+      expect(result).toHaveProperty('order');
+      expect(result).toHaveProperty('payment');
+      expect(result.payment).toHaveProperty('orderId');
+      expect(result.payment).toHaveProperty('amount');
       expect(prismaMock.marketplaceOrder.create).toHaveBeenCalled();
+    });
+
+    it('commission is calculated at 10% of listing price', async () => {
+      const listing = mockListing({ price: 50000, sellerId: 'seller-1' });
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(listing);
+      prismaMock.marketplaceOrder.create.mockResolvedValue(mockOrder());
+
+      await service.createOrder('listing-1', 'buyer-1');
+
+      expect(prismaMock.marketplaceOrder.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ commission: 5000 }),
+        }),
+      );
+    });
+
+    it('orderId uses MU-MKT- prefix', async () => {
+      const listing = mockListing({ sellerId: 'seller-1' });
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(listing);
+      prismaMock.marketplaceOrder.create.mockResolvedValue(mockOrder());
+
+      await service.createOrder('listing-1', 'buyer-1');
+
+      expect(prismaMock.marketplaceOrder.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orderId: expect.stringMatching(/^MU-MKT-/),
+          }),
+        }),
+      );
+    });
+
+    it('throws BadRequestException when buyer is the seller', async () => {
+      const listing = mockListing({ sellerId: 'user-1' });
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(listing);
+
+      await expect(service.createOrder('listing-1', 'user-1')).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when listing does not exist', async () => {
       prismaMock.marketplaceListing.findUnique.mockResolvedValue(null);
 
       await expect(service.createOrder('no-such', 'user-2')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── confirmOrderPayment ────────────────────────────────────────────────────
+
+  describe('confirmOrderPayment (mock Toss mode)', () => {
+    it('updates order to paid status and notifies seller', async () => {
+      const order = mockOrder({ status: 'pending' });
+      const updated = mockOrder({ status: 'paid', paymentKey: 'pk-mock', paidAt: new Date() });
+      prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
+      prismaMock.marketplaceOrder.update.mockResolvedValue(updated);
+
+      const result = await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
+
+      expect(result.status).toBe('paid');
+      expect(prismaMock.marketplaceOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'paid', paymentKey: 'pk-mock' }),
+        }),
+      );
+      expect(notificationsServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          type: 'marketplace_order',
+        }),
+      );
+    });
+
+    it('throws NotFoundException when order does not exist', async () => {
+      prismaMock.marketplaceOrder.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.confirmOrderPayment('no-such', 'pk-mock', 'user-2'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when user is not the buyer', async () => {
+      prismaMock.marketplaceOrder.findUnique.mockResolvedValue(mockOrder({ buyerId: 'user-2' }));
+
+      await expect(
+        service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'wrong-user'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when order is already processed', async () => {
+      prismaMock.marketplaceOrder.findUnique.mockResolvedValue(mockOrder({ status: 'paid' }));
+
+      await expect(
+        service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

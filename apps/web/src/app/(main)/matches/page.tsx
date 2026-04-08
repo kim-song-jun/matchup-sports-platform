@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Search, SlidersHorizontal, Clock, Users, MapPin, Sparkles, X, List, Map } from 'lucide-react';
+import { Search, SlidersHorizontal, Clock, Users, MapPin, Sparkles, X, List, Map, TrendingUp } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -23,7 +23,7 @@ import {
 } from '@/lib/match-discovery';
 import { formatCurrency, formatMatchDate, getTimeBadge, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
-import type { Match } from '@/types/api';
+import type { Match, RecommendationReason } from '@/types/api';
 import { MatchesMapView } from '@/components/map/matches-map-view';
 
 const SPORT_FILTERS = [
@@ -49,6 +49,14 @@ const SORT_FILTERS: Array<{ key: MatchDiscoverySort; translationKey: string }> =
   { key: 'latest', translationKey: 'latest' },
   { key: 'deadline', translationKey: 'deadline' },
 ];
+
+const REASON_ICON_MAP: Record<string, React.ElementType> = {
+  level: TrendingUp,
+  distance: MapPin,
+  popularity: Users,
+  urgency: Clock,
+  new: Sparkles,
+};
 
 const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const filled = match.currentPlayers / match.maxPlayers;
@@ -130,6 +138,23 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             <span className="shrink-0 opacity-30">·</span>
             <span className="shrink-0">{friendlyLevel(match.levelMin, match.levelMax)}</span>
           </div>
+
+          {match.reasons && match.reasons.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {match.reasons.slice(0, 2).map((reason: RecommendationReason) => {
+                const ReasonIcon = REASON_ICON_MAP[reason.type];
+                return (
+                  <span
+                    key={reason.type}
+                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300 text-xs rounded-full px-2 py-1"
+                  >
+                    <ReasonIcon size={10} aria-hidden="true" />
+                    {reason.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </Link>

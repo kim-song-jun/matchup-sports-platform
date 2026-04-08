@@ -227,6 +227,49 @@ export class SettlementsService {
     return settlement;
   }
 
+  /**
+   * Records a new settlement entry for completed payments.
+   * Commission rate: 10%.
+   * type: 'match' | 'marketplace' | 'lesson'
+   */
+  recordSettlement(data: {
+    type: 'match' | 'marketplace' | 'lesson';
+    amount: number;
+    payerName: string;
+    recipientName: string;
+    relatedId: string;
+    description: string;
+  }): Settlement {
+    const typeMap: Record<string, SettlementType> = {
+      match: 'match_fee',
+      marketplace: 'venue_rental',
+      lesson: 'lesson_fee',
+    };
+
+    const commission = Math.round(data.amount * 0.10);
+    const netAmount = data.amount - commission;
+
+    const entry: Settlement = {
+      id: `settle-${Math.random().toString(36).slice(2, 10)}`,
+      type: typeMap[data.type],
+      status: 'pending',
+      amount: data.amount,
+      commission,
+      netAmount,
+      payerName: data.payerName,
+      recipientName: data.recipientName,
+      relatedId: data.relatedId,
+      description: data.description,
+      createdAt: new Date(),
+      processedAt: null,
+      failureReason: null,
+      history: [],
+    };
+
+    this.settlements.push(entry);
+    return entry;
+  }
+
   private createHistory(action: string, actor: string, note?: string | null, createdAt?: string) {
     return {
       id: `settlement-history-${Math.random().toString(36).slice(2, 8)}`,

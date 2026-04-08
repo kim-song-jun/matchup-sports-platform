@@ -161,6 +161,10 @@ export const handlers = [
     return success({ ...mockMatch, id: params.id as string, status: 'FULL' });
   }),
 
+  http.post('/api/v1/matches/:id/arrive', () => {
+    return success({ arrivedAt: new Date().toISOString() });
+  }),
+
   // ── Team Matches handlers ──
   http.get('/api/v1/team-matches', () => {
     return success({ items: [mockTeamMatch], nextCursor: null });

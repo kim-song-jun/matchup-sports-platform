@@ -52,6 +52,7 @@ import type {
   UpdateStatusInput,
   CancelMatchPayload,
   Upload,
+  ArriveMatchInput,
 } from '@/types/api';
 
 // Helper: the axios response interceptor returns `response.data` (the ApiResponse),
@@ -307,6 +308,20 @@ export function useCloseMatch(matchId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(matchId) });
+    },
+  });
+}
+
+export function useArriveMatch(matchId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ArriveMatchInput) => {
+      const res = await api.post(`/matches/${matchId}/arrive`, data);
+      return extractData<{ arrivedAt: string }>(res);
+    },
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(matchId) });
     },
   });

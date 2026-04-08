@@ -1,10 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsService } from './reviews.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScoringService } from '../scoring/scoring.service';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
   let prisma: PrismaService;
+
+  const mockScoringService = {
+    updateEloAfterMatch: jest.fn(),
+  };
 
   const mockPrismaService = {
     review: {
@@ -25,6 +30,7 @@ describe('ReviewsService', () => {
       providers: [
         ReviewsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: ScoringService, useValue: mockScoringService },
       ],
     }).compile();
 

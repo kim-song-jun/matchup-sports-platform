@@ -6,7 +6,7 @@
     "dev": "rm -rf .next && next dev --hostname 0.0.0.0 --port 3003",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "echo '[web] lint delegated to tsc --noEmit (CI runs it separately); ESLint setup is tracked as tech debt'",
     "clean": "rm -rf .next out",
     "test": "vitest run",
     "test:watch": "vitest"

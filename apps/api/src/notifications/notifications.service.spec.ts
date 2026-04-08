@@ -14,6 +14,10 @@ const mockPrisma = {
     updateMany: jest.fn(),
     count: jest.fn(),
   },
+  notificationPreference: {
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+  },
 };
 
 const mockRealtime = {
@@ -54,6 +58,7 @@ describe('NotificationsService', () => {
         isRead: false,
         createdAt: new Date(),
       };
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue(null);
       mockPrisma.notification.create.mockResolvedValue(notification);
 
       await service.create({
@@ -70,6 +75,82 @@ describe('NotificationsService', () => {
         category: 'match',
       }));
       expect(mockWebPushService.sendToUser).toHaveBeenCalledWith('u1', { title: 'Match!', body: 'Your match is ready' });
+    });
+
+    it('skips notification when category is disabled in user preferences', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: false,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+      });
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.match_created,
+        title: 'Match!',
+        body: 'Your match is ready',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+      expect(mockRealtime.emitToUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPreferences', () => {
+    it('returns default values when no preference row exists', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue(null);
+
+      const result = await service.getPreferences('u1');
+
+      expect(result).toEqual({
+        id: null,
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+      });
+    });
+
+    it('returns stored preference values', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        matchEnabled: true,
+        teamEnabled: false,
+        chatEnabled: true,
+        paymentEnabled: false,
+      });
+
+      const result = await service.getPreferences('u1');
+
+      expect(result).toEqual({
+        id: 'pref-1',
+        matchEnabled: true,
+        teamEnabled: false,
+        chatEnabled: true,
+        paymentEnabled: false,
+      });
+    });
+  });
+
+  describe('updatePreferences', () => {
+    it('upserts preferences and returns updated values', async () => {
+      const upserted = {
+        id: 'pref-1',
+        matchEnabled: true,
+        teamEnabled: false,
+        chatEnabled: true,
+        paymentEnabled: true,
+      };
+      mockPrisma.notificationPreference.upsert.mockResolvedValue(upserted);
+
+      const result = await service.updatePreferences('u1', { teamEnabled: false });
+
+      expect(mockPrisma.notificationPreference.upsert).toHaveBeenCalled();
+      expect(result.teamEnabled).toBe(false);
     });
   });
 

@@ -334,6 +334,27 @@ export interface Notification {
   ctaLabel?: string | null;
 }
 
+export interface NotificationPreference {
+  id: string | null;
+  matchEnabled: boolean;
+  teamEnabled: boolean;
+  chatEnabled: boolean;
+  paymentEnabled: boolean;
+}
+
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+
+export interface TeamInvitation {
+  id: string;
+  teamId: string;
+  team: { id: string; name: string; logoUrl?: string };
+  inviter: { id: string; nickname: string };
+  role: string;
+  status: InvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+}
+
 // ── Payment ──
 export interface Payment {
   id: string;
@@ -406,6 +427,8 @@ export interface ChatMessage {
   senderId: string;
   content: string;
   createdAt: string;
+  imageUrl?: string | null;
+  deletedAt?: string | null;
   sender?: { id: string; nickname: string; profileImageUrl: string | null };
 }
 

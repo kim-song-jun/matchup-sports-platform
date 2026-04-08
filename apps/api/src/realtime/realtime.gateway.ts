@@ -114,7 +114,7 @@ export class RealtimeGateway
   @SubscribeMessage('chat:message')
   async handleChatMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string; message: string },
+    @MessageBody() data: { roomId: string; message: string; imageUrl?: string },
   ) {
     const userId = (client.data as { userId?: string }).userId;
     if (!userId) return;
@@ -122,21 +122,37 @@ export class RealtimeGateway
     try {
       // ChatService.postMessage persists and broadcasts — no duplicate emit here.
       await this.chatService.postMessage(data.roomId, userId, {
-        content: data.message,
+        content: data.message ?? '',
+        imageUrl: data.imageUrl,
       });
     } catch (err) {
       this.logger.warn(`chat:message persist failed for userId=${userId} roomId=${data.roomId}: ${err}`);
-      client.emit('chat:error', { code: 'CHAT_FORBIDDEN', message: '메시지 전송 실패' });
+      client.emit('chat:error', { code: 'CHAT_SEND_FAILED', message: '메시지 전송 실패' });
     }
   }
 
   @SubscribeMessage('chat:typing')
   handleChatTyping(
     @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string; nickname?: string },
+  ) {
+    const userId = (client.data as { userId?: string }).userId;
+    if (!userId) return;
+    client.to(`chat:${data.roomId}`).emit('chat:typing', {
+      userId,
+      nickname: data.nickname ?? null,
+      roomId: data.roomId,
+    });
+  }
+
+  @SubscribeMessage('chat:stop-typing')
+  handleChatStopTyping(
+    @ConnectedSocket() client: Socket,
     @MessageBody() data: { roomId: string },
   ) {
     const userId = (client.data as { userId?: string }).userId;
-    client.to(`chat:${data.roomId}`).emit('chat:typing', {
+    if (!userId) return;
+    client.to(`chat:${data.roomId}`).emit('chat:stop-typing', {
       userId,
       roomId: data.roomId,
     });

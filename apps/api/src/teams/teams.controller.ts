@@ -16,7 +16,7 @@ import { TeamsService } from './teams.service';
 import { TeamMembershipService } from './team-membership.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto } from './dto/membership.dto';
+import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto, InviteMemberDto } from './dto/membership.dto';
 import { TeamRole } from '@prisma/client';
 
 @ApiTags('팀/클럽')
@@ -134,5 +134,54 @@ export class TeamsController {
   ) {
     await this.teamMembershipService.assertRole(teamId, userId, TeamRole.owner);
     await this.teamMembershipService.transferOwnership(teamId, userId, dto.toUserId, dto.demoteTo);
+  }
+
+  // ─── Invitation Endpoints ──────────────────────────────────────────────────
+
+  @Post(':id/invitations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 멤버 초대 (manager 이상)' })
+  async inviteMember(
+    @Param('id') teamId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: InviteMemberDto,
+  ) {
+    return this.teamsService.inviteMember(teamId, userId, dto.inviteeId, dto.role);
+  }
+
+  @Get(':id/invitations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 초대 목록 (manager 이상)' })
+  async getTeamInvitations(
+    @Param('id') teamId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.getTeamInvitations(teamId, userId);
+  }
+
+  @Patch(':id/invitations/:invitationId/accept')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '초대 수락 (초대받은 본인)' })
+  async acceptInvitation(
+    @Param('id') teamId: string,
+    @Param('invitationId') invitationId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.acceptInvitation(teamId, invitationId, userId);
+  }
+
+  @Patch(':id/invitations/:invitationId/decline')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '초대 거절 (초대받은 본인)' })
+  async declineInvitation(
+    @Param('id') teamId: string,
+    @Param('invitationId') invitationId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.declineInvitation(teamId, invitationId, userId);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { PostMessageDto } from './dto/post-message.dto';
@@ -47,7 +47,7 @@ export class ChatService {
   async getRoom(roomId: string, userId: string) {
     await this.assertParticipant(roomId, userId);
 
-    return this.prisma.chatRoom.findUnique({
+    const room = await this.prisma.chatRoom.findUnique({
       where: { id: roomId },
       include: {
         participants: {
@@ -62,6 +62,12 @@ export class ChatService {
         },
       },
     });
+
+    if (room) {
+      room.messages = room.messages.map((m) => this.applyDeletion(m));
+    }
+
+    return room;
   }
 
   /** List messages for a room with cursor pagination. */
@@ -82,7 +88,8 @@ export class ChatService {
     });
 
     const hasMore = messages.length > take;
-    const data = hasMore ? messages.slice(0, take) : messages;
+    const raw = hasMore ? messages.slice(0, take) : messages;
+    const data = raw.map((m) => this.applyDeletion(m));
     const nextCursor = hasMore ? data[data.length - 1].id : null;
 
     return { data, nextCursor, hasMore };
@@ -95,12 +102,17 @@ export class ChatService {
   async postMessage(roomId: string, userId: string, dto: PostMessageDto) {
     await this.assertParticipant(roomId, userId);
 
+    if (!dto.content && !dto.imageUrl) {
+      throw new BadRequestException({ code: 'CHAT_EMPTY_MESSAGE', message: '내용 또는 이미지가 필요합니다.' });
+    }
+
     const [message] = await this.prisma.$transaction([
       this.prisma.chatMessage.create({
         data: {
           roomId,
           senderId: userId,
-          content: dto.content,
+          content: dto.content ?? '',
+          ...(dto.imageUrl ? { imageUrl: dto.imageUrl } : {}),
         },
         include: {
           sender: { select: { id: true, nickname: true, profileImageUrl: true } },
@@ -118,11 +130,48 @@ export class ChatService {
       sender: (message as unknown as { sender: unknown }).sender,
       roomId,
       content: message.content,
+      imageUrl: message.imageUrl ?? null,
       type: message.type,
       createdAt: message.createdAt,
     });
 
     return message;
+  }
+
+  /**
+   * Soft-delete a message. Only the sender may delete their own message.
+   * Broadcasts chat:message-deleted to all room participants.
+   */
+  async deleteMessage(messageId: string, userId: string) {
+    const message = await this.prisma.chatMessage.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message) {
+      throw new NotFoundException({ code: 'CHAT_MESSAGE_NOT_FOUND', message: '메시지를 찾을 수 없습니다.' });
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenException({ code: 'CHAT_FORBIDDEN', message: '본인 메시지만 삭제할 수 있습니다.' });
+    }
+
+    if (message.deletedAt) {
+      // Already deleted — idempotent, no-op
+      return { id: messageId, deletedAt: message.deletedAt };
+    }
+
+    const updated = await this.prisma.chatMessage.update({
+      where: { id: messageId },
+      data: { deletedAt: new Date() },
+    });
+
+    this.realtimeGateway.emitToRoom(message.roomId, 'chat:message-deleted', {
+      messageId,
+      roomId: message.roomId,
+      deletedAt: updated.deletedAt,
+    });
+
+    return { id: messageId, deletedAt: updated.deletedAt };
   }
 
   /** Create a new chat room (get-or-create for team_match type). */
@@ -217,6 +266,17 @@ export class ChatService {
       where: { roomId_userId: { roomId, userId } },
       data: { lastReadAt: message.createdAt },
     });
+  }
+
+  /**
+   * Masks deleted message content for API consumers while preserving the DB row for audit.
+   * Works with any message-shaped object returned from Prisma includes.
+   */
+  private applyDeletion<T extends { deletedAt: Date | null; content: string; imageUrl?: string | null }>(
+    message: T,
+  ): T {
+    if (!message.deletedAt) return message;
+    return { ...message, content: '삭제된 메시지입니다', imageUrl: null };
   }
 
   /** Asserts that userId is a participant of roomId. Throws 403 CHAT_FORBIDDEN otherwise. */

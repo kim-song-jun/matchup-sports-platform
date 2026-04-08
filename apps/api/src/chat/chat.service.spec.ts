@@ -15,6 +15,7 @@ const mockPrisma = {
     findMany: jest.fn(),
     findUnique: jest.fn(),
     create: jest.fn(),
+    update: jest.fn(),
   },
   chatRoomParticipant: {
     findUnique: jest.fn(),
@@ -103,13 +104,34 @@ describe('ChatService', () => {
 
     it('returns cursor-paginated messages', async () => {
       mockPrisma.chatRoomParticipant.findUnique.mockResolvedValue({ roomId: 'r1', userId: 'u1' });
-      const messages = [{ id: 'm1', content: 'hi' }, { id: 'm2', content: 'hello' }];
+      const messages = [
+        { id: 'm1', content: 'hi', imageUrl: null, deletedAt: null },
+        { id: 'm2', content: 'hello', imageUrl: null, deletedAt: null },
+      ];
       mockPrisma.chatMessage.findMany.mockResolvedValue(messages);
 
       const result = await service.listMessages('r1', 'u1');
 
       expect(result.data).toHaveLength(2);
       expect(result.hasMore).toBe(false);
+    });
+
+    it('replaces content with "삭제된 메시지입니다" and nulls imageUrl for deleted messages', async () => {
+      mockPrisma.chatRoomParticipant.findUnique.mockResolvedValue({ roomId: 'r1', userId: 'u1' });
+      const messages = [
+        {
+          id: 'm1', content: 'secret text', imageUrl: 'https://cdn.example.com/img.jpg',
+          deletedAt: new Date(), senderId: 'u2',
+        },
+        { id: 'm2', content: 'visible', imageUrl: null, deletedAt: null, senderId: 'u1' },
+      ];
+      mockPrisma.chatMessage.findMany.mockResolvedValue(messages);
+
+      const result = await service.listMessages('r1', 'u1');
+
+      expect(result.data[0].content).toBe('삭제된 메시지입니다');
+      expect(result.data[0].imageUrl).toBeNull();
+      expect(result.data[1].content).toBe('visible');
     });
   });
 
@@ -120,16 +142,97 @@ describe('ChatService', () => {
       await expect(service.postMessage('r1', 'stranger', { content: 'hi' })).rejects.toThrow(ForbiddenException);
     });
 
+    it('throws BadRequestException when both content and imageUrl are absent', async () => {
+      mockPrisma.chatRoomParticipant.findUnique.mockResolvedValue({ roomId: 'r1', userId: 'u1' });
+
+      await expect(service.postMessage('r1', 'u1', { content: '' })).rejects.toThrow('내용 또는 이미지가 필요합니다.');
+    });
+
     it('persists message, updates lastMessageAt via transaction, and broadcasts via realtime', async () => {
       mockPrisma.chatRoomParticipant.findUnique.mockResolvedValue({ roomId: 'r1', userId: 'u1' });
-      const savedMessage = { id: 'm1', content: 'hi', senderId: 'u1', createdAt: new Date(), type: 'text', sender: { id: 'u1', nickname: 'User1' } };
+      const savedMessage = {
+        id: 'm1', content: 'hi', senderId: 'u1', createdAt: new Date(),
+        type: 'text', imageUrl: null, sender: { id: 'u1', nickname: 'User1' },
+      };
       mockPrisma.$transaction.mockResolvedValue([savedMessage, {}]);
 
       const result = await service.postMessage('r1', 'u1', { content: 'hi' });
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
-      expect(mockRealtimeGateway.emitToRoom).toHaveBeenCalledWith('r1', 'chat:message', expect.objectContaining({ id: 'm1', roomId: 'r1' }));
+      expect(mockRealtimeGateway.emitToRoom).toHaveBeenCalledWith(
+        'r1',
+        'chat:message',
+        expect.objectContaining({ id: 'm1', roomId: 'r1', imageUrl: null }),
+      );
       expect(result).toEqual(savedMessage);
+    });
+
+    it('persists image-only message with empty content and broadcasts imageUrl', async () => {
+      mockPrisma.chatRoomParticipant.findUnique.mockResolvedValue({ roomId: 'r1', userId: 'u1' });
+      const imageUrl = 'https://cdn.example.com/photo.jpg';
+      const savedMessage = {
+        id: 'm2', content: '', senderId: 'u1', createdAt: new Date(),
+        type: 'text', imageUrl, sender: { id: 'u1', nickname: 'User1' },
+      };
+      mockPrisma.$transaction.mockResolvedValue([savedMessage, {}]);
+
+      const result = await service.postMessage('r1', 'u1', { content: '', imageUrl });
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockRealtimeGateway.emitToRoom).toHaveBeenCalledWith(
+        'r1',
+        'chat:message',
+        expect.objectContaining({ imageUrl }),
+      );
+      expect(result.imageUrl).toBe(imageUrl);
+    });
+  });
+
+  describe('deleteMessage', () => {
+    it('throws NotFoundException when message does not exist', async () => {
+      mockPrisma.chatMessage.findUnique.mockResolvedValue(null);
+
+      await expect(service.deleteMessage('m-missing', 'u1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws CHAT_FORBIDDEN when user is not the sender', async () => {
+      mockPrisma.chatMessage.findUnique.mockResolvedValue({
+        id: 'm1', senderId: 'owner', roomId: 'r1', deletedAt: null,
+      });
+
+      await expect(service.deleteMessage('m1', 'other-user')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('soft-deletes message and broadcasts chat:message-deleted', async () => {
+      const deletedAt = new Date();
+      mockPrisma.chatMessage.findUnique.mockResolvedValue({
+        id: 'm1', senderId: 'u1', roomId: 'r1', deletedAt: null,
+      });
+      mockPrisma.chatMessage.update.mockResolvedValue({ id: 'm1', deletedAt });
+
+      const result = await service.deleteMessage('m1', 'u1');
+
+      expect(mockPrisma.chatMessage.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'm1' }, data: { deletedAt: expect.any(Date) } }),
+      );
+      expect(mockRealtimeGateway.emitToRoom).toHaveBeenCalledWith(
+        'r1',
+        'chat:message-deleted',
+        expect.objectContaining({ messageId: 'm1', roomId: 'r1' }),
+      );
+      expect(result.deletedAt).toBe(deletedAt);
+    });
+
+    it('is idempotent — returns existing deletedAt without re-updating when already deleted', async () => {
+      const deletedAt = new Date('2024-01-01');
+      mockPrisma.chatMessage.findUnique.mockResolvedValue({
+        id: 'm1', senderId: 'u1', roomId: 'r1', deletedAt,
+      });
+
+      const result = await service.deleteMessage('m1', 'u1');
+
+      expect(mockPrisma.chatMessage.update).not.toHaveBeenCalled();
+      expect(result.deletedAt).toBe(deletedAt);
     });
   });
 

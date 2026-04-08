@@ -33,6 +33,8 @@ import type {
   SettlementSummary,
   PendingReview,
   Notification,
+  NotificationPreference,
+  TeamInvitation,
   CreateTeamInput,
   UpdateMatchInput,
   CreateLessonInput,
@@ -130,6 +132,14 @@ export const queryKeys = {
     all: ['notifications'] as const,
     list: (isRead?: boolean) => ['notifications', { isRead }] as const,
     unreadCount: ['notifications', 'unread-count'] as const,
+    preferences: ['notifications', 'preferences'] as const,
+  },
+  invitations: {
+    byTeam: (teamId: string) => ['invitations', 'team', teamId] as const,
+    mine: ['invitations', 'me'] as const,
+  },
+  users: {
+    search: (query: string) => ['users', 'search', query] as const,
   },
   badges: {
     all: ['badges'] as const,
@@ -1433,3 +1443,121 @@ export function useWithdrawMercenaryApplication() {
     },
   });
 }
+
+// ── Notification Preferences ──
+export function useNotificationPreferences() {
+  const { isAuthenticated } = useAuthStore();
+  return useQuery<NotificationPreference>({
+    queryKey: queryKeys.notifications.preferences,
+    queryFn: async () => {
+      const res = await api.get('/notifications/preferences');
+      return extractData<NotificationPreference>(res);
+    },
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpdateNotificationPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<Pick<NotificationPreference, 'matchEnabled' | 'teamEnabled' | 'chatEnabled' | 'paymentEnabled'>>) => {
+      const res = await api.patch('/notifications/preferences', data);
+      return extractData<NotificationPreference>(res);
+    },
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.preferences });
+      const previous = queryClient.getQueryData<NotificationPreference>(queryKeys.notifications.preferences);
+      if (previous) {
+        queryClient.setQueryData(queryKeys.notifications.preferences, { ...previous, ...updates });
+      }
+      return { previous };
+    },
+    onError: (_error, _updates, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.notifications.preferences, context.previous);
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.preferences });
+    },
+  });
+}
+
+// ── Team Invitations ──
+export function useTeamInvitations(teamId: string) {
+  return useQuery<TeamInvitation[]>({
+    queryKey: queryKeys.invitations.byTeam(teamId),
+    queryFn: async () => {
+      const res = await api.get(`/teams/${teamId}/invitations`);
+      return extractData<TeamInvitation[]>(res);
+    },
+    enabled: !!teamId,
+  });
+}
+
+export function useMyInvitations() {
+  const { isAuthenticated } = useAuthStore();
+  return useQuery<TeamInvitation[]>({
+    queryKey: queryKeys.invitations.mine,
+    queryFn: async () => {
+      const res = await api.get('/users/me/invitations');
+      return extractData<TeamInvitation[]>(res);
+    },
+    enabled: isAuthenticated,
+  });
+}
+
+export function useInviteTeamMember(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { inviteeId: string; role?: string }) => {
+      const res = await api.post(`/teams/${teamId}/invitations`, data);
+      return extractData<TeamInvitation>(res);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.invitations.byTeam(teamId) });
+    },
+  });
+}
+
+export function useAcceptInvitation(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const res = await api.patch(`/teams/${teamId}/invitations/${invitationId}/accept`);
+      return extractData<TeamInvitation>(res);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.invitations.mine });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.me });
+    },
+  });
+}
+
+export function useDeclineInvitation(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const res = await api.patch(`/teams/${teamId}/invitations/${invitationId}/decline`);
+      return extractData<TeamInvitation>(res);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.invitations.mine });
+    },
+  });
+}
+
+// ── User Search ──
+export function useSearchUsers(query: string) {
+  return useQuery<UserProfile[]>({
+    queryKey: queryKeys.users.search(query),
+    queryFn: async () => {
+      const res = await api.get('/users/search', { params: { q: query } });
+      return extractData<UserProfile[]>(res);
+    },
+    enabled: query.length >= 2,
+    staleTime: 30 * 1000,
+  });
+}
+

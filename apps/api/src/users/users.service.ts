@@ -75,6 +75,28 @@ export class UsersService {
     });
   }
 
+  /**
+   * Searches users by nickname (case-insensitive, partial match).
+   * Excludes the caller and soft-deleted users. Returns max 10 results.
+   */
+  async searchByNickname(query: string, excludeUserId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        nickname: { contains: query, mode: 'insensitive' },
+        deletedAt: null,
+        NOT: { id: excludeUserId },
+      },
+      select: {
+        id: true,
+        nickname: true,
+        profileImageUrl: true,
+        mannerScore: true,
+        sportTypes: true,
+      },
+      take: 10,
+    });
+  }
+
   async getMatchHistory(
     userId: string,
     options: { status?: string; cursor?: string; limit?: number },

@@ -1,16 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { TeamsService } from './teams.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeamMembershipService } from './team-membership.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { TeamRole, InvitationStatus } from '@prisma/client';
 
 describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: PrismaService;
+  let membershipService: TeamMembershipService;
+  let notificationsService: NotificationsService;
 
   // $transaction mock: executes the callback with the same mock object
   const mockTx = {
-    sportTeam: { create: jest.fn() },
+    sportTeam: { create: jest.fn(), update: jest.fn() },
     teamMembership: { create: jest.fn() },
+    teamInvitation: { update: jest.fn() },
   };
 
   const mockPrismaService = {
@@ -22,7 +28,26 @@ describe('TeamsService', () => {
     teamMembership: {
       create: jest.fn(),
     },
+    teamInvitation: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      upsert: jest.fn(),
+      update: jest.fn(),
+    },
+    user: {
+      findFirst: jest.fn(),
+    },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
+  };
+
+  const mockMembershipService = {
+    assertRole: jest.fn(),
+    getMembership: jest.fn(),
+  };
+
+  const mockNotificationsService = {
+    create: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -30,11 +55,15 @@ describe('TeamsService', () => {
       providers: [
         TeamsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: TeamMembershipService, useValue: mockMembershipService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
     service = module.get<TeamsService>(TeamsService);
     prisma = module.get<PrismaService>(PrismaService);
+    membershipService = module.get<TeamMembershipService>(TeamMembershipService);
+    notificationsService = module.get<NotificationsService>(NotificationsService);
 
     jest.clearAllMocks();
   });
@@ -280,6 +309,261 @@ describe('TeamsService', () => {
           isRecruiting: true,
         }),
       });
+    });
+  });
+
+  // ─── Invitation Tests ──────────────────────────────────────────────────────
+
+  describe('inviteMember', () => {
+    const mockTeam = {
+      id: 'team-1',
+      name: 'FC 서울',
+      sportType: 'FUTSAL',
+      owner: { id: 'owner-1', nickname: '팀장', profileImageUrl: null, mannerScore: 4.5 },
+    };
+    const mockInvitee = { id: 'invitee-1', nickname: '초대받은유저' };
+    const mockInvitation = {
+      id: 'inv-1',
+      teamId: 'team-1',
+      inviterId: 'manager-1',
+      inviteeId: 'invitee-1',
+      role: TeamRole.member,
+      status: InvitationStatus.pending,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+      inviter: { id: 'manager-1', nickname: '매니저' },
+      invitee: { id: 'invitee-1', nickname: '초대받은유저' },
+      team: { id: 'team-1', name: 'FC 서울' },
+    };
+
+    beforeEach(() => {
+      mockMembershipService.assertRole.mockResolvedValue({});
+      mockMembershipService.getMembership.mockResolvedValue(null);
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue(mockTeam);
+      mockPrismaService.user.findFirst.mockResolvedValue(mockInvitee);
+      mockPrismaService.teamInvitation.findUnique.mockResolvedValue(null);
+      mockPrismaService.teamInvitation.upsert.mockResolvedValue(mockInvitation);
+      mockNotificationsService.create.mockResolvedValue({});
+    });
+
+    it('should create an invitation and send notification', async () => {
+      const result = await service.inviteMember('team-1', 'manager-1', 'invitee-1');
+
+      expect(result).toEqual(mockInvitation);
+      expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
+      expect(mockPrismaService.teamInvitation.upsert).toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when inviting self', async () => {
+      await expect(
+        service.inviteMember('team-1', 'manager-1', 'manager-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException when invitee does not exist', async () => {
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.inviteMember('team-1', 'manager-1', 'ghost-user'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when invitee is already a member', async () => {
+      mockMembershipService.getMembership.mockResolvedValue({
+        id: 'm-1',
+        teamId: 'team-1',
+        userId: 'invitee-1',
+        role: TeamRole.member,
+        status: 'active',
+      });
+
+      await expect(
+        service.inviteMember('team-1', 'manager-1', 'invitee-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw ConflictException when pending invitation already exists', async () => {
+      mockPrismaService.teamInvitation.findUnique.mockResolvedValue({
+        id: 'inv-existing',
+        status: InvitationStatus.pending,
+      });
+
+      await expect(
+        service.inviteMember('team-1', 'manager-1', 'invitee-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw ForbiddenException when caller lacks manager role', async () => {
+      mockMembershipService.assertRole.mockRejectedValue(
+        new ForbiddenException('팀 권한이 부족합니다'),
+      );
+
+      await expect(
+        service.inviteMember('team-1', 'regular-member', 'invitee-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow re-invitation when previous invitation is declined', async () => {
+      mockPrismaService.teamInvitation.findUnique.mockResolvedValue({
+        id: 'inv-old',
+        status: InvitationStatus.declined,
+      });
+
+      const result = await service.inviteMember('team-1', 'manager-1', 'invitee-1');
+
+      expect(result).toEqual(mockInvitation);
+      expect(mockPrismaService.teamInvitation.upsert).toHaveBeenCalled();
+    });
+  });
+
+  describe('acceptInvitation', () => {
+    const pendingInvitation = {
+      id: 'inv-1',
+      teamId: 'team-1',
+      inviterId: 'manager-1',
+      inviteeId: 'invitee-1',
+      role: TeamRole.member,
+      status: InvitationStatus.pending,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue(pendingInvitation);
+      mockTx.teamInvitation.update.mockResolvedValue({});
+      mockTx.teamMembership.create.mockResolvedValue({});
+      mockTx.sportTeam.update.mockResolvedValue({});
+    });
+
+    it('should accept invitation and create membership', async () => {
+      const result = await service.acceptInvitation('team-1', 'inv-1', 'invitee-1');
+
+      expect(result).toEqual({ accepted: true });
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when invitation does not exist', async () => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.acceptInvitation('team-1', 'inv-missing', 'invitee-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when non-invitee tries to accept', async () => {
+      await expect(
+        service.acceptInvitation('team-1', 'inv-1', 'other-user'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException when invitation is not pending', async () => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue({
+        ...pendingInvitation,
+        status: InvitationStatus.declined,
+      });
+
+      await expect(
+        service.acceptInvitation('team-1', 'inv-1', 'invitee-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException and mark expired when invitation has expired', async () => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue({
+        ...pendingInvitation,
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      mockPrismaService.teamInvitation.update.mockResolvedValue({});
+
+      await expect(
+        service.acceptInvitation('team-1', 'inv-1', 'invitee-1'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrismaService.teamInvitation.update).toHaveBeenCalledWith({
+        where: { id: 'inv-1' },
+        data: { status: InvitationStatus.expired },
+      });
+    });
+  });
+
+  describe('declineInvitation', () => {
+    const pendingInvitation = {
+      id: 'inv-1',
+      teamId: 'team-1',
+      inviterId: 'manager-1',
+      inviteeId: 'invitee-1',
+      role: TeamRole.member,
+      status: InvitationStatus.pending,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue(pendingInvitation);
+      mockPrismaService.teamInvitation.update.mockResolvedValue({
+        ...pendingInvitation,
+        status: InvitationStatus.declined,
+      });
+    });
+
+    it('should decline invitation successfully', async () => {
+      const result = await service.declineInvitation('team-1', 'inv-1', 'invitee-1');
+
+      expect(result).toEqual({ declined: true });
+      expect(mockPrismaService.teamInvitation.update).toHaveBeenCalledWith({
+        where: { id: 'inv-1' },
+        data: { status: InvitationStatus.declined },
+      });
+    });
+
+    it('should throw NotFoundException when invitation does not exist', async () => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.declineInvitation('team-1', 'inv-missing', 'invitee-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when non-invitee tries to decline', async () => {
+      await expect(
+        service.declineInvitation('team-1', 'inv-1', 'other-user'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException when invitation is already declined', async () => {
+      mockPrismaService.teamInvitation.findFirst.mockResolvedValue({
+        ...pendingInvitation,
+        status: InvitationStatus.declined,
+      });
+
+      await expect(
+        service.declineInvitation('team-1', 'inv-1', 'invitee-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getMyInvitations', () => {
+    it('should return pending non-expired invitations for the user', async () => {
+      const mockInvitations = [
+        {
+          id: 'inv-1',
+          teamId: 'team-1',
+          inviteeId: 'user-1',
+          status: InvitationStatus.pending,
+          team: { id: 'team-1', name: 'FC 서울', logoUrl: null, sportType: 'FUTSAL' },
+          inviter: { id: 'manager-1', nickname: '매니저', profileImageUrl: null },
+        },
+      ];
+      mockPrismaService.teamInvitation.findMany.mockResolvedValue(mockInvitations);
+
+      const result = await service.getMyInvitations('user-1');
+
+      expect(result).toEqual(mockInvitations);
+      expect(mockPrismaService.teamInvitation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            inviteeId: 'user-1',
+            status: InvitationStatus.pending,
+          }),
+        }),
+      );
     });
   });
 });

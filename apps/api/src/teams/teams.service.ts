@@ -1,9 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeamRole, InvitationStatus } from '@prisma/client';
+import { TeamMembershipService } from './team-membership.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+// Expiration duration for team invitations in days
+const INVITATION_EXPIRY_DAYS = 7;
 
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly membershipService: TeamMembershipService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findByOwner(ownerId: string) {
     return this.prisma.sportTeam.findMany({
@@ -96,5 +112,230 @@ export class TeamsService {
 
       return team;
     });
+  }
+
+  // ─── Invitation Methods ────────────────────────────────────────────────────
+
+  /**
+   * Invites a user to the team. Caller must have manager+ role.
+   * Throws ConflictException if invitee is already a member or has a pending invitation.
+   */
+  async inviteMember(
+    teamId: string,
+    inviterId: string,
+    inviteeId: string,
+    role: TeamRole = TeamRole.member,
+  ) {
+    await this.membershipService.assertRole(teamId, inviterId, TeamRole.manager);
+
+    const team = await this.findById(teamId);
+
+    // Prevent inviting self
+    if (inviterId === inviteeId) {
+      throw new BadRequestException({
+        code: 'TEAM_INVITATION_SELF',
+        message: '자기 자신을 초대할 수 없습니다.',
+      });
+    }
+
+    // Check invitee exists and is not deleted
+    const invitee = await this.prisma.user.findFirst({
+      where: { id: inviteeId, deletedAt: null },
+      select: { id: true, nickname: true },
+    });
+    if (!invitee) {
+      throw new NotFoundException('초대할 사용자를 찾을 수 없습니다.');
+    }
+
+    // Check if already an active member
+    const existingMembership = await this.membershipService.getMembership(teamId, inviteeId);
+    if (existingMembership) {
+      throw new ConflictException({
+        code: 'TEAM_INVITATION_ALREADY_MEMBER',
+        message: '이미 팀의 멤버입니다.',
+      });
+    }
+
+    // Check if pending invitation already exists
+    const existingInvitation = await this.prisma.teamInvitation.findUnique({
+      where: { teamId_inviteeId: { teamId, inviteeId } },
+    });
+    if (existingInvitation && existingInvitation.status === InvitationStatus.pending) {
+      throw new ConflictException({
+        code: 'TEAM_INVITATION_PENDING_EXISTS',
+        message: '이미 대기 중인 초대가 있습니다.',
+      });
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);
+
+    // Upsert: replace expired/declined invitation or create new
+    const invitation = await this.prisma.teamInvitation.upsert({
+      where: { teamId_inviteeId: { teamId, inviteeId } },
+      create: {
+        teamId,
+        inviterId,
+        inviteeId,
+        role,
+        status: InvitationStatus.pending,
+        expiresAt,
+      },
+      update: {
+        inviterId,
+        role,
+        status: InvitationStatus.pending,
+        expiresAt,
+      },
+      include: {
+        inviter: { select: { id: true, nickname: true } },
+        invitee: { select: { id: true, nickname: true } },
+        team: { select: { id: true, name: true } },
+      },
+    });
+
+    // Fire-and-forget notification
+    void this.notificationsService.create({
+      userId: inviteeId,
+      type: 'team_invitation',
+      title: '팀 초대',
+      body: `${team.name} 팀에서 초대장이 도착했습니다.`,
+      data: { teamId, invitationId: invitation.id },
+    });
+
+    return invitation;
+  }
+
+  /**
+   * Returns all invitations for a team. Caller must have manager+ role.
+   */
+  async getTeamInvitations(teamId: string, userId: string) {
+    await this.membershipService.assertRole(teamId, userId, TeamRole.manager);
+
+    return this.prisma.teamInvitation.findMany({
+      where: { teamId },
+      include: {
+        inviter: { select: { id: true, nickname: true, profileImageUrl: true } },
+        invitee: { select: { id: true, nickname: true, profileImageUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Returns all pending invitations sent to the current user.
+   */
+  async getMyInvitations(userId: string) {
+    return this.prisma.teamInvitation.findMany({
+      where: {
+        inviteeId: userId,
+        status: InvitationStatus.pending,
+        expiresAt: { gt: new Date() },
+      },
+      include: {
+        team: { select: { id: true, name: true, logoUrl: true, sportType: true } },
+        inviter: { select: { id: true, nickname: true, profileImageUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Accepts a pending, non-expired invitation and creates a TeamMembership.
+   * Only the invitee can accept.
+   */
+  async acceptInvitation(teamId: string, invitationId: string, userId: string) {
+    const invitation = await this.prisma.teamInvitation.findFirst({
+      where: { id: invitationId, teamId },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException({
+        code: 'TEAM_INVITATION_NOT_FOUND',
+        message: '초대를 찾을 수 없습니다.',
+      });
+    }
+    if (invitation.inviteeId !== userId) {
+      throw new ForbiddenException({
+        code: 'TEAM_INVITATION_FORBIDDEN',
+        message: '본인에게 온 초대만 수락할 수 있습니다.',
+      });
+    }
+    if (invitation.status !== InvitationStatus.pending) {
+      throw new BadRequestException({
+        code: 'TEAM_INVITATION_NOT_PENDING',
+        message: '대기 중인 초대가 아닙니다.',
+      });
+    }
+    if (invitation.expiresAt < new Date()) {
+      // Mark as expired
+      await this.prisma.teamInvitation.update({
+        where: { id: invitationId },
+        data: { status: InvitationStatus.expired },
+      });
+      throw new BadRequestException({
+        code: 'TEAM_INVITATION_EXPIRED',
+        message: '초대가 만료되었습니다.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.teamInvitation.update({
+        where: { id: invitationId },
+        data: { status: InvitationStatus.accepted },
+      });
+
+      await tx.teamMembership.create({
+        data: {
+          teamId,
+          userId,
+          role: invitation.role,
+          status: 'active',
+          invitedBy: invitation.inviterId,
+        },
+      });
+
+      await tx.sportTeam.update({
+        where: { id: teamId },
+        data: { memberCount: { increment: 1 } },
+      });
+
+      return { accepted: true };
+    });
+  }
+
+  /**
+   * Declines a pending invitation. Only the invitee can decline.
+   */
+  async declineInvitation(teamId: string, invitationId: string, userId: string) {
+    const invitation = await this.prisma.teamInvitation.findFirst({
+      where: { id: invitationId, teamId },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException({
+        code: 'TEAM_INVITATION_NOT_FOUND',
+        message: '초대를 찾을 수 없습니다.',
+      });
+    }
+    if (invitation.inviteeId !== userId) {
+      throw new ForbiddenException({
+        code: 'TEAM_INVITATION_FORBIDDEN',
+        message: '본인에게 온 초대만 거절할 수 있습니다.',
+      });
+    }
+    if (invitation.status !== InvitationStatus.pending) {
+      throw new BadRequestException({
+        code: 'TEAM_INVITATION_NOT_PENDING',
+        message: '대기 중인 초대가 아닙니다.',
+      });
+    }
+
+    await this.prisma.teamInvitation.update({
+      where: { id: invitationId },
+      data: { status: InvitationStatus.declined },
+    });
+
+    return { declined: true };
   }
 }

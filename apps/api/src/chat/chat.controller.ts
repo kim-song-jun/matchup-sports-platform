@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -76,6 +77,17 @@ export class ChatController {
     @Body() dto: PostMessageDto,
   ) {
     return this.chatService.postMessage(roomId, userId, dto);
+  }
+
+  @Delete('rooms/:roomId/messages/:messageId')
+  @ApiOperation({ summary: '메시지 삭제 (soft delete — 본인 메시지만)' })
+  @ApiParam({ name: 'roomId', description: 'Room ID' })
+  @ApiParam({ name: 'messageId', description: 'Message ID' })
+  async deleteMessage(
+    @Param('messageId') messageId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.chatService.deleteMessage(messageId, userId);
   }
 
   @Patch('rooms/:id/read')

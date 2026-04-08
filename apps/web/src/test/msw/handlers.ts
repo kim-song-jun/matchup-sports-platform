@@ -188,6 +188,109 @@ export const handlers = [
     return success({ ...mockNotification, isRead: true });
   }),
 
+  http.get('/api/v1/notifications/preferences', () => {
+    return success({
+      id: 'pref-1',
+      matchEnabled: true,
+      teamEnabled: true,
+      chatEnabled: true,
+      paymentEnabled: true,
+    });
+  }),
+
+  http.patch('/api/v1/notifications/preferences', async ({ request }) => {
+    const body = await request.json() as Record<string, boolean>;
+    return success({
+      id: 'pref-1',
+      matchEnabled: body.matchEnabled ?? true,
+      teamEnabled: body.teamEnabled ?? true,
+      chatEnabled: body.chatEnabled ?? true,
+      paymentEnabled: body.paymentEnabled ?? true,
+    });
+  }),
+
+  // ── Team Invitations handlers ──
+  http.get('/api/v1/teams/:teamId/invitations', ({ params }) => {
+    return success([
+      {
+        id: 'inv-1',
+        teamId: params.teamId as string,
+        team: { id: params.teamId as string, name: '서울 FC', logoUrl: null },
+        inviter: { id: 'user-1', nickname: '테스트유저' },
+        role: 'member',
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  }),
+
+  http.post('/api/v1/teams/:teamId/invitations', async ({ params, request }) => {
+    const body = await request.json() as { inviteeId: string; role?: string };
+    return success({
+      id: 'inv-new',
+      teamId: params.teamId as string,
+      team: { id: params.teamId as string, name: '서울 FC', logoUrl: null },
+      inviter: { id: 'user-1', nickname: '테스트유저' },
+      role: body.role ?? 'member',
+      status: 'pending',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.patch('/api/v1/teams/:teamId/invitations/:invId/accept', ({ params }) => {
+    return success({
+      id: params.invId as string,
+      teamId: params.teamId as string,
+      team: { id: params.teamId as string, name: '서울 FC', logoUrl: null },
+      inviter: { id: 'user-1', nickname: '테스트유저' },
+      role: 'member',
+      status: 'accepted',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.patch('/api/v1/teams/:teamId/invitations/:invId/decline', ({ params }) => {
+    return success({
+      id: params.invId as string,
+      teamId: params.teamId as string,
+      team: { id: params.teamId as string, name: '서울 FC', logoUrl: null },
+      inviter: { id: 'user-1', nickname: '테스트유저' },
+      role: 'member',
+      status: 'declined',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+    });
+  }),
+
+  http.get('/api/v1/users/me/invitations', () => {
+    return success([
+      {
+        id: 'inv-1',
+        teamId: 'team-1',
+        team: { id: 'team-1', name: '서울 FC', logoUrl: null },
+        inviter: { id: 'user-2', nickname: '초대자' },
+        role: 'member',
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  }),
+
+  // ── User Search handler ──
+  http.get('/api/v1/users/search', ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get('q') ?? '';
+    return success(
+      q.length >= 2
+        ? [{ id: 'user-2', nickname: `${q}유저`, email: null, profileImageUrl: null, mannerScore: 4.0, totalMatches: 5 }]
+        : [],
+    );
+  }),
+
   // ── Marketplace handlers ──
   http.get('/api/v1/marketplace/listings', () => {
     return success({ items: [mockListing], nextCursor: null });

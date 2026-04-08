@@ -15,6 +15,7 @@ import { WebPushService } from './web-push.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PushSubscribeDto, PushUnsubscribeDto } from './dto/push-subscribe.dto';
+import { UpdateNotificationPreferenceDto } from './dto/notification-preference.dto';
 
 @ApiTags('알림')
 @Controller('notifications')
@@ -97,5 +98,24 @@ export class NotificationsController {
     @Body() dto: PushUnsubscribeDto,
   ) {
     return this.webPushService.unsubscribe(userId, dto.endpoint);
+  }
+
+  @Get('preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '알림 설정 조회 (없으면 기본값 반환)' })
+  async getPreferences(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getPreferences(userId);
+  }
+
+  @Patch('preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '알림 설정 업데이트 (upsert)' })
+  async updatePreferences(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateNotificationPreferenceDto,
+  ) {
+    return this.notificationsService.updatePreferences(userId, dto);
   }
 }

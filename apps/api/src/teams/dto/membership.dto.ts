@@ -28,3 +28,14 @@ export class TransferOwnershipDto {
   @IsIn(['manager', 'member'])
   demoteTo: 'manager' | 'member';
 }
+
+export class InviteMemberDto {
+  @ApiProperty({ description: 'User ID to invite' })
+  @IsString()
+  inviteeId: string;
+
+  @ApiPropertyOptional({ enum: TeamRole, description: 'Role to assign upon acceptance (defaults to member)' })
+  @IsOptional()
+  @IsEnum(TeamRole)
+  role?: TeamRole;
+}

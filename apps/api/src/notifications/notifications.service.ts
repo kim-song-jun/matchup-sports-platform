@@ -3,7 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService } from './web-push.service';
-import { presentNotification } from './notification-presentation';
+import { presentNotification, notificationCategory } from './notification-presentation';
+import { UpdateNotificationPreferenceDto } from './dto/notification-preference.dto';
 
 @Injectable()
 export class NotificationsService {
@@ -21,6 +22,24 @@ export class NotificationsService {
     body: string;
     data?: Record<string, unknown>;
   }) {
+    // Check user notification preferences; default to enabled when no preference row exists
+    const preference = await this.prisma.notificationPreference.findUnique({
+      where: { userId: data.userId },
+    });
+
+    if (preference) {
+      const category = notificationCategory(data.type);
+      const blocked =
+        (category === 'match' && !preference.matchEnabled) ||
+        (category === 'team' && !preference.teamEnabled) ||
+        (category === 'chat' && !preference.chatEnabled) ||
+        (category === 'payment' && !preference.paymentEnabled);
+
+      if (blocked) {
+        return null;
+      }
+    }
+
     const notification = await this.prisma.notification.create({
       data: {
         userId: data.userId,
@@ -106,6 +125,58 @@ export class NotificationsService {
       where: { userId, isRead: false },
     });
     return { count };
+  }
+
+  async getPreferences(userId: string) {
+    const preference = await this.prisma.notificationPreference.findUnique({
+      where: { userId },
+    });
+
+    if (!preference) {
+      // Return default all-enabled when no row exists yet
+      return {
+        id: null,
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+      };
+    }
+
+    return {
+      id: preference.id,
+      matchEnabled: preference.matchEnabled,
+      teamEnabled: preference.teamEnabled,
+      chatEnabled: preference.chatEnabled,
+      paymentEnabled: preference.paymentEnabled,
+    };
+  }
+
+  async updatePreferences(userId: string, dto: UpdateNotificationPreferenceDto) {
+    const preference = await this.prisma.notificationPreference.upsert({
+      where: { userId },
+      create: {
+        userId,
+        matchEnabled: dto.matchEnabled ?? true,
+        teamEnabled: dto.teamEnabled ?? true,
+        chatEnabled: dto.chatEnabled ?? true,
+        paymentEnabled: dto.paymentEnabled ?? true,
+      },
+      update: {
+        ...(dto.matchEnabled !== undefined && { matchEnabled: dto.matchEnabled }),
+        ...(dto.teamEnabled !== undefined && { teamEnabled: dto.teamEnabled }),
+        ...(dto.chatEnabled !== undefined && { chatEnabled: dto.chatEnabled }),
+        ...(dto.paymentEnabled !== undefined && { paymentEnabled: dto.paymentEnabled }),
+      },
+    });
+
+    return {
+      id: preference.id,
+      matchEnabled: preference.matchEnabled,
+      teamEnabled: preference.teamEnabled,
+      chatEnabled: preference.chatEnabled,
+      paymentEnabled: preference.paymentEnabled,
+    };
   }
 
 }

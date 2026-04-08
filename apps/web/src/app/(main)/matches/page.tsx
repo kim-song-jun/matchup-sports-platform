@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Search, SlidersHorizontal, Clock, Users, MapPin, Sparkles, X } from 'lucide-react';
+import { Search, SlidersHorizontal, Clock, Users, MapPin, Sparkles, X, List, Map } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -24,6 +24,7 @@ import {
 import { formatCurrency, formatMatchDate, getTimeBadge, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
 import type { Match } from '@/types/api';
+import { MatchesMapView } from '@/components/map/matches-map-view';
 
 const SPORT_FILTERS = [
   { key: '', translationKey: 'all' },
@@ -144,6 +145,7 @@ export default function MatchesPage() {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const urlFilters = useMemo(() => parseMatchDiscoveryFilters(searchParams), [searchParams]);
   const pendingFiltersRef = useRef(urlFilters);
   const [draftFilters, setDraftFilters] = useState(urlFilters);
@@ -249,14 +251,45 @@ export default function MatchesPage() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('findMatch')}</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('subtitle')}</p>
           </div>
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            data-testid="match-clear-filters"
-            className="min-h-[44px] shrink-0 rounded-xl border border-gray-200 px-3 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-white"
-          >
-            {t('clearFilters')}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* List / Map view toggle */}
+            <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <button
+                type="button"
+                aria-label="리스트 뷰"
+                aria-pressed={viewMode === 'list'}
+                onClick={() => setViewMode('list')}
+                className={`min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+              >
+                <List size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label="지도 뷰"
+                aria-pressed={viewMode === 'map'}
+                onClick={() => setViewMode('map')}
+                className={`min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
+                  viewMode === 'map'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                }`}
+              >
+                <Map size={16} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              data-testid="match-clear-filters"
+              className="min-h-[44px] shrink-0 rounded-xl border border-gray-200 px-3 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-white"
+            >
+              {t('clearFilters')}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -510,6 +543,8 @@ export default function MatchesPage() {
           </div>
         ) : error ? (
           <ErrorState onRetry={() => refetch()} />
+        ) : viewMode === 'map' ? (
+          <MatchesMapView matches={matches} />
         ) : matches.length === 0 ? (
           <EmptyState
             icon={Search}

@@ -179,7 +179,7 @@ describe('RealtimeGateway', () => {
 
       expect(client.emit).toHaveBeenCalledWith(
         'chat:error',
-        expect.objectContaining({ code: 'CHAT_FORBIDDEN' }),
+        expect.objectContaining({ code: 'CHAT_SEND_FAILED' }),
       );
     });
 

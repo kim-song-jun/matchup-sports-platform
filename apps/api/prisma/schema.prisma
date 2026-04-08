@@ -99,6 +99,7 @@ enum NotificationType {
   payment_refunded
   marketplace_order
   marketplace_message
+  team_invitation
 }
 
 enum ChatRoomType {
@@ -229,6 +230,9 @@ model User {
   sentMessages           ChatMessage[]        @relation("MessageSender")
   pushSubscriptions      PushSubscription[]
   uploads                Upload[]
+  sentInvitations        TeamInvitation[]     @relation("InvitationsSent")
+  receivedInvitations    TeamInvitation[]     @relation("InvitationsReceived")
+  notificationPreference NotificationPreference?
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -735,6 +739,7 @@ model SportTeam {
   teamApplications    TeamMatchApplication[] @relation("TeamAppApplicant")
   memberships         TeamMembership[]
   mercenaryPosts      MercenaryPost[]
+  invitations         TeamInvitation[]
 
   @@index([sportType])
   @@map("sport_teams")
@@ -1066,6 +1071,8 @@ model ChatMessage {
   senderId  String          @map("sender_id")
   content   String          @db.VarChar(2000)
   type      ChatMessageType @default(text)
+  imageUrl  String?         @map("image_url")
+  deletedAt DateTime?       @map("deleted_at")
   createdAt DateTime        @default(now()) @map("created_at")
 
   room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -1110,4 +1117,48 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// ─── Team Invitations ───────────────────────────────────
+
+enum InvitationStatus {
+  pending
+  accepted
+  declined
+  expired
+}
+
+model TeamInvitation {
+  id        String           @id @default(cuid())
+  teamId    String           @map("team_id")
+  inviterId String           @map("inviter_id")
+  inviteeId String           @map("invitee_id")
+  role      TeamRole         @default(member)
+  status    InvitationStatus @default(pending)
+  expiresAt DateTime         @map("expires_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  team    SportTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  inviter User     @relation("InvitationsSent", fields: [inviterId], references: [id])
+  invitee User     @relation("InvitationsReceived", fields: [inviteeId], references: [id])
+
+  @@unique([teamId, inviteeId])
+  @@index([inviteeId, status])
+  @@map("team_invitations")
+}
+
+// ─── Notification Preferences ───────────────────────────
+
+model NotificationPreference {
+  id             String   @id @default(cuid())
+  userId         String   @unique @map("user_id")
+  matchEnabled   Boolean  @default(true) @map("match_enabled")
+  teamEnabled    Boolean  @default(true) @map("team_enabled")
+  chatEnabled    Boolean  @default(true) @map("chat_enabled")
+  paymentEnabled Boolean  @default(true) @map("payment_enabled")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
 }

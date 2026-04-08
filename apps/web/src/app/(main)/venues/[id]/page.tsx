@@ -10,6 +10,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import type { Venue } from '@/types/api';
 import { MapPlaceholder } from '@/components/ui/map-placeholder';
+import { KakaoMap } from '@/components/map/kakao-map';
 import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
 import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -239,13 +240,22 @@ export default function VenueDetailPage() {
                 ))}
               </div>
             )}
-            <MapPlaceholder
-              lat={venue.lat ?? 37.5665}
-              lng={venue.lng ?? 126.978}
-              address={venue.address}
-              name={venue.name}
-              height={220}
-            />
+            {venue.lat != null && venue.lng != null ? (
+              <KakaoMap
+                latitude={venue.lat}
+                longitude={venue.lng}
+                name={venue.name}
+                height="h-[220px]"
+              />
+            ) : (
+              <MapPlaceholder
+                lat={37.5665}
+                lng={126.978}
+                address={venue.address}
+                name={venue.name}
+                height={220}
+              />
+            )}
           </div>
 
           {/* Title card */}

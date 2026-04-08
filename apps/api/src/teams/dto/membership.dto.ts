@@ -34,8 +34,8 @@ export class InviteMemberDto {
   @IsString()
   inviteeId: string;
 
-  @ApiPropertyOptional({ enum: TeamRole, description: 'Role to assign upon acceptance (defaults to member)' })
+  @ApiPropertyOptional({ enum: ['manager', 'member'], description: 'Role to assign upon acceptance (defaults to member)' })
   @IsOptional()
-  @IsEnum(TeamRole)
-  role?: TeamRole;
+  @IsIn(['manager', 'member'])
+  role?: 'manager' | 'member';
 }

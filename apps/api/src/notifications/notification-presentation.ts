@@ -51,6 +51,7 @@ export function notificationCategory(type: NotificationType): NotificationCatego
     case NotificationType.review_pending:
       return 'match';
     case NotificationType.team_announced:
+    case NotificationType.team_invitation:
       return 'team';
     case NotificationType.marketplace_message:
       return 'chat';

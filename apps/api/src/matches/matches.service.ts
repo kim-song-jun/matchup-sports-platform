@@ -29,7 +29,7 @@ export class MatchesService {
     const matches = await this.prisma.match.findMany({
       where,
       include: {
-        venue: { select: { id: true, name: true, city: true, district: true } },
+        venue: { select: { id: true, name: true, city: true, district: true, imageUrls: true } },
         host: {
           select: { id: true, nickname: true, profileImageUrl: true },
         },
@@ -54,7 +54,7 @@ export class MatchesService {
     return this.prisma.match.findMany({
       where: { status: 'recruiting' },
       include: {
-        venue: { select: { id: true, name: true, city: true } },
+        venue: { select: { id: true, name: true, city: true, imageUrls: true } },
         host: {
           select: { id: true, nickname: true, profileImageUrl: true },
         },
@@ -105,6 +105,7 @@ export class MatchesService {
         hostId,
         title: dto.title,
         description: dto.description,
+        imageUrl: dto.imageUrl,
         sportType: dto.sportType as never,
         venueId: dto.venueId,
         matchDate: new Date(dto.matchDate),

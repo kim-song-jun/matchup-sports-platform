@@ -115,8 +115,9 @@ GitHub Actions 트리거
 6. API / Web Docker 이미지 빌드
 7. compose 스택 재기동 (`docker compose` 또는 `docker-compose`)
 8. `prisma migrate deploy` 실행
-9. 선택적 seed 실행
-10. localhost 헬스체크
+9. `prisma/seed-images.ts`로 DB-backed 이미지 보강
+10. 선택적 full seed 실행
+11. localhost 헬스체크
   ↓
 🎉 배포 완료
 ```
@@ -255,6 +256,7 @@ ssh -i matchup-key.pem ec2-user@<EC2_IP> '
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
   sudo docker exec matchup_api npx prisma migrate deploy
+  sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
 '
 ```
 
@@ -275,6 +277,12 @@ docker exec -it matchup_api npx prisma studio
 
 ```bash
 docker exec matchup_api npx ts-node prisma/seed.ts
+```
+
+### 이미지 데이터 보강 (운영 안전)
+
+```bash
+docker exec matchup_api npx ts-node prisma/seed-images.ts
 ```
 
 ---

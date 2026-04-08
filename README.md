@@ -249,12 +249,15 @@ cp apps/web/.env.example apps/web/.env.local
 make up
 
 # 2. DB 스키마 반영
-make db:push
+make db-push
 
 # 3. 초기 데이터 시드 (선택)
-make db:seed
+make db-seed
 
-# 4. 로그와 함께 붙어서 실행하려면
+# 4. 이미지 데이터만 안전하게 보강
+make db-seed-images
+
+# 5. 로그와 함께 붙어서 실행하려면
 make dev
 ```
 
@@ -285,9 +288,10 @@ pnpm qa:manual:ui-gaps
 pnpm docs:screenshots:overview
 pnpm docs:screenshots:app
 
-make db:push         # Prisma 스키마 → DB 즉시 반영 (dev)
-make db:migrate      # Prisma 마이그레이션 생성 및 적용
-make db:seed         # 초기 데이터 시드
+make db-push         # Prisma 스키마 → DB 즉시 반영 (dev)
+make db-migrate      # Prisma 마이그레이션 생성 및 적용
+make db-seed         # 초기 데이터 시드 (destructive full seed)
+make db-seed-images  # 이미지 데이터만 안전하게 보강
 ```
 
 ### 개별 앱
@@ -500,7 +504,7 @@ docker-compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 ```
 
 - Nginx 리버스 프록시로 Frontend(3000) / Backend(8100) 라우팅
-- GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, compose 재기동, `prisma migrate deploy`를 수행
+- GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, compose 재기동, `prisma migrate deploy`와 `prisma/seed-images.ts`를 수행
 - 운영 EC2 SSH 계정 기준은 `ec2-user`다
 - SSL 종료는 Nginx 레이어에서 처리
 - EC2 초기 설정: `deploy/setup-ec2.sh` 참고

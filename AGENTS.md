@@ -94,6 +94,7 @@ Errors:
 - Next dev 기준 `/home`은 첫 컴파일 비용이 특히 무거워 60초를 넘길 수 있다. Playwright 세션 안정화나 수동 캡처 스크립트의 첫 진입점으로는 `/home`보다 `/login`, `/landing`, `/matches` 같은 더 가벼운 경로를 먼저 워밍업한 뒤 대상 페이지로 이동한다.
 - Production compose 기준 포트는 `web=3000`, `api=8100`이다. dev/prod 포트를 혼동하지 않는다.
 - 현재 운영 EC2는 `ec2-user`로 접속하며, Amazon Linux bootstrap은 standalone `docker-compose`를 제공할 수 있다. CI/runbook/manual deploy는 `docker compose` 플러그인만 있다고 가정하지 말고 두 형태를 모두 처리하거나 사전 검증한다.
+- 운영 자동화에 destructive full seed(`prisma db seed`, `make db-seed`)를 기본 경로로 연결하지 않는다. deploy-safe data backfill은 idempotent 전용 스크립트(`prisma/seed-images.ts`, `make db-seed-images`)로 분리한다.
 - 이미 실행 중인 스택이 있으면 재시작보다 현재 상태를 활용한다.
 
 ## 2) Context Budget Rules
@@ -146,7 +147,9 @@ Errors:
 - 현실감이 중요한 카드/리스트 이미지 슬롯은 SVG보다 실사형 로컬 mock 이미지를 우선 사용한다.
 - 사용자가 실사 방향을 명시한 경우 active fallback catalog에는 실사 사진만 남기고, 생성형/SVG 자산은 동일 슬롯에 혼합하지 않는다.
 - 사용자-facing create/edit 폼의 빈 업로드 슬롯도 이미지 경험의 일부로 본다. 업로드 전 비어 있는 상태라면 회색 박스만 두지 말고, helper 기반 실사 예시 스트립이나 명확한 fallback 가이드를 함께 제공한다.
+- 사용자-facing 상세 이미지 확대/갤러리 경험은 generic `Modal`로 구현하지 않는다. immersive media viewing은 전용 `MediaLightbox` 패턴으로 분리하고, `Escape`, backdrop close, current index, multi-image navigation을 기본 계약으로 둔다.
 - 사용자-facing create/edit 폼에서 화면에 노출한 입력, 업로드, 직접 입력 옵션은 실제 저장 경로와 반드시 일치해야 한다. 현재 저장되지 않는 선택지를 노출하는 false affordance는 금지한다.
+- URL 기반 필터 화면(`matches`, `marketplace`, `lessons` 등)은 router query만 단일 source로 직접 조합하지 않는다. 빠른 연속 입력/토글에서 stale query overwrite가 발생하므로, local draft filter state를 두고 debounce/replace로 동기화한다.
 - 같은 도메인 여정(`list -> create -> detail -> edit -> history`) 안의 페이지는 하나의 accent/control language를 공유해야 한다. 일부 화면만 흑백 토글이나 별도 폼 스킨으로 분리하지 않는다.
 - 배지, 평점, 전적, 신뢰도처럼 사용자 의사결정에 직접 영향을 주는 신호는 `verified`, `estimated`, `sample` 상태를 명확히 구분해야 한다. mock/샘플 데이터를 실제 신뢰 신호처럼 렌더링하지 않는다.
 - 서비스 전체 지원 범위(종목, 상태, 역할 등)는 list/create/edit/detail 하위 플로우에서도 일관되게 유지한다. 일부 화면에서만 조용히 범위를 줄이는 silent capability narrowing은 금지한다.

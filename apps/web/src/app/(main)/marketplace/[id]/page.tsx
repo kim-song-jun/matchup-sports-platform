@@ -7,6 +7,7 @@ import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
+import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
@@ -30,6 +31,8 @@ export default function ListingDetailPage() {
   const [liked, setLiked] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [showMediaLightbox, setShowMediaLightbox] = useState(false);
   const listingId = params.id as string;
 
   const { data: listing, isLoading } = useListing(listingId);
@@ -63,10 +66,31 @@ export default function ListingDetailPage() {
   const fallbackGalleryImages = getListingImageSet(undefined, listing.id, 3);
   const heroImage = selectedImage || galleryImages[0];
   const heroFallbackImage = fallbackGalleryImages[0];
+  const mediaImages = galleryImages.filter((image): image is string => Boolean(image)).map((image, index) => ({
+    src: image,
+    alt: `${listing.title} 이미지 ${index + 1}`,
+    fallbackSrc: fallbackGalleryImages[index] ?? heroFallbackImage,
+  }));
 
   useEffect(() => {
     setSelectedImage(galleryImages[0] ?? null);
   }, [listingId, galleryImages[0]]);
+
+  const heroMediaIndex = mediaImages.findIndex((image) => image.src === heroImage);
+
+  function openHeroImage() {
+    if (mediaImages.length === 0) return;
+    setMediaIndex(Math.max(heroMediaIndex, 0));
+    setShowMediaLightbox(true);
+  }
+
+  function openMediaBySource(src: string) {
+    const index = mediaImages.findIndex((image) => image.src === src);
+    if (index < 0) return;
+    setSelectedImage(src);
+    setMediaIndex(index);
+    setShowMediaLightbox(true);
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -113,7 +137,12 @@ export default function ListingDetailPage() {
         {/* Left: product info */}
         <div className="px-5 @3xl:px-0">
           <div className="mb-4">
-            <div className="h-64 @3xl:h-80 rounded-xl bg-gray-100 dark:bg-gray-700 overflow-hidden">
+            <button
+              type="button"
+              onClick={openHeroImage}
+              aria-label={`${listing.title} 대표 이미지 보기`}
+              className="h-64 @3xl:h-80 rounded-xl w-full bg-gray-100 dark:bg-gray-700 overflow-hidden"
+            >
               {heroImage ? (
                 <SafeImage
                   src={heroImage}
@@ -126,14 +155,15 @@ export default function ListingDetailPage() {
                   {SportIcon ? <SportIcon size={64} className="text-gray-300" /> : <div className="text-6xl text-gray-300">📦</div>}
                 </div>
               )}
-            </div>
+            </button>
             {galleryImages.length > 1 && (
               <div className="mt-2 grid grid-cols-3 gap-2">
                 {galleryImages.map((image, index) => (
                   <button
                     key={`${image}-${index}`}
                     type="button"
-                    onClick={() => setSelectedImage(image)}
+                    onClick={() => openMediaBySource(image)}
+                    aria-label={`${listing.title} 이미지 ${index + 1} 보기`}
                     className={`overflow-hidden rounded-xl border transition-colors ${
                       heroImage === image
                         ? 'border-blue-500'
@@ -309,6 +339,14 @@ export default function ListingDetailPage() {
           </div>
         </div>
       )}
+
+      <MediaLightbox
+        isOpen={showMediaLightbox}
+        images={mediaImages}
+        initialIndex={mediaIndex}
+        onClose={() => setShowMediaLightbox(false)}
+        title={`${listing.title} 상품 사진`}
+      />
     </div>
   );
 }

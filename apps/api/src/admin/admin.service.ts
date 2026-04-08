@@ -243,6 +243,7 @@ export class AdminService {
         description: data.description as string | undefined,
         logoUrl: data.logoUrl as string | undefined,
         coverImageUrl: data.coverImageUrl as string | undefined,
+        photos: (data.photos as string[]) || [],
         city: data.city as string | undefined,
         district: data.district as string | undefined,
         memberCount: (data.memberCount as number) || 1,

@@ -311,6 +311,7 @@ model Match {
   sportType     SportType   @map("sport_type")
   title         String
   description   String?
+  imageUrl      String?     @map("image_url")
   venueId       String      @map("venue_id")
   matchDate     DateTime    @map("match_date") @db.Date
   startTime     String      @map("start_time") // HH:mm
@@ -705,6 +706,7 @@ model SportTeam {
   description   String?
   logoUrl       String?   @map("logo_url")
   coverImageUrl String?   @map("cover_image_url")
+  photos        String[]  @default([])
   city          String?
   district      String?
   memberCount   Int       @default(1) @map("member_count")

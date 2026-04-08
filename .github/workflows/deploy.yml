@@ -13,7 +13,7 @@ on:
         default: false
         type: boolean
       run_seed:
-        description: 'Run seed data (append, no drop)'
+        description: 'DANGER: Run destructive full seed data refresh'
         required: false
         default: false
         type: boolean
@@ -159,10 +159,13 @@ jobs:
           else
             sudo docker exec matchup_api npx prisma migrate deploy
             if [ "${RUN_SEED}" = "true" ]; then
-              echo "[INFO] Running seed (append mode)..."
+              echo "[DANGER] Running destructive full seed..."
               sudo docker exec matchup_api npx prisma db seed
             fi
           fi
+
+          echo "[INFO] Syncing DB-backed image data..."
+          sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
 
           sudo docker exec matchup_nginx nginx -s reload
           sudo docker image prune -f

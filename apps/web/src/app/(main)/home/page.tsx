@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
-import { getSportImage, getTeamLogo, getListingImage } from '@/lib/sport-image';
+import { getSportDetailImageSet, getTeamLogo, getListingImage } from '@/lib/sport-image';
 import type { Match, SportTeam, Lesson, MarketplaceListing, TeamMatch } from '@/types/api';
 
 const sportFilters = [
@@ -385,8 +385,13 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const filled = match.currentPlayers / match.maxPlayers;
   const isAlmostFull = filled >= 0.7;
   const timeBadge = getTimeBadge(match.matchDate);
-  const matchImage = getSportImage(match.sportType, match.imageUrl, match.id);
-  const fallbackMatchImage = getSportImage(match.sportType, undefined, match.id);
+  const matchImage = getSportDetailImageSet(
+    match.sportType,
+    [match.imageUrl, ...(match.venue?.imageUrls ?? [])],
+    match.id,
+    1,
+  )[0];
+  const fallbackMatchImage = getSportDetailImageSet(match.sportType, undefined, match.id, 1)[0];
 
   return (
     <Link href={`/matches/${match.id}`}>

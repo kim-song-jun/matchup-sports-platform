@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { syncImageData } from './sync-image-data';
 
 const prisma = new PrismaClient();
 
@@ -298,6 +299,7 @@ async function main() {
         sportType: 'futsal',
         title: '주말 풋살 한판! 🔥',
         description: '마포 풋살파크에서 즐거운 풋살 합시다. 초보도 환영!',
+        imageUrl: null,
         venueId: venues[0].id,
         matchDate: nextSat,
         startTime: '18:00',
@@ -318,6 +320,7 @@ async function main() {
         sportType: 'basketball',
         title: '농구 3대3 모집 🏀',
         description: '강남 스포츠센터 농구코트에서 3:3 합니다',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: nextSun,
         startTime: '14:00',
@@ -338,6 +341,7 @@ async function main() {
         sportType: 'ice_hockey',
         title: '아이스하키 픽업게임 🏒',
         description: '잠실 링크에서 하키 합시다. 장비 있으신 분만!',
+        imageUrl: null,
         venueId: venues[2].id,
         matchDate: nextSat,
         startTime: '10:00',
@@ -357,6 +361,7 @@ async function main() {
         sportType: 'badminton',
         title: '배드민턴 복식 모집 🏸',
         description: '초보끼리 재밌게 쳐요! 라켓 없어도 돼요',
+        imageUrl: null,
         venueId: venues[3].id,
         matchDate: tomorrow,
         startTime: '19:00',
@@ -377,6 +382,7 @@ async function main() {
         sportType: 'futsal',
         title: '퇴근 후 풋살 ⚡',
         description: '영등포 근처 직장인 풋살! 가볍게 한 게임',
+        imageUrl: null,
         venueId: venues[0].id,
         matchDate: dayAfter,
         startTime: '20:00',
@@ -397,6 +403,7 @@ async function main() {
         sportType: 'soccer',
         title: '축구 11:11 팀매칭',
         description: '노원 축구장에서 11:11 풀매치! 중급 이상 모집합니다.',
+        imageUrl: null,
         venueId: venues[4].id,
         matchDate: nextSat,
         startTime: '14:00',
@@ -417,6 +424,7 @@ async function main() {
         sportType: 'basketball',
         title: '평일 저녁 농구 3:3',
         description: '퇴근 후 강남에서 3:3 농구! 남녀 무관',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: tomorrow,
         startTime: '20:00',
@@ -437,6 +445,7 @@ async function main() {
         sportType: 'badminton',
         title: '초보 환영 배드민턴',
         description: '서초 아레나에서 복식 배드민턴. 라켓 대여 가능!',
+        imageUrl: null,
         venueId: venues[5].id,
         matchDate: dayAfter,
         startTime: '10:00',
@@ -456,6 +465,7 @@ async function main() {
         sportType: 'tennis',
         title: '테니스 복식 파트너 구합니다',
         description: '주말 아침 테니스! 중급 이상 환영합니다.',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: nextSun,
         startTime: '10:00',
@@ -476,6 +486,7 @@ async function main() {
         sportType: 'swimming',
         title: '수영 자유형 연습 모임',
         description: '함께 자유형 연습해요. 레인 나눠서 사용합니다.',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: in3Days,
         startTime: '07:00',
@@ -495,6 +506,7 @@ async function main() {
         sportType: 'futsal',
         title: '직장인 풋살 리그 3주차',
         description: '마포 풋살파크 정기 리그. 팀 자동 밸런스.',
+        imageUrl: null,
         venueId: venues[0].id,
         matchDate: in4Days,
         startTime: '19:00',
@@ -515,6 +527,7 @@ async function main() {
         sportType: 'basketball',
         title: '주말 농구 5:5 풀코트',
         description: '강남 스포츠센터 풀코트 5:5! 고수 환영.',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: nextNextSat,
         startTime: '16:00',
@@ -535,6 +548,7 @@ async function main() {
         sportType: 'badminton',
         title: '배드민턴 단식 스파링',
         description: '영등포 배드민턴클럽 단식 경기. 상급자 위주.',
+        imageUrl: null,
         venueId: venues[3].id,
         matchDate: in5Days,
         startTime: '18:00',
@@ -554,6 +568,7 @@ async function main() {
         sportType: 'ice_hockey',
         title: '하키 초보 연습 게임',
         description: '입문자끼리 부담 없이 즐기는 하키. 장비 대여 가능.',
+        imageUrl: null,
         venueId: venues[2].id,
         matchDate: nextNextSun,
         startTime: '14:00',
@@ -573,6 +588,7 @@ async function main() {
         sportType: 'soccer',
         title: '주말 아침 축구',
         description: '노원 축구장 아침 경기. 가볍게 뛰어요!',
+        imageUrl: null,
         venueId: venues[4].id,
         matchDate: nextSun,
         startTime: '08:00',
@@ -592,6 +608,7 @@ async function main() {
         sportType: 'futsal',
         title: '여성 풋살 모집',
         description: '마포 풋살파크 여성 풋살 경기. 초보 환영!',
+        imageUrl: null,
         venueId: venues[0].id,
         matchDate: nextNextSat,
         startTime: '10:00',
@@ -612,6 +629,7 @@ async function main() {
         sportType: 'tennis',
         title: '테니스 단식 매치',
         description: '실력 비슷한 분끼리 단식 경기! 중급자 모집.',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: in3Days,
         startTime: '18:00',
@@ -631,6 +649,7 @@ async function main() {
         sportType: 'badminton',
         title: '주말 배드민턴 혼합복식',
         description: '서초 아레나 혼합복식! 남녀 각 2명 모집.',
+        imageUrl: null,
         venueId: venues[5].id,
         matchDate: nextSat,
         startTime: '14:00',
@@ -651,6 +670,7 @@ async function main() {
         sportType: 'ice_hockey',
         title: '하키 정기전 멤버 충원',
         description: '매주 화요일 잠실 하키. 레벨 3 이상 모집.',
+        imageUrl: null,
         venueId: venues[2].id,
         matchDate: in4Days,
         startTime: '20:00',
@@ -670,6 +690,7 @@ async function main() {
         sportType: 'swimming',
         title: '수영 접영/배영 연습',
         description: '접영, 배영 같이 연습할 분! 중급 이상.',
+        imageUrl: null,
         venueId: venues[1].id,
         matchDate: nextNextSun,
         startTime: '07:00',
@@ -1009,6 +1030,7 @@ async function main() {
       level: 4,
       isRecruiting: true,
       contactInfo: '오픈카톡: icebears2024',
+      photos: [],
     },
     {
       ownerId: users[0].id,
@@ -1021,6 +1043,7 @@ async function main() {
       level: 3,
       isRecruiting: true,
       contactInfo: '카카오톡: fcmapo',
+      photos: [],
     },
     {
       ownerId: users[1].id,
@@ -1033,6 +1056,7 @@ async function main() {
       level: 3,
       isRecruiting: true,
       contactInfo: '오픈카톡: slammers_gn',
+      photos: [],
     },
     {
       ownerId: users[3].id,
@@ -1045,6 +1069,7 @@ async function main() {
       level: 2,
       isRecruiting: false,
       contactInfo: '카카오톡: shuttle_fighters',
+      photos: [],
     },
   ];
 
@@ -1144,6 +1169,8 @@ async function main() {
     mercenarySeedData.map((data) => prisma.mercenaryPost.create({ data })),
   );
   console.log(`  ✅ ${mercenarySeedData.length} mercenary posts seeded`);
+
+  await syncImageData(prisma);
 
   // ── Team Matching ──
   const existingTeams = createdTeams;

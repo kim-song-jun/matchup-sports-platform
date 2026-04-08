@@ -21,6 +21,11 @@ export class CreateMatchDto {
   @IsOptional()
   description?: string;
 
+  @ApiPropertyOptional({ description: '대표 이미지 URL' })
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
   @ApiProperty({ enum: ['futsal', 'basketball', 'badminton', 'ice_hockey', 'figure_skating', 'short_track'] })
   @IsString()
   sportType: string;

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
+import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { useMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
@@ -29,6 +30,8 @@ export default function MatchDetailPage() {
   const { data: match, isLoading } = useMatch(matchId);
   const [showCheckout, setShowCheckout] = useState(false);
   const [pendingParticipantId, setPendingParticipantId] = useState<string | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
   const joinMutation = useMutation<MatchParticipant, unknown, { openCheckout: boolean }>({
     mutationFn: async () => {
@@ -98,8 +101,19 @@ export default function MatchDetailPage() {
   const isParticipant = !!currentParticipant;
   const hasPendingPayment = currentParticipant?.paymentStatus === 'pending';
   const isFull = match.currentPlayers >= match.maxPlayers;
-  const matchImages = getSportDetailImageSet(match.sportType, [match.imageUrl], match.id, 4);
+  const matchImages = getSportDetailImageSet(
+    match.sportType,
+    [match.imageUrl, ...(match.venue?.imageUrls ?? [])],
+    match.id,
+    4,
+  );
   const fallbackMatchImages = getSportDetailImageSet(match.sportType, undefined, match.id, 4);
+  const matchedImageEntries = matchImages.filter((image, index, images) => images.indexOf(image) === index);
+  const mediaImages = matchedImageEntries.map((image, index) => ({
+    src: image,
+    alt: `${match.title} 이미지 ${index + 1}`,
+    fallbackSrc: fallbackMatchImages[index] ?? fallbackMatchImages[0],
+  }));
   const heroImage = matchImages[0];
   const heroFallbackImage = fallbackMatchImages[0];
   const venuePreviewImage = match.venue
@@ -108,6 +122,12 @@ export default function MatchDetailPage() {
   const fallbackVenuePreviewImage = match.venue
     ? getVenueImageSet(match.sportType, undefined, `${match.id}-venue`, 1)[0]
     : null;
+  const mediaImageIndex = new Map(mediaImages.map((image, index) => [image.src, index]));
+
+  function openMediaAt(index: number) {
+    setMediaIndex(index);
+    setShowMediaLightbox(true);
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -147,18 +167,29 @@ export default function MatchDetailPage() {
         <div className="px-5 @3xl:px-0">
           {heroImage && (
             <div className="mb-4">
-              <div className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+              <button
+                type="button"
+                onClick={() => openMediaAt(0)}
+                aria-label={`${match.title} 대표 이미지 보기`}
+                className="w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+              >
                 <SafeImage
                   src={heroImage}
                   fallbackSrc={heroFallbackImage}
                   alt={match.title}
                   className="h-[220px] w-full object-cover"
                 />
-              </div>
+              </button>
               {matchImages.length > 1 && (
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {matchImages.slice(1).map((image, index) => (
-                    <div key={`${image}-${index}`} className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() => openMediaAt(mediaImageIndex.get(image) ?? index + 1)}
+                      aria-label={`${match.title} 이미지 ${index + 2} 보기`}
+                      className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+                    >
                       <SafeImage
                         src={image}
                         fallbackSrc={fallbackMatchImages[index + 1] ?? heroFallbackImage}
@@ -166,7 +197,7 @@ export default function MatchDetailPage() {
                         className="aspect-[4/3] h-full w-full object-cover"
                         loading="lazy"
                       />
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -371,6 +402,15 @@ export default function MatchDetailPage() {
         </div>
       </div>
 
+
+      {/* 결제 모달 */}
+      <MediaLightbox
+        isOpen={showMediaLightbox}
+        images={mediaImages}
+        initialIndex={mediaIndex}
+        onClose={() => setShowMediaLightbox(false)}
+        title={`${match.title} 사진`}
+      />
 
       {/* 결제 모달 */}
       {showCheckout && match && (

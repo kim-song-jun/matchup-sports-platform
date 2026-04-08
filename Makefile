@@ -193,6 +193,10 @@ db-push: ## Run prisma db push inside the api container
 db-seed: ## Insert seed data inside the api container
 	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed"
 
+.PHONY: db-seed-images
+db-seed-images: ## Fill or refresh DB-backed image data without wiping records
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:images"
+
 .PHONY: db-studio
 db-studio: ## Open Prisma Studio (exposes port 5555 only while running)
 	@echo "Prisma Studio will be available at http://localhost:5555"

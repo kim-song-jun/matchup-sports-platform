@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Calendar, Clock, Instagram, Youtube, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
@@ -7,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
 import { SafeImage } from '@/components/ui/safe-image';
+import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { useTeam, useTeamBadges } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
@@ -51,6 +53,8 @@ export default function TeamDetailPage() {
   const { isAuthenticated, user } = useAuthStore();
   const { data: team, isLoading } = useTeam(teamId);
   const { data: apiBadges } = useTeamBadges(teamId);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
   // API 뱃지가 있으면 사용, 없으면 목업 폴백
   const teamBadges = apiBadges || mockBadges;
@@ -89,6 +93,24 @@ export default function TeamDetailPage() {
   const fallbackCoverImage = getTeamImage(team.sportType, undefined, team.id);
   const fallbackTeamGallery = getTeamImageSet(team.sportType, undefined, team.id, 3);
   const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
+  const mediaImages = [coverImage, ...teamGallery]
+    .filter((image): image is string => Boolean(image))
+    .map((image, index) => ({
+      src: image,
+      alt: `${team.name} 사진 ${index + 1}`,
+      fallbackSrc: index === 0 ? fallbackCoverImage : (fallbackTeamGallery[index - 1] ?? fallbackCoverImage),
+    }));
+
+  function openMediaAt(index: number) {
+    if (index < 0 || index >= mediaImages.length) return;
+    setMediaIndex(index);
+    setShowMediaLightbox(true);
+  }
+
+  function openMediaBySource(src: string) {
+    const index = mediaImages.findIndex((image) => image.src === src);
+    openMediaAt(index);
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -126,7 +148,12 @@ export default function TeamDetailPage() {
           {/* Cover + Team header */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
-            <div className="h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center relative">
+            <button
+              type="button"
+              onClick={() => openMediaBySource(coverImage)}
+              aria-label={`${team.name} 커버 이미지 보기`}
+              className="h-32 @3xl:h-44 w-full bg-gray-800 flex items-center justify-center relative"
+            >
               <SafeImage
                 src={coverImage}
                 fallbackSrc={fallbackCoverImage}
@@ -146,7 +173,7 @@ export default function TeamDetailPage() {
                   />
                 </div>
               </div>
-            </div>
+            </button>
 
             <div className="pt-8 px-5 pb-5">
               <div className="flex items-center gap-2 mb-1">
@@ -342,7 +369,13 @@ export default function TeamDetailPage() {
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">갤러리</h3>
               <div className="grid grid-cols-3 gap-2">
                 {teamGallery.map((photo: string, i: number) => (
-                  <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                  <button
+                    key={`${photo}-${i}`}
+                    type="button"
+                    onClick={() => openMediaBySource(photo)}
+                    aria-label={`${team.name} 갤러리 이미지 ${i + 1} 보기`}
+                    className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
+                  >
                     <SafeImage
                       src={photo}
                       fallbackSrc={fallbackTeamGallery[i] ?? fallbackCoverImage}
@@ -350,7 +383,7 @@ export default function TeamDetailPage() {
                       className="w-full h-full object-cover"
                       loading="lazy"
                     />
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -476,6 +509,13 @@ export default function TeamDetailPage() {
         </div>
       </div>
 
+      <MediaLightbox
+        isOpen={showMediaLightbox}
+        images={mediaImages}
+        initialIndex={mediaIndex}
+        onClose={() => setShowMediaLightbox(false)}
+        title={`${team.name} 이미지`}
+      />
     </div>
   );
 }

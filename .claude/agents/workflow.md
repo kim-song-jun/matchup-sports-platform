@@ -71,6 +71,8 @@
 16. **Admin flows must stay in admin context** — 관리자 list/detail/action 흐름은 public surface로 빠지지 말고 admin shell 안에서 맥락을 유지해야 한다
 17. **Operational actions need auditability** — 제재/정산/분쟁 처리 같은 운영 액션은 처리 주체, 사유, 결과, 부분 실패를 추적 가능하게 보여줘야 한다
 18. **Runtime image fallback is mandatory** — 사용자-facing list/detail/hero/gallery/logo가 원격 URL을 받을 수 있으면 helper 반환값만 믿지 말고 렌더 단계에서 로컬 mock으로 degrade되어야 한다
+19. **Deploy-safe data sync must be idempotent** — 운영 배포 자동화에는 destructive full seed를 기본 연결하지 말고, 전용 backfill command를 별도로 둔다
+20. **URL-synced filter UIs must merge against pending local state** — `router.replace` 기반 query sync 화면은 stale `searchParams` snapshot을 재사용하지 말고 pending filter state/ref를 기준으로 다음 query를 만든다
 
 ---
 

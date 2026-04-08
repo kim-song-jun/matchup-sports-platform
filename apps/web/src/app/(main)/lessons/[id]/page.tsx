@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useAuthStore } from '@/stores/auth-store';
+import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLesson } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
@@ -39,6 +40,8 @@ export default function LessonDetailPage() {
   const queryClient = useQueryClient();
   const lessonId = params.id as string;
   const [selectedTicketPlan, setSelectedTicketPlan] = useState<LessonTicketPlan | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
 
@@ -84,6 +87,18 @@ export default function LessonDetailPage() {
   const heroImage = lessonImages[0];
   const heroFallbackImage = fallbackLessonImages[0];
   const galleryImages = lessonImages.slice(1, 4);
+  const mediaImageEntries = [heroImage, ...galleryImages].filter((image): image is string => Boolean(image)).map((image, index) => ({
+    src: image,
+    alt: `강좌 사진 ${index + 1}`,
+    fallbackSrc: fallbackLessonImages[index] ?? heroFallbackImage,
+  }));
+
+  function openMediaAt(src: string) {
+    const index = mediaImageEntries.findIndex((image) => image.src === src);
+    if (index < 0) return;
+    setMediaIndex(index);
+    setShowMediaLightbox(true);
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -100,12 +115,19 @@ export default function LessonDetailPage() {
           {/* 커버 */}
           <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 @3xl:h-56 mb-4 overflow-hidden relative">
             {heroImage ? (
-              <SafeImage
-                src={heroImage}
-                fallbackSrc={heroFallbackImage}
-                alt={lesson.title}
-                className="h-full w-full object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => openMediaAt(heroImage)}
+                aria-label={`${lesson.title} 대표 이미지 보기`}
+                className="h-full w-full"
+              >
+                <SafeImage
+                  src={heroImage}
+                  fallbackSrc={heroFallbackImage}
+                  alt={lesson.title}
+                  className="h-full w-full object-cover"
+                />
+              </button>
             ) : (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center text-white/80">
@@ -113,8 +135,8 @@ export default function LessonDetailPage() {
                 </div>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-            <div className="absolute bottom-4 left-4">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+            <div className="pointer-events-none absolute bottom-4 left-4">
               <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
@@ -224,7 +246,13 @@ export default function LessonDetailPage() {
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
               {galleryImages.map((image, index) => (
-                <div key={`${image}-${index}`} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                <button
+                  key={`${image}-${index}`}
+                  type="button"
+                  onClick={() => openMediaAt(image)}
+                  aria-label={`${lesson.title} 이미지 ${index + 2} 보기`}
+                  className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
+                >
                   <SafeImage
                     src={image}
                     fallbackSrc={fallbackLessonImages[index + 1] ?? heroFallbackImage}
@@ -232,7 +260,7 @@ export default function LessonDetailPage() {
                     className="h-full w-full object-cover"
                     loading="lazy"
                   />
-                </div>
+                </button>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-3 text-center">업로드된 사진이 없어도 실사형 로컬 자산으로 미리보기를 제공합니다</p>
@@ -357,6 +385,13 @@ export default function LessonDetailPage() {
         </div>
       </div>
 
+      <MediaLightbox
+        isOpen={showMediaLightbox}
+        images={mediaImageEntries}
+        initialIndex={mediaIndex}
+        onClose={() => setShowMediaLightbox(false)}
+        title={`${lesson.title} 사진`}
+      />
     </div>
   );
 }

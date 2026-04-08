@@ -75,6 +75,7 @@ Key principles:
 - Production Dockerfiles: deploy/Dockerfile.api, deploy/Dockerfile.web
 - CI/CD: .github/workflows/deploy.yml
 - Production EC2 access uses `ec2-user`, and Amazon Linux bootstrap may provide standalone `docker-compose` instead of the `docker compose` plugin
+- Deploy automation must distinguish destructive full seed from idempotent data backfills; production defaults should call the safe backfill command, not `prisma db seed`
 - Secrets in .env files only — never hardcode in docker-compose or code
 - Turborepo for build orchestration (turbo.json)
 - Next.js: standalone output in prod, static export for Capacitor builds

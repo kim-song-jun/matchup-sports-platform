@@ -8,6 +8,7 @@ import { useLessons } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent, lessonTypeLabel, ticketTypeLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
@@ -41,6 +42,8 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
   const remaining = lesson.maxParticipants - lesson.currentParticipants;
   const accent = sportCardAccent[lesson.sportType];
   const dotColor = accent?.dot || 'bg-gray-400';
+  const lessonImage = getSportImage(lesson.sportType, lesson.imageUrls?.[0] ?? lesson.imageUrl, lesson.id);
+  const fallbackLessonImage = getSportImage(lesson.sportType, undefined, lesson.id);
 
   // Determine next session date: prefer upcomingSchedules if available
   const nextDate = lesson.upcomingSchedules?.[0]?.sessionDate ?? lesson.lessonDate;
@@ -52,8 +55,9 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
 
         {/* Image — 16:9 top banner */}
         <div className="relative aspect-[16/9] bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <img
-            src={getSportImage(lesson.sportType, lesson.imageUrls?.[0] ?? lesson.imageUrl, lesson.id)}
+          <SafeImage
+            src={lessonImage}
+            fallbackSrc={fallbackLessonImage}
             alt=""
             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
             loading="lazy"

@@ -10,6 +10,7 @@ const prismaMock = {
   user: {
     count: jest.fn(),
     findMany: jest.fn(),
+    findFirst: jest.fn(),
   },
   match: {
     count: jest.fn(),
@@ -149,6 +150,59 @@ describe('AdminService', () => {
           skip: 1,
         }),
       );
+    });
+  });
+
+  describe('getUserDetail', () => {
+    it('returns moderation metadata with audit defaults', async () => {
+      prismaMock.user.findFirst.mockResolvedValue({
+        id: 'u1',
+        nickname: 'alice',
+        email: 'alice@test.com',
+        profileImageUrl: null,
+        gender: null,
+        bio: null,
+        mannerScore: 4.8,
+        totalMatches: 12,
+        locationCity: 'Seoul',
+        locationDistrict: 'Mapo',
+        createdAt: new Date(),
+        sportTypes: ['futsal'],
+        sportProfiles: [],
+        oauthProvider: 'kakao',
+      });
+
+      const result = await service.getUserDetail('u1');
+
+      expect(result.adminStatus).toBe('active');
+      expect(result.warningCount).toBe(0);
+      expect(result.adminAuditLog).toEqual([]);
+    });
+  });
+
+  describe('moderation actions', () => {
+    beforeEach(() => {
+      prismaMock.user.findFirst.mockResolvedValue({ id: 'u1' });
+    });
+
+    it('records warning actions', async () => {
+      const result = await service.warnUser('u1', { actor: 'admin', note: 'repeat no-show' });
+
+      expect(result.action).toBe('warn');
+      expect(result.warningCount).toBe(1);
+      expect(result.auditEntry.note).toBe('repeat no-show');
+    });
+
+    it('updates user status and returns audit entry', async () => {
+      const result = await service.updateUserStatus('u1', {
+        actor: 'admin',
+        status: 'suspended',
+        note: 'abusive language',
+      });
+
+      expect(result.status).toBe('suspended');
+      expect(result.suspensionReason).toBe('abusive language');
+      expect(result.auditEntry.action).toBe('suspend');
     });
   });
 

@@ -8,7 +8,6 @@ import { runE2EPreflight } from './fixtures/preflight';
 import { promoteAdminPersona, reactivateE2EUsers } from './fixtures/db-runtime';
 
 const AUTH_DIR = path.join(__dirname, '.auth');
-
 export default async function globalSetup(_config: FullConfig) {
   const allowOffline = process.env.E2E_ALLOW_OFFLINE === '1';
 

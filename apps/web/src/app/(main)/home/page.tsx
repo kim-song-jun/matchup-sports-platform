@@ -7,6 +7,7 @@ import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@
 import { useAuthStore } from '@/stores/auth-store';
 import { ChevronRight, Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportImage, getTeamLogo, getListingImage } from '@/lib/sport-image';
@@ -258,13 +259,20 @@ export default function HomePage() {
               {teams.map((team: SportTeam) => {
                 const accent = sportCardAccent[team.sportType];
                 const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
+                const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${accent?.tint || 'bg-gray-100'} shrink-0 p-0.5`}>
-                            <img src={teamLogo} alt={`${team.name} logo`} className="h-full w-full rounded-[10px] object-cover" loading="lazy" />
+                            <SafeImage
+                              src={teamLogo}
+                              fallbackSrc={fallbackTeamLogo}
+                              alt={`${team.name} logo`}
+                              className="h-full w-full rounded-[10px] object-cover"
+                              loading="lazy"
+                            />
                           </div>
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
                         </div>
@@ -319,22 +327,33 @@ export default function HomePage() {
           <section className="mt-6 px-5 @3xl:px-0">
             <SectionHeader title={t('latestMarketplace')} href="/marketplace" showMore={listings.length > 3} moreLabel={t('viewMore')} />
             <div className="grid grid-cols-2 gap-3 @3xl:grid-cols-3 @5xl:grid-cols-4 @3xl:gap-3">
-              {listings.map((item: MarketplaceListing) => (
-                <Link key={item.id} href={`/marketplace/${item.id}`}>
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
-                    <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                      <img src={getListingImage(item.imageUrls, item.id)} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+              {listings.map((item: MarketplaceListing) => {
+                const listingImage = getListingImage(item.imageUrls, item.id);
+                const fallbackListingImage = getListingImage(undefined, item.id);
+
+                return (
+                  <Link key={item.id} href={`/marketplace/${item.id}`}>
+                    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
+                      <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                        <SafeImage
+                          src={listingImage}
+                          fallbackSrc={fallbackListingImage}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
+                        {item.listingType === 'rent' && (
+                          <span className="inline-block mt-1 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded-full px-2 py-0.5">대여</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="p-2.5">
-                      <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
-                      <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
-                      {item.listingType === 'rent' && (
-                        <span className="inline-block mt-1 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded-full px-2 py-0.5">대여</span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -366,13 +385,21 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const filled = match.currentPlayers / match.maxPlayers;
   const isAlmostFull = filled >= 0.7;
   const timeBadge = getTimeBadge(match.matchDate);
+  const matchImage = getSportImage(match.sportType, match.imageUrl, match.id);
+  const fallbackMatchImage = getSportImage(match.sportType, undefined, match.id);
 
   return (
     <Link href={`/matches/${match.id}`}>
       <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
         {/* 이미지: 정사각형 고정 */}
         <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
-          <img src={getSportImage(match.sportType, match.imageUrl, match.id)} alt={match.title} className="w-full h-full object-cover" loading="lazy" />
+          <SafeImage
+            src={matchImage}
+            fallbackSrc={fallbackMatchImage}
+            alt={match.title}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
           {timeBadge && (
             <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}

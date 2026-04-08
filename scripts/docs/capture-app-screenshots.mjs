@@ -3,6 +3,7 @@ import { join } from 'path';
 
 const BASE = 'http://localhost:3003';
 const OUT = join(process.cwd(), 'docs/screenshots');
+const NAVIGATION_TIMEOUT = 60000;
 
 const pages = [
   { path: '/login', name: '01_login', desc: '로그인' },
@@ -28,6 +29,21 @@ const pages = [
   { path: '/admin/statistics', name: '21_admin_statistics', desc: 'Admin 통계', needsLogin: true },
 ];
 
+async function openPage(page, path) {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: NAVIGATION_TIMEOUT });
+  await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+}
+
+async function loginAsDev(page, nickname = '축구왕민수') {
+  await openPage(page, '/login');
+  await page.locator('[data-testid="dev-login-input"]').waitFor({ state: 'visible', timeout: NAVIGATION_TIMEOUT });
+  await page.locator('[data-testid="dev-login-input"]').fill(nickname);
+  await page.locator('[data-testid="dev-login-submit"]').click();
+  await page.waitForURL('**/home', { timeout: NAVIGATION_TIMEOUT }).catch(() => {});
+  await page.waitForTimeout(1500);
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true });
 
@@ -36,16 +52,11 @@ async function main() {
   const desktopCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const desktopPage = await desktopCtx.newPage();
 
-  // Login first
-  await desktopPage.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await desktopPage.fill('input[placeholder="닉네임 입력"]', '축구왕민수');
-  await desktopPage.click('button:has-text("입장")');
-  await desktopPage.waitForTimeout(2000);
+  await loginAsDev(desktopPage);
 
   for (const pg of pages) {
     try {
-      await desktopPage.goto(`${BASE}${pg.path}`, { waitUntil: 'networkidle', timeout: 10000 });
-      await desktopPage.waitForTimeout(1000);
+      await openPage(desktopPage, pg.path);
       await desktopPage.screenshot({ path: join(OUT, `${pg.name}_desktop.png`), fullPage: false });
       console.log(`  ✅ ${pg.name}_desktop.png — ${pg.desc}`);
     } catch (e) {
@@ -62,10 +73,7 @@ async function main() {
   });
   const mobilePage = await mobileCtx.newPage();
 
-  await mobilePage.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await mobilePage.fill('input[placeholder="닉네임 입력"]', '축구왕민수');
-  await mobilePage.click('button:has-text("입장")');
-  await mobilePage.waitForTimeout(2000);
+  await loginAsDev(mobilePage);
 
   const mobilePages = [
     { path: '/home', name: '02_home' },
@@ -77,8 +85,7 @@ async function main() {
 
   for (const pg of mobilePages) {
     try {
-      await mobilePage.goto(`${BASE}${pg.path}`, { waitUntil: 'networkidle', timeout: 10000 });
-      await mobilePage.waitForTimeout(1000);
+      await openPage(mobilePage, pg.path);
       await mobilePage.screenshot({ path: join(OUT, `${pg.name}_mobile.png`), fullPage: false });
       console.log(`  ✅ ${pg.name}_mobile.png`);
     } catch (e) {

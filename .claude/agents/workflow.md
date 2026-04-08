@@ -63,6 +63,14 @@
 8. **Consolidated reports** — combine each agent's result into one summary
 9. **No false affordance in user flows** — create/edit UI에 노출한 입력/업로드/직접입력 옵션은 실제 저장 경로와 반드시 일치해야 한다
 10. **Keep journey-level visual continuity** — 같은 기능 여정 안에서는 create/list/detail/history가 공통 accent와 control language를 공유해야 한다
+11. **Trust signals must be truthful** — 배지, 평점, 전적, 신뢰도 패널은 verified/sample/estimated 상태를 명확히 구분하고 mock를 실제처럼 렌더링하지 않는다
+12. **No silent capability narrowing** — list/create/edit/detail 하위 플로우는 서비스 전체 지원 범위를 조용히 축소하면 안 된다
+13. **Edit screens must bind to the routed entity** — manage/edit surface가 다른 seed/mock 엔티티로 silently fallback하면 안 된다
+14. **Transactional flows must not fake success** — 결제/환불/신청 확정 같은 거래형 액션은 API 실패를 성공 토스트나 mock 완료 상태로 덮으면 안 된다
+15. **Transactional entrypoints need real context** — checkout/refund/approval CTA는 order id, amount, route entity 등 필수 컨텍스트를 실제 서버 바인딩 기준으로 함께 전달해야 한다
+16. **Admin flows must stay in admin context** — 관리자 list/detail/action 흐름은 public surface로 빠지지 말고 admin shell 안에서 맥락을 유지해야 한다
+17. **Operational actions need auditability** — 제재/정산/분쟁 처리 같은 운영 액션은 처리 주체, 사유, 결과, 부분 실패를 추적 가능하게 보여줘야 한다
+18. **Runtime image fallback is mandatory** — 사용자-facing list/detail/hero/gallery/logo가 원격 URL을 받을 수 있으면 helper 반환값만 믿지 말고 렌더 단계에서 로컬 mock으로 degrade되어야 한다
 
 ---
 

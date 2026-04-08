@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:3003';
 const results = [];
+const NAVIGATION_TIMEOUT = 60000;
 
 function log(page, status, msg) {
   results.push({ page, status, msg });
@@ -9,9 +10,32 @@ function log(page, status, msg) {
   console.log(`${icon} [${page}] ${msg}`);
 }
 
+async function openPage(page, path) {
+  const res = await page.goto(`${BASE}${path}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: NAVIGATION_TIMEOUT,
+  });
+
+  await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+
+  return res;
+}
+
+async function loginAsDev(page, nickname = '테스트유저') {
+  await openPage(page, '/login');
+
+  const devInput = page.locator('[data-testid="dev-login-input"]');
+  await devInput.waitFor({ state: 'visible', timeout: NAVIGATION_TIMEOUT });
+  await devInput.fill(nickname);
+  await page.locator('[data-testid="dev-login-submit"]').click();
+  await page.waitForURL('**/home', { timeout: NAVIGATION_TIMEOUT }).catch(() => {});
+  await page.waitForTimeout(1500);
+}
+
 async function testPage(page, path, checks) {
   try {
-    const res = await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle', timeout: 15000 });
+    const res = await openPage(page, path);
     if (!res || res.status() !== 200) {
       log(path, 'FAIL', `HTTP ${res?.status()}`);
       return;
@@ -136,31 +160,65 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  const guestPage = await context.newPage();
 
   const checks = [checkDeadInteractions, checkEmptyContent, checkBrokenImages];
 
-  // 모든 주요 라우트 테스트
+  await loginAsDev(page);
+
   const routes = [
-    '/home', '/matches', '/lessons', '/marketplace', '/teams',
-    '/chat', '/mercenary', '/badges', '/payments', '/profile',
-    '/notifications', '/reviews', '/settings', '/venues', '/team-matches',
-    '/login',
-    '/matches/new', '/teams/new', '/marketplace/new', '/mercenary/new',
-    '/team-matches/new', '/payments/checkout',
-    '/my/matches', '/my/team-matches', '/my/teams', '/my/lessons',
-    '/my/listings', '/my/mercenary', '/my/reviews-received',
-    '/settings/account', '/settings/notifications', '/settings/terms', '/settings/privacy',
-    '/admin/dashboard', '/admin/matches', '/admin/users', '/admin/lessons',
-    '/admin/teams', '/admin/venues', '/admin/payments', '/admin/disputes',
-    '/admin/statistics', '/admin/settlements',
+    { path: '/home', requiresAuth: true },
+    { path: '/matches', requiresAuth: true },
+    { path: '/lessons', requiresAuth: true },
+    { path: '/marketplace', requiresAuth: true },
+    { path: '/teams', requiresAuth: true },
+    { path: '/chat', requiresAuth: true },
+    { path: '/mercenary', requiresAuth: true },
+    { path: '/badges', requiresAuth: true },
+    { path: '/payments', requiresAuth: true },
+    { path: '/profile', requiresAuth: true },
+    { path: '/notifications', requiresAuth: true },
+    { path: '/reviews', requiresAuth: true },
+    { path: '/settings', requiresAuth: true },
+    { path: '/venues', requiresAuth: true },
+    { path: '/team-matches', requiresAuth: true },
+    { path: '/login', requiresAuth: false },
+    { path: '/matches/new', requiresAuth: true },
+    { path: '/teams/new', requiresAuth: true },
+    { path: '/marketplace/new', requiresAuth: true },
+    { path: '/mercenary/new', requiresAuth: true },
+    { path: '/team-matches/new', requiresAuth: true },
+    { path: '/payments/checkout', requiresAuth: true },
+    { path: '/my/matches', requiresAuth: true },
+    { path: '/my/team-matches', requiresAuth: true },
+    { path: '/my/teams', requiresAuth: true },
+    { path: '/my/lessons', requiresAuth: true },
+    { path: '/my/listings', requiresAuth: true },
+    { path: '/my/mercenary', requiresAuth: true },
+    { path: '/my/reviews-received', requiresAuth: true },
+    { path: '/settings/account', requiresAuth: true },
+    { path: '/settings/notifications', requiresAuth: true },
+    { path: '/settings/terms', requiresAuth: true },
+    { path: '/settings/privacy', requiresAuth: true },
+    { path: '/admin/dashboard', requiresAuth: true },
+    { path: '/admin/matches', requiresAuth: true },
+    { path: '/admin/users', requiresAuth: true },
+    { path: '/admin/lessons', requiresAuth: true },
+    { path: '/admin/teams', requiresAuth: true },
+    { path: '/admin/venues', requiresAuth: true },
+    { path: '/admin/payments', requiresAuth: true },
+    { path: '/admin/disputes', requiresAuth: true },
+    { path: '/admin/statistics', requiresAuth: true },
+    { path: '/admin/settlements', requiresAuth: true },
   ];
 
   console.log(`\n🔍 MatchUp QA 테스트 시작 — ${routes.length}개 라우트\n`);
 
   for (const route of routes) {
-    await testPage(page, route, checks);
+    await testPage(route.requiresAuth ? page : guestPage, route.path, checks);
   }
 
+  await guestPage.close();
   await browser.close();
 
   // Summary

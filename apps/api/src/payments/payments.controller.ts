@@ -29,8 +29,8 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '환불 요청' })
-  async refund(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.paymentsService.refund(id, body);
+  async refund(@CurrentUser('id') userId: string, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.paymentsService.refund(userId, id, body);
   }
 
   @Get('me')
@@ -39,5 +39,13 @@ export class PaymentsController {
   @ApiOperation({ summary: '내 결제 내역' })
   async getMyPayments(@CurrentUser('id') userId: string) {
     return this.paymentsService.getByUserId(userId);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '내 결제 상세' })
+  async getPaymentById(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.paymentsService.getById(userId, id);
   }
 }

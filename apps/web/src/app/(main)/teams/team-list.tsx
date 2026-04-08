@@ -7,6 +7,7 @@ import { useTeams, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
 import { Users as UsersIcon } from 'lucide-react';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getTeamImage, getTeamLogo } from '@/lib/sport-image';
@@ -16,15 +17,30 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
   const t = useTranslations('teams');
   const tl = useTranslations('levels');
   const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
+  const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
+  const teamCoverImage = getTeamImage(team.sportType, team.coverImageUrl, team.id);
+  const fallbackTeamCoverImage = getTeamImage(team.sportType, undefined, team.id);
 
   return (
     <Link href={`/teams/${team.id}`}>
       <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지 */}
         <div className="relative w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <img src={getTeamImage(team.sportType, team.coverImageUrl, team.id)} alt={team.name} className="w-full h-full object-cover" loading="lazy" />
+          <SafeImage
+            src={teamCoverImage}
+            fallbackSrc={fallbackTeamCoverImage}
+            alt={team.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
           <div className="absolute bottom-2 left-2 rounded-2xl bg-white/92 p-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
-            <img src={teamLogo} alt={`${team.name} logo`} className="h-9 w-9 rounded-xl object-cover" loading="lazy" />
+            <SafeImage
+              src={teamLogo}
+              fallbackSrc={fallbackTeamLogo}
+              alt={`${team.name} logo`}
+              className="h-9 w-9 rounded-xl object-cover"
+              loading="lazy"
+            />
           </div>
         </div>
         {/* 텍스트 */}

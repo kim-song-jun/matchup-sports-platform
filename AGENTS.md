@@ -87,6 +87,7 @@ Errors:
 - Prisma Studio: `make db-studio` 후 `http://localhost:5555`
 - Dev compose의 Postgres/Redis는 내부 Docker 네트워크로만 접근한다. host direct connect를 전제하지 말고, 필요하면 `docker compose exec` 또는 앱/API 경유 흐름을 사용한다.
 - `deploy/Dockerfile.dev`는 native addon 호환성을 위해 glibc 기반 Node 이미지를 유지한다. dev compose의 `node_modules` 볼륨은 `nocopy` + 이미지 내 `/opt/deps` bootstrap service로 매 기동 시 동기화하고, `pg_isready`는 항상 실제 DB명까지 지정한다.
+- dev compose에서 `web`만 단독 restart 하지 않는다. `deps` bootstrap 없이 `web`만 다시 뜨면 `@parcel/watcher` optional binary가 빠져 Next dev가 기동 실패할 수 있으므로 `docker compose up -d deps web`로 같이 올린다.
 - dev compose의 API는 `AUTH_HASH_DRIVER=bcryptjs`를 사용해 native `bcrypt`를 로드하지 않는다. production 기본값은 `bcrypt`를 유지한다.
 - `web` 서비스는 `api`의 단순 프로세스 시작이 아니라 `/api/v1/health` healthcheck 통과 이후에만 의존하도록 유지한다. cold start 시 프록시 초기 요청이 API readiness보다 앞서면 간헐적 5xx가 난다.
 - 로컬 Playwright E2E는 Next dev on-demand compile 부하 때문에 기본값을 `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter로 유지한다. 병렬도를 올릴 때는 `PW_WORKERS`와 `PLAYWRIGHT_REPORTER`를 명시적으로 override한다.
@@ -140,12 +141,20 @@ Errors:
   - 필요 시 각 `*.spec.ts` / `*.test.tsx` 내부 inline mock
 - Prisma 모델, DTO, API 응답, i18n 메시지, mock 이미지 전략이 바뀌면 관련 fixture/MSW/E2E/public mock 문서까지 같은 변경에서 sync한다.
 - 외부 이미지 fallback 대신 `apps/web/public/mock/` 자산을 우선 사용한다.
+- 사용자-facing list/detail/hero/gallery/logo 이미지가 원격 URL을 받을 수 있으면, helper가 remote URL을 반환하더라도 렌더 단계에서 로컬 mock으로 fallback되는 runtime 보호를 둔다. raw `<img>` 단독 렌더는 금지한다.
 - 실사형 mock 이미지를 추가/교체할 때는 `apps/web/public/mock/photoreal/ATTRIBUTION.md`에 source URL, creator, license를 같이 기록한다.
 - 현실감이 중요한 카드/리스트 이미지 슬롯은 SVG보다 실사형 로컬 mock 이미지를 우선 사용한다.
 - 사용자가 실사 방향을 명시한 경우 active fallback catalog에는 실사 사진만 남기고, 생성형/SVG 자산은 동일 슬롯에 혼합하지 않는다.
 - 사용자-facing create/edit 폼의 빈 업로드 슬롯도 이미지 경험의 일부로 본다. 업로드 전 비어 있는 상태라면 회색 박스만 두지 말고, helper 기반 실사 예시 스트립이나 명확한 fallback 가이드를 함께 제공한다.
 - 사용자-facing create/edit 폼에서 화면에 노출한 입력, 업로드, 직접 입력 옵션은 실제 저장 경로와 반드시 일치해야 한다. 현재 저장되지 않는 선택지를 노출하는 false affordance는 금지한다.
 - 같은 도메인 여정(`list -> create -> detail -> edit -> history`) 안의 페이지는 하나의 accent/control language를 공유해야 한다. 일부 화면만 흑백 토글이나 별도 폼 스킨으로 분리하지 않는다.
+- 배지, 평점, 전적, 신뢰도처럼 사용자 의사결정에 직접 영향을 주는 신호는 `verified`, `estimated`, `sample` 상태를 명확히 구분해야 한다. mock/샘플 데이터를 실제 신뢰 신호처럼 렌더링하지 않는다.
+- 서비스 전체 지원 범위(종목, 상태, 역할 등)는 list/create/edit/detail 하위 플로우에서도 일관되게 유지한다. 일부 화면에서만 조용히 범위를 줄이는 silent capability narrowing은 금지한다.
+- edit/manage 화면은 현재 route의 실제 엔티티를 기준으로 hydrate되어야 한다. 다른 seed/mock 엔티티로 silently fallback하는 편집 화면은 금지한다.
+- 결제, 환불, 신청 확정 같은 거래형 액션은 API 실패를 성공처럼 시뮬레이션하면 안 된다. 실패 원인, 재시도, 보류 상태를 명시적으로 보여줘야 한다.
+- checkout, refund, approval처럼 확정 플로우로 진입하는 CTA는 필수 컨텍스트(order id, route entity, amount 등)를 실제 서버 바인딩 기준으로 넘겨야 한다. 필수 정보 없이 화면만 이동시키는 dead-end entry는 금지한다.
+- admin/ops surface의 상세 링크와 후속 액션은 관리자 shell 안에서 맥락을 유지해야 한다. public surface로 이탈하는 관리 플로우는 금지한다.
+- 관리자 제재/정산/분쟁 처리처럼 운영 판단이 개입되는 액션은 local mock 완료나 단순 toast만으로 끝내면 안 된다. 처리 주체, 사유, 결과, 부분 실패를 추적 가능한 형태로 남겨야 한다.
 - 루트에 ad hoc 스크립트나 개인 메모 파일을 두지 않는다. 수동 QA 도구는 `scripts/qa/`, 문서 캡처 도구는 `scripts/docs/`, 버전 관리할 시각 레퍼런스는 `docs/reference/`로 보낸다.
 - `ec2-info` 같은 호스트/운영자 로컬 메모는 git에 커밋하지 않고 ignore 상태로만 유지한다.
 - `packages/`는 실제 공유 워크스페이스가 다시 필요해질 때만 되살린다. 빈 placeholder 디렉터리는 유지하지 않는다.

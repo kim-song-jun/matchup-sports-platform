@@ -55,7 +55,7 @@ export default function AdminPaymentsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const { data, isLoading } = useAdminPayments();
 
-  const apiPayments = data?.items ?? data ?? [];
+  const apiPayments = data ?? [];
   const allPayments: AdminPayment[] = (Array.isArray(apiPayments) && apiPayments.length > 0) ? (apiPayments as unknown as AdminPayment[]) : mockAdminPayments;
 
   const payments = allPayments.filter((p: AdminPayment) => {

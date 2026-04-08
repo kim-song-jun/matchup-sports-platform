@@ -1,95 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ChevronRight, Clock } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
+import { useAdminDisputes } from '@/hooks/use-api';
 
-type DisputeType = 'no_show' | 'late' | 'level_mismatch' | 'misconduct';
-type DisputeStatus = 'pending' | 'investigating' | 'resolved' | 'dismissed';
-
-interface Dispute {
-  id: string;
-  reporterTeam: string;
-  reportedTeam: string;
-  matchDate: string;
-  type: DisputeType;
-  status: DisputeStatus;
-  createdAt: string;
-}
-
-const mockDisputes: Dispute[] = [
-  {
-    id: 'D-001',
-    reporterTeam: 'FC 강남유나이티드',
-    reportedTeam: '서초 FC',
-    matchDate: '2026-03-15',
-    type: 'no_show',
-    status: 'pending',
-    createdAt: '2026-03-15',
-  },
-  {
-    id: 'D-002',
-    reporterTeam: '마포 킥커즈',
-    reportedTeam: '용산 스트라이커즈',
-    matchDate: '2026-03-12',
-    type: 'misconduct',
-    status: 'investigating',
-    createdAt: '2026-03-12',
-  },
-  {
-    id: 'D-003',
-    reporterTeam: '성동 유나이티드',
-    reportedTeam: 'FC 송파',
-    matchDate: '2026-03-10',
-    type: 'level_mismatch',
-    status: 'resolved',
-    createdAt: '2026-03-10',
-  },
-  {
-    id: 'D-004',
-    reporterTeam: '관악 FC',
-    reportedTeam: '노원 블루스',
-    matchDate: '2026-03-08',
-    type: 'late',
-    status: 'pending',
-    createdAt: '2026-03-08',
-  },
-  {
-    id: 'D-005',
-    reporterTeam: '종로 드래곤즈',
-    reportedTeam: '강서 유나이티드',
-    matchDate: '2026-03-05',
-    type: 'misconduct',
-    status: 'dismissed',
-    createdAt: '2026-03-06',
-  },
-  {
-    id: 'D-006',
-    reporterTeam: '동작 FC',
-    reportedTeam: '영등포 스타즈',
-    matchDate: '2026-03-01',
-    type: 'no_show',
-    status: 'resolved',
-    createdAt: '2026-03-01',
-  },
-];
-
-const typeLabel: Record<DisputeType, string> = {
-  no_show: '노쇼', late: '지각', level_mismatch: '실력 차이', misconduct: '비매너',
+const typeLabel: Record<string, string> = {
+  no_show: '노쇼',
+  late: '지각',
+  level_mismatch: '실력 차이',
+  misconduct: '비매너',
 };
-const typeColor: Record<DisputeType, string> = {
+
+const typeColor: Record<string, string> = {
   no_show: 'bg-red-50 text-red-600',
   late: 'bg-amber-50 text-amber-600',
   level_mismatch: 'bg-gray-100 text-gray-600',
   misconduct: 'bg-red-50 text-red-500',
 };
 
-const statusLabel: Record<DisputeStatus, string> = {
-  pending: '대기중', investigating: '조사중', resolved: '해결됨', dismissed: '기각됨',
+const statusLabel: Record<string, string> = {
+  pending: '대기중',
+  investigating: '조사중',
+  resolved: '해결됨',
+  dismissed: '기각됨',
 };
-const statusColor: Record<DisputeStatus, string> = {
+
+const statusColor: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-600',
   investigating: 'bg-blue-50 text-blue-500',
   resolved: 'bg-green-50 text-green-500',
@@ -107,29 +47,32 @@ const disputeFilters = [
 export default function AdminDisputesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const { data: disputes = [], isLoading, isError, refetch } = useAdminDisputes();
 
-  const filtered = mockDisputes.filter((d) => {
-    const matchesSearch = !search ||
-      d.reporterTeam.toLowerCase().includes(search.toLowerCase()) ||
-      d.reportedTeam.toLowerCase().includes(search.toLowerCase()) ||
-      d.id.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || d.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filtered = useMemo(() => {
+    return disputes.filter((dispute) => {
+      const matchesSearch = !search ||
+        dispute.reporterTeam?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        dispute.reportedTeam?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        dispute.id.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || dispute.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [disputes, search, statusFilter]);
 
-  const pendingCount = mockDisputes.filter((d) => d.status === 'pending').length;
-  const investigatingCount = mockDisputes.filter((d) => d.status === 'investigating').length;
+  const pendingCount = disputes.filter((d) => d.status === 'pending').length;
+  const investigatingCount = disputes.filter((d) => d.status === 'investigating').length;
 
   const handleDownloadCSV = () => {
     downloadCSV(
-      filtered.map((d) => ({
-        ID: d.id,
-        신고팀: d.reporterTeam,
-        피신고팀: d.reportedTeam,
-        매치일: d.matchDate,
-        유형: typeLabel[d.type],
-        상태: statusLabel[d.status],
-        신고일: d.createdAt,
+      filtered.map((dispute) => ({
+        ID: dispute.id,
+        신고팀: dispute.reporterTeam?.name ?? '-',
+        피신고팀: dispute.reportedTeam?.name ?? '-',
+        매치일: dispute.match?.date ?? '-',
+        유형: typeLabel[dispute.type] ?? dispute.type,
+        상태: statusLabel[dispute.status] ?? dispute.status,
+        신고일: dispute.createdAt,
       })),
       '신고분쟁'
     );
@@ -140,7 +83,7 @@ export default function AdminDisputesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">신고/분쟁 관리</h1>
-          <p className="text-base text-gray-400 mt-1">팀 간 분쟁과 신고를 처리하세요</p>
+          <p className="text-base text-gray-400 mt-1">실제 운영 로그와 함께 분쟁을 처리하세요</p>
         </div>
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
@@ -168,70 +111,75 @@ export default function AdminDisputesPage() {
         countLabel="건"
       />
 
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">ID</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신고팀</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">피신고팀</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매치일</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">유형</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">상태</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신고일</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-              {filtered.map((d) => (
-                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-5 py-3.5 text-sm font-mono text-gray-500 dark:text-gray-400">{d.id}</td>
-                  <td className="px-5 py-3.5">
-                    <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{d.reporterTeam}</p>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{d.reportedTeam}</p>
-                  </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{d.matchDate}</td>
-                  <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${typeColor[d.type]}`}>
-                      {typeLabel[d.type]}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[d.status]}`}>
-                      {statusLabel[d.status]}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{d.createdAt}</td>
-                  <td className="px-5 py-3.5">
-                    <Link
-                      href={`/admin/disputes/${d.id}`}
-                      className="flex items-center gap-1 text-sm font-medium text-blue-500 hover:text-blue-600 whitespace-nowrap"
-                    >
-                      상세
-                      <ChevronRight size={14} />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8}>
-                    <EmptyState
-                      icon={AlertCircle}
-                      title="검색 조건에 맞는 신고가 없어요"
-                      description="다른 조건으로 다시 찾아보세요"
-                      size="sm"
-                    />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {isLoading ? (
+        <div className="space-y-3 animate-pulse">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-16 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+          ))}
         </div>
-      </div>
+      ) : isError ? (
+        <ErrorState message="분쟁 목록을 불러오지 못했어요" onRetry={() => void refetch()} />
+      ) : (
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">ID</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신고팀</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">피신고팀</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매치일</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">유형</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">상태</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">신고일</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {filtered.map((dispute) => (
+                  <tr key={dispute.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <td className="px-5 py-3.5 text-sm font-mono text-gray-500 dark:text-gray-400">{dispute.id}</td>
+                    <td className="px-5 py-3.5 text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{dispute.reporterTeam?.name ?? '-'}</td>
+                    <td className="px-5 py-3.5 text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{dispute.reportedTeam?.name ?? '-'}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{dispute.match?.date ?? '-'}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${typeColor[dispute.type] || 'bg-gray-100 text-gray-500'}`}>
+                        {typeLabel[dispute.type] ?? dispute.type}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[dispute.status] || 'bg-gray-100 text-gray-500'}`}>
+                        {statusLabel[dispute.status] ?? dispute.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                      {new Date(dispute.createdAt).toLocaleDateString('ko-KR')}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Link href={`/admin/disputes/${dispute.id}`} className="flex items-center gap-1 text-sm font-medium text-blue-500 hover:text-blue-600 whitespace-nowrap">
+                        상세
+                        <ChevronRight size={14} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={8}>
+                      <EmptyState
+                        icon={AlertCircle}
+                        title="검색 조건에 맞는 신고가 없어요"
+                        description="다른 조건으로 다시 찾아보세요"
+                        size="sm"
+                      />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

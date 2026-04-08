@@ -6,14 +6,17 @@ import {
   ArrowLeft,
   RotateCcw,
   AlertTriangle,
-  CheckCircle,
   Calendar,
   MapPin,
-  CreditCard,
   Clock,
-  X,
   Loader2,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { Modal } from '@/components/ui/modal';
+import { useToast } from '@/components/ui/toast';
+import { usePayment, useRefundPayment } from '@/hooks/use-api';
+import { getPaymentMethodMeta, getPaymentSource, getRefundPolicy } from '@/lib/payment-ui';
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const refundReasons = [
@@ -23,137 +26,143 @@ const refundReasons = [
   { id: 'other', label: '기타' },
 ];
 
-const _mockPayment = {
-  id: 'pay_mock_001',
-  amount: 14500,
-  method: '신용카드 (신한 **** 1234)',
-  paidAt: '2026-03-20T10:30:15',
-  match: {
-    name: '풋살 친선 매치',
-    date: '2026년 3월 25일 (수) 19:00',
-    venue: '서울 마포구 월드컵경기장 풋살파크 A구장',
-  },
-  matchStartTime: '2026-03-25T19:00:00',
-};
-
-const emptyPayment = {
-  id: '',
-  amount: 0,
-  method: '',
-  paidAt: new Date().toISOString(),
-  match: { name: '', date: '', venue: '' },
-  matchStartTime: new Date().toISOString(),
-};
-
-const mockPayment = process.env.NODE_ENV === 'development' ? _mockPayment : emptyPayment;
-
-function getRefundInfo(matchStartTime: string) {
-  const now = new Date();
-  const matchDate = new Date(matchStartTime);
-  const hoursUntilMatch = (matchDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-  if (hoursUntilMatch > 24) {
-    return { percentage: 100, label: '전액 환불', color: 'text-green-600', bgColor: 'bg-green-50' };
-  } else if (hoursUntilMatch > 1) {
-    return { percentage: 50, label: '50% 환불', color: 'text-amber-600', bgColor: 'bg-amber-50' };
-  } else {
-    return { percentage: 0, label: '환불 불가', color: 'text-red-500', bgColor: 'bg-red-50' };
-  }
-}
-
 export default function RefundRequestPage() {
   const router = useRouter();
   const params = useParams();
+  const paymentId = params.id as string;
+  const { toast } = useToast();
   const [selectedReason, setSelectedReason] = useState('');
   const [additionalReason, setAdditionalReason] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
 
-  const refundInfo = getRefundInfo(mockPayment.matchStartTime);
-  const refundAmount = Math.floor(mockPayment.amount * (refundInfo.percentage / 100));
+  const { data: payment, isLoading, isError, refetch } = usePayment(paymentId);
+  const refundPayment = useRefundPayment();
+
+  if (isLoading) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <div className="space-y-4 animate-pulse">
+          <div className="h-8 w-32 rounded-lg bg-gray-100 dark:bg-gray-800" />
+          <div className="h-32 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-48 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <ErrorState message="환불 정보를 불러오지 못했어요" onRetry={() => void refetch()} />
+      </div>
+    );
+  }
+
+  if (!payment) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={RotateCcw}
+          title="환불 대상을 찾을 수 없어요"
+          description="결제 내역에서 다시 시도해주세요"
+          action={{ label: '결제 내역으로', href: '/payments' }}
+        />
+      </div>
+    );
+  }
+
+  const source = getPaymentSource(payment);
+  const method = getPaymentMethodMeta(payment.method);
+  const refundPolicy = getRefundPolicy(source.scheduledAt);
+  const refundAmount = Math.floor(payment.amount * (refundPolicy.percentage / 100));
+  const isRefundable = payment.status === 'completed' && source.kind === 'match' && refundPolicy.percentage > 0;
 
   const handleRefundSubmit = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setIsProcessing(false);
-    setShowModal(false);
-    setShowSuccess(true);
-    setTimeout(() => {
-      router.push(`/payments/${params.id}`);
-    }, 1500);
+    try {
+      await refundPayment.mutateAsync({
+        id: paymentId,
+        data: {
+          reason: selectedReason,
+          note: additionalReason,
+        },
+      });
+      toast('success', '환불 요청이 접수되었어요');
+      router.push(`/payments/${paymentId}`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '환불 요청에 실패했어요.');
+    }
   };
+
+  if (!isRefundable) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={RotateCcw}
+          title="지금은 환불할 수 없어요"
+          description={refundPolicy.description}
+          action={{ label: '결제 상세로', href: `/payments/${paymentId}` }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
-      {/* Success Toast */}
-      {showSuccess && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
-          <CheckCircle size={18} className="text-green-400" />
-          <span className="text-base font-medium text-white">환불 요청이 완료되었습니다</span>
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">환불 확인</h3>
-              <button aria-label="닫기" onClick={() => setShowModal(false)} className="rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
-                <X size={20} className="text-gray-500" />
-              </button>
-            </div>
-            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500">결제 금액</span>
-                <span className="text-base text-gray-700 dark:text-gray-200">{formatAmount(mockPayment.amount)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">환불 금액</span>
-                <span className="text-lg font-bold text-blue-500">{formatAmount(refundAmount)}</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 mb-5">
-              <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-700 leading-relaxed">
-                환불 요청 후에는 취소할 수 없습니다. 환불 처리까지 영업일 기준 1-3일이 소요됩니다.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleRefundSubmit}
-                disabled={isProcessing}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    처리중
-                  </>
-                ) : (
-                  '환불 요청'
-                )}
-              </button>
-            </div>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="환불 확인" size="sm">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-500">결제 금액</span>
+            <span className="text-base text-gray-700 dark:text-gray-200">{formatAmount(payment.amount)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">환불 금액</span>
+            <span className="text-lg font-bold text-blue-500">{formatAmount(refundAmount)}</span>
           </div>
         </div>
-      )}
 
-      {/* Header */}
+        <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 mb-5">
+          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700 leading-relaxed">
+            환불 요청 후에는 취소할 수 없습니다. 환불 처리까지 영업일 기준 1~3일이 소요될 수 있습니다.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowModal(false)}
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => void handleRefundSubmit()}
+            disabled={refundPayment.isPending}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
+          >
+            {refundPayment.isPending ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                처리중
+              </>
+            ) : (
+              '환불 요청'
+            )}
+          </button>
+        </div>
+      </Modal>
+
       <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+        >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">환불 요청</h1>
       </header>
+
       <div className="hidden @3xl:block mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-base text-gray-500 hover:text-gray-600 mb-2 transition-colors">
           <ArrowLeft size={16} /> 결제 상세
@@ -162,84 +171,81 @@ export default function RefundRequestPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
-        {/* Payment Summary */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 정보</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">상품명</span>
-              <span className="text-base font-medium text-gray-900 dark:text-white">{mockPayment.match.name}</span>
+              <span className="text-base font-medium text-gray-900 dark:text-white">{source.title}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">결제 금액</span>
-              <span className="text-base font-semibold text-gray-900 dark:text-white">{formatAmount(mockPayment.amount)}</span>
+              <span className="text-base font-semibold text-gray-900 dark:text-white">{formatAmount(payment.amount)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">결제 수단</span>
-              <span className="text-sm text-gray-600 dark:text-gray-300">{mockPayment.method}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">{method.label}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">결제일</span>
-              <span className="text-sm text-gray-600 dark:text-gray-300">{formatDateTime(mockPayment.paidAt)}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">{formatDateTime(payment.paidAt || payment.createdAt)}</span>
             </div>
           </div>
           <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-1.5">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Calendar size={14} className="text-gray-500 shrink-0" />
-              {mockPayment.match.date}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <MapPin size={14} className="text-gray-500 shrink-0" />
-              {mockPayment.match.venue}
-            </div>
+            {source.scheduledAt && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Calendar size={14} className="text-gray-500 shrink-0" />
+                {formatDateTime(source.scheduledAt)}
+              </div>
+            )}
+            {source.venueName && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <MapPin size={14} className="text-gray-500 shrink-0" />
+                {source.venueName}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Refund Policy */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
           <div className="space-y-2">
-            <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${refundInfo.percentage === 100 ? 'bg-green-50 ring-2 ring-green-200' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
-              <div className="flex items-center gap-2">
-                <Clock size={14} className={refundInfo.percentage === 100 ? 'text-green-500' : 'text-gray-500'} />
-                <span className={`text-sm font-medium ${refundInfo.percentage === 100 ? 'text-green-700' : 'text-gray-600 dark:text-gray-300'}`}>경기 24시간 전</span>
+            {[
+              { key: 'full', label: '경기 24시간 전', result: '전액 환불', active: refundPolicy.percentage === 100 },
+              { key: 'half', label: '경기 1~24시간 전', result: '50% 환불', active: refundPolicy.percentage === 50 },
+              { key: 'none', label: '경기 1시간 이내', result: '환불 불가', active: refundPolicy.percentage === 0 },
+            ].map((rule) => (
+              <div
+                key={rule.key}
+                className={`flex items-center justify-between rounded-xl px-4 py-3 ${
+                  rule.active ? refundPolicy.bgColor : 'bg-gray-50 dark:bg-gray-800/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock size={14} className={rule.active ? refundPolicy.color : 'text-gray-500'} />
+                  <span className={`text-sm font-medium ${rule.active ? refundPolicy.color : 'text-gray-600 dark:text-gray-300'}`}>
+                    {rule.label}
+                  </span>
+                </div>
+                <span className={`text-sm font-bold ${rule.active ? refundPolicy.color : 'text-gray-500'}`}>{rule.result}</span>
               </div>
-              <span className={`text-sm font-bold ${refundInfo.percentage === 100 ? 'text-green-600' : 'text-gray-500'}`}>전액 환불</span>
-            </div>
-            <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${refundInfo.percentage === 50 ? 'bg-amber-50 ring-2 ring-amber-200' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
-              <div className="flex items-center gap-2">
-                <Clock size={14} className={refundInfo.percentage === 50 ? 'text-amber-500' : 'text-gray-500'} />
-                <span className={`text-sm font-medium ${refundInfo.percentage === 50 ? 'text-amber-700' : 'text-gray-600 dark:text-gray-300'}`}>경기 1~24시간 전</span>
-              </div>
-              <span className={`text-sm font-bold ${refundInfo.percentage === 50 ? 'text-amber-600' : 'text-gray-500'}`}>50% 환불</span>
-            </div>
-            <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${refundInfo.percentage === 0 ? 'bg-red-50 ring-2 ring-red-200' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
-              <div className="flex items-center gap-2">
-                <Clock size={14} className={refundInfo.percentage === 0 ? 'text-red-500' : 'text-gray-500'} />
-                <span className={`text-sm font-medium ${refundInfo.percentage === 0 ? 'text-red-700' : 'text-gray-600 dark:text-gray-300'}`}>경기 1시간 이내</span>
-              </div>
-              <span className={`text-sm font-bold ${refundInfo.percentage === 0 ? 'text-red-500' : 'text-gray-500'}`}>환불 불가</span>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Refund Amount */}
-        <div className={`rounded-2xl border p-5 ${refundInfo.bgColor} border-transparent`}>
+        <div className={`rounded-2xl border p-5 ${refundPolicy.bgColor} border-transparent`}>
           <div className="flex items-center gap-3 mb-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${refundInfo.color}`}>
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${refundPolicy.color}`}>
               <RotateCcw size={20} />
             </div>
             <div>
               <p className="text-sm text-gray-500">예상 환불 금액</p>
-              <p className={`text-2xl font-bold ${refundInfo.color}`}>{formatAmount(refundAmount)}</p>
+              <p className={`text-2xl font-bold ${refundPolicy.color}`}>{formatAmount(refundAmount)}</p>
             </div>
           </div>
-          <p className="text-xs text-gray-500">
-            현재 경기 시작까지 24시간 이상 남아있어 {refundInfo.label}이 적용됩니다.
-          </p>
+          <p className="text-xs text-gray-500">{refundPolicy.description}</p>
         </div>
 
-        {/* Reason Selection */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 사유</h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -267,20 +273,16 @@ export default function RefundRequestPage() {
         </div>
       </div>
 
-      {/* Fixed Bottom CTA */}
       <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
         <div className="flex items-center justify-between mb-3 @3xl:hidden">
           <span className="text-sm text-gray-500">환불 예상 금액</span>
-          <span className={`text-xl font-bold ${refundInfo.color}`}>{formatAmount(refundAmount)}</span>
+          <span className={`text-xl font-bold ${refundPolicy.color}`}>{formatAmount(refundAmount)}</span>
         </div>
         <button
-          onClick={() => {
-            if (refundInfo.percentage === 0) return;
-            setShowModal(true);
-          }}
-          disabled={!selectedReason || refundInfo.percentage === 0}
+          onClick={() => setShowModal(true)}
+          disabled={!selectedReason || refundPayment.isPending}
           className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-colors ${
-            selectedReason && refundInfo.percentage > 0
+            selectedReason
               ? 'bg-red-500 text-white hover:bg-red-600 active:scale-[0.98]'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}

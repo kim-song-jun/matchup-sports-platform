@@ -335,9 +335,39 @@ export interface Payment {
   method: string | null;
   status: string;
   orderId: string;
+  paymentKey?: string | null;
   paidAt: string | null;
   createdAt: string;
+  refundAmount?: number | null;
+  refundReason?: string | null;
+  refundedAt?: string | null;
+  participantId?: string | null;
+  sourceType?: 'match' | 'lesson' | 'marketplace' | 'unknown';
+  sourceName?: string | null;
+  participant?: {
+    id: string;
+    status: string;
+    paymentStatus: string;
+    match?: {
+      id: string;
+      title: string;
+      sportType: string;
+      matchDate: string;
+      startTime: string;
+      endTime?: string;
+      fee?: number;
+      venue?: { id: string; name: string; address?: string | null };
+      venueName?: string | null;
+      venueAddress?: string | null;
+    };
+  };
   user?: { id: string; nickname: string; email?: string; profileImageUrl: string | null };
+}
+
+export interface PreparedPayment {
+  paymentId: string;
+  orderId: string;
+  amount: number;
 }
 
 // ── Admin stats ──
@@ -390,33 +420,95 @@ export interface Badge {
   type: string;
   name: string;
   description: string;
+  earned?: boolean;
+  earnedAt?: string;
 }
 
 // ── Dispute ──
+export interface AdminActionLog {
+  id: string;
+  action: string;
+  actor: string;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface Dispute {
   id: string;
-  reporterId: string;
-  targetId: string;
+  reporterTeamId: string;
+  reportedTeamId: string;
+  teamMatchId: string;
   type: string;
   description: string;
   status: string;
+  resolution?: string | null;
   createdAt: string;
+  updatedAt?: string;
+  adminNotes?: string;
+  reporterTeam?: {
+    id: string;
+    name: string;
+    captain?: string;
+    trustScore?: number;
+    memberCount?: number;
+  };
+  reportedTeam?: {
+    id: string;
+    name: string;
+    captain?: string;
+    trustScore?: number;
+    memberCount?: number;
+  };
+  match?: {
+    id: string;
+    date: string;
+    startTime?: string;
+    endTime?: string;
+    venue?: string;
+    address?: string;
+    sport?: string;
+  };
+  arrivalCheck?: {
+    reporterArrival?: string | null;
+    reportedArrival?: string | null;
+    reporterCheckedIn?: boolean;
+    reportedCheckedIn?: boolean;
+  };
+  evidence?: Array<{
+    id: string;
+    type: string;
+    description: string;
+  }>;
+  history?: AdminActionLog[];
 }
 
 // ── Settlement ──
 export interface Settlement {
   id: string;
+  type: string;
   amount: number;
+  commission: number;
+  netAmount: number;
+  payerName: string;
+  recipientName: string;
+  relatedId: string;
+  description: string;
   status: string;
   processedAt: string | null;
   createdAt: string;
+  failureReason?: string | null;
+  history?: AdminActionLog[];
 }
 
 export interface SettlementSummary {
-  totalAmount: number;
-  pendingAmount: number;
-  processedAmount: number;
-  count: number;
+  total: number;
+  commission: number;
+  pending: number;
+  refunded: number;
+  processedCount: number;
+  pendingCount: number;
+  refundedCount: number;
+  failedCount: number;
 }
 
 // ── Review ──
@@ -478,10 +570,10 @@ export interface CreateVenueReviewInput {
 }
 
 export interface PreparePaymentInput {
-  orderId: string;
+  participantId: string;
   amount: number;
   method: string;
-  itemName: string;
+  orderId?: string;
 }
 
 export interface ConfirmPaymentInput {
@@ -492,6 +584,14 @@ export interface ConfirmPaymentInput {
 
 export interface RefundPaymentInput {
   reason?: string;
+  note?: string;
+}
+
+export interface AdminUserDetail extends UserProfile {
+  adminStatus?: 'active' | 'suspended';
+  warningCount?: number;
+  suspensionReason?: string | null;
+  adminAuditLog?: AdminActionLog[];
 }
 
 export interface CreateTeamMatchInput {

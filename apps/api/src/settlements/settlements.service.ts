@@ -3,6 +3,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 export type SettlementStatus = 'pending' | 'processed' | 'refunded' | 'failed';
 export type SettlementType = 'match_fee' | 'lesson_fee' | 'mercenary_fee' | 'venue_rental';
 
+interface SettlementHistoryEntry {
+  id: string;
+  action: string;
+  actor: string;
+  note: string | null;
+  createdAt: Date;
+}
+
 export interface Settlement {
   id: string;
   type: SettlementType;
@@ -16,6 +24,8 @@ export interface Settlement {
   description: string;
   createdAt: Date;
   processedAt: Date | null;
+  failureReason: string | null;
+  history: SettlementHistoryEntry[];
 }
 
 @Injectable()
@@ -34,6 +44,8 @@ export class SettlementsService {
       description: '3/15 풋살 매치 참가비',
       createdAt: new Date('2026-03-15T12:00:00Z'),
       processedAt: new Date('2026-03-16T10:00:00Z'),
+      failureReason: null,
+      history: [this.createHistory('approve', 'admin', '정산 승인 완료', '2026-03-16T10:00:00Z')],
     },
     {
       id: 'settle-002',
@@ -48,6 +60,8 @@ export class SettlementsService {
       description: '3/14 농구 레슨비',
       createdAt: new Date('2026-03-14T15:00:00Z'),
       processedAt: new Date('2026-03-15T09:00:00Z'),
+      failureReason: null,
+      history: [this.createHistory('approve', 'admin', '정산 승인 완료', '2026-03-15T09:00:00Z')],
     },
     {
       id: 'settle-003',
@@ -62,6 +76,8 @@ export class SettlementsService {
       description: '3/18 풋살 용병비',
       createdAt: new Date('2026-03-18T10:00:00Z'),
       processedAt: null,
+      failureReason: null,
+      history: [],
     },
     {
       id: 'settle-004',
@@ -76,6 +92,8 @@ export class SettlementsService {
       description: '3/12 구장 대관료',
       createdAt: new Date('2026-03-12T08:00:00Z'),
       processedAt: new Date('2026-03-13T11:00:00Z'),
+      failureReason: null,
+      history: [this.createHistory('approve', 'admin', '정산 승인 완료', '2026-03-13T11:00:00Z')],
     },
     {
       id: 'settle-005',
@@ -90,6 +108,8 @@ export class SettlementsService {
       description: '3/10 매치 취소 환불',
       createdAt: new Date('2026-03-10T09:00:00Z'),
       processedAt: new Date('2026-03-10T14:00:00Z'),
+      failureReason: null,
+      history: [this.createHistory('refund', 'admin', '취소 환불 처리 완료', '2026-03-10T14:00:00Z')],
     },
     {
       id: 'settle-006',
@@ -104,6 +124,8 @@ export class SettlementsService {
       description: '3/20 배드민턴 레슨비',
       createdAt: new Date('2026-03-20T11:00:00Z'),
       processedAt: null,
+      failureReason: null,
+      history: [],
     },
     {
       id: 'settle-007',
@@ -117,7 +139,9 @@ export class SettlementsService {
       relatedId: 'merc-002',
       description: '3/17 풋살 용병비 - 결제 실패',
       createdAt: new Date('2026-03-17T13:00:00Z'),
-      processedAt: null,
+      processedAt: new Date('2026-03-17T16:00:00Z'),
+      failureReason: '정산 계좌 검증 실패',
+      history: [this.createHistory('reject', 'admin', '정산 계좌 확인 필요', '2026-03-17T16:00:00Z')],
     },
     {
       id: 'settle-008',
@@ -132,6 +156,8 @@ export class SettlementsService {
       description: '3/21 아이스하키 구장 대관료',
       createdAt: new Date('2026-03-21T07:00:00Z'),
       processedAt: null,
+      failureReason: null,
+      history: [],
     },
   ];
 
@@ -172,7 +198,7 @@ export class SettlementsService {
     };
   }
 
-  process(id: string, data: { action: string }) {
+  process(id: string, data: { action: string; note?: string; actor?: string }) {
     const settlement = this.settlements.find((s) => s.id === id);
     if (!settlement) {
       throw new NotFoundException(`정산 ${id}을(를) 찾을 수 없습니다.`);
@@ -180,17 +206,34 @@ export class SettlementsService {
 
     if (data.action === 'approve') {
       settlement.status = 'processed';
+      settlement.failureReason = null;
       settlement.processedAt = new Date();
     } else if (data.action === 'refund') {
       settlement.status = 'refunded';
       settlement.commission = 0;
       settlement.netAmount = 0;
+      settlement.failureReason = null;
       settlement.processedAt = new Date();
     } else if (data.action === 'reject') {
       settlement.status = 'failed';
+      settlement.failureReason = data.note ?? '운영자 반려';
       settlement.processedAt = new Date();
     }
 
+    settlement.history.push(
+      this.createHistory(data.action, data.actor ?? 'admin', data.note ?? null),
+    );
+
     return settlement;
+  }
+
+  private createHistory(action: string, actor: string, note?: string | null, createdAt?: string) {
+    return {
+      id: `settlement-history-${Math.random().toString(36).slice(2, 8)}`,
+      action,
+      actor,
+      note: note ?? null,
+      createdAt: createdAt ? new Date(createdAt) : new Date(),
+    };
   }
 }

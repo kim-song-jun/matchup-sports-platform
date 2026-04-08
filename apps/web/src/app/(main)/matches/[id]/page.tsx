@@ -5,11 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
 import { useMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import type { MatchParticipant } from '@/types/api';
+import type { ApiResponse, MatchParticipant, Payment } from '@/types/api';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportDetailImageSet, getVenueImageSet } from '@/lib/sport-image';
@@ -27,12 +28,24 @@ export default function MatchDetailPage() {
   const matchId = params.id as string;
   const { data: match, isLoading } = useMatch(matchId);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [pendingParticipantId, setPendingParticipantId] = useState<string | null>(null);
 
-  const joinMutation = useMutation({
-    mutationFn: () => api.post(`/matches/${matchId}/join`) as Promise<unknown>,
-    onSuccess: () => {
-      toast('success', '참가 완료! 경기에서 만나요');
+  const joinMutation = useMutation<MatchParticipant, unknown, { openCheckout: boolean }>({
+    mutationFn: async () => {
+      const res = await api.post(`/matches/${matchId}/join`);
+      return (res as unknown as ApiResponse<MatchParticipant>).data;
+    },
+    onSuccess: (participant, variables) => {
       queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
+
+      if (variables.openCheckout && participant.paymentStatus === 'pending') {
+        setPendingParticipantId(participant.id);
+        setShowCheckout(true);
+        toast('info', '참가 신청이 생성되었어요. 결제를 완료하면 확정됩니다.');
+        return;
+      }
+
+      toast('success', '참가 완료! 경기에서 만나요');
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -81,12 +94,19 @@ export default function MatchDetailPage() {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
   const isAlmostFull = filledPercent >= 70;
   const isHost = user?.id === match.hostId;
-  const isParticipant = match.participants?.some((p: MatchParticipant) => p.userId === user?.id);
+  const currentParticipant = match.participants?.find((p: MatchParticipant) => p.userId === user?.id);
+  const isParticipant = !!currentParticipant;
+  const hasPendingPayment = currentParticipant?.paymentStatus === 'pending';
   const isFull = match.currentPlayers >= match.maxPlayers;
   const matchImages = getSportDetailImageSet(match.sportType, [match.imageUrl], match.id, 4);
+  const fallbackMatchImages = getSportDetailImageSet(match.sportType, undefined, match.id, 4);
   const heroImage = matchImages[0];
+  const heroFallbackImage = fallbackMatchImages[0];
   const venuePreviewImage = match.venue
     ? getVenueImageSet(match.sportType, match.venue.imageUrls, `${match.id}-venue`, 1)[0]
+    : null;
+  const fallbackVenuePreviewImage = match.venue
+    ? getVenueImageSet(match.sportType, undefined, `${match.id}-venue`, 1)[0]
     : null;
 
   return (
@@ -128,13 +148,24 @@ export default function MatchDetailPage() {
           {heroImage && (
             <div className="mb-4">
               <div className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
-                <img src={heroImage} alt={match.title} className="h-[220px] w-full object-cover" />
+                <SafeImage
+                  src={heroImage}
+                  fallbackSrc={heroFallbackImage}
+                  alt={match.title}
+                  className="h-[220px] w-full object-cover"
+                />
               </div>
               {matchImages.length > 1 && (
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {matchImages.slice(1).map((image, index) => (
                     <div key={`${image}-${index}`} className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
-                      <img src={image} alt={`${match.title} 이미지 ${index + 2}`} className="aspect-[4/3] h-full w-full object-cover" loading="lazy" />
+                      <SafeImage
+                        src={image}
+                        fallbackSrc={fallbackMatchImages[index + 1] ?? heroFallbackImage}
+                        alt={`${match.title} 이미지 ${index + 2}`}
+                        className="aspect-[4/3] h-full w-full object-cover"
+                        loading="lazy"
+                      />
                     </div>
                   ))}
                 </div>
@@ -183,7 +214,13 @@ export default function MatchDetailPage() {
               <div className="flex items-center gap-3">
                 {venuePreviewImage && (
                   <div className="h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                    <img src={venuePreviewImage} alt={match.venue.name} className="h-full w-full object-cover" loading="lazy" />
+                    <SafeImage
+                      src={venuePreviewImage}
+                      fallbackSrc={fallbackVenuePreviewImage}
+                      alt={match.venue.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                 )}
                 <div>
@@ -226,26 +263,40 @@ export default function MatchDetailPage() {
                 내가 만든 매치
               </button>
             ) : isParticipant ? (
-              <button
-                onClick={() => leaveMutation.mutate()}
-                disabled={leaveMutation.isPending}
-                data-testid="match-leave-button"
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
-              >
-                {leaveMutation.isPending ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
-                    처리 중...
-                  </span>
-                ) : '참가 취소하기'}
-              </button>
+              <div className="space-y-2">
+                {hasPendingPayment ? (
+                  <button
+                    onClick={() => {
+                      setPendingParticipantId(currentParticipant?.id ?? null);
+                      setShowCheckout(true);
+                    }}
+                    className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
+                  >
+                    결제 마무리하기 · {formatAmount(match.fee)}
+                  </button>
+                ) : null}
+
+                <button
+                  onClick={() => leaveMutation.mutate()}
+                  disabled={leaveMutation.isPending}
+                  data-testid="match-leave-button"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  {leaveMutation.isPending ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                      처리 중...
+                    </span>
+                  ) : hasPendingPayment ? '참가 신청 취소하기' : '참가 취소하기'}
+                </button>
+              </div>
             ) : isFull ? (
               <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
                 마감되었습니다
               </button>
             ) : (
               <button
-                onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
+                onClick={() => joinMutation.mutate({ openCheckout: match.fee > 0 })}
                 disabled={joinMutation.isPending}
                 data-testid="match-join-button"
                 className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
@@ -256,7 +307,7 @@ export default function MatchDetailPage() {
                     처리 중...
                   </span>
                 ) : (
-                  `참가하기 · ${formatAmount(match.fee)}`
+                  `${match.fee > 0 ? '참가 후 결제하기' : '참가하기'} · ${formatAmount(match.fee)}`
                 )}
               </button>
             )}
@@ -326,16 +377,17 @@ export default function MatchDetailPage() {
         <CheckoutModal
           isOpen={showCheckout}
           onClose={() => setShowCheckout(false)}
+          participantId={pendingParticipantId ?? ''}
           amount={match.fee}
           itemName={match.title}
-          orderId={`match-${matchId}-${Date.now()}`}
-          onSuccess={() => {
-            joinMutation.mutate();
+          onSuccess={(payment: Payment) => {
+            queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
+            queryClient.invalidateQueries({ queryKey: ['payments'] });
+            setPendingParticipantId(payment.participantId ?? pendingParticipantId);
             setShowCheckout(false);
           }}
           onError={() => {
             toast('error', '결제에 실패했어요. 잠시 후 다시 시도해주세요');
-            setShowCheckout(false);
           }}
         />
       )}

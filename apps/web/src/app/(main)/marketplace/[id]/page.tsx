@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
@@ -58,7 +60,9 @@ export default function ListingDetailPage() {
 
   const SportIcon = SportIconMap[listing.sportType];
   const galleryImages = getListingImageSet(listing.imageUrls, listing.id, 3);
+  const fallbackGalleryImages = getListingImageSet(undefined, listing.id, 3);
   const heroImage = selectedImage || galleryImages[0];
+  const heroFallbackImage = fallbackGalleryImages[0];
 
   useEffect(() => {
     setSelectedImage(galleryImages[0] ?? null);
@@ -111,7 +115,12 @@ export default function ListingDetailPage() {
           <div className="mb-4">
             <div className="h-64 @3xl:h-80 rounded-xl bg-gray-100 dark:bg-gray-700 overflow-hidden">
               {heroImage ? (
-                <img src={heroImage} alt={listing.title} className="h-full w-full object-cover" />
+                <SafeImage
+                  src={heroImage}
+                  fallbackSrc={heroFallbackImage}
+                  alt={listing.title}
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="flex h-full items-center justify-center">
                   {SportIcon ? <SportIcon size={64} className="text-gray-300" /> : <div className="text-6xl text-gray-300">📦</div>}
@@ -131,7 +140,12 @@ export default function ListingDetailPage() {
                         : 'border-gray-100 dark:border-gray-700'
                     }`}
                   >
-                    <img src={image} alt={`${listing.title} 썸네일 ${index + 1}`} className="aspect-[4/3] h-full w-full object-cover" />
+                    <SafeImage
+                      src={image}
+                      fallbackSrc={fallbackGalleryImages[index] ?? heroFallbackImage}
+                      alt={`${listing.title} 썸네일 ${index + 1}`}
+                      className="aspect-[4/3] h-full w-full object-cover"
+                    />
                   </button>
                 ))}
               </div>
@@ -212,7 +226,7 @@ export default function ListingDetailPage() {
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">안전거래 안내</p>
-                <p className="text-xs text-gray-500 mt-0.5">에스크로 결제로 안전하게 거래하세요</p>
+                <p className="text-xs text-gray-500 mt-0.5">실제 안전결제는 아직 준비 중이며, 현재는 채팅 기반 거래만 지원합니다.</p>
               </div>
             </div>
           </div>
@@ -226,12 +240,6 @@ export default function ListingDetailPage() {
             ) : (
               <div className="space-y-2">
                 <button
-                  onClick={() => router.push('/payments/checkout')}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors"
-                >
-                  {listing.listingType === 'rent' ? '대여 신청하기' : '구매하기'}
-                </button>
-                <button
                   onClick={() => {
                     toast('success', '판매자와 채팅을 시작했어요');
                     router.push('/chat');
@@ -241,6 +249,14 @@ export default function ListingDetailPage() {
                   <MessageCircle size={18} />
                   채팅하기
                 </button>
+                {user?.id !== listing?.sellerId && (
+                  <TrustSignalBanner
+                    tone="warning"
+                    label="결제 준비 중"
+                    title={listing.listingType === 'rent' ? '대여 결제는 아직 열리지 않았어요' : '장터 구매 결제는 아직 열리지 않았어요'}
+                    description="현재는 판매자와 채팅으로 거래 조건을 확인하는 단계까지만 지원합니다. 결제 페이지로 보내는 가짜 흐름은 제거되었습니다."
+                  />
+                )}
                 {user?.id === listing?.sellerId && (
                   <div className="flex gap-2 mt-2">
                     <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600">

@@ -10,6 +10,7 @@ dist/
 playwright-report/
 test-results/
 tmp/
+output/
 e2e/.auth/
 *.log
 .claude/agents/*.bak.*

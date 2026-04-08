@@ -9,184 +9,135 @@ import {
   Wallet,
   MapPin,
   Calendar,
-  Tag,
   CheckCircle,
   Loader2,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
-import { api } from '@/lib/api';
-import { formatAmount } from '@/lib/utils';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
+import { useConfirmPayment, usePreparePayment } from '@/hooks/use-api';
+import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const paymentMethods = [
   { id: 'card', label: '신용/체크카드', icon: CreditCard, description: '모든 카드 가능' },
   { id: 'tosspay', label: '토스페이', icon: Wallet, description: '토스 간편결제' },
   { id: 'naverpay', label: '네이버페이', icon: Wallet, description: '네이버 간편결제' },
   { id: 'kakaopay', label: '카카오페이', icon: Wallet, description: '카카오 간편결제' },
-];
-
-const defaultOrder = {
-  type: '매치',
-  name: '풋살 친선 매치',
-  date: '2026년 3월 25일 (수) 19:00',
-  venue: '서울 마포구 월드컵경기장 풋살파크 A구장',
-  originalPrice: 15000,
-  couponDiscount: 500,
-};
+] as const;
 
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const preparePayment = usePreparePayment();
+  const confirmPayment = useConfirmPayment();
 
-  const [selectedMethod, setSelectedMethod] = useState('card');
-  const [couponCode, setCouponCode] = useState('');
-  const [couponApplied, setCouponApplied] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<(typeof paymentMethods)[number]['id']>('card');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [completedOrderName, setCompletedOrderName] = useState('');
-  const [completedAmount, setCompletedAmount] = useState(0);
 
-  // Validate required params — name and a non-zero price must be present
-  const paramName = searchParams.get('name');
-  const paramPrice = Number(searchParams.get('price'));
-  if (!paramName || !paramPrice) {
+  const source = searchParams.get('source');
+  const participantId = searchParams.get('participantId');
+  const name = searchParams.get('name');
+  const amount = Number(searchParams.get('amount'));
+  const scheduledAt = searchParams.get('scheduledAt');
+  const venue = searchParams.get('venue');
+
+  const isMatchCheckout = source === 'match' && !!participantId && !!name && Number.isFinite(amount) && amount > 0;
+  const isProcessing = preparePayment.isPending || confirmPayment.isPending;
+
+  if (!source) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-5">
         <EmptyState
           icon={AlertCircle}
           title="결제 정보가 없어요"
-          description="올바른 경로로 접근해주세요"
+          description="올바른 경로로 다시 접근해주세요"
           action={{ label: '홈으로 돌아가기', href: '/home' }}
         />
       </div>
     );
   }
 
-  // Build order from URL search params
-  const order = {
-    type: searchParams.get('type') || defaultOrder.type,
-    name: paramName,
-    date: searchParams.get('date') || defaultOrder.date,
-    venue: searchParams.get('venue') || defaultOrder.venue,
-    originalPrice: paramPrice,
-    couponDiscount: Number(searchParams.get('discount')) || defaultOrder.couponDiscount,
-  };
-
-  const discount = couponApplied ? order.couponDiscount : 0;
-  const finalPrice = order.originalPrice - discount;
-
-  const handleApplyCoupon = () => {
-    if (couponCode.trim()) {
-      setCouponApplied(true);
-    }
-  };
-
   const handlePayment = async () => {
-    if (!agreedToTerms || isProcessing) return;
-    setIsProcessing(true);
-
-    const orderId = `order_${Date.now()}`;
+    if (!isMatchCheckout || !participantId || !agreedToTerms) {
+      return;
+    }
 
     try {
-      // Step 1: Prepare payment via API
-      const prepareRes = await api.post('/payments/prepare', {
-        orderId,
-        amount: finalPrice,
+      const prepared = await preparePayment.mutateAsync({
+        participantId,
+        amount,
         method: selectedMethod,
-        itemName: order.name,
-      });
-      const payment = (prepareRes as unknown as { data: { id: string } }).data;
-
-      // Step 2: Simulate Toss payment widget confirmation
-      const paymentKey = `toss_${Date.now()}`;
-      await api.post('/payments/confirm', {
-        paymentKey,
-        orderId,
-        amount: finalPrice,
       });
 
-      setIsProcessing(false);
-      setCompletedOrderName(order.name);
-      setCompletedAmount(finalPrice);
-      setShowSuccess(true);
+      const payment = await confirmPayment.mutateAsync({
+        orderId: prepared.orderId,
+        amount,
+        paymentKey: `dev-${Date.now()}`,
+      });
 
-      setTimeout(() => {
-        router.push(`/payments/${payment?.id || orderId}`);
-      }, 1500);
-    } catch {
-      // API not available -- fall back to mock flow
-      toast('info', '테스트 모드: 결제가 시뮬레이션되었어요');
-      await new Promise((r) => setTimeout(r, 1000));
-
-      setIsProcessing(false);
-      setCompletedOrderName(order.name);
-      setCompletedAmount(finalPrice);
-      setShowSuccess(true);
-
-      const mockPaymentId = `pay_mock_${Date.now()}`;
-      setTimeout(() => {
-        router.push(`/payments/${mockPaymentId}`);
-      }, 1500);
+      toast('success', '결제가 완료되었습니다');
+      router.push(`/payments/${payment.id}`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '결제를 완료하지 못했어요.');
     }
   };
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
-      {/* Success Toast */}
-      {showSuccess && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1 rounded-2xl bg-gray-900 px-5 py-3 shadow-lg animate-fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={18} className="text-green-400" />
-            <span className="text-base font-medium text-white">결제가 완료되었습니다</span>
-          </div>
-          <span className="text-xs text-gray-500">{completedOrderName} - {formatAmount(completedAmount)}</span>
-        </div>
-      )}
-
-      {/* Header */}
       <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+        >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제하기</h1>
       </header>
+
       <div className="hidden @3xl:block mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제하기</h2>
-        <p className="text-base text-gray-500 mt-1">주문 내용을 확인하고 결제를 진행해 주세요</p>
+        <p className="text-base text-gray-500 mt-1">실제 결제 컨텍스트가 있는 주문만 처리됩니다</p>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
-        {/* Order Summary Card */}
+        {!isMatchCheckout ? (
+          <TrustSignalBanner
+            tone="warning"
+            label="지원 범위"
+            title="현재는 매치 참가 결제만 처리할 수 있어요"
+            description="강좌/장터 구매처럼 참가자 컨텍스트가 없는 결제는 아직 연결되지 않았습니다. 가짜 성공 처리 없이 이 화면에서 중단됩니다."
+          />
+        ) : null}
+
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">주문 정보</h3>
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
-                <Tag size={20} className="text-blue-500 dark:text-blue-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="inline-block rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 mb-1">
-                  {order.type}
-                </span>
-                <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{order.name}</p>
-              </div>
+            <div>
+              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 text-blue-500 mb-1">
+                {source === 'match' ? '매치' : '미지원'}
+              </span>
+              <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{name || '미지원 주문'}</p>
             </div>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5 space-y-2">
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Calendar size={14} className="text-gray-500 shrink-0" />
-                {order.date}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <MapPin size={14} className="text-gray-500 shrink-0" />
-                {order.venue}
-              </div>
+              {scheduledAt ? (
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Calendar size={14} className="text-gray-500 shrink-0" />
+                  {formatDateTime(scheduledAt)}
+                </div>
+              ) : null}
+              {venue ? (
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <MapPin size={14} className="text-gray-500 shrink-0" />
+                  {venue}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
 
-        {/* Payment Method */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="space-y-2">
@@ -197,37 +148,28 @@ export default function CheckoutPage() {
                 <button
                   key={method.id}
                   onClick={() => setSelectedMethod(method.id)}
+                  disabled={!isMatchCheckout || isProcessing}
                   className={`w-full flex items-center gap-3.5 rounded-xl border-2 p-4 transition-colors text-left ${
                     isSelected
                       ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/30'
                       : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600'
-                  }`}
+                  } ${!isMatchCheckout ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                      isSelected ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
-                    }`}
-                  >
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                    isSelected ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                  }`}>
                     <Icon size={20} />
                   </div>
                   <div className="flex-1">
-                    <p
-                      className={`text-base font-semibold ${
-                        isSelected ? 'text-blue-600' : 'text-gray-900 dark:text-gray-100'
-                      }`}
-                    >
+                    <p className={`text-base font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-900 dark:text-gray-100'}`}>
                       {method.label}
                     </p>
                     <p className="text-xs text-gray-500">{method.description}</p>
                   </div>
-                  <div
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                      isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                    }`}
-                  >
-                    {isSelected && (
-                      <div className="h-2 w-2 rounded-full bg-white dark:bg-gray-800" />
-                    )}
+                  <div className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                    isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                  }`}>
+                    {isSelected && <div className="h-2 w-2 rounded-full bg-white dark:bg-gray-800" />}
                   </div>
                 </button>
               );
@@ -235,66 +177,19 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Coupon */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">쿠폰</h3>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value)}
-              placeholder="쿠폰 코드를 입력하세요"
-              className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-gray-100 bg-transparent placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-            />
-            <button
-              onClick={handleApplyCoupon}
-              className="shrink-0 rounded-xl bg-blue-500 px-5 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
-            >
-              적용
-            </button>
-          </div>
-          {couponApplied && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/30 px-3 py-2">
-              <CheckCircle size={14} className="text-green-500 dark:text-green-400" />
-              <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                신규 가입 쿠폰 ({formatAmount(order.couponDiscount)} 할인 적용됨)
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Price Breakdown */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-base text-gray-500">원가</span>
-              <span className="text-base font-medium text-gray-700 dark:text-gray-300">{formatAmount(order.originalPrice)}</span>
-            </div>
-            {couponApplied && (
-              <div className="flex items-center justify-between">
-                <span className="text-base text-gray-500">쿠폰 할인</span>
-                <span className="text-base text-red-500 font-medium">-{formatAmount(discount)}</span>
-              </div>
-            )}
-            <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
-              <span className="text-md font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
-              <span className="text-xl font-bold text-blue-500">{formatAmount(finalPrice)}</span>
-            </div>
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
+            <span className="text-md font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
+            <span className="text-xl font-bold text-blue-500">{formatAmount(Number.isFinite(amount) ? amount : 0)}</span>
           </div>
         </div>
 
-        {/* Terms */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <button
-            onClick={() => setAgreedToTerms(!agreedToTerms)}
-            className="flex items-center gap-3 w-full text-left"
-          >
-            <div
-              className={`flex h-5 w-5 items-center justify-center rounded-md border-2 transition-colors ${
-                agreedToTerms ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
-              }`}
-            >
+          <button onClick={() => setAgreedToTerms(!agreedToTerms)} className="flex items-center gap-3 w-full text-left">
+            <div className={`flex h-5 w-5 items-center justify-center rounded-md border-2 transition-colors ${
+              agreedToTerms ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+            }`}>
               {agreedToTerms && <CheckCircle size={12} className="text-white" />}
             </div>
             <span className="text-base text-gray-700 dark:text-gray-300">결제 및 취소 규정에 동의합니다</span>
@@ -302,37 +197,32 @@ export default function CheckoutPage() {
           <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
             <p className="text-xs text-gray-500 leading-relaxed">
               경기 시작 24시간 전: 전액 환불 / 1~24시간 전: 50% 환불 / 1시간 이내: 환불 불가.
-              결제 완료 시 TeamMeet 이용약관 및 결제 취소 규정에 동의하는 것으로 간주합니다.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Fixed Bottom CTA */}
       <div className="fixed bottom-[calc(80px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
         <div className="flex items-center justify-between mb-3 @3xl:hidden">
           <span className="text-sm text-gray-500">최종 결제 금액</span>
-          <span className="text-xl font-bold text-blue-500">{formatAmount(finalPrice)}</span>
+          <span className="text-xl font-bold text-blue-500">{formatAmount(Number.isFinite(amount) ? amount : 0)}</span>
         </div>
         <button
-          onClick={handlePayment}
-          disabled={!agreedToTerms || isProcessing}
+          onClick={() => void handlePayment()}
+          disabled={!isMatchCheckout || !agreedToTerms || isProcessing}
           className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-colors ${
-            agreedToTerms && !isProcessing
-              ? 'bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98]'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+            isMatchCheckout && agreedToTerms
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}
         >
           {isProcessing ? (
             <>
-              <Loader2 size={20} className="animate-spin" />
+              <Loader2 size={18} className="animate-spin" />
               결제 처리중...
             </>
           ) : (
-            <>
-              <CreditCard size={20} />
-              {formatAmount(finalPrice)} 결제하기
-            </>
+            `${formatAmount(Number.isFinite(amount) ? amount : 0)} 결제하기`
           )}
         </button>
       </div>

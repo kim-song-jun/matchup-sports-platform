@@ -1,95 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, CreditCard, CheckCircle, XCircle, Clock, RotateCcw, Wallet, ShoppingBag, Trophy, GraduationCap, ChevronRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, ChevronRight, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePayments } from '@/hooks/use-api';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { formatAmount, formatFullDate } from '@/lib/utils';
+import { getPaymentMethodMeta, getPaymentSource, paymentStatusConfig } from '@/lib/payment-ui';
 
 const tabs = [
   { id: 'all', label: '전체' },
   { id: 'match', label: '매치' },
   { id: 'lesson', label: '강좌' },
-  { id: 'market', label: '장터' },
-];
-
-const statusConfig: Record<string, { label: string; icon: typeof CheckCircle; color: string }> = {
-  completed: { label: '결제 완료', icon: CheckCircle, color: 'text-green-600 bg-green-50' },
-  pending: { label: '대기중', icon: Clock, color: 'text-amber-500 bg-amber-50' },
-  refunded: { label: '환불됨', icon: RotateCcw, color: 'text-red-500 bg-red-50' },
-  failed: { label: '실패', icon: XCircle, color: 'text-gray-500 bg-gray-100' },
-};
-
-const methodConfig: Record<string, { label: string; icon: typeof CreditCard }> = {
-  card: { label: '카드', icon: CreditCard },
-  tosspay: { label: '토스페이', icon: Wallet },
-  naverpay: { label: '네이버페이', icon: Wallet },
-  kakaopay: { label: '카카오페이', icon: Wallet },
-};
-
-const typeConfig: Record<string, { label: string; icon: typeof Trophy; color: string }> = {
-  match: { label: '매치', icon: Trophy, color: 'bg-gray-100 text-gray-500' },
-  lesson: { label: '강좌', icon: GraduationCap, color: 'bg-gray-100 text-gray-500' },
-  market: { label: '장터', icon: ShoppingBag, color: 'bg-gray-100 text-gray-600' },
-};
-
-const mockPayments = [
-  {
-    id: 'pay_mock_001',
-    type: 'match',
-    name: '풋살 친선 매치',
-    amount: 14500,
-    status: 'completed',
-    method: 'card',
-    createdAt: '2026-03-20T10:30:00',
-  },
-  {
-    id: 'pay_mock_002',
-    type: 'match',
-    name: '농구 3:3 매치',
-    amount: 20000,
-    status: 'refunded',
-    method: 'tosspay',
-    createdAt: '2026-03-15T14:20:00',
-  },
-  {
-    id: 'pay_mock_003',
-    type: 'lesson',
-    name: '배드민턴 초급 강좌',
-    amount: 35000,
-    status: 'completed',
-    method: 'kakaopay',
-    createdAt: '2026-03-12T09:00:00',
-  },
-  {
-    id: 'pay_mock_004',
-    type: 'match',
-    name: '풋살 리그전',
-    amount: 18000,
-    status: 'pending',
-    method: 'naverpay',
-    createdAt: '2026-03-19T16:45:00',
-  },
-  {
-    id: 'pay_mock_005',
-    type: 'market',
-    name: '축구화 나이키 팬텀',
-    amount: 85000,
-    status: 'completed',
-    method: 'card',
-    createdAt: '2026-03-10T11:30:00',
-  },
-  {
-    id: 'pay_mock_006',
-    type: 'lesson',
-    name: '아이스하키 입문반',
-    amount: 60000,
-    status: 'failed',
-    method: 'card',
-    createdAt: '2026-03-08T13:15:00',
-  },
+  { id: 'marketplace', label: '장터' },
 ];
 
 export default function PaymentsPage() {
@@ -97,47 +22,50 @@ export default function PaymentsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const { data: apiPayments } = usePayments();
+  const { data: payments = [], isLoading, isError, refetch } = usePayments();
 
-  // API 데이터가 있으면 사용, 없으면 목업 데이터로 폴백
-  // API Payment 타입과 목업 타입이 다르므로 공통 형태로 변환
-  const payments = apiPayments
-    ? apiPayments.map((p) => ({
-        id: p.id,
-        type: 'match' as string,
-        name: p.orderId || '결제',
-        amount: p.amount,
-        status: p.status,
-        method: p.method || 'card',
-        createdAt: p.createdAt,
-      }))
-    : mockPayments;
-
-  const tabFiltered = activeTab === 'all'
-    ? payments
-    : payments.filter((p) => p.type === activeTab);
-  const filtered = tabFiltered.filter((p) => {
-    if (dateFrom && p.createdAt < dateFrom) return false;
-    if (dateTo && p.createdAt > dateTo + 'T23:59:59') return false;
-    return true;
-  });
+  const filteredPayments = useMemo(() => {
+    return payments
+      .filter((payment) => {
+        const source = getPaymentSource(payment);
+        if (activeTab !== 'all' && source.kind !== activeTab) {
+          return false;
+        }
+        if (dateFrom && payment.createdAt < dateFrom) {
+          return false;
+        }
+        if (dateTo && payment.createdAt > `${dateTo}T23:59:59`) {
+          return false;
+        }
+        return true;
+      })
+      .map((payment) => ({
+        payment,
+        source: getPaymentSource(payment),
+        method: getPaymentMethodMeta(payment.method),
+        status: paymentStatusConfig[payment.status] ?? paymentStatusConfig.pending,
+      }));
+  }, [activeTab, dateFrom, dateTo, payments]);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
-      {/* Header */}
       <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+        >
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
       </header>
+
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
-        <p className="text-sm text-gray-500 mt-0.5">매치, 강좌, 장터 결제 내역을 확인하세요</p>
+        <p className="text-sm text-gray-500 mt-0.5">실제 결제와 환불 상태를 확인하세요</p>
       </div>
 
       <div className="px-5 @3xl:px-0">
-        {/* 기간 필터 */}
         <div className="flex items-center gap-2 mb-4">
           <input
             type="date"
@@ -154,7 +82,6 @@ export default function PaymentsPage() {
           />
         </div>
 
-        {/* Filter Tabs */}
         <div className="flex items-center gap-1 mb-5 rounded-xl bg-gray-100 p-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
@@ -171,52 +98,69 @@ export default function PaymentsPage() {
           ))}
         </div>
 
-        {/* Payment List */}
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-3 animate-pulse">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-24 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+            ))}
+          </div>
+        ) : isError ? (
+          <ErrorState message="결제 내역을 불러오지 못했어요" onRetry={() => void refetch()} />
+        ) : filteredPayments.length === 0 ? (
           <EmptyState
             icon={CreditCard}
             title="아직 결제 내역이 없어요"
-            description="매치에 참가하면 여기서 확인할 수 있어요"
+            description="매치 참가 결제를 완료하면 여기서 확인할 수 있어요"
           />
         ) : (
           <div className="space-y-3 stagger-children">
-            {filtered.map((p) => {
-              const s = statusConfig[p.status] || statusConfig.pending;
-              const m = methodConfig[p.method] || methodConfig.card;
-              const t = typeConfig[p.type] || typeConfig.match;
-              const StatusIcon = s.icon;
-              const MethodIcon = m.icon;
-              const TypeIcon = t.icon;
+            {filteredPayments.map(({ payment, source, method, status }) => {
+              const StatusIcon = status.icon;
+              const MethodIcon = method.icon;
+              const SourceIcon = source.icon;
+
               return (
                 <Link
-                  key={p.id}
-                  href={`/payments/${p.id}`}
+                  key={payment.id}
+                  href={`/payments/${payment.id}`}
                   className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${t.color} shrink-0`}>
-                        <TypeIcon size={20} />
+                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${source.color} shrink-0`}>
+                        <SourceIcon size={20} />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{p.name}</p>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold ${s.color}`}>
-                            {s.label}
+                          <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{source.title}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold ${status.bgColor} ${status.color}`}>
+                            {status.label}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <MethodIcon size={12} />
-                            {m.label}
+                            {method.label}
                           </span>
                           <span aria-hidden="true">·</span>
-                          <span>{formatFullDate(p.createdAt)}</span>
+                          <span>{formatFullDate(payment.createdAt)}</span>
                         </div>
+                        {source.venueName && (
+                          <p className="mt-1 text-xs text-gray-400 truncate">{source.venueName}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className="text-md font-bold text-gray-900 dark:text-white">{formatAmount(p.amount)}</span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <span className="block text-md font-bold text-gray-900 dark:text-white">
+                          {formatAmount(payment.amount)}
+                        </span>
+                        <div className="mt-1 flex items-center justify-end gap-1 text-2xs text-gray-400">
+                          <StatusIcon size={12} />
+                          <span>{source.label}</span>
+                        </div>
+                      </div>
                       <ChevronRight size={16} className="text-gray-300" />
                     </div>
                   </div>

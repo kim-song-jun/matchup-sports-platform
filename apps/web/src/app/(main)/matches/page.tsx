@@ -8,6 +8,7 @@ import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge, friendlyLevel } from '@/lib/utils';
 import { getSportImage } from '@/lib/sport-image';
@@ -21,14 +22,17 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const accent = sportCardAccent[match.sportType];
   const dotColor = accent?.dot || 'bg-gray-400';
   const remaining = match.maxPlayers - match.currentPlayers;
+  const matchImage = getSportImage(match.sportType, match.imageUrl, match.id);
+  const fallbackMatchImage = getSportImage(match.sportType, undefined, match.id);
 
   return (
     <Link href={`/matches/${match.id}`} className="block">
       <div className="group rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
         {/* Image — 16:9 top banner */}
         <div className="relative aspect-[16/9] bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <img
-            src={getSportImage(match.sportType, match.imageUrl, match.id)}
+          <SafeImage
+            src={matchImage}
+            fallbackSrc={fallbackMatchImage}
             alt=""
             className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
             loading="lazy"

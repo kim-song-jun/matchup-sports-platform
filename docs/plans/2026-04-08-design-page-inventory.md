@@ -581,10 +581,18 @@
 - `Batch C` 완료
   - 문서: `docs/plans/2026-04-08-design-review-batch-c.md`
   - 핵심: create flow false affordance, 매치 흐름 스타일 드리프트, find/create/history 연속성 약함
-- `Batch D` 다음 진행
-  - 범위: 팀 탐색/등록/상세/관리 + 팀 매칭 생성/상세/평가
-- `Batch D~G` 대기
-  - 팀/팀매칭, 거래/강좌/시설, 결제/리뷰, 관리자 순으로 진행 예정
+- `Batch D` 완료
+  - 문서: `docs/plans/2026-04-08-design-review-batch-d.md`
+  - 핵심: 팀매칭 종목 범위 축소, 팀 상세 mock 신뢰 신호, team/team-match 공통 폼 시스템 부재
+- `Batch E` 완료
+  - 문서: `docs/plans/2026-04-08-design-review-batch-e.md`
+  - 핵심: lessons만 상대적으로 일관적, mercenary/marketplace/venues 시스템 이탈, edit/mock 신뢰 문제
+- `Batch F` 완료
+  - 문서: `docs/plans/2026-04-08-design-review-batch-f.md`
+  - 핵심: 거래 신뢰 신호와 sample 경계 붕괴, 결제 타입/checkout 컨텍스트 손실, 환불 모달/토스트 시스템 분산
+- `Batch G` 완료
+  - 문서: `docs/plans/2026-04-08-design-review-batch-g.md`
+  - 핵심: admin mock/fallback 혼재, 운영 액션 감사성 부족, admin shell 이탈 링크, 상태 grammar 불균일
 
 ### Batch A. 브랜드 / 공개 페이지
 
@@ -669,3 +677,4 @@
 
 - `apps/web/src/app/{auth}`, `apps/web/src/app/{main}` 디렉토리가 존재하지만 현재 active `page.tsx` 인벤토리에는 포함되지 않았다. 실제 route source of truth는 `apps/web/src/app/**/page.tsx` 기준으로 본다.
 - 다음 단계에서는 각 batch를 단위로 `agent-design`을 돌리고, 결과를 별도 디자인 리뷰 문서에 누적하는 방식이 적합하다.
+- 2026-04-08 기준 Batch A~G 순차 디자인 리뷰를 모두 마쳤다. 다음 단계는 배치별 High 우선순위를 task 문서로 쪼개고, `frontend-dev -> design re-review -> QA` 루프로 옮기는 것이다.

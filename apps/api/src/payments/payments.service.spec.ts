@@ -32,6 +32,7 @@ const prismaMock = {
     update: jest.fn(),
   },
   matchParticipant: {
+    findUnique: jest.fn(),
     update: jest.fn(),
   },
 };
@@ -65,11 +66,19 @@ describe('PaymentsService', () => {
   describe('prepare', () => {
     it('creates a pending payment and returns paymentId, orderId, amount', async () => {
       const payment = mockPayment();
+      prismaMock.matchParticipant.findUnique.mockResolvedValue({
+        id: 'participant-1',
+        userId: 'user-1',
+        paymentStatus: 'pending',
+        match: { fee: 15000 },
+      });
+      prismaMock.payment.findUnique.mockResolvedValue(null);
       prismaMock.payment.create.mockResolvedValue(payment);
 
       const result = await service.prepare('user-1', {
         participantId: 'participant-1',
         amount: 15000,
+        method: 'card',
       });
 
       expect(result).toHaveProperty('paymentId');
@@ -80,6 +89,7 @@ describe('PaymentsService', () => {
           data: expect.objectContaining({
             userId: 'user-1',
             status: 'pending',
+            method: 'card',
           }),
         }),
       );
@@ -124,8 +134,9 @@ describe('PaymentsService', () => {
       });
       prismaMock.payment.findUnique.mockResolvedValue(payment);
       prismaMock.payment.update.mockResolvedValue(refunded);
+      prismaMock.matchParticipant.update.mockResolvedValue({});
 
-      const result = await service.refund('pay-1', { reason: 'event cancelled' });
+      const result = await service.refund('user-1', 'pay-1', { reason: 'event cancelled' });
 
       expect(result.status).toBe('refunded');
       expect(result.refundAmount).toBe(15000);
@@ -134,7 +145,7 @@ describe('PaymentsService', () => {
     it('throws NotFoundException when payment does not exist', async () => {
       prismaMock.payment.findUnique.mockResolvedValue(null);
 
-      await expect(service.refund('no-such', {})).rejects.toThrow(NotFoundException);
+      await expect(service.refund('user-1', 'no-such', {})).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -154,6 +165,7 @@ describe('PaymentsService', () => {
       expect(prismaMock.payment.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: 'user-1' },
+          include: expect.any(Object),
           orderBy: { createdAt: 'desc' },
         }),
       );
@@ -165,6 +177,29 @@ describe('PaymentsService', () => {
       const result = await service.getByUserId('user-no-payments');
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getById', () => {
+    it('returns a payment detail for the owner', async () => {
+      const payment = mockPayment();
+      prismaMock.payment.findUnique.mockResolvedValue(payment);
+
+      const result = await service.getById('user-1', 'pay-1');
+
+      expect(result.id).toBe('pay-1');
+      expect(prismaMock.payment.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'pay-1' },
+          include: expect.any(Object),
+        }),
+      );
+    });
+
+    it('throws NotFoundException when payment belongs to another user', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(mockPayment({ userId: 'other-user' }));
+
+      await expect(service.getById('user-1', 'pay-1')).rejects.toThrow(NotFoundException);
     });
   });
 });

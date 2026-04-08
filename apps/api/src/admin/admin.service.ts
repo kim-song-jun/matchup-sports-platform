@@ -1,8 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+
+export interface AdminAuditEntry {
+  id: string;
+  action: string;
+  actor: string;
+  note: string | null;
+  createdAt: Date;
+}
+
+interface UserModerationState {
+  status: 'active' | 'suspended';
+  suspensionReason: string | null;
+}
 
 @Injectable()
 export class AdminService {
+  private readonly userAuditLog = new Map<string, AdminAuditEntry[]>();
+  private readonly userModerationState = new Map<string, UserModerationState>();
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getDashboardStats() {
@@ -57,6 +73,90 @@ export class AdminService {
     const hasNext = items.length > limit;
     const result = hasNext ? items.slice(0, limit) : items;
     return { items: result, nextCursor: hasNext ? result[result.length - 1].id : null };
+  }
+
+  async getUserDetail(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        nickname: true,
+        email: true,
+        profileImageUrl: true,
+        gender: true,
+        bio: true,
+        mannerScore: true,
+        totalMatches: true,
+        locationCity: true,
+        locationDistrict: true,
+        createdAt: true,
+        sportTypes: true,
+        sportProfiles: true,
+        oauthProvider: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const moderationState = this.userModerationState.get(id) ?? {
+      status: 'active' as const,
+      suspensionReason: null,
+    };
+    const auditLog = [...(this.userAuditLog.get(id) ?? [])].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+
+    return {
+      ...user,
+      provider: user.oauthProvider,
+      adminStatus: moderationState.status,
+      warningCount: auditLog.filter((entry) => entry.action === 'warn').length,
+      suspensionReason: moderationState.suspensionReason,
+      adminAuditLog: auditLog,
+    };
+  }
+
+  async warnUser(id: string, payload: { actor: string; note?: string }) {
+    await this.ensureUserExists(id);
+    const entry = this.appendUserAudit(id, {
+      action: 'warn',
+      actor: payload.actor,
+      note: payload.note ?? null,
+    });
+
+    return {
+      userId: id,
+      action: 'warn',
+      warningCount: (this.userAuditLog.get(id) ?? []).filter((item) => item.action === 'warn').length,
+      auditEntry: entry,
+    };
+  }
+
+  async updateUserStatus(
+    id: string,
+    payload: { actor: string; status: 'active' | 'suspended'; note?: string },
+  ) {
+    await this.ensureUserExists(id);
+
+    this.userModerationState.set(id, {
+      status: payload.status,
+      suspensionReason: payload.status === 'suspended' ? payload.note ?? null : null,
+    });
+
+    const entry = this.appendUserAudit(id, {
+      action: payload.status === 'suspended' ? 'suspend' : 'reactivate',
+      actor: payload.actor,
+      note: payload.note ?? null,
+    });
+
+    return {
+      userId: id,
+      status: payload.status,
+      suspensionReason: payload.status === 'suspended' ? payload.note ?? null : null,
+      auditEntry: entry,
+    };
   }
 
   async getMatches(filter: { status?: string; cursor?: string }) {
@@ -193,9 +293,44 @@ export class AdminService {
     return this.prisma.payment.findMany({
       include: {
         user: { select: { id: true, nickname: true } },
+        participant: {
+          include: {
+            match: {
+              include: {
+                venue: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+  }
+
+  private async ensureUserExists(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+  }
+
+  private appendUserAudit(
+    userId: string,
+    entry: Omit<AdminAuditEntry, 'id' | 'createdAt'>,
+  ) {
+    const auditEntry: AdminAuditEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: new Date(),
+      ...entry,
+    };
+    const current = this.userAuditLog.get(userId) ?? [];
+    current.push(auditEntry);
+    this.userAuditLog.set(userId, current);
+    return auditEntry;
   }
 }

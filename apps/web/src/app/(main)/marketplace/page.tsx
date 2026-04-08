@@ -8,6 +8,7 @@ import { useListings } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getListingImage } from '@/lib/sport-image';
 import { formatCurrency } from '@/lib/utils';
@@ -114,8 +115,9 @@ export default function MarketplacePage() {
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
                     <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-300 overflow-hidden">
-                      <img
+                      <SafeImage
                         src={getListingImage(item.imageUrls, item.id)}
+                        fallbackSrc={getListingImage(undefined, item.id)}
                         alt={item.title}
                         className="h-full w-full object-cover"
                         loading="lazy"

@@ -12,10 +12,12 @@ import type {
   Lesson,
   MarketplaceListing,
   UserProfile,
+  AdminUserDetail,
   SportTeam,
   TeamMatch,
   TeamMatchApplication,
   Payment,
+  PreparedPayment,
   AdminStats,
   ChatRoom,
   ChatMessage,
@@ -46,6 +48,15 @@ import type {
 // so `api.get(...)` resolves to `ApiResponse<T>`. We cast accordingly.
 function extractData<T>(res: unknown): T {
   return (res as ApiResponse<T>).data;
+}
+
+function extractCollection<T>(res: unknown): T[] {
+  const data = extractData<T[] | { items?: T[] }>(res);
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return data.items ?? [];
 }
 
 // ── Query Key Factory ──
@@ -425,10 +436,10 @@ export function usePreparePayment() {
   return useMutation({
     mutationFn: async (data: PreparePaymentInput) => {
       const res = await api.post('/payments/prepare', data);
-      return extractData<Payment>(res);
+      return extractData<PreparedPayment>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
     },
   });
 }
@@ -441,7 +452,7 @@ export function useConfirmPayment() {
       return extractData<Payment>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
     },
   });
 }
@@ -570,11 +581,11 @@ export function useAdminUsers(params?: Record<string, string>) {
 }
 
 export function useAdminUser(id: string) {
-  return useQuery<UserProfile>({
+  return useQuery<AdminUserDetail>({
     queryKey: queryKeys.admin.user(id),
     queryFn: async () => {
       const res = await api.get(`/admin/users/${id}`);
-      return extractData<UserProfile>(res);
+      return extractData<AdminUserDetail>(res);
     },
     enabled: !!id,
   });
@@ -621,11 +632,11 @@ export function useAdminVenues() {
 }
 
 export function useAdminPayments() {
-  return useQuery<PaginatedResponse<Payment>>({
+  return useQuery<Payment[]>({
     queryKey: queryKeys.admin.payments,
     queryFn: async () => {
       const res = await api.get('/admin/payments');
-      return extractData<PaginatedResponse<Payment>>(res);
+      return extractCollection<Payment>(res);
     },
   });
 }
@@ -848,7 +859,7 @@ export function useAdminDisputes() {
     queryKey: queryKeys.admin.disputes,
     queryFn: async () => {
       const res = await api.get('/admin/disputes');
-      return extractData<Dispute[]>(res);
+      return extractCollection<Dispute>(res);
     },
   });
 }
@@ -867,12 +878,13 @@ export function useAdminDispute(id: string) {
 export function useUpdateDisputeStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateStatusInput }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateStatusInput & Record<string, unknown> }) => {
       const res = await api.patch(`/admin/disputes/${id}/status`, data);
       return extractData<Dispute>(res);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'disputes'] });
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.disputes });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.dispute(id) });
     },
   });
 }
@@ -883,7 +895,7 @@ export function useAdminSettlements() {
     queryKey: queryKeys.admin.settlements,
     queryFn: async () => {
       const res = await api.get('/admin/settlements');
-      return extractData<Settlement[]>(res);
+      return extractCollection<Settlement>(res);
     },
   });
 }
@@ -906,7 +918,8 @@ export function useProcessSettlement() {
       return extractData<Settlement>(res);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'settlements'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.settlements });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.settlementsSummary });
     },
   });
 }

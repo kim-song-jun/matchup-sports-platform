@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('관리자')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -20,6 +21,37 @@ export class AdminController {
   @ApiOperation({ summary: '사용자 목록' })
   async getUsers(@Query('search') search?: string, @Query('cursor') cursor?: string) {
     return this.adminService.getUsers({ search, cursor });
+  }
+
+  @Get('users/:id')
+  @ApiOperation({ summary: '사용자 상세' })
+  async getUserDetail(@Param('id') id: string) {
+    return this.adminService.getUserDetail(id);
+  }
+
+  @Post('users/:id/warn')
+  @ApiOperation({ summary: '사용자 경고 부여' })
+  async warnUser(
+    @Param('id') id: string,
+    @CurrentUser('nickname') actor: string,
+    @Body('note') note?: string,
+  ) {
+    return this.adminService.warnUser(id, { actor: actor || 'admin', note });
+  }
+
+  @Patch('users/:id/status')
+  @ApiOperation({ summary: '사용자 상태 변경' })
+  async updateUserStatus(
+    @Param('id') id: string,
+    @CurrentUser('nickname') actor: string,
+    @Body('status') status: 'active' | 'suspended',
+    @Body('note') note?: string,
+  ) {
+    return this.adminService.updateUserStatus(id, {
+      actor: actor || 'admin',
+      status,
+      note,
+    });
   }
 
   @Get('matches')

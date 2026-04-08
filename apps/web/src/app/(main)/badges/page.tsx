@@ -5,6 +5,7 @@ import { ArrowLeft, Star, Clock, Shield, CheckCircle, Sparkles, Trophy, Flame, H
 import { useRouter } from 'next/navigation';
 import { useAllBadgeTypes } from '@/hooks/use-api';
 import { formatDateCompact } from '@/lib/utils';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 
 interface BadgeInfo {
   id: string;
@@ -137,6 +138,7 @@ export default function BadgesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const { data: apiBadges } = useAllBadgeTypes();
+  const hasLiveCatalog = Boolean(apiBadges?.length);
 
   // API 뱃지가 있으면 로컬 UI 메타데이터와 병합, 없으면 목업 폴백
   const badges: BadgeInfo[] = apiBadges
@@ -178,6 +180,16 @@ export default function BadgesPage() {
 
       {/* Summary */}
       <div className="px-5 @3xl:px-0 mb-4">
+        <div className="mb-4">
+          <TrustSignalBanner
+            tone={hasLiveCatalog ? 'info' : 'warning'}
+            label={hasLiveCatalog ? '혼합 데이터' : '샘플 데이터'}
+            title={hasLiveCatalog ? '뱃지 카탈로그만 실데이터로 연결되어 있어요' : '현재 뱃지 화면은 샘플 기반입니다'}
+            description={hasLiveCatalog
+              ? '뱃지 종류는 API에서 불러오지만, 획득 여부와 진행률 일부는 로컬 추정값을 사용합니다.'
+              : '획득 여부와 진행률, 발급 일시는 UI 검증용 샘플이므로 실제 신뢰 지표로 사용하면 안 됩니다.'}
+          />
+        </div>
         <div className="rounded-xl bg-blue-500 p-5 text-white">
           <p className="text-sm text-blue-100">획득한 뱃지</p>
           <div className="flex items-end gap-1 mt-1">

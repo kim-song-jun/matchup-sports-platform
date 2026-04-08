@@ -3,68 +3,79 @@
 import { useState } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { api } from '@/lib/api';
+import { useConfirmPayment, usePreparePayment } from '@/hooks/use-api';
 import { CreditCard, Wallet, Loader2, CheckCircle } from 'lucide-react';
-import type { ApiResponse, CheckoutResult } from '@/types/api';
+import type { Payment } from '@/types/api';
 import { formatAmount } from '@/lib/utils';
 
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  orderId: string;
+  participantId: string;
   amount: number;
   itemName: string;
-  onSuccess: (paymentKey: string) => void;
+  onSuccess: (payment: Payment) => void;
   onError: (error: string) => void;
 }
 
 const paymentMethods = [
   { key: 'card', label: '카드', icon: CreditCard, description: '신용/체크카드' },
   { key: 'tosspay', label: '토스페이', icon: Wallet, description: '토스로 간편결제' },
-  { key: 'naverpay', label: '네이버페이', icon: Wallet, description: '네이버페이 결제' },
-  { key: 'kakaopay', label: '카카오페이', icon: Wallet, description: '카카오페이 결제' },
+  { key: 'naverpay', label: '네이버페이', icon: Wallet, description: '네이버 간편결제' },
+  { key: 'kakaopay', label: '카카오페이', icon: Wallet, description: '카카오 간편결제' },
 ] as const;
 
 type PaymentMethod = typeof paymentMethods[number]['key'];
 
-export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSuccess, onError }: CheckoutModalProps) {
+export function CheckoutModal({
+  isOpen,
+  onClose,
+  participantId,
+  amount,
+  itemName,
+  onSuccess,
+  onError,
+}: CheckoutModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('card');
-  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const preparePayment = usePreparePayment();
+  const confirmPayment = useConfirmPayment();
+
+  const isProcessing = preparePayment.isPending || confirmPayment.isPending;
 
   const handlePayment = async () => {
-    setIsProcessing(true);
     try {
-      const res = await api.post('/payments/checkout', {
-        orderId,
+      const prepared = await preparePayment.mutateAsync({
+        participantId,
         amount,
         method: selectedMethod,
-        itemName,
       });
-      const paymentKey = (res as unknown as ApiResponse<CheckoutResult>).data?.paymentKey;
+
+      const confirmed = await confirmPayment.mutateAsync({
+        orderId: prepared.orderId,
+        amount,
+        paymentKey: `dev-${Date.now()}`,
+      });
+
       toast('success', '결제가 완료되었어요');
-      onSuccess(paymentKey);
+      onSuccess(confirmed);
       onClose();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      const message = axiosErr?.response?.data?.message || '결제 처리 중 오류가 발생했습니다';
+      const message = axiosErr?.response?.data?.message || '결제 처리 중 오류가 발생했습니다.';
       toast('error', message);
       onError(message);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="결제하기" size="md">
-      {/* 주문 요약 */}
       <div className="rounded-xl bg-gray-50 p-4 mb-5">
         <p className="text-xs text-gray-500 mb-1">주문 내역</p>
         <p className="text-md font-semibold text-gray-900">{itemName}</p>
         <p className="text-xl font-bold text-gray-900 mt-2">{formatAmount(amount)}</p>
       </div>
 
-      {/* 결제 수단 선택 */}
       <div className="mb-6">
         <p className="text-base font-semibold text-gray-900 mb-3">결제 수단</p>
         <div className="space-y-2">
@@ -103,10 +114,9 @@ export function CheckoutModal({ isOpen, onClose, orderId, amount, itemName, onSu
         </div>
       </div>
 
-      {/* 결제 버튼 */}
       <button
         onClick={handlePayment}
-        disabled={isProcessing}
+        disabled={isProcessing || !participantId}
         className={`w-full rounded-xl py-4 text-md font-semibold text-white transition-[colors,transform] ${
           isProcessing
             ? 'bg-gray-400 cursor-not-allowed'

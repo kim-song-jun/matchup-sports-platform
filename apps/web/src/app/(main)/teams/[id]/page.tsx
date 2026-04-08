@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, V
 import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
+import { SafeImage } from '@/components/ui/safe-image';
 import { useTeam, useTeamBadges } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
@@ -85,6 +86,9 @@ export default function TeamDetailPage() {
   const coverImage = getTeamImage(team.sportType, team.coverImageUrl, team.id);
   const teamGallery = getTeamImageSet(team.sportType, team.photos, team.id, 3);
   const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
+  const fallbackCoverImage = getTeamImage(team.sportType, undefined, team.id);
+  const fallbackTeamGallery = getTeamImageSet(team.sportType, undefined, team.id, 3);
+  const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -123,12 +127,23 @@ export default function TeamDetailPage() {
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
             <div className="h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center relative">
-              <img src={coverImage} alt="" className="w-full h-full object-cover" />
+              <SafeImage
+                src={coverImage}
+                fallbackSrc={fallbackCoverImage}
+                alt=""
+                className="w-full h-full object-cover"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               {/* Logo overlay */}
               <div className="absolute -bottom-6 left-5">
                 <div className="rounded-[22px] bg-white/94 p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.24)] backdrop-blur-sm">
-                  <img src={teamLogo} alt={`${team.name} logo`} className="h-14 w-14 rounded-[18px] object-cover" loading="lazy" />
+                  <SafeImage
+                    src={teamLogo}
+                    fallbackSrc={fallbackTeamLogo}
+                    alt={`${team.name} logo`}
+                    className="h-14 w-14 rounded-[18px] object-cover"
+                    loading="lazy"
+                  />
                 </div>
               </div>
             </div>
@@ -328,7 +343,13 @@ export default function TeamDetailPage() {
               <div className="grid grid-cols-3 gap-2">
                 {teamGallery.map((photo: string, i: number) => (
                   <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
-                    <img src={photo} alt={`팀 사진 ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    <SafeImage
+                      src={photo}
+                      fallbackSrc={fallbackTeamGallery[i] ?? fallbackCoverImage}
+                      alt={`팀 사진 ${i + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                 ))}
               </div>

@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:3003';
 const issues = [];
+const NAVIGATION_TIMEOUT = 60000;
 
 function issue(page, severity, msg) {
   issues.push({ page, severity, msg });
@@ -9,9 +10,28 @@ function issue(page, severity, msg) {
   console.log(`${icon} [${page}] ${msg}`);
 }
 
+async function openPage(page, path) {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: NAVIGATION_TIMEOUT });
+  await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(1200);
+}
+
+async function loginAsDev(page, nickname = '테스트유저') {
+  await openPage(page, '/login');
+  await page.locator('[data-testid="dev-login-input"]').waitFor({ state: 'visible', timeout: NAVIGATION_TIMEOUT });
+  await page.locator('[data-testid="dev-login-input"]').fill(nickname);
+  await page.locator('[data-testid="dev-login-submit"]').click();
+  await page.waitForURL('**/home', { timeout: NAVIGATION_TIMEOUT }).catch(() => {});
+  await page.waitForTimeout(1500);
+}
+
+async function hasText(page, text) {
+  return (await page.getByText(text, { exact: false }).count()) > 0;
+}
+
 async function checkPage(page, path, name, checks) {
   try {
-    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle', timeout: 12000 });
+    await openPage(page, path);
     for (const check of checks) {
       await check(page, path, name);
     }
@@ -25,11 +45,7 @@ async function main() {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
 
-  // 먼저 로그인
-  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-  await page.fill('input[placeholder="닉네임 입력"]', '테스트유저');
-  await page.click('button:has-text("입장")');
-  await page.waitForTimeout(2000);
+  await loginAsDev(page);
 
   console.log('\n🔍 UI 관점 기능 누락 분석\n');
 
@@ -61,15 +77,15 @@ async function main() {
   // ━━━ 매치 상세 ━━━
   await checkPage(page, '/matches', '매치→상세', [
     async (p, path) => {
-      const firstMatch = await p.$('a[href*="/matches/"]');
-      if (firstMatch) {
-        await firstMatch.click();
-        await p.waitForTimeout(2000);
+        const firstMatch = await p.$('a[href*="/matches/"]');
+        if (firstMatch) {
+          await firstMatch.click();
+          await p.waitForTimeout(2000);
 
-        const hasParticipantList = await p.$text('참가자');
+        const hasParticipantList = await hasText(p, '참가자');
         if (!hasParticipantList) issue('/matches/[id]', 'MED', '참가자 목록이 보이지 않음');
 
-        const hasHostInfo = await p.$text('호스트');
+        const hasHostInfo = await hasText(p, '호스트');
         if (!hasHostInfo) issue('/matches/[id]', 'LOW', '호스트 정보 미표시');
 
         const hasVenueMap = await p.$('[class*="map"], [class*="Map"]');
@@ -110,7 +126,7 @@ async function main() {
         const hasJoinBtn = await p.$('button:has-text("가입"), button:has-text("신청"), button:has-text("참여")');
         if (!hasJoinBtn) issue('/teams/[id]', 'HIGH', '팀 가입/참여 신청 버튼 없음');
 
-        const hasGallery = await p.$text('갤러리');
+        const hasGallery = await hasText(p, '갤러리');
         // 갤러리는 optional
 
         await p.goBack();
@@ -141,7 +157,7 @@ async function main() {
         await firstItem.click();
         await p.waitForTimeout(2000);
 
-        const hasSellerRating = await p.$text('매너');
+        const hasSellerRating = await hasText(p, '매너');
         // 판매자 매너 점수
 
         const hasReportBtn = await p.$('button:has-text("신고"), button:has-text("report")');
@@ -187,10 +203,10 @@ async function main() {
   // ━━━ 프로필 ━━━
   await checkPage(page, '/profile', '프로필', [
     async (p, path) => {
-      const hasActivityStats = await p.$text('활동 통계');
+      const hasActivityStats = await hasText(p, '활동 통계');
       if (!hasActivityStats) issue(path, 'MED', '활동 통계 요약(승률, 총 경기수 등) 없음');
 
-      const hasBadgeDisplay = await p.$text('뱃지');
+      const hasBadgeDisplay = await hasText(p, '뱃지');
       if (!hasBadgeDisplay) issue(path, 'MED', '프로필에 뱃지 표시 없음');
     }
   ]);
@@ -209,7 +225,7 @@ async function main() {
       const hasDateFilter = await p.$('input[type="date"], button:has-text("기간")');
       if (!hasDateFilter) issue(path, 'MED', '결제 내역 기간 필터 없음');
 
-      const hasTotalAmount = await p.$text('총');
+      const hasTotalAmount = await hasText(p, '총');
       if (!hasTotalAmount) issue(path, 'LOW', '총 결제 금액 요약 없음');
     }
   ]);

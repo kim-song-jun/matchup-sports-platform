@@ -43,6 +43,44 @@ export async function injectTokens(page: Page, tokens: TokenPair): Promise<void>
   }, tokens);
 }
 
+async function waitForSettledPage(page: Page): Promise<void> {
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+}
+
+async function navigateToHomeWithinWarmShell(page: Page): Promise<boolean> {
+  const homeCandidates = [
+    page.locator('aside a[href="/home"]:visible').first(),
+    page.locator('[data-testid="bottom-nav-home"]:visible').first(),
+    page.locator('a[href="/home"]:visible').first(),
+  ];
+
+  for (const candidate of homeCandidates) {
+    const isVisible = await candidate.isVisible().catch(() => false);
+    if (!isVisible) continue;
+
+    try {
+      await Promise.all([
+        page.waitForURL(/\/home(?:\?|$)/, {
+          timeout: 20_000,
+          waitUntil: 'commit',
+        }),
+        candidate.click(),
+      ]);
+      await page.locator('main:visible').first().waitFor({
+        state: 'visible',
+        timeout: 30_000,
+      });
+      await page.waitForTimeout(300);
+      return true;
+    } catch {
+      // Fall through to the next visible candidate or direct navigation fallback.
+    }
+  }
+
+  return false;
+}
+
 /**
  * Warm the Next.js dev server on a lighter route before entering a heavier page.
  */
@@ -53,13 +91,15 @@ export async function gotoWithWarmup(
 ): Promise<void> {
   if (targetPath !== warmupPath) {
     await page.goto(warmupPath, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+    await waitForSettledPage(page);
+  }
+
+  if (targetPath === '/home' && await navigateToHomeWithinWarmShell(page)) {
+    return;
   }
 
   await page.goto(targetPath, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+  await waitForSettledPage(page);
 }
 
 /**

@@ -3,6 +3,7 @@ import { mkdirSync } from 'fs';
 
 const BASE = 'http://localhost:3003';
 const OUT = 'docs/screenshots/v4_intro';
+const NAVIGATION_TIMEOUT = 60000;
 
 const pages = [
   // Intro pages - desktop
@@ -50,8 +51,8 @@ async function capture() {
     await tab.setViewportSize({ width: page.width, height: page.height });
 
     try {
-      await tab.goto(`${BASE}${page.url}`, { waitUntil: 'networkidle', timeout: 15000 });
-      // Wait for animations to settle
+      await tab.goto(`${BASE}${page.url}`, { waitUntil: 'domcontentloaded', timeout: NAVIGATION_TIMEOUT });
+      await tab.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
       await tab.waitForTimeout(1500);
       await tab.screenshot({
         path: `${OUT}/${page.name}.png`,

@@ -5,10 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, BookOpen, Pencil, GraduationCap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SafeImage } from '@/components/ui/safe-image';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import dynamic from 'next/dynamic';
-const CheckoutModal = dynamic(() => import('@/components/payment/checkout-modal').then(m => ({ default: m.CheckoutModal })), { ssr: false });
 import { useLesson } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
@@ -38,7 +38,6 @@ export default function LessonDetailPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const lessonId = params.id as string;
-  const [showCheckout, setShowCheckout] = useState(false);
   const [selectedTicketPlan, setSelectedTicketPlan] = useState<LessonTicketPlan | null>(null);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
@@ -58,6 +57,8 @@ export default function LessonDetailPage() {
   const isHost = user?.id === lesson?.hostId;
   const isEnrolled = !!(lesson?.participants?.some((p) => p.userId === user?.id));
   const isFull = !!(lesson && lesson.currentParticipants >= lesson.maxParticipants);
+  const selectedPrice = selectedTicketPlan?.price ?? lesson?.fee ?? 0;
+  const requiresPayment = selectedPrice > 0;
 
   if (isLoading) return <div role="status" aria-label="로딩 중" className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-2xl" /><div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-2xl" /></div></div>;
   if (!lesson) return (
@@ -79,7 +80,9 @@ export default function LessonDetailPage() {
     lesson.id,
     4,
   );
+  const fallbackLessonImages = getSportDetailImageSet(lesson.sportType, undefined, lesson.id, 4);
   const heroImage = lessonImages[0];
+  const heroFallbackImage = fallbackLessonImages[0];
   const galleryImages = lessonImages.slice(1, 4);
 
   return (
@@ -97,7 +100,12 @@ export default function LessonDetailPage() {
           {/* 커버 */}
           <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 @3xl:h-56 mb-4 overflow-hidden relative">
             {heroImage ? (
-              <img src={heroImage} alt={lesson.title} className="h-full w-full object-cover" />
+              <SafeImage
+                src={heroImage}
+                fallbackSrc={heroFallbackImage}
+                alt={lesson.title}
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center text-white/80">
@@ -174,7 +182,7 @@ export default function LessonDetailPage() {
               onPurchase={(plan) => {
                 setSelectedTicketPlan(plan);
                 if (plan.price > 0) {
-                  setShowCheckout(true);
+                  toast('info', '유료 수강권 결제는 아직 준비 중이에요');
                 } else {
                   enrollMutation.mutate();
                 }
@@ -217,7 +225,13 @@ export default function LessonDetailPage() {
             <div className="grid grid-cols-3 gap-2">
               {galleryImages.map((image, index) => (
                 <div key={`${image}-${index}`} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
-                  <img src={image} alt={`${lesson.title} 사진 ${index + 2}`} className="h-full w-full object-cover" loading="lazy" />
+                  <SafeImage
+                    src={image}
+                    fallbackSrc={fallbackLessonImages[index + 1] ?? heroFallbackImage}
+                    alt={`${lesson.title} 사진 ${index + 2}`}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
               ))}
             </div>
@@ -263,14 +277,16 @@ export default function LessonDetailPage() {
               ) : (
                 <button
                   onClick={() => {
-                    if (lesson.fee > 0) {
-                      setShowCheckout(true);
-                    } else {
+                    if (!requiresPayment) {
                       enrollMutation.mutate();
                     }
                   }}
-                  disabled={enrollMutation.isPending}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
+                  disabled={enrollMutation.isPending || requiresPayment}
+                  className={`w-full rounded-xl py-3.5 text-md font-bold transition-colors disabled:opacity-50 ${
+                    requiresPayment
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
+                  }`}
                 >
                   {enrollMutation.isPending ? (
                     <span className="flex items-center justify-center gap-2">
@@ -278,7 +294,7 @@ export default function LessonDetailPage() {
                       처리 중...
                     </span>
                   ) : (
-                    `수강 신청하기 ${lesson.fee > 0 ? `· ${formatCurrency(lesson.fee)}` : ''}`
+                    requiresPayment ? '유료 수강권 준비 중' : `수강 신청하기 ${lesson.fee > 0 ? `· ${formatCurrency(lesson.fee)}` : ''}`
                   )}
                 </button>
               )}
@@ -319,6 +335,15 @@ export default function LessonDetailPage() {
               </div>
             </div>
 
+            {requiresPayment && !isHost && !isEnrolled && (
+              <TrustSignalBanner
+                tone="warning"
+                label="결제 준비 중"
+                title="유료 강좌 결제는 아직 연결되지 않았어요"
+                description="강좌/수강권 구매는 결제와 좌석 확정이 아직 백엔드와 연결되지 않았습니다. 가짜 성공 없이 신청 버튼이 비활성화됩니다."
+              />
+            )}
+
             {isHost && (
               <Link
                 href={`/lessons/${lessonId}/edit`}
@@ -332,28 +357,6 @@ export default function LessonDetailPage() {
         </div>
       </div>
 
-      {/* 결제 모달 */}
-      {showCheckout && lesson && (
-        <CheckoutModal
-          isOpen={showCheckout}
-          onClose={() => setShowCheckout(false)}
-          amount={selectedTicketPlan?.price ?? lesson.fee}
-          itemName={
-            selectedTicketPlan
-              ? `${lesson.title} — ${selectedTicketPlan.name}`
-              : lesson.title
-          }
-          orderId={`lesson-${lessonId}-${selectedTicketPlan?.id ?? 'default'}-${Date.now()}`}
-          onSuccess={() => {
-            setShowCheckout(false);
-            enrollMutation.mutate();
-          }}
-          onError={() => {
-            setShowCheckout(false);
-            toast('error', '결제에 실패했어요. 다시 시도해주세요');
-          }}
-        />
-      )}
     </div>
   );
 }

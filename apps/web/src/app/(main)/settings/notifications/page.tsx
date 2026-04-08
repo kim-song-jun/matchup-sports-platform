@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import {
   ArrowLeft,
   ChevronRight,
@@ -24,6 +25,7 @@ interface NotificationCategory {
 }
 
 export default function NotificationsPage() {
+  useRequireAuth();
   const router = useRouter();
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

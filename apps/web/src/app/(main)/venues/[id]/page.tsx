@@ -25,22 +25,22 @@ const dayLabels: Record<string, string> = {
 };
 
 const facilityColors: Record<string, string> = {
-  '주차장': 'bg-gray-100 text-gray-700 border-gray-200',
-  '샤워실': 'bg-gray-100 text-gray-700 border-gray-200',
-  '탈의실': 'bg-gray-100 text-gray-700 border-gray-200',
-  '음수대': 'bg-gray-100 text-gray-700 border-gray-200',
-  '관람석': 'bg-gray-100 text-gray-700 border-gray-200',
-  '조명': 'bg-gray-100 text-gray-700 border-gray-200',
-  '냉난방': 'bg-gray-100 text-gray-700 border-gray-200',
-  '매점': 'bg-gray-100 text-gray-700 border-gray-200',
-  '와이파이': 'bg-gray-100 text-gray-700 border-gray-200',
-  'AED': 'bg-gray-100 text-gray-700 border-gray-200',
-  '장비대여': 'bg-gray-100 text-gray-700 border-gray-200',
-  '정빙기': 'bg-gray-100 text-gray-700 border-gray-200',
+  '주차장': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '샤워실': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '탈의실': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '음수대': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '관람석': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '조명': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '냉난방': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '매점': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '와이파이': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  'AED': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '장비대여': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
+  '정빙기': 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600',
 };
 
 function getDefaultFacilityColor() {
-  return 'bg-gray-100 text-gray-700 border-gray-200';
+  return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600';
 }
 
 // Mock venue data

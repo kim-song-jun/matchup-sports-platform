@@ -34,8 +34,9 @@ export function KakaoMap({ latitude, longitude, name, className, height = 'h-64'
         const marker = new kakaoMaps.Marker({ position: center, map });
 
         if (name) {
+          const escapedName = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
           const infoWindow = new kakaoMaps.InfoWindow({
-            content: `<div style="padding:6px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${name}</div>`,
+            content: `<div style="padding:6px 10px;font-size:13px;font-weight:600;white-space:nowrap;">${escapedName}</div>`,
           });
           infoWindow.open(map, marker);
 

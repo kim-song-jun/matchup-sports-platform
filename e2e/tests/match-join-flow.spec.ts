@@ -15,7 +15,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { TEST_PERSONAS } from '../fixtures/test-users';
 import { expectLoginRedirectOrLink, createAuthenticatedSession, closeSessions } from '../fixtures/sessions';
 import { createMatchViaApi, findVenueBySport } from '../fixtures/api-helpers';
-import { setupAuthState, loginViaApi } from '../fixtures/auth';
+import { gotoWithWarmup, setupAuthState, loginViaApi } from '../fixtures/auth';
 
 const SINARO = TEST_PERSONAS.sinaro.nickname;
 const TEAM_MEMBER = TEST_PERSONAS.teamMember.nickname;
@@ -82,6 +82,49 @@ test.describe('Matches list page — public filters', () => {
     await searchInput.fill('풋살');
     await page.waitForTimeout(400);
     await expect(page.locator('main:visible').first()).toBeVisible();
+  });
+
+  test('sport query param initializes selected chip and survives reload', async ({ page }) => {
+    await page.goto('/matches?sport=futsal');
+    await expect(visibleTestId(page, 'match-sport-futsal')).toHaveAttribute('aria-pressed', 'true');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    await expect(visibleTestId(page, 'match-sport-futsal')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('advanced filters sync into URL and persist after reload', async ({ page }) => {
+    await page.goto('/matches');
+    await visibleTestId(page, 'match-filter-toggle').click();
+    await visibleTestId(page, 'match-region-input').fill('서울');
+    await visibleTestId(page, 'match-quick-free').click();
+    await visibleTestId(page, 'match-sort-latest').click();
+
+    await expect(page).toHaveURL(/city=%EC%84%9C%EC%9A%B8/);
+    await expect(page).toHaveURL(/fee=free/);
+    await expect(page).toHaveURL(/sort=latest/);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const regionInput = visibleTestId(page, 'match-region-input');
+    if (await regionInput.count() === 0) {
+      await visibleTestId(page, 'match-filter-toggle').click();
+    }
+
+    await expect(visibleTestId(page, 'match-region-input')).toHaveValue('서울');
+    await expect(visibleTestId(page, 'match-quick-free')).toHaveAttribute('aria-pressed', 'true');
+    await expect(visibleTestId(page, 'match-sort-latest')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('home sport deep link keeps discovery context', async ({ page }) => {
+    await gotoWithWarmup(page, '/home');
+    await page.locator('button:visible').filter({ hasText: /^풋살$/ }).first().click();
+    await page.locator('a[href="/matches?sport=futsal"]:visible').first().click();
+
+    await expect(page).toHaveURL(/\/matches\?sport=futsal/);
+    await expect(visibleTestId(page, 'match-sport-futsal')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -257,10 +300,144 @@ test.describe('Deep match flows', () => {
       overflowSession = await createAuthenticatedSession(browser, TEAM_MANAGER, detailPath);
       await expect(visibleTestId(overflowSession.page, 'match-participant-count')).toContainText('2/2명');
       await expect(
-        overflowSession.page.getByRole('button', { name: '마감되었습니다' }),
+        overflowSession.page.getByRole('button', { name: '모집이 마감되었어요' }),
       ).toBeVisible({ timeout: 10_000 });
     } finally {
       await closeSessions([hostSession, participantSession, overflowSession]);
+    }
+  });
+
+  test('MATCH-003 lets host edit lifecycle state and reflects it across detail/my matches/participant view', async ({ browser }) => {
+    const venue = await findVenueBySport('futsal');
+    const schedule = buildFutureSchedule(4);
+    const hostTokens = await loginViaApi(SINARO);
+    const originalTitle = `E2E매치수정-${Date.now()}`;
+    const updatedTitle = `${originalTitle}-수정`;
+    const updatedDescription = '호스트가 수정한 설명입니다.';
+
+    const created = await createMatchViaApi(hostTokens.accessToken, {
+      title: originalTitle,
+      description: '초기 설명',
+      sportType: 'futsal',
+      matchDate: schedule.matchDate,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      venueId: venue.id,
+      maxPlayers: 4,
+      fee: 0,
+      levelMin: 2,
+      levelMax: 4,
+    });
+
+    const detailPath = `/matches/${created.id}`;
+    let hostSession = null;
+    let participantSession = null;
+
+    try {
+      hostSession = await createAuthenticatedSession(browser, SINARO, detailPath);
+      participantSession = await createAuthenticatedSession(browser, TEAM_MEMBER, detailPath);
+
+      await expect(visibleTestId(hostSession.page, 'match-status-badge')).toHaveText('모집중');
+      await expect(visibleTestId(participantSession.page, 'match-join-button')).toBeVisible();
+
+      await visibleTestId(hostSession.page, 'match-host-close-button').click();
+      await expect(visibleTestId(hostSession.page, 'match-status-badge')).toHaveText('마감');
+
+      await participantSession.page.reload();
+      await participantSession.page.waitForLoadState('networkidle');
+      await expect(
+        participantSession.page.getByRole('button', { name: '모집이 마감되었어요' }),
+      ).toBeVisible({ timeout: 10_000 });
+
+      await visibleTestId(hostSession.page, 'match-host-reopen-button').click();
+      await expect(visibleTestId(hostSession.page, 'match-status-badge')).toHaveText('모집중');
+
+      await participantSession.page.reload();
+      await participantSession.page.waitForLoadState('networkidle');
+      await expect(visibleTestId(participantSession.page, 'match-join-button')).toBeVisible();
+
+      await visibleTestId(hostSession.page, 'match-host-edit-button').click();
+      await hostSession.page.waitForURL(/\/matches\/[^/]+\/edit$/, { timeout: 15_000 });
+      await hostSession.page.locator('#edit-title:visible').fill(updatedTitle);
+      await hostSession.page.locator('#edit-description:visible').fill(updatedDescription);
+      await hostSession.page.locator('#edit-maxPlayers:visible').fill('6');
+      await hostSession.page.getByRole('button', { name: '수정 완료' }).click();
+      await hostSession.page.waitForURL(new RegExp(`/matches/${created.id}$`), { timeout: 15_000 });
+      await expect(visibleTestId(hostSession.page, 'match-detail-title')).toHaveText(updatedTitle);
+      await expect(hostSession.page.locator('p:visible').filter({ hasText: updatedDescription }).first()).toBeVisible();
+      await expect(visibleTestId(hostSession.page, 'match-participant-count')).toContainText('1/6명');
+
+      await hostSession.page.goto('/my/matches?tab=created');
+      await hostSession.page.waitForLoadState('networkidle');
+      await expect(hostSession.page.getByTestId(`my-match-link-${created.id}`)).toContainText(updatedTitle);
+      await expect(hostSession.page.getByTestId(`my-match-status-${created.id}`)).toHaveText('모집중');
+
+      await hostSession.page.goto(detailPath);
+      await hostSession.page.waitForLoadState('networkidle');
+      await visibleTestId(hostSession.page, 'match-host-cancel-button').click();
+      await expect(visibleTestId(hostSession.page, 'match-status-badge')).toHaveText('취소됨');
+
+      await participantSession.page.reload();
+      await participantSession.page.waitForLoadState('networkidle');
+      await expect(
+        participantSession.page.getByRole('button', { name: '취소된 매치예요' }),
+      ).toBeVisible({ timeout: 10_000 });
+
+      await hostSession.page.goto('/my/matches?tab=created');
+      await hostSession.page.waitForLoadState('networkidle');
+      await expect(hostSession.page.getByTestId(`my-match-link-${created.id}`)).toContainText(updatedTitle);
+      await expect(hostSession.page.getByTestId(`my-match-status-${created.id}`)).toHaveText('취소됨');
+    } finally {
+      await closeSessions([hostSession, participantSession]);
+    }
+  });
+
+  test('MATCH-003 lets host complete a match and removes edit/join affordances', async ({ browser }) => {
+    const venue = await findVenueBySport('futsal');
+    const schedule = buildFutureSchedule(5);
+    const hostTokens = await loginViaApi(SINARO);
+    const title = `E2E매치완료-${Date.now()}`;
+
+    const created = await createMatchViaApi(hostTokens.accessToken, {
+      title,
+      description: '호스트 완료 처리 검증',
+      sportType: 'futsal',
+      matchDate: schedule.matchDate,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      venueId: venue.id,
+      maxPlayers: 6,
+      fee: 0,
+      levelMin: 2,
+      levelMax: 4,
+    });
+
+    const detailPath = `/matches/${created.id}`;
+    let hostSession = null;
+    let participantSession = null;
+
+    try {
+      hostSession = await createAuthenticatedSession(browser, SINARO, detailPath);
+      participantSession = await createAuthenticatedSession(browser, TEAM_MEMBER, detailPath);
+
+      await expect(visibleTestId(hostSession.page, 'match-host-complete-button')).toBeVisible();
+      await visibleTestId(hostSession.page, 'match-host-complete-button').click();
+      await expect(visibleTestId(hostSession.page, 'match-status-badge')).toHaveText('완료');
+      await expect(visibleTestId(hostSession.page, 'match-host-edit-button')).toHaveCount(0);
+      await expect(hostSession.page.getByText('완료되거나 취소된 매치는 수정할 수 없어요.')).toBeVisible();
+
+      await participantSession.page.reload();
+      await participantSession.page.waitForLoadState('networkidle');
+      await expect(
+        participantSession.page.getByRole('button', { name: '종료된 매치예요' }),
+      ).toBeVisible({ timeout: 10_000 });
+
+      await hostSession.page.goto('/my/matches?tab=created');
+      await hostSession.page.waitForLoadState('networkidle');
+      await expect(hostSession.page.getByTestId(`my-match-link-${created.id}`)).toContainText(title);
+      await expect(hostSession.page.getByTestId(`my-match-status-${created.id}`)).toHaveText('완료');
+    } finally {
+      await closeSessions([hostSession, participantSession]);
     }
   });
 });

@@ -11,6 +11,76 @@ import {
 } from 'lucide-react';
 import type { Payment } from '@/types/api';
 
+// ── Toss Payments widget integration ──
+// When NEXT_PUBLIC_TOSS_CLIENT_KEY is absent, falls back to a mock confirm flow.
+
+export type TossWidgetInstance = {
+  /** Render the payment selection UI into the given container element */
+  renderPaymentMethods: (selector: string, amount: { value: number }) => Promise<void>;
+  /** Render the agreement terms UI into the given container element */
+  renderAgreement: (selector: string) => Promise<void>;
+  /** Trigger the payment flow; resolves when the user completes or rejects */
+  requestPayment: (params: {
+    orderId: string;
+    orderName: string;
+    customerName: string;
+    successUrl: string;
+    failUrl: string;
+  }) => Promise<void>;
+};
+
+/**
+ * Initialise the Toss Payments widget SDK.
+ *
+ * Returns `null` when the client key env var is missing so callers can
+ * fall back to the mock payment flow instead.
+ */
+export async function initTossWidget(
+  customerKey: string,
+  amount: number,
+): Promise<TossWidgetInstance | null> {
+  const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+  if (!clientKey) {
+    return null;
+  }
+
+  // Dynamically import the SDK to keep it out of the initial bundle.
+  // The package is an optional peer dependency; we guard at runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let sdkModule: any;
+  try {
+    // Use a variable to prevent Vite from statically resolving this import
+    const sdkName = '@tosspayments/payment-widget-sdk';
+    sdkModule = await (Function('name', 'return import(name)') as (name: string) => Promise<any>)(sdkName);
+  } catch {
+    console.warn('[payment-ui] @tosspayments/payment-widget-sdk not installed — falling back to mock');
+    return null;
+  }
+
+  const { loadTossPayments } = sdkModule;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tossPayments: any = await loadTossPayments(clientKey);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const widget: any = tossPayments.widgets({ customerKey });
+
+  await widget.setAmount({ currency: 'KRW', value: amount });
+
+  return {
+    renderPaymentMethods: (selector: string, amountObj: { value: number }) =>
+      widget.renderPaymentMethods({ selector, variantKey: 'DEFAULT' }, amountObj),
+    renderAgreement: (selector: string) =>
+      widget.renderAgreement({ selector }),
+    requestPayment: (params: {
+      orderId: string;
+      orderName: string;
+      customerName: string;
+      successUrl: string;
+      failUrl: string;
+    }) =>
+      widget.requestPayment(params),
+  };
+}
+
 type PaymentIcon = typeof CheckCircle;
 
 export const paymentStatusConfig: Record<string, { label: string; icon: PaymentIcon; color: string; bgColor: string }> = {
@@ -143,10 +213,21 @@ export function getRefundPolicy(startAt?: string | null) {
   };
 }
 
-function buildScheduledAt(matchDate?: string, startTime?: string) {
+export function buildScheduledAt(matchDate?: string, startTime?: string) {
   if (!matchDate || !startTime) {
     return null;
   }
 
-  return `${matchDate}T${startTime}`;
+  const normalizedDate = matchDate.includes('T') ? matchDate.slice(0, 10) : matchDate;
+  const normalizedTime = startTime.length >= 8 ? startTime.slice(0, 8) : `${startTime}:00`;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+    return null;
+  }
+
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedTime)) {
+    return null;
+  }
+
+  return `${normalizedDate}T${normalizedTime}`;
 }

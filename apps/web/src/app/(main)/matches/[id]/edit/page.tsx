@@ -1,28 +1,62 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, ChevronRight, Image as ImageIcon, Plus, X, SearchX } from 'lucide-react';
+import { ArrowLeft, ChevronRight, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
-import { useMatch, useVenues } from '@/hooks/use-api';
+import { SafeImage } from '@/components/ui/safe-image';
+import { useMatch, useUpdateMatch, useVenues } from '@/hooks/use-api';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { getSportDetailImageSet } from '@/lib/sport-image';
-import { api } from '@/lib/api';
-import type { Venue } from '@/types/api';
+import type { UpdateMatchInput, Venue } from '@/types/api';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
+function toDateInputValue(value?: string | null) {
+  return value ? value.split('T')[0] : '';
+}
+
+function buildUpdatePayload(form: {
+  sportType: string;
+  title: string;
+  description: string;
+  venueId: string;
+  matchDate: string;
+  startTime: string;
+  endTime: string;
+  maxPlayers: number;
+  fee: number;
+  levelMin: number;
+  levelMax: number;
+  gender: string;
+}): UpdateMatchInput {
+  return {
+    sportType: form.sportType,
+    title: form.title.trim(),
+    description: form.description.trim(),
+    venueId: form.venueId,
+    matchDate: form.matchDate,
+    startTime: form.startTime,
+    endTime: form.endTime,
+    maxPlayers: Number(form.maxPlayers),
+    fee: Number(form.fee),
+    levelMin: Number(form.levelMin),
+    levelMax: Number(form.levelMax),
+    gender: form.gender,
+  };
+}
+
 export default function EditMatchPage() {
+  useRequireAuth();
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
   const matchId = params.id as string;
   const { data: apiMatch, isLoading } = useMatch(matchId);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const updateMatchMutation = useUpdateMatch();
 
   const [form, setForm] = useState({
     sportType: '',
@@ -37,17 +71,13 @@ export default function EditMatchPage() {
     levelMin: 1,
     levelMax: 5,
     gender: 'any',
-    rules: '',
   });
-  const [isSaving, setIsSaving] = useState(false);
-  const fallbackImages = imagePreviews.length === 0
-    ? getSportDetailImageSet(
-        form.sportType || apiMatch?.sportType || 'soccer',
-        apiMatch?.imageUrl ? [apiMatch.imageUrl] : undefined,
-        `${matchId}-edit-form`,
-        3,
-      )
-    : [];
+  const fallbackImages = getSportDetailImageSet(
+    form.sportType || apiMatch?.sportType || 'soccer',
+    apiMatch?.imageUrl ? [apiMatch.imageUrl] : undefined,
+    `${matchId}-edit-form`,
+    3,
+  );
   const hasExistingMatchImage = Boolean(apiMatch?.imageUrl);
 
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
@@ -60,7 +90,7 @@ export default function EditMatchPage() {
         title: apiMatch.title || '',
         description: apiMatch.description || '',
         venueId: apiMatch.venue?.id || '',
-        matchDate: apiMatch.matchDate || '',
+        matchDate: toDateInputValue(apiMatch.matchDate),
         startTime: apiMatch.startTime || '',
         endTime: apiMatch.endTime || '',
         maxPlayers: apiMatch.maxPlayers || 10,
@@ -68,38 +98,23 @@ export default function EditMatchPage() {
         levelMin: apiMatch.levelMin || 1,
         levelMax: apiMatch.levelMax || 5,
         gender: apiMatch.gender || 'any',
-        rules: '',
       });
     }
   }, [apiMatch]);
 
-  const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (imageFiles.length + files.length > 5) {
-      toast('error', '이미지는 최대 5장까지 가능해요');
-      return;
-    }
-    const newFiles = [...imageFiles, ...files].slice(0, 5);
-    setImageFiles(newFiles);
-    setImagePreviews(newFiles.map(f => URL.createObjectURL(f)));
-  };
-
-  const removeImage = (idx: number) => {
-    setImageFiles(prev => prev.filter((_, i) => i !== idx));
-    setImagePreviews(prev => prev.filter((_, i) => i !== idx));
-  };
-
   const handleSave = async () => {
     if (!form.title) return toast('error', '제목을 입력해주세요');
-    setIsSaving(true);
+    if (!form.venueId) return toast('error', '시설을 선택해주세요');
+    if (form.levelMin > form.levelMax) {
+      return toast('error', '최소 레벨은 최대 레벨보다 높을 수 없어요');
+    }
     try {
-      await api.patch(`/matches/${matchId}`, form);
+      await updateMatchMutation.mutateAsync({ id: matchId, data: buildUpdatePayload(form) });
       toast('success', '매치 정보가 저장되었어요');
       router.push(`/matches/${matchId}`);
-    } catch {
-      toast('error', '수정에 실패했어요');
-    } finally {
-      setIsSaving(false);
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요');
     }
   };
 
@@ -125,6 +140,19 @@ export default function EditMatchPage() {
           title="매치를 찾을 수 없어요"
           description="삭제되었거나 존재하지 않는 매치예요"
           action={{ label: '매치 목록으로', href: '/matches' }}
+        />
+      </div>
+    );
+  }
+
+  if (apiMatch.status === 'completed' || apiMatch.status === 'cancelled') {
+    return (
+      <div className="px-5 @3xl:px-0 pt-10">
+        <EmptyState
+          icon={SearchX}
+          title="종료된 매치는 수정할 수 없어요"
+          description="취소되었거나 이미 완료된 매치는 상세 화면에서 기록만 확인할 수 있어요"
+          action={{ label: '매치 상세로', href: `/matches/${matchId}` }}
         />
       </div>
     );
@@ -174,45 +202,25 @@ export default function EditMatchPage() {
         </FormSection>
 
         {/* Images */}
-        <FormSection label="이미지 (선택)">
+        <FormSection label="대표 이미지 미리보기">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {imagePreviews.map((src, i) => (
-              <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
-                <img src={src} alt="" className="w-full h-full object-cover" />
-                <button onClick={() => removeImage(i)} aria-label="이미지 삭제" className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900/60 text-white">
-                  <X size={10} />
-                </button>
-              </div>
-            ))}
-            {imageFiles.length < 5 && (
-              <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex flex-col items-center justify-center w-20 h-20 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <ImageIcon size={16} />
-                <span className="text-2xs mt-1">{imageFiles.length}/5</span>
-              </button>
-            )}
-            {fallbackImages.map((src) => (
-              <div key={src} className="relative shrink-0 w-20 h-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                <img
+            {fallbackImages.map((src, index) => (
+              <div key={`${src}-${index}`} className="shrink-0 h-20 w-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                <SafeImage
                   src={src}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-full w-full object-cover opacity-60"
+                  fallbackSrc={fallbackImages[index + 1] ?? fallbackImages[0]}
+                  alt={`${form.title || apiMatch?.title || '매치'} 이미지 ${index + 1}`}
+                  className="h-full w-full object-cover"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
-                  <Plus size={18} className="text-white/90" />
-                </div>
               </div>
             ))}
-            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
           </div>
-          {fallbackImages.length > 0 && (
-            <p className="mt-1.5 text-xs text-gray-500">
-              {hasExistingMatchImage
-                ? '현재 대표 이미지와 fallback 예시를 함께 보여줍니다.'
-                : '대표 이미지가 비어 있으면 오른쪽 실사 예시처럼 노출됩니다.'}
-            </p>
-          )}
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {hasExistingMatchImage
+              ? '이미지 업로드 수정은 아직 지원하지 않아요. 현재 대표 이미지를 미리보기로만 확인할 수 있어요.'
+              : '이미지 업로드 수정은 아직 지원하지 않아요. 대표 이미지가 없으면 기본 스포츠 이미지를 사용해요.'}
+          </p>
         </FormSection>
 
         {/* Venue */}
@@ -290,22 +298,15 @@ export default function EditMatchPage() {
           </div>
         </FormSection>
 
-        {/* Rules */}
-        <FormSection label="추가 규칙 (선택)" id="edit-rules">
-          <textarea id="edit-rules" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })}
-            placeholder="참가자에게 알릴 규칙이나 공지사항" rows={2}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
-        </FormSection>
-
         {/* Actions */}
         <div className="flex gap-3 mt-6">
           <button onClick={() => router.back()}
             className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 py-3 text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
             돌아가기
           </button>
-          <button onClick={handleSave} disabled={isSaving}
+          <button onClick={handleSave} disabled={updateMatchMutation.isPending} data-testid="match-edit-save"
             className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
-            {isSaving ? '수정 중...' : '수정 완료'}
+            {updateMatchMutation.isPending ? '수정 중...' : '수정 완료'}
           </button>
         </div>
       </div>

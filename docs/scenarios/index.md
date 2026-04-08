@@ -81,12 +81,12 @@
 | Scenario File | Primary Spec | Status |
 |---------------|--------------|--------|
 | `01-auth-and-session.md` | `e2e/tests/auth-session-matrix.spec.ts` | Verified (`Desktop Chrome 7/7`, `Mobile Chrome 7/7`) |
-| `02-home-and-discovery.md` | `e2e/tests/home.spec.ts` | Passed smoke (`Desktop Chrome`, `Mobile Chrome`), `HOME-002` pending, `HOME-003` photoreal fallback smoke verified |
+| `02-home-and-discovery.md` | `e2e/tests/home.spec.ts`, `e2e/tests/match-discovery.spec.ts` | Home smoke passed (`Desktop Chrome`, `Mobile Chrome`), discovery deep-link/url persistence `Desktop Chrome 3/3`, `HOME-002` pending |
 | `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts` | `MATCH-001/002` verified (`Desktop Chrome 13/13`, `Mobile Chrome deep 2/2`), `MATCH-003` blocked |
 | `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` | Partial + `TEAM-003` visual fallback verified |
 | `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts` | Smoke verified |
 | `06-mercenary-flows.md` | `e2e/tests/mercenary-flow.spec.ts` | Partial |
-| `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts` | Smoke verified |
+| `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts` | Chat smoke verified, notification center `Desktop Chrome 3/3` verified (`match_created`, `player_joined`, `payment_confirmed`) |
 | `08-marketplace-and-lessons.md` | `e2e/tests/marketplace-flow.spec.ts` | Partial + `MKT-003` / `LES-003` visual fallback verified |
 | `09-payment-review-badge.md` | TBD | Planned |
 | `10-profile-settings-admin.md` | `e2e/tests/admin-dashboard.spec.ts` | Partial |
@@ -113,6 +113,9 @@
 | 2026-04-08 | `matches` 생성/참가 deep flow는 우선 `reload-based persistence`까지 검증하고, 호스트 상세의 새로고침 없는 실시간 sync는 별도 follow-up으로 분리한다. |
 | 2026-04-08 | `MATCH-003`는 테스트 미작성보다 기능 공백에 가깝다. 프론트의 수정/취소 UI를 유지하려면 backend `PATCH /matches/:id` 또는 동등한 API가 먼저 필요하다. |
 | 2026-04-08 | photoreal fallback QA는 사용자 노출 image slot 중 `mock/local fallback`이 발생하는 표면을 인스코프로 본다. 업로드 원본과 관리자 전용 이미지는 제외하되, 사용자-facing 생성/수정 폼의 빈 업로드 슬롯은 예외적으로 포함한다. |
+| 2026-04-08 | query-sync discovery 화면은 URL만 단일 source로 두더라도 빠른 입력/연속 토글이 있는 경우 pending local filter state를 같이 유지해야 한다. stale query snapshot 병합은 실제 필터 유실 버그를 만든다. |
+| 2026-04-08 | notification center v1은 설정 영속화보다 `producer wiring -> action center -> read sync -> deep link`를 우선한다. `/settings/notifications`는 device-local 명시를 유지하고 false affordance를 만들지 않는다. |
+| 2026-04-08 | notification card는 읽음 mutation과 라우팅을 같은 `Link` 기본 동작에 맡기지 않는다. in-app navigation이 필요한 카드 액션은 explicit handler와 connect-time backfill을 같이 둬서 websocket late-connect race를 막는다. |
 
 ### Findings Log
 
@@ -134,6 +137,10 @@
 | 2026-04-08 | Match deep flow | Passed with follow-up | `e2e/tests/match-join-flow.spec.ts`에서 `MATCH-001` 생성->목록/상세/내 매치/새 탭/새로고침과 `MATCH-002` 다중 컨텍스트 참가/정원 초과 차단을 Desktop Chrome `13/13`, Mobile Chrome deep `2/2`로 검증했다. 실행 중 `/matches/new`가 UI 전용 필드를 DTO 그대로 POST해 실패하던 버그를 수정했다. | `MATCH-003`용 backend patch route 추가, custom venue 지원 여부 결정, host detail live sync 검증 |
 | 2026-04-08 | Photoreal fallback rollout | Passed | `/home`, `/marketplace/new`, `/my/listings`, `/matches/[id]`, `/lessons/[id]`, `/venues`, `/matches/new`, `/matches/[id]/edit`까지 실사형 로컬 fallback이 정리됐다. `sport-image` unit `21/21`, `tsc --noEmit`, 주요 페이지 `200 OK`, 디자인 `🔴 0 / 🟡 0`, QA 4개 페르소나에서 검증된 26개 체크 무실패를 확인했다. | 보호 경로 auth-injected visual smoke와 `/venues` skeleton 이후 이미지 대기 조건 보강 |
 | 2026-04-08 | Trust / Transaction / Admin remediation | Passed with scoped gaps | 결제 상세/환불은 owner-bound real data로 바뀌었고, 리뷰/뱃지에는 trust signal이 추가됐다. 유료 매치 결제는 `join -> participant -> prepare/confirm` 순서로 정렬했고, lesson/marketplace commerce는 fake success 없이 명시적 미지원으로 전환했다. 관리자 쪽은 user moderation audit log, dispute history, settlement partial-failure flow, admin team-match shell continuity를 반영했다. Backend service tests `247/247`, web `tsc --noEmit` 통과. | payment/review/badge 및 admin 시나리오의 실제 Playwright coverage 확장, lesson/marketplace commerce backend 구현 시 unsupported state 해제 |
+| 2026-04-08 | Shared media lightbox rollout | Passed with follow-up | `MediaLightbox`를 추가해 `matches/[id]`, `lessons/[id]`, `marketplace/[id]`, `teams/[id]`, `venues/[id]` 상세 이미지에서 full-screen viewer, index, keyboard navigation, backdrop close, swipe를 공통화했다. `media-lightbox` unit `7/7`, web `tsc --noEmit`, `venue` detail browser smoke(`open -> Escape close`) 통과. dedicated Playwright spec은 아직 없어 follow-up으로 남긴다. | detail image lightbox Playwright spec 추가, mobile/desktop smoke 고정 |
+| 2026-04-08 | Match discovery 2.0 v1 | Passed with scoped gaps | `/matches`가 URL 기반 필터 상태를 읽고 quick filter, 지역/레벨/정렬 패널을 유지하도록 바뀌었다. backend는 `q/city/district/freeOnly/availableOnly/beginnerFriendly/sort`를 지원하고, discovery helper unit `6/6`, backend match spec `252/252`, Playwright discovery subset `Desktop Chrome 3/3`를 통과했다. saved search와 recommendation reason badge는 이번 범위에서 제외했다. | saved search, personalized recommendation reason, distance/GPS filtering, multi-tab query-state matrix |
+| 2026-04-08 | Discovery live-contract rerun | Passed with runtime note | DTO/query 변경 후 `localhost:8111`이 stale contract를 계속 서빙할 수 있어 `curl`로 먼저 검증했고, dev compose `api` watch compile blocker를 우회해 transpile-only runtime에서 `e2e/tests/match-discovery.spec.ts` `Desktop Chrome 3/3`를 다시 확인했다. | dev compose `api` watch 정상화, `teams` seed/create runtime drift 정리 |
+| 2026-04-08 | Notification center v1 | Passed | `match_created`, `player_joined`, `payment_confirmed`, `payment_refunded` producer를 backend에 연결했고, `/notifications`를 API + websocket action center로 전환했다. `Desktop Chrome`에서 `notification-center.spec.ts` 전체 `3/3`를 통과했고, explicit in-app navigation, socket connect backfill, focus/visibility backfill, lighter `global-setup` bootstrap, fresh mutation token 패턴까지 고정했다. | chat-origin notification producer, `/settings/notifications` 영속화, unrelated `teams` seed drift 정리 |
 
 ## Latest Run Summary
 
@@ -145,6 +152,11 @@
   - `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/home.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome'`
   - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
   - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line --grep 'Deep match flows'`
+  - `pnpm --filter api test -- notifications.service.spec.ts matches.service.spec.ts payments.service.spec.ts`
+  - `pnpm --filter web test -- src/lib/__tests__/notification-center.test.ts`
+  - `pnpm --filter web test -- src/hooks/__tests__/use-realtime.test.tsx`
+  - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' -g 'payment-confirmed notification opens the payment detail route' --workers=1`
+  - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1`
 - 결과:
   - backend auth unit: `242/242` passed
   - `auth-store` unit: `6/6` passed
@@ -153,11 +165,16 @@
   - auth + home mobile bundle: `21/21` passed
   - match flow desktop full file: `13/13` passed
   - match flow mobile deep: `2/2` passed
+  - notification center backend/unit bundle: `253/253` passed
+  - `notification-center` unit: `5/5` passed
+  - `use-realtime` unit: `8/8` passed
+  - notification center payment deep-link rerun: `Desktop Chrome 1/1` passed
+  - notification center full-file rerun: `Desktop Chrome 3/3` passed
 - 재분류:
   - 해결된 환경 블로커: API `:8111` health, host Playwright module resolution, E2E DB setup/teardown topology
   - 해결된 스펙 품질 문제: broad selector, auth wall 판정, bottom-nav contract, chat room response shape, hidden duplicate DOM 대응
   - 해결된 제품 문제: `/matches/new` create payload가 DTO에 없는 UI 필드를 전송하던 버그
-  - 남은 갭: `MATCH-003`, team-match approval/notification deep flows, persistence/realtime depth expansion, multi-browser 확대
+  - 남은 갭: `MATCH-003`, unrelated `global-setup` team seed/runtime drift, team-match approval/notification deep flows, persistence/realtime depth expansion, multi-browser 확대
 
 ## How To Use
 

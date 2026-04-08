@@ -1,5 +1,6 @@
-import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Get, Param, Body, UseGuards, Headers, RawBodyRequest, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -23,6 +24,19 @@ export class PaymentsController {
   @ApiOperation({ summary: '결제 승인' })
   async confirm(@Body() body: Record<string, unknown>) {
     return this.paymentsService.confirm(body);
+  }
+
+  @Post('webhook')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Toss Payments 웹훅 수신 (내부용)' })
+  @ApiHeader({ name: 'toss-signature', description: 'HMAC-SHA256 서명 (Toss 발급)', required: false })
+  async webhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('toss-signature') signature: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
+    return this.paymentsService.handleWebhook(rawBody, signature, body);
   }
 
   @Post(':id/refund')

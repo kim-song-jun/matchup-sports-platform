@@ -75,6 +75,28 @@ describe('useMatches', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.get).toHaveBeenCalledWith('/matches', { params: { sportType: 'SOCCER' } });
   });
+
+  it('passes extended discovery params 그대로 to the api client', async () => {
+    mockApi.get.mockResolvedValueOnce({
+      status: 'success',
+      data: { items: [mockMatch], nextCursor: null },
+    });
+
+    const wrapper = makeWrapper();
+    const params = {
+      sportType: 'futsal',
+      q: '강남',
+      date: '2026-04-08',
+      freeOnly: 'true',
+      availableOnly: 'true',
+      beginnerFriendly: 'true',
+      sort: 'deadline',
+    };
+    const { result } = renderHook(() => useMatches(params), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockApi.get).toHaveBeenCalledWith('/matches', { params });
+  });
 });
 
 describe('useApplyTeamMatch', () => {

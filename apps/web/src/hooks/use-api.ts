@@ -3,6 +3,11 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import {
+  markAllNotificationsReadInList,
+  markNotificationReadInList,
+  unreadNotificationCount,
+} from '@/lib/notification-center';
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -29,6 +34,7 @@ import type {
   PendingReview,
   Notification,
   CreateTeamInput,
+  UpdateMatchInput,
   CreateLessonInput,
   CreateListingInput,
   CreateVenueReviewInput,
@@ -42,6 +48,8 @@ import type {
   CreateMercenaryPostInput,
   ApplyMercenaryInput,
   UpdateStatusInput,
+  CancelMatchPayload,
+  Upload,
 } from '@/types/api';
 
 // Helper: the axios response interceptor returns `response.data` (the ApiResponse),
@@ -244,6 +252,75 @@ export function useMatch(id: string) {
       return extractData<Match>(res);
     },
     enabled: !!id,
+  });
+}
+
+export function useUpdateMatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateMatchInput }) => {
+      const res = await api.patch(`/matches/${id}`, data);
+      return extractData<Match>(res);
+    },
+    onSuccess: (_match, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: ['my-matches'] });
+    },
+  });
+}
+
+export function useCancelMatch(matchId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data?: CancelMatchPayload) => {
+      const res = await api.post(`/matches/${matchId}/cancel`, data);
+      return extractData<Match>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(matchId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.my() });
+    },
+  });
+}
+
+export function useCloseMatch(matchId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/matches/${matchId}/close`);
+      return extractData<Match>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(matchId) });
+    },
+  });
+}
+
+export function useUploadImages() {
+  return useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach((f) => formData.append('files', f));
+      const res = await api.post('/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return extractData<Upload[]>(res);
+    },
+  });
+}
+
+export function useDeleteUpload() {
+  return useMutation({
+    mutationFn: async (uploadId: string) => {
+      const res = await api.delete(`/uploads/${uploadId}`);
+      return extractData<{ id: string }>(res);
+    },
   });
 }
 
@@ -961,6 +1038,11 @@ export function useNotifications(isRead?: boolean) {
       return extractData<Notification[]>(res);
     },
     enabled: isAuthenticated,
+    // Backfill notifications if a realtime event is missed during socket handshakes.
+    refetchInterval: isAuthenticated ? 5_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
 
@@ -974,6 +1056,10 @@ export function useUnreadCount() {
     },
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
+    refetchInterval: isAuthenticated ? 15_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
 
@@ -982,10 +1068,44 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await api.patch(`/notifications/${id}/read`);
-      return extractData<{ id: string }>(res);
+      return extractData<Notification>(res);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all });
+
+      const previousAll = queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(undefined));
+      const previousUnread = queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(false));
+      const previousUnreadCount = queryClient.getQueryData<{ count: number }>(queryKeys.notifications.unreadCount);
+
+      const nextAll = markNotificationReadInList(previousAll, id);
+      const nextUnread = markNotificationReadInList(previousUnread, id)?.filter((notification) => !notification.isRead);
+      const countSource = nextAll ?? nextUnread;
+
+      queryClient.setQueryData(queryKeys.notifications.list(undefined), nextAll);
+      queryClient.setQueryData(queryKeys.notifications.list(false), nextUnread);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, {
+        count: countSource
+          ? unreadNotificationCount(countSource)
+          : Math.max(0, (previousUnreadCount?.count ?? 0) - 1),
+      });
+
+      return {
+        previousAll,
+        previousUnread,
+        previousUnreadCount,
+      };
+    },
+    onError: (_error, _id, context) => {
+      if (!context) {
+        return;
+      }
+
+      queryClient.setQueryData(queryKeys.notifications.list(undefined), context.previousAll);
+      queryClient.setQueryData(queryKeys.notifications.list(false), context.previousUnread);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, context.previousUnreadCount);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all, refetchType: 'inactive' });
     },
   });
 }
@@ -997,8 +1117,37 @@ export function useMarkAllNotificationsRead() {
       const res = await api.patch('/notifications/read-all');
       return extractData<{ count: number }>(res);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.all });
+
+      const previousAll = queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(undefined));
+      const previousUnread = queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(false));
+      const previousUnreadCount = queryClient.getQueryData<{ count: number }>(queryKeys.notifications.unreadCount);
+
+      queryClient.setQueryData(
+        queryKeys.notifications.list(undefined),
+        markAllNotificationsReadInList(previousAll),
+      );
+      queryClient.setQueryData(queryKeys.notifications.list(false), []);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, { count: 0 });
+
+      return {
+        previousAll,
+        previousUnread,
+        previousUnreadCount,
+      };
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) {
+        return;
+      }
+
+      queryClient.setQueryData(queryKeys.notifications.list(undefined), context.previousAll);
+      queryClient.setQueryData(queryKeys.notifications.list(false), context.previousUnread);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, context.previousUnreadCount);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all, refetchType: 'inactive' });
     },
   });
 }

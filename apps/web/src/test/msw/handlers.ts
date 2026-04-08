@@ -76,11 +76,15 @@ const mockMercenaryPost = {
 
 const mockNotification = {
   id: 'notif-1',
-  type: 'match',
-  title: '매치 알림',
-  body: '매치가 시작됩니다',
+  type: 'player_joined',
+  title: '새 참가 신청',
+  body: '새로운 참가 신청이 도착했어요.',
   isRead: false,
   createdAt: '2024-01-01T00:00:00.000Z',
+  data: { matchId: 'match-1' },
+  category: 'match',
+  link: '/matches/match-1',
+  ctaLabel: '매치 보기',
 };
 
 const mockListing = {
@@ -137,8 +141,24 @@ export const handlers = [
     return success(mockMatch);
   }),
 
+  http.get('/api/v1/matches/:id', ({ params }) => {
+    return success({ ...mockMatch, id: params.id as string });
+  }),
+
+  http.patch('/api/v1/matches/:id', ({ params }) => {
+    return success({ ...mockMatch, id: params.id as string });
+  }),
+
   http.post('/api/v1/matches/:id/join', () => {
     return success({ message: '참가 신청이 완료되었습니다' });
+  }),
+
+  http.post('/api/v1/matches/:id/cancel', ({ params }) => {
+    return success({ ...mockMatch, id: params.id as string, status: 'CANCELLED' });
+  }),
+
+  http.post('/api/v1/matches/:id/close', ({ params }) => {
+    return success({ ...mockMatch, id: params.id as string, status: 'FULL' });
   }),
 
   // ── Team Matches handlers ──
@@ -153,11 +173,44 @@ export const handlers = [
 
   // ── Notifications handlers ──
   http.get('/api/v1/notifications', () => {
-    return success({ items: [mockNotification], nextCursor: null });
+    return success([mockNotification]);
+  }),
+
+  http.get('/api/v1/notifications/unread-count', () => {
+    return success({ count: 1 });
+  }),
+
+  http.patch('/api/v1/notifications/read-all', () => {
+    return success({ count: 1 });
+  }),
+
+  http.patch('/api/v1/notifications/:id/read', () => {
+    return success({ ...mockNotification, isRead: true });
   }),
 
   // ── Marketplace handlers ──
   http.get('/api/v1/marketplace/listings', () => {
     return success({ items: [mockListing], nextCursor: null });
+  }),
+
+  // ── Upload handlers ──
+  http.post('/api/v1/uploads', () => {
+    const mockUpload = {
+      id: 'upload-1',
+      userId: 'user-1',
+      filename: 'mock-file.jpg',
+      originalName: 'original.jpg',
+      mimetype: 'image/jpeg',
+      size: 102400,
+      path: '/uploads/mock-file.jpg',
+      width: 1280,
+      height: 720,
+      createdAt: new Date().toISOString(),
+    };
+    return success([mockUpload]);
+  }),
+
+  http.delete('/api/v1/uploads/:id', ({ params }) => {
+    return success({ id: params.id as string });
   }),
 ];

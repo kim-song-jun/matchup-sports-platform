@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 // Mock socket.io-client before any imports
 const mockOn = vi.fn();
@@ -34,7 +35,8 @@ vi.mock('@/stores/auth-store', () => ({
 }));
 
 // Must import after mocks are set up
-import { useRealtime } from '../use-realtime';
+import { queryKeys } from '../use-api';
+import { useNotificationSync, useRealtime } from '../use-realtime';
 
 describe('useRealtime', () => {
   beforeEach(() => {
@@ -101,6 +103,70 @@ describe('useRealtime', () => {
 
     expect(result.current.connected).toBe(false);
     expect(result.current.connectionState).toBe('disconnected');
+  });
+
+  it('refetches notifications after the socket connects', async () => {
+    mockToken = 'valid-token';
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    renderHook(() => useNotificationSync(), { wrapper });
+
+    const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
+    act(() => connectHandler?.());
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.notifications.all }),
+      );
+    });
+  });
+
+  it('refetches notifications when the tab becomes visible again', async () => {
+    mockToken = 'valid-token';
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const visibilityStateSpy = vi.spyOn(document, 'visibilityState', 'get');
+    visibilityStateSpy.mockReturnValue('hidden');
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    renderHook(() => useNotificationSync(), { wrapper });
+
+    const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
+    act(() => connectHandler?.());
+    invalidateSpy.mockClear();
+
+    visibilityStateSpy.mockReturnValue('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.notifications.all }),
+      );
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: queryKeys.notifications.unreadCount }),
+      );
+    });
+
+    visibilityStateSpy.mockRestore();
   });
 
   it('transitions to error state on connect_error event', () => {

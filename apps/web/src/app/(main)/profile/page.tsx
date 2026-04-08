@@ -8,11 +8,10 @@ import { MiniCalendar } from '@/components/ui/mini-calendar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
-import { useNotificationStore } from '@/stores/notification-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
-import { useMyMatches, useMyTeams, useChatUnreadTotal } from '@/hooks/use-api';
+import { useMyMatches, useMyTeams, useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import type { SportProfile, Match } from '@/types/api';
 
 import { sportLabel, levelLabel } from '@/lib/constants';
@@ -29,7 +28,8 @@ export default function ProfilePage() {
 
   useEffect(() => { setMounted(true); }, []);
   const chatUnread = useChatUnreadTotal();
-  const notifUnread = useNotificationStore((s) => s.getUnreadCount());
+  const { data: unreadData } = useUnreadCount();
+  const notifUnread = unreadData?.count ?? 0;
 
   const { data: myTeams } = useMyTeams();
   const hasTeams = myTeams && myTeams.length > 0;

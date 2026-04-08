@@ -17,11 +17,22 @@ const loadPasswordHasher = (driver: string): PasswordHasher => {
   return require('bcryptjs') as PasswordHasher;
 };
 
+/** Normalized social profile returned from each provider */
+interface SocialProfile {
+  providerId: string;
+  email: string | null;
+  nickname: string;
+  profileImage: string | null;
+}
+
 @Injectable()
 export class AuthService {
   private readonly adminEmail = 'test2@gmail.com';
   private readonly passwordHasher: PasswordHasher;
   private readonly logger = new Logger(AuthService.name);
+
+  private readonly kakaoEnabled: boolean;
+  private readonly naverEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -32,6 +43,8 @@ export class AuthService {
     const hashDriver = this.configService.get<string>('auth.hashDriver') ?? 'bcryptjs';
 
     this.passwordHasher = loadPasswordHasher(hashDriver);
+    this.kakaoEnabled = !!process.env.KAKAO_CLIENT_ID;
+    this.naverEnabled = !!process.env.NAVER_CLIENT_ID;
   }
 
   private getRoleForEmail(email?: string | null) {
@@ -99,10 +112,216 @@ export class AuthService {
   }
 
   async oauthLogin(provider: string, code: string, redirectUri?: string) {
-    // TODO: 실제 OAuth 검증 — 카카오/네이버 API 연동 필요
-    throw new UnauthorizedException(
-      `OAuth ${provider} login not yet implemented. Use /api/v1/auth/dev-login or email login.`,
+    let profile: SocialProfile;
+
+    if (provider === 'kakao') {
+      profile = this.kakaoEnabled
+        ? await this.fetchKakaoProfile(code, redirectUri)
+        : this.mockSocialProfile('kakao', code);
+    } else if (provider === 'naver') {
+      profile = this.naverEnabled
+        ? await this.fetchNaverProfile(code, redirectUri)
+        : this.mockSocialProfile('naver', code);
+    } else {
+      throw new UnauthorizedException(
+        `OAuth ${provider} login not yet implemented.`,
+      );
+    }
+
+    return this.upsertSocialUser(provider, profile);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Kakao
+  // ---------------------------------------------------------------------------
+
+  private async fetchKakaoProfile(code: string, redirectUri?: string): Promise<SocialProfile> {
+    const clientId = process.env.KAKAO_CLIENT_ID!;
+    const clientSecret = process.env.KAKAO_CLIENT_SECRET ?? '';
+    const redirect = redirectUri ?? process.env.KAKAO_REDIRECT_URI ?? '';
+
+    const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirect,
+        code,
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text();
+      this.logger.warn(`Kakao token exchange failed: ${tokenRes.status} ${body}`);
+      throw new UnauthorizedException('카카오 로그인에 실패했습니다.');
+    }
+
+    const tokenData = (await tokenRes.json()) as { access_token: string };
+
+    const userRes = await fetch('https://kapi.kakao.com/v2/user/me', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    if (!userRes.ok) {
+      this.logger.warn(`Kakao user info fetch failed: ${userRes.status}`);
+      throw new UnauthorizedException('카카오 사용자 정보를 가져오지 못했습니다.');
+    }
+
+    const userData = (await userRes.json()) as {
+      id: number;
+      kakao_account?: {
+        email?: string;
+        profile?: { nickname?: string; profile_image_url?: string };
+      };
+      properties?: { nickname?: string; profile_image?: string };
+    };
+
+    const account = userData.kakao_account;
+    const nickname =
+      account?.profile?.nickname ??
+      userData.properties?.nickname ??
+      `kakao_${userData.id}`;
+
+    return {
+      providerId: String(userData.id),
+      email: account?.email ?? null,
+      nickname,
+      profileImage:
+        account?.profile?.profile_image_url ??
+        userData.properties?.profile_image ??
+        null,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Naver
+  // ---------------------------------------------------------------------------
+
+  private async fetchNaverProfile(code: string, redirectUri?: string): Promise<SocialProfile> {
+    const clientId = process.env.NAVER_CLIENT_ID!;
+    const clientSecret = process.env.NAVER_CLIENT_SECRET!;
+    const redirect = redirectUri ?? process.env.NAVER_REDIRECT_URI ?? '';
+    const state = 'matchup';
+
+    const tokenRes = await fetch(
+      `https://nid.naver.com/oauth2.0/token?grant_type=authorization_code&client_id=${clientId}&client_secret=${clientSecret}&redirect_uri=${encodeURIComponent(redirect)}&code=${code}&state=${state}`,
+      { method: 'POST' },
     );
+
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text();
+      this.logger.warn(`Naver token exchange failed: ${tokenRes.status} ${body}`);
+      throw new UnauthorizedException('네이버 로그인에 실패했습니다.');
+    }
+
+    const tokenData = (await tokenRes.json()) as { access_token: string };
+
+    const userRes = await fetch('https://openapi.naver.com/v1/nid/me', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    if (!userRes.ok) {
+      this.logger.warn(`Naver user info fetch failed: ${userRes.status}`);
+      throw new UnauthorizedException('네이버 사용자 정보를 가져오지 못했습니다.');
+    }
+
+    const userData = (await userRes.json()) as {
+      resultcode: string;
+      response: {
+        id: string;
+        email?: string;
+        nickname?: string;
+        profile_image?: string;
+      };
+    };
+
+    const r = userData.response;
+    return {
+      providerId: r.id,
+      email: r.email ?? null,
+      nickname: r.nickname ?? `naver_${r.id}`,
+      profileImage: r.profile_image ?? null,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mock (dev — env keys missing)
+  // ---------------------------------------------------------------------------
+
+  private mockSocialProfile(provider: string, code: string): SocialProfile {
+    this.logger.warn(
+      `OAuth ${provider} keys not configured — returning mock profile for code="${code}"`,
+    );
+    return {
+      providerId: `mock_${provider}_${code}`,
+      email: `mock_${provider}_${code}@dev.matchup.kr`,
+      nickname: `${provider}_dev_${code.slice(0, 6)}`,
+      profileImage: null,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Upsert social user
+  // ---------------------------------------------------------------------------
+
+  private async upsertSocialUser(provider: string, profile: SocialProfile) {
+    // 1. provider + providerId 로 조회
+    let user = await this.prisma.user.findFirst({
+      where: {
+        oauthProvider: provider as 'kakao' | 'naver',
+        oauthId: profile.providerId,
+        deletedAt: null,
+      },
+    });
+
+    // 2. 같은 이메일의 기존 계정이 있으면 연결
+    if (!user && profile.email) {
+      user = await this.prisma.user.findFirst({
+        where: { email: profile.email, deletedAt: null },
+      });
+    }
+
+    if (user) {
+      // Soft-deleted account reactivation is not needed here (deletedAt: null filter above).
+      await this.syncFixedAdminRole(user.id, user.email);
+      const tokens = this.generateTokens(user.id);
+      const fullUser = await this.usersService.findById(user.id);
+      return { ...tokens, user: fullUser };
+    }
+
+    // 3. 신규 회원가입
+    const nickname = await this.resolveUniqueNickname(profile.nickname);
+
+    const newUser = await this.prisma.user.create({
+      data: {
+        email: profile.email,
+        nickname,
+        role: this.getRoleForEmail(profile.email),
+        oauthProvider: provider as 'kakao' | 'naver',
+        oauthId: profile.providerId,
+        profileImageUrl: profile.profileImage,
+        sportTypes: [],
+        mannerScore: 3.0,
+      },
+    });
+
+    const tokens = this.generateTokens(newUser.id);
+    const fullUser = await this.usersService.findById(newUser.id);
+    return { ...tokens, user: fullUser };
+  }
+
+  /** Append numeric suffix until nickname is unique. */
+  private async resolveUniqueNickname(base: string): Promise<string> {
+    let candidate = base;
+    let attempt = 0;
+    while (true) {
+      const existing = await this.prisma.user.findUnique({ where: { nickname: candidate } });
+      if (!existing) return candidate;
+      attempt += 1;
+      candidate = `${base}_${attempt}`;
+    }
   }
 
   /**

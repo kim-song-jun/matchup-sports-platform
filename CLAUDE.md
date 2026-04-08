@@ -43,7 +43,7 @@
 7. **Structured Task Documents** (구조화된 태스크 문서)
    - 기획팀은 `.github/tasks/{N}-{task-name}.md` 위치에 태스크 문서를 작성한다.
    - **필수 섹션**: Context / Goal / Original Conditions (체크박스) / User Scenarios / Test Scenarios (happy/edge/error/mock updates) / Parallel Work Breakdown (Backend ⟂ Frontend ⟂ Infra + 순차) / Acceptance Criteria / Tech Debt Resolved / Security Notes / Risks & Dependencies / Ambiguity Log.
-   - 상세 템플릿: `.claude/agents/prompts.md`의 "Task Document Format" 섹션 참조.
+   - 상세 템플릿: `.claude/agents/prompts.md.legacy`의 "Task Document Format" 섹션 참조.
    - 현재 레포 관행: `.github/tasks/`에 `qa-feedback-execution-plan.md`, `qa-followup-detailed.md`, `qa-followup-tech-design.md`, `qa-followup-completion-report.md` 존재.
 
 ## 프로젝트 구조
@@ -221,7 +221,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET me` | `PATCH me` | `GET me/matches` | `GET :id`
 
 ### 매치 (`/matches`)
-`GET /` | `GET recommended` | `POST /` | `GET :id` | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete`
+`GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` | `POST :id/close` | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete`
 
 ### 팀 (`/teams`)
 `GET /` | `GET me` (소유 팀 목록, JwtAuthGuard) | `GET :id` | `POST /` | `PATCH :id` | `DELETE :id`
@@ -242,7 +242,10 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET listings` | `POST listings` | `GET listings/:id` | `POST listings/:id/order`
 
 ### 결제 (`/payments`)
-`POST prepare` | `POST confirm` | `POST :id/refund` | `GET me`
+`POST prepare` | `POST confirm` | `POST :id/refund` | `GET me` | `POST webhook`
+
+### 업로드 (`/uploads`)
+`POST /` (멀티파트, 최대 5개 10MB, jpeg/png/webp/gif) | `GET :id` | `DELETE :id`
 
 ### 채팅 (`/chat`)
 `GET rooms` (cursor on lastMessageAt) | `GET rooms/:id` (cursor on message createdAt) | `POST rooms` (with optional teamMatchId) | `POST rooms/:id/messages` | `POST rooms/:id/read` | `GET unread-count`
@@ -367,7 +370,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 ## Agent Team 운영
 
 글로벌 `~/.claude/CLAUDE.md`의 Agent Team 운영 섹션 참조.
-프로젝트별 에이전트 프롬프트: `.claude/agents/prompts.md`
+프로젝트별 에이전트 프롬프트: `.claude/agents/` 디렉토리 (개별 파일, 19 에이전트)
 
 ## 구현 문서 위치
 
@@ -382,7 +385,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 ## Known Blockers
 
-1. **VAPID 키 미생성**: `WebPushService`는 크레덴셜 없을 때 graceful disable(`enabled=false`)로 동작하므로 빌드/머지는 가능. 실제 디바이스 푸시 수신은 아래 환경변수가 필요:
+1. **이미지 업로드 UI 미구현**: `/uploads` 백엔드 파이프라인(sharp 변환, 로컬 스토리지)은 완성됐으나 매치 생성/수정 등 프론트엔드 UI(`components/ui/image-upload.tsx`)는 미구현 상태. Phase 2 채팅 이미지, 도착 인증 사진 전 구현 필요.
+
+2. **VAPID 키 미생성**: `WebPushService`는 크레덴셜 없을 때 graceful disable(`enabled=false`)로 동작하므로 빌드/머지는 가능. 실제 디바이스 푸시 수신은 아래 환경변수가 필요:
    ```bash
    # 키 생성: node -e "const wp = require('web-push'); console.log(wp.generateVAPIDKeys())"
    VAPID_PUBLIC_KEY=

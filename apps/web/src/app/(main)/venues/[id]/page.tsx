@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import type { Venue } from '@/types/api';
 import { MapPlaceholder } from '@/components/ui/map-placeholder';
 import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
+import { MediaLightbox } from '@/components/ui/media-lightbox';
+import { SafeImage } from '@/components/ui/safe-image';
 import { useVenue } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { getVenueImageSet } from '@/lib/sport-image';
@@ -124,6 +126,8 @@ export default function VenueDetailPage() {
   const venueId = params.id as string;
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
   // Use API hook with mock data fallback
   const { data: apiVenue } = useVenue(venueId);
@@ -139,11 +143,33 @@ export default function VenueDetailPage() {
   const operatingHours = venue.operatingHours as Record<string, { open: string; close: string }> | null;
   const primarySport = venue.sportType || venue.sportTypes?.[0] || 'soccer';
   const venueImages = getVenueImageSet(primarySport, venue.imageUrls, venue.id, 3);
+  const fallbackVenueImages = getVenueImageSet(primarySport, undefined, `${venue.id}-fallback`, 3);
+  const mediaImages = venueImages.filter((image): image is string => Boolean(image)).map((image, index) => ({
+    src: image,
+    alt: `${venue.name} 이미지 ${index + 1}`,
+    fallbackSrc: fallbackVenueImages[index] ?? fallbackVenueImages[0],
+  }));
   const heroImage = selectedImage || venueImages[0];
+
+  const heroMediaIndex = mediaImages.findIndex((image) => image.src === heroImage);
 
   useEffect(() => {
     setSelectedImage(venueImages[0] ?? null);
   }, [venueId, venueImages[0]]);
+
+  function openHeroImage() {
+    if (mediaImages.length === 0) return;
+    setMediaIndex(Math.max(heroMediaIndex, 0));
+    setShowMediaLightbox(true);
+  }
+
+  function openMediaBySource(src: string) {
+    const index = mediaImages.findIndex((image) => image.src === src);
+    if (index < 0) return;
+    setSelectedImage(src);
+    setMediaIndex(index);
+    setShowMediaLightbox(true);
+  }
 
   function handleReviewSubmit(data: ReviewData) {
     // In real implementation, this would call an API
@@ -175,9 +201,19 @@ export default function VenueDetailPage() {
         <div className="px-5 @3xl:px-0">
           <div className="mb-4">
             {heroImage && (
-              <div className="mb-2 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                <img src={heroImage} alt={venue.name} className="h-[220px] w-full object-cover" />
-              </div>
+              <button
+                type="button"
+                onClick={openHeroImage}
+                aria-label={`${venue.name} 대표 이미지 보기`}
+                className="mb-2 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
+              >
+                <SafeImage
+                  src={heroImage}
+                  fallbackSrc={fallbackVenueImages[0]}
+                  alt={venue.name}
+                  className="h-[220px] w-full object-cover"
+                />
+              </button>
             )}
             {venueImages.length > 1 && (
               <div className="mb-2 grid grid-cols-3 gap-2">
@@ -185,14 +221,20 @@ export default function VenueDetailPage() {
                   <button
                     key={`${image}-${index}`}
                     type="button"
-                    onClick={() => setSelectedImage(image)}
+                    onClick={() => openMediaBySource(image)}
+                    aria-label={`${venue.name} 이미지 ${index + 1} 보기`}
                     className={`overflow-hidden rounded-xl border transition-colors ${
                       heroImage === image
                         ? 'border-blue-500'
                         : 'border-gray-100 dark:border-gray-700'
                     }`}
                   >
-                    <img src={image} alt={`${venue.name} 이미지 ${index + 1}`} className="aspect-[4/3] h-full w-full object-cover" />
+                    <SafeImage
+                      src={image}
+                      fallbackSrc={fallbackVenueImages[index] ?? fallbackVenueImages[0]}
+                      alt={`${venue.name} 이미지 ${index + 1}`}
+                      className="aspect-[4/3] h-full w-full object-cover"
+                    />
                   </button>
                 ))}
               </div>
@@ -466,6 +508,13 @@ export default function VenueDetailPage() {
         </div>
       </div>
 
+      <MediaLightbox
+        isOpen={showMediaLightbox}
+        images={mediaImages}
+        initialIndex={mediaIndex}
+        onClose={() => setShowMediaLightbox(false)}
+        title={`${venue.name} 이미지`}
+      />
     </div>
   );
 }

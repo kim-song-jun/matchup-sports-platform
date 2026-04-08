@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { MediaLightbox } from '@/components/ui/media-lightbox';
-import { useMatch } from '@/hooks/use-api';
+import { Modal } from '@/components/ui/modal';
+import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
@@ -28,10 +29,16 @@ export default function MatchDetailPage() {
   const queryClient = useQueryClient();
   const matchId = params.id as string;
   const { data: match, isLoading } = useMatch(matchId);
+  const updateMatchMutation = useUpdateMatch();
+  const cancelMutation = useCancelMatch(matchId);
+  const closeMutation = useCloseMatch(matchId);
   const [showCheckout, setShowCheckout] = useState(false);
   const [pendingParticipantId, setPendingParticipantId] = useState<string | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const joinMutation = useMutation<MatchParticipant, unknown, { openCheckout: boolean }>({
     mutationFn: async () => {
@@ -97,10 +104,14 @@ export default function MatchDetailPage() {
   const filledPercent = (match.currentPlayers / match.maxPlayers) * 100;
   const isAlmostFull = filledPercent >= 70;
   const isHost = user?.id === match.hostId;
+  const isClosedStatus = match.status === 'cancelled' || match.status === 'completed';
+  const canHostEdit = isHost && !isClosedStatus;
+  const canHostReopen = isHost && match.status === 'full' && match.currentPlayers < match.maxPlayers;
   const currentParticipant = match.participants?.find((p: MatchParticipant) => p.userId === user?.id);
   const isParticipant = !!currentParticipant;
   const hasPendingPayment = currentParticipant?.paymentStatus === 'pending';
   const isFull = match.currentPlayers >= match.maxPlayers;
+  const isRecruitingOpen = match.status === 'recruiting';
   const matchImages = getSportDetailImageSet(
     match.sportType,
     [match.imageUrl, ...(match.venue?.imageUrls ?? [])],
@@ -127,6 +138,66 @@ export default function MatchDetailPage() {
   function openMediaAt(index: number) {
     setMediaIndex(index);
     setShowMediaLightbox(true);
+  }
+
+  const statusLabel = match.status === 'recruiting'
+    ? '모집중'
+    : match.status === 'full'
+      ? '마감'
+      : match.status === 'completed'
+        ? '완료'
+        : match.status === 'cancelled'
+          ? '취소됨'
+          : match.status;
+
+  const statusBadgeClass = match.status === 'completed'
+    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
+    : match.status === 'cancelled'
+      ? 'bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-red-300'
+      : match.status === 'full'
+        ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200'
+        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300';
+  const capacitySubLabel = match.status === 'completed'
+    ? '경기 종료'
+    : match.status === 'cancelled'
+      ? '취소된 매치'
+      : match.status === 'full'
+        ? '모집 마감'
+        : isAlmostFull
+          ? '마감 임박'
+          : '모집중';
+
+  async function handleHostStatusChange(status: 'recruiting' | 'full' | 'completed' | 'cancelled', successMessage: string) {
+    try {
+      await updateMatchMutation.mutateAsync({ id: matchId, data: { status } });
+      toast('success', successMessage);
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '상태 변경에 실패했어요');
+    }
+  }
+
+  async function handleCloseConfirm() {
+    try {
+      await closeMutation.mutateAsync();
+      toast('success', '모집을 마감했어요');
+      setShowCloseModal(false);
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '상태 변경에 실패했어요');
+    }
+  }
+
+  async function handleCancelConfirm() {
+    try {
+      await cancelMutation.mutateAsync(cancelReason ? { reason: cancelReason } : undefined);
+      toast('success', '매치를 취소했어요');
+      setShowCancelModal(false);
+      setCancelReason('');
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '취소에 실패했어요');
+    }
   }
 
   return (
@@ -234,7 +305,7 @@ export default function MatchDetailPage() {
           <div className="mt-4 grid grid-cols-2 gap-3 @3xl:gap-5">
             <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
             <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
-            <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={isAlmostFull ? '마감 임박' : '모집중'} highlight={isAlmostFull} />
+            <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={capacitySubLabel} highlight={isAlmostFull && isRecruitingOpen} />
             <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatAmount(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
           </div>
 
@@ -284,14 +355,82 @@ export default function MatchDetailPage() {
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
               <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
+            <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+              <span className="text-sm text-gray-500">매치 상태</span>
+              <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass}`}>
+                {statusLabel}
+              </span>
+            </div>
 
             {!isAuthenticated ? (
               <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
                 로그인 후 참가하기
               </Link>
             ) : isHost ? (
+              <div className="space-y-2">
+                <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
+                  내가 만든 매치
+                </button>
+                {canHostEdit ? (
+                  <>
+                    <Link
+                      href={`/matches/${matchId}/edit`}
+                      data-testid="match-host-edit-button"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <Pencil size={14} />
+                      매치 수정
+                    </Link>
+                    {match.status === 'recruiting' && (
+                      <button
+                        onClick={() => setShowCloseModal(true)}
+                        disabled={updateMatchMutation.isPending}
+                        data-testid="match-host-close-button"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
+                      >
+                        모집 마감
+                      </button>
+                    )}
+                    {canHostReopen && (
+                      <button
+                        onClick={() => handleHostStatusChange('recruiting', '재모집을 시작했어요')}
+                        disabled={updateMatchMutation.isPending}
+                        data-testid="match-host-reopen-button"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
+                      >
+                        재모집 시작
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleHostStatusChange('completed', '매치를 완료 처리했어요')}
+                      disabled={updateMatchMutation.isPending}
+                      data-testid="match-host-complete-button"
+                      className="w-full rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-60"
+                    >
+                      매치 완료
+                    </button>
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      disabled={updateMatchMutation.isPending}
+                      data-testid="match-host-cancel-button"
+                      className="w-full rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
+                    >
+                      매치 취소
+                    </button>
+                  </>
+                ) : (
+                  <p className="rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2 text-xs text-gray-500">
+                    완료되거나 취소된 매치는 수정할 수 없어요.
+                  </p>
+                )}
+              </div>
+            ) : match.status === 'cancelled' ? (
               <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
-                내가 만든 매치
+                취소된 매치예요
+              </button>
+            ) : match.status === 'completed' ? (
+              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
+                종료된 매치예요
               </button>
             ) : isParticipant ? (
               <div className="space-y-2">
@@ -321,6 +460,10 @@ export default function MatchDetailPage() {
                   ) : hasPendingPayment ? '참가 신청 취소하기' : '참가 취소하기'}
                 </button>
               </div>
+            ) : !isRecruitingOpen ? (
+              <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
+                모집이 마감되었어요
+              </button>
             ) : isFull ? (
               <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
                 마감되었습니다
@@ -341,13 +484,6 @@ export default function MatchDetailPage() {
                   `${match.fee > 0 ? '참가 후 결제하기' : '참가하기'} · ${formatAmount(match.fee)}`
                 )}
               </button>
-            )}
-
-            {user?.id === match.hostId && (
-              <Link href={`/matches/${matchId}/edit`} className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors mt-2">
-                <Pencil size={14} />
-                매치 수정
-              </Link>
             )}
 
             {/* 캘린더 추가 */}
@@ -403,7 +539,100 @@ export default function MatchDetailPage() {
       </div>
 
 
-      {/* 결제 모달 */}
+      {/* 모집 마감 확인 모달 */}
+      <Modal
+        isOpen={showCloseModal}
+        onClose={() => setShowCloseModal(false)}
+        title="모집 마감"
+        size="sm"
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/30">
+            <AlertTriangle size={24} className="text-amber-500" aria-hidden="true" />
+          </div>
+          <p className="text-center text-base text-gray-700 dark:text-gray-300">
+            모집을 마감하시겠습니까?<br />
+            <span className="text-sm text-gray-500">마감 후에도 재모집을 시작할 수 있어요.</span>
+          </p>
+          <div className="flex w-full gap-3 pt-2">
+            <button
+              onClick={() => setShowCloseModal(false)}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors min-h-[44px]"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleCloseConfirm}
+              disabled={updateMatchMutation.isPending}
+              data-testid="match-close-confirm-button"
+              className="flex-1 rounded-xl bg-gray-900 dark:bg-white py-3 text-base font-semibold text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors disabled:opacity-60 min-h-[44px]"
+            >
+              {updateMatchMutation.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  처리 중...
+                </span>
+              ) : '마감하기'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 매치 취소 확인 모달 */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => { setShowCancelModal(false); setCancelReason(''); }}
+        title="매치 취소"
+        size="sm"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
+              <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
+            </div>
+            <p className="text-center text-base text-gray-700 dark:text-gray-300">
+              매치를 취소하시겠습니까?<br />
+              <span className="text-sm text-gray-500">취소하면 참가자들에게 알림이 발송돼요.<br />이 작업은 되돌릴 수 없어요.</span>
+            </p>
+          </div>
+          <div>
+            <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              취소 사유 <span className="text-gray-400 font-normal">(선택)</span>
+            </label>
+            <textarea
+              id="cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="참가자들에게 전달할 취소 사유를 입력해주세요"
+              rows={3}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none transition-colors resize-none"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { setShowCancelModal(false); setCancelReason(''); }}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors min-h-[44px]"
+            >
+              돌아가기
+            </button>
+            <button
+              onClick={handleCancelConfirm}
+              disabled={updateMatchMutation.isPending}
+              data-testid="match-cancel-confirm-button"
+              className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60 min-h-[44px]"
+            >
+              {updateMatchMutation.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  처리 중...
+                </span>
+              ) : '취소하기'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 미디어 라이트박스 */}
       <MediaLightbox
         isOpen={showMediaLightbox}
         images={mediaImages}

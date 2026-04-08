@@ -11,6 +11,8 @@ export interface PaginatedResponse<T> {
 }
 
 // ── Match types ──
+export type MatchStatus = 'recruiting' | 'full' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+
 export interface Match {
   id: string;
   hostId: string;
@@ -27,7 +29,7 @@ export interface Match {
   levelMin: number;
   levelMax: number;
   gender: string;
-  status: string;
+  status: MatchStatus;
   imageUrl?: string;
   teamConfig: Record<string, unknown> | null;
   createdAt?: string;
@@ -326,6 +328,10 @@ export interface Notification {
   body: string;
   isRead: boolean;
   createdAt: string;
+  data?: Record<string, unknown> | null;
+  category?: 'match' | 'team' | 'chat' | 'payment' | 'system';
+  link?: string | null;
+  ctaLabel?: string | null;
 }
 
 // ── Payment ──
@@ -532,6 +538,45 @@ export interface CreateTeamInput {
   description?: string;
   city?: string;
   district?: string;
+}
+
+export interface UpdateMatchInput {
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  sportType?: string;
+  venueId?: string;
+  location?: string;
+  matchDate?: string;
+  startTime?: string;
+  endTime?: string;
+  maxPlayers?: number;
+  fee?: number;
+  levelMin?: number;
+  levelMax?: number;
+  gender?: string;
+  teamConfig?: Record<string, unknown>;
+  status?: MatchStatus;
+}
+
+// Alias kept for backward compat — prefer UpdateMatchInput
+export type UpdateMatchPayload = UpdateMatchInput;
+
+export interface CancelMatchPayload {
+  reason?: string;
+}
+
+export interface Upload {
+  id: string;
+  userId: string;
+  filename: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  path: string;
+  width?: number;
+  height?: number;
+  createdAt: string;
 }
 
 export interface CreateLessonInput {

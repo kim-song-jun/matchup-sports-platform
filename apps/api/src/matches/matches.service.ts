@@ -4,37 +4,201 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma, NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateMatchDto, MatchFilterDto } from './dto/match.dto';
+import { CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const matchListSelect = {
+  id: true,
+  hostId: true,
+  sportType: true,
+  title: true,
+  description: true,
+  venueId: true,
+  matchDate: true,
+  startTime: true,
+  endTime: true,
+  maxPlayers: true,
+  currentPlayers: true,
+  fee: true,
+  levelMin: true,
+  levelMax: true,
+  gender: true,
+  status: true,
+  teamConfig: true,
+  createdAt: true,
+  venue: {
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      district: true,
+      imageUrls: true,
+    },
+  },
+  host: {
+    select: {
+      id: true,
+      nickname: true,
+      profileImageUrl: true,
+    },
+  },
+} satisfies Prisma.MatchSelect;
+
+const matchDetailSelect = {
+  id: true,
+  hostId: true,
+  sportType: true,
+  title: true,
+  description: true,
+  venueId: true,
+  matchDate: true,
+  startTime: true,
+  endTime: true,
+  maxPlayers: true,
+  currentPlayers: true,
+  fee: true,
+  levelMin: true,
+  levelMax: true,
+  gender: true,
+  status: true,
+  teamConfig: true,
+  createdAt: true,
+  updatedAt: true,
+  venue: true,
+  host: {
+    select: {
+      id: true,
+      nickname: true,
+      profileImageUrl: true,
+      mannerScore: true,
+    },
+  },
+  participants: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          nickname: true,
+          profileImageUrl: true,
+        },
+      },
+    },
+  },
+  teams: true,
+} satisfies Prisma.MatchSelect;
+
+const matchMutationSelect = {
+  id: true,
+  hostId: true,
+  sportType: true,
+  title: true,
+  description: true,
+  venueId: true,
+  matchDate: true,
+  startTime: true,
+  endTime: true,
+  maxPlayers: true,
+  currentPlayers: true,
+  fee: true,
+  levelMin: true,
+  levelMax: true,
+  gender: true,
+  status: true,
+  teamConfig: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.MatchSelect;
+
+type MatchStatus = 'recruiting' | 'full' | 'in_progress' | 'cancelled' | 'completed';
 
 @Injectable()
 export class MatchesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findAll(filter: MatchFilterDto) {
     const limit = filter.limit || 20;
-
-    const where: Record<string, unknown> = {
-      status: { in: ['recruiting', 'full'] },
+    const where: Prisma.MatchWhereInput = {
+      status: filter.availableOnly ? 'recruiting' : { in: ['recruiting', 'full'] },
     };
 
-    if (filter.sportType) where.sportType = filter.sportType;
-    if (filter.city) where.venue = { city: filter.city };
-    if (filter.date) where.matchDate = new Date(filter.date);
-    if (filter.levelMin || filter.levelMax) {
-      where.levelMin = { gte: filter.levelMin || 1 };
-      where.levelMax = { lte: filter.levelMax || 5 };
+    if (filter.sportType) where.sportType = filter.sportType as never;
+    if (filter.q) {
+      where.OR = [
+        { title: { contains: filter.q, mode: 'insensitive' } },
+        { description: { contains: filter.q, mode: 'insensitive' } },
+        {
+          venue: {
+            is: {
+              name: { contains: filter.q, mode: 'insensitive' },
+            },
+          },
+        },
+        {
+          venue: {
+            is: {
+              city: { contains: filter.q, mode: 'insensitive' },
+            },
+          },
+        },
+        {
+          venue: {
+            is: {
+              district: { contains: filter.q, mode: 'insensitive' },
+            },
+          },
+        },
+      ];
     }
+    if (filter.city || filter.district) {
+      where.venue = {
+        is: {
+          ...(filter.city ? { city: { contains: filter.city, mode: 'insensitive' } } : {}),
+          ...(filter.district ? { district: { contains: filter.district, mode: 'insensitive' } } : {}),
+        },
+      };
+    }
+    if (filter.date) where.matchDate = new Date(filter.date);
+    if (typeof filter.maxFee === 'number' && !Number.isNaN(filter.maxFee)) {
+      where.fee = { lte: filter.maxFee };
+    }
+    if (filter.freeOnly) {
+      where.fee = 0;
+    }
+    const levelMinFilter: Prisma.IntFilter = {};
+    const levelMaxFilter: Prisma.IntFilter = {};
+
+    if (filter.levelMin) {
+      levelMaxFilter.gte = filter.levelMin;
+    }
+    if (filter.levelMax) {
+      levelMinFilter.lte = filter.levelMax;
+    }
+    if (filter.beginnerFriendly) {
+      levelMaxFilter.lte = 2;
+    }
+    if (Object.keys(levelMinFilter).length > 0) {
+      where.levelMin = levelMinFilter;
+    }
+    if (Object.keys(levelMaxFilter).length > 0) {
+      where.levelMax = levelMaxFilter;
+    }
+
+    const orderBy: Prisma.MatchOrderByWithRelationInput[] =
+      filter.sort === 'latest'
+        ? [{ createdAt: 'desc' }]
+        : filter.sort === 'deadline'
+          ? [{ currentPlayers: 'desc' }, { maxPlayers: 'asc' }, { matchDate: 'asc' }, { startTime: 'asc' }]
+          : [{ matchDate: 'asc' }, { startTime: 'asc' }];
 
     const matches = await this.prisma.match.findMany({
       where,
-      include: {
-        venue: { select: { id: true, name: true, city: true, district: true, imageUrls: true } },
-        host: {
-          select: { id: true, nickname: true, profileImageUrl: true },
-        },
-      },
-      orderBy: { matchDate: 'asc' },
+      select: matchListSelect,
+      orderBy,
       take: limit + 1,
       ...(filter.cursor && { cursor: { id: filter.cursor }, skip: 1 }),
     });
@@ -53,12 +217,7 @@ export class MatchesService {
     // 현재는 최신 recruiting 매치 반환
     return this.prisma.match.findMany({
       where: { status: 'recruiting' },
-      include: {
-        venue: { select: { id: true, name: true, city: true, imageUrls: true } },
-        host: {
-          select: { id: true, nickname: true, profileImageUrl: true },
-        },
-      },
+      select: matchListSelect,
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
@@ -67,29 +226,7 @@ export class MatchesService {
   async findOne(id: string) {
     const match = await this.prisma.match.findUnique({
       where: { id },
-      include: {
-        venue: true,
-        host: {
-          select: {
-            id: true,
-            nickname: true,
-            profileImageUrl: true,
-            mannerScore: true,
-          },
-        },
-        participants: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                nickname: true,
-                profileImageUrl: true,
-              },
-            },
-          },
-        },
-        teams: true,
-      },
+      select: matchDetailSelect,
     });
 
     if (!match) {
@@ -101,6 +238,7 @@ export class MatchesService {
 
   async create(hostId: string, dto: CreateMatchDto) {
     const match = await this.prisma.match.create({
+      select: matchMutationSelect,
       data: {
         hostId,
         title: dto.title,
@@ -131,12 +269,175 @@ export class MatchesService {
       },
     });
 
+    await this.notificationsService.create({
+      userId: hostId,
+      type: NotificationType.match_created,
+      title: '매치 등록 완료',
+      body: `"${match.title}" 매치를 등록했어요.`,
+      data: {
+        matchId: match.id,
+        sportType: match.sportType,
+      },
+    });
+
     return match;
+  }
+
+  private resolveRecruitingStatus(
+    currentPlayers: number,
+    maxPlayers: number,
+    currentStatus: MatchStatus,
+  ): MatchStatus {
+    if (currentStatus === 'recruiting' || currentStatus === 'full') {
+      return currentPlayers >= maxPlayers ? 'full' : 'recruiting';
+    }
+    return currentStatus;
+  }
+
+  async update(matchId: string, userId: string, dto: UpdateMatchDto) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        hostId: true,
+        title: true,
+        status: true,
+        currentPlayers: true,
+        maxPlayers: true,
+      },
+    });
+
+    if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
+    if (match.hostId !== userId) {
+      throw new ForbiddenException('호스트만 매치를 수정할 수 있습니다.');
+    }
+
+    if (match.status === 'cancelled' || match.status === 'completed') {
+      throw new BadRequestException('종료된 매치는 수정할 수 없습니다.');
+    }
+
+    if (match.status === 'in_progress') {
+      throw new BadRequestException('진행 중인 매치는 수정할 수 없습니다.');
+    }
+
+    const nextMaxPlayers = dto.maxPlayers ?? match.maxPlayers;
+    if (nextMaxPlayers < match.currentPlayers) {
+      throw new BadRequestException(
+        '현재 참가 인원보다 최대 인원을 낮출 수 없습니다.',
+      );
+    }
+
+    const nextStatus = this.resolveRecruitingStatus(
+      match.currentPlayers,
+      nextMaxPlayers,
+      match.status as MatchStatus,
+    );
+
+    const updatedMatch = await this.prisma.match.update({
+      where: { id: matchId },
+      select: matchMutationSelect,
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.venueId !== undefined ? { venueId: dto.venueId } : {}),
+        ...(dto.matchDate !== undefined ? { matchDate: new Date(dto.matchDate) } : {}),
+        ...(dto.maxPlayers !== undefined ? { maxPlayers: dto.maxPlayers } : {}),
+        ...(dto.fee !== undefined ? { fee: dto.fee } : {}),
+        status: nextStatus,
+      },
+    });
+
+    await this.notifyParticipants(matchId, match.hostId, {
+      type: NotificationType.match_updated,
+      title: '매치 정보가 수정되었어요',
+      body: `"${updatedMatch.title}" 매치 정보가 변경되었습니다.`,
+      data: {
+        matchId: updatedMatch.id,
+      },
+    });
+
+    return updatedMatch;
+  }
+
+  async cancelMatch(matchId: string, userId: string, dto?: CancelMatchDto) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        hostId: true,
+        title: true,
+        status: true,
+      },
+    });
+
+    if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
+    if (match.hostId !== userId) {
+      throw new ForbiddenException('호스트만 매치를 취소할 수 있습니다.');
+    }
+    if (match.status === 'cancelled' || match.status === 'completed') {
+      throw new BadRequestException('이미 종료된 매치입니다.');
+    }
+
+    const cancelled = await this.prisma.match.update({
+      where: { id: matchId },
+      select: matchMutationSelect,
+      data: { status: 'cancelled' },
+    });
+
+    await this.notifyParticipants(matchId, userId, {
+      type: NotificationType.match_cancelled,
+      title: '매치가 취소되었어요',
+      body: dto?.reason
+        ? `"${match.title}" 매치가 취소되었습니다. 사유: ${dto.reason}`
+        : `"${match.title}" 매치가 취소되었습니다.`,
+      data: {
+        matchId,
+        status: 'cancelled',
+        ...(dto?.reason ? { reason: dto.reason } : {}),
+      },
+    });
+
+    return cancelled;
+  }
+
+  async closeMatch(matchId: string, userId: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        hostId: true,
+        title: true,
+        status: true,
+      },
+    });
+
+    if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
+    if (match.hostId !== userId) {
+      throw new ForbiddenException('호스트만 모집을 마감할 수 있습니다.');
+    }
+    if (match.status !== 'recruiting') {
+      throw new BadRequestException('모집 중인 매치만 마감할 수 있습니다.');
+    }
+
+    return this.prisma.match.update({
+      where: { id: matchId },
+      select: matchMutationSelect,
+      data: { status: 'confirmed' },
+    });
   }
 
   async join(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
+      select: {
+        id: true,
+        hostId: true,
+        title: true,
+        status: true,
+        currentPlayers: true,
+        maxPlayers: true,
+        fee: true,
+      },
     });
 
     if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
@@ -163,9 +464,21 @@ export class MatchesService {
     const newCount = match.currentPlayers + 1;
     await this.prisma.match.update({
       where: { id: matchId },
+      select: { id: true },
       data: {
         currentPlayers: newCount,
         status: newCount >= match.maxPlayers ? 'full' : 'recruiting',
+      },
+    });
+
+    await this.notificationsService.create({
+      userId: match.hostId,
+      type: NotificationType.player_joined,
+      title: '새 참가 신청',
+      body: `"${match.title}" 매치에 새로운 참가 신청이 도착했어요.`,
+      data: {
+        matchId: match.id,
+        participantId: participant.id,
       },
     });
 
@@ -175,20 +488,65 @@ export class MatchesService {
   async leave(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
+      select: {
+        id: true,
+        hostId: true,
+        title: true,
+        status: true,
+        currentPlayers: true,
+        maxPlayers: true,
+      },
     });
     if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
     if (match.hostId === userId)
       throw new ForbiddenException('호스트는 매치를 떠날 수 없습니다.');
+    if (match.status === 'in_progress') {
+      throw new BadRequestException('진행 중인 매치에서는 탈퇴할 수 없습니다.');
+    }
+    if (match.status === 'cancelled' || match.status === 'completed') {
+      throw new BadRequestException('종료된 매치에서는 탈퇴할 수 없습니다.');
+    }
+
+    const participant = await this.prisma.matchParticipant.findUnique({
+      where: {
+        matchId_userId: { matchId, userId },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!participant) {
+      throw new BadRequestException('참가 중인 매치가 아닙니다.');
+    }
 
     await this.prisma.matchParticipant.delete({
       where: { matchId_userId: { matchId, userId } },
     });
 
+    const nextPlayers = Math.max(match.currentPlayers - 1, 0);
+
     await this.prisma.match.update({
       where: { id: matchId },
+      select: { id: true },
       data: {
-        currentPlayers: { decrement: 1 },
-        status: 'recruiting',
+        currentPlayers: nextPlayers,
+        status:
+          match.status === 'recruiting'
+            ? nextPlayers >= match.maxPlayers
+              ? 'full'
+              : 'recruiting'
+            : match.status,
+      },
+    });
+
+    await this.notificationsService.create({
+      userId: match.hostId,
+      type: NotificationType.player_left,
+      title: '참가자가 나갔어요',
+      body: `"${match.title}" 매치에서 참가 취소가 발생했어요.`,
+      data: {
+        matchId,
       },
     });
 
@@ -198,7 +556,14 @@ export class MatchesService {
   async generateTeams(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
-      include: { participants: { where: { status: 'confirmed' } } },
+      select: {
+        id: true,
+        hostId: true,
+        teamConfig: true,
+        participants: {
+          where: { status: 'confirmed' },
+        },
+      },
     });
 
     if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
@@ -240,15 +605,71 @@ export class MatchesService {
   async complete(matchId: string, userId: string) {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
+      select: {
+        id: true,
+        hostId: true,
+        title: true,
+        status: true,
+      },
     });
 
     if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
-    if (match.hostId !== userId)
-      throw new ForbiddenException('호스트만 매치를 완료할 수 있습니다.');
+    if (match.hostId !== userId) {
+      throw new ForbiddenException('호스트만 매치를 완료 처리할 수 있습니다.');
+    }
+    if (match.status === 'cancelled' || match.status === 'completed') {
+      throw new BadRequestException('이미 종료된 매치입니다.');
+    }
 
-    return this.prisma.match.update({
+    const completed = await this.prisma.match.update({
       where: { id: matchId },
+      select: matchMutationSelect,
       data: { status: 'completed' },
     });
+
+    await this.notifyParticipants(matchId, userId, {
+      type: NotificationType.match_completed,
+      title: '매치가 종료되었어요',
+      body: `"${match.title}" 매치가 종료되었습니다.`,
+      data: {
+        matchId,
+        status: 'completed',
+      },
+    });
+
+    return completed;
+  }
+
+  private async notifyParticipants(
+    matchId: string,
+    hostId: string,
+    notification: {
+      type: NotificationType;
+      title: string;
+      body: string;
+      data: Record<string, unknown>;
+    },
+  ) {
+    const participants = await this.prisma.matchParticipant.findMany({
+      where: {
+        matchId,
+        userId: { not: hostId },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    await Promise.all(
+      participants.map((participant) =>
+        this.notificationsService.create({
+          userId: participant.userId,
+          type: notification.type,
+          title: notification.title,
+          body: notification.body,
+          data: notification.data,
+        }),
+      ),
+    );
   }
 }

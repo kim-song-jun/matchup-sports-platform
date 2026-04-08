@@ -7,9 +7,18 @@ import {
   disconnectSocket,
   type RealtimeSocket,
   type NotificationPayload,
+  type NotificationReadPayload,
+  type NotificationReadAllPayload,
   type ChatMessagePayload,
 } from '@/lib/realtime-client';
 import { queryKeys } from '@/hooks/use-api';
+import {
+  upsertNotificationList,
+  markNotificationReadInList,
+  markAllNotificationsReadInList,
+  unreadNotificationCount,
+} from '@/lib/notification-center';
+import type { Notification } from '@/types/api';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -133,6 +142,104 @@ export function useChatUnreadSync() {
     socket.on('chat:message', handleMessage);
     return () => {
       socket.off('chat:message', handleMessage);
+    };
+  }, [socket, connected, queryClient]);
+}
+
+/**
+ * Keeps the notification center and unread badge synchronized with websocket events.
+ * Mount once at the app level.
+ */
+export function useNotificationSync() {
+  const { socket, connected } = useRealtime();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!socket || !connected) return;
+
+    const refreshNotifications = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.unreadCount });
+    };
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      refreshNotifications();
+    };
+
+    // Backfill notifications created before the socket finished connecting.
+    refreshNotifications();
+
+    function handleNew(payload: NotificationPayload) {
+      const previousUnreadCount = queryClient.getQueryData<{ count: number }>(queryKeys.notifications.unreadCount);
+      const nextAll = upsertNotificationList(
+        queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(undefined)),
+        payload,
+      );
+      const nextUnread = payload.isRead
+        ? queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(false))
+        : upsertNotificationList(
+          queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(false)),
+          payload,
+        );
+
+      queryClient.setQueryData(queryKeys.notifications.list(undefined), nextAll);
+      queryClient.setQueryData(queryKeys.notifications.list(false), nextUnread);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, {
+        count: nextAll || nextUnread
+          ? unreadNotificationCount(nextAll ?? nextUnread)
+          : Math.max(0, (previousUnreadCount?.count ?? 0) + (payload.isRead ? 0 : 1)),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all, refetchType: 'inactive' });
+    }
+
+    function handleRead(payload: NotificationReadPayload) {
+      const previousUnreadCount = queryClient.getQueryData<{ count: number }>(queryKeys.notifications.unreadCount);
+      const nextAll = markNotificationReadInList(
+        queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(undefined)),
+        payload.notificationId,
+      );
+      const nextUnread = markNotificationReadInList(
+        queryClient.getQueryData<Notification[]>(queryKeys.notifications.list(false)),
+        payload.notificationId,
+      )?.filter((notification) => !notification.isRead);
+      const countSource = nextAll ?? nextUnread;
+
+      queryClient.setQueryData(queryKeys.notifications.list(undefined), nextAll);
+      queryClient.setQueryData(queryKeys.notifications.list(false), nextUnread);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, {
+        count: countSource
+          ? unreadNotificationCount(countSource)
+          : Math.max(0, (previousUnreadCount?.count ?? 0) - 1),
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all, refetchType: 'inactive' });
+    }
+
+    function handleReadAll(_payload: NotificationReadAllPayload) {
+      queryClient.setQueryData(
+        queryKeys.notifications.list(undefined),
+        (current: Notification[] | undefined) => markAllNotificationsReadInList(current),
+      );
+      queryClient.setQueryData<Notification[]>(queryKeys.notifications.list(false), []);
+      queryClient.setQueryData(queryKeys.notifications.unreadCount, { count: 0 });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all, refetchType: 'inactive' });
+    }
+
+    socket.on('notification:new', handleNew);
+    socket.on('notification:read', handleRead);
+    socket.on('notification:read-all', handleReadAll);
+    window.addEventListener('focus', refreshNotifications);
+    document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+    return () => {
+      socket.off('notification:new', handleNew);
+      socket.off('notification:read', handleRead);
+      socket.off('notification:read-all', handleReadAll);
+      window.removeEventListener('focus', refreshNotifications);
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh);
     };
   }, [socket, connected, queryClient]);
 }

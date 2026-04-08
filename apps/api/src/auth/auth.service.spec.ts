@@ -27,6 +27,7 @@ const mockUser = (overrides = {}) => ({
   mannerScore: 3.5,
   locationCity: '서울',
   locationDistrict: '마포구',
+  profileImageUrl: null as string | null,
   deletedAt: null as Date | null,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -81,6 +82,10 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    // Ensure OAuth env keys are absent by default so mock-mode is active
+    delete process.env.KAKAO_CLIENT_ID;
+    delete process.env.NAVER_CLIENT_ID;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -175,6 +180,271 @@ describe('AuthService', () => {
       await expect(
         service.emailLogin('test@example.com', 'pass'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ── oauthLogin — mock mode ─────────────────────────────────────────────────
+
+  describe('oauthLogin (mock mode — env keys absent)', () => {
+    it('kakao: auto-registers a new user when none exists', async () => {
+      const newUser = mockUser({ oauthProvider: 'kakao', oauthId: 'mock_kakao_abc123' });
+      // 1st findFirst: by providerId → null, 2nd findFirst: by email → null
+      prismaMock.user.findFirst.mockResolvedValue(null);
+      // resolveUniqueNickname
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue(newUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(newUser));
+
+      const result = await service.oauthLogin('kakao', 'abc123');
+
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ oauthProvider: 'kakao' }),
+        }),
+      );
+      expect(result).toHaveProperty('accessToken');
+      expect(result.user).not.toHaveProperty('passwordHash');
+    });
+
+    it('kakao: returns existing user matched by oauthId', async () => {
+      const existingUser = mockUser({ oauthProvider: 'kakao', oauthId: 'mock_kakao_abc123' });
+      // findFirst by providerId returns the user immediately
+      prismaMock.user.findFirst.mockResolvedValue(existingUser);
+      prismaMock.user.update.mockResolvedValue(existingUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(existingUser));
+
+      const result = await service.oauthLogin('kakao', 'abc123');
+
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('accessToken');
+    });
+
+    it('naver: auto-registers a new user when none exists', async () => {
+      const newUser = mockUser({ oauthProvider: 'naver', oauthId: 'mock_naver_xyz789' });
+      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue(newUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(newUser));
+
+      const result = await service.oauthLogin('naver', 'xyz789');
+
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ oauthProvider: 'naver' }),
+        }),
+      );
+      expect(result).toHaveProperty('accessToken');
+    });
+
+    it('links to existing email account when provider lookup misses but email matches', async () => {
+      const emailUser = mockUser({ email: 'mock_kakao_abc123@dev.matchup.kr' });
+      // 1st findFirst (by providerId) → null, 2nd findFirst (by email) → emailUser
+      prismaMock.user.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(emailUser);
+      prismaMock.user.update.mockResolvedValue(emailUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(emailUser));
+
+      const result = await service.oauthLogin('kakao', 'abc123');
+
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('accessToken');
+    });
+
+    it('throws UnauthorizedException for unsupported provider', async () => {
+      await expect(service.oauthLogin('apple', 'code')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  // ── oauthLogin — real mode (HTTP calls mocked via global fetch) ────────────
+
+  describe('oauthLogin (real mode — env keys present)', () => {
+    let fetchSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      process.env.KAKAO_CLIENT_ID = 'kakao-real-id';
+      process.env.KAKAO_CLIENT_SECRET = 'kakao-real-secret';
+      process.env.KAKAO_REDIRECT_URI = 'http://localhost:3003/auth/kakao/callback';
+
+      process.env.NAVER_CLIENT_ID = 'naver-real-id';
+      process.env.NAVER_CLIENT_SECRET = 'naver-real-secret';
+      process.env.NAVER_REDIRECT_URI = 'http://localhost:3003/auth/naver/callback';
+
+      // Re-create service instance with env keys set
+      fetchSpy = jest.spyOn(global, 'fetch');
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+      delete process.env.KAKAO_CLIENT_ID;
+      delete process.env.KAKAO_CLIENT_SECRET;
+      delete process.env.KAKAO_REDIRECT_URI;
+      delete process.env.NAVER_CLIENT_ID;
+      delete process.env.NAVER_CLIENT_SECRET;
+      delete process.env.NAVER_REDIRECT_URI;
+    });
+
+    it('kakao: fetches profile and registers new user via real API flow', async () => {
+      const kakaoTokenPayload = { access_token: 'kakao-access-token' };
+      const kakaoUserPayload = {
+        id: 99999,
+        kakao_account: {
+          email: 'kakaouser@kakao.com',
+          profile: { nickname: '카카오유저', profile_image_url: 'https://img.kakao.com/pic.jpg' },
+        },
+      };
+
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => kakaoTokenPayload,
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => kakaoUserPayload,
+        } as Response);
+
+      const newUser = mockUser({
+        email: 'kakaouser@kakao.com',
+        oauthProvider: 'kakao',
+        oauthId: '99999',
+      });
+      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue(newUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(newUser));
+
+      // Rebuild service so kakaoEnabled reads the env key set in beforeEach
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+      const svc = module.get<AuthService>(AuthService);
+
+      const result = await svc.oauthLogin('kakao', 'real-auth-code');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        'https://kauth.kakao.com/oauth/token',
+        expect.objectContaining({ method: 'POST' }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        'https://kapi.kakao.com/v2/user/me',
+        expect.objectContaining({ headers: { Authorization: 'Bearer kakao-access-token' } }),
+      );
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ oauthProvider: 'kakao', oauthId: '99999' }),
+        }),
+      );
+      expect(result).toHaveProperty('accessToken');
+    });
+
+    it('naver: fetches profile and registers new user via real API flow', async () => {
+      const naverTokenPayload = { access_token: 'naver-access-token' };
+      const naverUserPayload = {
+        resultcode: '00',
+        response: {
+          id: 'naver-user-id',
+          email: 'naveruser@naver.com',
+          nickname: '네이버유저',
+          profile_image: 'https://img.naver.com/pic.jpg',
+        },
+      };
+
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => naverTokenPayload,
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => naverUserPayload,
+        } as Response);
+
+      const newUser = mockUser({
+        email: 'naveruser@naver.com',
+        oauthProvider: 'naver',
+        oauthId: 'naver-user-id',
+      });
+      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      prismaMock.user.create.mockResolvedValue(newUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(newUser));
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+      const svc = module.get<AuthService>(AuthService);
+
+      const result = await svc.oauthLogin('naver', 'real-naver-code');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(prismaMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ oauthProvider: 'naver', oauthId: 'naver-user-id' }),
+        }),
+      );
+      expect(result).toHaveProperty('accessToken');
+    });
+
+    it('kakao: throws UnauthorizedException when token exchange fails (HTTP 400)', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () => 'KOE320',
+      } as Response);
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+      const svc = module.get<AuthService>(AuthService);
+
+      await expect(svc.oauthLogin('kakao', 'bad-code')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('naver: throws UnauthorizedException when user info fetch fails', async () => {
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ access_token: 'naver-token' }),
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+        } as Response);
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+      const svc = module.get<AuthService>(AuthService);
+
+      await expect(svc.oauthLogin('naver', 'valid-code')).rejects.toThrow(UnauthorizedException);
     });
   });
 

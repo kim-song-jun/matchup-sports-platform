@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Param,
   Body,
@@ -12,7 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MatchesService } from './matches.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CreateMatchDto, MatchFilterDto } from './dto/match.dto';
+import { CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
 
 @ApiTags('매치')
 @Controller('matches')
@@ -48,6 +49,38 @@ export class MatchesController {
   @ApiOperation({ summary: '매치 상세 조회' })
   async findOne(@Param('id') id: string) {
     return this.matchesService.findOne(id);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '매치 수정 및 상태 변경' })
+  async update(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateMatchDto,
+  ) {
+    return this.matchesService.update(id, userId, dto);
+  }
+
+  @Post(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '매치 취소 (host 전용)' })
+  async cancel(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: CancelMatchDto,
+  ) {
+    return this.matchesService.cancelMatch(id, userId, dto);
+  }
+
+  @Post(':id/close')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '모집 마감 (host 전용, recruiting → confirmed)' })
+  async close(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.matchesService.closeMatch(id, userId);
   }
 
   @Post(':id/join')

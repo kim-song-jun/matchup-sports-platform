@@ -36,6 +36,7 @@ enum VenueType {
 
 enum MatchStatus {
   recruiting
+  confirmed
   full
   in_progress
   completed
@@ -87,7 +88,10 @@ enum NotificationType {
   player_joined
   player_left
   team_announced
+  match_updated
+  match_confirmed
   match_reminder
+  match_cancelled
   match_completed
   review_pending
   level_changed
@@ -224,6 +228,7 @@ model User {
   chatParticipations     ChatRoomParticipant[]
   sentMessages           ChatMessage[]        @relation("MessageSender")
   pushSubscriptions      PushSubscription[]
+  uploads                Upload[]
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -1068,6 +1073,26 @@ model ChatMessage {
 
   @@index([roomId, createdAt])
   @@map("chat_messages")
+}
+
+// ─── Uploads ─────────────────────────────────────────────
+
+model Upload {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  filename     String
+  originalName String   @map("original_name")
+  mimetype     String
+  size         Int
+  path         String   // relative path: uploads/YYYY/MM/cuid.webp
+  width        Int?
+  height       Int?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("uploads")
 }
 
 // ─── Web Push Subscriptions ──────────────────────────────

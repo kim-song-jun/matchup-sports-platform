@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService } from './web-push.service';
+import { presentNotification } from './notification-presentation';
 
 @Injectable()
 export class NotificationsService {
@@ -30,14 +31,9 @@ export class NotificationsService {
       },
     });
 
-    this.realtime.emitToUser(data.userId, 'notification:new', {
-      id: notification.id,
-      type: notification.type,
-      title: notification.title,
-      body: notification.body,
-      data: notification.data,
-      createdAt: notification.createdAt,
-    });
+    const payload = presentNotification(notification);
+
+    this.realtime.emitToUser(data.userId, 'notification:new', payload);
 
     // Fire-and-forget push notification
     void this.webPushService.sendToUser(data.userId, {
@@ -45,7 +41,7 @@ export class NotificationsService {
       body: data.body,
     });
 
-    return notification;
+    return payload;
   }
 
   async findMine(
@@ -54,7 +50,7 @@ export class NotificationsService {
   ) {
     const { isRead, cursor, limit = 20 } = opts;
 
-    return this.prisma.notification.findMany({
+    const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
         ...(isRead !== undefined ? { isRead } : {}),
@@ -65,6 +61,8 @@ export class NotificationsService {
         ? { skip: 1, cursor: { id: cursor } }
         : {}),
     });
+
+    return notifications.map((notification) => presentNotification(notification));
   }
 
   async markRead(notificationId: string, userId: string) {
@@ -79,10 +77,17 @@ export class NotificationsService {
       throw new ForbiddenException('권한이 없습니다.');
     }
 
-    return this.prisma.notification.update({
+    const updated = await this.prisma.notification.update({
       where: { id: notificationId },
       data: { isRead: true },
     });
+
+    const payload = presentNotification(updated);
+    this.realtime.emitToUser(userId, 'notification:read', {
+      notificationId,
+    });
+
+    return payload;
   }
 
   async markAllRead(userId: string) {
@@ -90,7 +95,10 @@ export class NotificationsService {
       where: { userId, isRead: false },
       data: { isRead: true },
     });
-    return { updated: result.count };
+    this.realtime.emitToUser(userId, 'notification:read-all', {
+      count: result.count,
+    });
+    return { count: result.count };
   }
 
   async getUnreadCount(userId: string) {

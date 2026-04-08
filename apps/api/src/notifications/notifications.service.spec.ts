@@ -50,7 +50,8 @@ describe('NotificationsService', () => {
         type: NotificationType.match_created,
         title: 'Match!',
         body: 'Your match is ready',
-        data: null,
+        data: { matchId: 'match-1' },
+        isRead: false,
         createdAt: new Date(),
       };
       mockPrisma.notification.create.mockResolvedValue(notification);
@@ -63,7 +64,11 @@ describe('NotificationsService', () => {
       });
 
       expect(mockPrisma.notification.create).toHaveBeenCalled();
-      expect(mockRealtime.emitToUser).toHaveBeenCalledWith('u1', 'notification:new', expect.any(Object));
+      expect(mockRealtime.emitToUser).toHaveBeenCalledWith('u1', 'notification:new', expect.objectContaining({
+        body: 'Your match is ready',
+        link: '/matches/match-1',
+        category: 'match',
+      }));
       expect(mockWebPushService.sendToUser).toHaveBeenCalledWith('u1', { title: 'Match!', body: 'Your match is ready' });
     });
   });
@@ -71,19 +76,41 @@ describe('NotificationsService', () => {
   describe('markRead', () => {
     it('marks the notification as read', async () => {
       mockPrisma.notification.findUnique.mockResolvedValue({ id: 'n1', userId: 'u1' });
-      mockPrisma.notification.update.mockResolvedValue({ id: 'n1', isRead: true });
+      mockPrisma.notification.update.mockResolvedValue({
+        id: 'n1',
+        type: NotificationType.match_created,
+        title: 'Match!',
+        body: 'Your match is ready',
+        isRead: true,
+        data: { matchId: 'match-1' },
+        createdAt: new Date(),
+      });
 
       await service.markRead('n1', 'u1');
 
       expect(mockPrisma.notification.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { isRead: true } }),
       );
+      expect(mockRealtime.emitToUser).toHaveBeenCalledWith('u1', 'notification:read', {
+        notificationId: 'n1',
+      });
     });
 
     it('throws NotFoundException for unknown notification', async () => {
       mockPrisma.notification.findUnique.mockResolvedValue(null);
 
       await expect(service.markRead('nonexistent', 'u1')).rejects.toThrow();
+    });
+  });
+
+  describe('markAllRead', () => {
+    it('marks all unread notifications and emits a sync event', async () => {
+      mockPrisma.notification.updateMany.mockResolvedValue({ count: 3 });
+
+      await expect(service.markAllRead('u1')).resolves.toEqual({ count: 3 });
+      expect(mockRealtime.emitToUser).toHaveBeenCalledWith('u1', 'notification:read-all', {
+        count: 3,
+      });
     });
   });
 });

@@ -4,7 +4,7 @@
 
 - [ ] CHAT-001 두 사용자 간 채팅 송수신
 - [ ] CHAT-002 같은 사용자의 다중 탭 unread/read 동기화
-- [ ] NOTI-001 이벤트 기반 알림 생성과 영속성
+- [x] NOTI-001 이벤트 기반 알림 생성과 영속성 - `match_created`, `player_joined`, `payment_confirmed/refunded` producer 연결 완료, `e2e/tests/notification-center.spec.ts` `Desktop Chrome 3/3` 통과
 
 ## CHAT-001 두 사용자 간 채팅 송수신
 
@@ -50,9 +50,12 @@
 
 ### Trigger Candidates
 
+- [x] 매치 생성
+- [x] 매치 참가 신청
+- [x] 결제 완료
+- [x] 환불 완료
 - [ ] 팀 매치 승인
 - [ ] 용병 승인
-- [ ] 결제 완료
 
 ### Steps
 
@@ -62,12 +65,12 @@
 
 ### Expected
 
-- [ ] 알림 항목이 생성된다.
-- [ ] unread 카운트가 증가한다.
+- [x] 알림 항목이 생성된다.
+- [x] unread 카운트가 증가한다.
 
 ### Persistence Check
 
-- [ ] 새로고침 후 유지된다.
+- [x] 새로고침 후 유지된다.
 - [ ] 가능하면 서버 재시작 후에도 유지된다.
 
 ## Notes
@@ -75,3 +78,6 @@
 - 이 파일은 Playwright 다중 컨텍스트와 MCP 수동 검증을 같이 써야 가치가 크다.
 - 2026-04-07: `/chat` 페이지 진입, 메시지 입력창, 두 사용자 동일 채팅방 진입 Desktop Chrome 스모크는 통과했다. 실제 실시간 송수신 assert, unread/read 다중 탭 동기화, 이벤트 기반 알림 생성은 후속 자동화 대상이다.
 - 2026-04-07: `e2e/tests/chat-realtime.spec.ts` Desktop Chrome smoke와 auth/chat focused rerun이 모두 통과했다. 현재 범위는 채팅방 진입/입력/2-context 구조 검증까지이며, unread-read sync와 notification coupling은 아직 미완료다.
+- 2026-04-08: `e2e/tests/notification-center.spec.ts`로 `match_created` same-user multi-tab delivery, `player_joined` multi-tab read sync, `payment_confirmed` deep-link를 `Desktop Chrome 3/3`로 최종 검증했다.
+- 2026-04-08: 알림 센터는 explicit in-app navigation, socket connect-time backfill, focus/visibility backfill을 같이 둬서 hidden tab recovery까지 보장하도록 정리했다.
+- 2026-04-08: `global-setup`의 `teams` seed drift는 여전히 best-effort warning으로 남지만, notification suite 자체는 더 이상 그 이슈에 막히지 않는다.

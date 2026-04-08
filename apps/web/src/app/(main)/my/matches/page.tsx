@@ -5,10 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MapPin, Calendar, Clock, Users, Pencil, Trash2, AlertTriangle, Info, Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { api } from '@/lib/api';
 import { useMyMatches } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
 
@@ -25,7 +26,7 @@ const mockMyMatches = [
     currentPlayers: 8,
     maxPlayers: 10,
     fee: 15000,
-    status: 'open',
+    status: 'recruiting',
   },
   {
     id: 'match-2',
@@ -38,7 +39,7 @@ const mockMyMatches = [
     currentPlayers: 6,
     maxPlayers: 10,
     fee: 10000,
-    status: 'open',
+    status: 'recruiting',
   },
   {
     id: 'match-3',
@@ -65,10 +66,11 @@ const mockParticipatedMatches = [
 ];
 
 const statusLabel: Record<string, { text: string; style: string }> = {
-  open: { text: '모집중', style: 'bg-gray-100 text-gray-500' },
-  full: { text: '마감', style: 'bg-gray-100 text-gray-600' },
-  completed: { text: '완료', style: 'text-blue-500' },
-  cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500' },
+  recruiting: { text: '모집중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
+  open: { text: '모집중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
+  full: { text: '마감', style: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-300' },
+  completed: { text: '완료', style: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
+  cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-red-300' },
 };
 
 const resultConfig: Record<string, { text: string; style: string; icon: typeof TrendingUp }> = {
@@ -89,7 +91,7 @@ export default function MyMatchesPage() {
   const { toast } = useToast();
   useRequireAuth();
   const { data: apiData } = useMyMatches();
-  const usingMock = !apiData?.items;
+  const [isCancelling, setIsCancelling] = useState(false);
   const apiMatches = apiData?.items?.map((m) => ({
     id: m.id,
     title: m.title,
@@ -103,9 +105,7 @@ export default function MyMatchesPage() {
     fee: m.fee,
     status: m.status,
   }));
-  const [localMatches, setLocalMatches] = useState(mockMyMatches);
-  const matches = apiMatches ?? (process.env.NODE_ENV === 'development' ? localMatches : []);
-  const setMatches = setLocalMatches;
+  const matches = apiMatches ?? [];
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   // Support ?tab=created|history URL param — map to internal tab keys
@@ -114,14 +114,16 @@ export default function MyMatchesPage() {
   const [activeTab, setActiveTab] = useState<Tab>(resolvedTab);
 
   const handleDelete = async (id: string) => {
+    setIsCancelling(true);
     try {
-      await api.patch(`/matches/${id}`, { status: 'cancelled' });
-      setMatches(prev => prev.map(m => m.id === id ? { ...m, status: 'cancelled' } : m));
+      await api.post(`/matches/${id}/cancel`);
       toast('success', '매치가 취소되었어요');
-    } catch {
-      toast('error', '취소하지 못했어요. 다시 시도해주세요');
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '취소하지 못했어요. 다시 시도해주세요');
     }
     setDeleteTarget(null);
+    setIsCancelling(false);
   };
 
   /* ── Participated data with dev guard ── */
@@ -169,12 +171,6 @@ export default function MyMatchesPage() {
         </div>
       </div>
 
-      {usingMock && (
-        <div className="mx-5 @3xl:mx-0 mt-3 mb-1 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
-          <Info size={16} className="text-gray-500 shrink-0" />
-          <span className="text-sm text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
-        </div>
-      )}
 
       {/* ── Tab: 참가 매치 ── */}
       {activeTab === 'participated' && (
@@ -274,22 +270,29 @@ export default function MyMatchesPage() {
             />
           ) : (
             matches.map((match) => {
-              const st = statusLabel[match.status] || statusLabel.open;
+              const st = statusLabel[match.status] || statusLabel.recruiting;
               return (
-                <div key={match.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+                <div
+                  key={match.id}
+                  data-testid={`my-match-card-${match.id}`}
+                  className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4"
+                >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">
                         {sportLabel[match.sportType]}
                       </span>
-                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
+                      <span
+                        data-testid={`my-match-status-${match.id}`}
+                        className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}
+                      >
                         {st.text}
                       </span>
                     </div>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(match.fee)}</span>
                   </div>
 
-                  <Link href={`/matches/${match.id}`}>
+                  <Link href={`/matches/${match.id}`} data-testid={`my-match-link-${match.id}`}>
                     <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{match.title}</h3>
                   </Link>
 
@@ -323,7 +326,9 @@ export default function MyMatchesPage() {
                       </Link>
                       <button
                         onClick={() => setDeleteTarget(match.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-100 transition-colors"
+                        disabled={isCancelling}
+                        data-testid={`my-match-cancel-${match.id}`}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"
                       >
                         <Trash2 size={14} />
                         취소
@@ -338,31 +343,43 @@ export default function MyMatchesPage() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매치를 취소하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">취소하면 참가자들에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors"
-              >
-                돌아가기
-              </button>
-              <button
-                onClick={() => handleDelete(deleteTarget)}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
-              >
-                취소하기
-              </button>
-            </div>
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="매치 취소"
+        size="sm"
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
+            <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
+          </div>
+          <p className="text-center text-base text-gray-700 dark:text-gray-300">
+            매치를 취소하시겠어요?<br />
+            <span className="text-sm text-gray-500">취소하면 참가자들에게 알림이 발송돼요.<br />이 작업은 되돌릴 수 없어요.</span>
+          </p>
+          <div className="flex w-full gap-3 pt-2">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors min-h-[44px]"
+            >
+              돌아가기
+            </button>
+            <button
+              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              disabled={isCancelling}
+              data-testid="my-match-cancel-confirm"
+              className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60 min-h-[44px]"
+            >
+              {isCancelling ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  처리 중...
+                </span>
+              ) : '취소하기'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

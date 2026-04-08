@@ -20,6 +20,7 @@ import { SettlementsModule } from './settlements/settlements.module';
 import { ChatModule } from './chat/chat.module';
 import { MercenaryModule } from './mercenary/mercenary.module';
 import { BadgesModule } from './badges/badges.module';
+import { UploadsModule } from './uploads/uploads.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -48,6 +49,7 @@ import configuration from './config/configuration';
     ChatModule,
     MercenaryModule,
     BadgesModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

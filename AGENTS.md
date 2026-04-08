@@ -90,8 +90,11 @@ Errors:
 - dev compose에서 `web`만 단독 restart 하지 않는다. `deps` bootstrap 없이 `web`만 다시 뜨면 `@parcel/watcher` optional binary가 빠져 Next dev가 기동 실패할 수 있으므로 `docker compose up -d deps web`로 같이 올린다.
 - dev compose의 API는 `AUTH_HASH_DRIVER=bcryptjs`를 사용해 native `bcrypt`를 로드하지 않는다. production 기본값은 `bcrypt`를 유지한다.
 - `web` 서비스는 `api`의 단순 프로세스 시작이 아니라 `/api/v1/health` healthcheck 통과 이후에만 의존하도록 유지한다. cold start 시 프록시 초기 요청이 API readiness보다 앞서면 간헐적 5xx가 난다.
+- dev compose의 `api` watch가 unrelated TypeScript error에 막히면 `localhost:8111`은 테스트/tsc와 다른 stale contract를 계속 서빙할 수 있다. query/DTO 변경 후에는 unit test만 보지 말고 live `curl` 또는 브라우저 경로로 실제 `8111` 응답까지 확인한다.
 - 로컬 Playwright E2E는 Next dev on-demand compile 부하 때문에 기본값을 `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter로 유지한다. 병렬도를 올릴 때는 `PW_WORKERS`와 `PLAYWRIGHT_REPORTER`를 명시적으로 override한다.
 - Next dev 기준 `/home`은 첫 컴파일 비용이 특히 무거워 60초를 넘길 수 있다. Playwright 세션 안정화나 수동 캡처 스크립트의 첫 진입점으로는 `/home`보다 `/login`, `/landing`, `/matches` 같은 더 가벼운 경로를 먼저 워밍업한 뒤 대상 페이지로 이동한다.
+- notification/action-center UI에서 "읽음 처리 + in-app deep link"를 같은 `Link` 기본 동작에 맡기지 않는다. mutation이 같이 일어나는 카드 액션은 explicit navigation handler를 두고, websocket 연결 직후 한 번 backfill invalidate를 걸어 late-connect race를 막는다.
+- realtime unread/notification surface는 websocket event만 믿지 않는다. hidden tab 복귀와 late-connect를 고려해 focus/visibility 시점의 backfill refetch 경로를 함께 둔다.
 - Production compose 기준 포트는 `web=3000`, `api=8100`이다. dev/prod 포트를 혼동하지 않는다.
 - 현재 운영 EC2는 `ec2-user`로 접속하며, Amazon Linux bootstrap은 standalone `docker-compose`를 제공할 수 있다. CI/runbook/manual deploy는 `docker compose` 플러그인만 있다고 가정하지 말고 두 형태를 모두 처리하거나 사전 검증한다.
 - 운영 자동화에 destructive full seed(`prisma db seed`, `make db-seed`)를 기본 경로로 연결하지 않는다. deploy-safe data backfill은 idempotent 전용 스크립트(`prisma/seed-images.ts`, `make db-seed-images`)로 분리한다.
@@ -152,6 +155,7 @@ Errors:
 - URL 기반 필터 화면(`matches`, `marketplace`, `lessons` 등)은 router query만 단일 source로 직접 조합하지 않는다. 빠른 연속 입력/토글에서 stale query overwrite가 발생하므로, local draft filter state를 두고 debounce/replace로 동기화한다.
 - 같은 도메인 여정(`list -> create -> detail -> edit -> history`) 안의 페이지는 하나의 accent/control language를 공유해야 한다. 일부 화면만 흑백 토글이나 별도 폼 스킨으로 분리하지 않는다.
 - 배지, 평점, 전적, 신뢰도처럼 사용자 의사결정에 직접 영향을 주는 신호는 `verified`, `estimated`, `sample` 상태를 명확히 구분해야 한다. mock/샘플 데이터를 실제 신뢰 신호처럼 렌더링하지 않는다.
+- 실시간/optimistic 업데이트가 붙은 알림·리스트 CTA는 클릭 직후 항목 재정렬이나 unmount가 발생해도 navigation이 유실되지 않도록 구현한다. 읽음 처리와 route 전환이 서로 경쟁하는 구조는 금지한다.
 - 서비스 전체 지원 범위(종목, 상태, 역할 등)는 list/create/edit/detail 하위 플로우에서도 일관되게 유지한다. 일부 화면에서만 조용히 범위를 줄이는 silent capability narrowing은 금지한다.
 - edit/manage 화면은 현재 route의 실제 엔티티를 기준으로 hydrate되어야 한다. 다른 seed/mock 엔티티로 silently fallback하는 편집 화면은 금지한다.
 - 결제, 환불, 신청 확정 같은 거래형 액션은 API 실패를 성공처럼 시뮬레이션하면 안 된다. 실패 원인, 재시도, 보류 상태를 명시적으로 보여줘야 한다.
@@ -164,6 +168,8 @@ Errors:
 - task 문서는 `.github/tasks/`를 표준 경로로 사용한다. 기존 task 문서가 있으면 그 문서를 single source of truth로 갱신한다.
 - 기능 검증 시나리오는 `docs/scenarios/*.md`에 기능별 체크리스트로 유지하고, 진행/논의는 `docs/scenarios/index.md`에 누적한다.
 - 보호 경로 E2E는 토큰 주입 직후 바로 진입하지 말고, `/home` 등에서 인증된 UI 상태가 실제로 hydrate된 뒤 다음 경로로 이동한다. 그렇지 않으면 간헐적으로 auth wall false negative가 난다.
+- multi-tab Playwright E2E는 무거운 루트 `/`보다 가벼운 route 기반 storage bootstrap을 우선하고, dev-login 기반 API mutation이 간헐적 401을 내면 long-lived token 재사용보다 mutation 직전 fresh token 재발급 패턴으로 안정화한다.
+- 로컬 dev DB는 Prisma schema보다 뒤처진 컬럼 드리프트(`matches.image_url`, `sport_teams.photos`)가 남아 있을 수 있다. live runtime 검증이 필요한 read/update path에서는 broad `include: true`나 default return payload 대신 explicit `select`를 우선 사용해 런타임 false negative를 줄인다.
 
 ## 5) Validation Commands
 

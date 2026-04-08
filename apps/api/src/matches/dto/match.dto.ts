@@ -1,15 +1,31 @@
 import {
-  IsString,
-  IsOptional,
-  IsInt,
-  IsEnum,
-  Min,
-  Max,
+  IsBoolean,
   IsDateString,
+  IsEnum,
+  IsIn,
+  IsInt,
   IsObject,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+
+const MATCH_SPORT_TYPES = [
+  'soccer',
+  'futsal',
+  'basketball',
+  'badminton',
+  'ice_hockey',
+  'figure_skating',
+  'short_track',
+  'swimming',
+  'tennis',
+  'baseball',
+  'volleyball',
+] as const;
 
 export class CreateMatchDto {
   @ApiProperty({ description: '매치 제목' })
@@ -26,8 +42,8 @@ export class CreateMatchDto {
   @IsOptional()
   imageUrl?: string;
 
-  @ApiProperty({ enum: ['futsal', 'basketball', 'badminton', 'ice_hockey', 'figure_skating', 'short_track'] })
-  @IsString()
+  @ApiProperty({ enum: MATCH_SPORT_TYPES })
+  @IsEnum(MATCH_SPORT_TYPES)
   sportType: string;
 
   @ApiProperty({ description: '시설 ID' })
@@ -87,12 +103,22 @@ export class MatchFilterDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  q?: string;
+
+  @ApiPropertyOptional()
+  @IsEnum(MATCH_SPORT_TYPES)
+  @IsOptional()
   sportType?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   city?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  district?: string;
 
   @ApiPropertyOptional()
   @IsDateString()
@@ -116,6 +142,36 @@ export class MatchFilterDto {
   levelMax?: number;
 
   @ApiPropertyOptional()
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value))
+  maxFee?: number;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  freeOnly?: boolean;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  availableOnly?: boolean;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  beginnerFriendly?: boolean;
+
+  @ApiPropertyOptional({ enum: ['upcoming', 'latest', 'deadline'] })
+  @IsIn(['upcoming', 'latest', 'deadline'])
+  @IsOptional()
+  sort?: 'upcoming' | 'latest' | 'deadline';
+
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   cursor?: string;
@@ -127,4 +183,45 @@ export class MatchFilterDto {
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   limit?: number;
+}
+
+export class UpdateMatchDto {
+  @ApiPropertyOptional({ description: '매치 제목' })
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @ApiPropertyOptional({ description: '매치 설명' })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional({ description: '매치 날짜 (YYYY-MM-DD)' })
+  @IsDateString()
+  @IsOptional()
+  matchDate?: string;
+
+  @ApiPropertyOptional({ description: '최대 인원' })
+  @IsInt()
+  @Min(2)
+  @IsOptional()
+  maxPlayers?: number;
+
+  @ApiPropertyOptional({ description: '참가비' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  fee?: number;
+
+  @ApiPropertyOptional({ description: '시설 ID' })
+  @IsString()
+  @IsOptional()
+  venueId?: string;
+}
+
+export class CancelMatchDto {
+  @ApiPropertyOptional({ description: '취소 사유' })
+  @IsString()
+  @IsOptional()
+  reason?: string;
 }

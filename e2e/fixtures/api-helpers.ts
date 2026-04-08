@@ -78,6 +78,40 @@ export async function createMatchViaApi(
   });
 }
 
+export async function joinMatchViaApi(
+  token: string,
+  matchId: string,
+): Promise<{ id: string; matchId: string; userId: string }> {
+  return apiCall('POST', `/matches/${matchId}/join`, token);
+}
+
+export async function preparePaymentViaApi(
+  token: string,
+  data: {
+    participantId: string;
+    amount: number;
+    method?: string;
+  },
+): Promise<{ paymentId: string; orderId: string; amount: number }> {
+  return apiCall('POST', '/payments/prepare', token, {
+    method: 'card',
+    ...data,
+  });
+}
+
+export async function confirmPaymentViaApi(
+  token: string,
+  data: {
+    orderId: string;
+    paymentKey?: string;
+  },
+): Promise<{ id: string; orderId: string }> {
+  return apiCall('POST', '/payments/confirm', token, {
+    paymentKey: `e2e-${Date.now()}`,
+    ...data,
+  });
+}
+
 export async function findVenueBySport(
   sportType: string,
 ): Promise<{ id: string; name: string; address: string }> {

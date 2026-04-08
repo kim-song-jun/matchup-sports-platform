@@ -7,6 +7,104 @@ import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 
+// Kakao icon per brand guideline
+function KakaoIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M10 3C6.134 3 3 5.492 3 8.556c0 1.942 1.195 3.654 3.007 4.706L5.3 16.178a.25.25 0 0 0 .374.27L9.29 14.09c.234.022.47.034.71.034 3.866 0 7-2.492 7-5.556C17 5.492 13.866 3 10 3Z"
+        fill="#191919"
+      />
+    </svg>
+  );
+}
+
+// Naver icon per brand guideline
+function NaverIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M11.408 10.274L8.376 5H5v10h3.592L11.624 9.726V15H15V5h-3.592z"
+        fill="white"
+      />
+    </svg>
+  );
+}
+
+// Builds the Kakao OAuth authorize URL
+function buildKakaoAuthUrl(): string | null {
+  const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+  const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+  if (!clientId || !redirectUri) return null;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+  });
+  return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
+}
+
+// Builds the Naver OAuth authorize URL
+function buildNaverAuthUrl(): string | null {
+  const clientId = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
+  const redirectUri = process.env.NEXT_PUBLIC_NAVER_REDIRECT_URI;
+  if (!clientId || !redirectUri) return null;
+  // state is required by Naver OAuth spec; use a random value stored in sessionStorage for CSRF protection
+  const state = Math.random().toString(36).slice(2);
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('naverOAuthState', state);
+  }
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    state,
+  });
+  return `https://nid.naver.com/oauth2.0/authorize?${params.toString()}`;
+}
+
+function SocialLoginButtons() {
+  const kakaoUrl = buildKakaoAuthUrl();
+  const naverUrl = buildNaverAuthUrl();
+
+  // Both providers disabled — render nothing
+  if (!kakaoUrl && !naverUrl) return null;
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+        <span className="text-xs text-gray-400">또는</span>
+        <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+      </div>
+      <div className="space-y-2">
+        {kakaoUrl && (
+          <a
+            href={kakaoUrl}
+            className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-base font-semibold text-[#191919] hover:brightness-95 active:scale-[0.98] transition-[filter,transform]"
+            aria-label="카카오 계정으로 로그인"
+          >
+            <KakaoIcon />
+            카카오로 시작하기
+          </a>
+        )}
+        {naverUrl && (
+          <a
+            href={naverUrl}
+            className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-base font-semibold text-white hover:brightness-95 active:scale-[0.98] transition-[filter,transform]"
+            aria-label="네이버 계정으로 로그인"
+          >
+            <NaverIcon />
+            네이버로 시작하기
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const devLogin = useDevLogin();
@@ -120,24 +218,8 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {/* 소셜 로그인 (준비중) */}
-          <div className="mt-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-              <span className="text-xs text-gray-400">또는</span>
-              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-            </div>
-            <div className="space-y-2">
-              <button disabled aria-disabled="true" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-base font-semibold text-[#191919] opacity-50 cursor-not-allowed">
-                카카오로 시작하기
-                <span className="text-xs font-normal opacity-70">(준비 중)</span>
-              </button>
-              <button disabled aria-disabled="true" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-base font-semibold text-white opacity-50 cursor-not-allowed">
-                네이버로 시작하기
-                <span className="text-xs font-normal opacity-70">(준비 중)</span>
-              </button>
-            </div>
-          </div>
+          {/* 소셜 로그인 */}
+          <SocialLoginButtons />
 
           {/* 둘러보기 — 로그인 없이 홈으로 */}
           <div className="mt-5 text-center">

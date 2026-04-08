@@ -5,6 +5,7 @@
 - [x] HOME-001 홈 피드 렌더링과 필터 반응
 - [ ] HOME-002 추천/목록 데이터 새로고침 후 일관성
 - [x] HOME-003 홈 카드 fallback 이미지가 실사형 로컬 자산으로 유지됨
+- [x] HOME-004 홈 종목 deep link가 `/matches` 필터 상태로 이어짐
 
 ## HOME-001 홈 피드 렌더링과 필터 반응
 
@@ -53,9 +54,29 @@
 - [x] 같은 데이터는 새로고침 후에도 deterministic하게 같은 fallback 계열을 유지한다.
 - [x] 카드 비율과 크롭이 깨지지 않는다.
 
+## HOME-004 홈 종목 deep link가 `/matches` 필터 상태로 이어짐
+
+### Steps
+
+- [x] `/home`에 진입한다.
+- [x] 홈의 종목 칩에서 `풋살`을 선택한다.
+- [x] 해당 섹션의 더보기 링크로 `/matches?sport=futsal`로 이동한다.
+- [x] `/matches`에서 quick/advanced filter를 바꾸고 새로고침한다.
+
+### Expected
+
+- [x] `/matches` 진입 직후 같은 종목 칩이 활성 상태다.
+- [x] URL query가 실제 필터 UI 상태와 일치한다.
+- [x] 필터 변경 후 새로고침해도 상태가 유지된다.
+- [x] 빠른 연속 필터 토글에서도 이전 query state가 덮여쓰이지 않는다.
+
 ## Notes
 
 - 이 파일은 탐색 계열 smoke test 기준이다. 필터 정확도 심화 검증은 매치/팀/장터 문서에서 이어진다.
 - 2026-04-07: `e2e/tests/home.spec.ts` Desktop Chrome 기준 통과. 다만 `HOME-002` 전용 새로고침 일관성 spec은 아직 분리하지 않았다.
 - 2026-04-07: 같은 `home.spec.ts`가 Mobile Chrome 기준도 `14/14` 통과했다. 홈 종목 칩 테스트는 모바일 숨김 중복 DOM을 피하도록 `button:visible` 스코프로 보정했다.
 - 2026-04-08: 홈 매치/장터 카드의 fallback 이미지는 `/mock/photoreal/` 로컬 자산으로 재검증했다.
+- 2026-04-08: `/home -> /matches?sport=futsal` deep link와 discovery query-state reload persistence는 `e2e/tests/match-join-flow.spec.ts` smoke(`Desktop Chrome 3/3`)로 검증했다.
+- 2026-04-08: `e2e/tests/match-join-flow.spec.ts`에 discovery subset을 추가해 `/home -> /matches?sport=futsal`, advanced filter URL sync, reload persistence를 Desktop Chrome `3/3`로 검증했다.
+- 2026-04-08: dedicated `e2e/tests/match-discovery.spec.ts`로 `/home -> /matches?sport=futsal`, query-based filter persistence, quick filter clear flow를 Desktop Chrome `3/3`로 재검증했다.
+- 2026-04-08: discovery live rerun 중 dev compose `api` watch가 stale contract를 남기는 현상을 확인했다. 이후 `curl`로 query contract를 먼저 확인하고 transpile-only api runtime으로 browser rerun을 마쳤다.

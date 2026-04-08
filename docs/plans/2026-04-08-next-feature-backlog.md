@@ -39,6 +39,13 @@
 
 ### FTR-001. Shared media lightbox / gallery
 
+**Status**
+
+- 2026-04-08 구현 완료
+- 범위: `matches/[id]`, `lessons/[id]`, `marketplace/[id]`, `teams/[id]`, `venues/[id]`
+- 검증: `media-lightbox` unit `7/7` pass, `pnpm --filter web exec tsc --noEmit` pass, `venue` detail browser smoke pass
+- 잔여: dedicated Playwright spec은 아직 미작성, multi-surface browser smoke는 follow-up
+
 **왜 먼저 필요한가**
 
 - 팀, 매치, 레슨, 시설, 장터 상세에 이미지가 이미 들어가는데 대부분은 썸네일 선택만 가능하고 확대 viewing이 없다.
@@ -68,6 +75,14 @@
 
 ### FTR-002. Match discovery 2.0
 
+**Status**
+
+- 2026-04-08 v1 구현 완료
+- 범위: `/home -> /matches?sport=...` deep link 유지, `/matches` URL filter sync, quick filters(`today/free/beginner/available`), advanced filters(`region/level/sort`), backend query 확장(`q/city/district/freeOnly/availableOnly/beginnerFriendly/sort`)
+- 검증: `pnpm --filter api test -- matches.service.spec.ts` `252/252` pass, `pnpm --filter web test -- src/lib/__tests__/match-discovery.test.ts src/hooks/__tests__/use-api-matches.test.tsx` `11/11` pass, `pnpm --filter web exec tsc --noEmit` pass, `pnpm --filter api exec tsc --noEmit` pass, `e2e/tests/match-discovery.spec.ts` `Desktop Chrome 3/3` pass
+- 런타임 메모: dev compose `api` watch는 unrelated compile blocker가 있으면 stale contract를 남길 수 있었다. 이번 live rerun은 `curl -> transpile-only api -> Playwright` 순서로 실제 `8111` 응답을 다시 확인했다.
+- 잔여: saved search, personalized recommendation, why-recommended badge, GPS distance filter는 다음 epic
+
 **왜 먼저 필요한가**
 
 - `/matches`는 현재 제목/시설 검색, 종목 칩, 날짜, 정원 임박 정렬 정도만 제공한다.
@@ -96,7 +111,30 @@
 - 다중 탭에서 동일 query state 재현
 - 비로그인/로그인 추천 표면 차등 노출
 
+**이번 라운드에서 실제 반영한 것**
+
+- 홈의 `/matches?sport=...` deep link를 실제 `/matches` 필터 상태와 연결
+- URL 기반 탐색 상태와 로컬 draft state를 분리해 rapid toggle/query overwrite race 제거
+- 지역 텍스트 검색, level band, 무료/모집중/초보/오늘 quick filter 추가
+- backend 검색을 title/description/venue/city/district까지 확장
+- discovery helper/unit test와 Playwright smoke를 함께 추가
+
+**이번 라운드에서 미룬 것**
+
+- saved search / 최근 필터 복원
+- GPS/거리 기반 정렬
+- 추천 이유 badge 및 personalized recommendation explanation
+- 로그인/비로그인별 discovery surface 차등
+
 ### FTR-003. Notifications: delivery + action center
+
+**Status**
+
+- 2026-04-08 v1 구현 완료
+- 범위: `match_created`, `player_joined`, `payment_confirmed`, `payment_refunded` 생산자 연결, notification serialization(`category/link/ctaLabel/data`), `/notifications` API 기반 action center, websocket read/read-all sync, badge source 정렬
+- 검증: `pnpm --filter api test -- notifications.service.spec.ts matches.service.spec.ts payments.service.spec.ts` `253/253` pass, `pnpm --filter web test -- src/lib/__tests__/notification-center.test.ts` `5/5` pass, `pnpm --filter api exec tsc --noEmit`, `pnpm --filter web exec tsc --noEmit` pass
+- 브라우저 검증: `notification-center.spec.ts` `Desktop Chrome 3/3` 통과. 안정화 포인트는 explicit in-app navigation, socket connect-time backfill, focus/visibility backfill, lighter `global-setup` bootstrap, fresh dev-login token for API mutations다.
+- 잔여: `/settings/notifications` 영속화, chat-originated notification producer, unrelated `teams` seed drift 정리
 
 **왜 먼저 필요한가**
 
@@ -125,6 +163,12 @@
 
 ### FTR-004. Match lifecycle completion
 
+**Status**
+
+- 2026-04-09 구현 완료
+- 범위: `PATCH /matches/:id` (호스트 수정), `POST /matches/:id/cancel` (CancelMatchDto: reason), `POST /matches/:id/close` (recruiting → full), 프론트 edit 페이지 API 연결, 상세 호스트 관리 영역, 상태 배지
+- 참가자 변경 알림 발송 (`player_joined` → `match_updated` producer 연결)
+
 **왜 먼저 필요한가**
 
 - 개인 매치 핵심 flow 중 `MATCH-003`가 아직 backend route 공백으로 막혀 있다.
@@ -150,6 +194,12 @@
 - 일정/장소 변경 시 알림 생성
 
 ### FTR-005. Upload pipeline for user-generated media
+
+**Status**
+
+- 2026-04-09 백엔드 완료, 프론트엔드 UI 미구현
+- 백엔드 범위: `POST /uploads` (멀티파트, 최대 5개·10MB·jpeg/png/webp/gif), `GET /uploads/:id`, `DELETE /uploads/:id` (소유자만), sharp webp 변환 + 1200px 리사이즈 + 300px 썸네일, 로컬 스토리지 (`uploads/` 디렉토리), Prisma `Upload` 모델 추가
+- 잔여: 프론트엔드 드래그&드롭 UI (`components/ui/image-upload.tsx`), 매치 생성/수정·팀 프로필·장터·구장 리뷰·프로필 사진 연결 (Phase 2 채팅 이미지, 도착 인증 사진 이전 착수 필요)
 
 **왜 먼저 필요한가**
 

@@ -8,6 +8,9 @@ import { runE2EPreflight } from './fixtures/preflight';
 import { promoteAdminPersona, reactivateE2EUsers } from './fixtures/db-runtime';
 
 const AUTH_DIR = path.join(__dirname, '.auth');
+const STORAGE_BOOTSTRAP_URL = 'http://localhost:3003/matches';
+const STORAGE_BOOTSTRAP_TIMEOUT = 120_000;
+
 export default async function globalSetup(_config: FullConfig) {
   const allowOffline = process.env.E2E_ALLOW_OFFLINE === '1';
 
@@ -46,7 +49,10 @@ export default async function globalSetup(_config: FullConfig) {
         // Save storageState for this persona
         const context = await browser.newContext();
         const page = await context.newPage();
-        await page.goto('http://localhost:3003');
+        await page.goto(STORAGE_BOOTSTRAP_URL, {
+          waitUntil: 'domcontentloaded',
+          timeout: STORAGE_BOOTSTRAP_TIMEOUT,
+        });
         await injectTokens(page, t);
         await context.storageState({ path: path.join(AUTH_DIR, `${key}.json`) });
         await context.close();

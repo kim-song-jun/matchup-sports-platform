@@ -15,20 +15,35 @@ export interface NotificationPayload {
   id: string;
   type: string;
   title: string;
-  message: string;
+  body: string;
+  isRead?: boolean;
   data?: Record<string, unknown>;
+  category?: 'match' | 'team' | 'chat' | 'payment' | 'system';
+  link?: string | null;
+  ctaLabel?: string | null;
   createdAt: string;
+}
+
+export interface NotificationReadPayload {
+  notificationId: string;
+}
+
+export interface NotificationReadAllPayload {
+  count: number;
 }
 
 export interface ServerToClientEvents {
   'chat:message': (payload: ChatMessagePayload) => void;
   'notification:new': (payload: NotificationPayload) => void;
+  'notification:read': (payload: NotificationReadPayload) => void;
+  'notification:read-all': (payload: NotificationReadAllPayload) => void;
 }
 
 export interface ClientToServerEvents {
   'chat:join': (roomId: string) => void;
   'chat:leave': (roomId: string) => void;
   'chat:message': (payload: { roomId: string; content: string }) => void;
+  'notification:read': (payload: { notificationId: string }) => void;
 }
 
 export type RealtimeSocket = Socket<ServerToClientEvents, ClientToServerEvents>;

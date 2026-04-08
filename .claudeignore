@@ -1,0 +1,52 @@
+# Dependencies & build output
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+target/
+
+# Lock files
+pnpm-lock.yaml
+
+# Git & IDE
+.git/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs & backups
+*.log
+logs/
+*.bak
+*.bak.*
+*.legacy
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage & cache
+coverage/
+.cache/
+
+# Playwright artifacts
+e2e/test-results/
+e2e/playwright-report/
+
+# Screenshots & images in root
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+
+# Docker & infra config (security)
+docker-compose*.yml
+docker-compose*.yaml
+.env*
+deploy/
+
+# Capacitor native projects
+ios/
+android/

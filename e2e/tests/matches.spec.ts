@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectLoginRedirectOrLink } from '../fixtures/sessions';
 
 test.describe('Matches list page', () => {
   test('page loads with heading and search input', async ({ page }) => {
@@ -44,7 +45,6 @@ test.describe('Match detail page', () => {
 test.describe('Match creation', () => {
   test('unauthenticated user sees login prompt', async ({ page }) => {
     await page.goto('/matches/new');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('main')).toBeVisible();
+    await expectLoginRedirectOrLink(page);
   });
 });

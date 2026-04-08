@@ -5,13 +5,37 @@ x-app-base: &app-base
   working_dir: /app
   volumes:
     - .:/app
-    - root_node_modules:/app/node_modules
-    - api_node_modules:/app/apps/api/node_modules
-    - web_node_modules:/app/apps/web/node_modules
+    - type: volume
+      source: root_node_modules_v3
+      target: /app/node_modules
+      volume:
+        nocopy: true
+    - type: volume
+      source: api_node_modules_v3
+      target: /app/apps/api/node_modules
+      volume:
+        nocopy: true
+    - type: volume
+      source: web_node_modules_v3
+      target: /app/apps/web/node_modules
+      volume:
+        nocopy: true
   environment:
     TZ: Asia/Seoul
 
 services:
+  deps:
+    <<: *app-base
+    command: >
+      sh -c "
+      find /app/node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} +;
+      find /app/apps/api/node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} +;
+      find /app/apps/web/node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} +;
+      cp -a /opt/deps/node_modules/. /app/node_modules/;
+      cp -a /opt/deps/apps/api/node_modules/. /app/apps/api/node_modules/;
+      cp -a /opt/deps/apps/web/node_modules/. /app/apps/web/node_modules/
+      "
+
   postgres:
     image: postgres:16-alpine
     container_name: matchup_postgres_dev
@@ -19,14 +43,13 @@ services:
       POSTGRES_USER: matchup_user
       POSTGRES_PASSWORD: matchup_password
       POSTGRES_DB: matchup_dev
-    # No external port — internal Docker network only.
-    # Access from host: `make db-studio` or `docker exec -it matchup_postgres_dev psql -U matchup_user matchup_dev`
+    # Internal Docker network only.
     expose:
       - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U matchup_user"]
+      test: ["CMD-SHELL", "pg_isready -U matchup_user -d matchup_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -34,8 +57,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: matchup_redis_dev
-    # No external port — internal Docker network only.
-    # Access from host: `docker exec -it matchup_redis_dev redis-cli`
+    # Internal Docker network only.
     expose:
       - "6379"
     volumes:
@@ -49,20 +71,33 @@ services:
   api:
     <<: *app-base
     container_name: matchup_api_dev
-    command: sh -c "pnpm --filter api db:generate && pnpm --filter api dev"
+    command: sh -c "cd /app/apps/api && pnpm db:generate && pnpm dev"
     environment:
       TZ: Asia/Seoul
       DATABASE_URL: postgresql://matchup_user:matchup_password@postgres:5432/matchup_dev
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: dev-secret
       API_PORT: 8111
+      AUTH_HASH_DRIVER: bcryptjs
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"
     depends_on:
+      deps:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8111/api/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     ports:
       - "8111:8111"
 
@@ -78,14 +113,16 @@ services:
       NEXT_PUBLIC_WS_URL: http://localhost:8111
       WATCHPACK_POLLING: "true"
     depends_on:
+      deps:
+        condition: service_completed_successfully
       api:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "3003:3003"
 
 volumes:
   postgres_data:
   redis_data:
-  root_node_modules:
-  api_node_modules:
-  web_node_modules:
+  root_node_modules_v3:
+  api_node_modules_v3:
+  web_node_modules_v3:

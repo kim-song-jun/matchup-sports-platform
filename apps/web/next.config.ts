@@ -5,6 +5,10 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const isCapacitorBuild = process.env.CAPACITOR_BUILD === 'true';
 
 const isProd = process.env.NODE_ENV === 'production';
+const internalApiOrigin =
+  process.env.INTERNAL_API_ORIGIN
+  || process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '')
+  || 'http://localhost:8111';
 
 const nextConfig: NextConfig = {
   // 프로덕션: standalone, Capacitor: export
@@ -26,7 +30,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8111'}/api/:path*`,
+        destination: `${internalApiOrigin}/api/:path*`,
       },
     ];
   },

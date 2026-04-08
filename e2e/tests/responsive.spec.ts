@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { gotoWithWarmup } from '../fixtures/auth';
 
 test.describe('Responsive - Mobile (375px)', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test('bottom nav visible, sidebar hidden', async ({ page }) => {
-    await page.goto('/home');
+    await gotoWithWarmup(page, '/home');
     const sidebar = page.locator('aside');
     await expect(sidebar).not.toBeVisible();
     const bottomNav = page.locator('nav').filter({ has: page.locator('a[href="/home"]') });
@@ -18,7 +19,7 @@ test.describe('Responsive - Mobile (375px)', () => {
   });
 
   test('horizontal scroll on home sport filters', async ({ page }) => {
-    await page.goto('/home');
+    await gotoWithWarmup(page, '/home');
     await page.waitForTimeout(500);
     // Sport filter container should be scrollable
     await expect(page.locator('main')).toBeVisible();
@@ -29,7 +30,7 @@ test.describe('Responsive - Tablet (768px)', () => {
   test.use({ viewport: { width: 768, height: 1024 } });
 
   test('bottom nav visible at tablet size', async ({ page }) => {
-    await page.goto('/home');
+    await gotoWithWarmup(page, '/home');
     const sidebar = page.locator('aside');
     // At 768px (< 1024px lg:), sidebar should be hidden
     await expect(sidebar).not.toBeVisible();
@@ -53,7 +54,7 @@ test.describe('Responsive - Desktop (1440px)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test('sidebar visible, bottom nav hidden', async ({ page }) => {
-    await page.goto('/home');
+    await gotoWithWarmup(page, '/home');
     const sidebar = page.locator('aside');
     await expect(sidebar).toBeVisible();
   });

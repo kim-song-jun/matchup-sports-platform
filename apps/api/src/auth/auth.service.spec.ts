@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
@@ -42,6 +42,7 @@ const safeUser = (u: ReturnType<typeof mockUser>) => {
 const prismaMock = {
   user: {
     findFirst: jest.fn(),
+    findUnique: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -58,6 +59,7 @@ const jwtServiceMock = {
 const configServiceMock = {
   get: jest.fn((key: string) => {
     const map: Record<string, string> = {
+      'auth.hashDriver': 'bcryptjs',
       'jwt.secret': 'test-secret',
       'jwt.expiresIn': '15m',
       'jwt.refreshExpiresIn': '30d',
@@ -181,7 +183,7 @@ describe('AuthService', () => {
   describe('devLogin', () => {
     it('creates a new user when nickname does not exist', async () => {
       const user = mockUser();
-      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
       prismaMock.user.create.mockResolvedValue(user);
       prismaMock.userSportProfile.createMany.mockResolvedValue({ count: 2 });
       usersServiceMock.findById.mockResolvedValue(safeUser(user));
@@ -194,13 +196,43 @@ describe('AuthService', () => {
 
     it('reuses existing user when nickname already exists (idempotent)', async () => {
       const user = mockUser();
-      prismaMock.user.findFirst.mockResolvedValue(user);
+      prismaMock.user.findUnique.mockResolvedValue(user);
       usersServiceMock.findById.mockResolvedValue(safeUser(user));
 
       const result = await service.devLogin('tester');
 
       expect(prismaMock.user.create).not.toHaveBeenCalled();
       expect(result).toHaveProperty('accessToken');
+    });
+
+    it('reactivates a soft-deleted user before issuing tokens', async () => {
+      const deletedUser = mockUser({
+        id: 'deleted-user',
+        nickname: 'deleted-e2e',
+        deletedAt: new Date('2026-04-07T00:00:00.000Z'),
+      });
+      const reactivatedUser = mockUser({
+        id: 'deleted-user',
+        nickname: 'deleted-e2e',
+        deletedAt: null,
+      });
+
+      prismaMock.user.findUnique.mockResolvedValue(deletedUser);
+      prismaMock.user.update.mockResolvedValue(reactivatedUser);
+      usersServiceMock.findById.mockResolvedValue(safeUser(reactivatedUser));
+
+      const result = await service.devLogin('deleted-e2e');
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: 'deleted-user' },
+        data: { deletedAt: null },
+      });
+      expect(prismaMock.user.create).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('accessToken');
+      expect(result.user).toMatchObject({
+        id: 'deleted-user',
+        nickname: 'deleted-e2e',
+      });
     });
   });
 

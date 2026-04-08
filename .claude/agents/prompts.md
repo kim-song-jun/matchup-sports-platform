@@ -74,6 +74,7 @@ Key principles:
 - Docker Compose for local dev (PostgreSQL + Redis)
 - Production Dockerfiles: deploy/Dockerfile.api, deploy/Dockerfile.web
 - CI/CD: .github/workflows/deploy.yml
+- Production EC2 access uses `ec2-user`, and Amazon Linux bootstrap may provide standalone `docker-compose` instead of the `docker compose` plugin
 - Secrets in .env files only — never hardcode in docker-compose or code
 - Turborepo for build orchestration (turbo.json)
 - Next.js: standalone output in prod, static export for Capacitor builds
@@ -437,3 +438,77 @@ Expected result: ...
 |------|-----------|----------|------------|
 | ...  | backend-dev | ... | ... |
 ```
+
+---
+<!-- codex-init:delta version=1 timestamp=20260407_130704 -->
+
+## Injected by codex-init
+
+The sections below fill project-specific gaps while preserving curated content above.
+
+### Current Repo Overrides
+
+- This repository uses `.claude/agents/` as the active agent directory. Do not add parallel `.agents/` docs unless an explicit migration is requested.
+- Mock and fixture handling in the current repo is broader than inline test doubles only. Treat the following as first-class sources that must stay in sync with schema/API changes:
+  - `apps/api/test/fixtures/`
+  - `apps/web/src/test/msw/`
+  - `apps/web/public/mock/`
+  - `e2e/fixtures/`
+  - existing inline mocks in `*.spec.ts` / `*.test.tsx`
+- Runtime ports must follow live config, not stale summaries:
+  - dev web: `3003`
+  - dev api: `8111`
+  - Swagger: `http://localhost:8111/docs`
+  - prod web: `3000`
+  - prod api: `8100`
+- Preferred run and validation entrypoints:
+  - `make dev`, `make up`, `make dev-local`
+  - `make test-web`, `make test-api`, `make test-integration`, `make test-e2e`
+  - `pnpm build`, `pnpm lint`
+- When documentation drifts from code, prefer these files as source of truth:
+  - `apps/api/src/main.ts`
+  - `apps/api/src/config/configuration.ts`
+  - `apps/web/next.config.ts`
+  - `docker-compose.yml`
+  - `Makefile`
+
+### docs-writer
+```text
+You are the documentation owner for MatchUp.
+Owned surfaces:
+- AGENTS.md
+- .claude/agents/prompts.md
+- .claude/agents/team-config.md
+- .claude/agents/workflow.md
+- README.md
+- docs/*.md
+- docs/scenarios/*.md
+- docs/plans/*.md
+- .github/tasks/*.md (status/result updates only after implementation is stable)
+
+Repository context:
+- pnpm workspaces + Turborepo monorepo
+- web: Next.js 15 App Router, React 19, Tailwind CSS v4, next-intl, Zustand, React Query
+- api: NestJS 11, Prisma 6, PostgreSQL 16, Redis 7, Swagger, Socket.IO
+- testing: Vitest, Jest, Supertest, Playwright
+- runtime: Makefile + docker-compose driven local workflow
+
+Mandatory checks:
+1. Reflect current commands and ports from Makefile, docker-compose.yml, apps/api/src/main.ts, and apps/web/next.config.ts.
+2. Never read or print .env* contents. Document environment variables generically by name and purpose only.
+3. Keep docs aligned with the real mock/fixture layout:
+   - apps/api/test/fixtures/
+   - apps/web/src/test/msw/
+   - apps/web/public/mock/
+   - e2e/fixtures/
+4. When behavior changes, update the closest source of truth first, then summary docs.
+5. If a new repo rule/pattern/gotcha was introduced during implementation, update AGENTS.md and the relevant .claude/agents file in the same change.
+6. Preserve curated Korean documentation tone while keeping commands, paths, and identifiers exact.
+
+Output / report expectations:
+- Updated files list
+- Summary of user-facing and developer-facing doc changes
+- Any unresolved documentation drift or follow-up gaps
+```
+
+<!-- /codex-init:delta -->

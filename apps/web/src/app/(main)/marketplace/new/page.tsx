@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Camera, Plus, X, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Camera, Plus, ShoppingBag } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
+import { getListingPreviewImages } from '@/lib/sport-image';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -41,6 +42,7 @@ export default function CreateListingPage() {
     rentalPricePerDay: 0,
     rentalDeposit: 0,
   });
+  const previewImages = getListingPreviewImages(form.sportType || 'marketplace-new', 3);
 
   const handleSubmit = async () => {
     if (!form.title) return toast('error', '제목을 입력해주세요');
@@ -107,14 +109,22 @@ export default function CreateListingPage() {
               <Camera size={20} />
               <span className="text-xs font-medium">0/10</span>
             </label>
-            {/* Placeholder thumbnails */}
-            {[1, 2].map((i) => (
-              <div key={i} className="relative h-[80px] w-[80px] shrink-0 rounded-xl bg-gray-100 flex items-center justify-center opacity-30">
-                <Plus size={20} className="text-gray-300" />
+            {previewImages.map((image) => (
+              <div key={image} className="relative h-[80px] w-[80px] shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                <img
+                  src={image}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full object-cover opacity-60"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
+                  <Plus size={20} className="text-white/90" />
+                </div>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다</p>
+          <p className="text-xs text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다. 오른쪽 예시는 실제 노출 스타일 참고용입니다.</p>
         </div>
 
         {/* 제목 */}

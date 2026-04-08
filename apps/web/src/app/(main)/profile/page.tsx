@@ -120,10 +120,14 @@ export default function ProfilePage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-8 text-center">
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-8 text-center" data-testid="auth-wall">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t('loginPromptTitle')}</h2>
             <p className="text-sm text-gray-500 mt-1.5 whitespace-pre-line">{t('loginPromptDesc')}</p>
-            <Link href="/login" className="inline-block mt-4 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
+            <Link
+              href="/login"
+              data-testid="auth-wall-login-link"
+              className="inline-block mt-4 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors"
+            >
               {tc('login')}
             </Link>
           </div>

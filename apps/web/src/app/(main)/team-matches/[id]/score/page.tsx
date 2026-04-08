@@ -7,11 +7,13 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { getTeamLogo } from '@/lib/sport-image';
 
 // Mock match data (dev only)
 const _mockMatch = {
   id: 'tm-001',
   title: '서울 FC vs 강남 유나이티드',
+  sportType: 'futsal',
   homeTeam: { name: '서울 FC', logo: null },
   awayTeam: { name: '강남 유나이티드', logo: null },
   quarterCount: 4,
@@ -27,6 +29,7 @@ const _mockMatch = {
 const emptyMatch = {
   id: '',
   title: '',
+  sportType: 'soccer',
   homeTeam: { name: '-', logo: null },
   awayTeam: { name: '-', logo: null },
   quarterCount: 4,
@@ -51,6 +54,8 @@ export default function ScoreInputPage() {
     Array.from({ length: mockMatch.quarterCount }, () => ({ home: '', away: '' })),
   );
   const [submitted, setSubmitted] = useState(false);
+  const homeTeamLogo = getTeamLogo(mockMatch.homeTeam.name, mockMatch.sportType, mockMatch.homeTeam.logo, `${mockMatch.id}-home`);
+  const awayTeamLogo = getTeamLogo(mockMatch.awayTeam.name, mockMatch.sportType, mockMatch.awayTeam.logo, `${mockMatch.id}-away`);
 
   function updateScore(quarterIdx: number, team: 'home' | 'away', value: string) {
     // Only allow non-negative integers
@@ -96,10 +101,13 @@ export default function ScoreInputPage() {
           <div className="flex items-center justify-between">
             {/* Home team */}
             <div className="flex-1 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white dark:bg-gray-800/10 mx-auto mb-2">
-                <span className="text-xl font-bold text-white">
-                  {mockMatch.homeTeam.name.charAt(0)}
-                </span>
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-white dark:bg-gray-800/10">
+                <img
+                  src={homeTeamLogo}
+                  alt={`${mockMatch.homeTeam.name} logo`}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
               </div>
               <p className="text-base font-semibold text-white">{mockMatch.homeTeam.name}</p>
               <p className="text-xs text-gray-500 mt-0.5">홈</p>
@@ -119,10 +127,13 @@ export default function ScoreInputPage() {
 
             {/* Away team */}
             <div className="flex-1 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white dark:bg-gray-800/10 mx-auto mb-2">
-                <span className="text-xl font-bold text-white">
-                  {mockMatch.awayTeam.name.charAt(0)}
-                </span>
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-white dark:bg-gray-800/10">
+                <img
+                  src={awayTeamLogo}
+                  alt={`${mockMatch.awayTeam.name} logo`}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
               </div>
               <p className="text-base font-semibold text-white">{mockMatch.awayTeam.name}</p>
               <p className="text-xs text-gray-500 mt-0.5">원정</p>

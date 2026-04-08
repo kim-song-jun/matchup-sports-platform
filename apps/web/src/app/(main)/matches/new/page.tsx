@@ -9,6 +9,7 @@ import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { getSportImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
@@ -42,6 +43,9 @@ export default function CreateMatchPage() {
 
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
   const venues: Venue[] = Array.isArray(venuesData) ? venuesData : (venuesData?.items ?? []);
+  const sampleImages = imagePreviews.length === 0
+    ? getSportImageSet(form.sportType || 'futsal', `match-create-${form.sportType || 'default'}`, 3)
+    : [];
 
   const steps = ['종목', '정보', '장소·일시', '확인'];
 
@@ -65,7 +69,25 @@ export default function CreateMatchPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await api.post('/matches', form);
+      if (!form.venueId) {
+        toast('error', '현재는 등록된 시설만 선택할 수 있어요');
+        return;
+      }
+
+      await api.post('/matches', {
+        title: form.title,
+        description: form.description,
+        sportType: form.sportType,
+        venueId: form.venueId,
+        matchDate: form.matchDate,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        maxPlayers: form.maxPlayers,
+        fee: form.fee,
+        levelMin: form.levelMin,
+        levelMax: form.levelMax,
+        gender: form.gender,
+      });
       toast('success', '매치가 만들어졌어요!');
       router.push('/matches?created=true');
     } catch (err: unknown) {
@@ -79,10 +101,14 @@ export default function CreateMatchPage() {
   if (!isAuthenticated) {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
-        <div className="max-w-[500px] mx-auto mt-20 text-center">
+        <div className="max-w-[500px] mx-auto mt-20 text-center" data-testid="auth-wall">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치를 만들어보세요</h2>
           <p className="text-sm text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
-          <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
+          <Link
+            href="/login"
+            data-testid="auth-wall-login-link"
+            className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors"
+          >
             로그인하고 시작하기
           </Link>
         </div>
@@ -126,6 +152,7 @@ export default function CreateMatchPage() {
                 <button
                   key={type}
                   onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
+                  data-testid={`match-sport-${type}`}
                   className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                     form.sportType === type
                       ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
@@ -169,8 +196,25 @@ export default function CreateMatchPage() {
                     <span className="text-2xs mt-1">{imageFiles.length}/5</span>
                   </button>
                 )}
+                {sampleImages.map((src) => (
+                  <div key={src} className="relative shrink-0 w-20 h-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                    <img
+                      src={src}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover opacity-60"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
+                      <Plus size={18} className="text-white/90" />
+                    </div>
+                  </div>
+                ))}
                 <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
               </div>
+              {sampleImages.length > 0 && (
+                <p className="mt-1.5 text-xs text-gray-500">대표 이미지가 비어 있으면 오른쪽 실사 예시처럼 노출됩니다.</p>
+              )}
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
@@ -225,6 +269,7 @@ export default function CreateMatchPage() {
                 }
                 setStep(2);
               }}
+              data-testid="match-create-next-info"
               className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
               다음
             </button>
@@ -240,6 +285,7 @@ export default function CreateMatchPage() {
                 <div className="space-y-2 mb-3">
                   {venues.map((v: Venue) => (
                     <button key={v.id} onClick={() => setForm({ ...form, venueId: v.id, customVenue: '' })}
+                      data-testid={`match-venue-${v.id}`}
                       className={`w-full text-left rounded-xl p-3 transition-colors ${
                         form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}>
@@ -272,13 +318,14 @@ export default function CreateMatchPage() {
               </Field>
             </div>
             <button onClick={() => {
-                if (!form.venueId && !form.customVenue) { toast('error', '시설을 선택하거나 직접 입력해주세요'); return; }
+                if (!form.venueId) { toast('error', '현재는 등록된 시설만 선택할 수 있어요'); return; }
                 if (!form.matchDate) { toast('error', '날짜를 선택해주세요'); return; }
                 if (!form.startTime) { toast('error', '시작 시간을 입력해주세요'); return; }
                 const today = new Date().toISOString().split('T')[0];
                 if (form.matchDate < today) { toast('error', '과거 날짜는 선택할 수 없어요'); return; }
                 setStep(3);
               }}
+              data-testid="match-create-next-schedule"
               className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
               다음
             </button>
@@ -305,6 +352,7 @@ export default function CreateMatchPage() {
               {imageFiles.length > 0 && <ConfirmRow label="이미지" value={`${imageFiles.length}장`} />}
             </div>
             <button onClick={handleSubmit} disabled={isSubmitting}
+              data-testid="match-create-submit"
               className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
               {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
             </button>

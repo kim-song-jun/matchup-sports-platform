@@ -1,7 +1,7 @@
 # MatchUp — Makefile
 # Monorepo: pnpm workspaces + Turborepo
 # Backend: NestJS (apps/api, port 8111) | Frontend: Next.js (apps/web, port 3003)
-# DB: PostgreSQL (port 5433) | Cache: Redis (port 6380)
+# DB: PostgreSQL (internal Docker network) | Cache: Redis (internal Docker network)
 
 SHELL := /bin/bash
 ROOT_DIR := $(shell pwd)
@@ -106,7 +106,7 @@ _init-docker:
 	@$(DOCKER_DEV) up -d postgres redis
 	@echo "  ▸ Waiting for postgres health..."
 	@for i in 1 2 3 4 5 6 7 8 9 10 11 12; do \
-		if $(DOCKER_DEV) exec -T postgres pg_isready -U matchup_user >/dev/null 2>&1; then \
+		if $(DOCKER_DEV) exec -T postgres pg_isready -U matchup_user -d matchup_dev >/dev/null 2>&1; then \
 			echo "  ✓ postgres is ready"; break; \
 		fi; \
 		if [ "$$i" = "12" ]; then echo "  ✗ postgres failed to start"; exit 1; fi; \
@@ -124,11 +124,11 @@ _init-docker:
 _init-db:
 	@echo ""
 	@echo "▸ Initializing database (via api container, internal network)..."
-	@$(DOCKER_DEV) run --rm api pnpm --filter api db:generate >/dev/null 2>&1 && echo "  ✓ Prisma client generated"
-	@$(DOCKER_DEV) run --rm api pnpm --filter api exec prisma migrate deploy 2>&1 \
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate" >/dev/null 2>&1 && echo "  ✓ Prisma client generated"
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm exec prisma migrate deploy" 2>&1 \
 		| grep -E "(Applying|migration|already|No pending|All migrations)" | sed 's/^/    /' || true
 	@echo "  ✓ Migrations applied"
-	@$(DOCKER_DEV) run --rm api pnpm --filter api db:seed 2>&1 | tail -15 | sed 's/^/    /' || true
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:seed" 2>&1 | tail -15 | sed 's/^/    /' || true
 	@echo "  ✓ Seed data inserted"
 
 .PHONY: dev-local
@@ -155,7 +155,7 @@ up: ## Start full dev environment in Docker Compose (detached)
 	@$(DOCKER_DEV) up -d --build
 	@echo "Waiting for postgres to be ready..."
 	@$(DOCKER_DEV) exec -T postgres sh -c \
-		'until pg_isready -U matchup_user; do sleep 1; done' 2>/dev/null || true
+		'until pg_isready -U matchup_user -d matchup_dev; do sleep 1; done' 2>/dev/null || true
 	@echo "Docker development stack is up."
 
 .PHONY: dev-api
@@ -183,21 +183,21 @@ down: ## Stop and remove Docker development containers
 
 .PHONY: db-migrate
 db-migrate: ## Run prisma migrate dev inside the api container
-	@$(DOCKER_DEV) run --rm api pnpm --filter api db:migrate
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:migrate"
 
 .PHONY: db-push
 db-push: ## Run prisma db push inside the api container
-	@$(DOCKER_DEV) run --rm api pnpm --filter api db:push
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:push"
 
 .PHONY: db-seed
 db-seed: ## Insert seed data inside the api container
-	@$(DOCKER_DEV) run --rm api sh -c "pnpm --filter api db:generate && pnpm --filter api db:seed"
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed"
 
 .PHONY: db-studio
 db-studio: ## Open Prisma Studio (exposes port 5555 only while running)
 	@echo "Prisma Studio will be available at http://localhost:5555"
 	@$(DOCKER_DEV) run --rm -p 127.0.0.1:5555:5555 api \
-		pnpm --filter api exec prisma studio --browser none --hostname 0.0.0.0 --port 5555
+		sh -c "cd /app/apps/api && pnpm exec prisma studio --browser none --hostname 0.0.0.0 --port 5555"
 
 .PHONY: db-shell
 db-shell: ## Open psql shell inside postgres container
@@ -211,7 +211,7 @@ redis-shell: ## Open redis-cli inside redis container
 db-reset: ## DESTRUCTIVE: reset DB, re-migrate, re-seed
 	@echo "WARNING: This will wipe the dev database!"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	@$(DOCKER_DEV) run --rm api pnpm --filter api exec prisma migrate reset --force
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm exec prisma migrate reset --force"
 	@$(MAKE) db-seed
 
 # ─── Testing ──────────────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ test-web: ## Frontend tests only (Vitest)
 
 .PHONY: test-integration
 test-integration: ## Backend integration tests (runs in api container, needs db)
-	@$(DOCKER_DEV) run --rm api pnpm --filter api test:integration
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm test:integration"
 
 .PHONY: test-e2e
 test-e2e: ## Playwright E2E tests (assumes `make dev` is running)
@@ -304,10 +304,10 @@ vapid-keys: ## Generate new VAPID keys for Web Push
 
 .PHONY: clear
 clear: ## Find and kill processes blocking MatchUp dev ports (interactive y/N)
-	@printf "\n▸ Checking MatchUp dev ports (3003, 8111, 5433, 6380, 5555)...\n"
+	@printf "\n▸ Checking MatchUp dev ports (3003, 8111, 5555)...\n"
 	@command -v lsof >/dev/null 2>&1 || { printf "  ✗ lsof not found\n"; exit 1; }
 	@found=0; docker_detected=0; \
-	for port in 3003 8111 5433 6380 5555; do \
+	for port in 3003 8111 5555; do \
 		pids=$$(lsof -ti :$$port -sTCP:LISTEN 2>/dev/null); \
 		if [ -z "$$pids" ]; then \
 			printf "  \033[32m✓\033[0m Port %-5s free\n" "$$port"; \

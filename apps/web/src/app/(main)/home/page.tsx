@@ -9,7 +9,7 @@ import { ChevronRight, Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users } 
 import { EmptyState } from '@/components/ui/empty-state';
 import { sportLabel, sportCardAccent, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
-import { getSportImage, getTeamImage, getListingImage } from '@/lib/sport-image';
+import { getSportImage, getTeamLogo, getListingImage } from '@/lib/sport-image';
 import type { Match, SportTeam, Lesson, MarketplaceListing, TeamMatch } from '@/types/api';
 
 const sportFilters = [
@@ -31,6 +31,7 @@ export default function HomePage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  const canRenderAuthenticated = mounted && isAuthenticated;
   const t = useTranslations('home');
   const te = useTranslations('empty');
   const ts = useTranslations('sports');
@@ -83,13 +84,13 @@ export default function HomePage() {
               {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'TeamMeet'}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {mounted && isAuthenticated
+              {canRenderAuthenticated
                 ? upcoming.length > 0 ? `${t('upcomingSchedule')} ${t('upcomingCount', { count: upcoming.length })}` : t('findMatchToday')
                 : t('findPartner')
               }
             </p>
           </div>
-          {isAuthenticated ? (
+          {canRenderAuthenticated ? (
             <Link href="/matches/new" className="flex items-center gap-1 rounded-xl bg-blue-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
               <Plus size={14} strokeWidth={2.5} />
               {t('createMatch')}
@@ -103,7 +104,7 @@ export default function HomePage() {
       </section>
 
       {/* 다가오는 일정 — 컴팩트 리스트 (이미지 없음, 긴급성 강조) */}
-      {isAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
+      {canRenderAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
         <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
             <div className="flex items-center justify-between mb-2">
@@ -154,7 +155,7 @@ export default function HomePage() {
       )}
 
       {/* 비로그인 가치 제안 */}
-      {!isAuthenticated && (
+      {!canRenderAuthenticated && (
         <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-xl bg-gray-900 dark:bg-gray-800 p-5">
             <p className="text-lg font-bold text-white">{t('aiMatchIntro')}</p>
@@ -167,7 +168,7 @@ export default function HomePage() {
       )}
 
       {/* 배너 (로그인 유저) */}
-      {isAuthenticated && (
+      {canRenderAuthenticated && (
         <section className="mt-4 px-5 @3xl:px-0">
           <div className="relative rounded-xl overflow-hidden h-[96px]" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
             {/* Crossfade layers */}
@@ -209,7 +210,7 @@ export default function HomePage() {
       <section className="mt-6 px-5 @3xl:px-0">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
-            <button key={type} onClick={() => handleSportClick(type)}
+            <button key={type} onClick={() => handleSportClick(type)} aria-pressed={activeSport === type}
               className={`shrink-0 rounded-lg px-3 min-h-[44px] flex items-center text-sm font-medium transition-colors ${
                 activeSport === type
                   ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
@@ -256,13 +257,14 @@ export default function HomePage() {
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
               {teams.map((team: SportTeam) => {
                 const accent = sportCardAccent[team.sportType];
+                const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className={`flex h-7 w-7 items-center justify-center rounded-full ${accent?.tint || 'bg-gray-100'} shrink-0`}>
-                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300">{team.name?.charAt(0)}</span>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${accent?.tint || 'bg-gray-100'} shrink-0 p-0.5`}>
+                            <img src={teamLogo} alt={`${team.name} logo`} className="h-full w-full rounded-[10px] object-cover" loading="lazy" />
                           </div>
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
                         </div>

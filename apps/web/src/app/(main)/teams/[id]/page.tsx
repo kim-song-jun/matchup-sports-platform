@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Calendar, Clock, Instagram, Youtube, Image, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Calendar, Clock, Instagram, Youtube, Shield, CheckCircle, UserPlus, Trophy, AlertCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { BadgeDisplay } from '@/components/ui/badge-display';
@@ -12,7 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo } from '@/lib/skill-grades';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
-import { getTeamImage, getTeamImageSet } from '@/lib/sport-image';
+import { getTeamImage, getTeamImageSet, getTeamLogo } from '@/lib/sport-image';
 
 // Mock trust score data (폴백 — API 연동 시 교체 필요)
 const mockTrustScore = {
@@ -84,6 +84,7 @@ export default function TeamDetailPage() {
   const hasSns = team.instagramUrl || team.youtubeUrl || team.kakaoOpenChat || team.websiteUrl;
   const coverImage = getTeamImage(team.sportType, team.coverImageUrl, team.id);
   const teamGallery = getTeamImageSet(team.sportType, team.photos, team.id, 3);
+  const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -122,19 +123,12 @@ export default function TeamDetailPage() {
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
             {/* Cover image placeholder */}
             <div className="h-32 @3xl:h-44 bg-gray-800 flex items-center justify-center relative">
-              {coverImage ? (
-                <img src={coverImage} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="text-center text-white/60">
-                  <Image size={32} className="mx-auto mb-1" />
-                  <p className="text-xs">커버 이미지</p>
-                </div>
-              )}
+              <img src={coverImage} alt="" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               {/* Logo overlay */}
               <div className="absolute -bottom-6 left-5">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500 text-white text-xl font-black border-2 border-white shadow-lg">
-                  {team.name?.charAt(0)}
+                <div className="rounded-[22px] bg-white/94 p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.24)] backdrop-blur-sm">
+                  <img src={teamLogo} alt={`${team.name} logo`} className="h-14 w-14 rounded-[18px] object-cover" loading="lazy" />
                 </div>
               </div>
             </div>

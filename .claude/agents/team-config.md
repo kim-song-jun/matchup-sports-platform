@@ -76,3 +76,73 @@ qa-uiux     → "Are all UI states handled correctly?"
 ```
 Review/QA results → production team fixes → re-review
 ```
+
+---
+<!-- codex-init:delta version=1 timestamp=20260407_130704 -->
+
+## Injected by codex-init
+
+The sections below fill project-specific gaps while preserving curated content above.
+
+## Missing Team Coverage
+
+| Agent | Team | Role | Focus |
+|-------|------|------|-------|
+| `docs-writer` | Docs | Documentation writer | `AGENTS.md`, `.claude/agents/*`, `README.md`, `docs/*.md`, task/result doc sync |
+
+## Recommended Models / Effort
+
+| Team | Agents | Model | Effort |
+|------|--------|-------|--------|
+| Planning | `project-director`, `tech-planner` | `gpt-5.4-pro` | `high` |
+| Production | `backend-dev`, `frontend-dev`, `infra-dev` | `gpt-5.3-instant` | `medium` |
+| Review | `backend-review`, `frontend-review`, `infra-review` | `gpt-5.4-pro` | `high` |
+| Design | `design-main`, `ux-manager`, `ui-manager` | `gpt-5.3-instant` | `medium` |
+| QA | `qa-beginner`, `qa-regular`, `qa-power`, `qa-uiux` | `gpt-5.3-instant` | `medium` |
+| Docs | `docs-writer` | `gpt-5.4-mini` | `low` |
+
+## Command Aliases
+
+- `@build`: `backend-dev` + `frontend-dev` + `infra-dev`
+- `@review`: `backend-review` + `frontend-review` + `infra-review`
+- `@design`: `design-main` + `ux-manager` + `ui-manager`
+- `@plan`: `project-director` + `tech-planner`
+- `@test`: `qa-beginner` + `qa-regular` + `qa-power` + `qa-uiux`
+- `@docs`: `docs-writer`
+- `@all`: `@plan -> @build -> @review/fix loop -> @design -> @test -> @docs`
+
+## Handoff Rules
+
+1. Builders run in parallel when ownership is independent.
+2. Review starts only after build output is complete.
+3. QA starts only after review passes with `Critical=0` and `Warning=0`.
+4. Docs start last, after implementation and QA results are stable.
+5. Ambiguity returns to planning; builders do not guess.
+6. Non-trivial work should be anchored in `.github/tasks/`.
+
+## Report Formats
+
+### Build
+
+- Changed files grouped by Backend / Frontend / Infra
+- Tests run and outcomes
+- Any tech debt resolved in scope
+
+### Review
+
+- `Critical(N) / Warning(N) / Good(N) / Suggestion(N)`
+- Every Critical includes exact file reference and fix direction
+
+### QA
+
+- Passed scenarios count
+- Failed scenarios with reproduction steps
+- Improvement list
+
+### Docs
+
+- Updated files list
+- Summary of instruction/doc changes
+- Remaining drift or follow-up items
+
+<!-- /codex-init:delta -->

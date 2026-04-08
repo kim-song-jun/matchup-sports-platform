@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectLoginRedirectOrLink } from '../fixtures/sessions';
 
 test.describe('Teams page', () => {
   test('page loads with heading', async ({ page }) => {
@@ -37,27 +38,20 @@ test.describe('Marketplace page', () => {
 test.describe('Notifications page', () => {
   test('unauthenticated shows login prompt', async ({ page }) => {
     await page.goto('/notifications');
-    await page.waitForTimeout(500);
-    // Should show EmptyState with login action
-    const loginLink = page.locator('a[href="/login"]');
-    await expect(loginLink.first()).toBeVisible();
+    await expectLoginRedirectOrLink(page);
   });
 });
 
 test.describe('Chat page', () => {
   test('unauthenticated shows login prompt', async ({ page }) => {
     await page.goto('/chat');
-    await page.waitForTimeout(500);
-    const loginLink = page.locator('a[href="/login"]');
-    await expect(loginLink.first()).toBeVisible();
+    await expectLoginRedirectOrLink(page);
   });
 });
 
 test.describe('Profile page', () => {
   test('unauthenticated shows login prompt', async ({ page }) => {
     await page.goto('/profile');
-    await page.waitForTimeout(500);
-    const loginLink = page.locator('a[href="/login"]');
-    await expect(loginLink.first()).toBeVisible();
+    await expectLoginRedirectOrLink(page);
   });
 });

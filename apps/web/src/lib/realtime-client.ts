@@ -54,7 +54,7 @@ export function createRealtimeSocket(token: string): RealtimeSocket {
     _socket = null;
   }
 
-  const url = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8100';
+  const url = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8111';
 
   _socket = io(url, {
     auth: { token },

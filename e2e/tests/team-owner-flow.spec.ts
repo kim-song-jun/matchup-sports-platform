@@ -26,13 +26,13 @@ test.describe('Team creation — authenticated teamOwner', () => {
     await page.goto('/teams/new');
     await page.waitForLoadState('networkidle');
     // Team name input
-    await expect(page.locator('#team-name')).toBeVisible();
+    await expect(page.locator('#team-name:visible').first()).toBeVisible();
     // Sport type buttons
     await expect(page.getByRole('button', { name: '풋살' })).toBeVisible();
     // City selector
-    await expect(page.locator('#team-city')).toBeVisible();
+    await expect(page.locator('#team-city:visible').first()).toBeVisible();
     // Submit button
-    await expect(page.getByRole('button', { name: '팀 등록하기' })).toBeVisible();
+    await expect(page.locator('button:visible').filter({ hasText: '팀 등록하기' }).first()).toBeVisible();
   });
 
   test('submitting team creation form with valid data navigates to /teams', async ({ page }) => {
@@ -41,13 +41,13 @@ test.describe('Team creation — authenticated teamOwner', () => {
 
     const uniqueName = `E2E팀${Date.now()}`;
 
-    await page.locator('#team-name').fill(uniqueName);
+    await page.locator('#team-name:visible').first().fill(uniqueName);
     // Select futsal sport
     await page.getByRole('button', { name: '풋살' }).click();
     // Select city
-    await page.locator('#team-city').selectOption('서울');
+    await page.locator('#team-city:visible').first().selectOption('서울');
 
-    await page.getByRole('button', { name: '팀 등록하기' }).click();
+    await page.locator('button:visible').filter({ hasText: '팀 등록하기' }).first().click();
 
     // Should navigate to /teams after success
     await page.waitForURL(/\/teams/, { timeout: 10_000 });
@@ -74,7 +74,7 @@ test.describe('My teams page — authenticated teamOwner', () => {
   test('/my/teams page loads with heading', async ({ page }) => {
     await page.goto('/my/teams');
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('h1, h2').filter({ hasText: /내 팀/ }).first()).toBeVisible();
+    await expect(page.locator('h1:visible, h2:visible').filter({ hasText: /내 팀/ }).first()).toBeVisible();
   });
 
   test('my teams page shows create team button or existing teams', async ({ page }) => {
@@ -130,7 +130,7 @@ test.describe('Team matches creation — multi-step form', () => {
 
     // Step 0: select sport and fill title
     await page.getByRole('button', { name: '풋살' }).first().click();
-    const titleInput = page.locator('input[placeholder*="친선경기"]');
+    const titleInput = page.locator('input[placeholder*="친선경기"]:visible').first();
     await titleInput.fill('E2E 테스트 경기 모집');
 
     // "다음" button should be enabled
@@ -146,13 +146,13 @@ test.describe('Team matches creation — multi-step form', () => {
 test.describe('Team matches list page', () => {
   test('/team-matches page loads with heading and filters', async ({ page }) => {
     await page.goto('/team-matches');
-    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('h1:visible').first()).toBeVisible();
     await expect(page.getByRole('button', { name: '전체' }).first()).toBeVisible();
   });
 
   test('"모집글 작성" link is present on /team-matches', async ({ page }) => {
     await page.goto('/team-matches');
-    const createLink = page.locator('a[href="/team-matches/new"]');
+    const createLink = page.locator('a[href="/team-matches/new"]:visible').first();
     await expect(createLink).toBeVisible();
   });
 });

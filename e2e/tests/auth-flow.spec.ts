@@ -13,6 +13,7 @@
 import { test, expect } from '@playwright/test';
 import { TEST_PERSONAS } from '../fixtures/test-users';
 import { setupAuthState, loginViaApi, injectTokens } from '../fixtures/auth';
+import { expectLoginRedirectOrLink } from '../fixtures/sessions';
 
 const SINARO = TEST_PERSONAS.sinaro.nickname;
 
@@ -71,19 +72,12 @@ test.describe('Login page UI structure', () => {
 test.describe('Protected page redirect', () => {
   test('unauthenticated visit to /my/teams redirects to /login', async ({ page }) => {
     await page.goto('/my/teams');
-    await page.waitForURL('**/login**', { timeout: 8_000 }).catch(async () => {
-      // Fallback: some implementations show a login link instead of hard redirect
-      const loginLink = page.locator('a[href="/login"]');
-      await expect(loginLink.first()).toBeVisible();
-    });
+    await expectLoginRedirectOrLink(page);
   });
 
   test('unauthenticated visit to /my/mercenary redirects to /login', async ({ page }) => {
     await page.goto('/my/mercenary');
-    await page.waitForURL('**/login**', { timeout: 8_000 }).catch(async () => {
-      const loginLink = page.locator('a[href="/login"]');
-      await expect(loginLink.first()).toBeVisible();
-    });
+    await expectLoginRedirectOrLink(page);
   });
 });
 

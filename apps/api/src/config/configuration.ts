@@ -1,5 +1,5 @@
 export default () => ({
-  port: parseInt(process.env.API_PORT || '8000', 10),
+  port: parseInt(process.env.API_PORT || '8111', 10),
   database: {
     url: process.env.DATABASE_URL,
   },
@@ -10,6 +10,9 @@ export default () => ({
     secret: process.env.JWT_SECRET || 'dev-secret',
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+  },
+  auth: {
+    hashDriver: process.env.AUTH_HASH_DRIVER || 'bcryptjs',
   },
   oauth: {
     kakao: {

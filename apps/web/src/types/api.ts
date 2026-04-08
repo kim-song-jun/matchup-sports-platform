@@ -31,7 +31,7 @@ export interface Match {
   imageUrl?: string;
   teamConfig: Record<string, unknown> | null;
   createdAt?: string;
-  venue?: { id: string; name: string; city: string; district?: string; address?: string; rating?: number; reviewCount?: number; lat?: number; lng?: number };
+  venue?: { id: string; name: string; city: string; district?: string; address?: string; rating?: number; reviewCount?: number; lat?: number; lng?: number; imageUrls?: string[] };
   host?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore?: number; totalMatches?: number };
   participants?: MatchParticipant[];
   teams?: Team[];
@@ -254,6 +254,7 @@ export interface SportTeam {
   uniformColor?: string;
   isRecruiting: boolean;
   contactInfo?: string;
+  logoUrl?: string;
   coverImageUrl?: string;
   instagramUrl?: string;
   youtubeUrl?: string;

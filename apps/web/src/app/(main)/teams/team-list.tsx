@@ -9,19 +9,23 @@ import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Users as UsersIcon } from 'lucide-react';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
-import { getTeamImage } from '@/lib/sport-image';
+import { getTeamImage, getTeamLogo } from '@/lib/sport-image';
 import type { SportTeam } from '@/types/api';
 
 const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
   const t = useTranslations('teams');
   const tl = useTranslations('levels');
+  const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
 
   return (
     <Link href={`/teams/${team.id}`}>
       <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
         {/* 이미지 */}
-        <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+        <div className="relative w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
           <img src={getTeamImage(team.sportType, team.coverImageUrl, team.id)} alt={team.name} className="w-full h-full object-cover" loading="lazy" />
+          <div className="absolute bottom-2 left-2 rounded-2xl bg-white/92 p-1 shadow-[0_10px_30px_rgba(15,23,42,0.18)] backdrop-blur-sm">
+            <img src={teamLogo} alt={`${team.name} logo`} className="h-9 w-9 rounded-xl object-cover" loading="lazy" />
+          </div>
         </div>
         {/* 텍스트 */}
         <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">

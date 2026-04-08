@@ -172,8 +172,15 @@ sports-platform/
 │           ├── schema.prisma       # DB 스키마 (27개 모델)
 │           └── seed.ts             # 초기 데이터 시드
 │
-├── e2e/                            # Playwright E2E 테스트 (125 passed)
+├── e2e/                            # Playwright E2E 테스트
+├── scripts/
+│   ├── qa/                         # 수동 QA/감사 보조 스크립트
+│   └── docs/                       # 문서용 스크린샷 캡처 스크립트
 ├── deploy/                         # Dockerfile, Nginx 설정, EC2 스크립트
+├── docs/
+│   ├── screenshots/                # 문서에 참조되는 canonical 스크린샷
+│   ├── reference/                  # 버전 관리되는 시각 레퍼런스
+│   └── plans/                      # 실행/정리 계획 문서
 ├── docker-compose.yml              # 로컬 개발 (PostgreSQL + Redis)
 ├── turbo.json                      # Turborepo 파이프라인
 └── pnpm-workspace.yaml
@@ -238,17 +245,17 @@ cp apps/web/.env.example apps/web/.env.local
 ### Start Development
 
 ```bash
-# 1. DB + Redis 실행 (Docker)
-docker compose up -d
+# 1. 전체 개발 스택 실행 (Docker Compose)
+make up
 
 # 2. DB 스키마 반영
-pnpm db:push
+make db:push
 
 # 3. 초기 데이터 시드 (선택)
-pnpm db:seed
+make db:seed
 
-# 4. 개발 서버 실행
-pnpm dev
+# 4. 로그와 함께 붙어서 실행하려면
+make dev
 ```
 
 | 서비스 | URL |
@@ -265,15 +272,22 @@ pnpm dev
 ### 전체 명령어
 
 ```bash
-pnpm dev             # 전체 개발 서버 (Turborepo 병렬 실행)
+make dev             # 전체 개발 스택 실행 (attached logs)
+make up              # 전체 개발 스택 실행 (detached)
+make stop            # 컨테이너 중지
+make down            # 컨테이너 제거
+
 pnpm build           # 전체 프로덕션 빌드
 pnpm lint            # 전체 린트 검사
 pnpm clean           # 빌드 캐시 및 .next 정리
+pnpm qa:manual:routes
+pnpm qa:manual:ui-gaps
+pnpm docs:screenshots:overview
+pnpm docs:screenshots:app
 
-pnpm db:push         # Prisma 스키마 → DB 즉시 반영 (dev)
-pnpm db:migrate      # Prisma 마이그레이션 생성 및 적용
-pnpm db:studio       # Prisma Studio (DB 브라우저, 포트 5555)
-pnpm db:seed         # 초기 데이터 시드
+make db:push         # Prisma 스키마 → DB 즉시 반영 (dev)
+make db:migrate      # Prisma 마이그레이션 생성 및 적용
+make db:seed         # 초기 데이터 시드
 ```
 
 ### 개별 앱
@@ -281,18 +295,25 @@ pnpm db:seed         # 초기 데이터 시드
 ```bash
 # Frontend
 cd apps/web
-pnpm dev             # Next.js dev server (포트 3003)
+pnpm dev             # Next.js dev server (포트 3003, 로컬 직접 실행 시)
 pnpm build           # 프로덕션 빌드
 pnpm test            # Vitest 단위 테스트
 pnpm test:watch      # 와치 모드
 
 # Backend
 cd apps/api
-pnpm dev             # NestJS watch mode (포트 8111)
+pnpm dev             # NestJS watch mode (포트 8111, 로컬 직접 실행 시)
 pnpm build           # 프로덕션 빌드
 pnpm test            # Jest 단위 테스트
 pnpm test:cov        # 커버리지 리포트 포함
 ```
+
+### 저장소 위생 규칙
+
+- 루트에는 앱 엔트리와 설정 파일만 둡니다. 일회성 QA 도구는 `scripts/qa/`, 문서 캡처 도구는 `scripts/docs/`에 둡니다.
+- 문서에서 참조하는 스크린샷은 `docs/screenshots/`를 canonical 경로로 사용합니다.
+- 디자인/기획용 버전 관리 레퍼런스 이미지는 `docs/reference/`에 둡니다.
+- 로컬 산출물과 캐시는 `playwright-report/`, `test-results/`, `.playwright-mcp/`, `.pnpm-store/`, `tmp/`, `ec2-info`처럼 git ignore 대상에만 둡니다.
 
 ---
 
@@ -474,10 +495,13 @@ docker build -f deploy/Dockerfile.web -t matchup-web .
 docker build -f deploy/Dockerfile.api -t matchup-api .
 
 # 프로덕션 전체 실행
-docker compose -f deploy/docker-compose.prod.yml up -d
+docker-compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
+# Docker Compose plugin이 설치된 환경에서는 `docker compose ...`도 사용 가능
 ```
 
-- Nginx 리버스 프록시로 Frontend(3003) / Backend(8111) 라우팅
+- Nginx 리버스 프록시로 Frontend(3000) / Backend(8100) 라우팅
+- GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, compose 재기동, `prisma migrate deploy`를 수행
+- 운영 EC2 SSH 계정 기준은 `ec2-user`다
 - SSL 종료는 Nginx 레이어에서 처리
 - EC2 초기 설정: `deploy/setup-ec2.sh` 참고
 

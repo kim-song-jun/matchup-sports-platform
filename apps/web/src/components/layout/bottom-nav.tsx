@@ -16,23 +16,27 @@ export function BottomNav() {
   const t = useTranslations('nav');
 
   const navItems = [
-    { href: '/home', icon: Home, label: t('home') },
-    { href: '/matches', icon: Search, label: t('matches') },
-    { href: '/lessons', icon: GraduationCap, label: t('lessons') },
-    { href: '/marketplace', icon: ShoppingBag, label: t('marketplace') },
-    { href: '/profile', icon: User, label: t('profile') },
+    { href: '/home', icon: Home, label: t('home'), testId: 'bottom-nav-home' },
+    { href: '/matches', icon: Search, label: t('matches'), testId: 'bottom-nav-matches' },
+    { href: '/lessons', icon: GraduationCap, label: t('lessons'), testId: 'bottom-nav-lessons' },
+    { href: '/marketplace', icon: ShoppingBag, label: t('marketplace'), testId: 'bottom-nav-marketplace' },
+    { href: '/profile', icon: User, label: t('profile'), testId: 'bottom-nav-profile' },
   ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(var(--safe-area-bottom)+0.75rem)]">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(var(--safe-area-bottom)+0.75rem)]"
+      data-testid="bottom-nav"
+    >
       <div className="floating-bottom-nav flex w-full max-w-xl items-center justify-between rounded-[28px] px-2 py-2">
-        {navItems.map(({ href, icon: Icon, label }) => {
+        {navItems.map(({ href, icon: Icon, label, testId }) => {
           const isActive = pathname.startsWith(href);
           const isProfile = href === '/profile';
           return (
             <Link
               key={href}
               href={href}
+              data-testid={testId}
               className={cn(
                 'bottom-nav-link flex min-h-[56px] min-w-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-3 py-2 text-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
                 isActive ? 'is-active text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',

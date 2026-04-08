@@ -23,6 +23,21 @@ async function apiCall<T>(
   return ((json.data ?? json) as unknown) as T;
 }
 
+async function publicApiCall<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API GET ${path} failed: ${res.status} ${text}`);
+  }
+  const json = await res.json() as Record<string, unknown>;
+  return ((json.data ?? json) as unknown) as T;
+}
+
 export async function createTeamViaApi(
   token: string,
   data: {
@@ -47,16 +62,34 @@ export async function createMatchViaApi(
     matchDate: string;
     startTime: string;
     endTime: string;
-    venue: string;
+    venueId: string;
     maxPlayers: number;
     fee?: number;
+    description?: string;
+    levelMin?: number;
+    levelMax?: number;
   },
 ): Promise<{ id: string }> {
   return apiCall('POST', '/matches', token, {
     fee: 0,
-    level: 3,
+    levelMin: 1,
+    levelMax: 5,
     ...data,
   });
+}
+
+export async function findVenueBySport(
+  sportType: string,
+): Promise<{ id: string; name: string; address: string }> {
+  const venues = await publicApiCall<Array<{ id: string; name: string; address: string }>>(
+    `/venues?sportType=${encodeURIComponent(sportType)}`,
+  );
+
+  if (!Array.isArray(venues) || venues.length === 0) {
+    throw new Error(`No venue found for sportType="${sportType}"`);
+  }
+
+  return venues[0];
 }
 
 export async function createTeamMatchViaApi(

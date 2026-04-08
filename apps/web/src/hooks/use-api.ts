@@ -673,7 +673,13 @@ export function useChatRooms() {
     queryKey: queryKeys.chat.rooms,
     queryFn: async () => {
       const res = await api.get('/chat/rooms');
-      return extractData<ChatRoom[]>(res);
+      const data = extractData<ChatRoom[] | PaginatedResponse<ChatRoom>>(res);
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      const paginated = data as PaginatedResponse<ChatRoom> & { data?: ChatRoom[] };
+      return paginated.items ?? paginated.data ?? [];
     },
     enabled: isAuthenticated,
   });

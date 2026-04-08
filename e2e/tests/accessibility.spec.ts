@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { gotoWithWarmup } from '../fixtures/auth';
 
 test.describe('Accessibility', () => {
   test('home page has proper heading hierarchy', async ({ page }) => {
-    await page.goto('/home');
+    await gotoWithWarmup(page, '/home');
     const h1 = page.locator('h1');
     expect(await h1.count()).toBeGreaterThanOrEqual(1);
   });
@@ -23,7 +24,7 @@ test.describe('Accessibility', () => {
   });
 
   test('touch targets are at least 44px', async ({ page }) => {
-    await page.goto('/home');
+    await gotoWithWarmup(page, '/home');
     await page.waitForTimeout(500);
     // Check bottom nav tabs
     const navLinks = page.locator('nav a');

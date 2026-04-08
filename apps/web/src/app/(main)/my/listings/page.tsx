@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { useListings } from '@/hooks/use-api';
+import { getListingImage } from '@/lib/sport-image';
 import { formatAmount } from '@/lib/utils';
 
 const mockMyListings = [
@@ -23,7 +24,7 @@ const mockMyListings = [
     viewCount: 42,
     likeCount: 5,
     createdAt: '2026-03-15',
-    imageUrl: null,
+    imageUrls: [],
   },
   {
     id: 'listing-2',
@@ -36,7 +37,7 @@ const mockMyListings = [
     viewCount: 28,
     likeCount: 3,
     createdAt: '2026-03-10',
-    imageUrl: null,
+    imageUrls: [],
   },
   {
     id: 'listing-3',
@@ -49,7 +50,7 @@ const mockMyListings = [
     viewCount: 65,
     likeCount: 8,
     createdAt: '2026-03-05',
-    imageUrl: null,
+    imageUrls: [],
   },
 ];
 
@@ -86,7 +87,7 @@ export default function MyListingsPage() {
     viewCount: l.viewCount ?? 0,
     likeCount: l.likeCount ?? 0,
     createdAt: '',
-    imageUrl: l.imageUrls?.[0] || null,
+    imageUrls: l.imageUrls ?? [],
   }));
   const [localListings, setLocalListings] = useState(mockMyListings);
   const listings = apiListings ?? localListings;
@@ -157,8 +158,13 @@ export default function MyListingsPage() {
             return (
               <div key={listing.id} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-20 h-20 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center shrink-0">
-                    <Package size={24} className="text-gray-300 dark:text-gray-500" />
+                  <div className="w-20 h-20 rounded-xl bg-gray-100 dark:bg-gray-700 overflow-hidden shrink-0">
+                    <img
+                      src={getListingImage(listing.imageUrls, listing.id)}
+                      alt={listing.title}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">

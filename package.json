@@ -10,8 +10,12 @@
     "db:migrate": "pnpm --filter api db:migrate",
     "db:studio": "pnpm --filter api db:studio",
     "db:seed": "pnpm --filter api db:seed",
-    "test:e2e": "cd e2e && npx playwright test",
-    "test:all": "pnpm --filter api test && pnpm --filter web test && cd e2e && npx playwright test"
+    "test:e2e": "pnpm exec playwright test --config=e2e/playwright.config.ts",
+    "test:all": "pnpm --filter api test && pnpm --filter web test && pnpm exec playwright test --config=e2e/playwright.config.ts",
+    "qa:manual:routes": "node scripts/qa/manual-route-smoke.mjs",
+    "qa:manual:ui-gaps": "node scripts/qa/manual-ui-gap-audit.mjs",
+    "docs:screenshots:overview": "node scripts/docs/capture-overview-screenshots.mjs",
+    "docs:screenshots:app": "node scripts/docs/capture-app-screenshots.mjs"
   },
   "packageManager": "pnpm@9.15.4",
   "engines": {

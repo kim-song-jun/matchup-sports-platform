@@ -58,7 +58,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-white dark:bg-gray-900">
+    <div className="flex min-h-dvh flex-col bg-white dark:bg-gray-900" data-testid="login-page">
       {/* 상단 — 뒤로가기 */}
       <div className="flex items-center px-4 pt-4">
         <Link
@@ -88,6 +88,7 @@ export default function LoginPage() {
           <div className="flex mb-5">
             {(['login', 'register'] as const).map(tab => (
               <button key={tab} onClick={() => setMode(tab)}
+                data-testid={tab === 'login' ? 'auth-tab-login' : 'auth-tab-register'}
                 className={`flex-1 py-2.5 text-base font-medium border-b-2 transition-colors ${
                   mode === tab ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}>
@@ -113,7 +114,7 @@ export default function LoginPage() {
                   className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
               </>
             )}
-            <button onClick={handleEmailSubmit} disabled={isLoading}
+            <button onClick={handleEmailSubmit} disabled={isLoading} data-testid="auth-submit"
               className="w-full rounded-xl bg-blue-500 py-3 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-[colors,transform]">
               {isLoading ? (mode === 'login' ? '로그인 중...' : '가입 중...') : mode === 'login' ? '로그인' : '가입하기'}
             </button>
@@ -142,6 +143,7 @@ export default function LoginPage() {
           <div className="mt-5 text-center">
             <Link
               href="/home"
+              data-testid="browse-without-login"
               className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors min-h-[44px]"
             >
               로그인 없이 둘러보기
@@ -154,13 +156,13 @@ export default function LoginPage() {
       </div>
 
       {/* 개발 빠른 로그인 — 개발 환경에서만 표시 */}
-      {process.env.NODE_ENV !== 'production' && <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6">
+      {process.env.NODE_ENV !== 'production' && <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6" data-testid="dev-login-panel">
         <p className="text-center text-xs text-gray-400 mb-3">개발 모드</p>
         <div className="flex gap-2 max-w-sm mx-auto">
-          <input type="text" placeholder="닉네임" aria-label="테스트 닉네임" value={devNickname} onChange={e => setDevNickname(e.target.value)}
+          <input type="text" placeholder="닉네임" aria-label="테스트 닉네임" data-testid="dev-login-input" value={devNickname} onChange={e => setDevNickname(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleDevLogin()}
             className="flex-1 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none" />
-          <button onClick={() => handleDevLogin()} disabled={isLoading}
+          <button onClick={() => handleDevLogin()} disabled={isLoading} data-testid="dev-login-submit"
             className="rounded-xl bg-gray-900 dark:bg-white px-5 py-2.5 text-sm font-bold text-white dark:text-gray-900 disabled:opacity-50 transition-colors">
             입장
           </button>

@@ -61,6 +61,8 @@
 6. **Ambiguity escalates up, not sideways** — 빌더는 추측하지 않고 반드시 planners로 에스컬레이션
 7. **Mock data sync** — schema 변경 시 같은 변경에서 inline mock 업데이트 필수
 8. **Consolidated reports** — combine each agent's result into one summary
+9. **No false affordance in user flows** — create/edit UI에 노출한 입력/업로드/직접입력 옵션은 실제 저장 경로와 반드시 일치해야 한다
+10. **Keep journey-level visual continuity** — 같은 기능 여정 안에서는 create/list/detail/history가 공통 accent와 control language를 공유해야 한다
 
 ---
 
@@ -182,3 +184,88 @@ Pass: N/M scenarios
 Fail: [failed scenarios + reproduction steps]
 Improvements: [list]
 ```
+
+---
+<!-- codex-init:delta version=1 timestamp=20260407_130704 -->
+
+## Injected by codex-init
+
+The sections below fill project-specific gaps while preserving curated content above.
+
+## Corrected Pipeline Order
+
+### New Feature
+
+`@plan -> @build -> @review/fix loop -> @design -> @test -> @docs`
+
+### Bug Fix
+
+`@build -> @review/fix loop -> @test -> @docs`
+
+### Design Refactor
+
+`@design audit -> @build -> @design review/fix -> @test -> @docs`
+
+### Docs Only
+
+`@docs` after confirming no code, schema, runtime, or test changes are required
+
+## Current Repo Runtime Notes
+
+- Use `make dev`, `make up`, or `make dev-local` as the default execution entrypoints.
+- Dev source-of-truth ports are `web=3003` and `api=8111`.
+- Production compose uses `web=3000` and `api=8100`.
+- Swagger lives at `http://localhost:8111/docs` in dev.
+- Production EC2 access is `ec2-user`, and the bootstrap path may leave the host with standalone `docker-compose` instead of the `docker compose` plugin. Infra work must not assume only one form exists.
+- Keep the dev Docker runtime on a glibc-based Node image, resync dev `node_modules` volumes from the image via a `nocopy` bootstrap service on each startup, and point `pg_isready` at the configured database name.
+- Keep production hashing on native `bcrypt`, but allow dev compose to override the hash driver to `bcryptjs` when native addons are not reliably loadable in the mounted workspace runtime.
+- Keep Postgres and Redis on the internal Docker network in dev, and gate `web` startup on the API healthcheck instead of `service_started`.
+
+## Current Repo Validation Notes
+
+- Frontend unit: `make test-web` or `pnpm --filter web test`
+- Backend unit: `make test-api` or `pnpm --filter api test`
+- Backend integration: `make test-integration` or `pnpm --filter api test:integration`
+- E2E: `make test-e2e` or `pnpm exec playwright test --config=e2e/playwright.config.ts`
+- Local Playwright defaults should stay conservative for Next dev: `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter. Override with env vars only when intentionally load-testing the dev server.
+- Nest API validation is strict (`whitelist + forbidNonWhitelisted`). Frontend forms with UI-only fields must sanitize submit payloads before POST/PATCH.
+- Guarded-route E2E helpers should wait for an authenticated home-state signal before navigating deeper, or auth-wall false negatives can appear during hydration.
+- Cross-cutting: `pnpm build`, `pnpm lint`
+
+## Fixture / Mock Sync Gate
+
+Review is not complete if a change touches schema, DTOs, API responses, or seeded/demo content without syncing the relevant test and mock surfaces:
+
+- `apps/api/test/fixtures/`
+- `apps/web/src/test/msw/`
+- `apps/web/public/mock/`
+- `apps/web/public/mock/photoreal/ATTRIBUTION.md`
+- `e2e/fixtures/`
+- affected inline mocks in `*.spec.ts` / `*.test.tsx`
+
+When the change adds or replaces photoreal mock images, review must also confirm that:
+
+- the consuming catalog/helper points at local photo assets rather than remote URLs
+- attribution metadata (source URL, creator, license) is recorded alongside the asset set
+- explicit photoreal slots do not continue to mix SVG or generated art inside the same active fallback catalog
+- empty upload states on user-facing create/edit surfaces do not regress to generic gray placeholders when the product already uses a photoreal helper strategy
+
+## Docs Last Rule
+
+`docs-writer` runs after the code path is stable and records:
+
+- what changed
+- which commands/ports/instructions were affected
+- whether `AGENTS.md` or `.claude/agents/*` required updates
+- any remaining documentation drift
+
+### Docs Report
+
+```
+## Docs Report
+Updated: [files]
+Summary: [what changed and why]
+Open gaps: [remaining drift or follow-up]
+```
+
+<!-- /codex-init:delta -->

@@ -1,20 +1,38 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+
+type PasswordHasher = {
+  compare(data: string, encrypted: string): Promise<boolean>;
+  hash(data: string, saltOrRounds: string | number): Promise<string>;
+};
+
+const loadPasswordHasher = (driver: string): PasswordHasher => {
+  if (driver !== 'bcryptjs') {
+    throw new Error(`Unsupported auth hash driver: ${driver}`);
+  }
+
+  return require('bcryptjs') as PasswordHasher;
+};
 
 @Injectable()
 export class AuthService {
   private readonly adminEmail = 'test2@gmail.com';
+  private readonly passwordHasher: PasswordHasher;
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    const hashDriver = this.configService.get<string>('auth.hashDriver') ?? 'bcryptjs';
+
+    this.passwordHasher = loadPasswordHasher(hashDriver);
+  }
 
   private getRoleForEmail(email?: string | null) {
     return email === this.adminEmail ? 'admin' : 'user';
@@ -40,7 +58,7 @@ export class AuthService {
       throw new ConflictException('이미 사용 중인 닉네임이에요');
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await this.passwordHasher.hash(password, 10);
 
     const user = await this.prisma.user.create({
       data: {
@@ -69,7 +87,7 @@ export class AuthService {
       throw new BadRequestException('이메일 또는 비밀번호가 올바르지 않아요');
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await this.passwordHasher.compare(password, user.passwordHash);
     if (!valid) {
       throw new BadRequestException('이메일 또는 비밀번호가 올바르지 않아요');
     }
@@ -92,54 +110,69 @@ export class AuthService {
    * 프로덕션에서는 비활성화 해야 함
    */
   async devLogin(nickname: string) {
-    // 기존 사용자 찾기
-    let user = await this.prisma.user.findFirst({
-      where: { nickname, deletedAt: null },
-    });
-
-    // 없으면 새로 생성
-    if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          nickname,
-          role: 'user',
-          oauthProvider: 'kakao',
-          oauthId: `dev_${nickname}_${Date.now()}`,
-          sportTypes: ['futsal', 'basketball'],
-          mannerScore: 3.5,
-          locationCity: '서울',
-          locationDistrict: '마포구',
-        },
+    try {
+      // 기존 사용자 찾기
+      let user = await this.prisma.user.findUnique({
+        where: { nickname },
       });
 
-      // 기본 종목 프로필 생성
-      await this.prisma.userSportProfile.createMany({
-        data: [
-          {
-            userId: user.id,
-            sportType: 'futsal',
-            level: 3,
-            eloRating: 1200,
-            preferredPositions: ['MF', 'FW'],
+      if (user?.deletedAt) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { deletedAt: null },
+        });
+      }
+
+      // 없으면 새로 생성
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            nickname,
+            role: 'user',
+            oauthProvider: 'kakao',
+            oauthId: `dev_${nickname}_${Date.now()}`,
+            sportTypes: ['futsal', 'basketball'],
+            mannerScore: 3.5,
+            locationCity: '서울',
+            locationDistrict: '마포구',
           },
-          {
-            userId: user.id,
-            sportType: 'basketball',
-            level: 2,
-            eloRating: 1000,
-            preferredPositions: ['SG', 'SF'],
-          },
-        ],
-      });
+        });
+
+        // 기본 종목 프로필 생성
+        await this.prisma.userSportProfile.createMany({
+          data: [
+            {
+              userId: user.id,
+              sportType: 'futsal',
+              level: 3,
+              eloRating: 1200,
+              preferredPositions: ['MF', 'FW'],
+            },
+            {
+              userId: user.id,
+              sportType: 'basketball',
+              level: 2,
+              eloRating: 1000,
+              preferredPositions: ['SG', 'SF'],
+            },
+          ],
+        });
+      }
+
+      const tokens = this.generateTokens(user.id);
+      const fullUser = await this.usersService.findById(user.id);
+
+      return {
+        ...tokens,
+        user: fullUser,
+      };
+    } catch (error) {
+      this.logger.error(
+        `devLogin failed for ${nickname}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
     }
-
-    const tokens = this.generateTokens(user.id);
-    const fullUser = await this.usersService.findById(user.id);
-
-    return {
-      ...tokens,
-      user: fullUser,
-    };
   }
 
   async refreshToken(refreshToken: string) {

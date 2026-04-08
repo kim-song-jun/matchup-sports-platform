@@ -12,6 +12,7 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import type { MatchParticipant } from '@/types/api';
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
+import { getSportDetailImageSet, getVenueImageSet } from '@/lib/sport-image';
 import { formatFullDate, formatAmount } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
@@ -82,6 +83,11 @@ export default function MatchDetailPage() {
   const isHost = user?.id === match.hostId;
   const isParticipant = match.participants?.some((p: MatchParticipant) => p.userId === user?.id);
   const isFull = match.currentPlayers >= match.maxPlayers;
+  const matchImages = getSportDetailImageSet(match.sportType, [match.imageUrl], match.id, 4);
+  const heroImage = matchImages[0];
+  const venuePreviewImage = match.venue
+    ? getVenueImageSet(match.sportType, match.venue.imageUrls, `${match.id}-venue`, 1)[0]
+    : null;
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -119,6 +125,23 @@ export default function MatchDetailPage() {
       <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         {/* Left: match info */}
         <div className="px-5 @3xl:px-0">
+          {heroImage && (
+            <div className="mb-4">
+              <div className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+                <img src={heroImage} alt={match.title} className="h-[220px] w-full object-cover" />
+              </div>
+              {matchImages.length > 1 && (
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {matchImages.slice(1).map((image, index) => (
+                    <div key={`${image}-${index}`} className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+                      <img src={image} alt={`${match.title} 이미지 ${index + 2}`} className="aspect-[4/3] h-full w-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Title card */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 @3xl:p-6">
             <div className="flex items-start gap-3">
@@ -129,7 +152,7 @@ export default function MatchDetailPage() {
               )}
               <div>
                 <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[match.sportType]}</span>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
+                <h2 data-testid="match-detail-title" className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
                   {match.title}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
@@ -158,9 +181,11 @@ export default function MatchDetailPage() {
             <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">시설 정보</h3>
               <div className="flex items-center gap-3">
-                <div className="h-16 w-16 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                  <MapPin size={24} className="text-gray-300 dark:text-gray-500" />
-                </div>
+                {venuePreviewImage && (
+                  <div className="h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                    <img src={venuePreviewImage} alt={match.venue.name} className="h-full w-full object-cover" loading="lazy" />
+                  </div>
+                )}
                 <div>
                   <p className="text-base font-medium text-gray-800 dark:text-gray-200">{match.venue.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{match.venue.address}</p>
@@ -184,7 +209,7 @@ export default function MatchDetailPage() {
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">참가 현황</span>
-              <span className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
+              <span data-testid="match-participant-count" className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
                 {match.currentPlayers}/{match.maxPlayers}명
               </span>
             </div>
@@ -204,6 +229,7 @@ export default function MatchDetailPage() {
               <button
                 onClick={() => leaveMutation.mutate()}
                 disabled={leaveMutation.isPending}
+                data-testid="match-leave-button"
                 className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3.5 text-md font-semibold text-red-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
               >
                 {leaveMutation.isPending ? (
@@ -221,6 +247,7 @@ export default function MatchDetailPage() {
               <button
                 onClick={() => match.fee > 0 ? setShowCheckout(true) : joinMutation.mutate()}
                 disabled={joinMutation.isPending}
+                data-testid="match-join-button"
                 className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
               >
                 {joinMutation.isPending ? (

@@ -1,6 +1,6 @@
 # MatchUp - AI 스포츠 매칭 플랫폼 프로젝트 현황
 
-> 최종 업데이트: 2026-04-06 | 스크린샷: v4 (Playwright 자동 캡처)
+> 최종 업데이트: 2026-04-08 | 스크린샷: v4 (Playwright 자동 캡처)
 
 ---
 
@@ -42,10 +42,12 @@ MatchUp은 생활체육 동호인을 위한 AI 기반 멀티스포츠 소셜 매
 sports-platform/
 ├── apps/
 │   ├── web/          → Next.js 프론트엔드 (포트 3003)
-│   └── api/          → NestJS 백엔드 (포트 8100)
-├── packages/
-│   └── shared/       → 공유 타입/상수
-└── docs/             → 문서 및 스크린샷
+│   └── api/          → NestJS 백엔드 (포트 8111)
+├── e2e/              → Playwright E2E
+├── scripts/
+│   ├── qa/           → 수동 QA 보조 스크립트
+│   └── docs/         → 문서 스크린샷 캡처 스크립트
+└── docs/             → 문서, canonical 스크린샷, 레퍼런스
 ```
 
 ---
@@ -320,22 +322,23 @@ UI (모달, 토스트, 스켈레톤), 레이아웃 (사이드바, 하단네비),
 # 의존성 설치
 pnpm install
 
-# DB 실행
-docker compose up -d    # PostgreSQL + Redis
+# 전체 개발 스택 실행
+make up
 
-# 전체 개발 서버
-pnpm dev               # 프론트 3003 + 백엔드 8100
+# 전체 개발 서버 로그 보기
+make dev               # 프론트 3003 + 백엔드 8111
 
 # DB 관리
-pnpm db:push           # Prisma 스키마 반영
-pnpm db:studio         # Prisma Studio
-pnpm db:seed           # 시드 데이터
+make db:push           # Prisma 스키마 반영
+make db:seed           # 시드 데이터
+make down              # 개발 컨테이너 제거
 
 # 스크린샷 캡처
-node scripts/capture-screenshots.mjs
+pnpm docs:screenshots:overview
+pnpm docs:screenshots:app
 
 # Swagger 문서
-open http://localhost:8100/docs
+open http://localhost:8111/docs
 ```
 
 ---

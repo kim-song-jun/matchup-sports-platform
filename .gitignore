@@ -4,6 +4,17 @@ dist/
 .turbo/
 *.tsbuildinfo
 
+# local caches and runtime artifacts
+.playwright-mcp/
+.pnpm-store/
+playwright-report/
+test-results/
+tmp/
+e2e/.auth/
+*.log
+.claude/agents/*.bak.*
+ec2-info
+
 # env
 .env
 .env.local

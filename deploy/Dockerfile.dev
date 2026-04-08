@@ -1,0 +1,28 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential python3 openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/api/prisma apps/api/prisma
+COPY apps/web/package.json apps/web/package.json
+
+RUN pnpm install --frozen-lockfile
+RUN mkdir -p /opt/deps/node_modules /opt/deps/apps/api/node_modules /opt/deps/apps/web/node_modules \
+    && cp -a /app/node_modules/. /opt/deps/node_modules/ \
+    && cp -a /app/apps/api/node_modules/. /opt/deps/apps/api/node_modules/ \
+    && cp -a /app/apps/web/node_modules/. /opt/deps/apps/web/node_modules/
+
+COPY apps/api apps/api
+COPY apps/web apps/web
+
+RUN pnpm --filter api db:generate

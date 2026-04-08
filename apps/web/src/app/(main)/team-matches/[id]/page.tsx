@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo, MATCH_TYPES } from '@/lib/skill-grades';
 import { sportLabel } from '@/lib/constants';
+import { getTeamLogo } from '@/lib/sport-image';
 import { formatDateDot, formatAmount } from '@/lib/utils';
 
 const levelLabel: Record<string, string> = {
@@ -78,6 +79,14 @@ export default function TeamMatchDetailPage() {
   const isMatchDay = new Date(match.matchDate).toDateString() === new Date().toDateString();
   const isCompleted = match.status === 'completed';
   const isRecruiting = match.status === 'recruiting';
+  const hostTeamLogo = match.hostTeam
+    ? getTeamLogo(
+        match.hostTeam.name,
+        match.sportType,
+        match.hostTeam.logoUrl,
+        match.hostTeam.id || match.id,
+      )
+    : null;
   const applications = match.applications ?? [];
 
   const statusMap: Record<string, { label: string; className: string }> = {
@@ -303,8 +312,17 @@ export default function TeamMatchDetailPage() {
               <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">호스트 팀</h2>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-500 text-lg font-bold">
-                    {match.hostTeam.name?.charAt(0)}
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 text-lg font-bold">
+                    {hostTeamLogo ? (
+                      <img
+                        src={hostTeamLogo}
+                        alt={`${match.hostTeam.name} logo`}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      match.hostTeam.name?.charAt(0)
+                    )}
                   </div>
                   <div className="flex-1">
                     <p className="text-md font-semibold text-gray-900 dark:text-white">{match.hostTeam.name}</p>

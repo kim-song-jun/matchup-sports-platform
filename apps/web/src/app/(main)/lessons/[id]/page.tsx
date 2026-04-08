@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, Image, BookOpen, Pencil, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, BookOpen, Pencil, GraduationCap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sportLabel, lessonTypeLabel, levelLabel } from '@/lib/constants';
+import { getSportDetailImageSet } from '@/lib/sport-image';
 import { formatFullDate, formatCurrency } from '@/lib/utils';
 import { TicketPlanSelector } from '@/components/lesson/ticket-plan-selector';
 import { LessonCalendar } from '@/components/lesson/lesson-calendar';
@@ -72,6 +73,14 @@ export default function LessonDetailPage() {
 
   const SportIcon = SportIconMap[lesson.sportType];
   const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
+  const lessonImages = getSportDetailImageSet(
+    lesson.sportType,
+    [...(lesson.imageUrls ?? []), lesson.imageUrl],
+    lesson.id,
+    4,
+  );
+  const heroImage = lessonImages[0];
+  const galleryImages = lessonImages.slice(1, 4);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -86,10 +95,19 @@ export default function LessonDetailPage() {
       <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         <div className="px-5 @3xl:px-0">
           {/* 커버 */}
-          <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 @3xl:h-56 flex items-center justify-center mb-4 overflow-hidden">
-            <div className="text-center text-white/80">
-              {SportIcon && <SportIcon size={48} className="mx-auto mb-2 text-white/60" />}
-              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm">{lessonTypeLabel[lesson.type]}</span>
+          <div className="rounded-2xl bg-blue-500 dark:bg-blue-600 h-44 @3xl:h-56 mb-4 overflow-hidden relative">
+            {heroImage ? (
+              <img src={heroImage} alt={lesson.title} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center text-white/80">
+                  {SportIcon && <SportIcon size={48} className="mx-auto mb-2 text-white/60" />}
+                </div>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+            <div className="absolute bottom-4 left-4">
+              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
 
@@ -197,11 +215,13 @@ export default function LessonDetailPage() {
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center text-gray-300 dark:text-gray-500"><Image size={20} /></div>
+              {galleryImages.map((image, index) => (
+                <div key={`${image}-${index}`} className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                  <img src={image} alt={`${lesson.title} 사진 ${index + 2}`} className="h-full w-full object-cover" loading="lazy" />
+                </div>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-3 text-center">아직 등록된 사진이 없어요</p>
+            <p className="text-xs text-gray-500 mt-3 text-center">업로드된 사진이 없어도 실사형 로컬 자산으로 미리보기를 제공합니다</p>
           </div>
         </div>
 

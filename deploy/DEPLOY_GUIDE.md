@@ -107,17 +107,21 @@ cat matchup-key.pem            # 출력 후 전체 복사
 GitHub Actions 트리거
   ↓
 1. pnpm install
-2. Prisma generate + NestJS build (타입 체크)
-3. Next.js build (타입 체크)
+2. Prisma generate
+3. lint + type-check + test
   ↓ (빌드 성공 시)
 4. SSH로 EC2 접속
-5. git pull origin main
-6. docker compose up -d --build
-7. prisma db push
-8. 헬스체크
+5. rsync로 `~/matchup` 작업 트리 동기화 (`deploy/.env` 보호)
+6. API / Web Docker 이미지 빌드
+7. compose 스택 재기동 (`docker compose` 또는 `docker-compose`)
+8. `prisma migrate deploy` 실행
+9. 선택적 seed 실행
+10. localhost 헬스체크
   ↓
 🎉 배포 완료
 ```
+
+> 운영 서버의 `~/matchup`는 CI가 동기화한 mirror일 수 있어 `.git`이 없을 수 있습니다. 서버에서 `git pull`이 항상 가능하다고 가정하지 않습니다.
 
 ---
 
@@ -188,13 +192,19 @@ Nginx 라우팅:
 ```bash
 ssh -i matchup-key.pem ec2-user@<EC2_IP>
 cd ~/matchup/deploy
+
+if docker compose version >/dev/null 2>&1; then
+  export COMPOSE="docker compose"
+else
+  export COMPOSE="docker-compose"
+fi
 ```
 
 ### 상태 확인
 
 ```bash
 # 전체 컨테이너 상태
-docker compose -f docker-compose.prod.yml ps
+$COMPOSE -f docker-compose.prod.yml ps
 
 # 로그 확인
 docker logs matchup_api -f --tail 50
@@ -212,20 +222,40 @@ curl http://localhost/api/v1/health
 
 ```bash
 # 전체 재시작
-docker compose -f docker-compose.prod.yml restart
+$COMPOSE -f docker-compose.prod.yml restart
 
 # 특정 서비스만
-docker compose -f docker-compose.prod.yml restart api
-docker compose -f docker-compose.prod.yml restart web
+$COMPOSE -f docker-compose.prod.yml restart api
+$COMPOSE -f docker-compose.prod.yml restart web
 ```
 
 ### 수동 업데이트
 
 ```bash
-cd ~/matchup
-git pull origin main
-cd deploy
-docker compose -f docker-compose.prod.yml up -d --build
+# 권장: GitHub Actions의 workflow_dispatch로 CI / Deploy 재실행
+# 서버의 ~/matchup는 Git worktree가 아닐 수 있으므로 서버 내부 git pull을 기본 절차로 쓰지 않는다.
+
+rsync -avz --delete \
+  --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
+  --filter 'protect deploy/.env' \
+  -e "ssh -i matchup-key.pem -o StrictHostKeyChecking=no" \
+  ./ ec2-user@<EC2_IP>:~/matchup/
+
+ssh -i matchup-key.pem ec2-user@<EC2_IP> '
+  set -e
+  cd ~/matchup
+  sudo docker build -f deploy/Dockerfile.api -t matchup-api .
+  sudo docker build -f deploy/Dockerfile.web -t matchup-web .
+  cd deploy
+  if sudo docker compose version >/dev/null 2>&1; then
+    COMPOSE="sudo docker compose"
+  else
+    COMPOSE="sudo docker-compose"
+  fi
+  ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
+  ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
+  sudo docker exec matchup_api npx prisma migrate deploy
+'
 ```
 
 ### DB 관리
@@ -264,11 +294,11 @@ docker exec matchup_api npx ts-node prisma/seed.ts
 sudo yum install -y certbot || sudo apt install -y certbot
 
 # Nginx 중지 후 인증서 발급
-docker compose -f docker-compose.prod.yml stop nginx
+$COMPOSE -f docker-compose.prod.yml stop nginx
 sudo certbot certonly --standalone -d matchup.kr -d www.matchup.kr
 
 # nginx.conf에 SSL 설정 추가 후 재시작
-docker compose -f docker-compose.prod.yml up -d nginx
+$COMPOSE -f docker-compose.prod.yml up -d nginx
 ```
 
 ---
@@ -296,7 +326,7 @@ docker compose -f docker-compose.prod.yml up -d nginx
 ```bash
 # 캐시 클리어 후 재빌드
 docker system prune -f
-docker compose -f docker-compose.prod.yml build --no-cache
+$COMPOSE -f docker-compose.prod.yml build --no-cache
 ```
 
 ### 메모리 부족 (t3.small)

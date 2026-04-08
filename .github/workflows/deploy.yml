@@ -48,8 +48,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -128,29 +126,49 @@ jobs:
           RESET_DB: ${{ inputs.reset_db }}
           RUN_SEED: ${{ inputs.run_seed }}
         run: |
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
-            "cd ~/matchup && \
-             sudo docker build -f deploy/Dockerfile.api -t matchup-api . && \
-             sudo docker build -f deploy/Dockerfile.web -t matchup-web . && \
-             cd deploy && \
-             sudo docker compose -f docker-compose.prod.yml --env-file .env down && \
-             sudo docker compose -f docker-compose.prod.yml --env-file .env up -d && \
-             sleep 10 && \
-             if [ \"${RESET_DB}\" = \"true\" ]; then \
-               echo '[DANGER] Resetting database...' && \
-               sudo docker exec matchup_api npx prisma migrate reset --force --skip-seed && \
-               sudo docker exec matchup_api npx prisma db seed; \
-             else \
-               sudo docker exec matchup_api npx prisma migrate deploy; \
-               if [ \"${RUN_SEED}\" = \"true\" ]; then \
-                 echo '[INFO] Running seed (append mode)...' && \
-                 sudo docker exec matchup_api npx prisma db seed; \
-               fi; \
-             fi && \
-             sudo docker exec matchup_nginx nginx -s reload && \
-             sudo docker image prune -f"
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' bash -se" <<'EOF'
+          set -euo pipefail
+
+          RESET_DB="${RESET_DB:-false}"
+          RUN_SEED="${RUN_SEED:-false}"
+
+          cd ~/matchup
+
+          if sudo docker compose version >/dev/null 2>&1; then
+            COMPOSE="sudo docker compose"
+          elif sudo docker-compose version >/dev/null 2>&1; then
+            COMPOSE="sudo docker-compose"
+          else
+            echo "Docker Compose is not installed on the EC2 host"
+            exit 1
+          fi
+
+          sudo docker build -f deploy/Dockerfile.api -t matchup-api .
+          sudo docker build -f deploy/Dockerfile.web -t matchup-web .
+
+          cd deploy
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
+
+          sleep 10
+
+          if [ "${RESET_DB}" = "true" ]; then
+            echo "[DANGER] Resetting database..."
+            sudo docker exec matchup_api npx prisma migrate reset --force --skip-seed
+            sudo docker exec matchup_api npx prisma db seed
+          else
+            sudo docker exec matchup_api npx prisma migrate deploy
+            if [ "${RUN_SEED}" = "true" ]; then
+              echo "[INFO] Running seed (append mode)..."
+              sudo docker exec matchup_api npx prisma db seed
+            fi
+          fi
+
+          sudo docker exec matchup_nginx nginx -s reload
+          sudo docker image prune -f
+          EOF
 
       - name: Health check
         run: |
           sleep 10
-          ssh ec2 'curl -sf http://localhost > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'
+          ssh ec2 'curl -sf http://localhost > /dev/null && curl -sf http://localhost/api/v1/health > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'

@@ -13,6 +13,24 @@ MatchUp 스포츠 매칭 플랫폼의 프론트엔드 디자인 시스템 전면
 - 핵심 종목/팀/시설/장터 자산은 AI 생성 `webp`, 나머지는 SVG fallback으로 구성
 - 종목 카드, 팀 카드, 장터 카드, 시설 카드, 팀/장터/시설 상세에 deterministic image rotation 적용
 - 이미지가 없는 API 응답에서도 리스트와 상세가 항상 다양한 비주얼을 노출하도록 헬퍼 계층 보강
+- 개발용 `docker-compose.yml`을 API/Web/Postgres/Redis 전체 스택 기준으로 확장
+- `make dev`, `make up`, `make stop`, `make down`, `make db:*`를 Docker 중심 흐름으로 정리
+
+### 2026-04-07 추가 업데이트
+- 풋살 mock 이미지를 `/apps/web/public/mock/photoreal/futsal/` 실사 사진 10장 세트로 교체
+- 팀 카드/상세의 로고 fallback을 deterministic SVG emblem으로 보강
+- 실사형 mock 자산 출처를 `/apps/web/public/mock/photoreal/ATTRIBUTION.md`에 기록하는 규칙 추가
+
+### 2026-04-08 추가 업데이트
+- `apps/web/src/lib/sport-image.ts`의 active fallback catalog를 전부 `/apps/web/public/mock/photoreal/` 기반 실사 사진으로 전환
+- 축구, 농구, 배드민턴, 아이스하키, 수영, 테니스, 야구, 배구, 피겨, 쇼트트랙, 팀, 시설, 장터에 대한 로컬 실사 fallback 풀을 정리
+- 실사감이 약하거나 스포츠 맥락이 약한 후보 컷은 active set에서 제외하고 attribution 문서를 전체 세트 기준으로 갱신
+- `내 장터 매물`, `매물 등록` 예시 썸네일, `팀 매치 스코어/상세` 로고 슬롯까지 helper 기반 fallback 적용 범위를 확장
+- 매치 상세, 강좌 상세, 내 장터 매물 화면도 공용 photoreal helper를 쓰도록 확장해 아이콘/빈 박스 기반 이미지 자리표시자를 제거
+- 빈 문자열 이미지 URL을 helper에서 정리하도록 보강하고, 매치 상세의 시설 썸네일은 venue-aware fallback 우선순위로 수정
+- `시설 찾기` 목록 카드도 venue helper를 쓰도록 맞춰 시설 리스트와 시설 상세의 fallback 계층을 일치시킴
+- `매치 만들기`, `매치 수정` 화면은 업로드 전 빈 슬롯 대신 실사형 예시 스트립을 노출하도록 정리해 작성 플로우에서도 placeholder 느낌을 제거
+- review/design/QA 파이프라인은 모두 blocking issue 없이 종료됐고, 남은 후속은 보호 경로 시각 스모크 자동화 안정화 정도로 정리됨
 
 ---
 

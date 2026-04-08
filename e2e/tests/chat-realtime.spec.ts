@@ -9,9 +9,10 @@
  * - Two browser contexts: basic message exchange simulation
  */
 
-import { test, expect, chromium } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { TEST_PERSONAS } from '../fixtures/test-users';
 import { setupAuthState, loginViaApi, injectTokens } from '../fixtures/auth';
+import { expectLoginRedirectOrLink } from '../fixtures/sessions';
 
 const SINARO = TEST_PERSONAS.sinaro.nickname;
 const TEAM_OWNER = TEST_PERSONAS.teamOwner.nickname;
@@ -19,9 +20,7 @@ const TEAM_OWNER = TEST_PERSONAS.teamOwner.nickname;
 test.describe('Chat page — unauthenticated', () => {
   test('unauthenticated /chat shows login link', async ({ page }) => {
     await page.goto('/chat');
-    await page.waitForTimeout(500);
-    const loginLink = page.locator('a[href="/login"]');
-    await expect(loginLink.first()).toBeVisible();
+    await expectLoginRedirectOrLink(page);
   });
 });
 
@@ -33,7 +32,7 @@ test.describe('Chat page — authenticated sinaro', () => {
   test('/chat page loads without crash', async ({ page }) => {
     await page.goto('/chat');
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main:visible').first()).toBeVisible();
   });
 
   test('/chat shows chat room list or empty state', async ({ page }) => {
@@ -45,7 +44,7 @@ test.describe('Chat page — authenticated sinaro', () => {
     const emptyState = page.getByText(/채팅방이 없어요|대화 내역|로그인/i);
     const roomItems = page.locator('[class*="rounded"]').filter({ hasText: /.+/ }).first();
 
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main:visible').first()).toBeVisible();
     const hasEmpty = await emptyState.count() > 0;
     const hasRooms = await roomItems.count() > 0;
     expect(hasEmpty || hasRooms).toBe(true);
@@ -54,7 +53,7 @@ test.describe('Chat page — authenticated sinaro', () => {
   test('/chat page has heading or back button', async ({ page }) => {
     await page.goto('/chat');
     await page.waitForLoadState('networkidle');
-    const heading = page.locator('h1, h2').filter({ hasText: /채팅|Chat/i });
+    const heading = page.locator('h1:visible, h2:visible').filter({ hasText: /채팅|Chat/i });
     await expect(heading.first()).toBeVisible({ timeout: 8_000 });
   });
 });
@@ -104,7 +103,7 @@ test.describe('Chat room — message send', () => {
     await page.waitForTimeout(500);
 
     // Message should appear in the chat or input should clear
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main:visible').first()).toBeVisible();
   });
 });
 
@@ -134,8 +133,8 @@ test.describe('Chat — two-context realtime simulation', () => {
       await page2.waitForLoadState('networkidle');
 
       // Both pages should render chat without crash
-      await expect(page1.locator('main')).toBeVisible();
-      await expect(page2.locator('main')).toBeVisible();
+      await expect(page1.locator('main:visible').first()).toBeVisible();
+      await expect(page2.locator('main:visible').first()).toBeVisible();
     } finally {
       await context1.close();
       await context2.close();

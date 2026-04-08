@@ -67,7 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!isAuthenticated || !isAdmin) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
+        <div className="text-center" data-testid="admin-auth-wall">
           <ShieldCheck size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
           <p className="text-gray-500 dark:text-gray-400 text-base">관리자 권한이 필요합니다</p>
           <Link href={isAuthenticated ? "/home" : "/login"} className="mt-3 inline-block text-blue-500 text-base font-medium hover:underline">

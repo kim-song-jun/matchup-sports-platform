@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, ChevronRight, Image as ImageIcon, X, SearchX } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Image as ImageIcon, Plus, X, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useMatch, useVenues } from '@/hooks/use-api';
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { getSportDetailImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
 import type { Venue } from '@/types/api';
 
@@ -39,6 +40,15 @@ export default function EditMatchPage() {
     rules: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const fallbackImages = imagePreviews.length === 0
+    ? getSportDetailImageSet(
+        form.sportType || apiMatch?.sportType || 'soccer',
+        apiMatch?.imageUrl ? [apiMatch.imageUrl] : undefined,
+        `${matchId}-edit-form`,
+        3,
+      )
+    : [];
+  const hasExistingMatchImage = Boolean(apiMatch?.imageUrl);
 
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
   const venues = (venuesData || []) as Venue[];
@@ -180,8 +190,29 @@ export default function EditMatchPage() {
                 <span className="text-2xs mt-1">{imageFiles.length}/5</span>
               </button>
             )}
+            {fallbackImages.map((src) => (
+              <div key={src} className="relative shrink-0 w-20 h-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                <img
+                  src={src}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-full object-cover opacity-60"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
+                  <Plus size={18} className="text-white/90" />
+                </div>
+              </div>
+            ))}
             <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
           </div>
+          {fallbackImages.length > 0 && (
+            <p className="mt-1.5 text-xs text-gray-500">
+              {hasExistingMatchImage
+                ? '현재 대표 이미지와 fallback 예시를 함께 보여줍니다.'
+                : '대표 이미지가 비어 있으면 오른쪽 실사 예시처럼 노출됩니다.'}
+            </p>
+          )}
         </FormSection>
 
         {/* Venue */}

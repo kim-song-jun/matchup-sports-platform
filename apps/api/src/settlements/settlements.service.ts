@@ -1,282 +1,139 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-
-export type SettlementStatus = 'pending' | 'processed' | 'refunded' | 'failed';
-export type SettlementType = 'match_fee' | 'lesson_fee' | 'mercenary_fee' | 'venue_rental';
-
-interface SettlementHistoryEntry {
-  id: string;
-  action: string;
-  actor: string;
-  note: string | null;
-  createdAt: Date;
-}
-
-export interface Settlement {
-  id: string;
-  type: SettlementType;
-  status: SettlementStatus;
-  amount: number;
-  commission: number;
-  netAmount: number;
-  payerName: string;
-  recipientName: string;
-  relatedId: string;
-  description: string;
-  createdAt: Date;
-  processedAt: Date | null;
-  failureReason: string | null;
-  history: SettlementHistoryEntry[];
-}
+import { SettlementStatus, SettlementType } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class SettlementsService {
-  private settlements: Settlement[] = [
-    {
-      id: 'settle-001',
-      type: 'match_fee',
-      status: 'processed',
-      amount: 50000,
-      commission: 5000,
-      netAmount: 45000,
-      payerName: 'FC 서울 유나이티드',
-      recipientName: '구장 A 관리자',
-      relatedId: 'tm-001',
-      description: '3/15 풋살 매치 참가비',
-      createdAt: new Date('2026-03-15T12:00:00Z'),
-      processedAt: new Date('2026-03-16T10:00:00Z'),
-      failureReason: null,
-      history: [this.createHistory('approve', 'admin', '정산 승인 완료', '2026-03-16T10:00:00Z')],
-    },
-    {
-      id: 'settle-002',
-      type: 'lesson_fee',
-      status: 'processed',
-      amount: 80000,
-      commission: 8000,
-      netAmount: 72000,
-      payerName: '김민수',
-      recipientName: '코치 박진영',
-      relatedId: 'lesson-001',
-      description: '3/14 농구 레슨비',
-      createdAt: new Date('2026-03-14T15:00:00Z'),
-      processedAt: new Date('2026-03-15T09:00:00Z'),
-      failureReason: null,
-      history: [this.createHistory('approve', 'admin', '정산 승인 완료', '2026-03-15T09:00:00Z')],
-    },
-    {
-      id: 'settle-003',
-      type: 'mercenary_fee',
-      status: 'pending',
-      amount: 30000,
-      commission: 3000,
-      netAmount: 27000,
-      payerName: 'FC 강남',
-      recipientName: '용병 이정훈',
-      relatedId: 'merc-001',
-      description: '3/18 풋살 용병비',
-      createdAt: new Date('2026-03-18T10:00:00Z'),
-      processedAt: null,
-      failureReason: null,
-      history: [],
-    },
-    {
-      id: 'settle-004',
-      type: 'venue_rental',
-      status: 'processed',
-      amount: 120000,
-      commission: 12000,
-      netAmount: 108000,
-      payerName: 'FC 한강',
-      recipientName: '스포츠파크 B',
-      relatedId: 'venue-booking-001',
-      description: '3/12 구장 대관료',
-      createdAt: new Date('2026-03-12T08:00:00Z'),
-      processedAt: new Date('2026-03-13T11:00:00Z'),
-      failureReason: null,
-      history: [this.createHistory('approve', 'admin', '정산 승인 완료', '2026-03-13T11:00:00Z')],
-    },
-    {
-      id: 'settle-005',
-      type: 'match_fee',
-      status: 'refunded',
-      amount: 50000,
-      commission: 0,
-      netAmount: 0,
-      payerName: 'FC 잠실',
-      recipientName: '구장 C 관리자',
-      relatedId: 'tm-003',
-      description: '3/10 매치 취소 환불',
-      createdAt: new Date('2026-03-10T09:00:00Z'),
-      processedAt: new Date('2026-03-10T14:00:00Z'),
-      failureReason: null,
-      history: [this.createHistory('refund', 'admin', '취소 환불 처리 완료', '2026-03-10T14:00:00Z')],
-    },
-    {
-      id: 'settle-006',
-      type: 'lesson_fee',
-      status: 'pending',
-      amount: 60000,
-      commission: 6000,
-      netAmount: 54000,
-      payerName: '박영희',
-      recipientName: '코치 최은지',
-      relatedId: 'lesson-002',
-      description: '3/20 배드민턴 레슨비',
-      createdAt: new Date('2026-03-20T11:00:00Z'),
-      processedAt: null,
-      failureReason: null,
-      history: [],
-    },
-    {
-      id: 'settle-007',
-      type: 'mercenary_fee',
-      status: 'failed',
-      amount: 25000,
-      commission: 2500,
-      netAmount: 22500,
-      payerName: 'FC 목동',
-      recipientName: '용병 김태호',
-      relatedId: 'merc-002',
-      description: '3/17 풋살 용병비 - 결제 실패',
-      createdAt: new Date('2026-03-17T13:00:00Z'),
-      processedAt: new Date('2026-03-17T16:00:00Z'),
-      failureReason: '정산 계좌 검증 실패',
-      history: [this.createHistory('reject', 'admin', '정산 계좌 확인 필요', '2026-03-17T16:00:00Z')],
-    },
-    {
-      id: 'settle-008',
-      type: 'venue_rental',
-      status: 'pending',
-      amount: 150000,
-      commission: 15000,
-      netAmount: 135000,
-      payerName: 'FC 송파',
-      recipientName: '아이스링크 D',
-      relatedId: 'venue-booking-002',
-      description: '3/21 아이스하키 구장 대관료',
-      createdAt: new Date('2026-03-21T07:00:00Z'),
-      processedAt: null,
-      failureReason: null,
-      history: [],
-    },
-  ];
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll(filter: { status?: string; type?: string }) {
-    let result = [...this.settlements];
+  async findAll(filter: { status?: string; type?: string }) {
+    const where: {
+      status?: SettlementStatus;
+      type?: SettlementType;
+    } = {};
 
-    if (filter.status) {
-      result = result.filter((s) => s.status === filter.status);
+    if (filter.status && Object.values(SettlementStatus).includes(filter.status as SettlementStatus)) {
+      where.status = filter.status as SettlementStatus;
     }
-    if (filter.type) {
-      result = result.filter((s) => s.type === filter.type);
+    if (filter.type && Object.values(SettlementType).includes(filter.type as SettlementType)) {
+      where.type = filter.type as SettlementType;
     }
 
-    return { items: result, total: result.length };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.settlementRecord.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.settlementRecord.count({ where }),
+    ]);
+
+    return { items, total };
   }
 
-  getSummary() {
-    const total = this.settlements.reduce((sum, s) => sum + s.amount, 0);
-    const commission = this.settlements
-      .filter((s) => s.status === 'processed')
-      .reduce((sum, s) => sum + s.commission, 0);
-    const pending = this.settlements
-      .filter((s) => s.status === 'pending')
-      .reduce((sum, s) => sum + s.amount, 0);
-    const refunded = this.settlements
-      .filter((s) => s.status === 'refunded')
-      .reduce((sum, s) => sum + s.amount, 0);
+  async getById(id: string) {
+    const record = await this.prisma.settlementRecord.findUnique({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`정산 ${id}을(를) 찾을 수 없습니다.`);
+    }
+    return record;
+  }
+
+  async getSummary() {
+    const [totalAgg, commissionAgg, pendingAgg, processedCount, pendingCount, failedCount] =
+      await this.prisma.$transaction([
+        this.prisma.settlementRecord.aggregate({ _sum: { amount: true } }),
+        this.prisma.settlementRecord.aggregate({
+          where: { status: SettlementStatus.completed },
+          _sum: { commission: true },
+        }),
+        this.prisma.settlementRecord.aggregate({
+          where: { status: SettlementStatus.pending },
+          _sum: { amount: true },
+        }),
+        this.prisma.settlementRecord.count({ where: { status: SettlementStatus.completed } }),
+        this.prisma.settlementRecord.count({ where: { status: SettlementStatus.pending } }),
+        this.prisma.settlementRecord.count({ where: { status: SettlementStatus.failed } }),
+      ]);
 
     return {
-      total,
-      commission,
-      pending,
-      refunded,
-      processedCount: this.settlements.filter((s) => s.status === 'processed').length,
-      pendingCount: this.settlements.filter((s) => s.status === 'pending').length,
-      refundedCount: this.settlements.filter((s) => s.status === 'refunded').length,
-      failedCount: this.settlements.filter((s) => s.status === 'failed').length,
+      total: totalAgg._sum.amount ?? 0,
+      commission: commissionAgg._sum.commission ?? 0,
+      pending: pendingAgg._sum.amount ?? 0,
+      refunded: 0, // SettlementStatus enum has no 'refunded' value
+      processedCount,
+      pendingCount,
+      refundedCount: 0,
+      failedCount,
     };
   }
 
-  process(id: string, data: { action: string; note?: string; actor?: string }) {
-    const settlement = this.settlements.find((s) => s.id === id);
-    if (!settlement) {
+  async process(id: string, data: { action: string; note?: string; actor?: string }) {
+    const record = await this.prisma.settlementRecord.findUnique({ where: { id } });
+    if (!record) {
       throw new NotFoundException(`정산 ${id}을(를) 찾을 수 없습니다.`);
     }
 
-    if (data.action === 'approve') {
-      settlement.status = 'processed';
-      settlement.failureReason = null;
-      settlement.processedAt = new Date();
-    } else if (data.action === 'refund') {
-      settlement.status = 'refunded';
-      settlement.commission = 0;
-      settlement.netAmount = 0;
-      settlement.failureReason = null;
-      settlement.processedAt = new Date();
-    } else if (data.action === 'reject') {
-      settlement.status = 'failed';
-      settlement.failureReason = data.note ?? '운영자 반려';
-      settlement.processedAt = new Date();
+    let newStatus: SettlementStatus;
+    let processedAt: Date | undefined = new Date();
+
+    switch (data.action) {
+      case 'approve':
+        newStatus = SettlementStatus.completed;
+        break;
+      case 'reject':
+        newStatus = SettlementStatus.failed;
+        break;
+      default:
+        newStatus = SettlementStatus.processing;
     }
 
-    settlement.history.push(
-      this.createHistory(data.action, data.actor ?? 'admin', data.note ?? null),
-    );
-
-    return settlement;
+    return this.prisma.settlementRecord.update({
+      where: { id },
+      data: { status: newStatus, processedAt },
+    });
   }
 
   /**
-   * Records a new settlement entry for completed payments.
+   * Creates a SettlementRecord for a completed payment.
    * Commission rate: 10%.
-   * type: 'match' | 'marketplace' | 'lesson'
    */
-  recordSettlement(data: {
+  async recordSettlement(data: {
     type: 'match' | 'marketplace' | 'lesson';
     amount: number;
-    payerName: string;
-    recipientName: string;
-    relatedId: string;
-    description: string;
-  }): Settlement {
+    recipientId?: string;
+    sourceId: string;
+  }) {
     const typeMap: Record<string, SettlementType> = {
-      match: 'match_fee',
-      marketplace: 'venue_rental',
-      lesson: 'lesson_fee',
+      match: SettlementType.match,
+      marketplace: SettlementType.marketplace,
+      lesson: SettlementType.lesson,
     };
 
-    const commission = Math.round(data.amount * 0.10);
+    const commission = Math.round(data.amount * 0.1);
     const netAmount = data.amount - commission;
 
-    const entry: Settlement = {
-      id: `settle-${Math.random().toString(36).slice(2, 10)}`,
-      type: typeMap[data.type],
-      status: 'pending',
-      amount: data.amount,
-      commission,
-      netAmount,
-      payerName: data.payerName,
-      recipientName: data.recipientName,
-      relatedId: data.relatedId,
-      description: data.description,
-      createdAt: new Date(),
-      processedAt: null,
-      failureReason: null,
-      history: [],
-    };
-
-    this.settlements.push(entry);
-    return entry;
+    return this.prisma.settlementRecord.create({
+      data: {
+        type: typeMap[data.type],
+        sourceId: data.sourceId,
+        amount: data.amount,
+        commission,
+        netAmount,
+        recipientId: data.recipientId ?? null,
+        status: SettlementStatus.pending,
+      },
+    });
   }
 
-  private createHistory(action: string, actor: string, note?: string | null, createdAt?: string) {
-    return {
-      id: `settlement-history-${Math.random().toString(36).slice(2, 8)}`,
-      action,
-      actor,
-      note: note ?? null,
-      createdAt: createdAt ? new Date(createdAt) : new Date(),
-    };
+  async markProcessed(id: string) {
+    const record = await this.prisma.settlementRecord.findUnique({ where: { id } });
+    if (!record) {
+      throw new NotFoundException(`정산 ${id}을(를) 찾을 수 없습니다.`);
+    }
+
+    return this.prisma.settlementRecord.update({
+      where: { id },
+      data: { status: SettlementStatus.completed, processedAt: new Date() },
+    });
   }
 }

@@ -3,6 +3,11 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { LessonsService } from './lessons.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettlementsService } from '../settlements/settlements.service';
+
+const lessonsSettlementsMock = {
+  recordSettlement: jest.fn().mockResolvedValue(undefined),
+};
 
 describe('LessonsService', () => {
   let service: LessonsService;
@@ -36,6 +41,7 @@ describe('LessonsService', () => {
         LessonsService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: NotificationsService, useValue: notificationsServiceMock },
+        { provide: SettlementsService, useValue: lessonsSettlementsMock },
       ],
     }).compile();
 

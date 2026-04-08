@@ -236,6 +236,10 @@ model User {
   sentInvitations        TeamInvitation[]     @relation("InvitationsSent")
   receivedInvitations    TeamInvitation[]     @relation("InvitationsReceived")
   notificationPreference NotificationPreference?
+  userBadges             UserBadge[]
+  sentReports            Report[]             @relation("ReportsSent")
+  blocksFrom             UserBlock[]          @relation("BlocksFrom")
+  blocksTo               UserBlock[]          @relation("BlocksTo")
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -1168,4 +1172,101 @@ model NotificationPreference {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
+}
+
+// ─── Settlements (persistent) ───────────────────────────
+
+enum SettlementType {
+  match
+  marketplace
+  lesson
+}
+
+enum SettlementStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model SettlementRecord {
+  id         String           @id @default(cuid())
+  type       SettlementType
+  sourceId   String           @map("source_id") // orderId / paymentId / ticketId
+  amount     Int              // gross amount
+  commission Int              // platform commission (10%)
+  netAmount  Int              @map("net_amount") // amount - commission
+  recipientId String?         @map("recipient_id") // seller or instructor
+  status     SettlementStatus @default(pending)
+  processedAt DateTime?       @map("processed_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([type, status])
+  @@index([recipientId])
+  @@map("settlement_records")
+}
+
+// ─── User Badges (persistent) ───────────────────────────
+
+model UserBadge {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  type        String
+  name        String
+  description String?
+  earnedAt    DateTime @default(now()) @map("earned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("user_badges")
+}
+
+// ─── Reports & User Blocks ──────────────────────────────
+
+enum ReportTargetType {
+  user
+  message
+  listing
+  review
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  resolved
+  dismissed
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporterId  String           @map("reporter_id")
+  targetType  ReportTargetType @map("target_type")
+  targetId    String           @map("target_id")
+  reason      String
+  description String?
+  status      ReportStatus     @default(pending)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  reporter User @relation("ReportsSent", fields: [reporterId], references: [id])
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@map("reports")
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("BlocksFrom", fields: [blockerId], references: [id])
+  blocked User @relation("BlocksTo", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@map("user_blocks")
 }

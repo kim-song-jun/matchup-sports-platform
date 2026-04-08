@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { PostMessageDto } from './dto/post-message.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { UserBlocksService } from '../user-blocks/user-blocks.service';
 
 @Injectable()
 export class ChatService {
@@ -10,6 +11,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => RealtimeGateway))
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly userBlocksService: UserBlocksService,
   ) {}
 
   /** List rooms the user participates in, cursor-paginated by lastMessageAt desc. */
@@ -104,6 +106,17 @@ export class ChatService {
 
     if (!dto.content && !dto.imageUrl) {
       throw new BadRequestException({ code: 'CHAT_EMPTY_MESSAGE', message: '내용 또는 이미지가 필요합니다.' });
+    }
+
+    // Block check: if any other participant has blocked the sender, reject the message
+    const otherParticipants = await this.prisma.chatRoomParticipant.findMany({
+      where: { roomId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    for (const { userId: otherId } of otherParticipants) {
+      if (await this.userBlocksService.isBlocked(otherId, userId)) {
+        throw new ForbiddenException({ code: 'CHAT_BLOCKED', message: '차단된 사용자에게 메시지를 보낼 수 없습니다.' });
+      }
     }
 
     const [message] = await this.prisma.$transaction([

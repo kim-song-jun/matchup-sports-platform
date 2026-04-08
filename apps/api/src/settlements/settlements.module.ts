@@ -5,5 +5,6 @@ import { SettlementsService } from './settlements.service';
 @Module({
   controllers: [SettlementsController],
   providers: [SettlementsService],
+  exports: [SettlementsService],
 })
 export class SettlementsModule {}

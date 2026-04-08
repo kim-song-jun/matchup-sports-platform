@@ -3,6 +3,11 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { MarketplaceService } from './marketplace.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettlementsService } from '../settlements/settlements.service';
+
+const settlementsServiceMock = {
+  recordSettlement: jest.fn().mockResolvedValue(undefined),
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -82,6 +87,7 @@ describe('MarketplaceService', () => {
         MarketplaceService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: NotificationsService, useValue: notificationsServiceMock },
+        { provide: SettlementsService, useValue: settlementsServiceMock },
       ],
     }).compile();
 

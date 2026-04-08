@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException, UnauthorizedException } from '@
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettlementsService } from '../settlements/settlements.service';
 import { createHmac } from 'crypto';
 
 // ---------------------------------------------------------------------------
@@ -67,6 +68,10 @@ const notificationsServiceMock = {
   create: jest.fn(),
 };
 
+const settlementsServiceMock = {
+  recordSettlement: jest.fn().mockResolvedValue({}),
+};
+
 // ---------------------------------------------------------------------------
 // Suite helpers
 // ---------------------------------------------------------------------------
@@ -83,6 +88,7 @@ async function buildMockModeService(): Promise<PaymentsService> {
       PaymentsService,
       { provide: PrismaService, useValue: prismaMock },
       { provide: NotificationsService, useValue: notificationsServiceMock },
+      { provide: SettlementsService, useValue: settlementsServiceMock },
     ],
   }).compile();
 
@@ -101,6 +107,7 @@ async function buildRealModeService(): Promise<PaymentsService> {
       PaymentsService,
       { provide: PrismaService, useValue: prismaMock },
       { provide: NotificationsService, useValue: notificationsServiceMock },
+      { provide: SettlementsService, useValue: settlementsServiceMock },
     ],
   }).compile();
 

@@ -23,6 +23,8 @@ import { BadgesModule } from './badges/badges.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { ScoringModule } from './scoring/scoring.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { ReportsModule } from './reports/reports.module';
+import { UserBlocksModule } from './user-blocks/user-blocks.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -54,6 +56,8 @@ import configuration from './config/configuration';
     UploadsModule,
     ScoringModule,
     SchedulerModule,
+    ReportsModule,
+    UserBlocksModule,
   ],
 })
 export class AppModule {}

@@ -9,6 +9,7 @@ import {
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettlementsService } from '../settlements/settlements.service';
 import { randomUUID } from 'crypto';
 
 interface TossConfirmResponse {
@@ -34,6 +35,7 @@ export class LessonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly settlementsService: SettlementsService,
   ) {
     this.tossSecretKey = process.env.TOSS_SECRET_KEY ?? '';
     this.tossEnabled = !!this.tossSecretKey;
@@ -182,6 +184,16 @@ export class LessonsService {
       body: `"${ticket.lesson.title}" 레슨 티켓이 구매되었습니다.`,
       data: { ticketId: ticket.id, lessonId: ticket.lessonId },
     });
+
+    // Fire-and-forget: settlement record for lesson ticket sale
+    this.settlementsService
+      .recordSettlement({
+        type: 'lesson',
+        amount: ticket.paidAmount,
+        sourceId: ticket.id,
+        recipientId: ticket.lesson.hostId,
+      })
+      .catch((err) => this.logger.error(`Settlement record failed for lesson ticket ${ticket.id}: ${err}`));
 
     return updated;
   }

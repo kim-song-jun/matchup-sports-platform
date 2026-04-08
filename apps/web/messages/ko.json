@@ -237,7 +237,34 @@
     "typeTeam": "팀",
     "typeChat": "채팅",
     "typeSystem": "시스템",
-    "typePayment": "결제"
+    "typePayment": "결제",
+    "markReadErrorToast": "알림을 읽음 처리하지 못했어요"
+  },
+  "feed": {
+    "title": "활동 피드",
+    "today": "오늘",
+    "thisWeek": "이번 주",
+    "lastMonth": "지난달",
+    "older": "이전",
+    "loginPromptTitle": "활동 내역이 기다려요",
+    "loginPromptDesc": "로그인하면 내 활동 피드를 볼 수 있어요",
+    "viewAllActivity": "전체 활동 보기"
+  },
+  "report": {
+    "title": "신고하기",
+    "targetLabel": "{name} 신고",
+    "reasonLabel": "신고 사유",
+    "reasonSpam": "스팸·광고",
+    "reasonAbuse": "욕설·혐오 표현",
+    "reasonFraud": "사기·허위 정보",
+    "reasonOther": "기타",
+    "detailLabel": "상세 내용 (선택)",
+    "detailPlaceholder": "신고 내용을 자세히 설명해주세요",
+    "submit": "신고 제출",
+    "submitting": "제출 중...",
+    "successToast": "신고가 접수됐어요. 검토 후 조치할게요.",
+    "errorToast": "신고 제출에 실패했어요. 다시 시도해주세요.",
+    "reasonRequired": "신고 사유를 선택해주세요"
   },
   "chat": {
     "title": "채팅",

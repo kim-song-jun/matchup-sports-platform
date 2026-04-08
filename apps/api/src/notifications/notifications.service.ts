@@ -5,6 +5,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService } from './web-push.service';
 import { presentNotification, notificationCategory } from './notification-presentation';
 import { UpdateNotificationPreferenceDto } from './dto/notification-preference.dto';
+import { UserBlocksService } from '../user-blocks/user-blocks.service';
 
 @Injectable()
 export class NotificationsService {
@@ -13,6 +14,7 @@ export class NotificationsService {
     @Inject(forwardRef(() => RealtimeGateway))
     private readonly realtime: RealtimeGateway,
     private readonly webPushService: WebPushService,
+    private readonly userBlocksService: UserBlocksService,
   ) {}
 
   async create(data: {
@@ -21,7 +23,14 @@ export class NotificationsService {
     title: string;
     body: string;
     data?: Record<string, unknown>;
+    /** Optional sender — if the recipient has blocked this user, the notification is suppressed. */
+    fromUserId?: string;
   }) {
+    // Block check: suppress notification when recipient has blocked the sender
+    if (data.fromUserId && (await this.userBlocksService.isBlocked(data.userId, data.fromUserId))) {
+      return null;
+    }
+
     // Check user notification preferences; default to enabled when no preference row exists
     const preference = await this.prisma.notificationPreference.findUnique({
       where: { userId: data.userId },

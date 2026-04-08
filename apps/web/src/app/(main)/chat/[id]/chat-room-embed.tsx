@@ -14,6 +14,7 @@ import {
   ChatBubble, DateSeparator, SystemMessage,
   formatDateLabel, getDateKey,
 } from '@/components/chat/chat-bubble';
+import { ReportModal } from '@/components/chat/report-modal';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -77,6 +78,7 @@ export default function ChatRoomEmbed({
   const [showMatchInfo, setShowMatchInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -264,7 +266,7 @@ export default function ChatRoomEmbed({
             {showMenu && (
               <div className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-lg py-1 z-50 animate-fade-in">
                 <button
-                  onClick={() => { setShowMenu(false); toast('info', '신고 기능을 준비 중이에요'); }}
+                  onClick={() => { setShowMenu(false); setShowReportModal(true); }}
                   className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <Flag size={14} className="text-gray-500" />
@@ -443,6 +445,15 @@ export default function ChatRoomEmbed({
           </button>
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="chatRoom"
+        targetId={chatRoomId}
+        targetName={room?.name}
+      />
 
       {/* Leave Confirmation Modal */}
       <Modal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} title="채팅방 나가기">

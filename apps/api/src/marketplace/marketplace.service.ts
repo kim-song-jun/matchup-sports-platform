@@ -9,6 +9,7 @@ import {
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettlementsService } from '../settlements/settlements.service';
 import { randomUUID } from 'crypto';
 
 // Toss Payments confirm response shape (shared subset used here)
@@ -36,6 +37,7 @@ export class MarketplaceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly settlementsService: SettlementsService,
   ) {
     this.tossSecretKey = process.env.TOSS_SECRET_KEY ?? '';
     this.tossEnabled = !!this.tossSecretKey;
@@ -184,6 +186,16 @@ export class MarketplaceService {
       body: `"${order.listing.title}" 상품에 주문이 접수되었습니다.`,
       data: { orderId: order.id, listingId: order.listingId },
     });
+
+    // Fire-and-forget: settlement record for marketplace sale
+    this.settlementsService
+      .recordSettlement({
+        type: 'marketplace',
+        amount: order.amount,
+        sourceId: order.id,
+        recipientId: order.sellerId,
+      })
+      .catch((err) => this.logger.error(`Settlement record failed for marketplace order ${order.id}: ${err}`));
 
     return updated;
   }

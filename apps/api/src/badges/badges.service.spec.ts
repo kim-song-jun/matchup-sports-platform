@@ -12,8 +12,9 @@ const prismaMock = {
     findMany: jest.fn(),
     create: jest.fn(),
   },
-  notification: {
-    findFirst: jest.fn(),
+  userBadge: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
   },
 };
 
@@ -102,8 +103,9 @@ describe('BadgesService', () => {
   // ── awardIfEligible ─────────────────────────────────────────────────────────
 
   describe('awardIfEligible', () => {
-    it('awards badge and sends notification on first call', async () => {
-      prismaMock.notification.findFirst.mockResolvedValue(null);
+    it('creates UserBadge and sends notification on first call', async () => {
+      prismaMock.userBadge.findUnique.mockResolvedValue(null);
+      prismaMock.userBadge.create.mockResolvedValue({ id: 'ub-1' });
       notificationsMock.create.mockResolvedValue({});
 
       const result = await service.awardIfEligible('user-1', 'match_10', {
@@ -112,6 +114,11 @@ describe('BadgesService', () => {
       });
 
       expect(result).toBe(true);
+      expect(prismaMock.userBadge.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: 'user-1', type: 'match_10' }),
+        }),
+      );
       expect(notificationsMock.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-1',
@@ -120,17 +127,19 @@ describe('BadgesService', () => {
       );
     });
 
-    it('returns false and sends no notification when badge already awarded', async () => {
-      prismaMock.notification.findFirst.mockResolvedValue({ id: 'notif-existing' });
+    it('returns false and creates nothing when UserBadge already exists', async () => {
+      prismaMock.userBadge.findUnique.mockResolvedValue({ id: 'ub-existing' });
 
       const result = await service.awardIfEligible('user-2', 'match_10', { name: '10경기 달성' });
 
       expect(result).toBe(false);
+      expect(prismaMock.userBadge.create).not.toHaveBeenCalled();
       expect(notificationsMock.create).not.toHaveBeenCalled();
     });
 
     it('awards different badge types independently for same user', async () => {
-      prismaMock.notification.findFirst.mockResolvedValue(null);
+      prismaMock.userBadge.findUnique.mockResolvedValue(null);
+      prismaMock.userBadge.create.mockResolvedValue({ id: 'ub-new' });
       notificationsMock.create.mockResolvedValue({});
 
       const r1 = await service.awardIfEligible('user-3', 'match_10', { name: '10경기 달성' });
@@ -138,7 +147,22 @@ describe('BadgesService', () => {
 
       expect(r1).toBe(true);
       expect(r2).toBe(true);
+      expect(prismaMock.userBadge.create).toHaveBeenCalledTimes(2);
       expect(notificationsMock.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses userId_type composite key for uniqueness check', async () => {
+      prismaMock.userBadge.findUnique.mockResolvedValue(null);
+      prismaMock.userBadge.create.mockResolvedValue({ id: 'ub-1' });
+      notificationsMock.create.mockResolvedValue({});
+
+      await service.awardIfEligible('user-4', 'newcomer', { name: '신규 사용자' });
+
+      expect(prismaMock.userBadge.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId_type: { userId: 'user-4', type: 'newcomer' } },
+        }),
+      );
     });
   });
 

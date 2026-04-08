@@ -237,7 +237,34 @@
     "typeTeam": "Team",
     "typeChat": "Chat",
     "typeSystem": "System",
-    "typePayment": "Payment"
+    "typePayment": "Payment",
+    "markReadErrorToast": "Could not mark notification as read"
+  },
+  "feed": {
+    "title": "Activity Feed",
+    "today": "Today",
+    "thisWeek": "This Week",
+    "lastMonth": "Last Month",
+    "older": "Older",
+    "loginPromptTitle": "Your activity feed is waiting",
+    "loginPromptDesc": "Login to view your activity history",
+    "viewAllActivity": "View all activity"
+  },
+  "report": {
+    "title": "Report",
+    "targetLabel": "Report {name}",
+    "reasonLabel": "Reason",
+    "reasonSpam": "Spam / Advertising",
+    "reasonAbuse": "Abusive language",
+    "reasonFraud": "Fraud / False information",
+    "reasonOther": "Other",
+    "detailLabel": "Details (optional)",
+    "detailPlaceholder": "Please describe the issue in detail",
+    "submit": "Submit Report",
+    "submitting": "Submitting...",
+    "successToast": "Report submitted. We will review and take action.",
+    "errorToast": "Failed to submit report. Please try again.",
+    "reasonRequired": "Please select a reason"
   },
   "chat": {
     "title": "Chat",

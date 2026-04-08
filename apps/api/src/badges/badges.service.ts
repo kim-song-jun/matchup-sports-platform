@@ -56,25 +56,22 @@ export class BadgesService {
 
   /**
    * Award a user-level badge if not already granted.
-   * Uses the Notification table as the source of truth for awarded badges,
-   * since the current Badge model is team-scoped. A dedicated UserBadge model
-   * would be preferred long-term.
+   * Uses UserBadge table with unique(userId, type) constraint for idempotency.
    */
   async awardIfEligible(
     userId: string,
     type: string,
     meta: { name: string; description?: string },
   ): Promise<boolean> {
-    // Check notification history for prior award of this badge type
-    const existing = await this.prisma.notification.findFirst({
-      where: {
-        userId,
-        type: NotificationType.badge_earned,
-        data: { path: ['badgeType'], equals: type },
-      },
+    const existing = await this.prisma.userBadge.findUnique({
+      where: { userId_type: { userId, type } },
       select: { id: true },
     });
     if (existing) return false;
+
+    await this.prisma.userBadge.create({
+      data: { userId, type, name: meta.name, description: meta.description ?? null },
+    });
 
     await this.notifications.create({
       userId,

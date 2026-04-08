@@ -3,7 +3,12 @@ import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService } from './web-push.service';
+import { UserBlocksService } from '../user-blocks/user-blocks.service';
 import { NotificationType } from '@prisma/client';
+
+const mockUserBlocksService = {
+  isBlocked: jest.fn().mockResolvedValue(false),
+};
 
 const mockPrisma = {
   notification: {
@@ -39,6 +44,7 @@ describe('NotificationsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RealtimeGateway, useValue: mockRealtime },
         { provide: WebPushService, useValue: mockWebPushService },
+        { provide: UserBlocksService, useValue: mockUserBlocksService },
       ],
     }).compile();
 

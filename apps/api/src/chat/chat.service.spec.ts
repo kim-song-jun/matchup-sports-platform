@@ -3,6 +3,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { UserBlocksService } from '../user-blocks/user-blocks.service';
 
 const mockPrisma = {
   chatRoom: {
@@ -19,6 +20,7 @@ const mockPrisma = {
   },
   chatRoomParticipant: {
     findUnique: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
     update: jest.fn(),
   },
   teamMatch: {
@@ -31,6 +33,10 @@ const mockRealtimeGateway = {
   emitToRoom: jest.fn(),
 };
 
+const mockUserBlocksService = {
+  isBlocked: jest.fn().mockResolvedValue(false),
+};
+
 describe('ChatService', () => {
   let service: ChatService;
 
@@ -40,6 +46,7 @@ describe('ChatService', () => {
         ChatService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RealtimeGateway, useValue: mockRealtimeGateway },
+        { provide: UserBlocksService, useValue: mockUserBlocksService },
       ],
     }).compile();
 

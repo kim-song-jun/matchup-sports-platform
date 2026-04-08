@@ -10,6 +10,7 @@ import { NotificationType, PaymentMethod } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettlementsService } from '../settlements/settlements.service';
 
 // ---------------------------------------------------------------------------
 // Toss Payments API response shapes (v1)
@@ -45,6 +46,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly settlementsService: SettlementsService,
   ) {
     this.tossSecretKey = process.env.TOSS_SECRET_KEY ?? '';
     this.tossWebhookSecret = process.env.TOSS_WEBHOOK_SECRET ?? '';
@@ -245,7 +247,7 @@ export class PaymentsService {
     return payment;
   }
 
-  private async finalizeConfirm(payment: { id: string; userId: string; participantId: string; orderId: string; participant?: { match?: { id?: string; title?: string } | null } | null }) {
+  private async finalizeConfirm(payment: { id: string; userId: string; participantId: string; orderId: string; amount: number; participant?: { match?: { id?: string; title?: string } | null } | null }) {
     await this.prisma.matchParticipant.update({
       where: { id: payment.participantId },
       data: { status: 'confirmed', paymentStatus: 'completed' },
@@ -263,6 +265,16 @@ export class PaymentsService {
         matchId: payment.participant?.match?.id ?? null,
       },
     });
+
+    // Fire-and-forget: settlement record creation must not block payment confirmation
+    this.settlementsService
+      .recordSettlement({
+        type: 'match',
+        amount: payment.amount,
+        sourceId: payment.id,
+        recipientId: undefined,
+      })
+      .catch((err) => this.logger.error(`Settlement record failed for payment ${payment.id}: ${err}`));
   }
 
   // ── refund ─────────────────────────────────────────────────────────────────

@@ -1576,3 +1576,19 @@ export function useSearchUsers(query: string) {
   });
 }
 
+// ── Reports ──
+export interface CreateReportInput {
+  targetType: string;
+  targetId: string;
+  reason: string;
+  detail?: string;
+}
+
+export function useCreateReport() {
+  return useMutation({
+    mutationFn: async (data: CreateReportInput) => {
+      const res = await api.post('/reports', data);
+      return extractData<{ id: string }>(res);
+    },
+  });
+}

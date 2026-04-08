@@ -163,19 +163,28 @@ jobs:
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
 
-          sleep 10
+          # Wait for matchup_api to become healthy (CMD runs migrate deploy
+          # before starting the NestJS server, so the container is only
+          # considered "up" once migrations have been applied).
+          echo "[INFO] Waiting for matchup_api to start..."
+          for i in $(seq 1 30); do
+            if sudo docker exec matchup_api sh -c "pidof node >/dev/null 2>&1"; then
+              echo "[INFO] matchup_api is running (attempt $i)"
+              break
+            fi
+            sleep 2
+          done
 
           if [ "${RESET_DB}" = "true" ]; then
             echo "[DANGER] Resetting database..."
             sudo docker exec matchup_api npx prisma migrate reset --force --skip-seed
             sudo docker exec matchup_api npx prisma db seed
-          else
-            sudo docker exec matchup_api npx prisma migrate deploy
-            if [ "${RUN_SEED}" = "true" ]; then
-              echo "[DANGER] Running destructive full seed..."
-              sudo docker exec matchup_api npx prisma db seed
-            fi
+          elif [ "${RUN_SEED}" = "true" ]; then
+            echo "[DANGER] Running destructive full seed..."
+            sudo docker exec matchup_api npx prisma db seed
           fi
+          # Regular migrations are now applied by the container CMD on boot,
+          # so no explicit 'migrate deploy' call is needed here.
 
           echo "[INFO] Syncing DB-backed image data..."
           sudo docker exec matchup_api npx ts-node prisma/seed-images.ts

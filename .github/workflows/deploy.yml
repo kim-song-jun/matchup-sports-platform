@@ -143,6 +143,19 @@ jobs:
             exit 1
           fi
 
+          # ── Pre-build disk cleanup ────────────────────────────────────────
+          # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
+          # dangling images, stopped containers, and unused build cache.
+          # Volumes are NOT touched (postgres/redis data must persist).
+          echo "[cleanup] Disk usage before prune:"
+          df -h / | tail -1
+          sudo docker image prune -a -f || true
+          sudo docker container prune -f || true
+          sudo docker builder prune -a -f || true
+          sudo docker network prune -f || true
+          echo "[cleanup] Disk usage after prune:"
+          df -h / | tail -1
+
           sudo docker build -f deploy/Dockerfile.api -t matchup-api .
           sudo docker build -f deploy/Dockerfile.web -t matchup-web .
 
@@ -168,7 +181,13 @@ jobs:
           sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
 
           sudo docker exec matchup_nginx nginx -s reload
-          sudo docker image prune -f
+
+          # ── Post-deploy cleanup ───────────────────────────────────────────
+          # Reclaim space from the images and build cache replaced by this run.
+          sudo docker image prune -a -f || true
+          sudo docker builder prune -a -f || true
+          echo "[cleanup] Final disk usage:"
+          df -h / | tail -1
           EOF
 
       - name: Health check

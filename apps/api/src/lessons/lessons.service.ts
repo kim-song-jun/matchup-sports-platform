@@ -122,8 +122,6 @@ export class LessonsService {
     if (!plan) throw new NotFoundException('티켓 플랜을 찾을 수 없습니다.');
     if (!plan.isActive) throw new BadRequestException('비활성화된 티켓 플랜입니다.');
 
-    const orderId = `MU-LESSON-${randomUUID()}`;
-
     const ticket = await this.prisma.lessonTicket.create({
       data: {
         planId,
@@ -136,10 +134,12 @@ export class LessonsService {
       },
     });
 
+    // orderId is derived from ticket.id so confirmTicketPayment can reconstruct it
+    // without persisting a separate column.
     return {
       ticket,
       payment: {
-        orderId,
+        orderId: `MU-LESSON-${ticket.id}`,
         amount: plan.price,
         ticketId: ticket.id,
       },

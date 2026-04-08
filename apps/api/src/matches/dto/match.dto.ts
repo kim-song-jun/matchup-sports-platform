@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -228,9 +229,15 @@ export class CancelMatchDto {
 
 export class ArriveMatchDto {
   @ApiProperty({ description: 'GPS 위도' })
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
   lat: number;
 
   @ApiProperty({ description: 'GPS 경도' })
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
   lng: number;
 
   @ApiProperty({ description: '도착 인증 사진 URL' })

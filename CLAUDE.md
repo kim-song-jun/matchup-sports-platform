@@ -232,8 +232,12 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 **소유권 이전**:
 `POST :id/transfer-ownership` (owner 전용, `TransferOwnershipDto` — `targetUserId`, `demoteTo: 'manager'|'member'`)
 
+**팀 전용 하위 페이지** (Task 22 추가, 프론트엔드):
+- `/teams/:id/matches` — 해당 팀이 host 또는 applicant로 참여한 팀 매칭 목록 (`GET /team-matches?teamId=`)
+- `/teams/:id/mercenary` — 해당 팀의 용병 모집글 목록 (`GET /mercenary?teamId=`)
+
 ### 팀 매치 (`/team-matches`)
-`GET /` | `GET :id` | `POST /` | `POST :id/apply` | `PATCH :id/applications/:appId/approve|reject` | `POST :id/check-in` | `POST :id/result` | `POST :id/evaluate` | `GET :id/referee-schedule`
+`GET /` (쿼리: `teamId` — 호스트 또는 신청자로 참여한 팀의 매칭 필터) | `GET :id` | `POST /` | `POST :id/apply` | `PATCH :id/applications/:appId/approve` | `PATCH :id/applications/:appId/reject` | `POST :id/check-in` | `POST :id/result` | `POST :id/evaluate` | `GET :id/referee-schedule`
 
 **신청 조회** (Phase 1-5 추가):
 `GET :id/applications` (호스트 뷰) | `GET me/applications` (신청자 본인 뷰)
@@ -308,7 +312,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - 로컬 포맷터 정의 금지 — 반드시 `lib/utils.ts` 유틸 사용
 
 ### 주요 커스텀 훅 (`hooks/use-api.ts`)
-- `useMyTeams()` — 로그인 유저 소유 팀 목록 (`GET /teams/me`), 팀 선택 UI·팀 매칭 생성 시 사용
+- `useMyTeams()` — 로그인 유저 소속 팀 목록 (`GET /teams/me`). 백엔드 `TeamMembership[]` 응답을 `{ id, name, role, sportType, description, city, district, memberCount, level, isRecruiting, logoUrl, joinedAt }[]` 평탄화 형태로 정규화하여 반환. 팀 선택 UI·팀 매칭 생성 시 사용
+- `useMyTeamMatchApplications()` — 신청자 본인이 보낸 팀 매칭 신청 목록 (`GET /team-matches/me/applications`). `/my/team-match-applications` 페이지에서 사용
 - `useRequireAuth()` — 비로그인 접근 시 로그인 페이지로 redirect. **인증이 필요한 모든 페이지에 반드시 적용** (`/(main)/my/*`, `/teams/new`, `/team-matches/new`, `/mercenary/new` 등)
 - `useChatUnreadTotal()` — 전체 미읽음 메시지 수 (`GET /chat/unread-count`), 하단 내비게이션 뱃지에 사용
 - `useChatRoomSocket()` — Socket.IO `chat:message` 이벤트 구독, React Query 캐시 invalidate
@@ -352,6 +357,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `components/teams/transfer-ownership-modal.tsx` — 소유권 이전 확인 모달 (owner 전용, `components/ui/modal.tsx` 기반)
 
 ### 프론트엔드 품질 기준
+- **Open Redirect 방지**: `/login?redirect=...` 파라미터는 반드시 `sanitizeRedirect()` (`apps/web/src/app/(auth)/login/page.tsx`)를 통과시켜 **상대 경로만** 허용한다. 절대 URL, `javascript:`, `//host/` 형태는 모두 차단하고 `/home`으로 fallback.
 - **접근성 기준**: **WCAG 2.1 AA** 준수 (토스·당근마켓 동급). 컬러 대비 4.5:1, 키보드 접근성, 스크린리더 대응, `prefers-reduced-motion` 필수.
 - **컬러만으로 정보 전달 금지**: 종목·상태·알림 등 의미 있는 구분은 반드시 **컬러 + 아이콘/텍스트/패턴**을 병행. 예: recruiting = 파란 점 + "모집중" 텍스트. 색맹 시뮬레이션 대응.
 - **다크모드**: 모든 `bg-white` → `dark:bg-gray-800`, `text-gray-900` → `dark:text-white`. 라이트/다크 전환 시 4.5:1 대비 유지. 누락은 Critical.
@@ -395,3 +401,13 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
    VAPID_SUBJECT=mailto:admin@matchup.kr
    ```
    Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요.
+
+3. **`/mercenary/[id]` 상세 페이지 미존재** (UX Critical): 디렉토리는 있으나 `page.tsx`가 없고 `edit/` 하위만 존재. 용병 목록 → 상세 이동 링크가 dead-end. Task 26 후보.
+
+4. **팀 매칭 모집글 종목 2종목 하드코딩** (`/team-matches/new/page.tsx`): `sportOptions`가 `soccer`/`futsal`만 포함. 다른 종목 팀은 모집글 생성 불가. `lib/constants.ts`의 `SPORT_TYPES` 상수로 교체 필요. Task 26 후보.
+
+5. **`/mercenary` 종목 필터 2종목 하드코딩** (`/mercenary/page.tsx`): 필터가 `soccer`/`futsal`만 있어 다른 종목 용병 탐색 불가. Task 26 후보.
+
+6. **`POST /teams/:id/apply` 미구현**: 팀 가입 신청 API가 백엔드에 없음. 팀 상세 페이지 "가입 신청" CTA가 dead-end. Task 26 후보.
+
+7. **`/my/team-matches/page.tsx` mock 데이터 잔존**: `mockTeamMatches` 상수로 하드코딩된 데이터가 남아 있어 실제 API 연동 전까지 동작은 되나 실제 데이터 미반영. Task 26 후보.

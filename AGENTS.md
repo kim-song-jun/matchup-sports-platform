@@ -171,6 +171,17 @@ Errors:
 - multi-tab Playwright E2E는 무거운 루트 `/`보다 가벼운 route 기반 storage bootstrap을 우선하고, dev-login 기반 API mutation이 간헐적 401을 내면 long-lived token 재사용보다 mutation 직전 fresh token 재발급 패턴으로 안정화한다.
 - 로컬 dev DB는 Prisma schema보다 뒤처진 컬럼 드리프트(`matches.image_url`, `sport_teams.photos`)가 남아 있을 수 있다. live runtime 검증이 필요한 read/update path에서는 broad `include: true`나 default return payload 대신 explicit `select`를 우선 사용해 런타임 false negative를 줄인다.
 
+## 4.1) Proven Pipeline Patterns
+
+### Wave 3a → 3b Sequential-Then-Parallel (Task 21-25 파이프라인 검증)
+
+데이터 레이어 변경이 UI 레이어에 blocking dependency를 가질 때 효과적인 패턴:
+
+- **Wave 3a (sequential)**: 공유 타입/훅/DTO 등 다른 에이전트가 모두 의존하는 파일을 **단일 에이전트**가 먼저 완료. 예: `use-api.ts`의 `useMyTeams()` 평탄화, `MyTeam` 타입 정규화, MSW 핸들러 경로 수정.
+- **Wave 3b (parallel)**: 3a 완료 후 UI 레이어(페이지/컴포넌트) 변경을 **복수 에이전트**가 병렬 실행. 각 에이전트는 서로 다른 라우트 파일을 소유하므로 충돌 없음.
+- **충돌 방지 핵심**: `use-api.ts`, `types/api.ts`, `msw/handlers.ts` 같은 공유 파일은 반드시 3a에서 처리. 개별 `page.tsx`, `[id]/page.tsx`는 3b에서 병렬 가능.
+- **검증 시점**: 3b 완료 후 반드시 `pnpm --filter web build` 또는 `tsc --noEmit`으로 통합 손실 확인.
+
 ## 5) Validation Commands
 
 - Frontend unit: `pnpm --filter web test`

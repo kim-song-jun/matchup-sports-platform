@@ -187,7 +187,10 @@ jobs:
           # so no explicit 'migrate deploy' call is needed here.
 
           echo "[INFO] Syncing DB-backed image data..."
-          sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
+          # Best-effort: ts-node is a devDependency and not present in the
+          # production image. Skip silently if it cannot run; image data sync
+          # is non-critical and can be re-run manually.
+          sudo docker exec matchup_api npx ts-node prisma/seed-images.ts || echo "[WARN] seed-images skipped (ts-node not available in prod image)"
 
           sudo docker exec matchup_nginx nginx -s reload
 

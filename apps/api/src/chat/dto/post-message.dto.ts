@@ -6,7 +6,7 @@ export class PostMessageDto {
   @IsString()
   @MinLength(0)
   @MaxLength(2000)
-  content: string;
+  content!: string;
 
   @ApiPropertyOptional({ description: 'Image URL attached to the message' })
   @IsOptional()

@@ -4,6 +4,7 @@ import { IsString, IsNotEmpty } from 'class-validator';
 import { MarketplaceService } from './marketplace.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateListingDto } from './dto/create-listing.dto';
 
 class ConfirmOrderPaymentDto {
   @ApiProperty({ description: '토스페이먼츠 paymentKey' })
@@ -32,7 +33,7 @@ export class MarketplaceController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '매물 등록' })
-  async createListing(@CurrentUser('id') userId: string, @Body() body: Record<string, unknown>) {
+  async createListing(@CurrentUser('id') userId: string, @Body() body: CreateListingDto) {
     return this.marketplaceService.createListing(userId, body);
   }
 

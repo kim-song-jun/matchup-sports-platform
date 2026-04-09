@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateLessonAdminDto } from './dto/create-lesson-admin.dto';
+import { CreateTeamAdminDto } from './dto/create-team-admin.dto';
+import { CreateVenueAdminDto, UpdateVenueAdminDto } from './dto/create-venue-admin.dto';
+import { SportType, LessonType, VenueType, MatchStatus, LessonStatus } from '@prisma/client';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -210,16 +214,179 @@ describe('AdminService', () => {
 
   describe('updateMatchStatus', () => {
     it('updates match status successfully', async () => {
-      const updated = { id: 'match-1', status: 'cancelled' };
+      const updated = { id: 'match-1', status: MatchStatus.cancelled };
       prismaMock.match.update.mockResolvedValue(updated);
 
-      const result = await service.updateMatchStatus('match-1', 'cancelled');
+      const result = await service.updateMatchStatus('match-1', MatchStatus.cancelled);
 
-      expect(result.status).toBe('cancelled');
+      expect(result.status).toBe(MatchStatus.cancelled);
       expect(prismaMock.match.update).toHaveBeenCalledWith({
         where: { id: 'match-1' },
-        data: { status: 'cancelled' },
+        data: { status: MatchStatus.cancelled },
       });
+    });
+  });
+
+  // ── createLesson ────────────────────────────────────────────────────────────
+
+  describe('createLesson', () => {
+    const validDto: CreateLessonAdminDto = {
+      hostId: 'host-uuid-1',
+      sportType: SportType.futsal,
+      type: LessonType.group_lesson,
+      title: '풋살 기초 강좌',
+      lessonDate: '2026-06-01',
+      startTime: '10:00',
+      endTime: '12:00',
+      maxParticipants: 10,
+    };
+
+    it('creates a lesson with typed DTO', async () => {
+      const created = { id: 'lesson-1', ...validDto };
+      prismaMock.lesson.create.mockResolvedValue(created);
+
+      const result = await service.createLesson(validDto);
+
+      expect(result.id).toBe('lesson-1');
+      expect(prismaMock.lesson.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            hostId: 'host-uuid-1',
+            sportType: SportType.futsal,
+            type: LessonType.group_lesson,
+            title: '풋살 기초 강좌',
+            maxParticipants: 10,
+            fee: 0,
+            levelMin: 1,
+            levelMax: 5,
+          }),
+        }),
+      );
+    });
+
+    it('applies default values for optional numeric fields', async () => {
+      prismaMock.lesson.create.mockResolvedValue({ id: 'lesson-2' });
+
+      await service.createLesson(validDto);
+
+      expect(prismaMock.lesson.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ fee: 0, levelMin: 1, levelMax: 5 }),
+        }),
+      );
+    });
+  });
+
+  // ── updateLessonStatus ──────────────────────────────────────────────────────
+
+  describe('updateLessonStatus', () => {
+    it('updates lesson status with typed enum', async () => {
+      const updated = { id: 'lesson-1', status: LessonStatus.cancelled };
+      prismaMock.lesson.update.mockResolvedValue(updated);
+
+      const result = await service.updateLessonStatus('lesson-1', LessonStatus.cancelled);
+
+      expect(result.status).toBe(LessonStatus.cancelled);
+      expect(prismaMock.lesson.update).toHaveBeenCalledWith({
+        where: { id: 'lesson-1' },
+        data: { status: LessonStatus.cancelled },
+      });
+    });
+  });
+
+  // ── createTeam ──────────────────────────────────────────────────────────────
+
+  describe('createTeam', () => {
+    const validDto: CreateTeamAdminDto = {
+      ownerId: 'owner-uuid-1',
+      name: '서울 풋살 FC',
+      sportType: SportType.futsal,
+    };
+
+    it('creates a team with typed DTO', async () => {
+      const created = { id: 'team-1', ...validDto };
+      prismaMock.sportTeam.create.mockResolvedValue(created);
+
+      const result = await service.createTeam(validDto);
+
+      expect(result.id).toBe('team-1');
+      expect(prismaMock.sportTeam.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            ownerId: 'owner-uuid-1',
+            name: '서울 풋살 FC',
+            sportType: SportType.futsal,
+            memberCount: 1,
+            level: 3,
+            isRecruiting: true,
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── createVenue ─────────────────────────────────────────────────────────────
+
+  describe('createVenue', () => {
+    const validDto: CreateVenueAdminDto = {
+      name: '마포 풋살파크',
+      type: VenueType.futsal_court,
+      sportTypes: [SportType.futsal],
+      address: '서울시 마포구 월드컵로 1',
+      lat: 37.57,
+      lng: 126.88,
+      city: '서울',
+      district: '마포구',
+    };
+
+    it('creates a venue with typed DTO and defaults', async () => {
+      const created = { id: 'venue-1', ...validDto };
+      prismaMock.venue.create.mockResolvedValue(created);
+
+      const result = await service.createVenue(validDto);
+
+      expect(result.id).toBe('venue-1');
+      expect(prismaMock.venue.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: '마포 풋살파크',
+            type: VenueType.futsal_court,
+            sportTypes: [SportType.futsal],
+            lat: 37.57,
+            lng: 126.88,
+            imageUrls: [],
+            facilities: [],
+            operatingHours: {},
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── updateVenue ─────────────────────────────────────────────────────────────
+
+  describe('updateVenue', () => {
+    it('updates only provided fields (partial)', async () => {
+      const dto: UpdateVenueAdminDto = { name: '새 이름', phone: '02-1234-5678' };
+      prismaMock.venue.update.mockResolvedValue({ id: 'venue-1', name: '새 이름' });
+
+      await service.updateVenue('venue-1', dto);
+
+      expect(prismaMock.venue.update).toHaveBeenCalledWith({
+        where: { id: 'venue-1' },
+        data: expect.objectContaining({ name: '새 이름', phone: '02-1234-5678' }),
+      });
+    });
+
+    it('does not include undefined fields in update data', async () => {
+      const dto: UpdateVenueAdminDto = { name: '이름만 변경' };
+      prismaMock.venue.update.mockResolvedValue({ id: 'venue-1' });
+
+      await service.updateVenue('venue-1', dto);
+
+      const callArg = prismaMock.venue.update.mock.calls[0][0];
+      expect(callArg.data).not.toHaveProperty('phone');
+      expect(callArg.data).not.toHaveProperty('lat');
     });
   });
 

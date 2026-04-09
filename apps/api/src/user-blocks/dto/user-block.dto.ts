@@ -4,7 +4,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateUserBlockDto {
   @ApiProperty({ description: '차단할 사용자 ID' })
   @IsString()
-  blockedId: string;
+  blockedId!: string;
 
   @ApiPropertyOptional({ description: '차단 사유', maxLength: 200 })
   @IsOptional()

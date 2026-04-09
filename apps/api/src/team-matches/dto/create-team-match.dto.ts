@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID, IsInt, Min, Max, IsOptional, IsEnum, IsBoolean, Matches } from 'class-validator';
+import { IsString, IsUUID, IsInt, Min, Max, IsOptional, IsEnum, IsBoolean, Matches, IsIn, MaxLength } from 'class-validator';
 import { SportType, MatchStyle } from '@prisma/client';
 
 export class CreateTeamMatchDto {
@@ -25,4 +25,29 @@ export class CreateTeamMatchDto {
   @ApiProperty({ required: false, enum: MatchStyle }) @IsOptional() @IsEnum(MatchStyle) matchStyle?: MatchStyle;
   @ApiProperty({ required: false, default: false }) @IsOptional() @IsBoolean() hasReferee?: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() notes?: string;
+
+  // Matching meta fields (task 17)
+  @ApiProperty({ required: false, enum: ['S', 'A+', 'A', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D'] })
+  @IsOptional() @IsIn(['S', 'A+', 'A', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D'])
+  skillGrade?: string;
+
+  @ApiProperty({ required: false, enum: ['11:11', '8:8', '6:6', '5:5'] })
+  @IsOptional() @IsIn(['11:11', '8:8', '6:6', '5:5'])
+  gameFormat?: string;
+
+  @ApiProperty({ required: false, enum: ['invitation', 'exchange', 'away'] })
+  @IsOptional() @IsIn(['invitation', 'exchange', 'away'])
+  matchType?: string;
+
+  @ApiProperty({ required: false, default: 0 })
+  @IsOptional() @IsInt() @Min(0) @Max(20)
+  proPlayerCount?: number;
+
+  @ApiProperty({ required: false, maxLength: 30 })
+  @IsOptional() @IsString() @MaxLength(30)
+  uniformColor?: string;
+
+  @ApiProperty({ required: false, default: false })
+  @IsOptional() @IsBoolean()
+  isFreeInvitation?: boolean;
 }

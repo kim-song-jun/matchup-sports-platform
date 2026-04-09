@@ -169,6 +169,15 @@ export async function createMercenaryPostViaApi(
   });
 }
 
+export async function addTeamMemberViaApi(
+  token: string,
+  teamId: string,
+  userId: string,
+  role: 'member' | 'manager' = 'member',
+): Promise<void> {
+  await apiCall('POST', `/teams/${teamId}/members`, token, { userId, role });
+}
+
 export async function createListingViaApi(
   token: string,
   data: {

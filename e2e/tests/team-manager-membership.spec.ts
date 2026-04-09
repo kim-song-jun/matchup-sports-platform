@@ -7,6 +7,9 @@
  * - Member sees leave button for themselves
  * - Non-owner cannot see delete team button on /my/teams (only owner can)
  * - Members page shows member list or empty state
+ *
+ * Prerequisite: global-setup creates 'E2E테스트팀' owned by teamOwner and
+ * adds teamManager + teamMember as members. seed-data.json holds ownerTeamId.
  */
 
 import { test, expect } from '@playwright/test';
@@ -19,39 +22,38 @@ import * as path from 'path';
 const OWNER = TEST_PERSONAS.teamOwner.nickname;
 const MANAGER = TEST_PERSONAS.teamManager.nickname;
 
-/** Read seed team id created by global-setup, if available. */
-function getSeedTeamId(): string | null {
-  try {
-    const seedFile = path.join(__dirname, '../.auth/seed-data.json');
-    if (fs.existsSync(seedFile)) {
-      const data = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
-      return data.ownerTeamId ?? null;
+/** Read seed team id created by global-setup. Throws if missing. */
+function getSeedTeamId(): string {
+  const seedFile = path.join(__dirname, '../.auth/seed-data.json');
+  if (fs.existsSync(seedFile)) {
+    const data = JSON.parse(fs.readFileSync(seedFile, 'utf-8')) as Record<string, unknown>;
+    const id = data.ownerTeamId;
+    if (typeof id === 'string' && id.length > 0) {
+      return id;
     }
-  } catch {
-    // ignore
   }
-  return null;
+  throw new Error(
+    '[team-manager-membership] seed-data.json missing or ownerTeamId not set. ' +
+    'Ensure global-setup completed successfully.',
+  );
 }
 
 test.describe('Team members page — page structure', () => {
-  let teamId: string | null = null;
+  let teamId: string;
 
   test.beforeAll(async () => {
-    teamId = getSeedTeamId();
-    if (!teamId) {
-      // Create a team on the fly for tests
-      try {
-        const tokens = await loginViaApi(OWNER);
-        const team = await createTeamViaApi(tokens.accessToken, {
-          name: `멤버테스트팀${Date.now()}`,
-          sportType: 'futsal',
-          city: '서울',
-        });
-        teamId = team.id;
-      } catch {
-        console.warn('[team-manager-membership] Could not create team — will use placeholder id');
-        teamId = 'placeholder-team-id';
-      }
+    try {
+      teamId = getSeedTeamId();
+    } catch {
+      // Fallback: create a team on the fly so tests are never blocked by
+      // a stale or missing seed-data.json from a previous failed global-setup.
+      const tokens = await loginViaApi(OWNER);
+      const team = await createTeamViaApi(tokens.accessToken, {
+        name: `멤버테스트팀${Date.now()}`,
+        sportType: 'futsal',
+        city: '서울',
+      });
+      teamId = team.id;
     }
   });
 
@@ -60,10 +62,6 @@ test.describe('Team members page — page structure', () => {
   });
 
   test('/teams/:id/members page loads with heading', async ({ page }) => {
-    if (!teamId || teamId === 'placeholder-team-id') {
-      test.skip();
-      return;
-    }
     await page.goto(`/teams/${teamId}/members`);
     await page.waitForLoadState('networkidle');
     // Heading or ErrorState
@@ -72,10 +70,6 @@ test.describe('Team members page — page structure', () => {
   });
 
   test('members page shows member items or empty state', async ({ page }) => {
-    if (!teamId || teamId === 'placeholder-team-id') {
-      test.skip();
-      return;
-    }
     await page.goto(`/teams/${teamId}/members`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(600);
@@ -92,10 +86,6 @@ test.describe('Team members page — page structure', () => {
   });
 
   test('owner sees MoreVertical menu button for non-owner members', async ({ page }) => {
-    if (!teamId || teamId === 'placeholder-team-id') {
-      test.skip();
-      return;
-    }
     await page.goto(`/teams/${teamId}/members`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(600);
@@ -146,10 +136,8 @@ test.describe('My teams page — owner actions', () => {
     await page.waitForTimeout(500);
 
     const deleteBtn = page.getByRole('button', { name: '삭제' }).first();
-    if (await deleteBtn.count() === 0) {
-      test.skip();
-      return;
-    }
+    // global-setup ensures teamOwner has at least one team; delete button must appear.
+    await expect(deleteBtn).toBeVisible({ timeout: 5_000 });
     await deleteBtn.click();
     // Confirmation dialog should appear
     const dialog = page.getByRole('dialog');
@@ -169,10 +157,6 @@ test.describe('Team member — leave action', () => {
 
   test('non-owner member sees leave (탈퇴) button on members page', async ({ page }) => {
     const seedTeamId = getSeedTeamId();
-    if (!seedTeamId) {
-      test.skip();
-      return;
-    }
     await page.goto(`/teams/${seedTeamId}/members`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(800);

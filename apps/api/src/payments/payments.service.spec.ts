@@ -115,6 +115,67 @@ async function buildRealModeService(): Promise<PaymentsService> {
 }
 
 // ---------------------------------------------------------------------------
+// Production guard suite
+// ---------------------------------------------------------------------------
+
+describe('PaymentsService — onModuleInit production guard', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    delete process.env.TOSS_SECRET_KEY;
+    delete process.env.TOSS_WEBHOOK_SECRET;
+    jest.clearAllMocks();
+  });
+
+  async function buildService(): Promise<{ init: () => Promise<unknown> }> {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: NotificationsService, useValue: notificationsServiceMock },
+        { provide: SettlementsService, useValue: settlementsServiceMock },
+      ],
+    }).compile();
+    return module;
+  }
+
+  it('does not throw in development when TOSS_SECRET_KEY is missing', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.TOSS_SECRET_KEY;
+
+    const module = await buildService();
+    await expect(module.init()).resolves.not.toThrow();
+  });
+
+  it('does not throw in test environment when TOSS_SECRET_KEY is missing', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.TOSS_SECRET_KEY;
+
+    const module = await buildService();
+    await expect(module.init()).resolves.not.toThrow();
+  });
+
+  it('throws on module init in production when TOSS_SECRET_KEY is missing', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.TOSS_SECRET_KEY;
+
+    const module = await buildService();
+    await expect(module.init()).rejects.toThrow(
+      /TOSS_SECRET_KEY is not set in production/,
+    );
+  });
+
+  it('does not throw on module init in production when TOSS_SECRET_KEY is present', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.TOSS_SECRET_KEY = 'live_sk_xxx';
+
+    const module = await buildService();
+    await expect(module.init()).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

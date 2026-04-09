@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { NotificationType, PaymentMethod } from '@prisma/client';
@@ -37,7 +38,7 @@ interface TossErrorResponse {
 // ---------------------------------------------------------------------------
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly tossEnabled: boolean;
   private readonly tossSecretKey: string;
@@ -54,6 +55,15 @@ export class PaymentsService {
 
     if (!this.tossEnabled) {
       this.logger.warn('TOSS_SECRET_KEY not set — payments running in mock mode');
+    }
+  }
+
+  onModuleInit() {
+    if (process.env.NODE_ENV === 'production' && !this.tossEnabled) {
+      throw new Error(
+        '[PaymentsService] TOSS_SECRET_KEY is not set in production. ' +
+        'Set the required environment variable before starting the server.',
+      );
     }
   }
 

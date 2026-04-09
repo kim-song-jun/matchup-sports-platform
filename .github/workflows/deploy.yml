@@ -159,13 +159,20 @@ jobs:
           sudo docker build -f deploy/Dockerfile.api -t matchup-api .
           sudo docker build -f deploy/Dockerfile.web -t matchup-web .
 
+          # ── Run database migrations before bringing up the new containers ──
+          # Explicit deploy step — migrations must succeed before the API
+          # starts. Failure aborts the deploy entirely (set -euo pipefail).
+          # Rollback: re-deploy a previous image tag or run
+          #   docker run --rm matchup-api npx prisma migrate resolve --rolled-back <migration>
+          echo "[INFO] Running database migrations..."
+          ${COMPOSE} -f deploy/docker-compose.prod.yml --env-file deploy/.env \
+            run --rm --no-deps api npx prisma migrate deploy
+
           cd deploy
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
 
-          # Wait for matchup_api to become healthy (CMD runs migrate deploy
-          # before starting the NestJS server, so the container is only
-          # considered "up" once migrations have been applied).
+          # Wait for matchup_api to become healthy (node process must be up).
           echo "[INFO] Waiting for matchup_api to start..."
           for i in $(seq 1 30); do
             if sudo docker exec matchup_api sh -c "pidof node >/dev/null 2>&1"; then
@@ -183,14 +190,14 @@ jobs:
             echo "[DANGER] Running destructive full seed..."
             sudo docker exec matchup_api npx prisma db seed
           fi
-          # Regular migrations are now applied by the container CMD on boot,
-          # so no explicit 'migrate deploy' call is needed here.
 
           echo "[INFO] Syncing DB-backed image data..."
-          # Best-effort: ts-node is a devDependency and not present in the
-          # production image. Skip silently if it cannot run; image data sync
-          # is non-critical and can be re-run manually.
-          sudo docker exec matchup_api npx ts-node prisma/seed-images.ts || echo "[WARN] seed-images skipped (ts-node not available in prod image)"
+          # ts-node is a devDependency and not present in the production image.
+          # Failure is surfaced as a GitHub Actions warning so operators are
+          # notified; it does NOT abort the deploy (image sync is non-critical).
+          if ! sudo docker exec matchup_api npx ts-node prisma/seed-images.ts; then
+            echo "::warning::seed-images sync failed — image data may be stale. Re-run manually: docker exec matchup_api npx ts-node prisma/seed-images.ts"
+          fi
 
           sudo docker exec matchup_nginx nginx -s reload
 
@@ -205,4 +212,4 @@ jobs:
       - name: Health check
         run: |
           sleep 10
-          ssh ec2 'curl -sf http://localhost > /dev/null && curl -sf http://localhost/api/v1/health > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'
+          ssh ec2 'curl -sf http://localhost > /dev/null && curl -fsS http://localhost/api/v1/health | jq -e ".checks.db == true and .checks.redis == true" > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'

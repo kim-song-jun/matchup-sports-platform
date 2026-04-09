@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
@@ -37,6 +37,32 @@ export default function ListingDetailPage() {
 
   const { data: listing, isLoading } = useListing(listingId);
 
+  // task 18: All hooks must be called before any conditional early return
+  // to satisfy React hooks rules (fix for production React error #310).
+  const galleryImages = useMemo(
+    () => getListingImageSet(listing?.imageUrls, listing?.id ?? listingId, 3),
+    [listing?.imageUrls, listing?.id, listingId],
+  );
+  const fallbackGalleryImages = useMemo(
+    () => getListingImageSet(undefined, listing?.id ?? listingId, 3),
+    [listing?.id, listingId],
+  );
+  const mediaImages = useMemo(
+    () =>
+      galleryImages
+        .filter((image): image is string => Boolean(image))
+        .map((image, index) => ({
+          src: image,
+          alt: `${listing?.title ?? ''} 이미지 ${index + 1}`,
+          fallbackSrc: fallbackGalleryImages[index] ?? fallbackGalleryImages[0],
+        })),
+    [galleryImages, fallbackGalleryImages, listing?.title],
+  );
+
+  useEffect(() => {
+    setSelectedImage(galleryImages[0] ?? null);
+  }, [listingId, galleryImages]);
+
   if (isLoading) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
@@ -62,20 +88,8 @@ export default function ListingDetailPage() {
   }
 
   const SportIcon = SportIconMap[listing.sportType];
-  const galleryImages = getListingImageSet(listing.imageUrls, listing.id, 3);
-  const fallbackGalleryImages = getListingImageSet(undefined, listing.id, 3);
   const heroImage = selectedImage || galleryImages[0];
   const heroFallbackImage = fallbackGalleryImages[0];
-  const mediaImages = galleryImages.filter((image): image is string => Boolean(image)).map((image, index) => ({
-    src: image,
-    alt: `${listing.title} 이미지 ${index + 1}`,
-    fallbackSrc: fallbackGalleryImages[index] ?? heroFallbackImage,
-  }));
-
-  useEffect(() => {
-    setSelectedImage(galleryImages[0] ?? null);
-  }, [listingId, galleryImages[0]]);
-
   const heroMediaIndex = mediaImages.findIndex((image) => image.src === heroImage);
 
   function openHeroImage() {

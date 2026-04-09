@@ -577,4 +577,113 @@ describe('AuthService', () => {
       process.env.NODE_ENV = original;
     });
   });
+
+  // ── onModuleInit — production OAuth credential guard ──────────────────────
+
+  describe('onModuleInit — production OAuth credential guard', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+      delete process.env.KAKAO_CLIENT_ID;
+      delete process.env.NAVER_CLIENT_ID;
+    });
+
+    it('does not throw in development even when OAuth keys are missing', async () => {
+      process.env.NODE_ENV = 'development';
+      delete process.env.KAKAO_CLIENT_ID;
+      delete process.env.NAVER_CLIENT_ID;
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+
+      // onModuleInit is called during module init — should not throw
+      await expect(module.init()).resolves.not.toThrow();
+    });
+
+    it('does not throw in test environment even when OAuth keys are missing', async () => {
+      process.env.NODE_ENV = 'test';
+      delete process.env.KAKAO_CLIENT_ID;
+      delete process.env.NAVER_CLIENT_ID;
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+
+      await expect(module.init()).resolves.not.toThrow();
+    });
+
+    it('throws on module init in production when both OAuth keys are missing', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.KAKAO_CLIENT_ID;
+      delete process.env.NAVER_CLIENT_ID;
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+
+      await expect(module.init()).rejects.toThrow(
+        /Missing OAuth credentials in production.*KAKAO_CLIENT_ID.*NAVER_CLIENT_ID/,
+      );
+    });
+
+    it('throws on module init in production when only KAKAO key is missing', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.KAKAO_CLIENT_ID;
+      process.env.NAVER_CLIENT_ID = 'naver-prod-id';
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+
+      await expect(module.init()).rejects.toThrow(
+        /Missing OAuth credentials in production.*KAKAO_CLIENT_ID/,
+      );
+
+      delete process.env.NAVER_CLIENT_ID;
+    });
+
+    it('does not throw on module init in production when all OAuth keys are present', async () => {
+      process.env.NODE_ENV = 'production';
+      process.env.KAKAO_CLIENT_ID = 'kakao-prod-id';
+      process.env.NAVER_CLIENT_ID = 'naver-prod-id';
+
+      const module = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: ConfigService, useValue: configServiceMock },
+          { provide: UsersService, useValue: usersServiceMock },
+        ],
+      }).compile();
+
+      await expect(module.init()).resolves.not.toThrow();
+    });
+  });
 });

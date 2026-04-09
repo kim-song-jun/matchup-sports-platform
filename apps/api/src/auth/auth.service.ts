@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,7 +26,7 @@ interface SocialProfile {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly adminEmail = 'test2@gmail.com';
   private readonly passwordHasher: PasswordHasher;
   private readonly logger = new Logger(AuthService.name);
@@ -45,6 +45,20 @@ export class AuthService {
     this.passwordHasher = loadPasswordHasher(hashDriver);
     this.kakaoEnabled = !!process.env.KAKAO_CLIENT_ID;
     this.naverEnabled = !!process.env.NAVER_CLIENT_ID;
+  }
+
+  onModuleInit() {
+    if (process.env.NODE_ENV === 'production') {
+      const missing: string[] = [];
+      if (!this.kakaoEnabled) missing.push('KAKAO_CLIENT_ID');
+      if (!this.naverEnabled) missing.push('NAVER_CLIENT_ID');
+      if (missing.length > 0) {
+        throw new Error(
+          `[AuthService] Missing OAuth credentials in production: ${missing.join(', ')}. ` +
+          'Set the required environment variables before starting the server.',
+        );
+      }
+    }
   }
 
   private getRoleForEmail(email?: string | null) {

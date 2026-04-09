@@ -4,6 +4,14 @@ import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import {
+  CreateLessonAdminDto,
+  CreateTeamAdminDto,
+  CreateVenueAdminDto,
+  UpdateVenueAdminDto,
+  UpdateMatchStatusDto,
+  UpdateLessonStatusDto,
+} from './dto';
 
 @ApiTags('관리자')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -62,8 +70,8 @@ export class AdminController {
 
   @Patch('matches/:id/status')
   @ApiOperation({ summary: '매치 상태 변경' })
-  async updateMatchStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.adminService.updateMatchStatus(id, status);
+  async updateMatchStatus(@Param('id') id: string, @Body() body: UpdateMatchStatusDto) {
+    return this.adminService.updateMatchStatus(id, body.status);
   }
 
   @Get('lessons')
@@ -74,14 +82,14 @@ export class AdminController {
 
   @Post('lessons')
   @ApiOperation({ summary: '강좌 생성 (관리자)' })
-  async createLesson(@Body() body: Record<string, unknown>) {
+  async createLesson(@Body() body: CreateLessonAdminDto) {
     return this.adminService.createLesson(body);
   }
 
   @Patch('lessons/:id/status')
   @ApiOperation({ summary: '강좌 상태 변경' })
-  async updateLessonStatus(@Param('id') id: string, @Body('status') status: string) {
-    return this.adminService.updateLessonStatus(id, status);
+  async updateLessonStatus(@Param('id') id: string, @Body() body: UpdateLessonStatusDto) {
+    return this.adminService.updateLessonStatus(id, body.status);
   }
 
   @Get('teams')
@@ -92,7 +100,7 @@ export class AdminController {
 
   @Post('teams')
   @ApiOperation({ summary: '팀 생성 (관리자)' })
-  async createTeam(@Body() body: Record<string, unknown>) {
+  async createTeam(@Body() body: CreateTeamAdminDto) {
     return this.adminService.createTeam(body);
   }
 
@@ -104,13 +112,13 @@ export class AdminController {
 
   @Post('venues')
   @ApiOperation({ summary: '시설 등록 (관리자)' })
-  async createVenue(@Body() body: Record<string, unknown>) {
+  async createVenue(@Body() body: CreateVenueAdminDto) {
     return this.adminService.createVenue(body);
   }
 
   @Patch('venues/:id')
   @ApiOperation({ summary: '시설 수정 (관리자)' })
-  async updateVenue(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+  async updateVenue(@Param('id') id: string, @Body() body: UpdateVenueAdminDto) {
     return this.adminService.updateVenue(id, body);
   }
 

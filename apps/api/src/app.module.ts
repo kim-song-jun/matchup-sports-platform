@@ -26,6 +26,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { ReportsModule } from './reports/reports.module';
 import { UserBlocksModule } from './user-blocks/user-blocks.module';
 import configuration from './config/configuration';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import configuration from './config/configuration';
       load: [configuration],
     }),
     PrismaModule,
+    RedisModule,
     AuthModule,
     UsersModule,
     MatchesModule,

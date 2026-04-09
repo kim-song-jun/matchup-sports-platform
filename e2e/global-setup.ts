@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TEST_PERSONAS } from './fixtures/test-users';
 import { loginViaApi, injectTokens } from './fixtures/auth';
-import { healthCheck, createTeamViaApi, createMercenaryPostViaApi } from './fixtures/api-helpers';
+import { healthCheck, createTeamViaApi, createMercenaryPostViaApi, addTeamMemberViaApi } from './fixtures/api-helpers';
 import { runE2EPreflight } from './fixtures/preflight';
 import { promoteAdminPersona, reactivateE2EUsers } from './fixtures/db-runtime';
 
@@ -36,7 +36,7 @@ export default async function globalSetup(_config: FullConfig) {
 
   // 2. Pre-create all personas in DB and save their storageState files
   const browser = await chromium.launch();
-  const tokens: Record<string, { accessToken: string; refreshToken: string }> = {};
+  const tokens: Record<string, { accessToken: string; refreshToken: string; user?: Record<string, unknown> }> = {};
   try {
     const failedPersonas: string[] = [];
 
@@ -91,6 +91,40 @@ export default async function globalSetup(_config: FullConfig) {
           'utf-8',
         );
         console.log(`[global-setup] Created seed team: ${team.id}`);
+
+        // Add teamManager and teamMember personas to the seed team so
+        // membership tests (team-manager-membership.spec.ts) have a real team
+        // with real members and do not fall back to placeholder-team-id.
+        const managerTokens = tokens['teamManager'];
+        const memberTokens = tokens['teamMember'];
+
+        if (managerTokens?.user?.id) {
+          try {
+            await addTeamMemberViaApi(
+              ownerTokens.accessToken,
+              team.id,
+              managerTokens.user.id as string,
+              'manager',
+            );
+            console.log(`[global-setup] Added teamManager to seed team as manager.`);
+          } catch (err) {
+            console.warn(`[global-setup] Could not add teamManager to seed team: ${err}`);
+          }
+        }
+
+        if (memberTokens?.user?.id) {
+          try {
+            await addTeamMemberViaApi(
+              ownerTokens.accessToken,
+              team.id,
+              memberTokens.user.id as string,
+              'member',
+            );
+            console.log(`[global-setup] Added teamMember to seed team as member.`);
+          } catch (err) {
+            console.warn(`[global-setup] Could not add teamMember to seed team: ${err}`);
+          }
+        }
 
         // Create a mercenary post for mercenaryHost (reuse already-obtained token)
         if (mercHostTokens) {

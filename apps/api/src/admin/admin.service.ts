@@ -1,5 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { MatchStatus, LessonStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateLessonAdminDto } from './dto/create-lesson-admin.dto';
+import { CreateTeamAdminDto } from './dto/create-team-admin.dto';
+import { CreateVenueAdminDto, UpdateVenueAdminDto } from './dto/create-venue-admin.dto';
 
 export interface AdminAuditEntry {
   id: string;
@@ -53,7 +57,9 @@ export class AdminService {
 
   async getUsers(filter: { search?: string; cursor?: string }) {
     const limit = 20;
-    const where: Record<string, unknown> = { deletedAt: null };
+    const where: { deletedAt: null; nickname?: { contains: string; mode: 'insensitive' } } = {
+      deletedAt: null,
+    };
     if (filter.search) {
       where.nickname = { contains: filter.search, mode: 'insensitive' };
     }
@@ -161,8 +167,8 @@ export class AdminService {
 
   async getMatches(filter: { status?: string; cursor?: string }) {
     const limit = 20;
-    const where: Record<string, unknown> = {};
-    if (filter.status) where.status = filter.status;
+    const where: { status?: MatchStatus } = {};
+    if (filter.status) where.status = filter.status as MatchStatus;
 
     const items = await this.prisma.match.findMany({
       where,
@@ -180,10 +186,10 @@ export class AdminService {
     return { items: result, nextCursor: hasNext ? result[result.length - 1].id : null };
   }
 
-  async updateMatchStatus(id: string, status: string) {
+  async updateMatchStatus(id: string, status: MatchStatus) {
     return this.prisma.match.update({
       where: { id },
-      data: { status: status as never },
+      data: { status },
     });
   }
 
@@ -203,54 +209,79 @@ export class AdminService {
     });
   }
 
-  async createLesson(data: Record<string, unknown>) {
+  async createLesson(data: CreateLessonAdminDto) {
     return this.prisma.lesson.create({
       data: {
-        hostId: data.hostId as string,
-        sportType: data.sportType as never,
-        type: data.type as never,
-        title: data.title as string,
-        description: data.description as string | undefined,
-        venueName: data.venueName as string | undefined,
-        venueId: data.venueId as string | undefined,
-        lessonDate: new Date(data.lessonDate as string),
-        startTime: data.startTime as string,
-        endTime: data.endTime as string,
-        maxParticipants: data.maxParticipants as number,
-        fee: (data.fee as number) || 0,
-        levelMin: (data.levelMin as number) || 1,
-        levelMax: (data.levelMax as number) || 5,
-        coachName: data.coachName as string | undefined,
-        coachBio: data.coachBio as string | undefined,
-        imageUrls: (data.imageUrls as string[]) || [],
+        hostId: data.hostId,
+        sportType: data.sportType,
+        type: data.type,
+        title: data.title,
+        description: data.description,
+        venueName: data.venueName,
+        venueId: data.venueId,
+        lessonDate: new Date(data.lessonDate),
+        startTime: data.startTime,
+        endTime: data.endTime,
+        maxParticipants: data.maxParticipants,
+        fee: data.fee ?? 0,
+        levelMin: data.levelMin ?? 1,
+        levelMax: data.levelMax ?? 5,
+        coachName: data.coachName,
+        coachBio: data.coachBio,
+        coachImageUrl: data.coachImageUrl,
+        imageUrls: data.imageUrls ?? [],
+        isRecurring: data.isRecurring ?? false,
+        recurringDays: data.recurringDays ?? [],
+        recurringUntil: data.recurringUntil ? new Date(data.recurringUntil) : undefined,
       },
     });
   }
 
-  async updateLessonStatus(id: string, status: string) {
+  async updateLessonStatus(id: string, status: LessonStatus) {
     return this.prisma.lesson.update({
       where: { id },
-      data: { status: status as never },
+      data: { status },
     });
   }
 
-  async createTeam(data: Record<string, unknown>) {
-    return this.prisma.sportTeam.create({
-      data: {
-        ownerId: data.ownerId as string,
-        name: data.name as string,
-        sportType: data.sportType as never,
-        description: data.description as string | undefined,
-        logoUrl: data.logoUrl as string | undefined,
-        coverImageUrl: data.coverImageUrl as string | undefined,
-        photos: (data.photos as string[]) || [],
-        city: data.city as string | undefined,
-        district: data.district as string | undefined,
-        memberCount: (data.memberCount as number) || 1,
-        level: (data.level as number) || 3,
-        isRecruiting: data.isRecruiting !== false,
-        contactInfo: data.contactInfo as string | undefined,
-      },
+  async createTeam(data: CreateTeamAdminDto) {
+    // task 19 fix: admin-created teams must also get an owner TeamMembership row,
+    // otherwise every TeamMembershipService.assertRole check fails on the team.
+    // Mirrors TeamsService.create transactional behavior.
+    return this.prisma.$transaction(async (tx) => {
+      const team = await tx.sportTeam.create({
+        data: {
+          ownerId: data.ownerId,
+          name: data.name,
+          sportType: data.sportType,
+          description: data.description,
+          logoUrl: data.logoUrl,
+          coverImageUrl: data.coverImageUrl,
+          photos: data.photos ?? [],
+          city: data.city,
+          district: data.district,
+          memberCount: data.memberCount ?? 1,
+          level: data.level ?? 3,
+          isRecruiting: data.isRecruiting ?? true,
+          contactInfo: data.contactInfo,
+          instagramUrl: data.instagramUrl,
+          youtubeUrl: data.youtubeUrl,
+          shortsUrl: data.shortsUrl,
+          kakaoOpenChat: data.kakaoOpenChat,
+          websiteUrl: data.websiteUrl,
+        },
+      });
+
+      await tx.teamMembership.create({
+        data: {
+          teamId: team.id,
+          userId: data.ownerId,
+          role: 'owner',
+          status: 'active',
+        },
+      });
+
+      return team;
     });
   }
 
@@ -261,32 +292,50 @@ export class AdminService {
     });
   }
 
-  async createVenue(data: Record<string, unknown>) {
+  async createVenue(data: CreateVenueAdminDto) {
     return this.prisma.venue.create({
       data: {
-        name: data.name as string,
-        type: data.type as never,
-        sportTypes: (data.sportTypes as never[]) || [],
-        address: data.address as string,
-        addressDetail: data.addressDetail as string | undefined,
-        lat: (data.lat as number) || 37.5,
-        lng: (data.lng as number) || 127.0,
-        city: data.city as string,
-        district: data.district as string,
-        phone: data.phone as string | undefined,
-        description: data.description as string | undefined,
-        imageUrls: (data.imageUrls as string[]) || [],
-        facilities: (data.facilities as string[]) || [],
-        operatingHours: data.operatingHours as never || {},
-        pricePerHour: data.pricePerHour as number | undefined,
+        name: data.name,
+        type: data.type,
+        sportTypes: data.sportTypes,
+        address: data.address,
+        addressDetail: data.addressDetail,
+        lat: data.lat,
+        lng: data.lng,
+        city: data.city,
+        district: data.district,
+        phone: data.phone,
+        description: data.description,
+        imageUrls: data.imageUrls ?? [],
+        facilities: data.facilities ?? [],
+        operatingHours: data.operatingHours ?? {},
+        pricePerHour: data.pricePerHour,
+        rinkSubType: data.rinkSubType,
       },
     });
   }
 
-  async updateVenue(id: string, data: Record<string, unknown>) {
+  async updateVenue(id: string, data: UpdateVenueAdminDto) {
     return this.prisma.venue.update({
       where: { id },
-      data: data as never,
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.sportTypes !== undefined && { sportTypes: data.sportTypes }),
+        ...(data.address !== undefined && { address: data.address }),
+        ...(data.addressDetail !== undefined && { addressDetail: data.addressDetail }),
+        ...(data.lat !== undefined && { lat: data.lat }),
+        ...(data.lng !== undefined && { lng: data.lng }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.district !== undefined && { district: data.district }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.imageUrls !== undefined && { imageUrls: data.imageUrls }),
+        ...(data.facilities !== undefined && { facilities: data.facilities }),
+        ...(data.operatingHours !== undefined && { operatingHours: data.operatingHours }),
+        ...(data.pricePerHour !== undefined && { pricePerHour: data.pricePerHour }),
+        ...(data.rinkSubType !== undefined && { rinkSubType: data.rinkSubType }),
+      },
     });
   }
 

@@ -5,7 +5,7 @@ import { ChatRoomType } from '@prisma/client';
 export class CreateRoomDto {
   @ApiProperty({ enum: ChatRoomType, description: 'Room type' })
   @IsEnum(ChatRoomType)
-  type: ChatRoomType;
+  type!: ChatRoomType;
 
   @ApiPropertyOptional({ description: 'TeamMatch ID (required when type is team_match)' })
   @ValidateIf((o: CreateRoomDto) => o.type === ChatRoomType.team_match)

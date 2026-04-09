@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, Plus, Image as ImageIcon, X, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Check, Plus, ChevronRight } from 'lucide-react';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { getSportImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -18,11 +19,9 @@ export default function CreateMatchPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     sportType: '',
@@ -43,28 +42,11 @@ export default function CreateMatchPage() {
 
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
   const venues: Venue[] = Array.isArray(venuesData) ? venuesData : (venuesData?.items ?? []);
-  const sampleImages = imagePreviews.length === 0
+  const sampleImages = imageUrls.length === 0
     ? getSportImageSet(form.sportType || 'futsal', `match-create-${form.sportType || 'default'}`, 3)
     : [];
 
   const steps = ['종목', '정보', '장소·일시', '확인'];
-
-  const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (imageFiles.length + files.length > 5) {
-      toast('error', '이미지는 최대 5장까지 가능해요');
-      return;
-    }
-    const newFiles = [...imageFiles, ...files].slice(0, 5);
-    setImageFiles(newFiles);
-    const previews = newFiles.map(f => URL.createObjectURL(f));
-    setImagePreviews(previews);
-  };
-
-  const removeImage = (idx: number) => {
-    setImageFiles(prev => prev.filter((_, i) => i !== idx));
-    setImagePreviews(prev => prev.filter((_, i) => i !== idx));
-  };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -87,6 +69,7 @@ export default function CreateMatchPage() {
         levelMin: form.levelMin,
         levelMax: form.levelMax,
         gender: form.gender,
+        ...(imageUrls.length > 0 ? { imageUrl: imageUrls[0] } : {}),
       });
       toast('success', '매치가 만들어졌어요!');
       router.push('/matches?created=true');
@@ -179,43 +162,38 @@ export default function CreateMatchPage() {
                 maxLength={1000} placeholder="매치에 대한 설명을 적어주세요" rows={3} className="form-input resize-none" />
             </Field>
 
-            {/* Image upload */}
-            <Field label="이미지 (선택)">
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {imagePreviews.map((src, i) => (
-                  <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
-                    <button onClick={() => removeImage(i)} aria-label="이미지 삭제" className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900/60 text-white">
-                      <X size={10} />
-                    </button>
-                  </div>
-                ))}
-                {imageFiles.length < 5 && (
-                  <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex flex-col items-center justify-center w-20 h-20 rounded-xl border border-dashed border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <ImageIcon size={16} />
-                    <span className="text-2xs mt-1">{imageFiles.length}/5</span>
-                  </button>
-                )}
-                {sampleImages.map((src) => (
-                  <div key={src} className="relative shrink-0 w-20 h-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                    <img
-                      src={src}
-                      alt=""
-                      aria-hidden="true"
-                      className="h-full w-full object-cover opacity-60"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
-                      <Plus size={18} className="text-white/90" />
-                    </div>
-                  </div>
-                ))}
-                <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageAdd} className="hidden" />
-              </div>
+            {/* Image upload — ImageUpload renders its own label, do not wrap in Field (avoids orphan label) */}
+            <div>
+              <ImageUpload
+                value={imageUrls}
+                onChange={setImageUrls}
+                max={5}
+                accept="image/jpeg,image/png,image/webp"
+                maxSizeMB={10}
+                label="이미지 (선택)"
+              />
               {sampleImages.length > 0 && (
-                <p className="mt-1.5 text-xs text-gray-500">대표 이미지가 비어 있으면 오른쪽 실사 예시처럼 노출됩니다.</p>
+                <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide pb-1">
+                  {sampleImages.map((src) => (
+                    <div key={src} className="relative shrink-0 w-20 h-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                      <img
+                        src={src}
+                        alt=""
+                        aria-hidden="true"
+                        className="h-full w-full object-cover opacity-60"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
+                        <Plus size={18} className="text-white/90" aria-hidden="true" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </Field>
+              {sampleImages.length > 0 && (
+                <p className="mt-1.5 text-xs text-gray-500">대표 이미지가 비어 있으면 위 예시처럼 노출됩니다.</p>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="최대 인원" id="match-maxPlayers">
@@ -349,7 +327,7 @@ export default function CreateMatchPage() {
               <ConfirmRow label="레벨" value={`${levelLabel[form.levelMin]} ~ ${levelLabel[form.levelMax]}`} />
               <ConfirmRow label="성별" value={form.gender === 'any' ? '무관' : form.gender === 'male' ? '남성' : '여성'} />
               {form.rules && <ConfirmRow label="규칙" value={form.rules} />}
-              {imageFiles.length > 0 && <ConfirmRow label="이미지" value={`${imageFiles.length}장`} />}
+              {imageUrls.length > 0 && <ConfirmRow label="이미지" value={`${imageUrls.length}장`} />}
             </div>
             <button onClick={handleSubmit} disabled={isSubmitting}
               data-testid="match-create-submit"

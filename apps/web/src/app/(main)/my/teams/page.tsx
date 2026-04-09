@@ -3,65 +3,21 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog, Star, Trophy, Info } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
-import { useTeams } from '@/hooks/use-api';
+import { useMyTeams, queryKeys } from '@/hooks/use-api';
+import { useQueryClient } from '@tanstack/react-query';
 import { sportLabel, levelLabel } from '@/lib/constants';
-
-const mockMyTeams = [
-  {
-    id: 'team-1',
-    name: 'FC 서울라이트',
-    sportType: 'futsal',
-    description: '서울 강남 지역 풋살 팀입니다. 주말마다 활동합니다.',
-    memberCount: 12,
-    maxMembers: 15,
-    region: '서울 강남구',
-    level: 3,
-    mannerScore: 4.5,
-    matchCount: 28,
-    winCount: 18,
-  },
-  {
-    id: 'team-2',
-    name: '강남 슬래머즈',
-    sportType: 'basketball',
-    description: '농구 좋아하는 직장인 모임. 평일 저녁 위주로 활동.',
-    memberCount: 8,
-    maxMembers: 12,
-    region: '서울 강남구',
-    level: 2,
-    mannerScore: 4.7,
-    matchCount: 15,
-    winCount: 10,
-  },
-];
 
 export default function MyTeamsPage() {
   const router = useRouter();
   const { toast } = useToast();
   useRequireAuth();
-  const { data: apiData } = useTeams();
-  const usingMock = !apiData?.items;
-  const apiTeams = apiData?.items?.map((t) => ({
-    id: t.id,
-    name: t.name,
-    sportType: t.sportType,
-    description: t.description || '',
-    memberCount: t.memberCount,
-    maxMembers: 15,
-    region: [t.city, t.district].filter(Boolean).join(' ') || '',
-    level: t.level,
-    mannerScore: t.mannerScore ?? 0,
-    matchCount: 0,
-    winCount: 0,
-  }));
-  const [localTeams, setLocalTeams] = useState(mockMyTeams);
-  const teams = apiTeams ?? localTeams;
-  const setTeams = setLocalTeams;
+  const queryClient = useQueryClient();
+  const { data: teams = [], isLoading } = useMyTeams();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,13 +30,17 @@ export default function MyTeamsPage() {
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/teams/${id}`);
-      setTeams(prev => prev.filter(t => t.id !== id));
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.me });
       toast('success', '팀이 삭제되었어요');
     } catch {
       toast('error', '삭제하지 못했어요. 다시 시도해주세요');
     }
     setDeleteTarget(null);
   };
+
+  if (isLoading) {
+    return <div className="px-5 pt-8 text-center text-gray-500 dark:text-gray-400">로딩 중...</div>;
+  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -94,13 +54,6 @@ export default function MyTeamsPage() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀</h2>
         <p className="text-base text-gray-500 dark:text-gray-400 mt-1">내가 운영하는 팀을 관리하세요</p>
       </div>
-
-      {usingMock && (
-        <div className="mx-5 @3xl:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
-          <Info size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />
-          <span className="text-sm text-gray-500 dark:text-gray-400">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
-        </div>
-      )}
 
       <div className="px-5 @3xl:px-0 space-y-3 pb-8">
         {teams.length === 0 ? (
@@ -127,10 +80,6 @@ export default function MyTeamsPage() {
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{team.name}</h3>
                   </Link>
                 </div>
-                <div className="flex items-center gap-0.5 text-amber-500">
-                  <Star size={14} fill="currentColor" />
-                  <span className="text-sm font-semibold">{team.mannerScore}</span>
-                </div>
               </div>
 
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">{team.description}</p>
@@ -138,16 +87,14 @@ export default function MyTeamsPage() {
               <div className="mt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center gap-1">
                   <Users size={12} />
-                  <span>{team.memberCount}/{team.maxMembers}명</span>
+                  <span>{team.memberCount}명</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <MapPin size={12} />
-                  <span>{team.region}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Trophy size={12} />
-                  <span>{team.matchCount}전 {team.winCount}승</span>
-                </div>
+                {(team.city || team.district) && (
+                  <div className="flex items-center gap-1">
+                    <MapPin size={12} />
+                    <span>{[team.city, team.district].filter(Boolean).join(' ')}</span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-3 flex gap-2">

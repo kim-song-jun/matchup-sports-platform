@@ -26,6 +26,8 @@ COPY --from=builder /app/package.json ./package.json
 ENV NODE_ENV=production
 EXPOSE 8100
 WORKDIR /app/apps/api
-# Run pending migrations before booting so the API never starts against
-# an outdated schema (prevents crash loops when new tables/columns land).
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+# Migrations are applied by the deploy workflow BEFORE this container starts
+# (see .github/workflows/deploy.yml "Run database migrations" step).
+# The CMD is kept pure so the container does not hold exclusive DB locks
+# during startup and so migration failures abort the deploy, not the boot loop.
+CMD ["node", "dist/src/main.js"]

@@ -6,11 +6,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, SportType, ItemCondition, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
 import { randomUUID } from 'crypto';
+import { CreateListingDto } from './dto/create-listing.dto';
 
 // Toss Payments confirm response shape (shared subset used here)
 interface TossConfirmResponse {
@@ -49,10 +50,10 @@ export class MarketplaceService {
 
   async findListings(filter: { sportType?: string; category?: string; condition?: string; cursor?: string }) {
     const limit = 20;
-    const where: Record<string, unknown> = { status: 'active' };
-    if (filter.sportType) where.sportType = filter.sportType;
+    const where: Prisma.MarketplaceListingWhereInput = { status: 'active' };
+    if (filter.sportType) where.sportType = filter.sportType as SportType;
     if (filter.category) where.category = filter.category;
-    if (filter.condition) where.condition = filter.condition;
+    if (filter.condition) where.condition = filter.condition as ItemCondition;
 
     const items = await this.prisma.marketplaceListing.findMany({
       where,
@@ -73,20 +74,24 @@ export class MarketplaceService {
     };
   }
 
-  async createListing(sellerId: string, data: Record<string, unknown>) {
+  async createListing(sellerId: string, data: CreateListingDto) {
     return this.prisma.marketplaceListing.create({
       data: {
         sellerId,
-        title: data.title as string,
-        description: data.description as string,
-        sportType: data.sportType as never,
-        category: data.category as string,
-        condition: data.condition as never,
-        price: data.price as number,
-        listingType: (data.listingType as never) || 'sell',
-        imageUrls: (data.imageUrls as string[]) || [],
-        locationCity: data.locationCity as string | undefined,
-        locationDistrict: data.locationDistrict as string | undefined,
+        title: data.title,
+        description: data.description,
+        sportType: data.sportType,
+        category: data.category,
+        condition: data.condition,
+        price: data.price,
+        listingType: data.listingType ?? 'sell',
+        imageUrls: data.imageUrls ?? [],
+        locationCity: data.locationCity,
+        locationDistrict: data.locationDistrict,
+        rentalPricePerDay: data.rentalPricePerDay,
+        rentalDeposit: data.rentalDeposit,
+        groupBuyTarget: data.groupBuyTarget,
+        groupBuyDeadline: data.groupBuyDeadline ? new Date(data.groupBuyDeadline) : undefined,
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
       },
     });

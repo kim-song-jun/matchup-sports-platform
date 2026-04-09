@@ -31,7 +31,7 @@ const MATCH_SPORT_TYPES = [
 export class CreateMatchDto {
   @ApiProperty({ description: '매치 제목' })
   @IsString()
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({ description: '매치 설명' })
   @IsString()
@@ -45,29 +45,29 @@ export class CreateMatchDto {
 
   @ApiProperty({ enum: MATCH_SPORT_TYPES })
   @IsEnum(MATCH_SPORT_TYPES)
-  sportType: string;
+  sportType!: string;
 
   @ApiProperty({ description: '시설 ID' })
   @IsString()
-  venueId: string;
+  venueId!: string;
 
   @ApiProperty({ description: '매치 날짜 (YYYY-MM-DD)' })
   @IsDateString()
-  matchDate: string;
+  matchDate!: string;
 
   @ApiProperty({ description: '시작 시간 (HH:mm)' })
   @IsString()
-  startTime: string;
+  startTime!: string;
 
   @ApiProperty({ description: '종료 시간 (HH:mm)' })
   @IsString()
-  endTime: string;
+  endTime!: string;
 
   @ApiProperty({ description: '최대 인원' })
   @IsInt()
   @Min(2)
   @Max(30)
-  maxPlayers: number;
+  maxPlayers!: number;
 
   @ApiPropertyOptional({ description: '참가비' })
   @IsInt()
@@ -232,15 +232,15 @@ export class ArriveMatchDto {
   @IsNumber()
   @Min(-90)
   @Max(90)
-  lat: number;
+  lat!: number;
 
   @ApiProperty({ description: 'GPS 경도' })
   @IsNumber()
   @Min(-180)
   @Max(180)
-  lng: number;
+  lng!: number;
 
   @ApiProperty({ description: '도착 인증 사진 URL' })
   @IsString()
-  photoUrl: string;
+  photoUrl!: string;
 }

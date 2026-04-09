@@ -3,7 +3,7 @@
 > **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
 > **Wave**: 3 (P1, P0 task 17/18/19 머지 후 시작)
 > **Owner**: 병렬 (infra-devops-dev: deploy + infra-security-dev: 가드 + backend-data-dev: e2e fixture)
-> **Status**: pending
+> **Status**: completed
 > **Estimated PRs**: 1 (deploy + security + e2e 묶어서, infra 디렉토리 위주라 충돌 적음)
 > **Blocked by**: task 17 (DB migration이 같은 deploy 사이클에 들어가야 검증 가능)
 

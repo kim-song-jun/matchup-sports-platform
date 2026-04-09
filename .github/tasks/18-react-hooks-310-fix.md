@@ -3,7 +3,7 @@
 > **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
 > **Wave**: 1 (P0 critical, task 16 Phase 1.1로 진범 식별 후 시작)
 > **Owner**: frontend-ui-dev (lead, sub-component 분리 가능 시 frontend-data-dev 협업)
-> **Status**: pending
+> **Status**: completed
 > **Estimated PRs**: 1 (단일 page 파일 수정 위주)
 > **Blocked by**: task 16 Phase 1.1 (진범 페이지 식별)
 

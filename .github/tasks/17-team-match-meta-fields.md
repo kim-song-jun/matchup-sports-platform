@@ -3,7 +3,7 @@
 > **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
 > **Wave**: 1 (P0 critical, task 16 검증 후 시작)
 > **Owner**: backend-data-dev (lead) → backend-api-dev → frontend-data-dev → frontend-ui-dev
-> **Status**: pending
+> **Status**: completed
 > **Estimated PRs**: 1 (단일 PR — schema migration이 단독이라 충돌 없음)
 > **Blocked by**: task 16 Phase 1.3 (schema drift 매트릭스로 다른 누락 필드 발견 시 scope 합치)
 

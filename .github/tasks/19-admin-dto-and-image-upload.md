@@ -3,7 +3,7 @@
 > **Parent plan**: `/Users/kimsungjun/.claude/plans/enumerated-scribbling-popcorn.md`
 > **Wave**: 2 (P0, task 17/18 머지 후 시작 권장 — 충돌 위험 낮지만 reviewer 부하 분산)
 > **Owner**: 병렬 (backend-api-dev: admin DTO + frontend-ui-dev: image-upload)
-> **Status**: pending
+> **Status**: completed
 > **Estimated PRs**: 1 또는 2 (분리 가능)
 > **Blocked by**: task 16 (검증 결과로 추가 untyped DTO 발견 시 scope 확장)
 

@@ -57,9 +57,25 @@ export default function MyTeamMatchApplicationsPage() {
           applications.map((app) => {
             const statusConf = appStatusConfig[app.status] ?? appStatusConfig.pending;
             const tm = app.teamMatch;
+
+            // Deleted match — render a tombstone card rather than crashing on null access
+            if (!tm) {
+              return (
+                <div key={app.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 opacity-60">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusConf.className}`}>
+                      {statusConf.label}
+                    </span>
+                  </div>
+                  <h3 className="text-md font-semibold text-gray-500 dark:text-gray-400">삭제된 매칭</h3>
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">이 팀 매칭은 더 이상 존재하지 않아요</p>
+                </div>
+              );
+            }
+
             return (
               <Link key={app.id} href={`/team-matches/${tm.id}`} className="block">
-                <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 dark:hover:border-gray-600 transition-colors active:scale-[0.995]">
+                <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 hover:bg-gray-50 dark:hover:border-gray-600 dark:hover:bg-gray-700 transition-colors active:scale-[0.995]">
                   <div className="flex items-center gap-2 mb-2">
                     <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusConf.className}`}>
                       {statusConf.label}
@@ -67,7 +83,7 @@ export default function MyTeamMatchApplicationsPage() {
                     {tm.hostTeam && (
                       <span className="text-xs text-gray-500 ml-auto flex items-center gap-1">
                         <Users size={11} aria-hidden="true" />
-                        {tm.hostTeam.name}
+                        {tm.hostTeam?.name ?? '—'}
                       </span>
                     )}
                   </div>

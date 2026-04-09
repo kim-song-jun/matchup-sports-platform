@@ -92,11 +92,11 @@ export default function TeamMatchDetailPage() {
   const applications = match.applications ?? [];
 
   const statusMap: Record<string, { label: string; className: string }> = {
-    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500' },
-    matched: { label: '매칭완료', className: 'bg-gray-100 text-blue-500' },
-    in_progress: { label: '경기중', className: 'bg-amber-50 text-amber-600' },
-    completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500' },
-    cancelled: { label: '취소됨', className: 'bg-red-50 text-red-500' },
+    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
+    matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
+    in_progress: { label: '경기중', className: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
+    completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
+    cancelled: { label: '취소됨', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
   };
   const status = statusMap[match.status] ?? statusMap.recruiting;
 
@@ -370,7 +370,7 @@ export default function TeamMatchDetailPage() {
                 <button
                   onClick={() => {
                     if (!isAuthenticated) {
-                      router.push('/login');
+                      router.push(`/login?redirect=/team-matches/${id}`);
                       return;
                     }
                     setShowApplyModal(true);

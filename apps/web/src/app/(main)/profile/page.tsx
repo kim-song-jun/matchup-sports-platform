@@ -217,7 +217,7 @@ export default function ProfilePage() {
                 <Link
                   href="/mercenary/new"
                   aria-label="용병 모집 추가"
-                  className="flex items-center justify-center h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                  className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
                 >
                   <Plus size={14} />
                 </Link>

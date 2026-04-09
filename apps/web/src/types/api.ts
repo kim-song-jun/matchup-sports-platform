@@ -263,6 +263,8 @@ export interface MyTeam {
   level: number;
   isRecruiting: boolean;
   logoUrl?: string;
+  coverImageUrl?: string | null;
+  photos?: string[];
   role: 'owner' | 'manager' | 'member';
   joinedAt?: string;
 }
@@ -462,9 +464,17 @@ export interface ChatMessage {
 export interface MercenaryPost {
   id: string;
   teamId: string;
-  matchDate: string;
+  authorId?: string;
   sportType: string;
-  description: string | null;
+  matchDate: string;
+  venue?: string;
+  position?: string;
+  count?: number;
+  level?: number;
+  fee?: number;
+  notes?: string | null;
+  /** @deprecated use notes — kept for backward compat with older API responses */
+  description?: string | null;
   status: string;
   team?: SportTeam;
 }
@@ -761,4 +771,22 @@ export interface ArriveMatchInput {
   lat: number;
   lng: number;
   photoUrl: string;
+}
+
+// ── MyTeamMatchApplication — applicant-side view of team match applications ──
+export interface MyTeamMatchApplication {
+  id: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  message: string | null;
+  createdAt: string;
+  teamMatch: {
+    id: string;
+    title: string;
+    matchDate: string;
+    startTime: string;
+    endTime: string;
+    venueName: string;
+    hostTeam?: { id: string; name: string };
+  };
+  applicantTeam?: { id: string; name: string };
 }

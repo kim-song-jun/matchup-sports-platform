@@ -6,7 +6,7 @@ import { ArrowLeft, UserPlus, Plus, Star, Calendar, MapPin } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useTeam, useMercenaryPosts, useMyTeams } from '@/hooks/use-api';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatMatchDate, formatCurrency } from '@/lib/utils';
 import type { MercenaryPost } from '@/types/api';
 
@@ -92,7 +92,7 @@ export default function TeamMercenaryPage() {
               <Link key={post.id} href={`/mercenary/${post.id}`} className="block">
                 <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.99]">
                   <div className="flex items-start justify-between gap-3 mb-1">
-                    <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-gray-300">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                       {sportLabel[post.sportType] || post.sportType}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${

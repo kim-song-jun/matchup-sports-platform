@@ -144,7 +144,7 @@ export default function TeamMatchesPage() {
           />
         ) : (
           <div className="space-y-6">
-            {isAuthenticated && myHostTeamIds.size > 0 && (
+            {isAuthenticated && (myTeams?.length ?? 0) > 0 && (
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
                 {myTeamMatches.length === 0 ? (
@@ -165,7 +165,7 @@ export default function TeamMatchesPage() {
               </div>
             )}
             <div>
-              {isAuthenticated && myHostTeamIds.size > 0 && (
+              {isAuthenticated && (myTeams?.length ?? 0) > 0 && (
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
               )}
               <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
@@ -184,10 +184,10 @@ export default function TeamMatchesPage() {
 
 function TeamMatchCard({ match }: { match: TeamMatch }) {
   const statusMap: Record<string, { label: string; className: string }> = {
-    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500' },
-    matched: { label: '매칭완료', className: 'text-blue-500' },
-    completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500' },
-    cancelled: { label: '취소', className: 'bg-red-50 text-red-500' },
+    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
+    matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
+    completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
+    cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
   };
   const status = statusMap[match.status] ?? statusMap.recruiting;
 

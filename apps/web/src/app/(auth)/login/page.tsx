@@ -1,11 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
+
+// Allows only same-origin relative paths. Blocks absolute URLs, protocol-relative
+// paths (//), javascript:, data:, and any scheme-containing strings.
+function sanitizeRedirect(raw: string | null): string {
+  if (!raw) return '/home';
+  if (!raw.startsWith('/')) return '/home';
+  if (raw.startsWith('//')) return '/home';
+  return raw;
+}
 
 // Kakao icon per brand guideline
 function KakaoIcon() {
@@ -107,6 +116,7 @@ function SocialLoginButtons() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const devLogin = useDevLogin();
   const emailLogin = useEmailLogin();
   const emailRegister = useEmailRegister();
@@ -118,6 +128,8 @@ export default function LoginPage() {
   const [nickname, setNickname] = useState('');
   const [devNickname, setDevNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const redirectTo = sanitizeRedirect(searchParams.get('redirect'));
 
   const { isAuthenticated } = useAuthStore();
   useEffect(() => {
@@ -134,10 +146,10 @@ export default function LoginPage() {
       if (mode === 'register') {
         await emailRegister.mutateAsync({ email, password, nickname });
         toast('success', '가입 완료! 환영합니다');
-        router.push('/onboarding');
+        router.push(redirectTo);
       } else {
         await emailLogin.mutateAsync({ email, password });
-        router.push('/home');
+        router.push(redirectTo);
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -151,7 +163,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await devLogin.mutateAsync(name || devNickname || '테스트유저');
-      router.push('/home');
+      router.push(redirectTo);
     } catch { /* handled by mutation */ } finally { setIsLoading(false); }
   };
 

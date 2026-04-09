@@ -22,6 +22,7 @@ import type {
   SportTeam,
   TeamMatch,
   TeamMatchApplication,
+  MyTeamMatchApplication,
   Payment,
   PreparedPayment,
   AdminStats,
@@ -1270,22 +1271,6 @@ export function useRejectTeamMatchApplication() {
 }
 
 // ── My Team Match Applications (applicant view) ──
-export interface MyTeamMatchApplication {
-  id: string;
-  status: string;
-  message: string | null;
-  createdAt: string;
-  teamMatch: {
-    id: string;
-    title: string;
-    matchDate: string;
-    startTime: string;
-    endTime: string;
-    venueName: string;
-    hostTeam?: { id: string; name: string };
-  };
-}
-
 export function useMyTeamMatchApplications() {
   const { isAuthenticated } = useAuthStore();
   return useQuery<MyTeamMatchApplication[]>({

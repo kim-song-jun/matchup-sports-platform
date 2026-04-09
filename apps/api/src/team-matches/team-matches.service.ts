@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from '../teams/team-membership.service';
 import { CreateTeamMatchDto } from './dto/create-team-match.dto';
@@ -17,15 +18,26 @@ export class TeamMatchesService {
 
   async findAll(filter: TeamMatchQueryDto) {
     const limit = filter.limit ?? 20;
-    const where: Record<string, unknown> = { status: filter.status || 'recruiting' };
-    if (filter.sportType) where.sportType = filter.sportType;
-    if (filter.city) where.hostTeam = { city: filter.city };
+
+    // Build AND conditions separately so that city and teamId OR do not cross-contaminate.
+    // Without AND wrapping, Prisma merges { hostTeam: { city } } and { OR: [...] } at the same
+    // where level, causing the city constraint to bleed into the applicant-team OR branch.
+    const andConditions: Prisma.TeamMatchWhereInput[] = [];
+    if (filter.city) andConditions.push({ hostTeam: { city: filter.city } });
     if (filter.teamId) {
-      where.OR = [
-        { hostTeamId: filter.teamId },
-        { applications: { some: { applicantTeamId: filter.teamId } } },
-      ];
+      andConditions.push({
+        OR: [
+          { hostTeamId: filter.teamId },
+          { applications: { some: { applicantTeamId: filter.teamId } } },
+        ],
+      });
     }
+
+    const where: Prisma.TeamMatchWhereInput = {
+      status: (filter.status || 'recruiting') as Prisma.EnumTeamMatchStatusFilter,
+      ...(filter.sportType && { sportType: filter.sportType as Prisma.EnumSportTypeFilter }),
+      ...(andConditions.length > 0 && { AND: andConditions }),
+    };
 
     const items = await this.prisma.teamMatch.findMany({
       where,

@@ -224,6 +224,43 @@ export const handlers = [
     return success({ items: [mockTeamMatch], nextCursor: null });
   }),
 
+  http.get('/api/v1/team-matches/me/applications', () => {
+    return success([
+      {
+        id: 'tma-1',
+        status: 'pending',
+        message: '참가 신청합니다',
+        createdAt: '2024-01-10T10:00:00.000Z',
+        teamMatch: {
+          id: 'tm-1',
+          title: '주말 친선 경기 모집',
+          matchDate: '2026-05-10',
+          startTime: '14:00',
+          endTime: '16:00',
+          venueName: '서울 풋살장',
+          hostTeam: { id: 'team-1', name: '서울 FC' },
+        },
+        applicantTeam: { id: 'team-2', name: '한강 농구단' },
+      },
+      {
+        id: 'tma-2',
+        status: 'approved',
+        message: null,
+        createdAt: '2024-01-08T09:00:00.000Z',
+        teamMatch: {
+          id: 'tm-2',
+          title: '평일 저녁 풋살',
+          matchDate: '2026-05-07',
+          startTime: '20:00',
+          endTime: '22:00',
+          venueName: '마포 실내 풋살장',
+          hostTeam: { id: 'team-3', name: '마포 FC' },
+        },
+        applicantTeam: { id: 'team-2', name: '한강 농구단' },
+      },
+    ]);
+  }),
+
   http.patch('/api/v1/team-matches/:id/applications/:appId/approve', ({ params }) => {
     return success({ id: params.appId as string, status: 'approved' });
   }),

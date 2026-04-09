@@ -167,10 +167,14 @@ describe('TeamMatchesService', () => {
       expect(prisma.teamMatch.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { hostTeamId: 't1' },
-              { applications: { some: { applicantTeamId: 't1' } } },
-            ],
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { hostTeamId: 't1' },
+                  { applications: { some: { applicantTeamId: 't1' } } },
+                ],
+              },
+            ]),
           }),
         }),
       );
@@ -189,9 +193,13 @@ describe('TeamMatchesService', () => {
       expect(prisma.teamMatch.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: expect.arrayContaining([
-              { hostTeamId: 't2' },
-              { applications: { some: { applicantTeamId: 't2' } } },
+            AND: expect.arrayContaining([
+              {
+                OR: expect.arrayContaining([
+                  { hostTeamId: 't2' },
+                  { applications: { some: { applicantTeamId: 't2' } } },
+                ]),
+              },
             ]),
           }),
         }),
@@ -207,13 +215,52 @@ describe('TeamMatchesService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             status: 'scheduled',
+          }),
+        }),
+      );
+    });
+
+    it('should scope OR to AND so city does not bleed into applicant-team branch', async () => {
+      // When both city and teamId are provided, the where structure must use AND to prevent
+      // hostTeam.city from being implicitly ANDed into the applicant-team OR branch.
+      mockPrismaService.teamMatch.findMany.mockResolvedValue([]);
+
+      await service.findAll({ teamId: 't1', city: '서울' });
+
+      const [callArg] = mockPrismaService.teamMatch.findMany.mock.calls[0] as [
+        { where: Record<string, unknown> },
+      ];
+      const where = callArg.where;
+
+      // city must NOT appear as a top-level hostTeam key — it must live inside AND
+      expect(where).not.toHaveProperty('hostTeam');
+      // OR must NOT appear at the top level — it must live inside AND
+      expect(where).not.toHaveProperty('OR');
+      // AND must contain both constraints
+      expect(where).toHaveProperty('AND');
+      const and = where.AND as unknown[];
+      expect(and).toEqual(
+        expect.arrayContaining([
+          { hostTeam: { city: '서울' } },
+          {
             OR: [
               { hostTeamId: 't1' },
               { applications: { some: { applicantTeamId: 't1' } } },
             ],
-          }),
-        }),
+          },
+        ]),
       );
+    });
+
+    it('should omit AND when neither city nor teamId are provided', async () => {
+      mockPrismaService.teamMatch.findMany.mockResolvedValue([]);
+
+      await service.findAll({ status: 'recruiting' });
+
+      const [callArg] = mockPrismaService.teamMatch.findMany.mock.calls[0] as [
+        { where: Record<string, unknown> },
+      ];
+      expect(callArg.where).not.toHaveProperty('AND');
     });
   });
 

@@ -13,12 +13,12 @@ import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getTeamImage, getTeamLogo } from '@/lib/sport-image';
 import type { SportTeam, MyTeam } from '@/types/api';
 
-const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
+const TeamCard = React.memo(function TeamCard({ team }: { team: MyTeam | SportTeam }) {
   const t = useTranslations('teams');
   const tl = useTranslations('levels');
   const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
   const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
-  const teamCoverImage = getTeamImage(team.sportType, team.coverImageUrl, team.id);
+  const teamCoverImage = getTeamImage(team.sportType, team.coverImageUrl ?? null, team.id);
   const fallbackTeamCoverImage = getTeamImage(team.sportType, undefined, team.id);
 
   return (
@@ -53,7 +53,7 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
             <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
               {sportLabel[team.sportType] || team.sportType}
             </span>
-            <span>{tl(String(team.level) as any)} · {t('memberCount', { count: team.memberCount })}</span>
+            <span>{tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}</span>
           </p>
           {team.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{team.description}</p>}
           {team.city && <p className="text-2xs text-gray-500 mt-0.5">{team.city} {team.district}</p>}
@@ -102,7 +102,7 @@ export function TeamList() {
           ) : (
             <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
               {myTeamList.map((team) => (
-                <TeamCard key={team.id} team={team as unknown as SportTeam} />
+                <TeamCard key={team.id} team={team} />
               ))}
             </div>
           )}

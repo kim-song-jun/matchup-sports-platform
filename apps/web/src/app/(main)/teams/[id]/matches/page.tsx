@@ -2,11 +2,11 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Trophy, Calendar, MapPin, Clock } from 'lucide-react';
+import { ArrowLeft, Trophy, Calendar, MapPin } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useTeam, useTeamMatches } from '@/hooks/use-api';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import type { TeamMatch } from '@/types/api';
 
 function getDayLabel(dateStr: string) {
@@ -82,7 +82,7 @@ export default function TeamMatchesPage() {
                   <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.99]">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-gray-300">
+                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[match.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                           {sportLabel[match.sportType] || match.sportType}
                         </span>
                         <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>

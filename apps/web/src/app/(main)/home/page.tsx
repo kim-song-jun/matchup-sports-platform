@@ -243,7 +243,7 @@ export default function HomePage() {
             secondaryAction={activeSport !== 'all' ? { label: t('viewAllMatches'), onClick: () => setActiveSport('all') } : undefined}
           />
         ) : (
-          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {filteredMatches.slice(0, 6).map((m: Match) => <MatchCard key={m.id} match={m} />)}
           </div>
         )}
@@ -395,9 +395,9 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
-        {/* 이미지: 정사각형 고정 */}
-        <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex h-24 hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
+        {/* 이미지: 1:1 정사각형 고정 */}
+        <div className="w-24 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
           <SafeImage
             src={matchImage}
             fallbackSrc={fallbackMatchImage}
@@ -410,7 +410,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
           )}
         </div>
         {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-800 p-4 min-w-0 flex flex-col justify-center">
+        <div className="flex-1 bg-white dark:bg-gray-900 px-3.5 py-3 min-w-0 flex flex-col justify-center">
           <p className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
             {match.title}
           </p>

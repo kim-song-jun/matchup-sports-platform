@@ -44,7 +44,7 @@ export function Sidebar() {
         { href: '/teams', icon: Users, label: t('teams') },
       ],
     },
-    ...(isAuthenticated ? [{
+    ...(mounted && isAuthenticated ? [{
       label: t('communication'),
       items: [
         { href: '/chat', icon: MessageCircle, label: t('chat') },
@@ -111,7 +111,7 @@ export function Sidebar() {
           </div>
         ))}
 
-        {isAdmin && (
+        {mounted && isAdmin && (
           <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
             <Link href="/admin/dashboard"
               className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${

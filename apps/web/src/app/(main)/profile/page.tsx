@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, User, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
@@ -11,15 +11,17 @@ import { useAuthStore } from '@/stores/auth-store';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
-import { useMyMatches, useMyTeams, useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
+import { useMyMatches, useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import type { SportProfile, Match } from '@/types/api';
 
 import { sportLabel, levelLabel } from '@/lib/constants';
-import { Plus } from 'lucide-react';
+
+type QuickAction = { href: string; label: string };
+type MenuItem = { label: string; icon: React.ElementType; href: string; quickAction?: QuickAction };
+type MenuGroup = { label: string; items: MenuItem[] };
 
 export default function ProfilePage() {
   const t = useTranslations('profile');
-  const te = useTranslations('empty');
   const tc = useTranslations('common');
   const { user, isAuthenticated, logout } = useAuthStore();
   const router = useRouter();
@@ -31,21 +33,38 @@ export default function ProfilePage() {
   const { data: unreadData } = useUnreadCount();
   const notifUnread = unreadData?.count ?? 0;
 
-  const { data: myTeams } = useMyTeams();
-  const hasTeams = myTeams && myTeams.length > 0;
-
-  const menuItems = [
-    { label: t('matchHistory'), icon: History, href: '/my/matches?tab=history', count: null },
-    { label: t('myMatches'), icon: Swords, href: '/my/matches?tab=created', count: null },
-    { label: t('myTeamMatches'), icon: Users, href: '/my/team-matches', count: null },
-    { label: t('myTeams'), icon: Users, href: '/my/teams', count: null },
-    { label: t('myLessons'), icon: BookOpen, href: '/my/lessons', count: null },
-    { label: '내 수강권', icon: Ticket, href: '/my/lesson-tickets', count: null },
-    { label: t('myListings'), icon: ShoppingBag, href: '/my/listings', count: null },
-    { label: t('myMercenary'), icon: UserCheck, href: '/my/mercenary', count: null },
-    { label: t('myReviews'), icon: Star, href: '/reviews', count: null },
-    { label: t('receivedReviews'), icon: MessageSquare, href: '/my/reviews-received', count: null },
-    { label: t('paymentHistory'), icon: CreditCard, href: '/payments', count: null },
+  const menuGroups: MenuGroup[] = [
+    {
+      label: '매칭',
+      items: [
+        { label: t('matchHistory'), icon: History, href: '/my/matches?tab=history' },
+        { label: t('myMatches'), icon: Swords, href: '/my/matches?tab=created' },
+        { label: t('myTeamMatches'), icon: Users, href: '/my/team-matches' },
+      ],
+    },
+    {
+      label: '팀 & 용병',
+      items: [
+        { label: t('myTeams'), icon: Users, href: '/my/teams' },
+        { label: t('myMercenary'), icon: UserCheck, href: '/my/mercenary', quickAction: { href: '/mercenary/new', label: '등록' } },
+      ],
+    },
+    {
+      label: '강좌 & 장터',
+      items: [
+        { label: t('myLessons'), icon: BookOpen, href: '/my/lessons' },
+        { label: '내 수강권', icon: Ticket, href: '/my/lesson-tickets' },
+        { label: t('myListings'), icon: ShoppingBag, href: '/my/listings' },
+      ],
+    },
+    {
+      label: '평가 & 결제',
+      items: [
+        { label: t('myReviews'), icon: Star, href: '/reviews' },
+        { label: t('receivedReviews'), icon: MessageSquare, href: '/my/reviews-received' },
+        { label: t('paymentHistory'), icon: CreditCard, href: '/payments' },
+      ],
+    },
   ];
 
   return (
@@ -184,79 +203,61 @@ export default function ProfilePage() {
         {mounted && !isAuthenticated && (
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 px-2">로그인 필요</p>
         )}
-        {menuItems.map((item) => (
-          <Link key={item.label} href={mounted && isAuthenticated ? item.href : '/login'}>
-            <div className="flex items-center justify-between py-4 border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] rounded-lg -mx-2 px-2">
-              <div className="flex items-center gap-3">
-                <item.icon size={20} className="text-gray-500" />
-                <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {item.count !== null && item.count !== undefined && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-bold text-white">
-                    {item.count}
-                  </span>
-                )}
-                <ChevronRight size={18} className="text-gray-300" />
-              </div>
-            </div>
-          </Link>
+        {menuGroups.map((group, gIdx) => (
+          <div key={group.label} className={gIdx === 0 ? '' : 'mt-5'}>
+            <p className="px-2 py-1.5 text-2xs font-semibold text-gray-400 uppercase tracking-wider">
+              {group.label}
+            </p>
+            {group.items.map((item, idx) => {
+              const isLast = idx === group.items.length - 1;
+              return (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between rounded-lg -mx-2 px-2 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform]"
+                >
+                  <Link
+                    href={mounted && isAuthenticated ? item.href : '/login'}
+                    className={`flex flex-1 items-center gap-3 py-3.5 min-h-[44px] ${isLast ? '' : 'border-b border-gray-100'}`}
+                  >
+                    <item.icon size={20} className="text-gray-500" />
+                    <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
+                  </Link>
+                  <div className={`flex items-center gap-1 pl-2 py-3.5 ${isLast ? '' : 'border-b border-gray-100'}`}>
+                    {item.quickAction && mounted && isAuthenticated && (
+                      <Link
+                        href={item.quickAction.href}
+                        aria-label={`${item.label} ${item.quickAction.label}`}
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors min-h-[44px]"
+                      >
+                        <Plus size={12} />
+                        {item.quickAction.label}
+                      </Link>
+                    )}
+                    <Link
+                      href={mounted && isAuthenticated ? item.href : '/login'}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="flex items-center min-w-[44px] min-h-[44px] justify-end"
+                    >
+                      <ChevronRight size={18} className="text-gray-300" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ))}
       </div>
-
-      {/* 내 용병 모집 섹션 */}
-      {mounted && isAuthenticated && (
-        <div className="px-5 @3xl:px-0 py-3">
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <UserCheck size={16} className="text-gray-500" />
-                <span className="text-base font-semibold text-gray-800 dark:text-gray-200">내 용병 모집</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/mercenary/new"
-                  aria-label="용병 모집 추가"
-                  className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                >
-                  <Plus size={14} />
-                </Link>
-                <Link href="/my/mercenary" className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors">
-                  내 모집글 보기
-                </Link>
-              </div>
-            </div>
-            {hasTeams ? (
-              <Link
-                href="/mercenary/new"
-                className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-blue-50 dark:bg-blue-900/20 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors min-h-[44px]"
-              >
-                <Plus size={16} />
-                모집글 등록
-              </Link>
-            ) : (
-              <div className="mt-2 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-3">
-                <p className="text-sm text-gray-500">팀이 있어야 용병 모집이 가능합니다</p>
-                <Link href="/teams/new" className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors">
-                  팀 만들기
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="h-2 bg-gray-50 dark:bg-gray-800 @3xl:hidden" />
 
       <div className="px-5 @3xl:px-0 py-2">
-        <Link href="/settings">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">{tc('settings')}</span></div>
-            <ChevronRight size={18} className="text-gray-300" />
-          </div>
+        <Link href="/settings" className="flex items-center justify-between min-h-[44px] py-3">
+          <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">{tc('settings')}</span></div>
+          <ChevronRight size={18} className="text-gray-300" aria-hidden="true" />
         </Link>
         {mounted && isAuthenticated && (
-          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 py-4 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
+          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 min-h-[44px] py-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
             <LogOut size={20} className="text-gray-500" />
             <span className="text-md font-medium text-gray-500">{tc('logout')}</span>
           </button>

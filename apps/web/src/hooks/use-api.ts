@@ -18,6 +18,7 @@ import type {
   MarketplaceListing,
   UserProfile,
   AdminUserDetail,
+  MyTeam,
   SportTeam,
   TeamMatch,
   TeamMatchApplication,
@@ -371,11 +372,39 @@ export function useTeam(id: string) {
   });
 }
 
+// Backend returns Array<TeamMembership & { team: SportTeam }>.
+// We flatten to MyTeam[] so callers always get { id, name, role, sportType, ... }.
+interface RawMembership {
+  id: string;
+  teamId: string;
+  userId: string;
+  role: 'owner' | 'manager' | 'member';
+  status: string;
+  joinedAt: string;
+  team: SportTeam;
+}
+
 export function useMyTeams() {
   const { isAuthenticated } = useAuthStore();
   return useQuery({
     queryKey: queryKeys.teams.me,
-    queryFn: () => api.get('/teams/me').then(extractData<SportTeam[]>),
+    queryFn: async () => {
+      const raw = await api.get('/teams/me').then(extractData<RawMembership[]>);
+      return raw.map((m): MyTeam => ({
+        id: m.team.id,
+        name: m.team.name,
+        sportType: m.team.sportType,
+        description: m.team.description,
+        city: m.team.city,
+        district: m.team.district,
+        memberCount: m.team.memberCount,
+        level: m.team.level,
+        isRecruiting: m.team.isRecruiting,
+        logoUrl: m.team.logoUrl,
+        role: m.role,
+        joinedAt: m.joinedAt,
+      }));
+    },
     enabled: isAuthenticated,
   });
 }
@@ -1216,7 +1245,7 @@ export function useApproveTeamMatchApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ matchId, applicationId }: { matchId: string; applicationId: string }) => {
-      const res = await api.patch(`/team-matches/${matchId}/applications/${applicationId}`, { action: 'approve' });
+      const res = await api.patch(`/team-matches/${matchId}/applications/${applicationId}/approve`);
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { matchId }) => {
@@ -1230,7 +1259,7 @@ export function useRejectTeamMatchApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ matchId, applicationId }: { matchId: string; applicationId: string }) => {
-      const res = await api.patch(`/team-matches/${matchId}/applications/${applicationId}`, { action: 'reject' });
+      const res = await api.patch(`/team-matches/${matchId}/applications/${applicationId}/reject`);
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { matchId }) => {

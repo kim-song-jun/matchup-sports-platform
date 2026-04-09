@@ -31,6 +31,11 @@ const mockTeam1 = {
   name: '서울 FC',
   sportType: 'SOCCER',
   memberCount: 11,
+  level: 3,
+  isRecruiting: true,
+  description: null,
+  city: null,
+  district: null,
   ownerId: 'user-1',
 };
 
@@ -39,7 +44,33 @@ const mockTeam2 = {
   name: '한강 농구단',
   sportType: 'BASKETBALL',
   memberCount: 5,
+  level: 2,
+  isRecruiting: false,
+  description: null,
+  city: null,
+  district: null,
   ownerId: 'user-1',
+};
+
+// Backend returns TeamMembership & { team: SportTeam } shape
+const mockMembership1 = {
+  id: 'mem-1',
+  teamId: 'team-1',
+  userId: 'user-1',
+  role: 'owner' as const,
+  status: 'active',
+  joinedAt: '2024-01-01T00:00:00.000Z',
+  team: mockTeam1,
+};
+
+const mockMembership2 = {
+  id: 'mem-2',
+  teamId: 'team-2',
+  userId: 'user-1',
+  role: 'member' as const,
+  status: 'active',
+  joinedAt: '2024-01-02T00:00:00.000Z',
+  team: mockTeam2,
 };
 
 function makeWrapper() {
@@ -58,9 +89,10 @@ describe('useMyTeams', () => {
   });
 
   it('returns my team list when authenticated', async () => {
+    // Mock returns membership-wrapped shape (backend listUserTeams() contract)
     mockApi.get.mockResolvedValueOnce({
       status: 'success',
-      data: [mockTeam1, mockTeam2],
+      data: [mockMembership1, mockMembership2],
     });
 
     const wrapper = makeWrapper();
@@ -70,6 +102,8 @@ describe('useMyTeams', () => {
     expect(mockApi.get).toHaveBeenCalledWith('/teams/me');
     expect(result.current.data).toHaveLength(2);
     expect(result.current.data?.[0].name).toBe('서울 FC');
+    expect(result.current.data?.[0].role).toBe('owner');
+    expect(result.current.data?.[1].role).toBe('member');
   });
 
   it('is disabled when not authenticated', () => {

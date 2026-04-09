@@ -44,13 +44,13 @@ export function Sidebar() {
         { href: '/teams', icon: Users, label: t('teams') },
       ],
     },
-    {
+    ...(isAuthenticated ? [{
       label: t('communication'),
       items: [
         { href: '/chat', icon: MessageCircle, label: t('chat') },
         { href: '/notifications', icon: Bell, label: t('notifications') },
       ],
-    },
+    }] : []),
     {
       label: null,
       items: [

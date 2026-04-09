@@ -145,7 +145,7 @@ export default function MercenaryPage() {
 
   async function handleApply(id: string) {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push(`/login?redirect=/mercenary/${id}`);
       return;
     }
     try {

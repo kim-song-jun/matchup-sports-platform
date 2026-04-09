@@ -887,6 +887,14 @@ model TeamMatch {
   hasReferee      Boolean         @default(false) @map("has_referee")
   notes           String?
 
+  // task 17: match meta fields
+  skillGrade        String?  @map("skill_grade")
+  gameFormat        String?  @map("game_format")
+  matchType         String?  @map("match_type")
+  proPlayerCount    Int      @default(0) @map("pro_player_count")
+  uniformColor      String?  @map("uniform_color")
+  isFreeInvitation  Boolean  @default(false) @map("is_free_invitation")
+
   // 상태
   status          TeamMatchStatus @default(recruiting)
   guestTeamId     String?         @map("guest_team_id") // 승인된 상대 팀
@@ -911,6 +919,7 @@ model TeamMatch {
 
   @@index([sportType, status])
   @@index([matchDate])
+  @@index([hostTeamId, status, matchDate])
   @@map("team_matches")
 }
 

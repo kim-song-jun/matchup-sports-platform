@@ -86,6 +86,8 @@ export default function NewTeamMatchPage() {
   const { toast } = useToast();
   useRequireAuth();
   const { data: myTeams, isLoading: teamsLoading, isError: teamsError } = useMyTeams();
+  // Only owner/manager can host a team match
+  const eligibleTeams = (myTeams ?? []).filter((t) => t.role === 'owner' || t.role === 'manager');
   const [selectedHostTeamId, setSelectedHostTeamId] = useState('');
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(initialForm);
@@ -107,7 +109,7 @@ export default function NewTeamMatchPage() {
   }
 
   function handleSubmit() {
-    const hostTeamId = selectedHostTeamId || (myTeams && myTeams.length > 0 ? myTeams[0].id : undefined);
+    const hostTeamId = selectedHostTeamId || (eligibleTeams.length > 0 ? eligibleTeams[0].id : undefined);
     const payload: CreateTeamMatchInput & { hostTeamId?: string } = {
       sportType: form.sportType,
       title: form.title,
@@ -124,6 +126,13 @@ export default function NewTeamMatchPage() {
       matchStyle: form.matchStyle,
       hasReferee: form.hasReferee,
       notes: form.notes,
+      // task 17: match meta fields
+      skillGrade: form.skillGrade,
+      gameFormat: form.gameFormat,
+      matchType: form.matchType,
+      proPlayerCount: form.proPlayerCount,
+      uniformColor: form.uniformColor || undefined,
+      isFreeInvitation: form.isFreeInvitation,
       ...(hostTeamId ? { hostTeamId } : {}),
     };
     createMutation.mutate(payload, {
@@ -173,6 +182,24 @@ export default function NewTeamMatchPage() {
     );
   }
 
+  if (myTeams !== undefined && eligibleTeams.length === 0) {
+    return (
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
+        <div className="max-w-[500px] mx-auto mt-20 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 mx-auto mb-4">
+            <Users size={28} className="text-gray-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">권한이 없어요</h2>
+          <p className="text-sm text-gray-500 mt-2">매니저 이상 권한을 가진 팀이 없어요</p>
+          <p className="text-xs text-gray-400 mt-1">모집글을 작성하려면 팀의 owner 또는 manager여야 해요</p>
+          <Link href="/teams/new" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
+            새 팀 만들기
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
@@ -204,7 +231,7 @@ export default function NewTeamMatchPage() {
         </div>
       </div>
 
-      {myTeams && myTeams.length > 1 && (
+      {eligibleTeams.length > 1 && (
         <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mb-5">
           <label htmlFor="host-team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">호스트 팀 선택</label>
           <select
@@ -213,8 +240,8 @@ export default function NewTeamMatchPage() {
             onChange={(e) => setSelectedHostTeamId(e.target.value)}
             className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors min-h-[44px]"
           >
-            {myTeams.map((team) => (
-              <option key={team.id} value={team.id}>{team.name}</option>
+            {eligibleTeams.map((team) => (
+              <option key={team.id} value={team.id}>{team.name} ({team.role === 'owner' ? '오너' : '매니저'})</option>
             ))}
           </select>
         </div>

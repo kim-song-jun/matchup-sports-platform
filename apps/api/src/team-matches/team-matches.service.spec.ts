@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { TeamMatchesService } from './team-matches.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from '../teams/team-membership.service';
@@ -158,6 +158,63 @@ describe('TeamMatchesService', () => {
         }),
       );
     });
+
+    it('should filter by teamId as host', async () => {
+      mockPrismaService.teamMatch.findMany.mockResolvedValue([mockTeamMatches[0]]);
+
+      await service.findAll({ teamId: 't1' });
+
+      expect(prisma.teamMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { hostTeamId: 't1' },
+              { applications: { some: { applicantTeamId: 't1' } } },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('should include applicant team matches when filtering by teamId', async () => {
+      const applicantMatch = {
+        ...mockTeamMatches[1],
+        id: 'tm-3',
+        hostTeam: { id: 't9', name: '상대팀', sportType: 'FUTSAL', city: '서울', district: '종로구', level: 3, memberCount: 10 },
+      };
+      mockPrismaService.teamMatch.findMany.mockResolvedValue([applicantMatch]);
+
+      await service.findAll({ teamId: 't2' });
+
+      expect(prisma.teamMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { hostTeamId: 't2' },
+              { applications: { some: { applicantTeamId: 't2' } } },
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('should combine teamId filter with status filter', async () => {
+      mockPrismaService.teamMatch.findMany.mockResolvedValue([]);
+
+      await service.findAll({ teamId: 't1', status: 'scheduled' });
+
+      expect(prisma.teamMatch.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'scheduled',
+            OR: [
+              { hostTeamId: 't1' },
+              { applications: { some: { applicantTeamId: 't1' } } },
+            ],
+          }),
+        }),
+      );
+    });
   });
 
   describe('findOne', () => {
@@ -186,6 +243,13 @@ describe('TeamMatchesService', () => {
       ],
       arrivalChecks: [],
       evaluations: [],
+      // task 17 meta fields
+      skillGrade: 'B+',
+      gameFormat: '6:6',
+      matchType: 'invitation',
+      proPlayerCount: 2,
+      uniformColor: '파랑',
+      isFreeInvitation: false,
     };
 
     it('should return team match with applications', async () => {
@@ -202,6 +266,21 @@ describe('TeamMatchesService', () => {
           arrivalChecks: true,
           evaluations: true,
         }),
+      });
+    });
+
+    it('should include task-17 meta fields in the returned match', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue(mockMatchDetail);
+
+      const result = await service.findOne('tm-1');
+
+      expect(result).toMatchObject({
+        skillGrade: 'B+',
+        gameFormat: '6:6',
+        matchType: 'invitation',
+        proPlayerCount: 2,
+        uniformColor: '파랑',
+        isFreeInvitation: false,
       });
     });
 
@@ -242,6 +321,13 @@ describe('TeamMatchesService', () => {
       hasReferee: false,
       allowMercenary: true,
       matchStyle: 'friendly',
+      // task 17 meta fields
+      skillGrade: null,
+      gameFormat: null,
+      matchType: null,
+      proPlayerCount: 0,
+      uniformColor: null,
+      isFreeInvitation: false,
     };
 
     it('should create a team match', async () => {
@@ -311,6 +397,93 @@ describe('TeamMatchesService', () => {
           hasReferee: false,
         }),
       });
+    });
+
+    it('should pass task-17 meta fields to prisma.create when provided', async () => {
+      const dataWithMeta = {
+        ...createData,
+        skillGrade: 'A',
+        gameFormat: '11:11',
+        matchType: 'exchange',
+        proPlayerCount: 3,
+        uniformColor: '빨강',
+        isFreeInvitation: true,
+      };
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: userId });
+      mockPrismaService.teamMatch.create.mockResolvedValue({ id: 'tm-meta', ...dataWithMeta });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.create(userId, dataWithMeta as any);
+
+      expect(prisma.teamMatch.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          skillGrade: 'A',
+          gameFormat: '11:11',
+          matchType: 'exchange',
+          proPlayerCount: 3,
+          uniformColor: '빨강',
+          isFreeInvitation: true,
+        }),
+      });
+    });
+
+    it('should use null/default values for task-17 meta fields when not provided', async () => {
+      const minimalDataNoMeta = {
+        hostTeamId: 'team-1',
+        sportType: 'FUTSAL',
+        title: '메타필드 없는 매치',
+        matchDate: '2026-04-10',
+        startTime: '10:00',
+        endTime: '12:00',
+        venueName: '테스트장',
+        venueAddress: '서울시 강남구',
+      };
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: userId });
+      mockPrismaService.teamMatch.create.mockResolvedValue({ id: 'tm-defaults' });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await service.create(userId, minimalDataNoMeta as any);
+
+      expect(prisma.teamMatch.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          skillGrade: null,
+          gameFormat: null,
+          matchType: null,
+          proPlayerCount: 0,
+          uniformColor: null,
+          isFreeInvitation: false,
+        }),
+      });
+    });
+
+    it('should allow owner to create a team match', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: userId });
+      mockPrismaService.teamMatch.create.mockResolvedValue(createdMatch);
+      mockTeamMembershipService.assertRole.mockResolvedValue({ role: 'owner' });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await expect(service.create(userId, createData as any)).resolves.toBeDefined();
+      expect(mockTeamMembershipService.assertRole).toHaveBeenCalledWith('team-1', userId, 'manager');
+    });
+
+    it('should allow manager to create a team match', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'other-user' });
+      mockPrismaService.teamMatch.create.mockResolvedValue(createdMatch);
+      mockTeamMembershipService.assertRole.mockResolvedValue({ role: 'manager' });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await expect(service.create(userId, createData as any)).resolves.toBeDefined();
+    });
+
+    it('should deny member from creating a team match', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'other-user' });
+      mockTeamMembershipService.assertRole.mockRejectedValue(
+        new ForbiddenException('팀 권한이 부족합니다'),
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await expect(service.create(userId, createData as any)).rejects.toThrow(ForbiddenException);
+      expect(prisma.teamMatch.create).not.toHaveBeenCalled();
     });
   });
 
@@ -412,6 +585,36 @@ describe('TeamMatchesService', () => {
       await expect(
         service.apply('tm-1', userId, {} as any),
       ).rejects.toThrow('팀 ID가 필요합니다');
+    });
+
+    it('should allow manager to apply on behalf of a team', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue(mockMatch);
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-2' });
+      mockPrismaService.teamMatchApplication.create.mockResolvedValue({
+        id: 'app-new',
+        teamMatchId: 'tm-1',
+        applicantTeamId: 'team-2',
+        status: 'pending',
+      });
+      mockTeamMembershipService.assertRole.mockResolvedValue({ role: 'manager' });
+
+      await expect(
+        service.apply('tm-1', userId, { applicantTeamId: 'team-2' }),
+      ).resolves.toBeDefined();
+      expect(mockTeamMembershipService.assertRole).toHaveBeenCalledWith('team-2', userId, 'manager');
+    });
+
+    it('should deny member from applying on behalf of a team', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue(mockMatch);
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-2' });
+      mockTeamMembershipService.assertRole.mockRejectedValue(
+        new ForbiddenException('팀 권한이 부족합니다'),
+      );
+
+      await expect(
+        service.apply('tm-1', userId, { applicantTeamId: 'team-2' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.teamMatchApplication.create).not.toHaveBeenCalled();
     });
   });
 

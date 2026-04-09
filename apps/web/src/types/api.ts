@@ -250,6 +250,23 @@ export interface SportProfile {
   position?: string;
 }
 
+// ── MyTeam — flattened shape returned by useMyTeams() ──
+// Backend returns TeamMembership & { team: SportTeam }; the hook normalizes to this.
+export interface MyTeam {
+  id: string;
+  name: string;
+  sportType: string;
+  description: string | null;
+  city: string | null;
+  district: string | null;
+  memberCount: number;
+  level: number;
+  isRecruiting: boolean;
+  logoUrl?: string;
+  role: 'owner' | 'manager' | 'member';
+  joinedAt?: string;
+}
+
 // ── SportTeam ──
 export interface SportTeam {
   id: string;
@@ -302,7 +319,7 @@ export interface TeamMatch {
   proPlayerCount?: number;
   skillGrade?: string;
   gameFormat?: string;
-  matchType?: string;
+  matchType?: 'invitation' | 'exchange' | 'away';
   uniformColor?: string;
   isFreeInvitation?: boolean;
   allowMercenary?: boolean;
@@ -689,6 +706,13 @@ export interface CreateTeamMatchInput {
   matchStyle?: string;
   hasReferee?: boolean;
   notes?: string;
+  // task 17: match meta fields
+  skillGrade?: string;
+  gameFormat?: string;
+  matchType?: 'invitation' | 'exchange' | 'away';
+  proPlayerCount?: number;
+  uniformColor?: string;
+  isFreeInvitation?: boolean;
 }
 
 export interface ApplyTeamMatchInput {

@@ -20,6 +20,12 @@ export class TeamMatchesService {
     const where: Record<string, unknown> = { status: filter.status || 'recruiting' };
     if (filter.sportType) where.sportType = filter.sportType;
     if (filter.city) where.hostTeam = { city: filter.city };
+    if (filter.teamId) {
+      where.OR = [
+        { hostTeamId: filter.teamId },
+        { applications: { some: { applicantTeamId: filter.teamId } } },
+      ];
+    }
 
     const items = await this.prisma.teamMatch.findMany({
       where,
@@ -100,6 +106,12 @@ export class TeamMatchesService {
         hasReferee: hasExternalReferee,
         notes: data.notes,
         refereeSchedule: hasExternalReferee ? undefined : refereeSchedule,
+        skillGrade: data.skillGrade ?? null,
+        gameFormat: data.gameFormat ?? null,
+        matchType: data.matchType ?? null,
+        proPlayerCount: data.proPlayerCount ?? 0,
+        uniformColor: data.uniformColor ?? null,
+        isFreeInvitation: data.isFreeInvitation ?? false,
       },
     });
   }

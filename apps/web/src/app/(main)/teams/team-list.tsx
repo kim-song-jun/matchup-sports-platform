@@ -11,7 +11,7 @@ import { SafeImage } from '@/components/ui/safe-image';
 import { Users as UsersIcon } from 'lucide-react';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getTeamImage, getTeamLogo } from '@/lib/sport-image';
-import type { SportTeam } from '@/types/api';
+import type { SportTeam, MyTeam } from '@/types/api';
 
 const TeamCard = React.memo(function TeamCard({ team }: { team: SportTeam }) {
   const t = useTranslations('teams');
@@ -70,8 +70,8 @@ export function TeamList() {
   const { data: myTeams } = useMyTeams();
 
   const allTeams = data?.items ?? [];
-  const myTeamList = myTeams ?? [];
-  const myTeamIds = new Set(myTeamList.map((t: SportTeam) => t.id));
+  const myTeamList: MyTeam[] = myTeams ?? [];
+  const myTeamIds = new Set(myTeamList.map((t) => t.id));
   const otherTeams = isAuthenticated ? allTeams.filter((t: SportTeam) => !myTeamIds.has(t.id)) : allTeams;
 
   if (isLoading) {
@@ -88,19 +88,29 @@ export function TeamList() {
 
   return (
     <div className="space-y-6">
-      {isAuthenticated && myTeamList.length > 0 && (
+      {isAuthenticated && (
         <div>
           <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀</h2>
-          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
-            {myTeamList.map((team: SportTeam) => (
-              <TeamCard key={team.id} team={team} />
-            ))}
-          </div>
+          {myTeamList.length === 0 ? (
+            <EmptyState
+              icon={UsersIcon}
+              title="소속 팀이 없어요"
+              description="팀을 만들거나 가입해보세요"
+              size="sm"
+              action={{ label: '팀 만들기', href: '/teams/new' }}
+            />
+          ) : (
+            <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
+              {myTeamList.map((team) => (
+                <TeamCard key={team.id} team={team as unknown as SportTeam} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       <div>
-        {isAuthenticated && myTeamList.length > 0 && (
+        {isAuthenticated && (
           <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀</h2>
         )}
         {otherTeams.length === 0 && !isLoading ? (

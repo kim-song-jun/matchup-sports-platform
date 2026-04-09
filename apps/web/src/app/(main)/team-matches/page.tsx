@@ -52,9 +52,14 @@ export default function TeamMatchesPage() {
     });
   }
 
-  const myTeamIds = new Set((myTeams ?? []).map((t) => t.id));
-  const myTeamMatches = isAuthenticated ? matches.filter((m: TeamMatch) => m.hostTeamId && myTeamIds.has(m.hostTeamId)) : [];
-  const otherMatches = isAuthenticated && myTeamMatches.length > 0 ? matches.filter((m: TeamMatch) => !m.hostTeamId || !myTeamIds.has(m.hostTeamId)) : matches;
+  // Only teams where user is owner/manager are considered "my host teams"
+  const myHostTeamIds = new Set(
+    (myTeams ?? [])
+      .filter((t) => t.role === 'owner' || t.role === 'manager')
+      .map((t) => t.id),
+  );
+  const myTeamMatches = isAuthenticated ? matches.filter((m: TeamMatch) => m.hostTeamId && myHostTeamIds.has(m.hostTeamId)) : [];
+  const otherMatches = isAuthenticated && myHostTeamIds.size > 0 ? matches.filter((m: TeamMatch) => !m.hostTeamId || !myHostTeamIds.has(m.hostTeamId)) : matches;
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
@@ -139,18 +144,28 @@ export default function TeamMatchesPage() {
           />
         ) : (
           <div className="space-y-6">
-            {myTeamMatches.length > 0 && (
+            {isAuthenticated && myHostTeamIds.size > 0 && (
               <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀 매칭</h2>
-                <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
-                  {myTeamMatches.map((match: TeamMatch) => (
-                    <TeamMatchCard key={match.id} match={match} />
-                  ))}
-                </div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
+                {myTeamMatches.length === 0 ? (
+                  <EmptyState
+                    icon={Search}
+                    title="내 팀의 모집글이 없어요"
+                    description="모집글을 작성해 상대팀을 구해보세요"
+                    action={{ label: '모집글 작성', href: '/team-matches/new' }}
+                    size="sm"
+                  />
+                ) : (
+                  <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
+                    {myTeamMatches.map((match: TeamMatch) => (
+                      <TeamMatchCard key={match.id} match={match} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <div>
-              {myTeamMatches.length > 0 && (
+              {isAuthenticated && myHostTeamIds.size > 0 && (
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
               )}
               <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">

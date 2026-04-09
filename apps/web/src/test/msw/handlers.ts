@@ -23,9 +23,13 @@ const mockTeam1 = {
   name: '서울 FC',
   sportType: 'SOCCER',
   memberCount: 11,
+  level: 3,
+  isRecruiting: true,
   ownerId: 'user-1',
   description: '서울 풋살 팀',
-  logoImageUrl: null,
+  city: '서울',
+  district: '송파구',
+  logoUrl: null,
   createdAt: '2024-01-01T00:00:00.000Z',
 };
 
@@ -34,11 +38,37 @@ const mockTeam2 = {
   name: '한강 농구단',
   sportType: 'BASKETBALL',
   memberCount: 5,
+  level: 2,
+  isRecruiting: false,
   ownerId: 'user-1',
   description: '한강 농구 팀',
-  logoImageUrl: null,
+  city: '서울',
+  district: '마포구',
+  logoUrl: null,
   createdAt: '2024-01-02T00:00:00.000Z',
 };
+
+// Membership-wrapped fixtures matching backend listUserTeams() shape
+const mockMyTeamMemberships = [
+  {
+    id: 'mem-1',
+    teamId: 'team-1',
+    userId: 'user-1',
+    role: 'owner',
+    status: 'active',
+    joinedAt: '2024-01-01T00:00:00.000Z',
+    team: mockTeam1,
+  },
+  {
+    id: 'mem-2',
+    teamId: 'team-2',
+    userId: 'user-1',
+    role: 'member',
+    status: 'active',
+    joinedAt: '2024-01-02T00:00:00.000Z',
+    team: mockTeam2,
+  },
+];
 
 const mockMatch = {
   id: 'match-1',
@@ -54,13 +84,36 @@ const mockMatch = {
 
 const mockTeamMatch = {
   id: 'tm-1',
-  sportType: 'SOCCER',
-  status: 'RECRUITING',
-  scheduledAt: '2025-06-01T14:00:00.000Z',
-  venueName: '서울 풋살장',
   hostTeamId: 'team-1',
   hostTeam: mockTeam1,
+  sportType: 'soccer',
+  title: '주말 친선 경기 모집',
+  description: '',
+  matchDate: '2026-05-10',
+  startTime: '14:00',
+  endTime: '16:00',
+  totalMinutes: 120,
+  quarterCount: 4,
+  venueName: '서울 풋살장',
+  venueAddress: '서울시 송파구 올림픽로 25',
+  totalFee: 200000,
+  opponentFee: 100000,
+  requiredLevel: 3,
+  hasProPlayers: false,
+  allowMercenary: true,
+  matchStyle: 'friendly',
+  hasReferee: true,
+  notes: '',
+  status: 'recruiting',
+  // task 17: match meta fields
+  skillGrade: 'B+',
+  gameFormat: '6:6',
+  matchType: 'invitation' as const,
+  proPlayerCount: 0,
+  uniformColor: '파랑',
+  isFreeInvitation: false,
   createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
 };
 
 const mockMercenaryPost = {
@@ -121,7 +174,8 @@ export const handlers = [
 
   // ── Teams handlers ──
   http.get('/api/v1/teams/me', () => {
-    return success([mockTeam1, mockTeam2]);
+    // Returns membership-wrapped shape matching backend listUserTeams()
+    return success(mockMyTeamMemberships);
   }),
 
   http.get('/api/v1/teams', () => {
@@ -168,6 +222,14 @@ export const handlers = [
   // ── Team Matches handlers ──
   http.get('/api/v1/team-matches', () => {
     return success({ items: [mockTeamMatch], nextCursor: null });
+  }),
+
+  http.patch('/api/v1/team-matches/:id/applications/:appId/approve', ({ params }) => {
+    return success({ id: params.appId as string, status: 'approved' });
+  }),
+
+  http.patch('/api/v1/team-matches/:id/applications/:appId/reject', ({ params }) => {
+    return success({ id: params.appId as string, status: 'rejected' });
   }),
 
   // ── Mercenary handlers ──

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -73,9 +73,11 @@ export default function TeamMatchDetailPage() {
     );
   }
 
-  // isHost: direct owner check OR user belongs to host team with manager+ role
-  const isHostTeamMember = myTeams?.some((t) => t.id === match.hostTeam?.id);
-  const isHost = user?.id === match.hostUserId || !!isHostTeamMember;
+  // isHost: user must belong to the host team with owner or manager role
+  const isHost = useMemo(() => {
+    if (!isAuthenticated || !match?.hostTeam?.id) return false;
+    return myTeams?.some((t) => t.id === match.hostTeam!.id && (t.role === 'owner' || t.role === 'manager')) ?? false;
+  }, [isAuthenticated, match?.hostTeam?.id, myTeams]);
   const isMatchDay = new Date(match.matchDate).toDateString() === new Date().toDateString();
   const isCompleted = match.status === 'completed';
   const isRecruiting = match.status === 'recruiting';
@@ -98,9 +100,20 @@ export default function TeamMatchDetailPage() {
   };
   const status = statusMap[match.status] ?? statusMap.recruiting;
 
+  // Teams eligible to apply: owner/manager role, not the host team, not already applied
+  const applicableTeams = useMemo(() => {
+    if (!myTeams) return [];
+    return myTeams.filter((t) => {
+      if (t.role !== 'owner' && t.role !== 'manager') return false;
+      if (t.id === match?.hostTeam?.id) return false;
+      if (applications.some((a) => a.applicantTeamId === t.id)) return false;
+      return true;
+    });
+  }, [myTeams, match?.hostTeam?.id, applications]);
+
   function handleApply() {
     if (!confirmed) return;
-    const teamId = myTeams && myTeams.length > 0 ? (selectedTeamId || myTeams[0].id) : undefined;
+    const teamId = applicableTeams.length > 0 ? (selectedTeamId || applicableTeams[0].id) : undefined;
     applyMutation.mutate(
       { id, data: { message: applyMessage, ...(teamId ? { teamId } : {}) } },
       { onSuccess: () => setShowApplyModal(false) },
@@ -311,7 +324,11 @@ export default function TeamMatchDetailPage() {
             {match.hostTeam && (
               <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">호스트 팀</h2>
-                <div className="flex items-center gap-3">
+                <Link
+                  href={`/teams/${match.hostTeam.id}`}
+                  aria-label="호스트 팀 상세 보기"
+                  className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl -mx-2 px-2 py-1 transition-colors"
+                >
                   <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 text-lg font-bold">
                     {hostTeamLogo ? (
                       <img
@@ -339,7 +356,7 @@ export default function TeamMatchDetailPage() {
                     </div>
                   </div>
                   <ChevronRight size={18} className="text-gray-300" />
-                </div>
+                </Link>
               </div>
             )}
           </div>
@@ -426,7 +443,11 @@ export default function TeamMatchDetailPage() {
           </div>
         </label>
 
-        {myTeams && myTeams.length > 1 && (
+        {applicableTeams.length === 0 ? (
+          <div className="mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            신청 가능한 팀이 없어요. 매니저 이상 권한이 있는 팀으로만 신청할 수 있어요.
+          </div>
+        ) : applicableTeams.length > 1 ? (
           <div className="mb-4">
             <label htmlFor="team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">신청 팀 선택</label>
             <select
@@ -435,10 +456,14 @@ export default function TeamMatchDetailPage() {
               onChange={(e) => setSelectedTeamId(e.target.value)}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             >
-              {myTeams.map((team) => (
+              {applicableTeams.map((team) => (
                 <option key={team.id} value={team.id}>{team.name}</option>
               ))}
             </select>
+          </div>
+        ) : (
+          <div className="mb-4 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+            신청 팀: <span className="font-semibold">{applicableTeams[0].name}</span>
           </div>
         )}
 
@@ -463,7 +488,7 @@ export default function TeamMatchDetailPage() {
           </button>
           <button
             onClick={handleApply}
-            disabled={!confirmed || applyMutation.isPending}
+            disabled={!confirmed || applyMutation.isPending || applicableTeams.length === 0}
             className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {applyMutation.isPending ? (

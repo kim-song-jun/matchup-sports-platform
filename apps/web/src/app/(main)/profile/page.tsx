@@ -213,9 +213,18 @@ export default function ProfilePage() {
                 <UserCheck size={16} className="text-gray-500" />
                 <span className="text-base font-semibold text-gray-800 dark:text-gray-200">내 용병 모집</span>
               </div>
-              <Link href="/my/mercenary" className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors">
-                내 모집글 보기
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/mercenary/new"
+                  aria-label="용병 모집 추가"
+                  className="flex items-center justify-center h-7 w-7 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                >
+                  <Plus size={14} />
+                </Link>
+                <Link href="/my/mercenary" className="text-sm text-blue-500 font-medium hover:text-blue-600 transition-colors">
+                  내 모집글 보기
+                </Link>
+              </div>
             </div>
             {hasTeams ? (
               <Link

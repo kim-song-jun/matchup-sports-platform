@@ -159,16 +159,37 @@ jobs:
           sudo docker build -f deploy/Dockerfile.api -t matchup-api .
           sudo docker build -f deploy/Dockerfile.web -t matchup-web .
 
+          cd deploy
+
+          # ── Ensure postgres and redis are running before migrations ───────
+          # network prune above may have removed the deploy_default network.
+          # Start DB services first so the migration container can reach them.
+          echo "[INFO] Starting database services..."
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis
+
+          echo "[INFO] Waiting for postgres to be healthy..."
+          for i in $(seq 1 30); do
+            if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T postgres \
+                pg_isready >/dev/null 2>&1; then
+              echo "[INFO] postgres is ready (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "[ERROR] postgres did not become healthy in time"
+              exit 1
+            fi
+            sleep 2
+          done
+
           # ── Run database migrations before bringing up the new containers ──
           # Explicit deploy step — migrations must succeed before the API
           # starts. Failure aborts the deploy entirely (set -euo pipefail).
           # Rollback: re-deploy a previous image tag or run
           #   docker run --rm matchup-api npx prisma migrate resolve --rolled-back <migration>
           echo "[INFO] Running database migrations..."
-          ${COMPOSE} -f deploy/docker-compose.prod.yml --env-file deploy/.env \
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T api npx prisma migrate deploy </dev/null
 
-          cd deploy
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
 

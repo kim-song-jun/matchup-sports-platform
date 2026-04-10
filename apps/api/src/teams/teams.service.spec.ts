@@ -27,6 +27,7 @@ describe('TeamsService', () => {
     },
     teamMembership: {
       create: jest.fn(),
+      update: jest.fn(),
       findFirst: jest.fn(),
       upsert: jest.fn(),
     },
@@ -560,28 +561,31 @@ describe('TeamsService', () => {
     beforeEach(() => {
       mockPrismaService.sportTeam.findUnique.mockResolvedValue(mockTeamRecruiting);
       mockPrismaService.teamMembership.findFirst.mockResolvedValue(null);
-      mockPrismaService.teamMembership.upsert.mockResolvedValue(mockPendingMembership);
+      mockPrismaService.teamMembership.create.mockResolvedValue(mockPendingMembership);
     });
 
-    it('should upsert and return a pending membership on success', async () => {
+    it('should create and return a pending membership on success', async () => {
       const result = await service.applyToTeam('team-1', 'user-1');
 
       expect(result).toEqual(mockPendingMembership);
-      expect(mockPrismaService.teamMembership.upsert).toHaveBeenCalledWith({
-        where: { teamId_userId: { teamId: 'team-1', userId: 'user-1' } },
-        create: { teamId: 'team-1', userId: 'user-1', role: 'member', status: 'pending' },
-        update: { role: 'member', status: 'pending' },
+      expect(mockPrismaService.teamMembership.create).toHaveBeenCalledWith({
+        data: { teamId: 'team-1', userId: 'user-1', role: 'member', status: 'pending' },
       });
     });
 
-    it('should allow re-application after left/removed status via upsert', async () => {
+    it('should allow re-application after left/removed status via update', async () => {
+      const existingLeft = { ...mockPendingMembership, id: 'mem-2', status: 'left' };
       const reapplyMembership = { ...mockPendingMembership, id: 'mem-2' };
-      mockPrismaService.teamMembership.upsert.mockResolvedValue(reapplyMembership);
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue(existingLeft);
+      mockPrismaService.teamMembership.update.mockResolvedValue(reapplyMembership);
 
       const result = await service.applyToTeam('team-1', 'user-1');
 
       expect(result).toEqual(reapplyMembership);
-      expect(mockPrismaService.teamMembership.upsert).toHaveBeenCalled();
+      expect(mockPrismaService.teamMembership.update).toHaveBeenCalledWith({
+        where: { id: 'mem-2' },
+        data: { role: 'member', status: 'pending' },
+      });
     });
 
     it('should throw ConflictException (TEAM_APPLY_DUPLICATE) on P2002 race condition', async () => {
@@ -590,7 +594,7 @@ describe('TeamsService', () => {
         clientVersion: '6.0.0',
       });
       Object.setPrototypeOf(p2002, (await import('@prisma/client')).Prisma.PrismaClientKnownRequestError.prototype);
-      mockPrismaService.teamMembership.upsert.mockRejectedValue(p2002);
+      mockPrismaService.teamMembership.create.mockRejectedValue(p2002);
 
       await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(ConflictException);
     });

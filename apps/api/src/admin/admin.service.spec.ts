@@ -32,6 +32,10 @@ const prismaMock = {
     findMany: jest.fn(),
     create: jest.fn(),
   },
+  teamMembership: {
+    create: jest.fn(),
+  },
+  $transaction: jest.fn().mockImplementation((cb: (tx: unknown) => unknown) => cb(prismaMock)),
   venue: {
     count: jest.fn(),
     findMany: jest.fn(),
@@ -306,6 +310,7 @@ describe('AdminService', () => {
     it('creates a team with typed DTO', async () => {
       const created = { id: 'team-1', ...validDto };
       prismaMock.sportTeam.create.mockResolvedValue(created);
+      prismaMock.teamMembership.create.mockResolvedValue({ id: 'mem-1' });
 
       const result = await service.createTeam(validDto);
 
@@ -322,6 +327,9 @@ describe('AdminService', () => {
           }),
         }),
       );
+      expect(prismaMock.teamMembership.create).toHaveBeenCalledWith({
+        data: { teamId: 'team-1', userId: 'owner-uuid-1', role: 'owner', status: 'active' },
+      });
     });
   });
 

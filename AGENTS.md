@@ -219,3 +219,24 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 - error handling
 - documentation expectations
 - team-operation baseline
+
+---
+<!-- codex-init:delta version=1 timestamp=20260410_175045 -->
+
+## Injected by codex-init
+
+The sections below fill project-specific gaps while preserving curated content above.
+
+### Codex Canonical Agent Docs
+
+- MatchUp의 Codex canonical agent docs는 `.codex/agents/`에 둔다.
+- `.claude/agents/prompts.md`는 Codex built-in `agent-*` 스킬이 읽는 compatibility entry다.
+- `.claude/agents/team-config.md`와 `.claude/agents/workflow.md`는 기존 Claude 운영 문서를 유지하되, Codex roster, alias, quality gate가 바뀌면 `.codex/agents/*`와 같은 변경에서 sync한다.
+- Codex 기준 agent 라우팅 우선순위는 `.codex/agents/prompts.md` → `.codex/agents/team-config.md` → `.codex/agents/workflow.md` → `.claude/agents/prompts.md` compatibility entry 순서로 본다.
+
+### Compatibility Guardrail
+
+- 이 저장소의 agent 문서 표준 경로는 `.agents/`가 아니다. 신규 Codex 문서는 `.codex/agents/`, compatibility entry는 기존 `.claude/agents/`를 사용한다.
+- Task 15에서 정한 canonical/compatibility split을 유지한다. `.codex/agents/`만 갱신하고 `.claude/agents/prompts.md`를 방치하는 drift는 허용하지 않는다.
+
+<!-- /codex-init:delta -->

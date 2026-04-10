@@ -97,3 +97,65 @@
 4. Docs start last, after implementation and QA results are stable
 5. Ambiguity returns to planning; builders do not guess
 6. Non-trivial work must be anchored in `.github/tasks/`
+
+---
+<!-- codex-init:delta version=1 timestamp=20260410_175045 -->
+
+## Injected by codex-init
+
+The sections below fill project-specific gaps while preserving curated content above.
+
+### Codex Normalized Roster Overlay
+
+- Codex orchestration 기준 roster는 16 agents다.
+- builder 압축 매핑:
+  - `backend-dev` = `backend-api-dev` + `backend-data-dev`
+  - `frontend-dev` = `frontend-ui-dev` + `frontend-data-dev`
+  - `infra-dev` = `infra-devops-dev` + `infra-security-dev`
+- `.codex/agents/*`를 Codex canonical policy로 보고, 위의 19-agent 상세 ownership은 local execution detail로 유지한다.
+
+### Codex Model / Effort Guidance
+
+| Team | Agents | Model | Effort |
+|------|--------|-------|--------|
+| Planning | `project-director`, `tech-planner` | `gpt-5.4-pro` | `high` |
+| Review | `backend-review`, `frontend-review`, `infra-review` | `gpt-5.4-pro` | `high` |
+| Production | `backend-dev`, `frontend-dev`, `infra-dev` | `gpt-5.3-instant` | `medium` |
+| Design | `design-main`, `ux-manager`, `ui-manager` | `gpt-5.3-instant` | `medium` |
+| QA | `qa-beginner`, `qa-regular`, `qa-power`, `qa-uiux` | `gpt-5.3-instant` | `medium` |
+| Docs | `docs-writer` | `gpt-5.4-mini` | `low` |
+
+### Codex Command Alias Overlay
+
+- `@build` / `@제작` → `backend-dev` + `frontend-dev` + `infra-dev`
+- `@backend` → `backend-dev`
+- `@frontend` → `frontend-dev`
+- `@infra` → `infra-dev`
+- `@review` / `@리뷰` → `backend-review` + `frontend-review` + `infra-review`
+- `@design` / `@디자인` → `design-main` + `ux-manager` + `ui-manager`
+- `@plan` / `@기획` → `project-director` + `tech-planner`
+- `@QA` / `@test` → `qa-beginner` + `qa-regular` + `qa-power` + `qa-uiux`
+- `@docs` / `@문서` → `docs-writer`
+- `@all` / `@전체` → `@plan` → `@build` → `@review`/fix loop → `@design` → `@QA` → `@docs`
+
+### Report Formats
+
+#### Build
+- Backend: changed files + tests + live contract check 여부
+- Frontend: changed files + tests/typecheck + mock/MSW sync 여부
+- Infra: changed files + validation + deploy/runtime impact
+
+#### Review
+- `🔴 Critical(N) / 🟡 Warning(N) / 🟢 Good(N) / 💡 Suggestion(N)`
+
+#### QA
+- `통과 N/M 시나리오, 실패: [목록], 개선: [목록]`
+
+#### Docs
+- updated files + changed guidance summary + unresolved drift
+
+### Sync Rule
+
+- Codex roster, alias, report shape가 바뀌면 `.codex/agents/team-config.md`와 `.claude/agents/prompts.md` compatibility entry를 같은 변경에서 sync한다.
+
+<!-- /codex-init:delta -->

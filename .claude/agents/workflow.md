@@ -240,3 +240,29 @@ Updated: [files]
 Summary: [what changed and why]
 Open gaps: [remaining drift or follow-up]
 ```
+
+---
+<!-- codex-init:delta version=1 timestamp=20260410_175045 -->
+
+## Injected by codex-init
+
+The sections below fill project-specific gaps while preserving curated content above.
+
+### Codex Normalized Alias Overlay
+
+- Codex built-in orchestration에서는 `backend-dev`, `frontend-dev`, `infra-dev` 3-builder 구성을 기본으로 본다.
+- 이 저장소에서는 각각 `backend-api-dev + backend-data-dev`, `frontend-ui-dev + frontend-data-dev`, `infra-devops-dev + infra-security-dev`로 압축 해석한다.
+
+### Docs-Only Pipeline
+
+1. 요청 범위가 순수 문서 변경인지 확인한다.
+2. `docs-writer`가 source-of-truth 문서를 먼저 갱신한다.
+3. 코드/런타임/검증 명령이 변경됐다면 `AGENTS.md`, `.codex/agents/*`, `.claude/agents/prompts.md` compatibility entry까지 함께 sync한다.
+4. code diff가 생기지 않았는지 확인한 뒤 종료한다.
+
+### Compatibility Sync Rule
+
+- `.codex/agents/`는 Codex canonical workflow source다.
+- `.claude/agents/workflow.md`는 저장소 운영 문서로 유지하되, Codex roster, alias, review-fix gate, docs-last rule이 바뀌면 `.codex/agents/workflow.md`와 drift 없이 같은 변경에서 갱신한다.
+
+<!-- /codex-init:delta -->

@@ -51,7 +51,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Get pnpm store path
@@ -182,6 +182,20 @@ jobs:
             sleep 2
           done
 
+          # Wait for matchup_web to become healthy (Next.js takes longer to start)
+          echo "[INFO] Waiting for matchup_web to start..."
+          for i in $(seq 1 45); do
+            if sudo docker exec matchup_web wget -qO /dev/null http://localhost:3000 2>/dev/null; then
+              echo "[INFO] matchup_web is running (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 45 ]; then
+              echo "[WARN] matchup_web startup timeout — continuing"
+            else
+              sleep 2
+            fi
+          done
+
           if [ "${RESET_DB}" = "true" ]; then
             echo "[DANGER] Resetting database..."
             sudo docker exec matchup_api npx prisma migrate reset --force --skip-seed
@@ -211,5 +225,15 @@ jobs:
 
       - name: Health check
         run: |
-          sleep 10
-          ssh ec2 'curl -sf http://localhost > /dev/null && curl -fsS http://localhost/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'
+          for i in $(seq 1 12); do
+            if ssh ec2 'curl -sf http://localhost > /dev/null 2>&1 && \
+                        curl -fsS http://localhost/api/v1/health | \
+                        jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null 2>&1'; then
+              echo "Deploy OK"
+              exit 0
+            fi
+            echo "Attempt $i/12 — not ready yet, retrying in 10s..."
+            sleep 10
+          done
+          echo "Deploy FAILED"
+          exit 1

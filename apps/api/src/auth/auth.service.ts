@@ -48,16 +48,14 @@ export class AuthService implements OnModuleInit {
   }
 
   onModuleInit() {
-    if (process.env.NODE_ENV === 'production') {
-      const missing: string[] = [];
-      if (!this.kakaoEnabled) missing.push('KAKAO_CLIENT_ID');
-      if (!this.naverEnabled) missing.push('NAVER_CLIENT_ID');
-      if (missing.length > 0) {
-        throw new Error(
-          `[AuthService] Missing OAuth credentials in production: ${missing.join(', ')}. ` +
-          'Set the required environment variables before starting the server.',
-        );
-      }
+    const missing: string[] = [];
+    if (!this.kakaoEnabled) missing.push('KAKAO_CLIENT_ID');
+    if (!this.naverEnabled) missing.push('NAVER_CLIENT_ID');
+    if (missing.length > 0) {
+      this.logger.warn(
+        `OAuth credentials not configured: ${missing.join(', ')}. ` +
+        'Social login for these providers will be unavailable.',
+      );
     }
   }
 

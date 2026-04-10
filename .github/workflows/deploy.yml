@@ -212,4 +212,4 @@ jobs:
       - name: Health check
         run: |
           sleep 10
-          ssh ec2 'curl -sf http://localhost > /dev/null && curl -fsS http://localhost/api/v1/health | jq -e ".checks.db == true and .checks.redis == true" > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'
+          ssh ec2 'curl -sf http://localhost > /dev/null && curl -fsS http://localhost/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null && echo "Deploy OK" || (echo "Deploy FAILED"; exit 1)'

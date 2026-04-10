@@ -6,10 +6,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, Prisma, SportType, LessonType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
+import { CreateLessonDto } from './dto/create-lesson.dto';
 import { randomUUID } from 'crypto';
 
 interface TossConfirmResponse {
@@ -66,10 +67,10 @@ export class LessonsService {
   }
 
   async findAll(filter: { sportType?: string; type?: string; cursor?: string; limit?: number }) {
-    const limit = Math.min(filter.limit ?? 20, 100);
-    const where: Record<string, unknown> = { status: 'open' };
-    if (filter.sportType) where.sportType = filter.sportType;
-    if (filter.type) where.type = filter.type;
+    const limit = Math.min(Math.max(1, filter.limit ?? 20), 100);
+    const where: Prisma.LessonWhereInput = { status: 'open' };
+    if (filter.sportType) where.sportType = filter.sportType as SportType;
+    if (filter.type) where.type = filter.type as LessonType;
 
     const items = await this.prisma.lesson.findMany({
       where,
@@ -89,26 +90,29 @@ export class LessonsService {
     };
   }
 
-  async create(hostId: string, data: Record<string, unknown>) {
+  async create(hostId: string, data: CreateLessonDto) {
     return this.prisma.lesson.create({
       data: {
         hostId,
-        sportType: data.sportType as never,
-        type: data.type as never,
-        title: data.title as string,
-        description: data.description as string | undefined,
-        venueName: data.venueName as string | undefined,
-        venueId: data.venueId as string | undefined,
-        lessonDate: new Date(data.lessonDate as string),
-        startTime: data.startTime as string,
-        endTime: data.endTime as string,
-        maxParticipants: data.maxParticipants as number,
-        fee: (data.fee as number) || 0,
-        levelMin: (data.levelMin as number) || 1,
-        levelMax: (data.levelMax as number) || 5,
-        coachName: data.coachName as string | undefined,
-        coachBio: data.coachBio as string | undefined,
-        imageUrls: (data.imageUrls as string[]) || [],
+        sportType: data.sportType,
+        type: data.type,
+        title: data.title,
+        description: data.description,
+        venueName: data.venueName,
+        venueId: data.venueId,
+        lessonDate: new Date(data.lessonDate),
+        startTime: data.startTime,
+        endTime: data.endTime,
+        maxParticipants: data.maxParticipants,
+        fee: data.fee ?? 0,
+        levelMin: data.levelMin ?? 1,
+        levelMax: data.levelMax ?? 5,
+        coachName: data.coachName,
+        coachBio: data.coachBio,
+        imageUrls: data.imageUrls ?? [],
+        isRecurring: data.isRecurring ?? false,
+        recurringDays: data.recurringDays ?? [],
+        recurringUntil: data.recurringUntil ? new Date(data.recurringUntil) : undefined,
       },
     });
   }

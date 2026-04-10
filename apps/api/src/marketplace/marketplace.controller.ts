@@ -27,7 +27,11 @@ export class MarketplaceController {
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.marketplaceService.findListings({ sportType, category, condition, cursor, limit: limit ? parseInt(limit, 10) : undefined });
+    const parsed = limit ? parseInt(limit, 10) : undefined;
+    const safeLimit = parsed !== undefined
+      ? Math.min(Math.max(1, Number.isNaN(parsed) ? 20 : parsed), 100)
+      : undefined;
+    return this.marketplaceService.findListings({ sportType, category, condition, cursor, limit: safeLimit });
   }
 
   @Post('listings')

@@ -4,6 +4,7 @@ import { IsString, IsNotEmpty } from 'class-validator';
 import { LessonsService } from './lessons.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateLessonDto } from './dto/create-lesson.dto';
 
 class ConfirmTicketPaymentDto {
   @ApiProperty({ description: '토스페이먼츠 paymentKey' })
@@ -25,7 +26,11 @@ export class LessonsController {
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.lessonsService.findAll({ sportType, type, cursor, limit: limit ? parseInt(limit, 10) : undefined });
+    const parsed = limit ? parseInt(limit, 10) : undefined;
+    const safeLimit = parsed !== undefined
+      ? Math.min(Math.max(1, Number.isNaN(parsed) ? 20 : parsed), 100)
+      : undefined;
+    return this.lessonsService.findAll({ sportType, type, cursor, limit: safeLimit });
   }
 
   @Get(':id')
@@ -38,7 +43,7 @@ export class LessonsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '강좌 생성' })
-  async create(@CurrentUser('id') userId: string, @Body() body: Record<string, unknown>) {
+  async create(@CurrentUser('id') userId: string, @Body() body: CreateLessonDto) {
     return this.lessonsService.create(userId, body);
   }
 

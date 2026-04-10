@@ -295,30 +295,30 @@ export class ChatService {
 
   /**
    * Returns the total number of unread messages across all chat rooms the user participates in.
-   * A message is unread if its createdAt is after the participant's lastReadAt for that room.
-   * Rooms where lastReadAt is null treat all messages as unread.
+   * A message is unread if:
+   *   - its createdAt is after the participant's lastReadAt (or lastReadAt is null = all unread)
+   *   - it was not sent by the user themselves
+   *   - it has not been soft-deleted
+   *
+   * Uses a single aggregation query instead of N per-room COUNT calls.
    */
   async getUnreadCount(userId: string): Promise<number> {
-    const participants = await this.prisma.chatRoomParticipant.findMany({
-      where: { userId },
-      select: { roomId: true, lastReadAt: true },
-    });
+    const rows = await this.prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COALESCE(SUM(unread_per_room), 0)::bigint AS total
+      FROM (
+        SELECT COUNT(*) AS unread_per_room
+        FROM chat_messages cm
+        INNER JOIN chat_room_participants cp
+          ON cp.room_id = cm.room_id
+          AND cp.user_id = ${userId}
+        WHERE cm.sender_id != ${userId}
+          AND cm.deleted_at IS NULL
+          AND (cp.last_read_at IS NULL OR cm.created_at > cp.last_read_at)
+        GROUP BY cm.room_id
+      ) sub
+    `;
 
-    if (participants.length === 0) return 0;
-
-    const counts = await Promise.all(
-      participants.map((p) =>
-        this.prisma.chatMessage.count({
-          where: {
-            roomId: p.roomId,
-            deletedAt: null,
-            ...(p.lastReadAt ? { createdAt: { gt: p.lastReadAt } } : {}),
-          },
-        }),
-      ),
-    );
-
-    return counts.reduce((sum, c) => sum + c, 0);
+    return Number(rows[0]?.total ?? 0n);
   }
 
   /** Asserts that userId is a participant of roomId. Throws 403 CHAT_FORBIDDEN otherwise. */

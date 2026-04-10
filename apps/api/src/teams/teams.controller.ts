@@ -17,6 +17,7 @@ import { TeamMembershipService } from './team-membership.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto, InviteMemberDto } from './dto/membership.dto';
+import { CreateTeamDto } from './dto/create-team.dto';
 import { TeamRole } from '@prisma/client';
 
 @ApiTags('팀/클럽')
@@ -36,7 +37,11 @@ export class TeamsController {
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.teamsService.findAll({ sportType, city, recruiting, cursor, limit: limit ? parseInt(limit, 10) : undefined });
+    const parsed = limit ? parseInt(limit, 10) : undefined;
+    const safeLimit = parsed !== undefined
+      ? Math.min(Math.max(1, Number.isNaN(parsed) ? 20 : parsed), 100)
+      : undefined;
+    return this.teamsService.findAll({ sportType, city, recruiting, cursor, limit: safeLimit });
   }
 
   @Get('me')
@@ -57,7 +62,7 @@ export class TeamsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '팀 생성' })
-  async create(@CurrentUser('id') userId: string, @Body() body: Record<string, unknown>) {
+  async create(@CurrentUser('id') userId: string, @Body() body: CreateTeamDto) {
     return this.teamsService.create(userId, body);
   }
 

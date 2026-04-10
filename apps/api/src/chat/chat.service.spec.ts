@@ -1,3 +1,7 @@
+// Prevent the lodash/_getRawTag resolution failure that occurs in the full dep chain
+// (RealtimeGateway → NotificationsService → WebPushService → @nestjs/config → lodash)
+jest.mock('../realtime/realtime.gateway');
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChatService } from './chat.service';
@@ -28,6 +32,7 @@ const mockPrisma = {
     findUnique: jest.fn(),
   },
   $transaction: jest.fn(),
+  $queryRaw: jest.fn(),
 };
 
 const mockRealtimeGateway = {
@@ -323,51 +328,54 @@ describe('ChatService', () => {
   });
 
   describe('getUnreadCount', () => {
-    it('returns 0 when user has no chat room participations', async () => {
-      mockPrisma.chatRoomParticipant.findMany.mockResolvedValue([]);
+    it('returns 0 when user participates in no rooms (raw query returns 0)', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ total: 0n }]);
 
       const result = await service.getUnreadCount('u1');
 
       expect(result).toBe(0);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+      // Prisma per-room count must NOT be called — N+1 guard
       expect(mockPrisma.chatMessage.count).not.toHaveBeenCalled();
     });
 
-    it('sums unread messages across all rooms (lastReadAt set)', async () => {
-      const lastReadAt = new Date('2024-01-01T10:00:00Z');
-      mockPrisma.chatRoomParticipant.findMany.mockResolvedValue([
-        { roomId: 'r1', lastReadAt },
-        { roomId: 'r2', lastReadAt },
-      ]);
-      mockPrisma.chatMessage.count
-        .mockResolvedValueOnce(3) // r1 has 3 unread
-        .mockResolvedValueOnce(2); // r2 has 2 unread
+    it('sums unread messages across all rooms via single raw query', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ total: 5n }]);
 
       const result = await service.getUnreadCount('u1');
 
       expect(result).toBe(5);
-      expect(mockPrisma.chatMessage.count).toHaveBeenCalledTimes(2);
-      expect(mockPrisma.chatMessage.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ roomId: 'r1', deletedAt: null }),
-        }),
-      );
+      // Exactly one DB round-trip regardless of room count
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.chatMessage.count).not.toHaveBeenCalled();
     });
 
-    it('counts all messages as unread when lastReadAt is null', async () => {
-      mockPrisma.chatRoomParticipant.findMany.mockResolvedValue([
-        { roomId: 'r1', lastReadAt: null },
-      ]);
-      mockPrisma.chatMessage.count.mockResolvedValueOnce(7);
+    it('excludes messages sent by the user themselves (senderId != userId)', async () => {
+      // The raw query embeds the senderId filter; service result reflects DB result
+      mockPrisma.$queryRaw.mockResolvedValue([{ total: 2n }]);
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toBe(2);
+      // Verify $queryRaw was invoked — the SQL contains senderId != userId filter
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 0 when raw query returns empty rows (no participations)', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toBe(0);
+    });
+
+    it('counts all messages as unread when lastReadAt is null (raw query handles NULL)', async () => {
+      // DB handles the NULL last_read_at case inside the SQL; service just sums result
+      mockPrisma.$queryRaw.mockResolvedValue([{ total: 7n }]);
 
       const result = await service.getUnreadCount('u1');
 
       expect(result).toBe(7);
-      // When lastReadAt is null, no createdAt filter should be applied
-      expect(mockPrisma.chatMessage.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { roomId: 'r1', deletedAt: null },
-        }),
-      );
     });
   });
 

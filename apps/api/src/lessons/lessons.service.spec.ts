@@ -4,6 +4,7 @@ import { LessonsService } from './lessons.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
+import { SportType, LessonType } from '@prisma/client';
 
 const lessonsSettlementsMock = {
   recordSettlement: jest.fn().mockResolvedValue(undefined),
@@ -227,8 +228,8 @@ describe('LessonsService', () => {
 
   describe('create', () => {
     const createData = {
-      sportType: 'FUTSAL',
-      type: 'group',
+      sportType: SportType.futsal,
+      type: LessonType.group_lesson,
       title: '풋살 기초 레슨',
       description: '초보자를 위한 레슨',
       venueName: '강남 풋살장',
@@ -261,8 +262,8 @@ describe('LessonsService', () => {
         data: expect.objectContaining({
           hostId: 'user-1',
           title: '풋살 기초 레슨',
-          sportType: 'FUTSAL',
-          type: 'group',
+          sportType: SportType.futsal,
+          type: LessonType.group_lesson,
           maxParticipants: 10,
           fee: 30000,
           coachName: '김코치',
@@ -275,8 +276,8 @@ describe('LessonsService', () => {
 
     it('should use default values for optional fields', async () => {
       const minimalData = {
-        sportType: 'BASKETBALL',
-        type: 'clinic',
+        sportType: SportType.basketball,
+        type: LessonType.clinic,
         title: '농구 클리닉',
         lessonDate: '2026-04-15',
         startTime: '10:00',

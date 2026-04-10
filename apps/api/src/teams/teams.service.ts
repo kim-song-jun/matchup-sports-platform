@@ -6,9 +6,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma, TeamRole, InvitationStatus } from '@prisma/client';
+import { Prisma, TeamRole, InvitationStatus, SportType } from '@prisma/client';
 import { TeamMembershipService } from './team-membership.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CreateTeamDto } from './dto/create-team.dto';
 
 // Expiration duration for team invitations in days
 const INVITATION_EXPIRY_DAYS = 7;
@@ -34,9 +35,9 @@ export class TeamsService {
   }
 
   async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string; limit?: number }) {
-    const limit = Math.min(filter.limit ?? 20, 100);
-    const where: Record<string, unknown> = {};
-    if (filter.sportType) where.sportType = filter.sportType;
+    const limit = Math.min(Math.max(1, filter.limit ?? 20), 100);
+    const where: Prisma.SportTeamWhereInput = {};
+    if (filter.sportType) where.sportType = filter.sportType as SportType;
     if (filter.city) where.city = filter.city;
     if (filter.recruiting === 'true') where.isRecruiting = true;
     if (filter.ownerId) where.ownerId = filter.ownerId;
@@ -81,23 +82,27 @@ export class TeamsService {
     return team;
   }
 
-  async create(ownerId: string, data: Record<string, unknown>) {
+  async create(ownerId: string, data: CreateTeamDto) {
     return this.prisma.$transaction(async (tx) => {
       const team = await tx.sportTeam.create({
         data: {
           ownerId,
-          name: data.name as string,
-          sportType: data.sportType as never,
-          description: data.description as string | undefined,
-          logoUrl: data.logoUrl as string | undefined,
-          coverImageUrl: data.coverImageUrl as string | undefined,
-          photos: (data.photos as string[]) || [],
-          city: data.city as string | undefined,
-          district: data.district as string | undefined,
-          memberCount: (data.memberCount as number) || 1,
-          level: (data.level as number) || 3,
-          isRecruiting: data.isRecruiting !== false,
-          contactInfo: data.contactInfo as string | undefined,
+          name: data.name,
+          sportType: data.sportType,
+          description: data.description,
+          logoUrl: data.logoUrl,
+          coverImageUrl: data.coverImageUrl,
+          photos: data.photos ?? [],
+          city: data.city,
+          district: data.district,
+          level: data.level ?? 3,
+          isRecruiting: data.isRecruiting ?? true,
+          contactInfo: data.contactInfo,
+          instagramUrl: data.instagramUrl,
+          youtubeUrl: data.youtubeUrl,
+          shortsUrl: data.shortsUrl,
+          kakaoOpenChat: data.kakaoOpenChat,
+          websiteUrl: data.websiteUrl,
         },
       });
 

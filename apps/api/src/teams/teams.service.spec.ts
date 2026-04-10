@@ -4,7 +4,7 @@ import { TeamsService } from './teams.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from './team-membership.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TeamRole, InvitationStatus } from '@prisma/client';
+import { TeamRole, InvitationStatus, SportType } from '@prisma/client';
 
 describe('TeamsService', () => {
   let service: TeamsService;
@@ -232,11 +232,10 @@ describe('TeamsService', () => {
   describe('create', () => {
     const createData = {
       name: 'FC 새팀',
-      sportType: 'FUTSAL',
+      sportType: SportType.futsal,
       description: '즐겁게 운동해요',
       city: '서울',
       district: '강남구',
-      memberCount: 5,
       level: 3,
       isRecruiting: true,
       contactInfo: '010-1234-5678',
@@ -264,11 +263,10 @@ describe('TeamsService', () => {
         data: expect.objectContaining({
           ownerId: 'user-1',
           name: 'FC 새팀',
-          sportType: 'FUTSAL',
+          sportType: SportType.futsal,
           description: '즐겁게 운동해요',
           city: '서울',
           district: '강남구',
-          memberCount: 5,
           level: 3,
           isRecruiting: true,
           contactInfo: '010-1234-5678',
@@ -292,7 +290,7 @@ describe('TeamsService', () => {
     it('should use default values for optional fields', async () => {
       const minimalData = {
         name: '최소 팀',
-        sportType: 'BASKETBALL',
+        sportType: SportType.basketball,
       };
 
       mockTx.sportTeam.create.mockResolvedValue({
@@ -307,7 +305,6 @@ describe('TeamsService', () => {
         data: expect.objectContaining({
           ownerId: 'user-1',
           name: '최소 팀',
-          memberCount: 1,
           level: 3,
           isRecruiting: true,
         }),

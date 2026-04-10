@@ -131,11 +131,11 @@ Choose one, then standardize:
 
 **Likely root cause**
 - host-side root `node_modules` / playwright package graph drifted during dependency reinstall attempts
-- Node version during execution is `v21.7.3`, while repo expects Node 20+
+- Node version during execution is `v21.7.3`, while repo expects Node 22+
 
 **Fix direction**
 1. Reinstall host dependencies under the repo's supported Node version
-2. Enforce Node 20 in local dev and CI
+2. Enforce Node 22 in local dev and CI
 3. Add preflight check in E2E docs/scripts that prints active Node version
 
 ---

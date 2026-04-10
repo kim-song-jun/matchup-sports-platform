@@ -878,8 +878,8 @@ GPS 위치 확인        → 구장 반경 500m 이내 확인
 
 | 서비스 | 이미지 | 포트 | 역할 |
 |--------|--------|------|------|
-| `web` | node:20-alpine | 3000 | Next.js 프론트엔드 |
-| `api` | node:20-alpine | 8000 | NestJS 백엔드 |
+| `web` | node:22-alpine | 3000 | Next.js 프론트엔드 |
+| `api` | node:22-alpine | 8000 | NestJS 백엔드 |
 | `db` | postgres:16-alpine | 5432 | PostgreSQL 데이터베이스 |
 | `redis` | redis:7-alpine | 6379 | 세션/캐시 |
 

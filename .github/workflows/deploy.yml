@@ -125,14 +125,40 @@ jobs:
         env:
           RESET_DB: ${{ inputs.reset_db }}
           RUN_SEED: ${{ inputs.run_seed }}
+          TOSS_CLIENT_KEY_SECRET: ${{ secrets.TOSS_CLIENT_KEY }}
+          TOSS_SECRET_KEY_SECRET: ${{ secrets.TOSS_SECRET_KEY }}
+          TOSS_WEBHOOK_SECRET_SECRET: ${{ secrets.TOSS_WEBHOOK_SECRET }}
         run: |
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' bash -se" <<'EOF'
+          TOSS_CLIENT_KEY_B64="$(printf '%s' "${TOSS_CLIENT_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          TOSS_SECRET_KEY_B64="$(printf '%s' "${TOSS_SECRET_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          TOSS_WEBHOOK_SECRET_B64="$(printf '%s' "${TOSS_WEBHOOK_SECRET_SECRET:-}" | base64 | tr -d '\n')"
+
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' bash -se" <<'EOF'
           set -euo pipefail
 
           RESET_DB="${RESET_DB:-false}"
           RUN_SEED="${RUN_SEED:-false}"
 
           cd ~/matchup
+
+          sync_env_from_github_secret() {
+            local key="$1"
+            local b64_value="$2"
+            local decoded_value=""
+            local tmp_env
+
+            if [ -n "$b64_value" ]; then
+              decoded_value=$(printf '%s' "$b64_value" | base64 -d)
+            fi
+
+            tmp_env=$(mktemp)
+            awk -v key="${key}=" 'index($0, key) != 1' deploy/.env > "$tmp_env"
+            {
+              cat "$tmp_env"
+              printf '%s=%s\n' "$key" "$decoded_value"
+            } > deploy/.env
+            rm -f "$tmp_env"
+          }
 
           if sudo docker compose version >/dev/null 2>&1; then
             COMPOSE="sudo docker compose"
@@ -142,6 +168,36 @@ jobs:
             echo "Docker Compose is not installed on the EC2 host"
             exit 1
           fi
+
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo yum install -y jq 2>/dev/null || sudo apt-get install -y jq 2>/dev/null || {
+              echo "[ERROR] jq is required for deploy health checks"
+              exit 1
+            }
+          fi
+
+          if [ ! -f deploy/.env ]; then
+            echo "[ERROR] Missing deploy/.env on the EC2 host"
+            exit 1
+          fi
+
+          sync_env_from_github_secret "TOSS_CLIENT_KEY" "${TOSS_CLIENT_KEY_B64:-}"
+          sync_env_from_github_secret "TOSS_SECRET_KEY" "${TOSS_SECRET_KEY_B64:-}"
+          sync_env_from_github_secret "TOSS_WEBHOOK_SECRET" "${TOSS_WEBHOOK_SECRET_B64:-}"
+
+          set -a
+          . deploy/.env
+          set +a
+
+          required_env_vars=(DB_PASSWORD JWT_SECRET)
+          for required_env in "${required_env_vars[@]}"; do
+            if [ -z "${!required_env:-}" ]; then
+              echo "[ERROR] Missing required deploy env: ${required_env}"
+              exit 1
+            fi
+          done
+
+          WEB_INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}"
 
           # ── Pre-build disk cleanup ────────────────────────────────────────
           # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
@@ -157,7 +213,12 @@ jobs:
           df -h / | tail -1
 
           sudo docker build -f deploy/Dockerfile.api -t matchup-api .
-          sudo docker build -f deploy/Dockerfile.web -t matchup-web .
+          sudo docker build \
+            -f deploy/Dockerfile.web \
+            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+            --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
+            --build-arg INTERNAL_API_ORIGIN="${WEB_INTERNAL_API_ORIGIN}" \
+            -t matchup-web .
 
           cd deploy
 
@@ -193,28 +254,35 @@ jobs:
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
 
-          # Wait for matchup_api to become healthy (node process must be up).
-          echo "[INFO] Waiting for matchup_api to start..."
-          for i in $(seq 1 30); do
-            if sudo docker exec matchup_api sh -c "pidof node >/dev/null 2>&1"; then
-              echo "[INFO] matchup_api is running (attempt $i)"
+          echo "[INFO] Waiting for matchup_api health..."
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:8100/api/v1/health | \
+                jq -e '.data.checks.db == true and .data.checks.redis == true' >/dev/null 2>&1; then
+              echo "[INFO] matchup_api is healthy (attempt $i)"
               break
+            fi
+            if [ "$i" -eq 45 ]; then
+              echo "[ERROR] matchup_api failed health check"
+              sudo docker logs matchup_api --tail 120 || true
+              exit 1
             fi
             sleep 2
           done
 
-          # Wait for matchup_web to become healthy (Next.js takes longer to start)
-          echo "[INFO] Waiting for matchup_web to start..."
+          echo "[INFO] Waiting for matchup_web routing..."
           for i in $(seq 1 45); do
-            if sudo docker exec matchup_web wget -qO /dev/null http://localhost:3000 2>/dev/null; then
-              echo "[INFO] matchup_web is running (attempt $i)"
+            if curl -fsS http://localhost:3000/api/v1/health | \
+                jq -e '.data.checks.db == true and .data.checks.redis == true' >/dev/null 2>&1 && \
+               curl -fsS http://localhost:3000/landing >/dev/null 2>&1; then
+              echo "[INFO] matchup_web routing is healthy (attempt $i)"
               break
             fi
             if [ "$i" -eq 45 ]; then
-              echo "[WARN] matchup_web startup timeout — continuing"
-            else
-              sleep 2
+              echo "[ERROR] matchup_web failed routing check"
+              sudo docker logs matchup_web --tail 120 || true
+              exit 1
             fi
+            sleep 2
           done
 
           if [ "${RESET_DB}" = "true" ]; then
@@ -234,6 +302,7 @@ jobs:
             echo "::warning::seed-images sync failed — image data may be stale. Re-run manually: docker exec matchup_api npx ts-node prisma/seed-images.ts"
           fi
 
+          sudo docker exec matchup_nginx nginx -t
           sudo docker exec matchup_nginx nginx -s reload
 
           # ── Post-deploy cleanup ───────────────────────────────────────────
@@ -247,7 +316,9 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -sf http://localhost > /dev/null 2>&1 && \
+            if ssh ec2 'curl -fsS http://localhost:8100/api/v1/health | \
+                        jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null 2>&1 && \
+                        curl -fsS http://localhost/landing > /dev/null 2>&1 && \
                         curl -fsS http://localhost/api/v1/health | \
                         jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null 2>&1'; then
               echo "Deploy OK"

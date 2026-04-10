@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useConfirmPayment, usePreparePayment } from '@/hooks/use-api';
+import { getCheckoutPaymentMode } from '@/lib/payment-ui';
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const paymentMethods = [
@@ -31,6 +32,8 @@ export default function CheckoutPage() {
   const { toast } = useToast();
   const preparePayment = usePreparePayment();
   const confirmPayment = useConfirmPayment();
+  const paymentMode = getCheckoutPaymentMode();
+  const isMockMode = paymentMode.state === 'mock';
 
   const [selectedMethod, setSelectedMethod] = useState<(typeof paymentMethods)[number]['id']>('card');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -76,7 +79,7 @@ export default function CheckoutPage() {
         paymentKey: `dev-${Date.now()}`,
       });
 
-      toast('success', '결제가 완료되었습니다');
+      toast('success', isMockMode ? '결제 시뮬레이션이 완료되었습니다' : '결제가 완료되었습니다');
       router.push(`/payments/${payment.id}`);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -94,12 +97,16 @@ export default function CheckoutPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제하기</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h1>
       </header>
 
       <div className="hidden @3xl:block mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제하기</h2>
-        <p className="text-base text-gray-500 mt-1">실제 결제 컨텍스트가 있는 주문만 처리됩니다</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
+        <p className="text-base text-gray-500 mt-1">
+          {isMockMode
+            ? '현재 환경에서는 결제 시뮬레이션만 기록되고 실제 청구는 발생하지 않습니다'
+            : '실제 결제 컨텍스트가 있는 주문만 처리됩니다'}
+        </p>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
@@ -109,6 +116,15 @@ export default function CheckoutPage() {
             label="지원 범위"
             title="현재는 매치 참가 결제만 처리할 수 있어요"
             description="강좌/장터 구매처럼 참가자 컨텍스트가 없는 결제는 아직 연결되지 않았습니다. 가짜 성공 처리 없이 이 화면에서 중단됩니다."
+          />
+        ) : null}
+
+        {isMatchCheckout && isMockMode ? (
+          <TrustSignalBanner
+            tone={paymentMode.tone}
+            label={paymentMode.label}
+            title={paymentMode.title}
+            description={paymentMode.description}
           />
         ) : null}
 
@@ -196,7 +212,9 @@ export default function CheckoutPage() {
           </button>
           <div className="mt-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 p-3.5">
             <p className="text-xs text-gray-500 leading-relaxed">
-              경기 시작 24시간 전: 전액 환불 / 1~24시간 전: 50% 환불 / 1시간 이내: 환불 불가.
+              {isMockMode
+                ? '현재는 테스트 결제로 동작하므로 환불도 시뮬레이션 상태 변경으로만 반영됩니다.'
+                : '경기 시작 24시간 전: 전액 환불 / 1~24시간 전: 50% 환불 / 1시간 이내: 환불 불가.'}
             </p>
           </div>
         </div>
@@ -219,10 +237,10 @@ export default function CheckoutPage() {
           {isProcessing ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              결제 처리중...
+              {isMockMode ? '테스트 결제 처리중...' : '결제 처리중...'}
             </>
           ) : (
-            `${formatAmount(Number.isFinite(amount) ? amount : 0)} 결제하기`
+            `${formatAmount(Number.isFinite(amount) ? amount : 0)} ${isMockMode ? '테스트 결제하기' : '결제하기'}`
           )}
         </button>
       </div>

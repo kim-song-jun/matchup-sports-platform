@@ -37,6 +37,8 @@ Your scope: Docker, Compose, deploy scripts, Makefile, CI/CD, reverse proxy, hea
 - `web` startup gated on API healthcheck (not `service_started`)
 - Production EC2: `ec2-user`, may have standalone `docker-compose` instead of `docker compose` plugin
 - Deploy automation: distinguish destructive full seed from idempotent backfill. Production defaults to safe backfill.
+- Production deploy must preflight only truly required env before starting containers. Toss payment secrets stay optional, and GitHub repo secrets must converge EC2 `deploy/.env` without leaving stale host values behind.
+- Production Next standalone rewrites and server-side fetches must target `http://api:8100`, never the dev fallback `http://localhost:8111`.
 - Dev runtime: glibc-based Node image, `nocopy` bootstrap for node_modules sync
 - Production: native `bcrypt`; dev: allow `bcryptjs` override
 - Secrets in `.env` files only — never hardcode in Compose or code

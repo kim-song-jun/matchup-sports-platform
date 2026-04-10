@@ -7,10 +7,12 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'tr
 const isCapacitorBuild = process.env.CAPACITOR_BUILD === 'true';
 
 const isProd = process.env.NODE_ENV === 'production';
+const defaultInternalApiOrigin = isProd ? 'http://api:8100' : 'http://localhost:8111';
+const publicApiOrigin = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '');
 const internalApiOrigin =
-  process.env.INTERNAL_API_ORIGIN
-  || process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '')
-  || 'http://localhost:8111';
+  process.env.INTERNAL_API_ORIGIN ||
+  (isProd ? defaultInternalApiOrigin : publicApiOrigin) ||
+  defaultInternalApiOrigin;
 
 const nextConfig: NextConfig = {
   // 프로덕션: standalone, Capacitor: export

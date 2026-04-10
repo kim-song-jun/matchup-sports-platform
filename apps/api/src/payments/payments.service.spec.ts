@@ -115,10 +115,10 @@ async function buildRealModeService(): Promise<PaymentsService> {
 }
 
 // ---------------------------------------------------------------------------
-// Production guard suite
+// Production fallback suite
 // ---------------------------------------------------------------------------
 
-describe('PaymentsService — onModuleInit production guard', () => {
+describe('PaymentsService — production fallback without Toss key', () => {
   const originalNodeEnv = process.env.NODE_ENV;
 
   afterEach(() => {
@@ -128,7 +128,7 @@ describe('PaymentsService — onModuleInit production guard', () => {
     jest.clearAllMocks();
   });
 
-  async function buildService(): Promise<{ init: () => Promise<unknown> }> {
+  async function buildService(): Promise<TestingModule> {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
@@ -156,14 +156,12 @@ describe('PaymentsService — onModuleInit production guard', () => {
     await expect(module.init()).resolves.not.toThrow();
   });
 
-  it('throws on module init in production when TOSS_SECRET_KEY is missing', async () => {
+  it('does not throw in production when TOSS_SECRET_KEY is missing', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.TOSS_SECRET_KEY;
 
     const module = await buildService();
-    await expect(module.init()).rejects.toThrow(
-      /TOSS_SECRET_KEY is not set in production/,
-    );
+    await expect(module.init()).resolves.not.toThrow();
   });
 
   it('does not throw on module init in production when TOSS_SECRET_KEY is present', async () => {
@@ -172,6 +170,79 @@ describe('PaymentsService — onModuleInit production guard', () => {
 
     const module = await buildService();
     await expect(module.init()).resolves.not.toThrow();
+  });
+
+  it('uses mock confirm path in production when TOSS_SECRET_KEY is missing', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.TOSS_SECRET_KEY;
+
+    const module = await buildService();
+    const service = module.get<PaymentsService>(PaymentsService);
+
+    prismaMock.payment.findUnique.mockResolvedValue(mockPayment({ status: 'pending', amount: 15000 }));
+    prismaMock.payment.update.mockResolvedValue(
+      mockPayment({ status: 'completed', paymentKey: 'pk-mock', paidAt: new Date(), pgProvider: 'mock' }),
+    );
+    prismaMock.matchParticipant.update.mockResolvedValue({});
+    notificationsServiceMock.create.mockResolvedValue(undefined);
+
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    const result = await service.confirm({
+      orderId: 'MU-111',
+      paymentKey: 'pk-mock',
+      amount: 15000,
+    });
+
+    expect(result.pgProvider).toBe('mock');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses mock refund path for mock payments in production when TOSS_SECRET_KEY is missing', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.TOSS_SECRET_KEY;
+
+    const module = await buildService();
+    const service = module.get<PaymentsService>(PaymentsService);
+
+    prismaMock.payment.findUnique.mockResolvedValue(
+      mockPayment({ status: 'completed', pgProvider: 'mock', paymentKey: 'pk-mock' }),
+    );
+    prismaMock.payment.update.mockResolvedValue(
+      mockPayment({ status: 'refunded', pgProvider: 'mock', refundAmount: 15000, refundedAt: new Date() }),
+    );
+    prismaMock.matchParticipant.update.mockResolvedValue({});
+    notificationsServiceMock.create.mockResolvedValue(undefined);
+
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    const result = await service.refund('user-1', 'pay-1', { reason: '테스트 환불' });
+
+    expect(result.status).toBe('refunded');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects refund for real payments in production when TOSS_SECRET_KEY is missing', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.TOSS_SECRET_KEY;
+
+    const module = await buildService();
+    const service = module.get<PaymentsService>(PaymentsService);
+
+    prismaMock.payment.findUnique.mockResolvedValue(
+      mockPayment({ status: 'completed', pgProvider: 'toss', paymentKey: 'pk-real' }),
+    );
+
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(service.refund('user-1', 'pay-1', { reason: '테스트 환불' })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prismaMock.payment.update).not.toHaveBeenCalled();
   });
 });
 
@@ -310,9 +381,10 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
 
   describe('refund — mock mode', () => {
     it('marks payment as refunded and sets refundAmount', async () => {
-      const payment = mockPayment({ status: 'completed', amount: 15000 });
+      const payment = mockPayment({ status: 'completed', amount: 15000, pgProvider: 'mock' });
       const refunded = mockPayment({
         status: 'refunded',
+        pgProvider: 'mock',
         refundAmount: 15000,
         refundReason: 'event cancelled',
         refundedAt: new Date(),
@@ -338,6 +410,15 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
     it('throws BadRequestException when payment is not completed', async () => {
       prismaMock.payment.findUnique.mockResolvedValue(mockPayment({ status: 'pending' }));
       await expect(service.refund('user-1', 'pay-1', {})).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects refund when the completed payment is not a mock payment', async () => {
+      prismaMock.payment.findUnique.mockResolvedValue(
+        mockPayment({ status: 'completed', pgProvider: 'toss', paymentKey: 'pk-real' }),
+      );
+
+      await expect(service.refund('user-1', 'pay-1', { reason: '테스트' })).rejects.toThrow(BadRequestException);
+      expect(prismaMock.payment.update).not.toHaveBeenCalled();
     });
   });
 

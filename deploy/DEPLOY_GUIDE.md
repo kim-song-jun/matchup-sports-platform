@@ -54,10 +54,14 @@ ssh -i matchup-key.pem ec2-user@<EC2_퍼블릭_IP>
 curl -sL https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/main/deploy/setup-ec2.sh | bash
 ```
 
+> `setup-ec2.sh`는 `TOSS_*` 값을 주면 `deploy/.env`에 반영합니다. 값을 비워 둬도 배포는 계속되며, 결제 기능만 mock mode로 동작합니다.
+
 이 스크립트가 자동으로 처리하는 것:
 - Docker + Docker Compose 설치
+- `jq` 설치 (healthcheck parser)
 - Git 설치 + 프로젝트 클론
 - DB 비밀번호, JWT Secret 랜덤 생성
+- 선택적 `TOSS_*` 값 `deploy/.env` 반영
 - Docker 이미지 빌드 (~5-10분)
 - PostgreSQL + Redis 시작
 - DB 스키마 적용 (Prisma)
@@ -87,6 +91,9 @@ GitHub 레포 → Settings → Secrets and variables → Actions → "New reposi
 | `EC2_HOST` | EC2 퍼블릭 IP | `3.35.xxx.xxx` |
 | `EC2_USER` | SSH 사용자명 | `ec2-user` |
 | `EC2_SSH_KEY` | SSH 프라이빗 키 전체 내용 | `-----BEGIN RSA...` |
+| `TOSS_SECRET_KEY` | 운영 결제 서버 시크릿, 없으면 mock mode | `live_sk_...` |
+| `TOSS_CLIENT_KEY` | 운영 결제 클라이언트 키, 없으면 mock widget | `live_ck_...` |
+| `TOSS_WEBHOOK_SECRET` | 운영 결제 webhook 서명 시크릿 | `whsec_...` |
 
 ### SSH 키 등록 방법
 
@@ -112,12 +119,17 @@ GitHub Actions 트리거
   ↓ (빌드 성공 시)
 4. SSH로 EC2 접속
 5. rsync로 `~/matchup` 작업 트리 동기화 (`deploy/.env` 보호)
-6. API / Web Docker 이미지 빌드
-7. compose 스택 재기동 (`docker compose` 또는 `docker-compose`)
-8. `prisma migrate deploy` 실행
-9. `prisma/seed-images.ts`로 DB-backed 이미지 보강
-10. 선택적 full seed 실행
-11. localhost 헬스체크
+6. GitHub repo secrets의 `TOSS_*` 값을 EC2 `deploy/.env`의 source of truth로 먼저 동기화
+7. `deploy/.env` 필수 값(`DB_PASSWORD`, `JWT_SECRET`) preflight 검증
+8. API / Web Docker 이미지 빌드
+9. Web 이미지는 `deploy/Dockerfile.web`로 직접 빌드하고, browser API base를 `/api/v1`, internal rewrite origin을 `http://api:8100`으로 주입
+10. postgres / redis 선기동
+11. `prisma migrate deploy` 실행
+12. compose 스택 재기동 (`docker compose` 또는 `docker-compose`)
+13. Next standalone `web` runtime은 `HOSTNAME=0.0.0.0`로 bind를 고정해 localhost healthcheck와 nginx dependency gate를 통과시킴
+14. API health + Web internal rewrite + Nginx localhost health 검증
+15. `prisma/seed-images.ts`로 DB-backed 이미지 보강
+16. 선택적 full seed 실행
   ↓
 🎉 배포 완료
 ```
@@ -139,8 +151,8 @@ DB_NAME=matchup
 # JWT
 JWT_SECRET=<자동생성된_48자_시크릿>
 
-# API URL (EC2 IP로 자동 설정됨)
-API_URL=http://<EC2_IP>/api/v1
+# Internal API origin used when Next.js builds server-side rewrites
+INTERNAL_API_ORIGIN=http://api:8100
 
 # OAuth (서비스 연동 시 수동 설정)
 KAKAO_CLIENT_ID=
@@ -148,10 +160,15 @@ KAKAO_CLIENT_SECRET=
 NAVER_CLIENT_ID=
 NAVER_CLIENT_SECRET=
 
-# Payment (서비스 연동 시 수동 설정)
+# Payment (leave blank to keep payments in mock mode)
 TOSS_CLIENT_KEY=
 TOSS_SECRET_KEY=
+TOSS_WEBHOOK_SECRET=
 ```
+
+`TOSS_SECRET_KEY`와 `TOSS_CLIENT_KEY`가 비어 있으면 결제 기능은 mock mode로 남고, 애플리케이션 배포 자체는 계속된다. GitHub Actions deploy는 `TOSS_*` repo secret을 EC2 `deploy/.env`의 source of truth로 취급하므로, secret이 비어 있거나 없으면 해당 runtime 값도 빈 값으로 동기화된다.
+
+`HOSTNAME`은 운영 compose에서 `0.0.0.0`으로 고정한다. Next standalone가 container IP에만 bind하면 앱은 떠 있어도 `localhost` healthcheck가 실패해 `web`/`nginx` dependency gate가 깨질 수 있다.
 
 ---
 
@@ -216,6 +233,7 @@ docker logs matchup_nginx -f --tail 50
 docker stats --no-stream
 
 # 헬스체크
+curl http://localhost:8100/api/v1/health
 curl http://localhost/api/v1/health
 ```
 
@@ -245,17 +263,31 @@ rsync -avz --delete \
 ssh -i matchup-key.pem ec2-user@<EC2_IP> '
   set -e
   cd ~/matchup
+  set -a
+  . deploy/.env
+  set +a
   sudo docker build -f deploy/Dockerfile.api -t matchup-api .
-  sudo docker build -f deploy/Dockerfile.web -t matchup-web .
+  sudo docker build \
+    -f deploy/Dockerfile.web \
+    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+    --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
+    --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
+    -t matchup-web .
+  # docker-compose.prod.yml is image-only for web/api, so use direct docker build
+  # before compose up when you need a fresh production image.
   cd deploy
   if sudo docker compose version >/dev/null 2>&1; then
     COMPOSE="sudo docker compose"
   else
     COMPOSE="sudo docker-compose"
   fi
+  ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis
+  ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
+    run --rm --no-deps -T api npx prisma migrate deploy
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
-  sudo docker exec matchup_api npx prisma migrate deploy
+  curl -fsS http://localhost:8100/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null
+  curl -fsS http://localhost/landing > /dev/null
   sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
 '
 ```

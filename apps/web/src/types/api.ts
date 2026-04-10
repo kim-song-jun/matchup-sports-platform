@@ -87,8 +87,8 @@ export interface Venue {
   rating: number;
   reviewCount: number;
   imageUrls: string[];
-  reviews?: Array<{ id: string; rating: number; comment: string | null; createdAt: string; user?: { id: string; nickname: string; profileImageUrl: string | null } }>;
-  venueReviews?: Array<{ id: string; rating: number; facilityRating: number; accessRating: number; costRating: number; comment: string | null; createdAt: string; user?: { id: string; nickname: string; profileImageUrl: string | null } }>;
+  reviews?: Array<{ id: string; rating: number; facilityRating?: number; accessRating?: number; costRating?: number; iceQuality?: number | null; comment: string | null; createdAt: string; user?: { id: string; nickname: string; profileImageUrl: string | null } }>;
+  venueReviews?: Array<{ id: string; rating: number; facilityRating?: number; accessRating?: number; costRating?: number; iceQuality?: number | null; comment: string | null; createdAt: string; user?: { id: string; nickname: string; profileImageUrl: string | null } }>;
 }
 
 // ── Lesson types ──
@@ -298,11 +298,45 @@ export interface SportTeam {
   owner?: { id: string; nickname: string; mannerScore?: number };
 }
 
+export type TeamMatchOutcome = 'win' | 'draw' | 'lose';
+export type TeamMatchQuarterScoreMap = Record<string, number>;
+
+export interface TeamMatchArrivalCheck {
+  id: string;
+  teamMatchId: string;
+  teamId: string;
+  isHome: boolean;
+  arrivedAt?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  photoUrl?: string | null;
+  opponentStatus?: string | null;
+  opponentNote?: string | null;
+  gameCompleted?: boolean | null;
+  createdAt?: string;
+}
+
+export interface TeamMatchEvaluation {
+  id: string;
+  teamMatchId: string;
+  evaluatorTeamId: string;
+  evaluatedTeamId: string;
+  levelAccuracy: number;
+  infoAccuracy: number;
+  mannerRating: number;
+  punctuality: number;
+  paymentClarity: number;
+  cooperation: number;
+  comment?: string | null;
+  createdAt?: string;
+}
+
 // ── TeamMatch ──
 export interface TeamMatch {
   id: string;
   hostTeamId: string;
   hostUserId?: string;
+  guestTeamId?: string | null;
   sportType: string;
   title: string;
   description?: string | null;
@@ -330,11 +364,16 @@ export interface TeamMatch {
   notes?: string;
   status: string;
   refereeSchedule?: Record<string, unknown>;
-  scoreHome?: Record<string, unknown>;
-  scoreAway?: Record<string, unknown>;
+  scoreHome?: TeamMatchQuarterScoreMap | null;
+  scoreAway?: TeamMatchQuarterScoreMap | null;
+  resultHome?: TeamMatchOutcome | null;
+  resultAway?: TeamMatchOutcome | null;
   hostTeam?: SportTeam;
+  guestTeam?: SportTeam | null;
   applicationCount?: number;
   applications?: TeamMatchApplication[];
+  arrivalChecks?: TeamMatchArrivalCheck[];
+  evaluations?: TeamMatchEvaluation[];
 }
 
 export interface TeamMatchApplication {
@@ -391,6 +430,7 @@ export interface Payment {
   status: string;
   orderId: string;
   paymentKey?: string | null;
+  pgProvider?: string | null;
   paidAt: string | null;
   createdAt: string;
   refundAmount?: number | null;
@@ -437,6 +477,48 @@ export interface AdminStats {
   activeTeams: number;
   todayNewUsers?: number;
   todayMatches?: number;
+  pendingReports?: number;
+  pendingSettlements?: number;
+  todayReports?: number;
+}
+
+export interface AdminReview {
+  id: string;
+  matchId?: string;
+  matchTitle?: string;
+  reviewerId?: string;
+  reviewerName?: string;
+  targetId?: string;
+  targetName?: string;
+  mannerRating?: number;
+  skillRating?: number;
+  comment?: string | null;
+  match?: { id: string; title: string };
+  author?: { id: string; nickname: string };
+  target?: { id: string; nickname: string };
+  createdAt: string;
+}
+
+export interface AdminStatisticsOverview {
+  periodLabel: string;
+  matchTrend: Array<{ month: string; count: number }>;
+  revenueTrend: Array<{ month: string; revenue: number }>;
+  sportDistribution: Array<{ sport: string; count: number }>;
+  topVenues: Array<{
+    name: string;
+    city: string;
+    matches: number;
+    revenue: number;
+    rating: number;
+  }>;
+  userGrowth: {
+    totalUsers: number;
+    thisMonth: number;
+    lastMonth: number;
+    growthRate: number;
+    activeUsers: number;
+    teamCount: number;
+  };
 }
 
 // ── Chat (API contract) ──
@@ -466,10 +548,21 @@ export interface MercenaryApplication {
   postId: string;
   userId: string;
   message: string | null;
-  status: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   appliedAt: string;
   decidedAt: string | null;
+  decidedBy?: string | null;
   user?: { id: string; nickname: string; profileImageUrl: string | null };
+}
+
+export interface MercenaryViewerState {
+  isAuthenticated: boolean;
+  isAuthor: boolean;
+  canManage: boolean;
+  canApply: boolean;
+  applyBlockReason: string | null;
+  myApplicationStatus: MercenaryApplication['status'] | null;
+  myApplicationId: string | null;
 }
 
 export interface MercenaryPost {
@@ -486,10 +579,16 @@ export interface MercenaryPost {
   notes?: string | null;
   /** @deprecated use notes — kept for backward compat with older API responses */
   description?: string | null;
-  status: string;
+  status: 'open' | 'closed' | 'filled' | 'cancelled';
   team?: SportTeam;
   applications?: MercenaryApplication[];
+  applicationCount?: number;
   author?: { id: string; nickname: string; profileImageUrl?: string | null };
+  viewer?: MercenaryViewerState;
+  canManageApplications?: boolean;
+  canApply?: boolean;
+  applyBlockReason?: string | null;
+  viewerApplication?: MercenaryApplication | null;
 }
 
 // ── Badge ──
@@ -598,9 +697,13 @@ export interface PendingReview {
 
 // ── Venue Schedule ──
 export interface VenueScheduleSlot {
-  time: string;
-  available: boolean;
-  matchId?: string;
+  id: string;
+  title: string;
+  matchDate: string;
+  startTime: string;
+  endTime: string;
+  sportType: string;
+  status: string;
 }
 
 // ── Create input types ──
@@ -615,7 +718,7 @@ export interface CreateTeamInput {
 export interface UpdateMatchInput {
   title?: string;
   description?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   sportType?: string;
   venueId?: string;
   location?: string;
@@ -683,7 +786,12 @@ export interface CreateListingInput {
 
 export interface CreateVenueReviewInput {
   rating: number;
+  facilityRating: number;
+  accessRating: number;
+  costRating: number;
+  iceQuality?: number;
   comment?: string;
+  imageUrls?: string[];
 }
 
 export interface PreparePaymentInput {
@@ -709,6 +817,40 @@ export interface AdminUserDetail extends UserProfile {
   warningCount?: number;
   suspensionReason?: string | null;
   adminAuditLog?: AdminActionLog[];
+}
+
+export interface AdminTeamMember {
+  id: string;
+  nickname: string;
+  email?: string | null;
+  profileImageUrl?: string | null;
+  mannerScore?: number;
+  role: 'owner' | 'manager' | 'member';
+  joinedAt: string;
+}
+
+export interface AdminTeamDetail extends SportTeam {
+  createdAt?: string;
+  updatedAt?: string;
+  owner?: {
+    id: string;
+    nickname: string;
+    email?: string | null;
+    profileImageUrl?: string | null;
+    mannerScore?: number;
+  };
+  members: AdminTeamMember[];
+  recentTeamMatches: Array<{
+    id: string;
+    title: string;
+    matchDate: string;
+    startTime: string;
+    endTime: string;
+    venueName: string;
+    totalFee: number;
+    opponentFee: number;
+    status: string;
+  }>;
 }
 
 export interface CreateTeamMatchInput {
@@ -740,21 +882,36 @@ export interface CreateTeamMatchInput {
 
 export interface ApplyTeamMatchInput {
   teamId?: string;
+  applicantTeamId?: string;
   message?: string;
   confirmedInfo?: boolean;
   confirmedLevel?: boolean;
 }
 
 export interface TeamMatchEvaluationInput {
-  opponentTeamId?: string;
-  levelAccuracy?: number;
-  infoAccuracy?: number;
-  mannerRating?: number;
-  punctuality?: number;
-  paymentClarity?: number;
-  cooperation?: number;
-  skillRating?: number;
+  evaluatorTeamId: string;
+  evaluatedTeamId: string;
+  levelAccuracy: number;
+  infoAccuracy: number;
+  mannerRating: number;
+  punctuality: number;
+  paymentClarity: number;
+  cooperation: number;
   comment?: string;
+}
+
+export interface SubmitTeamMatchResultInput {
+  scoreHome: TeamMatchQuarterScoreMap;
+  scoreAway: TeamMatchQuarterScoreMap;
+  resultHome: TeamMatchOutcome;
+  resultAway: TeamMatchOutcome;
+}
+
+export interface TeamMatchCheckInInput {
+  teamId: string;
+  lat?: number;
+  lng?: number;
+  photoUrl?: string;
 }
 
 export interface SendMessageInput {
@@ -765,11 +922,27 @@ export interface CreateMercenaryPostInput {
   teamId: string;
   matchDate: string;
   sportType: string;
-  description?: string;
+  venue: string;
+  position: string;
+  count?: number;
+  level?: number;
+  fee?: number;
+  notes?: string;
 }
 
 export interface ApplyMercenaryInput {
   message?: string;
+}
+
+export interface UpdateMercenaryPostInput {
+  matchDate?: string;
+  sportType?: string;
+  venue?: string;
+  position?: string;
+  count?: number;
+  level?: number;
+  fee?: number;
+  notes?: string;
 }
 
 export interface UpdateStatusInput {

@@ -6,6 +6,22 @@ set -e
 
 echo "🚀 MatchUp EC2 초기 설정 시작"
 
+write_toss_env() {
+  local tmp_env
+  tmp_env=$(mktemp)
+
+  awk '!/^(TOSS_CLIENT_KEY|TOSS_SECRET_KEY|TOSS_WEBHOOK_SECRET)=/' deploy/.env > "$tmp_env"
+
+  {
+    cat "$tmp_env"
+    printf 'TOSS_CLIENT_KEY=%s\n' "${TOSS_CLIENT_KEY:-}"
+    printf 'TOSS_SECRET_KEY=%s\n' "${TOSS_SECRET_KEY:-}"
+    printf 'TOSS_WEBHOOK_SECRET=%s\n' "${TOSS_WEBHOOK_SECRET:-}"
+  } > deploy/.env
+
+  rm -f "$tmp_env"
+}
+
 # 1. 시스템 업데이트
 echo "📦 시스템 업데이트..."
 sudo yum update -y 2>/dev/null || sudo apt-get update -y 2>/dev/null
@@ -34,15 +50,26 @@ fi
 echo "📂 Git 설치..."
 sudo yum install -y git 2>/dev/null || sudo apt-get install -y git 2>/dev/null
 
+# 4.1 jq 설치
+echo "🧰 jq 설치..."
+if ! command -v jq &> /dev/null; then
+  sudo yum install -y jq 2>/dev/null || sudo apt-get install -y jq 2>/dev/null
+fi
+
 # 5. 프로젝트 클론
 echo "📥 프로젝트 클론..."
 REPO_URL="https://github.com/kim-song-jun/matchup-sports-platform.git"
 APP_DIR="$HOME/matchup"
 
 if [ -d "$APP_DIR" ]; then
-  echo "프로젝트가 이미 존재합니다. 업데이트합니다..."
-  cd "$APP_DIR"
-  git pull origin main
+  if [ -d "$APP_DIR/.git" ]; then
+    echo "프로젝트가 이미 존재합니다. 업데이트합니다..."
+    cd "$APP_DIR"
+    git pull origin main
+  else
+    echo "프로젝트 디렉토리가 이미 존재하지만 git 메타데이터가 없습니다. 현재 작업 트리를 그대로 사용합니다."
+    cd "$APP_DIR"
+  fi
 else
   git clone "$REPO_URL" "$APP_DIR"
   cd "$APP_DIR"
@@ -61,37 +88,65 @@ if [ ! -f deploy/.env ]; then
   sed -i "s/CHANGE_ME_STRONG_PASSWORD/$DB_PASS/" deploy/.env
   sed -i "s/CHANGE_ME_RANDOM_64_CHAR_STRING/$JWT_SECRET/" deploy/.env
 
-  # EC2 퍼블릭 IP 가져오기
-  PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "localhost")
-  sed -i "s|API_URL=http://localhost:8100/api/v1|API_URL=http://$PUBLIC_IP/api/v1|" deploy/.env
+  write_toss_env
 
   echo "✅ 환경변수 자동 생성 완료"
-  echo "  DB 비밀번호: $DB_PASS"
-  echo "  JWT Secret: $JWT_SECRET"
-  echo "  Public IP: $PUBLIC_IP"
 else
   echo "deploy/.env 이미 존재합니다."
 fi
 
+if [ "${TOSS_CLIENT_KEY+x}" = "x" ] || [ "${TOSS_SECRET_KEY+x}" = "x" ] || [ "${TOSS_WEBHOOK_SECRET+x}" = "x" ]; then
+  write_toss_env
+fi
+
 # 7. Docker 빌드 + 실행
 echo "🏗️ Docker 빌드 중... (첫 빌드는 5-10분 소요)"
+cd "$APP_DIR"
+
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE="docker compose"
+else
+  COMPOSE="docker-compose"
+fi
+
+set -a
+. ./deploy/.env
+set +a
+
+sudo docker build -f deploy/Dockerfile.api -t matchup-api .
+sudo docker build \
+  -f deploy/Dockerfile.web \
+  --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+  --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
+  --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
+  -t matchup-web .
+
 cd deploy
-docker compose -f docker-compose.prod.yml up -d --build 2>/dev/null || \
-  docker-compose -f docker-compose.prod.yml up -d --build
+$COMPOSE -f docker-compose.prod.yml up -d postgres redis
 
 # 8. DB 초기화 대기
 echo "⏳ DB 초기화 대기 중..."
-sleep 15
+for i in $(seq 1 30); do
+  if $COMPOSE -f docker-compose.prod.yml exec -T postgres pg_isready >/dev/null 2>&1; then
+    echo "✅ postgres 준비 완료"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "❌ postgres가 제시간에 준비되지 않았습니다."
+    exit 1
+  fi
+  sleep 2
+done
 
-# 9. Prisma DB Push
-echo "🗄️ DB 스키마 적용..."
-docker exec matchup_api npx prisma db push --skip-generate 2>/dev/null || {
-  echo "⚠️ DB 스키마 적용 대기 중... 재시도"
-  sleep 10
-  docker exec matchup_api npx prisma db push --skip-generate
-}
+# 9. Prisma migrate deploy
+echo "🗄️ DB 마이그레이션 적용..."
+$COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T api npx prisma migrate deploy
 
-# 10. 시드 데이터 (선택)
+# 10. 전체 스택 시작
+echo "🚀 애플리케이션 스택 시작..."
+$COMPOSE -f docker-compose.prod.yml up -d
+
+# 11. 시드 데이터 (선택)
 echo "🌱 시드 데이터 입력..."
 docker exec matchup_api node -e "
   const { PrismaClient } = require('@prisma/client');
@@ -99,23 +154,24 @@ docker exec matchup_api node -e "
   prisma.\$connect().then(() => console.log('DB 연결 성공')).catch(e => console.error('DB 연결 실패:', e));
 " 2>/dev/null || echo "시드 데이터는 수동으로 실행해주세요."
 
-# 11. 상태 확인
+# 12. 상태 확인
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 배포 상태 확인"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-docker compose -f docker-compose.prod.yml ps 2>/dev/null || docker-compose -f docker-compose.prod.yml ps
+$COMPOSE -f docker-compose.prod.yml ps
 
 echo ""
 echo "🏥 헬스체크..."
 sleep 3
-if curl -sf http://localhost/api/v1/health > /dev/null 2>&1; then
+if curl -fsS http://localhost:8100/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' > /dev/null 2>&1 && \
+   curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' > /dev/null 2>&1; then
   echo "✅ API 서버 정상"
 else
   echo "⚠️ API 서버 응답 대기 중 (1분 후 다시 확인해주세요)"
 fi
 
-if curl -sf http://localhost/ > /dev/null 2>&1; then
+if curl -sf http://localhost/landing > /dev/null 2>&1; then
   echo "✅ 웹 서버 정상"
 else
   echo "⚠️ 웹 서버 응답 대기 중"
@@ -131,5 +187,5 @@ echo "  📚 API 문서:  http://$PUBLIC_IP/docs"
 echo "  🏥 헬스체크:  http://$PUBLIC_IP/api/v1/health"
 echo ""
 echo "  📋 로그 확인: docker logs matchup_api -f"
-echo "  📋 전체 상태: docker compose -f docker-compose.prod.yml ps"
+echo "  📋 전체 상태: $COMPOSE -f docker-compose.prod.yml ps"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -5,12 +5,16 @@
  */
 
 function getServerApiBase(): string {
+  const defaultOrigin =
+    process.env.NODE_ENV === 'production' ? 'http://api:8100' : 'http://localhost:8111';
+  const publicApiOrigin =
+    process.env.NEXT_PUBLIC_API_URL?.startsWith('http')
+      ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
+      : null;
   const origin =
     process.env.INTERNAL_API_ORIGIN ||
-    (process.env.NEXT_PUBLIC_API_URL?.startsWith('http')
-      ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
-      : null) ||
-    'http://localhost:8111';
+    (process.env.NODE_ENV === 'production' ? defaultOrigin : publicApiOrigin) ||
+    defaultOrigin;
   return `${origin}/api/v1`;
 }
 

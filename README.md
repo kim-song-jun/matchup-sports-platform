@@ -228,8 +228,8 @@ cp apps/web/.env.example apps/web/.env.local
 | `KAKAO_CLIENT_SECRET` | 카카오 OAuth 시크릿 | Yes |
 | `NAVER_CLIENT_ID` | 네이버 OAuth 앱 키 | Yes |
 | `NAVER_CLIENT_SECRET` | 네이버 OAuth 시크릿 | Yes |
-| `TOSS_SECRET_KEY` | 토스페이먼츠 시크릿 키 | Yes |
-| `TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키 | Yes |
+| `TOSS_SECRET_KEY` | 토스페이먼츠 시크릿 키, 없으면 mock mode | No |
+| `TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키, 없으면 mock widget | No |
 | `FCM_SERVICE_ACCOUNT` | Firebase 서비스 계정 JSON | No |
 | `API_PORT` | 서버 포트 (기본값: 8111) | No |
 
@@ -239,7 +239,7 @@ cp apps/web/.env.example apps/web/.env.local
 |----------|-------------|----------|
 | `NEXT_PUBLIC_API_URL` | 백엔드 API 주소 | Yes |
 | `NEXT_PUBLIC_SOCKET_URL` | Socket.IO 서버 주소 | Yes |
-| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키 | Yes |
+| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | 토스페이먼츠 클라이언트 키, 없으면 mock widget | No |
 | `NEXT_PUBLIC_KAKAO_MAP_KEY` | 카카오맵 JavaScript 키 | No |
 
 ### Start Development
@@ -493,7 +493,12 @@ npx playwright test --ui
 
 ```bash
 # Frontend 이미지 빌드
-docker build -f deploy/Dockerfile.web -t matchup-web .
+docker build \
+  -f deploy/Dockerfile.web \
+  --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+  --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
+  --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
+  -t matchup-web .
 
 # Backend 이미지 빌드
 docker build -f deploy/Dockerfile.api -t matchup-api .
@@ -505,6 +510,7 @@ docker-compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 
 - Nginx 리버스 프록시로 Frontend(3000) / Backend(8100) 라우팅
 - GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, compose 재기동, `prisma migrate deploy`와 `prisma/seed-images.ts`를 수행
+- 프로덕션 배포는 `DB_PASSWORD`, `JWT_SECRET`만 필수이며, `TOSS_*`가 비어 있으면 결제 기능만 mock mode로 동작한다
 - 운영 EC2 SSH 계정 기준은 `ec2-user`다
 - SSL 종료는 Nginx 레이어에서 처리
 - EC2 초기 설정: `deploy/setup-ec2.sh` 참고

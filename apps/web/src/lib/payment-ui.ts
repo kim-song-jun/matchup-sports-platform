@@ -82,6 +82,15 @@ export async function initTossWidget(
 }
 
 type PaymentIcon = typeof CheckCircle;
+type PaymentBannerTone = 'info' | 'warning';
+type PaymentModeState = 'ready' | 'mock' | 'unavailable';
+type PaymentModeMeta = {
+  state: PaymentModeState;
+  label: string;
+  title: string;
+  description: string;
+  tone: PaymentBannerTone;
+};
 
 export const paymentStatusConfig: Record<string, { label: string; icon: PaymentIcon; color: string; bgColor: string }> = {
   completed: { label: '결제 완료', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50' },
@@ -108,6 +117,125 @@ const paymentSourceConfig = {
   marketplace: { label: '장터', icon: ShoppingBag, color: 'bg-slate-100 text-slate-600' },
   unknown: { label: '결제', icon: CreditCard, color: 'bg-slate-100 text-slate-600' },
 } as const;
+
+const mockStatusLabels: Partial<Record<string, string>> = {
+  completed: '테스트 결제 완료',
+  pending: '테스트 결제 대기',
+  refunded: '테스트 환불 완료',
+  failed: '테스트 결제 실패',
+  partial_refunded: '테스트 부분 환불',
+};
+
+function hasTossClientKey() {
+  return Boolean(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY);
+}
+
+function createReadyMode(): PaymentModeMeta {
+  return {
+    state: 'ready',
+    label: '실결제',
+    title: '실제 결제 연동이 활성화되어 있어요',
+    description: '카드사 청구와 환불이 실제 결제사 연동 기준으로 처리됩니다.',
+    tone: 'info',
+  };
+}
+
+function createMockMode(): PaymentModeMeta {
+  return {
+    state: 'mock',
+    label: '테스트 결제',
+    title: '현재는 결제 시뮬레이션으로 동작해요',
+    description: '이 흐름은 테스트 기록만 남기며 실제 청구나 실환불은 발생하지 않습니다.',
+    tone: 'warning',
+  };
+}
+
+function createUnavailableMode(): PaymentModeMeta {
+  return {
+    state: 'unavailable',
+    label: '실결제 연동 비활성화',
+    title: '지금은 실결제 환불을 처리할 수 없어요',
+    description: 'legacy 실결제 기록은 유지되지만 현재 환경에서는 mock 결제만 환불 상태를 변경할 수 있습니다.',
+    tone: 'warning',
+  };
+}
+
+export function getCheckoutPaymentMode(): PaymentModeMeta {
+  return createMockMode();
+}
+
+export function getRecordedPaymentMode(
+  payment?: Pick<Payment, 'pgProvider'> | null,
+): PaymentModeMeta {
+  if (payment?.pgProvider === 'mock') {
+    return createMockMode();
+  }
+
+  if (payment?.pgProvider === 'toss' && !hasTossClientKey()) {
+    return createUnavailableMode();
+  }
+
+  if (!payment?.pgProvider) {
+    return createUnavailableMode();
+  }
+
+  return createReadyMode();
+}
+
+export function getPaymentStatusMeta(
+  payment?: Pick<Payment, 'status' | 'pgProvider'> | null,
+) {
+  const statusKey = payment?.status ?? 'pending';
+  const status = paymentStatusConfig[statusKey] ?? paymentStatusConfig.pending;
+  const paymentMode = getRecordedPaymentMode(payment);
+
+  if (paymentMode.state !== 'mock') {
+    return status;
+  }
+
+  return {
+    ...status,
+    label: mockStatusLabels[statusKey] ?? `테스트 ${status.label}`,
+  };
+}
+
+export function getPaymentTimelineLabels(
+  payment?: Pick<Payment, 'pgProvider'> | null,
+) {
+  const paymentMode = getRecordedPaymentMode(payment);
+
+  if (paymentMode.state === 'mock') {
+    return {
+      completed: '테스트 결제 완료',
+      refunded: '테스트 환불 완료',
+    };
+  }
+
+  return {
+    completed: '결제 완료',
+    refunded: '환불 완료',
+  };
+}
+
+export function getPaymentMethodDescription(
+  payment: Pick<Payment, 'paymentKey' | 'pgProvider'>,
+) {
+  const paymentMode = getRecordedPaymentMode(payment);
+
+  if (paymentMode.state === 'mock') {
+    return '테스트 결제 기록입니다. 실제 승인 키 발급이나 카드 청구는 발생하지 않았습니다.';
+  }
+
+  if (paymentMode.state === 'unavailable') {
+    return payment.paymentKey
+      ? `승인 키 ${payment.paymentKey} · 현재는 실결제 환불 연동이 비활성화되어 있습니다.`
+      : '실결제 기록입니다. 현재는 실결제 환불 연동이 비활성화되어 있습니다.';
+  }
+
+  return payment.paymentKey
+    ? `승인 키 ${payment.paymentKey}`
+    : '결제 수단이 저장되었습니다.';
+}
 
 export function getPaymentMethodMeta(method: string | null | undefined) {
   if (!method) {

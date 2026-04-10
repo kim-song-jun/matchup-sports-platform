@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useConfirmPayment, usePreparePayment } from '@/hooks/use-api';
+import { getCheckoutPaymentMode } from '@/lib/payment-ui';
 import { CreditCard, Wallet, Loader2, CheckCircle } from 'lucide-react';
 import type { Payment } from '@/types/api';
 import { formatAmount } from '@/lib/utils';
@@ -40,6 +42,8 @@ export function CheckoutModal({
   const { toast } = useToast();
   const preparePayment = usePreparePayment();
   const confirmPayment = useConfirmPayment();
+  const paymentMode = getCheckoutPaymentMode();
+  const isMockMode = paymentMode.state === 'mock';
 
   const isProcessing = preparePayment.isPending || confirmPayment.isPending;
 
@@ -57,7 +61,7 @@ export function CheckoutModal({
         paymentKey: `dev-${Date.now()}`,
       });
 
-      toast('success', '결제가 완료되었어요');
+      toast('success', isMockMode ? '결제 시뮬레이션이 완료되었어요' : '결제가 완료되었어요');
       onSuccess(confirmed);
       onClose();
     } catch (err: unknown) {
@@ -69,12 +73,23 @@ export function CheckoutModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="결제하기" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={isMockMode ? '테스트 결제' : '결제하기'} size="md">
       <div className="rounded-xl bg-gray-50 p-4 mb-5">
         <p className="text-xs text-gray-500 mb-1">주문 내역</p>
         <p className="text-md font-semibold text-gray-900">{itemName}</p>
         <p className="text-xl font-bold text-gray-900 mt-2">{formatAmount(amount)}</p>
       </div>
+
+      {isMockMode ? (
+        <div className="mb-5">
+          <TrustSignalBanner
+            tone={paymentMode.tone}
+            label={paymentMode.label}
+            title={paymentMode.title}
+            description={paymentMode.description}
+          />
+        </div>
+      ) : null}
 
       <div className="mb-6">
         <p className="text-base font-semibold text-gray-900 mb-3">결제 수단</p>
@@ -126,10 +141,10 @@ export function CheckoutModal({
         {isProcessing ? (
           <span className="flex items-center justify-center gap-2">
             <Loader2 size={18} className="animate-spin" />
-            결제 처리 중...
+            {isMockMode ? '테스트 결제 처리 중...' : '결제 처리 중...'}
           </span>
         ) : (
-          `결제하기 · ${formatAmount(amount)}`
+          `${isMockMode ? '테스트 결제' : '결제하기'} · ${formatAmount(amount)}`
         )}
       </button>
     </Modal>

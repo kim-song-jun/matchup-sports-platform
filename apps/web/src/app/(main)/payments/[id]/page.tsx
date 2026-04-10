@@ -16,8 +16,18 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { usePayment } from '@/hooks/use-api';
-import { buildPaymentReceiptNumber, getPaymentMethodMeta, getPaymentSource, getRefundPolicy, paymentStatusConfig } from '@/lib/payment-ui';
+import {
+  buildPaymentReceiptNumber,
+  getPaymentMethodDescription,
+  getPaymentMethodMeta,
+  getPaymentSource,
+  getPaymentStatusMeta,
+  getPaymentTimelineLabels,
+  getRecordedPaymentMode,
+  getRefundPolicy,
+} from '@/lib/payment-ui';
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
 export default function PaymentDetailPage() {
@@ -60,11 +70,14 @@ export default function PaymentDetailPage() {
     );
   }
 
-  const status = paymentStatusConfig[payment.status] ?? paymentStatusConfig.pending;
+  const paymentMode = getRecordedPaymentMode(payment);
+  const status = getPaymentStatusMeta(payment);
   const method = getPaymentMethodMeta(payment.method);
+  const methodDescription = getPaymentMethodDescription(payment);
   const source = getPaymentSource(payment);
   const refundPolicy = getRefundPolicy(source.scheduledAt);
   const receiptNumber = buildPaymentReceiptNumber(payment.orderId);
+  const timelineLabels = getPaymentTimelineLabels(payment);
   const StatusIcon = status.icon;
 
   const handleCopyReceipt = async () => {
@@ -75,9 +88,9 @@ export default function PaymentDetailPage() {
 
   const timelineSteps = [
     { label: '주문 생성', time: payment.createdAt, done: true },
-    { label: '결제 완료', time: payment.paidAt, done: !!payment.paidAt },
+    { label: timelineLabels.completed, time: payment.paidAt, done: !!payment.paidAt },
     ...(payment.refundedAt
-      ? [{ label: '환불 완료', time: payment.refundedAt, done: true }]
+      ? [{ label: timelineLabels.refunded, time: payment.refundedAt, done: true }]
       : []),
   ];
 
@@ -114,6 +127,15 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
+        {paymentMode.state !== 'ready' ? (
+          <TrustSignalBanner
+            tone={paymentMode.tone}
+            label={paymentMode.label}
+            title={paymentMode.title}
+            description={paymentMode.description}
+          />
+        ) : null}
+
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="space-y-3">
@@ -138,7 +160,7 @@ export default function PaymentDetailPage() {
             </div>
             <div>
               <p className="text-base font-medium text-gray-900 dark:text-gray-100">{method.label}</p>
-              <p className="text-xs text-gray-500">{payment.paymentKey ? `승인 키 ${payment.paymentKey}` : '결제 수단이 저장되었습니다.'}</p>
+              <p className="text-xs text-gray-500">{methodDescription}</p>
             </div>
           </div>
         </div>
@@ -222,16 +244,24 @@ export default function PaymentDetailPage() {
             </div>
 
             {refundPolicy.percentage > 0 ? (
-              <Link
-                href={`/payments/${payment.id}/refund`}
-                className="flex items-center justify-center gap-2 w-full rounded-2xl border border-red-200 bg-red-50 py-3.5 text-md font-semibold text-red-500 hover:bg-red-100 transition-colors"
-              >
-                <RotateCcw size={18} />
-                환불 요청
-              </Link>
+              paymentMode.state === 'unavailable' ? (
+                <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  현재 환경에서는 legacy 실결제 환불을 처리할 수 없습니다. 운영 결제 연동이 복구된 뒤 다시 시도해주세요.
+                </div>
+              ) : (
+                <Link
+                  href={`/payments/${payment.id}/refund`}
+                  className="flex items-center justify-center gap-2 w-full rounded-2xl border border-red-200 bg-red-50 py-3.5 text-md font-semibold text-red-500 hover:bg-red-100 transition-colors"
+                >
+                  <RotateCcw size={18} />
+                  {paymentMode.state === 'mock' ? '테스트 환불 처리' : '환불 요청'}
+                </Link>
+              )
             ) : (
               <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
-                현재 정책상 이 결제는 환불할 수 없습니다.
+                {paymentMode.state === 'mock'
+                  ? '현재 정책상 이 테스트 결제는 환불 상태를 변경할 수 없습니다.'
+                  : '현재 정책상 이 결제는 환불할 수 없습니다.'}
               </div>
             )}
           </div>

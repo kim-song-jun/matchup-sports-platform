@@ -14,9 +14,10 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useToast } from '@/components/ui/toast';
 import { usePayment, useRefundPayment } from '@/hooks/use-api';
-import { getPaymentMethodMeta, getPaymentSource, getRefundPolicy } from '@/lib/payment-ui';
+import { getPaymentMethodMeta, getPaymentSource, getRecordedPaymentMode, getRefundPolicy } from '@/lib/payment-ui';
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const refundReasons = [
@@ -73,9 +74,16 @@ export default function RefundRequestPage() {
 
   const source = getPaymentSource(payment);
   const method = getPaymentMethodMeta(payment.method);
+  const paymentMode = getRecordedPaymentMode(payment);
   const refundPolicy = getRefundPolicy(source.scheduledAt);
   const refundAmount = Math.floor(payment.amount * (refundPolicy.percentage / 100));
-  const isRefundable = payment.status === 'completed' && source.kind === 'match' && refundPolicy.percentage > 0;
+  const isRefundBlockedByMode = paymentMode.state === 'unavailable';
+  const isMockMode = paymentMode.state === 'mock';
+  const isRefundable =
+    payment.status === 'completed' &&
+    source.kind === 'match' &&
+    refundPolicy.percentage > 0 &&
+    !isRefundBlockedByMode;
 
   const handleRefundSubmit = async () => {
     try {
@@ -86,13 +94,26 @@ export default function RefundRequestPage() {
           note: additionalReason,
         },
       });
-      toast('success', '환불 요청이 접수되었어요');
+      toast('success', isMockMode ? '환불 시뮬레이션이 완료되었어요' : '환불 요청이 접수되었어요');
       router.push(`/payments/${paymentId}`);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       toast('error', axiosErr?.response?.data?.message || '환불 요청에 실패했어요.');
     }
   };
+
+  if (isRefundBlockedByMode) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={RotateCcw}
+          title="실결제 환불 연동이 비활성화되어 있어요"
+          description="이 결제는 실결제 기록이지만 현재 환경에서는 mock 결제만 환불 상태를 변경할 수 있습니다."
+          action={{ label: '결제 상세로', href: `/payments/${paymentId}` }}
+        />
+      </div>
+    );
+  }
 
   if (!isRefundable) {
     return (
@@ -109,7 +130,7 @@ export default function RefundRequestPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="환불 확인" size="sm">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={isMockMode ? '테스트 환불 확인' : '환불 확인'} size="sm">
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 mb-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-gray-500">결제 금액</span>
@@ -124,7 +145,9 @@ export default function RefundRequestPage() {
         <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 mb-5">
           <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
           <p className="text-sm text-amber-700 leading-relaxed">
-            환불 요청 후에는 취소할 수 없습니다. 환불 처리까지 영업일 기준 1~3일이 소요될 수 있습니다.
+            {isMockMode
+              ? '테스트 환불은 즉시 상태만 변경되며 실제 카드 취소나 계좌 입금은 발생하지 않습니다.'
+              : '환불 요청 후에는 취소할 수 없습니다. 환불 처리까지 영업일 기준 1~3일이 소요될 수 있습니다.'}
           </p>
         </div>
 
@@ -146,7 +169,7 @@ export default function RefundRequestPage() {
                 처리중
               </>
             ) : (
-              '환불 요청'
+              isMockMode ? '테스트 환불 처리' : '환불 요청'
             )}
           </button>
         </div>
@@ -160,17 +183,26 @@ export default function RefundRequestPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">환불 요청</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h1>
       </header>
 
       <div className="hidden @3xl:block mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-base text-gray-500 hover:text-gray-600 mb-2 transition-colors">
           <ArrowLeft size={16} /> 결제 상세
         </button>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">환불 요청</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h2>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
+        {isMockMode ? (
+          <TrustSignalBanner
+            tone={paymentMode.tone}
+            label={paymentMode.label}
+            title="이 환불은 테스트 상태만 변경해요"
+            description="실제 승인 취소나 계좌 환불 없이 결제 기록만 환불 완료로 전환됩니다."
+          />
+        ) : null}
+
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 정보</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
@@ -277,7 +309,7 @@ export default function RefundRequestPage() {
 
       <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
         <div className="flex items-center justify-between mb-3 @3xl:hidden">
-          <span className="text-sm text-gray-500">환불 예상 금액</span>
+          <span className="text-sm text-gray-500">{isMockMode ? '테스트 환불 예상 금액' : '환불 예상 금액'}</span>
           <span className={`text-xl font-bold ${refundPolicy.color}`}>{formatAmount(refundAmount)}</span>
         </div>
         <button
@@ -290,7 +322,7 @@ export default function RefundRequestPage() {
           }`}
         >
           <RotateCcw size={20} />
-          환불 요청
+          {isMockMode ? '테스트 환불 처리' : '환불 요청'}
         </button>
       </div>
     </div>

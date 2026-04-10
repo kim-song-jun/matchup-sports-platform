@@ -43,6 +43,7 @@
 - 상세 문서: `.codex/agents/infra-dev.md`
 - 범위: `docker-compose*`, `deploy/`, `Makefile`, `.github/workflows/`, runtime healthcheck, auth/config safety.
 - 필수 계약: dev ports `3003/8111`, prod ports `3000/8100`, health-gated startup, destructive seed 금지, `.env*` 미접근.
+- 추가 계약: production deploy는 DB/JWT 같은 truly required env만 fail-fast 검증하고, Toss 결제 시크릿은 없으면 mock mode로 둔다. GitHub repo secrets를 쓰는 경우 EC2 `deploy/.env`도 그 값으로 수렴시켜 stale host secret을 남기지 않는다. readiness는 process liveness가 아니라 `/api/v1/health` 기준으로 본다. Next.js production image는 `NEXT_PUBLIC_API_URL`과 `INTERNAL_API_ORIGIN` build-time 주입을 명시적으로 처리한다.
 - 검증: 관련 compose/workflow lint, 필요 시 `pnpm build`, deploy path 영향 확인.
 
 ## Review Team

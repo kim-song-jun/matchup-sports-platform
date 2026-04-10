@@ -4,7 +4,6 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
-  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { NotificationType, PaymentMethod } from '@prisma/client';
@@ -42,7 +41,7 @@ interface TossErrorResponse {
 // ---------------------------------------------------------------------------
 
 @Injectable()
-export class PaymentsService implements OnModuleInit {
+export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly tossEnabled: boolean;
   private readonly tossSecretKey: string;
@@ -59,15 +58,6 @@ export class PaymentsService implements OnModuleInit {
 
     if (!this.tossEnabled) {
       this.logger.warn('TOSS_SECRET_KEY not set — payments running in mock mode');
-    }
-  }
-
-  onModuleInit() {
-    if (process.env.NODE_ENV === 'production' && !this.tossEnabled) {
-      throw new Error(
-        '[PaymentsService] TOSS_SECRET_KEY is not set in production. ' +
-        'Set the required environment variable before starting the server.',
-      );
     }
   }
 
@@ -305,11 +295,15 @@ export class PaymentsService implements OnModuleInit {
       return this.realRefund(payment, cancelReason);
     }
 
-    return this.mockRefund(payment, cancelReason);
+    if (payment.pgProvider === 'mock') {
+      return this.mockRefund(payment, cancelReason);
+    }
+
+    throw new BadRequestException('결제 연동이 비활성화되어 실결제 환불을 처리할 수 없습니다.');
   }
 
   private async realRefund(
-    payment: { id: string; userId: string; participantId: string; orderId: string; amount: number; paymentKey: string | null; participant?: { match?: { id?: string; title?: string } | null } | null },
+    payment: { id: string; userId: string; participantId: string; orderId: string; amount: number; paymentKey: string | null; pgProvider?: string | null; participant?: { match?: { id?: string; title?: string } | null } | null },
     cancelReason: string,
   ) {
     if (!payment.paymentKey) {
@@ -322,7 +316,7 @@ export class PaymentsService implements OnModuleInit {
   }
 
   private async mockRefund(
-    payment: { id: string; userId: string; participantId: string; orderId: string; amount: number; participant?: { match?: { id?: string; title?: string } | null } | null },
+    payment: { id: string; userId: string; participantId: string; orderId: string; amount: number; pgProvider?: string | null; participant?: { match?: { id?: string; title?: string } | null } | null },
     cancelReason: string,
   ) {
     return this.finalizeRefund(payment, cancelReason);

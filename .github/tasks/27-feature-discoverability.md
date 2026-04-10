@@ -1,5 +1,9 @@
 # Task 27: Feature Discoverability Gap Resolution
 
+**Status: COMPLETED** (2026-04-09)
+
+All P0 dead-ends and P1 discoverability gaps resolved. Navigation infrastructure restructured, orphan pages connected, sport type hardcoding fixed, mock data removed from production UI.
+
 ## Context
 
 MatchUp has 12+ core feature domains implemented across backend API and frontend pages, but users cannot effectively discover or reach many of them. The gap between "feature exists in code" and "user can find it in the app" is the single largest UX issue in the current build.
@@ -116,38 +120,38 @@ Close the discoverability gap so that every implemented feature is reachable wit
 
 ### P0 -- Dead-End or Zero Entry Points (must fix this task)
 
-- [ ] **P0-1**: `/mercenary/[id]` detail page missing -- mercenary list links to a non-existent page
-- [ ] **P0-2**: `/venues` -- fully implemented page with zero navigation links from anywhere
-- [ ] **P0-3**: `/badges` -- fully implemented page with zero navigation links from anywhere
-- [ ] **P0-4**: `/feed` -- fully implemented page with zero navigation links from anywhere
-- [ ] **P0-5**: `POST /teams/:id/apply` -- backend endpoint not implemented; frontend button calls it and gets 404
-- [ ] **P0-6**: Team match creation hardcoded to 2 sports -- users of basketball/badminton/hockey etc. cannot create team matches
-- [ ] **P0-7**: Mercenary filter hardcoded to 2 sports -- users cannot filter by their sport
+- [x] **P0-1**: `/mercenary/[id]` detail page missing -- mercenary list links to a non-existent page
+- [x] **P0-2**: `/venues` -- fully implemented page with zero navigation links from anywhere
+- [x] **P0-3**: `/badges` -- fully implemented page with zero navigation links from anywhere
+- [x] **P0-4**: `/feed` -- fully implemented page with zero navigation links from anywhere
+- [x] **P0-5**: `POST /teams/:id/apply` -- backend endpoint not implemented; frontend button calls it and gets 404
+- [x] **P0-6**: Team match creation hardcoded to 2 sports -- users of basketball/badminton/hockey etc. cannot create team matches
+- [x] **P0-7**: Mercenary filter hardcoded to 2 sports -- users cannot filter by their sport
 
 ### P1 -- Feature Exists But Hard to Find (should fix this task)
 
-- [ ] **P1-1**: Team matching has no mobile bottom-nav or home quick-link entry
-- [ ] **P1-2**: Mercenary has no navigation entry (bottom nav, sidebar) -- only via rotating home banner or profile
-- [ ] **P1-3**: Venues has no sidebar entry
-- [ ] **P1-4**: Chat/Notifications not in bottom nav (accessible only through profile or desktop sidebar)
+- [x] **P1-1**: Team matching has no mobile bottom-nav or home quick-link entry
+- [x] **P1-2**: Mercenary has no navigation entry (bottom nav, sidebar) -- only via rotating home banner or profile
+- [x] **P1-3**: Venues has no sidebar entry
+- [x] **P1-4**: Chat/Notifications not in bottom nav (accessible only through profile or desktop sidebar)
 
 ### P2 -- Mock Data / Incomplete Integration (nice-to-have this task)
 
-- [ ] **P2-1**: `/my/team-matches` falls back to `mockTeamMatches` array when API returns no items
-- [ ] **P2-2**: `/my/mercenary` falls back to `mockMercenaryPosts` array when API returns no items
+- [x] **P2-1**: `/my/team-matches` falls back to `mockTeamMatches` array when API returns no items
+- [x] **P2-2**: `/my/mercenary` falls back to `mockMercenaryPosts` array when API returns no items
 
 ---
 
 ## Original Conditions (from user request)
 
-- [ ] All implemented features cataloged with user scenarios
-- [ ] Every feature's entry points (navigation paths) identified
-- [ ] P0 dead-end items fixed -- users can complete full flows
-- [ ] P0 orphan pages connected to navigation
-- [ ] Sport type hardcoding replaced with full `sportLabel` constant
-- [ ] No documentation-only changes -- all fixes are UI/Navigation code
-- [ ] Known Blockers from CLAUDE.md addressed (items 3, 4, 5)
-- [ ] Mock data fallbacks in `/my/team-matches` and `/my/mercenary` removed or clearly gated
+- [x] All implemented features cataloged with user scenarios
+- [x] Every feature's entry points (navigation paths) identified
+- [x] P0 dead-end items fixed -- users can complete full flows
+- [x] P0 orphan pages connected to navigation
+- [x] Sport type hardcoding replaced with full `sportLabel` constant
+- [x] No documentation-only changes -- all fixes are UI/Navigation code
+- [x] Known Blockers from CLAUDE.md addressed (items 3, 4, 5)
+- [x] Mock data fallbacks in `/my/team-matches` and `/my/mercenary` removed or clearly gated
 
 ---
 

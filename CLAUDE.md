@@ -224,13 +224,16 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` | `POST :id/close` | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete`
 
 ### 팀 (`/teams`)
-`GET /` | `GET me` (소유 팀 목록, JwtAuthGuard) | `GET :id` | `POST /` | `PATCH :id` | `DELETE :id`
+`GET /` | `GET me` (소유 팀 목록, JwtAuthGuard) | `GET :id` | `POST /` | `PATCH :id` | `DELETE :id` | `POST :id/apply`
 
 **팀 멤버 관리** (Phase 1-5 추가):
 `GET :id/members` | `POST :id/members` | `PATCH :id/members/:userId` | `DELETE :id/members/:userId` | `POST :id/leave`
 
 **소유권 이전**:
 `POST :id/transfer-ownership` (owner 전용, `TransferOwnershipDto` — `targetUserId`, `demoteTo: 'manager'|'member'`)
+
+**팀 신청** (Task 27 추가):
+`POST :id/apply` (JwtAuthGuard, 비멤버 대상, idempotent — 중복 신청 시 409)
 
 **팀 전용 하위 페이지** (Task 22 추가, 프론트엔드):
 - `/teams/:id/matches` — 해당 팀이 host 또는 applicant로 참여한 팀 매칭 목록 (`GET /team-matches?teamId=`)
@@ -267,7 +270,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET /` | `GET :id` | `POST /` | `PATCH :id/status`
 
 ### 용병 (`/mercenary`)
-`GET /` | `POST /` | `GET :id` | `POST :id/apply`
+`GET /` (모든 11 종목 필터링 지원, Task 27 수정) | `POST /` | `GET :id` (Task 27 추가, detail page 지원) | `POST :id/apply`
 
 **신청 관리** (Phase 1-5 추가):
 `GET me/applications` (신청자 본인 뷰) | `PATCH :id/applications/:appId/accept|reject` (호스트 뷰) | `DELETE :id/applications/me` (신청 취소)
@@ -399,7 +402,3 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
    VAPID_SUBJECT=mailto:admin@matchup.kr
    ```
    Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요.
-
-2. **`/my/mercenary/page.tsx` API 필드 매핑 미완성**: `useMercenaryPosts()`가 전체 목록을 반환하며 작성자 필터 없음. `startTime`, `endTime`, `venue` 등 필드가 빈값으로 매핑됨. Task 28 후보.
-
-3. **`/mercenary/[id]/edit/page.tsx` 현재값 미로드**: 수정 페이지에 mock 초기값 사용. `useMercenaryPost(id)` 훅으로 API 연동 필요. Task 28 후보.

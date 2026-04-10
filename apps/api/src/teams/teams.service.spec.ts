@@ -619,10 +619,7 @@ describe('TeamsService', () => {
     });
 
     it('should throw ConflictException (TEAM_ALREADY_MEMBER) when user is already an active member', async () => {
-      mockPrismaService.teamMembership.findFirst.mockImplementation(({ where }: { where: { status: string } }) => {
-        if (where.status === 'active') return Promise.resolve({ id: 'mem-active', status: 'active' });
-        return Promise.resolve(null);
-      });
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue({ id: 'mem-active', status: 'active' });
 
       await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(
         ConflictException,
@@ -630,11 +627,7 @@ describe('TeamsService', () => {
     });
 
     it('should throw ConflictException (TEAM_APPLY_PENDING_EXISTS) when a pending application already exists', async () => {
-      mockPrismaService.teamMembership.findFirst.mockImplementation(({ where }: { where: { status: string } }) => {
-        if (where.status === 'active') return Promise.resolve(null);
-        if (where.status === 'pending') return Promise.resolve({ id: 'mem-pending', status: 'pending' });
-        return Promise.resolve(null);
-      });
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue({ id: 'mem-pending', status: 'pending' });
 
       await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(
         ConflictException,

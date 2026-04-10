@@ -1,6 +1,6 @@
 # MatchUp 페이지별 기능 명세서
 
-> 최종 업데이트: 2026-03-23
+> 최종 업데이트: 2026-04-10
 > 전체 72개 페이지의 기능, 데이터 소스, 인터랙션 상세
 
 ---
@@ -46,7 +46,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| **데이터** | `useMatches()` — 모집 중 매치 목록 |
+| **데이터** | RSC 단계에서 matches/teams/lessons/listings/team-matches 사전 prefetch → HydrationBoundary. 클라이언트는 `useMatches()` 등 React Query 훅으로 캐시 재사용 |
 | **종목 캐러셀** | 풋살, 농구, 배드민턴, 하키, 피겨, 쇼트트랙 → `/matches?sport={type}` |
 | **매치 카드** | 종목 아이콘, 제목, 날짜, 장소, 인원, 참가비, 레벨, 모집 진행률 바 |
 | **마감임박** | 70% 이상 차면 빨간 배지 + 빨간 progress bar |
@@ -63,6 +63,7 @@
 |------|------|
 | **데이터** | `useMatches(params)` — 종목별 필터링 |
 | **검색** | 제목/시설명 로컬 필터링 |
+| **이미지 접근성** | 매치 카드 `SafeImage` alt=`` `${sportLabel[match.sportType]} 매치 이미지` `` — 종목명 포함 의미 있는 설명 |
 | **종목 필터** | 전체/풋살/농구/배드민턴/아이스하키 칩 |
 | **날짜 필터** | date input (상세 필터 패널) |
 | **정렬** | 최신순 / 마감임박 토글 |
@@ -533,9 +534,12 @@
 
 | 항목 | 내용 |
 |------|------|
+| **인증** | `useRequireAuth()` — 비인증 접근 시 `/login`으로 리디렉트 |
 | **수정** | 닉네임, 이메일, 전화번호 → `PATCH /users/me` |
 | **소셜 계정** | 카카오(연결됨), 네이버/Apple(연결하기) |
-| **회원 탈퇴** | "계정 삭제" 입력 확인 → 탈퇴 |
+| **회원 탈퇴** | "탈퇴합니다" 입력 확인 후 버튼 활성화 → 탈퇴 |
+| **DeleteModal 접근성** | `role="dialog"`, `aria-modal="true"`, `aria-labelledby="delete-modal-title"`, ESC 핸들러, focus trap (Tab/Shift+Tab 순환), 탈퇴하기 `disabled:pointer-events-none` |
+| **다크모드** | 경고 아이콘 컨테이너 `dark:bg-red-900/30`, 입력 필드 `dark:bg-gray-700` |
 
 ### `/settings/notifications` — 알림 설정
 

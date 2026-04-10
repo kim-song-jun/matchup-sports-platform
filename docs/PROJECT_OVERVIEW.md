@@ -1,6 +1,6 @@
 # MatchUp - AI 스포츠 매칭 플랫폼 프로젝트 현황
 
-> 최종 업데이트: 2026-04-08 | 스크린샷: v4 (Playwright 자동 캡처)
+> 최종 업데이트: 2026-04-10 | 스크린샷: v4 (Playwright 자동 캡처)
 
 ---
 
@@ -362,3 +362,16 @@ open http://localhost:8111/docs
 - 번들 분석 + 코드 스플리팅 최적화
 - SSG/ISR 활용 (소개 페이지)
 - Web Worker 활용 (검색, 필터)
+
+---
+
+## 보안 레이어
+
+| 레이어 | 항목 |
+|--------|------|
+| **nginx** | X-Frame-Options SAMEORIGIN, X-Content-Type-Options nosniff, X-XSS-Protection 1; mode=block, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy |
+| **nginx** | Swagger(`/docs`) 내부망(10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) 접근 제한 |
+| **nginx** | 업로드 엔드포인트(`/api/v1/uploads`) rate limiting (10r/s burst 20) |
+| **SafeImage** | `normalizeSrc()` 경로 순회 방어 (`../` 차단), `data:image/` URL 제한, `resolvedPriority` 버그 수정 |
+| **프론트엔드** | `useRequireAuth()` — 인증 필요 페이지 비로그인 접근 시 리디렉트 게이트 |
+| **접근성** | WCAG 2.1 AA 준수 (컬러 대비 4.5:1, 키보드 접근성, 스크린리더, `prefers-reduced-motion`) |

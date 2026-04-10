@@ -388,7 +388,7 @@ RefereeIncentive, SportIcons (6종)
 ### nginx 보안 레이어
 | 항목 | 구현 상태 |
 |------|---------|
-| X-Frame-Options | ✅ `DENY` (전체 location 블록) |
+| X-Frame-Options | ✅ `SAMEORIGIN` (전체 location 블록) |
 | X-Content-Type-Options | ✅ `nosniff` |
 | X-XSS-Protection | ✅ `1; mode=block` |
 | Referrer-Policy | ✅ `strict-origin-when-cross-origin` |

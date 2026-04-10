@@ -23,8 +23,9 @@ export class LessonsController {
     @Query('sportType') sportType?: string,
     @Query('type') type?: string,
     @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.lessonsService.findAll({ sportType, type, cursor });
+    return this.lessonsService.findAll({ sportType, type, cursor, limit: limit ? parseInt(limit, 10) : undefined });
   }
 
   @Get(':id')

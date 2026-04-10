@@ -47,8 +47,11 @@ export function BottomNav() {
               <div className="relative">
                 <Icon size={22} strokeWidth={isActive ? 1.9 : 1.6} />
                 {isProfile && totalUnread > 0 && (
-                  <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold text-white animate-badge-pulse">
-                    {totalUnread > 99 ? '99+' : totalUnread}
+                  <span
+                    className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold text-white animate-badge-pulse"
+                    aria-label={`읽지 않은 알림 ${totalUnread > 99 ? '99개 이상' : `${totalUnread}개`}`}
+                  >
+                    <span aria-hidden="true">{totalUnread > 99 ? '99+' : totalUnread}</span>
                   </span>
                 )}
               </div>

@@ -1,55 +1,65 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState, Suspense } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
-export function ProgressBar() {
+/**
+ * Tracks route changes via usePathname + useSearchParams.
+ * Must be wrapped in Suspense because useSearchParams requires it.
+ *
+ * Animation sequence on route change:
+ *   1. visible=true, progress=30  — bar appears at 30%
+ *   2. +50ms  → progress=100     — bar fills to 100%
+ *   3. +400ms → visible=false, progress=0 — bar hides
+ */
+function ProgressBarInner() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
-  const prevPathname = useRef(pathname);
+  const fillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (pathname !== prevPathname.current) {
-      // Page changed — show completion
-      setProgress(100);
-      setTimeout(() => {
-        setVisible(false);
-        setProgress(0);
-      }, 300);
-      prevPathname.current = pathname;
-    }
-  }, [pathname]);
+    // pathname/searchParams change = navigation completed
+    if (fillTimer.current) clearTimeout(fillTimer.current);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
 
-  // Start progress on link clicks
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest('a');
-      if (anchor && anchor.href && anchor.href.startsWith(window.location.origin) && !anchor.href.includes('#')) {
-        const url = new URL(anchor.href);
-        if (url.pathname !== pathname) {
-          setVisible(true);
-          setProgress(30);
-          // Simulate progress
-          const t1 = setTimeout(() => setProgress(60), 100);
-          const t2 = setTimeout(() => setProgress(80), 300);
-          return () => { clearTimeout(t1); clearTimeout(t2); };
-        }
-      }
+    setVisible(true);
+    setProgress(30);
+
+    fillTimer.current = setTimeout(() => setProgress(100), 50);
+    hideTimer.current = setTimeout(() => {
+      setVisible(false);
+      setProgress(0);
+    }, 400);
+
+    return () => {
+      if (fillTimer.current) clearTimeout(fillTimer.current);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
     };
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   if (!visible && progress === 0) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] h-[2px]">
+    <div className="fixed top-0 left-0 right-0 z-[9999] h-[2px]" aria-hidden="true">
       <div
-        className="h-full bg-blue-500 transition-[width,opacity] duration-200 ease-out"
-        style={{ width: `${progress}%`, opacity: progress === 100 ? 0 : 1 }}
+        className="h-full bg-blue-500 transition-[width] duration-200 ease-out"
+        style={{ width: `${progress}%`, opacity: 1 }}
       />
     </div>
+  );
+}
+
+/**
+ * Top progress bar that reacts to App Router navigation.
+ * Replaces the previous document-level capture click listener approach.
+ */
+export function ProgressBar() {
+  return (
+    <Suspense fallback={null}>
+      <ProgressBarInner />
+    </Suspense>
   );
 }

@@ -65,8 +65,8 @@ export class LessonsService {
     return lesson;
   }
 
-  async findAll(filter: { sportType?: string; type?: string; cursor?: string }) {
-    const limit = 20;
+  async findAll(filter: { sportType?: string; type?: string; cursor?: string; limit?: number }) {
+    const limit = Math.min(filter.limit ?? 20, 100);
     const where: Record<string, unknown> = { status: 'open' };
     if (filter.sportType) where.sportType = filter.sportType;
     if (filter.type) where.type = filter.type;

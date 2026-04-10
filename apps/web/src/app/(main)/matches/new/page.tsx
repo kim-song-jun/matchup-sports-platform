@@ -179,11 +179,11 @@ export default function CreateMatchPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="최대 인원" id="match-maxPlayers">
-                <input id="match-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: +e.target.value })}
+                <input id="match-maxPlayers" type="number" inputMode="numeric" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: +e.target.value })}
                   min={2} max={30} className="form-input" />
               </Field>
               <Field label="참가비 (원)" id="match-fee">
-                <input id="match-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: +e.target.value })}
+                <input id="match-fee" type="number" inputMode="numeric" value={form.fee} onChange={(e) => setForm({ ...form, fee: +e.target.value })}
                   min={0} step={1000} className="form-input" />
               </Field>
             </div>
@@ -256,8 +256,9 @@ export default function CreateMatchPage() {
                 </div>
               )}
               <div className="mt-2">
-                <p className="text-xs text-gray-500 mb-1.5">또는 직접 입력</p>
+                <label htmlFor="match-customVenue" className="block text-xs text-gray-500 mb-1.5">또는 직접 입력</label>
                 <input
+                  id="match-customVenue"
                   value={form.customVenue}
                   onChange={(e) => setForm({ ...form, customVenue: e.target.value, venueId: '' })}
                   maxLength={200}
@@ -311,7 +312,7 @@ export default function CreateMatchPage() {
               {form.rules && <ConfirmRow label="규칙" value={form.rules} />}
               {imageUrls.length > 0 && <ConfirmRow label="이미지" value={`${imageUrls.length}장`} />}
             </div>
-            <button onClick={handleSubmit} disabled={isSubmitting}
+            <button onClick={handleSubmit} disabled={isSubmitting} aria-busy={isSubmitting}
               data-testid="match-create-submit"
               className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
               {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}

@@ -293,6 +293,34 @@ export class ChatService {
     return { ...message, content: '삭제된 메시지입니다', imageUrl: null };
   }
 
+  /**
+   * Returns the total number of unread messages across all chat rooms the user participates in.
+   * A message is unread if its createdAt is after the participant's lastReadAt for that room.
+   * Rooms where lastReadAt is null treat all messages as unread.
+   */
+  async getUnreadCount(userId: string): Promise<number> {
+    const participants = await this.prisma.chatRoomParticipant.findMany({
+      where: { userId },
+      select: { roomId: true, lastReadAt: true },
+    });
+
+    if (participants.length === 0) return 0;
+
+    const counts = await Promise.all(
+      participants.map((p) =>
+        this.prisma.chatMessage.count({
+          where: {
+            roomId: p.roomId,
+            deletedAt: null,
+            ...(p.lastReadAt ? { createdAt: { gt: p.lastReadAt } } : {}),
+          },
+        }),
+      ),
+    );
+
+    return counts.reduce((sum, c) => sum + c, 0);
+  }
+
   /** Asserts that userId is a participant of roomId. Throws 403 CHAT_FORBIDDEN otherwise. */
   async assertParticipant(roomId: string, userId: string) {
     const participant = await this.prisma.chatRoomParticipant.findUnique({

@@ -136,7 +136,8 @@ export default function LoginPage() {
     if (isAuthenticated) router.replace('/home');
   }, [isAuthenticated, router]);
 
-  const handleEmailSubmit = async () => {
+  const handleEmailSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!email || !password) return toast('error', '이메일과 비밀번호를 입력해주세요');
     if (mode === 'register' && !nickname) return toast('error', '닉네임을 입력해주세요');
     if (password.length < 6) return toast('error', '비밀번호는 6자 이상이어야 해요');
@@ -208,27 +209,25 @@ export default function LoginPage() {
           </div>
 
           {/* 폼 */}
-          <div className="space-y-3">
+          <form onSubmit={handleEmailSubmit} className="space-y-3" noValidate>
             <label htmlFor="login-email" className="sr-only">이메일 주소</label>
             <input id="login-email" type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
             <label htmlFor="login-password" className="sr-only">비밀번호</label>
             <input id="login-password" type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleEmailSubmit()}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
             {mode === 'register' && (
               <>
                 <label htmlFor="login-nickname" className="sr-only">닉네임</label>
                 <input id="login-nickname" type="text" placeholder="닉네임" value={nickname} onChange={e => setNickname(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleEmailSubmit()}
                   className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
               </>
             )}
-            <button onClick={handleEmailSubmit} disabled={isLoading} data-testid="auth-submit"
-              className="w-full rounded-xl bg-blue-500 py-3 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-[colors,transform]">
+            <button type="submit" disabled={isLoading} data-testid="auth-submit"
+              className="w-full rounded-xl bg-blue-500 py-3 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-[background-color,color,transform]">
               {isLoading ? (mode === 'login' ? '로그인 중...' : '가입 중...') : mode === 'login' ? '로그인' : '가입하기'}
             </button>
-          </div>
+          </form>
 
           {/* 소셜 로그인 */}
           <SocialLoginButtons />

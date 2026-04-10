@@ -39,16 +39,16 @@ export default function HomePage() {
   const tc = useTranslations('common');
   const tn = useTranslations('nav');
   const { data: matchData, isLoading } = useMatches();
-  const { data: teamData } = useTeams();
-  const { data: lessonData } = useLessons();
-  const { data: listingData } = useListings();
-  const { data: teamMatchData } = useTeamMatches();
+  const { data: teamData } = useTeams({ limit: '6' });
+  const { data: lessonData } = useLessons({ limit: '4' });
+  const { data: listingData } = useListings({ limit: '4' });
+  const { data: teamMatchData } = useTeamMatches({ limit: '3' });
 
   const allMatches = matchData?.items ?? [];
-  const teams = (teamData?.items ?? []).slice(0, 6);
-  const lessons = (lessonData?.items ?? []).slice(0, 4);
-  const listings = (listingData?.items ?? []).slice(0, 4);
-  const teamMatches = (teamMatchData?.items ?? []).slice(0, 3);
+  const teams = teamData?.items ?? [];
+  const lessons = lessonData?.items ?? [];
+  const listings = listingData?.items ?? [];
+  const teamMatches = teamMatchData?.items ?? [];
 
   const [activeSport, setActiveSport] = useState<string>('all');
   const [bannerIdx, setBannerIdx] = useState(0);
@@ -69,11 +69,19 @@ export default function HomePage() {
   }, []);
 
   const [bannerPaused, setBannerPaused] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   useEffect(() => {
-    if (bannerPaused) return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  useEffect(() => {
+    if (bannerPaused || prefersReducedMotion) return;
     const t = setInterval(() => setBannerIdx(i => (i + 1) % banners.length), 5000);
     return () => clearInterval(t);
-  }, [bannerPaused]);
+  }, [bannerPaused, prefersReducedMotion]);
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -200,7 +208,7 @@ export default function HomePage() {
                 <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
                   aria-label={`배너 ${i + 1}`}
                   className="relative flex items-center justify-center p-2.5">
-                  <span className={`block h-1.5 rounded-full transition-[width,colors] duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
+                  <span className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
                 </button>
               ))}
             </div>
@@ -264,7 +272,7 @@ export default function HomePage() {
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-            {filteredMatches.slice(0, 6).map((m: Match) => <MatchCard key={m.id} match={m} />)}
+            {filteredMatches.slice(0, 6).map((m: Match, idx) => <MatchCard key={m.id} match={m} priority={idx === 0} />)}
           </div>
         )}
       </section>
@@ -281,7 +289,7 @@ export default function HomePage() {
                 const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
                 const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
                 return (
-                  <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
+                  <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto cursor-pointer">
                     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
@@ -319,7 +327,7 @@ export default function HomePage() {
               {lessons.map((l: Lesson) => {
                 const accent = sportCardAccent[l.sportType];
                 return (
-                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
+                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto cursor-pointer">
                     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors h-full">
                       <div className="flex items-center justify-between">
                         <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
@@ -352,7 +360,7 @@ export default function HomePage() {
                 const fallbackListingImage = getListingImage(undefined, item.id);
 
                 return (
-                  <Link key={item.id} href={`/marketplace/${item.id}`}>
+                  <Link key={item.id} href={`/marketplace/${item.id}`} className="cursor-pointer">
                     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                       <div className="aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <SafeImage
@@ -401,7 +409,7 @@ function SectionHeader({ title, count, href, showMore = true, moreLabel = '더�
 }
 
 
-const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
+const MatchCard = React.memo(function MatchCard({ match, priority = false }: { match: Match; priority?: boolean }) {
   const filled = match.currentPlayers / match.maxPlayers;
   const isAlmostFull = filled >= 0.7;
   const timeBadge = getTimeBadge(match.matchDate);
@@ -414,7 +422,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
   const fallbackMatchImage = getSportDetailImageSet(match.sportType, undefined, match.id, 1)[0];
 
   return (
-    <Link href={`/matches/${match.id}`}>
+    <Link href={`/matches/${match.id}`} className="cursor-pointer">
       <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex h-24 hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
         {/* 이미지: 1:1 정사각형 고정 */}
         <div className="w-24 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden relative">
@@ -423,7 +431,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
             fallbackSrc={fallbackMatchImage}
             alt={match.title}
             className="w-full h-full object-cover"
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
           />
           {timeBadge && (
             <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>

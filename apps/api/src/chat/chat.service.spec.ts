@@ -17,6 +17,7 @@ const mockPrisma = {
     findUnique: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   chatRoomParticipant: {
     findUnique: jest.fn(),
@@ -318,6 +319,55 @@ describe('ChatService', () => {
       await expect(
         service.createRoom('host', { type: 'team_match' as never, teamMatchId: 'missing-tm' }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getUnreadCount', () => {
+    it('returns 0 when user has no chat room participations', async () => {
+      mockPrisma.chatRoomParticipant.findMany.mockResolvedValue([]);
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toBe(0);
+      expect(mockPrisma.chatMessage.count).not.toHaveBeenCalled();
+    });
+
+    it('sums unread messages across all rooms (lastReadAt set)', async () => {
+      const lastReadAt = new Date('2024-01-01T10:00:00Z');
+      mockPrisma.chatRoomParticipant.findMany.mockResolvedValue([
+        { roomId: 'r1', lastReadAt },
+        { roomId: 'r2', lastReadAt },
+      ]);
+      mockPrisma.chatMessage.count
+        .mockResolvedValueOnce(3) // r1 has 3 unread
+        .mockResolvedValueOnce(2); // r2 has 2 unread
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toBe(5);
+      expect(mockPrisma.chatMessage.count).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.chatMessage.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ roomId: 'r1', deletedAt: null }),
+        }),
+      );
+    });
+
+    it('counts all messages as unread when lastReadAt is null', async () => {
+      mockPrisma.chatRoomParticipant.findMany.mockResolvedValue([
+        { roomId: 'r1', lastReadAt: null },
+      ]);
+      mockPrisma.chatMessage.count.mockResolvedValueOnce(7);
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toBe(7);
+      // When lastReadAt is null, no createdAt filter should be applied
+      expect(mockPrisma.chatMessage.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { roomId: 'r1', deletedAt: null },
+        }),
+      );
     });
   });
 

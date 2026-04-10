@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { Modal } from '@/components/ui/modal';
-import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch, useArriveMatch } from '@/hooks/use-api';
+import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch, useArriveMatch, queryKeys } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
@@ -51,6 +51,7 @@ export default function MatchDetailPage() {
       return (res as unknown as ApiResponse<MatchParticipant>).data;
     },
     onSuccess: (participant, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
       queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
 
       if (variables.openCheckout && participant.paymentStatus === 'pending') {

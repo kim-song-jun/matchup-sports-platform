@@ -3,17 +3,18 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { sportLabel } from '@/lib/constants';
+import { SportIconMap } from '@/components/icons/sport-icons';
 
 const sportOptions = [
-  { key: 'soccer', emoji: '⚽', label: '축구' },
-  { key: 'futsal', emoji: '🏃', label: '풋살' },
-  { key: 'basketball', emoji: '🏀', label: '농구' },
-  { key: 'badminton', emoji: '🏸', label: '배드민턴' },
-  { key: 'tennis', emoji: '🎾', label: '테니스' },
-  { key: 'ice_hockey', emoji: '🏒', label: '아이스하키' },
-  { key: 'swimming', emoji: '🏊', label: '수영' },
-  { key: 'baseball', emoji: '⚾', label: '야구' },
-  { key: 'volleyball', emoji: '🏐', label: '배구' },
+  { key: 'soccer', label: '축구' },
+  { key: 'futsal', label: '풋살' },
+  { key: 'basketball', label: '농구' },
+  { key: 'badminton', label: '배드민턴' },
+  { key: 'tennis', label: '테니스' },
+  { key: 'ice_hockey', label: '아이스하키' },
+  { key: 'swimming', label: '수영' },
+  { key: 'baseball', label: '야구' },
+  { key: 'volleyball', label: '배구' },
 ] as const;
 
 const features = [
@@ -61,20 +62,28 @@ export default function OnboardingPage() {
       <div className="flex flex-col w-full h-full max-w-md mx-auto px-6 py-8 select-none">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex gap-1.5">
-            <div className={`h-1 rounded-full transition-[width,colors] duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
-            <div className={`h-1 rounded-full transition-[width,colors] duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
+          <div className="flex gap-1.5" role="status" aria-label={`온보딩 ${step === 'sport' ? '1' : '2'}단계 중 2단계`}>
+            <div className={`h-1 rounded-full transition-[width,background-color,color] duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
+            <div className={`h-1 rounded-full transition-[width,background-color,color] duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
           </div>
           {step === 'sport' ? (
-            <button
-              onClick={() => router.push('/home')}
-              aria-label="온보딩 닫기"
-              className="min-h-[44px] min-w-11 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                <path d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={finish}
+                className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors min-h-[44px] flex items-center"
+              >
+                건너뛰기
+              </button>
+              <button
+                onClick={() => router.push('/home')}
+                aria-label="온보딩 닫기"
+                className="min-h-[44px] min-w-11 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
           ) : (
             <button
               onClick={finish}
@@ -104,13 +113,18 @@ export default function OnboardingPage() {
                   <button
                     key={sport.key}
                     onClick={() => toggleSport(sport.key)}
-                    className={`relative flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-[colors,transform] duration-200 active:scale-[0.96] ${
+                    className={`relative flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-[background-color,color,border-color,transform] duration-200 active:scale-[0.96] ${
                       isSelected
                         ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800'
                         : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 dark:hover:border-gray-700'
                     }`}
                   >
-                    <span className="text-2xl">{sport.emoji}</span>
+                    {(() => {
+                      const SportIcon = SportIconMap[sport.key as keyof typeof SportIconMap];
+                      return SportIcon ? (
+                        <SportIcon size={28} className="text-gray-700 dark:text-gray-300" aria-hidden="true" />
+                      ) : null;
+                    })()}
                     <span className={`text-sm font-medium ${isSelected ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>
                       {sport.label}
                     </span>
@@ -127,7 +141,7 @@ export default function OnboardingPage() {
             <div className="mt-auto pt-6 space-y-3">
               <button
                 onClick={() => setStep('features')}
-                className="w-full py-3.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-base hover:bg-gray-800 dark:hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform]"
+                className="w-full py-3.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-base hover:bg-gray-800 dark:hover:bg-gray-100 active:scale-[0.98] transition-[background-color,color,border-color,transform]"
               >
                 {selectedSports.length > 0
                   ? `${selectedSports.map(s => sportLabel[s] || s).join(', ')} 선택 완료`
@@ -172,7 +186,7 @@ export default function OnboardingPage() {
             <div className="mt-auto pt-6 space-y-3">
               <button
                 onClick={finish}
-                className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-bold text-base hover:bg-blue-600 active:scale-[0.98] transition-[colors,transform]"
+                className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-bold text-base hover:bg-blue-600 active:scale-[0.98] transition-[background-color,color,border-color,transform]"
               >
                 시작하기
               </button>

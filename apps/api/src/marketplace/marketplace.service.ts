@@ -49,8 +49,8 @@ export class MarketplaceService {
     }
   }
 
-  async findListings(filter: { sportType?: string; category?: string; condition?: string; cursor?: string }) {
-    const limit = PAGINATION.DEFAULT_LIMIT;
+  async findListings(filter: { sportType?: string; category?: string; condition?: string; cursor?: string; limit?: number }) {
+    const limit = Math.min(filter.limit ?? PAGINATION.DEFAULT_LIMIT, 100);
     const where: Prisma.MarketplaceListingWhereInput = { status: 'active' };
     if (filter.sportType) where.sportType = filter.sportType as SportType;
     if (filter.category) where.category = filter.category;

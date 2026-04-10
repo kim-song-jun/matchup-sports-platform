@@ -6,7 +6,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { usePushRegistration } from '@/hooks/use-push-registration';
-import { useChatUnreadSync, useNotificationSync } from '@/hooks/use-realtime';
+import { RealtimeProvider, useChatUnreadSync, useNotificationSync } from '@/hooks/use-realtime';
 
 /** 앱 마운트 시 /auth/me 로 실제 사용자 정보를 채움 */
 function AuthHydrator() {
@@ -56,7 +56,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000,
+            staleTime: 120 * 1000,
             gcTime: 5 * 60 * 1000,
             retry: false,
             refetchOnWindowFocus: false,
@@ -70,13 +70,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AuthHydrator />
-        <PushRegistrar />
-        <ChatUnreadSyncer />
-        <NotificationSyncer />
-        {children}
-      </ToastProvider>
+      <RealtimeProvider>
+        <ToastProvider>
+          <AuthHydrator />
+          <PushRegistrar />
+          <ChatUnreadSyncer />
+          <NotificationSyncer />
+          {children}
+        </ToastProvider>
+      </RealtimeProvider>
     </QueryClientProvider>
   );
 }

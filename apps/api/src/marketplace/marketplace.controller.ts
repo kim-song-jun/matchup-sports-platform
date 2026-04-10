@@ -25,8 +25,9 @@ export class MarketplaceController {
     @Query('category') category?: string,
     @Query('condition') condition?: string,
     @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.marketplaceService.findListings({ sportType, category, condition, cursor });
+    return this.marketplaceService.findListings({ sportType, category, condition, cursor, limit: limit ? parseInt(limit, 10) : undefined });
   }
 
   @Post('listings')

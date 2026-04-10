@@ -8,7 +8,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-gray-50">
+    <div id="main-content" tabIndex={-1} className="min-h-dvh bg-gray-50 dark:bg-gray-900 outline-none">
       {/* Desktop: sidebar + content */}
       <div className="hidden lg:block">
         <Sidebar />

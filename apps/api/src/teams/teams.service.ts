@@ -33,8 +33,8 @@ export class TeamsService {
     });
   }
 
-  async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string }) {
-    const limit = 20;
+  async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string; limit?: number }) {
+    const limit = Math.min(filter.limit ?? 20, 100);
     const where: Record<string, unknown> = {};
     if (filter.sportType) where.sportType = filter.sportType;
     if (filter.city) where.city = filter.city;

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
 import {
@@ -29,11 +29,22 @@ interface RealtimeState {
   error: Error | null;
 }
 
+// ---------------------------------------------------------------------------
+// Context — single instance shared across the entire app
+// ---------------------------------------------------------------------------
+
+const RealtimeContext = createContext<RealtimeState>({
+  socket: null,
+  connected: false,
+  connectionState: 'disconnected',
+  error: null,
+});
+
 /**
- * Manages the Socket.IO connection lifecycle.
- * Connects when the user is authenticated, disconnects on logout or token change.
+ * Mounts a single Socket.IO connection for the authenticated user.
+ * Place this provider inside QueryClientProvider and after auth store hydration.
  */
-export function useRealtime(): RealtimeState {
+export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const accessToken = useAuthStore((s) => s.accessToken);
   const [state, setState] = useState<RealtimeState>({
     socket: null,
@@ -44,6 +55,7 @@ export function useRealtime(): RealtimeState {
 
   useEffect(() => {
     if (!accessToken || typeof window === 'undefined') {
+      disconnectSocket();
       setState({ socket: null, connected: false, connectionState: 'disconnected', error: null });
       return;
     }
@@ -73,17 +85,39 @@ export function useRealtime(): RealtimeState {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
+      disconnectSocket();
     };
   }, [accessToken]);
 
-  return state;
+  return React.createElement(RealtimeContext.Provider, { value: state }, children);
 }
+
+/**
+ * Returns the realtime socket state from the nearest RealtimeProvider.
+ */
+export function useRealtimeContext(): RealtimeState {
+  return useContext(RealtimeContext);
+}
+
+/**
+ * Convenience alias — keeps existing call sites working without changes.
+ * Reads socket state from the shared RealtimeContext instead of creating
+ * an independent useState, so connect/disconnect listeners are registered
+ * exactly once (inside RealtimeProvider).
+ */
+export function useRealtime(): RealtimeState {
+  return useRealtimeContext();
+}
+
+// ---------------------------------------------------------------------------
+// Consumer hooks — all read from the shared context
+// ---------------------------------------------------------------------------
 
 /**
  * Subscribes to `notification:new` events from the realtime socket.
  */
 export function useNotificationSocket(onNew: (notification: NotificationPayload) => void) {
-  const { socket } = useRealtime();
+  const { socket } = useRealtimeContext();
 
   useEffect(() => {
     if (!socket) return;
@@ -102,7 +136,7 @@ export function useChatRoomSocket(
   roomId: string | null,
   onMessage: (payload: ChatMessagePayload) => void,
 ) {
-  const { socket, connected } = useRealtime();
+  const { socket, connected } = useRealtimeContext();
   const onMessageRef = useRef(onMessage);
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -126,10 +160,10 @@ export function useChatRoomSocket(
 /**
  * Listens to all incoming chat:message WS events and invalidates the chat rooms
  * query so useChatUnreadTotal() picks up new unread counts across all rooms.
- * Mount once at the app level (e.g. providers.tsx).
+ * Mount once at the app level (e.g. providers.tsx via RealtimeProvider).
  */
 export function useChatUnreadSync() {
-  const { socket, connected } = useRealtime();
+  const { socket, connected } = useRealtimeContext();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -137,6 +171,7 @@ export function useChatUnreadSync() {
 
     function handleMessage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.unreadCount });
     }
 
     socket.on('chat:message', handleMessage);
@@ -148,10 +183,10 @@ export function useChatUnreadSync() {
 
 /**
  * Keeps the notification center and unread badge synchronized with websocket events.
- * Mount once at the app level.
+ * Mount once at the app level via RealtimeProvider.
  */
 export function useNotificationSync() {
-  const { socket, connected } = useRealtime();
+  const { socket, connected } = useRealtimeContext();
   const queryClient = useQueryClient();
 
   useEffect(() => {

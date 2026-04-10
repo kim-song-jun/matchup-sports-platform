@@ -312,6 +312,11 @@ export const handlers = [
     });
   }),
 
+  // ── Chat handlers ──
+  http.get('/api/v1/chat/unread-count', () => {
+    return success({ unreadCount: 2 });
+  }),
+
   // ── Team Invitations handlers ──
   http.get('/api/v1/teams/:teamId/invitations', ({ params }) => {
     return success([

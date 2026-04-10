@@ -27,8 +27,8 @@ const SPORTS = [
 
 const SUB_FEATURES = [
   { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-blue-500' },
-  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-blue-500' },
-  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-blue-500' },
+  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-emerald-500' },
+  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-amber-500' },
 ];
 
 const STEPS = [

@@ -117,6 +117,7 @@ export const queryKeys = {
   chat: {
     rooms: ['chat', 'rooms'] as const,
     messages: (roomId: string) => ['chat', 'messages', roomId] as const,
+    unreadCount: ['chat', 'unread-count'] as const,
   },
   mercenary: {
     all: ['mercenary'] as const,
@@ -242,6 +243,7 @@ export function useMatches(params?: Record<string, string>) {
       const res = await api.get('/matches', { params });
       return extractData<PaginatedResponse<Match>>(res);
     },
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -359,6 +361,7 @@ export function useTeams(params?: Record<string, string>) {
       const res = await api.get('/teams', { params });
       return extractData<PaginatedResponse<SportTeam>>(res);
     },
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -431,6 +434,7 @@ export function useLessons(params?: Record<string, string>) {
       const res = await api.get('/lessons', { params });
       return extractData<PaginatedResponse<Lesson>>(res);
     },
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -512,6 +516,7 @@ export function useListings(params?: Record<string, string>) {
       const res = await api.get('/marketplace/listings', { params });
       return extractData<PaginatedResponse<MarketplaceListing>>(res);
     },
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -611,6 +616,7 @@ export function useTeamMatches(params?: Record<string, string>) {
       const res = await api.get('/team-matches', { params });
       return extractData<PaginatedResponse<TeamMatch>>(res);
     },
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -825,12 +831,24 @@ export function useChatRooms() {
       return paginated.items ?? paginated.data ?? [];
     },
     enabled: isAuthenticated,
+    staleTime: 30 * 1000,
   });
 }
 
 export function useChatUnreadTotal(): number {
-  const { data: rooms = [] } = useChatRooms();
-  return rooms.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+  const { isAuthenticated } = useAuthStore();
+  const { data } = useQuery<{ unreadCount: number }>({
+    queryKey: queryKeys.chat.unreadCount,
+    queryFn: async () => {
+      const res = await api.get('/chat/unread-count');
+      return extractData<{ unreadCount: number }>(res);
+    },
+    enabled: isAuthenticated,
+    staleTime: 30 * 1000,
+    refetchInterval: isAuthenticated ? 60 * 1000 : false,
+    refetchIntervalInBackground: false,
+  });
+  return data?.unreadCount ?? 0;
 }
 
 export function useChatMessages(roomId: string) {
@@ -1094,7 +1112,7 @@ export function useNotifications(isRead?: boolean) {
     },
     enabled: isAuthenticated,
     // Backfill notifications if a realtime event is missed during socket handshakes.
-    refetchInterval: isAuthenticated ? 5_000 : false,
+    refetchInterval: isAuthenticated ? 30_000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -1111,7 +1129,7 @@ export function useUnreadCount() {
     },
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
-    refetchInterval: isAuthenticated ? 15_000 : false,
+    refetchInterval: isAuthenticated ? 60_000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,

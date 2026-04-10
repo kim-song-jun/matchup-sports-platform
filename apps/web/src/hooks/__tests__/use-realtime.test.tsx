@@ -36,7 +36,19 @@ vi.mock('@/stores/auth-store', () => ({
 
 // Must import after mocks are set up
 import { queryKeys } from '../use-api';
-import { useNotificationSync, useRealtime } from '../use-realtime';
+import { RealtimeProvider, useNotificationSync, useRealtime } from '../use-realtime';
+
+/** Wraps the hook under test with RealtimeProvider + QueryClientProvider. */
+function makeWrapper(queryClient?: QueryClient) {
+  const qc = queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={qc}>
+        <RealtimeProvider>{children}</RealtimeProvider>
+      </QueryClientProvider>
+    );
+  };
+}
 
 describe('useRealtime', () => {
   beforeEach(() => {
@@ -54,7 +66,7 @@ describe('useRealtime', () => {
 
   it('starts in disconnected state', () => {
     mockToken = null;
-    const { result } = renderHook(() => useRealtime());
+    const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
     expect(result.current.connected).toBe(false);
     expect(result.current.connectionState).toBe('disconnected');
     expect(result.current.socket).toBeNull();
@@ -62,13 +74,13 @@ describe('useRealtime', () => {
 
   it('calls socket.connect() when token is present', () => {
     mockToken = 'valid-token';
-    renderHook(() => useRealtime());
+    renderHook(() => useRealtime(), { wrapper: makeWrapper() });
     expect(mockConnect).toHaveBeenCalledTimes(1);
   });
 
   it('registers connect/disconnect/connect_error event handlers', () => {
     mockToken = 'valid-token';
-    renderHook(() => useRealtime());
+    renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
     const registeredEvents = mockOn.mock.calls.map((c: [string]) => c[0]);
     expect(registeredEvents).toContain('connect');
@@ -78,7 +90,7 @@ describe('useRealtime', () => {
 
   it('transitions to connected state on connect event', () => {
     mockToken = 'valid-token';
-    const { result } = renderHook(() => useRealtime());
+    const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
     // Simulate server sending 'connect'
     const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
@@ -93,7 +105,7 @@ describe('useRealtime', () => {
 
   it('transitions to disconnected state on disconnect event', () => {
     mockToken = 'valid-token';
-    const { result } = renderHook(() => useRealtime());
+    const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
     const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
     act(() => connectHandler?.());
@@ -114,11 +126,8 @@ describe('useRealtime', () => {
       },
     });
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
 
-    renderHook(() => useNotificationSync(), { wrapper });
+    renderHook(() => useNotificationSync(), { wrapper: makeWrapper(queryClient) });
 
     const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
     act(() => connectHandler?.());
@@ -142,11 +151,7 @@ describe('useRealtime', () => {
     const visibilityStateSpy = vi.spyOn(document, 'visibilityState', 'get');
     visibilityStateSpy.mockReturnValue('hidden');
 
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-
-    renderHook(() => useNotificationSync(), { wrapper });
+    renderHook(() => useNotificationSync(), { wrapper: makeWrapper(queryClient) });
 
     const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
     act(() => connectHandler?.());
@@ -171,7 +176,7 @@ describe('useRealtime', () => {
 
   it('transitions to error state on connect_error event', () => {
     mockToken = 'valid-token';
-    const { result } = renderHook(() => useRealtime());
+    const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
     const errHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect_error')?.[1];
     const err = new Error('Auth failed');
@@ -183,7 +188,7 @@ describe('useRealtime', () => {
 
   it('removes event listeners on cleanup', () => {
     mockToken = 'valid-token';
-    const { unmount } = renderHook(() => useRealtime());
+    const { unmount } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
     unmount();
 
     const offEvents = mockOff.mock.calls.map((c: [string]) => c[0]);

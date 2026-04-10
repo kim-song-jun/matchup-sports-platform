@@ -100,4 +100,11 @@ export class ChatController {
   ) {
     return this.chatService.markRead(roomId, userId, messageId);
   }
+
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Get total unread message count' })
+  async getUnreadCount(@CurrentUser('id') userId: string) {
+    const count = await this.chatService.getUnreadCount(userId);
+    return { unreadCount: count };
+  }
 }

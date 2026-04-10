@@ -34,8 +34,9 @@ export class TeamsController {
     @Query('city') city?: string,
     @Query('recruiting') recruiting?: string,
     @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.teamsService.findAll({ sportType, city, recruiting, cursor });
+    return this.teamsService.findAll({ sportType, city, recruiting, cursor, limit: limit ? parseInt(limit, 10) : undefined });
   }
 
   @Get('me')

@@ -192,7 +192,7 @@ sports-platform/
 
 ### Prerequisites
 
-- **Node.js** >= 20
+- **Node.js** >= 22
 - **pnpm** >= 9
 - **Docker** + Docker Compose
 

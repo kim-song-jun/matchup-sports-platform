@@ -49,10 +49,10 @@ _check-prereqs:
 	@command -v docker >/dev/null 2>&1 || { echo "  ✗ docker not found. Install: https://docs.docker.com/get-docker/"; exit 1; }
 	@docker compose version >/dev/null 2>&1 || { echo "  ✗ docker compose v2 not found."; exit 1; }
 	@command -v pnpm >/dev/null 2>&1 || { echo "  ✗ pnpm not found. Install: npm install -g pnpm"; exit 1; }
-	@command -v node >/dev/null 2>&1 || { echo "  ✗ node not found. Install Node 20+: https://nodejs.org/"; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "  ✗ node not found. Install Node 22+: https://nodejs.org/"; exit 1; }
 	@node_major=$$(node -v | sed 's/v\([0-9]*\).*/\1/'); \
-	if [ "$$node_major" -lt 20 ]; then echo "  ✗ Node 20+ required (found $$(node -v))"; exit 1; fi
-	@echo "  ✓ docker, docker compose, pnpm, node 20+"
+	if [ "$$node_major" -lt 22 ]; then echo "  ✗ Node 22+ required (found $$(node -v))"; exit 1; fi
+	@echo "  ✓ docker, docker compose, pnpm, node 22+"
 
 .PHONY: _init-env
 _init-env:

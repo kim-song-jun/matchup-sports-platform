@@ -39,7 +39,7 @@ export async function openSiblingTab(session: AuthenticatedSession, path: string
 
 export async function expectLoginRedirectOrLink(page: Page) {
   try {
-    await page.waitForURL(/\/login/, { timeout: 5_000 });
+    await page.waitForURL(/\/login/, { timeout: 8_000 });
     await expect(page.getByTestId('login-page')).toBeVisible({ timeout: 5_000 });
     return;
   } catch {

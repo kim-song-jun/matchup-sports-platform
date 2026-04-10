@@ -249,7 +249,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET listings` | `POST listings` | `GET listings/:id` | `POST listings/:id/order`
 
 ### 결제 (`/payments`)
-`POST prepare` | `POST confirm` | `POST :id/refund` | `GET me` | `POST webhook`
+`POST prepare` (PreparePaymentDto) | `POST confirm` (ConfirmPaymentDto) | `POST :id/refund` (RefundPaymentDto) | `GET me` | `POST webhook`
 
 ### 업로드 (`/uploads`)
 `POST /` (멀티파트, 최대 5개 10MB, jpeg/png/webp/gif) | `GET :id` | `DELETE :id`
@@ -317,7 +317,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 ### 주요 커스텀 훅 (`hooks/use-api.ts`)
 - `useMyTeams()` — 로그인 유저 소속 팀 목록 (`GET /teams/me`). 백엔드 `TeamMembership[]` 응답을 `{ id, name, role, sportType, description, city, district, memberCount, level, isRecruiting, logoUrl, joinedAt }[]` 평탄화 형태로 정규화하여 반환. 팀 선택 UI·팀 매칭 생성 시 사용
 - `useMyTeamMatchApplications()` — 신청자 본인이 보낸 팀 매칭 신청 목록 (`GET /team-matches/me/applications`). `/my/team-match-applications` 페이지에서 사용
-- `useRequireAuth()` — 비로그인 접근 시 로그인 페이지로 redirect. **인증이 필요한 모든 페이지에 반드시 적용** (`/(main)/my/*`, `/teams/new`, `/team-matches/new`, `/mercenary/new` 등)
+- `useRequireAuth()` — 비로그인 접근 시 로그인 페이지로 redirect. **인증이 필요한 모든 페이지에 반드시 적용** (`/(main)/my/*`, `/(main)/profile`, `/(main)/matches/new`, `/(main)/lessons/new`, `/(main)/reviews`, `/teams/new`, `/team-matches/new`, `/mercenary/new` 등)
 - `useChatUnreadTotal()` — 전체 미읽음 메시지 수 (`GET /chat/unread-count`), 하단 내비게이션 뱃지에 사용
 - `useChatRoomSocket()` — Socket.IO `chat:message` 이벤트 구독, React Query 캐시 invalidate
 - `useNotificationSocket()` — `notification:new` 이벤트 구독, 인앱 알림 상태 반영

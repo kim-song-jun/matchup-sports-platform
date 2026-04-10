@@ -305,3 +305,10 @@ type SafeImageProps = {
 | 1 | transition-all 교체 필요? | 전수 조사 결과 0건 잔존. 스코프 제외. | 2026-04-10 |
 | 2 | SafeImage에 fill도 width/height도 전달하지 않는 기존 사용처 처리? | 기본 `fill={true}` 적용, 부모에 relative+크기 보장 | 2026-04-10 |
 | 3 | API 서버 업로드 이미지의 remotePatterns 등록 필요? | **불필요** — ADR-30-1 참조. 업로드 이미지는 같은 origin 상대 경로(`/uploads/...`)이므로 remotePatterns 대상 아님. `next.config.ts` 변경 없음. | 2026-04-10 |
+
+## QA Results (2026-04-10)
+
+- agent-review: Round 1 Critical 5 / Warning 9 → Round 2 Critical 0 / Warning 0 ✅
+- agent-qa: Beginner 4/4, Regular 5/6→5/6*, Power 7/7, UI/UX 9/9 통과
+  * Regular Fail: server-fetch 응답 파싱 엣지 케이스 (non-blocking, TransformInterceptor 항상 status 포함)
+- QA 후 수정: transition-[colors,transform] 복원, disabled:pointer-events-none 추가

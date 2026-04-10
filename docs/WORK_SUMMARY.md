@@ -21,6 +21,22 @@ MatchUp 스포츠 매칭 플랫폼의 프론트엔드 디자인 시스템 전면
 - 팀 카드/상세의 로고 fallback을 deterministic SVG emblem으로 보강
 - 실사형 mock 자산 출처를 `/apps/web/public/mock/photoreal/ATTRIBUTION.md`에 기록하는 규칙 추가
 
+### 2026-04-10 추가 업데이트
+
+- **SafeImage 보안 강화**: `normalizeSrc()` 함수 추가 — `..` 경로 순회 방어, `data:image/` URI만 허용(bare `data:` 차단), 상대 경로 자동 정규화. `resolvedPriority` 버그 수정(undefined → 항상 boolean). `usedFallback` 상태로 에러 루프 방지
+- **nginx 보안 헤더**: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy 5개 헤더 전체 location 블록에 추가(nginx 상속 규칙 대응). `/uploads/` rate limiting(10req/min per IP, burst=5), Swagger `/docs` 내부망(`127.0.0.1`) 전용 접근 제한, WebSocket keepalive `proxy_read_timeout 86400s`, `client_max_body_size 55m` 설정
+- **업로드 라우팅 및 RSC prefetch**: `next.config.ts`에 `/uploads/:path*` → `INTERNAL_API_ORIGIN` rewrite 추가. 홈 페이지 SSR 단계에서 matches/teams/lessons/listings/team-matches 데이터 prefetch → HydrationBoundary 적용. `server-fetch.ts` TransformInterceptor 응답 파싱 강화 및 `status` 필드 타입 검증
+- **백엔드 DTO 추가**: `lessons/` — `CreateLessonDto` 추가, 서비스/컨트롤러 DTO 통합. `teams/` — `CreateTeamDto` 추가, 서비스/컨트롤러 DTO 통합. `chat.service.ts` 및 `marketplace.controller.ts` 타입 수정
+- **계정 설정 WCAG 2.1 AA**: `settings/account` 페이지에 `useRequireAuth()` 추가. DeleteModal에 `role="dialog"`, `aria-modal`, `aria-labelledby`, ESC 핸들러, focus trap 적용. 다크모드 `dark:bg-red-900/30`, disabled 버튼 `pointer-events-none`, `transition-[colors,transform]` 복원
+- **i18n 텍스트 정리**: 홈 클라이언트의 하드코딩 "코치", "대여" → i18n 키(`t('coach')`, `t('rent')`) 교체
+- **alt 텍스트 개선**: 매치 목록 카드 이미지 `alt=""` → 의미 있는 alt 텍스트(`` `${sportLabel[match.sportType]} 매치 - ${match.title}` ``)
+- **에이전트 파이프라인 완료**: agent-review Round 1 Critical 5 / Warning 9 → Round 2 Critical 0 / Warning 0. agent-qa 4 페르소나 전원 통과(Beginner 4/4, Regular 5/6→non-blocking, Power 7/7, UI/UX 9/9)
+- **백엔드 DTO 신규 생성**: `lessons/dto/create-lesson.dto.ts`, `teams/dto/create-team.dto.ts` — class-validator 기반 DTO 추가. `lessons.controller.ts`, `marketplace.controller.ts`, `teams.controller.ts`에 `limit` NaN/음수 방어 추가
+- **타입 안전성**: `lessons.service.ts`, `teams.service.ts` — `Prisma.LessonWhereInput` / `Prisma.SportTeamWhereInput` 명시적 타입 적용
+- **chat N+1 해소**: `chat.service.ts` `getUnreadCount()` — 참가방 순회 N+1 → `$queryRaw` 단일 집계 쿼리. 본인 발송 메시지 제외 로직 추가. `chat.service.spec.ts` 5개 케이스로 재작성
+- **nginx 보안/성능**: `/api/docs` 접근 내부 IP 제한, `client_max_body_size 55m`, `/uploads/` rate limit 10req/min, WebSocket `proxy_read_timeout 86400s`
+- **저장소 정리**: `.gitignore`에 `*.bak.*`, `__pycache__/`, `*.pyc` 패턴 추가. 백업 파일 3개 + pyc 2개 인덱스 제거
+
 ### 2026-04-08 추가 업데이트
 - `apps/web/src/lib/sport-image.ts`의 active fallback catalog를 전부 `/apps/web/public/mock/photoreal/` 기반 실사 사진으로 전환
 - 축구, 농구, 배드민턴, 아이스하키, 수영, 테니스, 야구, 배구, 피겨, 쇼트트랙, 팀, 시설, 장터에 대한 로컬 실사 fallback 풀을 정리

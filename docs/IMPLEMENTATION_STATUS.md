@@ -1,6 +1,6 @@
 # MatchUp 구현 현황 문서
 
-> 최종 업데이트: 2026-03-22
+> 최종 업데이트: 2026-04-10
 > 기획서 대비 구현 상태 + 변경/추가 사항 정리
 
 ---
@@ -14,7 +14,7 @@
 | API 엔드포인트 | 70+ |
 | API Hooks | 62개 |
 | DB 모델 (Prisma) | 16개 |
-| Git 커밋 | 16개 |
+| Git 커밋 | 173개 |
 | 총 코드 라인 | ~25,000줄 |
 
 ---
@@ -144,7 +144,7 @@
 | 분쟁 검토 → 운영 조치 | ⚠️ | Admin UI 있으나 자동화 미구현 |
 | 결제/정산 | ⚠️ | UI 완성, 토스페이먼츠 실제 연동 미완 |
 | OAuth 소셜 로그인 | ⚠️ | API 구조 있으나 실제 카카오/네이버/애플 미연동 |
-| FCM 푸시 알림 | ⚠️ | 알림 모델+API 있으나 FCM 발송 미구현 |
+| 푸시 알림 | ⚠️ | web-push VAPID 구현 완료, VAPID 키 생성 + 환경변수 설정 필요 |
 | 이미지 업로드 | ⚠️ | UI 있으나 S3 업로드 미연동 |
 | GPS 실제 위치 | ⚠️ | 시뮬레이션으로 구현, 실제 Geolocation API 미연동 |
 
@@ -319,6 +319,16 @@ Core:       auth, users, matches, prisma, config, health, realtime
 Admin:      admin
 ```
 
+### DTO 현황 (class-validator 기반)
+
+| 모듈 | DTO 파일 |
+|------|---------|
+| lessons | `create-lesson.dto.ts` (신규, 2026-04-10) |
+| teams | `create-team.dto.ts` (신규, 2026-04-10) |
+| 기타 | auth/users/matches/team-matches/marketplace/payments 등 기존 DTO 유지 |
+
+> limit 파라미터 NaN/음수 방어가 `lessons`, `marketplace`, `teams` 컨트롤러에 추가됨.
+
 ---
 
 ## 7. 프로덕션 전 남은 작업
@@ -329,10 +339,9 @@ Admin:      admin
 | OAuth 실제 연동 | 카카오/네이버/애플 소셜 로그인 | 중 |
 | 토스페이먼츠 연동 | 실제 결제 + 웹훅 | 대 |
 | 이미지 업로드 | S3 + CloudFront CDN | 중 |
-| FCM 푸시 알림 | Firebase Admin SDK | 중 |
-| Socket.IO 실시간 | 채팅 실시간 연결 | 중 |
+| VAPID 키 발급 | web-push 환경변수 설정 (코드 완성됨) | 소 |
 | GPS 위치 API | Geolocation + 반경 계산 | 소 |
-| Vercel/Railway 배포 | 프론트 + 백엔드 호스팅 | 소 |
+| EC2/Docker 배포 | deploy/ Dockerfile + nginx 설정 완성됨 | 소 |
 
 ### 🟡 권장 (런칭 후 개선)
 | 항목 | 설명 |
@@ -371,3 +380,38 @@ Toast, Modal, Skeleton, ProgressBar, BadgeDisplay,
 MapPlaceholder, ReviewForm, CheckoutModal, ChatRoomEmbed,
 RefereeIncentive, SportIcons (6종)
 ```
+
+---
+
+## 9. 보안 및 접근성 현황 (2026-04-10 기준)
+
+### nginx 보안 레이어
+| 항목 | 구현 상태 |
+|------|---------|
+| X-Frame-Options | ✅ `DENY` (전체 location 블록) |
+| X-Content-Type-Options | ✅ `nosniff` |
+| X-XSS-Protection | ✅ `1; mode=block` |
+| Referrer-Policy | ✅ `strict-origin-when-cross-origin` |
+| Permissions-Policy | ✅ camera/microphone/geolocation 제한 |
+| Swagger `/docs` 접근 제한 | ✅ `allow 127.0.0.1; deny all` |
+| `/uploads/` rate limiting | ✅ 10req/min per IP, burst=5 |
+| `client_max_body_size` | ✅ 55m |
+| WebSocket keepalive | ✅ `proxy_read_timeout 86400s` |
+
+### SafeImage 보안
+| 항목 | 구현 상태 |
+|------|---------|
+| 경로 순회(`..`) 방어 | ✅ `normalizeSrc()` |
+| `data:` URI 제한 | ✅ `data:image/` prefix만 허용 |
+| 상대 경로 정규화 | ✅ 자동 처리 |
+| 에러 루프 방지 | ✅ `usedFallback` 상태 |
+
+### 접근성 (WCAG 2.1 AA)
+| 항목 | 구현 상태 |
+|------|---------|
+| 폼 label 연결 (`htmlFor` + `id`) | ✅ 42개 파일 전수 적용 |
+| 모달 aria 속성 | ✅ `role="dialog"`, `aria-modal`, `aria-labelledby`, ESC, focus trap |
+| 이미지 alt 텍스트 | ✅ 의미 있는 alt 텍스트 (매치 카드 등) |
+| 인증 보호 경로 | ✅ `useRequireAuth()` — 비로그인 시 리디렉트 |
+| 다크모드 대비 | ✅ WCAG 4.5:1 유지 |
+| `prefers-reduced-motion` | ✅ globals.css 적용 |

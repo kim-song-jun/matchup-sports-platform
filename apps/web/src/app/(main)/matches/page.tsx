@@ -23,12 +23,14 @@ export default async function Page({ searchParams }: PageProps) {
 
   const queryClient = new QueryClient();
 
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: ['matches', apiParams],
-      queryFn: () => serverFetch('/matches', apiParams),
-    }),
-  ]);
+  if (process.env.CAPACITOR_BUILD !== 'true') {
+    await Promise.allSettled([
+      queryClient.prefetchQuery({
+        queryKey: ['matches', apiParams],
+        queryFn: () => serverFetch('/matches', apiParams),
+      }),
+    ]);
+  }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

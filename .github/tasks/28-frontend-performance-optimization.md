@@ -185,3 +185,9 @@
 - `MatchesMapView`: `next/dynamic` + `ssr: false` lazy load (초기 JS 번들 분리), loading skeleton에 `role="status"` + `aria-label` 추가
 - 인증 플로우 해결: 공개 데이터만 서버 프리페치, 인증 필요 데이터(사용자 정보·내 팀)는 클라이언트 유지
 - `HydrationBoundary` + `dehydrate` 패턴으로 서버 데이터를 React Query 캐시에 주입 → 초기 로딩 스켈레톤 제거, FCP 개선
+
+### Adversarial Review 후 추가 수정 (완료)
+- `SafeImage.normalizeSrc()`: 백엔드 `uploads/YYYY/MM/file.webp` 경로 → `/uploads/...` 자동 변환, `..` 경로 traversal 차단, `useCallback`으로 `handleError` 안정화
+- `next.config.ts`: `/uploads/:path*` dev rewrite 추가, Capacitor export 빌드 시 rewrites 빈 배열 반환으로 불필요한 경고 제거
+- `nginx.conf`: `/uploads/` 프록시 블록 추가 (`proxy_http_version 1.1`, `X-Content-Type-Options: nosniff`, `Cache-Control: public, max-age=3600`)
+- RSC page.tsx 3개: `CAPACITOR_BUILD !== 'true'` 가드로 export 빌드 시 serverFetch 프리페치 완전 skip

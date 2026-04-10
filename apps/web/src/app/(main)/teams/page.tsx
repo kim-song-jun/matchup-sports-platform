@@ -5,12 +5,14 @@ import { TeamsPage } from './teams-client';
 export default async function Page() {
   const queryClient = new QueryClient();
 
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: ['teams', undefined],
-      queryFn: () => serverFetch('/teams'),
-    }),
-  ]);
+  if (process.env.CAPACITOR_BUILD !== 'true') {
+    await Promise.allSettled([
+      queryClient.prefetchQuery({
+        queryKey: ['teams', undefined],
+        queryFn: () => serverFetch('/teams'),
+      }),
+    ]);
+  }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

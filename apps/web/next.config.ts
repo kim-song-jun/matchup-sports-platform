@@ -29,10 +29,16 @@ const nextConfig: NextConfig = {
   },
   // 개발 시 API 프록시
   async rewrites() {
+    // Rewrites are ignored in export mode (CAPACITOR_BUILD=true)
+    if (isCapacitorBuild) return [];
     return [
       {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,
+      },
+      {
+        source: '/uploads/:path*',
+        destination: `${internalApiOrigin}/uploads/:path*`,
       },
     ];
   },

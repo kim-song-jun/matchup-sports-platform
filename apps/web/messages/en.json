@@ -90,7 +90,9 @@
     "viewMore": "More",
     "teamMatch": "Team Match",
     "recruiting": "Recruiting",
-    "viewAllMatches": "View All"
+    "viewAllMatches": "View All",
+    "coach": "Coach",
+    "rent": "Rent"
   },
   "matches": {
     "findMatch": "Find Match",

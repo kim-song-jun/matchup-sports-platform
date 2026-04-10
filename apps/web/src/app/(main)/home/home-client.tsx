@@ -340,7 +340,7 @@ export function HomePage() {
                       {l.coachName && (
                         <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
                           <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-2xs font-bold text-gray-500">{l.coachName.charAt(0)}</span>
-                          {l.coachName} 코치
+                          {l.coachName} {t('coach')}
                         </p>
                       )}
                     </div>
@@ -377,7 +377,7 @@ export function HomePage() {
                         <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
                         <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
                         {item.listingType === 'rent' && (
-                          <span className="inline-block mt-1 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded-full px-2 py-0.5">대여</span>
+                          <span className="inline-block mt-1 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded-full px-2 py-0.5">{t('rent')}</span>
                         )}
                       </div>
                     </div>

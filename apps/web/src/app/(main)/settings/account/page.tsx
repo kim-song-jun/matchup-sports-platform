@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { ArrowLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 
 export default function AccountPage() {
+  useRequireAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [nickname, setNickname] = useState('축구왕김선수');
@@ -19,7 +21,7 @@ export default function AccountPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Header */}
       <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-colors min-w-11 min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
@@ -191,13 +193,13 @@ function DeleteModal({
         <button
           aria-label="닫기"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+          className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors min-w-11 min-h-[44px] flex items-center justify-center"
         >
           <X size={20} className="text-gray-500" />
         </button>
 
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 mb-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/30 mb-4">
             <AlertTriangle size={28} className="text-red-500" />
           </div>
           <h3 id="delete-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>

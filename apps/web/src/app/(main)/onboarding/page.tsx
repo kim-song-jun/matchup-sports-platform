@@ -62,7 +62,7 @@ export default function OnboardingPage() {
       <div className="flex flex-col w-full h-full max-w-md mx-auto px-6 py-8 select-none">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex gap-1.5" role="status" aria-label={`온보딩 ${step === 'sport' ? '1' : '2'}단계 중 2단계`}>
+          <div className="flex gap-1.5" aria-label={`진행 단계: ${step === 'sport' ? '1' : '2'}/2`}>
             <div className={`h-1 rounded-full transition-[width,background-color,color] duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
             <div className={`h-1 rounded-full transition-[width,background-color,color] duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
           </div>

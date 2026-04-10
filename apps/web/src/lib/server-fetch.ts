@@ -35,9 +35,17 @@ export async function serverFetch<T>(
     throw new Error(`serverFetch ${path} failed with status ${res.status}`);
   }
 
-  const json = await res.json();
-  if (json !== null && typeof json === 'object' && 'data' in json) {
-    return json.data as T;
+  const json: unknown = await res.json();
+  if (json === null || typeof json !== 'object') {
+    throw new Error(`serverFetch ${path}: unexpected response structure`);
+  }
+  // TransformInterceptor format: { status, data, timestamp }
+  if ('data' in json) {
+    const wrapped = json as { status?: unknown; data: unknown };
+    if (typeof wrapped.status !== 'string') {
+      throw new Error(`serverFetch ${path}: missing or invalid status field`);
+    }
+    return wrapped.data as T;
   }
   return json as T;
 }

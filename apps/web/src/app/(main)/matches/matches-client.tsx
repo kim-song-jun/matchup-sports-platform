@@ -90,7 +90,7 @@ const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
           <SafeImage
             src={matchImage}
             fallbackSrc={fallbackMatchImage}
-            alt=""
+            alt={`${sportLabel[match.sportType]} 매치 - ${match.title}`}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 768px) 100vw, 50vw"

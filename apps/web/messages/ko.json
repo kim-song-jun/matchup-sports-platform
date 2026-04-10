@@ -90,7 +90,9 @@
     "viewMore": "더보기",
     "teamMatch": "팀 매치",
     "recruiting": "모집중",
-    "viewAllMatches": "전체 보기"
+    "viewAllMatches": "전체 보기",
+    "coach": "코치",
+    "rent": "대여"
   },
   "matches": {
     "findMatch": "매치 찾기",

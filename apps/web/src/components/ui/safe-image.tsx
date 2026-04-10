@@ -12,7 +12,7 @@ function normalizeSrc(src?: string | null): string | null {
   if (!src) return null;
   // Reject path traversal attempts regardless of how they arrive
   if (src.includes('..')) return null;
-  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('data:')) return src;
+  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('/') || src.startsWith('data:image/')) return src;
   return `/${src}`;
 }
 

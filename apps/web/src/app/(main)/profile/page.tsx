@@ -8,6 +8,7 @@ import { MiniCalendar } from '@/components/ui/mini-calendar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
@@ -21,6 +22,7 @@ type MenuItem = { label: string; icon: React.ElementType; href: string; quickAct
 type MenuGroup = { label: string; items: MenuItem[] };
 
 export default function ProfilePage() {
+  useRequireAuth();
   const t = useTranslations('profile');
   const tc = useTranslations('common');
   const { user, isAuthenticated, logout } = useAuthStore();
@@ -145,19 +147,7 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-8 text-center" data-testid="auth-wall">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t('loginPromptTitle')}</h2>
-            <p className="text-sm text-gray-500 mt-1.5 whitespace-pre-line">{t('loginPromptDesc')}</p>
-            <Link
-              href="/login"
-              data-testid="auth-wall-login-link"
-              className="inline-block mt-4 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors"
-            >
-              {tc('login')}
-            </Link>
-          </div>
-        )}
+        ) : null}
         {/* 다가오는 일정 — mobile only */}
         <div className="@3xl:hidden">
           {mounted && isAuthenticated && <UpcomingSchedule />}
@@ -207,9 +197,6 @@ export default function ProfilePage() {
       )}
 
       <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
-        {mounted && !isAuthenticated && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 px-2">로그인 필요</p>
-        )}
         {menuGroups.map((group, gIdx) => (
           <div key={group.label} className={gIdx === 0 ? '' : 'mt-5'}>
             <p className="px-2 py-1.5 text-2xs font-semibold text-gray-400 uppercase tracking-wider">

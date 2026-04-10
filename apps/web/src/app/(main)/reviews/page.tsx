@@ -1,21 +1,20 @@
 'use client';
 
-import { ArrowLeft, Star, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
 import { useState } from 'react';
-import Link from 'next/link';
 import { usePendingReviews } from '@/hooks/use-api';
 import type { PendingReview } from '@/types/api';
 import type { QueryClient } from '@tanstack/react-query';
 
 export default function ReviewsPage() {
+  useRequireAuth();
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -35,13 +34,7 @@ export default function ReviewsPage() {
       </div>
 
       <div className="px-5 @3xl:px-0">
-        {!isAuthenticated ? (
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-16 text-center">
-            <Star size={32} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-md font-medium text-gray-600">로그인 후 확인할 수 있어요</p>
-            <Link href="/login" className="mt-4 inline-block rounded-xl bg-blue-500 px-6 py-2.5 text-base font-semibold text-white hover:bg-blue-600 transition-colors">로그인</Link>
-          </div>
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 rounded-xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />)}</div>
         ) : pendingReviews.length === 0 ? (
           <EmptyState

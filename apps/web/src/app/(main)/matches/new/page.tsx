@@ -7,7 +7,7 @@ import { ArrowLeft, Check, Plus, ChevronRight } from 'lucide-react';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { getSportImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
@@ -16,9 +16,9 @@ import { ImageUpload } from '@/components/ui/image-upload';
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
 export default function CreateMatchPage() {
+  useRequireAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -80,24 +80,6 @@ export default function CreateMatchPage() {
       setIsSubmitting(false);
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
-        <div className="max-w-[500px] mx-auto mt-20 text-center" data-testid="auth-wall">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치를 만들어보세요</h2>
-          <p className="text-sm text-gray-500 mt-2">로그인하면 매치를 만들고 참가자를 모집할 수 있어요</p>
-          <Link
-            href="/login"
-            data-testid="auth-wall-login-link"
-            className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors"
-          >
-            로그인하고 시작하기
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">

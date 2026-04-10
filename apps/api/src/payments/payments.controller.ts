@@ -1,9 +1,12 @@
 import { Controller, Post, Get, Param, Body, UseGuards, Headers, RawBodyRequest, Req, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiHeader } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PreparePaymentDto } from './dto/prepare-payment.dto';
+import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
 
 @ApiTags('결제')
 @Controller('payments')
@@ -14,16 +17,18 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '결제 준비' })
-  async prepare(@CurrentUser('id') userId: string, @Body() body: Record<string, unknown>) {
-    return this.paymentsService.prepare(userId, body);
+  @ApiBody({ type: PreparePaymentDto })
+  async prepare(@CurrentUser('id') userId: string, @Body() dto: PreparePaymentDto) {
+    return this.paymentsService.prepare(userId, dto);
   }
 
   @Post('confirm')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '결제 승인' })
-  async confirm(@Body() body: Record<string, unknown>) {
-    return this.paymentsService.confirm(body);
+  @ApiBody({ type: ConfirmPaymentDto })
+  async confirm(@Body() dto: ConfirmPaymentDto) {
+    return this.paymentsService.confirm(dto);
   }
 
   @Post('webhook')
@@ -43,8 +48,9 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '환불 요청' })
-  async refund(@CurrentUser('id') userId: string, @Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.paymentsService.refund(userId, id, body);
+  @ApiBody({ type: RefundPaymentDto })
+  async refund(@CurrentUser('id') userId: string, @Param('id') id: string, @Body() dto: RefundPaymentDto) {
+    return this.paymentsService.refund(userId, id, dto);
   }
 
   @Get('me')

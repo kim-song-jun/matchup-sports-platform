@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
-import { useAuthStore } from '@/stores/auth-store';
+import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 
 const sports = [
@@ -62,9 +61,9 @@ const initialForm: FormData = {
 };
 
 export default function CreateLessonPage() {
+  useRequireAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const { isAuthenticated } = useAuthStore();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,28 +95,6 @@ export default function CreateLessonPage() {
       setIsSubmitting(false);
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-center py-20">
-        <p className="text-md font-medium text-gray-700 dark:text-gray-300">로그인 후 강좌를 등록할 수 있어요</p>
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <button
-            onClick={() => router.push('/login')}
-            className="rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
-          >
-            로그인
-          </button>
-          <Link
-            href="/lessons"
-            className="rounded-lg bg-gray-100 dark:bg-gray-800 px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
-            강좌 목록
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const selectedSport = sports.find((s) => s.type === form.sportType);
   const selectedType = lessonTypes.find((t) => t.value === form.type);

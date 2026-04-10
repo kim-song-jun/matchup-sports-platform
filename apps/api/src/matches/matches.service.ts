@@ -4,7 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, NotificationType } from '@prisma/client';
+import { Prisma, NotificationType, SportType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -167,7 +167,7 @@ export class MatchesService {
       status: filter.availableOnly ? 'recruiting' : { in: ['recruiting', 'full'] },
     };
 
-    if (filter.sportType) where.sportType = filter.sportType as never;
+    if (filter.sportType) where.sportType = filter.sportType as SportType;
     if (filter.q) {
       where.OR = [
         { title: { contains: filter.q, mode: 'insensitive' } },
@@ -330,7 +330,7 @@ export class MatchesService {
         title: dto.title,
         description: dto.description,
         imageUrl: dto.imageUrl,
-        sportType: dto.sportType as never,
+        sportType: dto.sportType as SportType,
         venueId: dto.venueId,
         matchDate: new Date(dto.matchDate),
         startTime: dto.startTime,
@@ -340,7 +340,7 @@ export class MatchesService {
         levelMin: dto.levelMin ?? 1,
         levelMax: dto.levelMax ?? 5,
         gender: dto.gender ?? 'any',
-        teamConfig: dto.teamConfig as never ?? undefined,
+        teamConfig: dto.teamConfig !== undefined ? (dto.teamConfig as Prisma.InputJsonValue) : undefined,
         currentPlayers: 1,
       },
     });

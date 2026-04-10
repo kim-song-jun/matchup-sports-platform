@@ -12,6 +12,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
+import { PreparePaymentDto } from './dto/prepare-payment.dto';
+import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
 
 // ---------------------------------------------------------------------------
 // Toss Payments API response shapes (v1)
@@ -105,16 +108,11 @@ export class PaymentsService implements OnModuleInit {
 
   // ── prepare ────────────────────────────────────────────────────────────────
 
-  async prepare(userId: string, data: Record<string, unknown>) {
-    const participantId = String(data.participantId ?? '');
-    const amount = Number(data.amount ?? 0);
+  async prepare(userId: string, dto: PreparePaymentDto) {
+    const { participantId, amount } = dto;
 
     if (!participantId) {
       throw new BadRequestException('참가 정보가 없습니다.');
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('유효한 결제 금액이 필요합니다.');
     }
 
     const participant = await this.prisma.matchParticipant.findUnique({
@@ -177,7 +175,7 @@ export class PaymentsService implements OnModuleInit {
         amount,
         orderId,
         status: 'pending',
-        method: this.normalizeMethod(data.method as string | undefined),
+        method: this.normalizeMethod(dto.method),
       },
     });
 
@@ -190,14 +188,8 @@ export class PaymentsService implements OnModuleInit {
 
   // ── confirm ────────────────────────────────────────────────────────────────
 
-  async confirm(data: Record<string, unknown>) {
-    const orderId = data.orderId as string;
-    const paymentKey = data.paymentKey as string;
-    const amount = Number(data.amount);
-
-    if (!orderId || !paymentKey) {
-      throw new BadRequestException('orderId와 paymentKey가 필요합니다.');
-    }
+  async confirm(dto: ConfirmPaymentDto) {
+    const { orderId, paymentKey, amount } = dto;
 
     // Verify amount against DB record before calling Toss
     const pendingPayment = await this.prisma.payment.findUnique({
@@ -208,7 +200,7 @@ export class PaymentsService implements OnModuleInit {
       throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
     }
 
-    if (Number.isFinite(amount) && pendingPayment.amount !== amount) {
+    if (amount !== undefined && pendingPayment.amount !== amount) {
       throw new BadRequestException('결제 금액이 일치하지 않습니다.');
     }
 
@@ -292,7 +284,7 @@ export class PaymentsService implements OnModuleInit {
 
   // ── refund ─────────────────────────────────────────────────────────────────
 
-  async refund(userId: string, paymentId: string, data: Record<string, unknown>) {
+  async refund(userId: string, paymentId: string, dto: RefundPaymentDto) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       include: this.paymentInclude,
@@ -306,7 +298,7 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException('완료된 결제만 환불할 수 있습니다.');
     }
 
-    const cancelReason = [data.reason, data.note].filter(Boolean).join(' / ') || '사용자 요청';
+    const cancelReason = [dto.reason, dto.note].filter(Boolean).join(' / ') || '사용자 요청';
 
     if (this.tossEnabled) {
       return this.realRefund(payment, cancelReason);

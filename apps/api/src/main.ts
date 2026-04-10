@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Serve uploaded files from /uploads/* as static assets
@@ -49,8 +50,8 @@ async function bootstrap() {
 
   const port = process.env.API_PORT || 8111;
   await app.listen(port);
-  console.log(`🚀 TeamMeet API running on http://localhost:${port}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/docs`);
+  logger.log(`TeamMeet API running on http://localhost:${port}`);
+  logger.log(`Swagger docs: http://localhost:${port}/docs`);
 }
 
 bootstrap();

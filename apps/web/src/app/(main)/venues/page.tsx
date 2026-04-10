@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
 import { getVenueImageSet } from '@/lib/sport-image';
+import { SafeImage } from '@/components/ui/safe-image';
 import type { Venue } from '@/types/api';
 
 const sportFilters = [
@@ -73,7 +74,8 @@ export default function VenuesPage() {
       <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-          <input type="text" placeholder="시설명, 지역 검색" value={searchQuery}
+          <label htmlFor="venues-search" className="sr-only">시설 검색</label>
+          <input id="venues-search" type="text" placeholder="시설명, 지역 검색" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-colors" />
         </div>
@@ -126,8 +128,8 @@ export default function VenuesPage() {
                 <Link key={venue.id} href={`/venues/${venue.id}`}>
                   <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
                     {/* 이미지 */}
-                    <div className="w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <img src={venuePreviewImage} alt={venue.name} className="w-full h-full object-cover" loading="lazy" />
+                    <div className="relative w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                      <SafeImage src={venuePreviewImage} alt={venue.name} fill className="object-cover" sizes="112px" />
                     </div>
                     {/* 텍스트 */}
                     <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">

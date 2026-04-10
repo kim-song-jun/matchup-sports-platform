@@ -121,8 +121,9 @@ export default function TeamMatchEvaluatePage() {
 
         {/* 코멘트 */}
         <div className="mt-4">
-          <label className="text-sm font-medium text-gray-700 mb-1.5 block">한줄 코멘트 (선택)</label>
+          <label htmlFor="team-match-eval-comment" className="text-sm font-medium text-gray-700 mb-1.5 block">한줄 코멘트 (선택)</label>
           <textarea
+            id="team-match-eval-comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="상대팀에 대한 한마디를 남겨주세요"

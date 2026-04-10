@@ -169,10 +169,11 @@ export default function ScoreInputPage() {
                 <div className="flex items-center gap-3">
                   {/* Home score */}
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500 mb-1 block text-center">
+                    <label htmlFor={`score-home-${idx}`} className="text-xs text-gray-500 mb-1 block text-center">
                       {mockMatch.homeTeam.name}
                     </label>
                     <input
+                      id={`score-home-${idx}`}
                       type="text"
                       inputMode="numeric"
                       value={score.home}
@@ -187,10 +188,11 @@ export default function ScoreInputPage() {
 
                   {/* Away score */}
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500 mb-1 block text-center">
+                    <label htmlFor={`score-away-${idx}`} className="text-xs text-gray-500 mb-1 block text-center">
                       {mockMatch.awayTeam.name}
                     </label>
                     <input
+                      id={`score-away-${idx}`}
                       type="text"
                       inputMode="numeric"
                       value={score.away}

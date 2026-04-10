@@ -150,18 +150,24 @@ export default function TeamDetailPage() {
                 src={coverImage}
                 fallbackSrc={fallbackCoverImage}
                 alt=""
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 60vw"
+                priority
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               <div className="absolute -bottom-6 left-5">
                 <div className="rounded-[22px] bg-white/94 p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.24)] backdrop-blur-sm">
-                  <SafeImage
-                    src={teamLogo}
-                    fallbackSrc={fallbackTeamLogo}
-                    alt={`${team.name} logo`}
-                    className="h-14 w-14 rounded-[18px] object-cover"
-                    loading="lazy"
-                  />
+                  <div className="relative h-14 w-14">
+                    <SafeImage
+                      src={teamLogo}
+                      fallbackSrc={fallbackTeamLogo}
+                      alt={`${team.name} logo`}
+                      fill
+                      className="rounded-[18px] object-cover"
+                      sizes="56px"
+                    />
+                  </div>
                 </div>
               </div>
             </button>
@@ -284,14 +290,15 @@ export default function TeamDetailPage() {
                     type="button"
                     onClick={() => openMediaBySource(photo)}
                     aria-label={`${team.name} 갤러리 이미지 ${i + 1} 보기`}
-                    className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
+                    className="relative aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
                   >
                     <SafeImage
                       src={photo}
                       fallbackSrc={fallbackTeamGallery[i] ?? fallbackCoverImage}
                       alt={`팀 사진 ${i + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 33vw, 20vw"
                     />
                   </button>
                 ))}

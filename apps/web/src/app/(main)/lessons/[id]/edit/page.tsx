@@ -227,10 +227,11 @@ export default function EditLessonPage() {
 
         {/* 강좌 제목 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="lesson-edit-title" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             강좌 제목 <span className="text-red-400">*</span>
           </label>
           <input
+            id="lesson-edit-title"
             type="text"
             value={form.title}
             onChange={(e) => update('title', e.target.value)}
@@ -241,8 +242,9 @@ export default function EditLessonPage() {
 
         {/* 강좌 설명 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">강좌 설명</label>
+          <label htmlFor="lesson-edit-description" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">강좌 설명</label>
           <textarea
+            id="lesson-edit-description"
             value={form.description}
             onChange={(e) => update('description', e.target.value)}
             placeholder="강좌에 대한 자세한 설명을 입력해주세요"
@@ -253,10 +255,11 @@ export default function EditLessonPage() {
 
         {/* 코치명 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="lesson-edit-coach-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             코치명 <span className="text-red-400">*</span>
           </label>
           <input
+            id="lesson-edit-coach-name"
             type="text"
             value={form.coachName}
             onChange={(e) => update('coachName', e.target.value)}
@@ -267,8 +270,9 @@ export default function EditLessonPage() {
 
         {/* 코치 소개 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">코치 소개</label>
+          <label htmlFor="lesson-edit-coach-bio" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">코치 소개</label>
           <textarea
+            id="lesson-edit-coach-bio"
             value={form.coachBio}
             onChange={(e) => update('coachBio', e.target.value)}
             placeholder="코치 경력 및 자격증 등을 입력해주세요"
@@ -279,10 +283,11 @@ export default function EditLessonPage() {
 
         {/* 장소명 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="lesson-edit-venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소명 <span className="text-red-400">*</span>
           </label>
           <input
+            id="lesson-edit-venue-name"
             type="text"
             value={form.venueName}
             onChange={(e) => update('venueName', e.target.value)}
@@ -293,10 +298,11 @@ export default function EditLessonPage() {
 
         {/* 날짜 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="lesson-edit-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             날짜 <span className="text-red-400">*</span>
           </label>
           <input
+            id="lesson-edit-date"
             type="date"
             value={form.lessonDate}
             onChange={(e) => update('lessonDate', e.target.value)}
@@ -308,10 +314,11 @@ export default function EditLessonPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label htmlFor="lesson-edit-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 시작 시간 <span className="text-red-400">*</span>
               </label>
               <input
+                id="lesson-edit-start-time"
                 type="time"
                 value={form.startTime}
                 onChange={(e) => update('startTime', e.target.value)}
@@ -319,10 +326,11 @@ export default function EditLessonPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label htmlFor="lesson-edit-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 종료 시간 <span className="text-red-400">*</span>
               </label>
               <input
+                id="lesson-edit-end-time"
                 type="time"
                 value={form.endTime}
                 onChange={(e) => update('endTime', e.target.value)}
@@ -336,8 +344,9 @@ export default function EditLessonPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 인원</label>
+              <label htmlFor="lesson-edit-max-participants" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 인원</label>
               <input
+                id="lesson-edit-max-participants"
                 type="number"
                 value={form.maxParticipants}
                 onChange={(e) => update('maxParticipants', +e.target.value)}
@@ -347,8 +356,9 @@ export default function EditLessonPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">수강료 (원)</label>
+              <label htmlFor="lesson-edit-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">수강료 (원)</label>
               <input
+                id="lesson-edit-fee"
                 type="number"
                 value={form.fee}
                 onChange={(e) => update('fee', +e.target.value)}
@@ -369,8 +379,9 @@ export default function EditLessonPage() {
         <section className="mb-6">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최소 레벨</label>
+              <label htmlFor="lesson-edit-level-min" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최소 레벨</label>
               <select
+                id="lesson-edit-level-min"
                 value={form.levelMin}
                 onChange={(e) => update('levelMin', +e.target.value)}
                 className={selectClass}
@@ -381,8 +392,9 @@ export default function EditLessonPage() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 레벨</label>
+              <label htmlFor="lesson-edit-level-max" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 레벨</label>
               <select
+                id="lesson-edit-level-max"
                 value={form.levelMax}
                 onChange={(e) => update('levelMax', +e.target.value)}
                 className={selectClass}

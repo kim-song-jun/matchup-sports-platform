@@ -227,10 +227,11 @@ export default function EditTeamMatchPage() {
 
         {/* 모집글 제목 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-title" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             모집글 제목 <span className="text-red-400">*</span>
           </label>
           <input
+            id="team-match-edit-title"
             type="text"
             value={form.title}
             onChange={(e) => update('title', e.target.value)}
@@ -241,10 +242,11 @@ export default function EditTeamMatchPage() {
 
         {/* 경기 날짜 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
           <input
+            id="team-match-edit-date"
             type="date"
             value={form.matchDate}
             onChange={(e) => update('matchDate', e.target.value)}
@@ -256,10 +258,11 @@ export default function EditTeamMatchPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label htmlFor="team-match-edit-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 시작 시간 <span className="text-red-400">*</span>
               </label>
               <input
+                id="team-match-edit-start-time"
                 type="time"
                 value={form.startTime}
                 onChange={(e) => update('startTime', e.target.value)}
@@ -267,10 +270,11 @@ export default function EditTeamMatchPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label htmlFor="team-match-edit-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
                 종료 시간 <span className="text-red-400">*</span>
               </label>
               <input
+                id="team-match-edit-end-time"
                 type="time"
                 value={form.endTime}
                 onChange={(e) => update('endTime', e.target.value)}
@@ -302,10 +306,11 @@ export default function EditTeamMatchPage() {
 
         {/* 구장 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             구장명 <span className="text-red-400">*</span>
           </label>
           <input
+            id="team-match-edit-venue-name"
             type="text"
             value={form.venueName}
             onChange={(e) => update('venueName', e.target.value)}
@@ -315,8 +320,9 @@ export default function EditTeamMatchPage() {
         </section>
 
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">구장 주소 (선택)</label>
+          <label htmlFor="team-match-edit-venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">구장 주소 (선택)</label>
           <input
+            id="team-match-edit-venue-address"
             type="text"
             value={form.venueAddress}
             onChange={(e) => update('venueAddress', e.target.value)}
@@ -350,8 +356,9 @@ export default function EditTeamMatchPage() {
 
         {/* 선출선수 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">선출선수 (명)</label>
+          <label htmlFor="team-match-edit-pro-player-count" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">선출선수 (명)</label>
           <input
+            id="team-match-edit-pro-player-count"
             type="number"
             min={0}
             max={10}
@@ -440,8 +447,9 @@ export default function EditTeamMatchPage() {
 
         {/* 유니폼 색상 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">유니폼 색상</label>
+          <label htmlFor="team-match-edit-uniform-color" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">유니폼 색상</label>
           <input
+            id="team-match-edit-uniform-color"
             type="text"
             value={form.uniformColor}
             onChange={(e) => update('uniformColor', e.target.value)}
@@ -466,10 +474,11 @@ export default function EditTeamMatchPage() {
 
         {/* 비용 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-total-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             총 비용 (원) <span className="text-red-400">*</span>
           </label>
           <input
+            id="team-match-edit-total-fee"
             type="number"
             value={form.totalFee}
             onChange={(e) => update('totalFee', e.target.value)}
@@ -482,8 +491,9 @@ export default function EditTeamMatchPage() {
         </section>
 
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+          <label htmlFor="team-match-edit-opponent-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
           <input
+            id="team-match-edit-opponent-fee"
             type="number"
             value={form.opponentFee}
             onChange={(e) => update('opponentFee', e.target.value)}
@@ -497,8 +507,9 @@ export default function EditTeamMatchPage() {
 
         {/* 추가 안내 */}
         <section className="mb-6">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">추가 안내 (선택)</label>
+          <label htmlFor="team-match-edit-notes" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">추가 안내 (선택)</label>
           <textarea
+            id="team-match-edit-notes"
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             placeholder="유니폼 색상, 주차 안내, 기타 규정 등"

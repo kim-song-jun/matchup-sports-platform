@@ -120,13 +120,13 @@ export default function AdminVenueNewPage() {
           <h3 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h3>
 
           <div>
-            <label className={labelClass}>시설명</label>
-            <input type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
+            <label htmlFor="admin-venue-new-name" className={labelClass}>시설명</label>
+            <input id="admin-venue-new-name" type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
           </div>
 
           <div>
-            <label className={labelClass}>시설 유형</label>
-            <select value={form.type} onChange={(e) => updateField('type', e.target.value)} className={inputClass}>
+            <label htmlFor="admin-venue-new-type" className={labelClass}>시설 유형</label>
+            <select id="admin-venue-new-type" value={form.type} onChange={(e) => updateField('type', e.target.value)} className={inputClass}>
               <option value="">유형 선택</option>
               {venueTypes.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -135,8 +135,8 @@ export default function AdminVenueNewPage() {
           </div>
 
           <div>
-            <label className={labelClass}>가능 종목</label>
-            <div className="flex flex-wrap gap-2">
+            <p id="sport-types-label" className={labelClass}>가능 종목</p>
+            <div role="group" aria-labelledby="sport-types-label" className="flex flex-wrap gap-2">
               {sportOptions.map((s) => {
                 const selected = form.sportTypes.includes(s.value);
                 return (
@@ -158,8 +158,9 @@ export default function AdminVenueNewPage() {
           </div>
 
           <div>
-            <label className={labelClass}>설명</label>
+            <label htmlFor="admin-venue-new-description" className={labelClass}>설명</label>
             <textarea
+              id="admin-venue-new-description"
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               placeholder="시설의 특징, 편의시설 등을 소개해주세요"
@@ -174,24 +175,24 @@ export default function AdminVenueNewPage() {
           <h3 className="text-md font-bold text-gray-900 dark:text-white">위치 정보</h3>
 
           <div>
-            <label className={labelClass}>주소</label>
-            <input type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
+            <label htmlFor="admin-venue-new-address" className={labelClass}>주소</label>
+            <input id="admin-venue-new-address" type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>시/도</label>
-              <input type="text" value={form.city} onChange={(e) => updateField('city', e.target.value)} placeholder="서울" className={inputClass} />
+              <label htmlFor="admin-venue-new-city" className={labelClass}>시/도</label>
+              <input id="admin-venue-new-city" type="text" value={form.city} onChange={(e) => updateField('city', e.target.value)} placeholder="서울" className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>구/군</label>
-              <input type="text" value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="강남구" className={inputClass} />
+              <label htmlFor="admin-venue-new-district" className={labelClass}>구/군</label>
+              <input id="admin-venue-new-district" type="text" value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="강남구" className={inputClass} />
             </div>
           </div>
 
           <div>
-            <label className={labelClass}>전화번호</label>
-            <input type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="02-1234-5678" className={inputClass} />
+            <label htmlFor="admin-venue-new-phone" className={labelClass}>전화번호</label>
+            <input id="admin-venue-new-phone" type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="02-1234-5678" className={inputClass} />
           </div>
         </div>
 
@@ -200,9 +201,10 @@ export default function AdminVenueNewPage() {
           <h3 className="text-md font-bold text-gray-900 dark:text-white">시설 & 요금</h3>
 
           <div>
-            <label className={labelClass}>부대시설</label>
+            <label htmlFor="admin-venue-new-facility" className={labelClass}>부대시설</label>
             <div className="flex gap-2">
               <input
+                id="admin-venue-new-facility"
                 type="text"
                 value={facilityInput}
                 onChange={(e) => setFacilityInput(e.target.value)}
@@ -233,8 +235,8 @@ export default function AdminVenueNewPage() {
           </div>
 
           <div>
-            <label className={labelClass}>시간당 요금 (원)</label>
-            <input type="number" value={form.pricePerHour} onChange={(e) => updateField('pricePerHour', e.target.value)} placeholder="50000" className={inputClass} />
+            <label htmlFor="admin-venue-new-price" className={labelClass}>시간당 요금 (원)</label>
+            <input id="admin-venue-new-price" type="number" value={form.pricePerHour} onChange={(e) => updateField('pricePerHour', e.target.value)} placeholder="50000" className={inputClass} />
           </div>
         </div>
 
@@ -243,20 +245,24 @@ export default function AdminVenueNewPage() {
           <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>
-            <label className={labelClass}>평일</label>
+            <p className={labelClass}>평일</p>
             <div className="flex items-center gap-2">
-              <input type="time" value={form.weekdayOpen} onChange={(e) => updateField('weekdayOpen', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-new-weekday-open" className="sr-only">평일 오픈 시간</label>
+              <input id="admin-venue-new-weekday-open" type="time" value={form.weekdayOpen} onChange={(e) => updateField('weekdayOpen', e.target.value)} className={inputClass} />
               <span className="text-gray-400 shrink-0">~</span>
-              <input type="time" value={form.weekdayClose} onChange={(e) => updateField('weekdayClose', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-new-weekday-close" className="sr-only">평일 마감 시간</label>
+              <input id="admin-venue-new-weekday-close" type="time" value={form.weekdayClose} onChange={(e) => updateField('weekdayClose', e.target.value)} className={inputClass} />
             </div>
           </div>
 
           <div>
-            <label className={labelClass}>주말</label>
+            <p className={labelClass}>주말</p>
             <div className="flex items-center gap-2">
-              <input type="time" value={form.weekendOpen} onChange={(e) => updateField('weekendOpen', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-new-weekend-open" className="sr-only">주말 오픈 시간</label>
+              <input id="admin-venue-new-weekend-open" type="time" value={form.weekendOpen} onChange={(e) => updateField('weekendOpen', e.target.value)} className={inputClass} />
               <span className="text-gray-400 shrink-0">~</span>
-              <input type="time" value={form.weekendClose} onChange={(e) => updateField('weekendClose', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-new-weekend-close" className="sr-only">주말 마감 시간</label>
+              <input id="admin-venue-new-weekend-close" type="time" value={form.weekendClose} onChange={(e) => updateField('weekendClose', e.target.value)} className={inputClass} />
             </div>
           </div>
         </div>

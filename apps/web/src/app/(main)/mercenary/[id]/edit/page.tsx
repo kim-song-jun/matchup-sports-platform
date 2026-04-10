@@ -161,10 +161,11 @@ export default function EditMercenaryPage() {
       <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* 팀명 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="mercenary-edit-team" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             팀명 <span className="text-red-400">*</span>
           </label>
           <input
+            id="mercenary-edit-team"
             type="text"
             value={form.team}
             onChange={(e) => update('team', e.target.value)}
@@ -175,10 +176,11 @@ export default function EditMercenaryPage() {
 
         {/* 경기 날짜 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="mercenary-edit-match-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
           <input
+            id="mercenary-edit-match-date"
             type="date"
             value={form.matchDate}
             onChange={(e) => update('matchDate', e.target.value)}
@@ -188,10 +190,11 @@ export default function EditMercenaryPage() {
 
         {/* 장소 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="mercenary-edit-venue" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소 <span className="text-red-400">*</span>
           </label>
           <input
+            id="mercenary-edit-venue"
             type="text"
             value={form.venue}
             onChange={(e) => update('venue', e.target.value)}
@@ -224,8 +227,9 @@ export default function EditMercenaryPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">모집 인원</label>
+              <label htmlFor="mercenary-edit-count" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">모집 인원</label>
               <input
+                id="mercenary-edit-count"
                 type="number"
                 value={form.count}
                 onChange={(e) => update('count', Math.max(1, +e.target.value))}
@@ -235,8 +239,9 @@ export default function EditMercenaryPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">참가비 (원)</label>
+              <label htmlFor="mercenary-edit-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">참가비 (원)</label>
               <input
+                id="mercenary-edit-fee"
                 type="number"
                 value={form.fee}
                 onChange={(e) => update('fee', +e.target.value)}
@@ -275,8 +280,9 @@ export default function EditMercenaryPage() {
 
         {/* 비고 */}
         <section className="mb-6">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
+          <label htmlFor="mercenary-edit-notes" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
           <textarea
+            id="mercenary-edit-notes"
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             placeholder="추가 안내사항을 입력해주세요"

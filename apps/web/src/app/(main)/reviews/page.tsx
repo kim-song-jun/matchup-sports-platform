@@ -59,6 +59,7 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
   const [mannerRating, setMannerRating] = useState(3);
   const [comment, setComment] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const commentId = `review-comment-${review.matchId}-${review.target?.id}`;
 
   const submitMutation = useMutation({
     mutationFn: () => api.post('/reviews', {
@@ -98,8 +99,8 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
           <RatingRow label="실력" value={skillRating} onChange={setSkillRating} />
           <RatingRow label="매너" value={mannerRating} onChange={setMannerRating} />
           <div>
-            <label className="text-sm font-semibold text-gray-700 mb-1 block">코멘트 (선택)</label>
-            <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="한 마디 남겨주세요"
+            <label htmlFor={commentId} className="text-sm font-semibold text-gray-700 mb-1 block">코멘트 (선택)</label>
+            <textarea id={commentId} value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="한 마디 남겨주세요"
               className="w-full rounded-xl border border-gray-200 bg-gray-50 dark:bg-gray-700 px-3 py-2.5 text-base outline-none focus:border-blue-300 resize-none" />
           </div>
           <button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}

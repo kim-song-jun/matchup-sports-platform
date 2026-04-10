@@ -256,10 +256,11 @@ export default function ArrivalCheckPage() {
           {/* Note for issues */}
           {(opponentStatus === 'late' || opponentStatus === 'absent') && (
             <div className="mt-4">
-              <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+              <label htmlFor="arrival-opponent-note" className="text-sm font-medium text-gray-700 mb-1.5 block">
                 특이사항
               </label>
               <input
+                id="arrival-opponent-note"
                 type="text"
                 value={opponentNote}
                 onChange={(e) => setOpponentNote(e.target.value)}

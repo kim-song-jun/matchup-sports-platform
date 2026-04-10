@@ -143,7 +143,10 @@ export default function AdminTeamDetailPage() {
                 </div>
                 <div>
                   {editing ? (
-                    <input id="team-name" type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className={`${inputClass} text-xl font-bold`} />
+                    <>
+                      <label htmlFor="team-name" className="sr-only">팀명</label>
+                      <input id="team-name" type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className={`${inputClass} text-xl font-bold`} />
+                    </>
                   ) : (
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">{team.name}</h2>
                   )}
@@ -169,7 +172,10 @@ export default function AdminTeamDetailPage() {
             </div>
 
             {editing ? (
-              <textarea id="team-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
+              <>
+                <label htmlFor="team-description" className="sr-only">팀 설명</label>
+                <textarea id="team-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className={`${inputClass} resize-none`} />
+              </>
             ) : (
               <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">{team.description}</p>
             )}

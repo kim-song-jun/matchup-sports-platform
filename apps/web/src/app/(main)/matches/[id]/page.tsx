@@ -323,13 +323,16 @@ export default function MatchDetailPage() {
                 type="button"
                 onClick={() => openMediaAt(0)}
                 aria-label={`${match.title} 대표 이미지 보기`}
-                className="w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+                className="relative h-[220px] w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
               >
                 <SafeImage
                   src={heroImage}
                   fallbackSrc={heroFallbackImage}
                   alt={match.title}
-                  className="h-[220px] w-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  priority
                 />
               </button>
               {matchImages.length > 1 && (
@@ -340,14 +343,15 @@ export default function MatchDetailPage() {
                       type="button"
                       onClick={() => openMediaAt(mediaImageIndex.get(image) ?? index + 1)}
                       aria-label={`${match.title} 이미지 ${index + 2} 보기`}
-                      className="overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+                      className="relative aspect-[4/3] overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
                     >
                       <SafeImage
                         src={image}
                         fallbackSrc={fallbackMatchImages[index + 1] ?? heroFallbackImage}
                         alt={`${match.title} 이미지 ${index + 2}`}
-                        className="aspect-[4/3] h-full w-full object-cover"
-                        loading="lazy"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 33vw, 20vw"
                       />
                     </button>
                   ))}
@@ -396,13 +400,14 @@ export default function MatchDetailPage() {
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">시설 정보</h3>
               <div className="flex items-center gap-3">
                 {venuePreviewImage && (
-                  <div className="h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                  <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
                     <SafeImage
                       src={venuePreviewImage}
                       fallbackSrc={fallbackVenuePreviewImage}
                       alt={match.venue.name}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
+                      fill
+                      className="object-cover"
+                      sizes="64px"
                     />
                   </div>
                 )}

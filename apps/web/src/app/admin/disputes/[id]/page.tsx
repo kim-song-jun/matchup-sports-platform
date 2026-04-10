@@ -115,7 +115,9 @@ export default function AdminDisputeDetailPage() {
                 ? '해결 근거와 조치 내용을 남기면 resolution과 감사 로그에 함께 남습니다.'
                 : '기각 사유를 남기면 감사 로그에 기록됩니다.'}
           </p>
+          <label htmlFor="admin-dispute-note" className="sr-only">운영 메모</label>
           <textarea
+            id="admin-dispute-note"
             value={adminNote}
             onChange={(e) => setAdminNote(e.target.value)}
             rows={4}

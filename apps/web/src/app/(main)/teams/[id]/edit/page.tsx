@@ -95,8 +95,9 @@ export default function EditTeamPage() {
       <div className="px-5 @3xl:px-0 pb-8 max-w-lg @3xl:max-w-[700px]">
         {/* Team Name */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 이름</label>
+          <label htmlFor="team-edit-name" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 이름</label>
           <input
+            id="team-edit-name"
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -124,8 +125,9 @@ export default function EditTeamPage() {
 
         {/* Description */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 소개</label>
+          <label htmlFor="team-edit-description" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 소개</label>
           <textarea
+            id="team-edit-description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={4}
@@ -135,8 +137,9 @@ export default function EditTeamPage() {
 
         {/* Region */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">활동 지역</label>
+          <label htmlFor="team-edit-region" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">활동 지역</label>
           <input
+            id="team-edit-region"
             type="text"
             value={form.region}
             onChange={(e) => setForm({ ...form, region: e.target.value })}
@@ -146,8 +149,9 @@ export default function EditTeamPage() {
 
         {/* Activity Days */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">활동 요일</label>
+          <label htmlFor="team-edit-activity-days" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">활동 요일</label>
           <input
+            id="team-edit-activity-days"
             type="text"
             value={form.activityDays}
             onChange={(e) => setForm({ ...form, activityDays: e.target.value })}
@@ -159,8 +163,9 @@ export default function EditTeamPage() {
         {/* Max Members & Level */}
         <div className="mb-5 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">최대 인원</label>
+            <label htmlFor="team-edit-max-members" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">최대 인원</label>
             <input
+              id="team-edit-max-members"
               type="number"
               value={form.maxMembers}
               onChange={(e) => setForm({ ...form, maxMembers: parseInt(e.target.value) || 0 })}
@@ -168,8 +173,9 @@ export default function EditTeamPage() {
             />
           </div>
           <div>
-            <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 레벨</label>
+            <label htmlFor="team-edit-level" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">팀 레벨</label>
             <select
+              id="team-edit-level"
               value={form.level}
               onChange={(e) => setForm({ ...form, level: parseInt(e.target.value) })}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
@@ -184,8 +190,9 @@ export default function EditTeamPage() {
         {/* Age Range */}
         <div className="mb-8 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">최소 나이</label>
+            <label htmlFor="team-edit-age-min" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">최소 나이</label>
             <input
+              id="team-edit-age-min"
               type="number"
               value={form.ageMin}
               onChange={(e) => setForm({ ...form, ageMin: parseInt(e.target.value) || 0 })}
@@ -193,8 +200,9 @@ export default function EditTeamPage() {
             />
           </div>
           <div>
-            <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">최대 나이</label>
+            <label htmlFor="team-edit-age-max" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">최대 나이</label>
             <input
+              id="team-edit-age-max"
               type="number"
               value={form.ageMax}
               onChange={(e) => setForm({ ...form, ageMax: parseInt(e.target.value) || 0 })}

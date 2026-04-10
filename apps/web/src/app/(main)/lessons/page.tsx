@@ -59,8 +59,9 @@ const LessonCard = React.memo(function LessonCard({ lesson }: { lesson: Lesson }
             src={lessonImage}
             fallbackSrc={fallbackLessonImage}
             alt=""
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-            loading="lazy"
+            fill
+            className="object-cover group-hover:scale-[1.02] transition-transform duration-300"
+            sizes="(max-width: 768px) 100vw, 50vw"
           />
           {/* Gradient overlay for overlay readability */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
@@ -197,7 +198,9 @@ export default function LessonsPage() {
       <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} aria-hidden="true" />
+          <label htmlFor="lessons-search" className="sr-only">강좌 검색</label>
           <input
+            id="lessons-search"
             type="text"
             placeholder={t('searchPlaceholder')}
             value={searchQuery}

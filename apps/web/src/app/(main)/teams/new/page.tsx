@@ -278,6 +278,7 @@ export default function CreateTeamPage() {
             <Video size={16} className="text-gray-500" />
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
           </div>
+          <label htmlFor="team-shortsUrl" className="sr-only">홍보 영상 URL</label>
           <input
             id="team-shortsUrl"
             value={form.shortsUrl}

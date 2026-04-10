@@ -30,17 +30,21 @@ const TeamCard = React.memo(function TeamCard({ team }: { team: MyTeam | SportTe
             src={teamCoverImage}
             fallbackSrc={fallbackTeamCoverImage}
             alt={team.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
+            fill
+            className="object-cover"
+            sizes="96px"
           />
           <div className="absolute bottom-1.5 left-1.5 rounded-xl bg-white/92 p-0.5 shadow-[0_4px_12px_rgba(15,23,42,0.18)] backdrop-blur-sm">
-            <SafeImage
-              src={teamLogo}
-              fallbackSrc={fallbackTeamLogo}
-              alt={`${team.name} logo`}
-              className="h-7 w-7 rounded-lg object-cover"
-              loading="lazy"
-            />
+            <div className="relative h-7 w-7">
+              <SafeImage
+                src={teamLogo}
+                fallbackSrc={fallbackTeamLogo}
+                alt={`${team.name} logo`}
+                fill
+                className="rounded-lg object-cover"
+                sizes="28px"
+              />
+            </div>
           </div>
         </div>
         {/* 텍스트 */}

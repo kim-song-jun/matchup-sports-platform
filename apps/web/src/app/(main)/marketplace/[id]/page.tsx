@@ -155,14 +155,17 @@ export default function ListingDetailPage() {
               type="button"
               onClick={openHeroImage}
               aria-label={`${listing.title} 대표 이미지 보기`}
-              className="h-64 @3xl:h-80 rounded-xl w-full bg-gray-100 dark:bg-gray-700 overflow-hidden"
+              className="relative h-64 @3xl:h-80 rounded-xl w-full bg-gray-100 dark:bg-gray-700 overflow-hidden"
             >
               {heroImage ? (
                 <SafeImage
                   src={heroImage}
                   fallbackSrc={heroFallbackImage}
                   alt={listing.title}
-                  className="h-full w-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  priority
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">
@@ -178,7 +181,7 @@ export default function ListingDetailPage() {
                     type="button"
                     onClick={() => openMediaBySource(image)}
                     aria-label={`${listing.title} 이미지 ${index + 1} 보기`}
-                    className={`overflow-hidden rounded-xl border transition-colors ${
+                    className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition-colors ${
                       heroImage === image
                         ? 'border-blue-500'
                         : 'border-gray-100 dark:border-gray-700'
@@ -188,7 +191,9 @@ export default function ListingDetailPage() {
                       src={image}
                       fallbackSrc={fallbackGalleryImages[index] ?? heroFallbackImage}
                       alt={`${listing.title} 썸네일 ${index + 1}`}
-                      className="aspect-[4/3] h-full w-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 33vw, 20vw"
                     />
                   </button>
                 ))}

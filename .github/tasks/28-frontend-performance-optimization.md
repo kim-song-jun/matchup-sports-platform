@@ -177,5 +177,11 @@
 ### MSW 핸들러 (완료)
 - `apps/web/src/test/msw/handlers.ts`에 `GET /api/v1/chat/unread-count` 핸들러 추가
 
-### Phase 3 (미완료 — 별도 태스크 필요)
-- RSC 전환: `home/page.tsx`, `matches/page.tsx`, `teams/page.tsx` 서버 컴포넌트 전환 (인증 플로우 영향 분석 필요)
+### Phase 3 (완료)
+- `apps/web/src/lib/server-fetch.ts` 신규: 서버 컴포넌트 전용 fetch 유틸 (`INTERNAL_API_ORIGIN` → `localhost:8111` 우선순위, 60s revalidate, `{ data }` 래퍼 자동 언래핑)
+- `home/page.tsx` → async RSC shell (`Promise.allSettled` 5개 공개 API 동시 프리페치) + `home-client.tsx` 분리
+- `matches/page.tsx` → async RSC shell (URL `searchParams` 파싱 → exact query key 구성 → 서버 프리페치) + `matches-client.tsx` 분리
+- `teams/page.tsx` → async RSC shell (팀 목록 서버 프리페치) + `teams-client.tsx` 분리
+- `MatchesMapView`: `next/dynamic` + `ssr: false` lazy load (초기 JS 번들 분리), loading skeleton에 `role="status"` + `aria-label` 추가
+- 인증 플로우 해결: 공개 데이터만 서버 프리페치, 인증 필요 데이터(사용자 정보·내 팀)는 클라이언트 유지
+- `HydrationBoundary` + `dehydrate` 패턴으로 서버 데이터를 React Query 캐시에 주입 → 초기 로딩 스켈레톤 제거, FCP 개선

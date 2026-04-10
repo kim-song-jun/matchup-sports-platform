@@ -425,8 +425,10 @@ export default function ChatRoomEmbed({
           >
             <Smile size={18} />
           </button>
+          <label htmlFor="chat-message-input" className="sr-only">메시지 입력</label>
           <input
             ref={inputRef}
+            id="chat-message-input"
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}

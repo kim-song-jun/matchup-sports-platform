@@ -66,7 +66,9 @@ export default function MarketplacePage() {
       <div className="px-5 @3xl:px-0 mb-2">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+          <label htmlFor="marketplace-search" className="sr-only">장터 검색</label>
           <input
+            id="marketplace-search"
             type="text"
             placeholder={t('searchPlaceholder')}
             value={searchQuery}
@@ -115,13 +117,14 @@ export default function MarketplacePage() {
                 <Link key={item.id} href={`/marketplace/${item.id}`} className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 p-4 active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex gap-3.5">
                     {/* Thumbnail */}
-                    <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-300 overflow-hidden">
+                    <div className="relative h-[100px] w-[100px] shrink-0 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
                       <SafeImage
                         src={getListingImage(item.imageUrls, item.id)}
                         fallbackSrc={getListingImage(undefined, item.id)}
                         alt={item.title}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
+                        fill
+                        className="object-cover"
+                        sizes="100px"
                       />
                     </div>
 

@@ -101,8 +101,9 @@ export default function EditListingPage() {
       <div className="px-5 @3xl:px-0 pb-8 max-w-lg @3xl:max-w-[700px]">
         {/* Title */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>
+          <label htmlFor="edit-listing-title" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>
           <input
+            id="edit-listing-title"
             type="text"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -112,8 +113,9 @@ export default function EditListingPage() {
 
         {/* Description */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">설명</label>
+          <label htmlFor="edit-listing-description" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">설명</label>
           <textarea
+            id="edit-listing-description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={4}
@@ -177,8 +179,9 @@ export default function EditListingPage() {
 
         {/* Price */}
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">가격 (원)</label>
+          <label htmlFor="edit-listing-price" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">가격 (원)</label>
           <input
+            id="edit-listing-price"
             type="number"
             value={form.price}
             onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })}

@@ -67,14 +67,18 @@ export default function PaymentsPage() {
 
       <div className="px-5 @3xl:px-0">
         <div className="flex items-center gap-2 mb-4">
+          <label htmlFor="payment-date-from" className="sr-only">시작 날짜</label>
           <input
+            id="payment-date-from"
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
           />
-          <span className="text-sm text-gray-500">~</span>
+          <span className="text-sm text-gray-500" aria-hidden="true">~</span>
+          <label htmlFor="payment-date-to" className="sr-only">종료 날짜</label>
           <input
+            id="payment-date-to"
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}

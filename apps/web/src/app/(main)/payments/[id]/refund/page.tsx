@@ -263,7 +263,9 @@ export default function RefundRequestPage() {
               </button>
             ))}
           </div>
+          <label htmlFor="refund-additional-reason" className="sr-only">추가 사유</label>
           <textarea
+            id="refund-additional-reason"
             value={additionalReason}
             onChange={(e) => setAdditionalReason(e.target.value)}
             placeholder="추가 사유를 입력해 주세요 (선택)"

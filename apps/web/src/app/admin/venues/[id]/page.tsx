@@ -347,20 +347,24 @@ export default function AdminVenueEditPage() {
           <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>
-            <label className={labelClass}>평일</label>
+            <p className={labelClass}>평일</p>
             <div className="flex items-center gap-2">
-              <input type="time" value={form.weekdayOpen} onChange={(e) => updateField('weekdayOpen', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-weekday-open" className="sr-only">평일 오픈 시간</label>
+              <input id="admin-venue-weekday-open" type="time" value={form.weekdayOpen} onChange={(e) => updateField('weekdayOpen', e.target.value)} className={inputClass} />
               <span className="text-gray-400 shrink-0">~</span>
-              <input type="time" value={form.weekdayClose} onChange={(e) => updateField('weekdayClose', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-weekday-close" className="sr-only">평일 마감 시간</label>
+              <input id="admin-venue-weekday-close" type="time" value={form.weekdayClose} onChange={(e) => updateField('weekdayClose', e.target.value)} className={inputClass} />
             </div>
           </div>
 
           <div>
-            <label className={labelClass}>주말</label>
+            <p className={labelClass}>주말</p>
             <div className="flex items-center gap-2">
-              <input type="time" value={form.weekendOpen} onChange={(e) => updateField('weekendOpen', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-weekend-open" className="sr-only">주말 오픈 시간</label>
+              <input id="admin-venue-weekend-open" type="time" value={form.weekendOpen} onChange={(e) => updateField('weekendOpen', e.target.value)} className={inputClass} />
               <span className="text-gray-400 shrink-0">~</span>
-              <input type="time" value={form.weekendClose} onChange={(e) => updateField('weekendClose', e.target.value)} className={inputClass} />
+              <label htmlFor="admin-venue-weekend-close" className="sr-only">주말 마감 시간</label>
+              <input id="admin-venue-weekend-close" type="time" value={form.weekendClose} onChange={(e) => updateField('weekendClose', e.target.value)} className={inputClass} />
             </div>
           </div>
         </div>

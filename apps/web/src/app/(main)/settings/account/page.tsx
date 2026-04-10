@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
@@ -33,8 +33,9 @@ export default function AccountPage() {
       <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-6">
         {/* 닉네임 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>
+          <label htmlFor="account-nickname" className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>
           <input
+            id="account-nickname"
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
@@ -46,8 +47,9 @@ export default function AccountPage() {
 
         {/* 이메일 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">이메일</label>
+          <label htmlFor="account-email" className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">이메일</label>
           <input
+            id="account-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -58,8 +60,9 @@ export default function AccountPage() {
 
         {/* 전화번호 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">전화번호</label>
+          <label htmlFor="account-phone" className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">전화번호</label>
           <input
+            id="account-phone"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -70,7 +73,7 @@ export default function AccountPage() {
 
         {/* 비밀번호 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">비밀번호</label>
+          <p className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">비밀번호</p>
           <div className="flex items-center gap-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 px-4 py-3.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600">
@@ -86,7 +89,7 @@ export default function AccountPage() {
 
         {/* 연결된 소셜 계정 */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">연결된 소셜 계정</label>
+          <p className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">연결된 소셜 계정</p>
           <div className="space-y-3">
             <SocialAccount provider="kakao" name="카카오" email="player@kakao.com" connected />
             <SocialAccount provider="naver" name="네이버" connected={false} />
@@ -123,29 +126,89 @@ export default function AccountPage() {
 
       {/* 회원 탈퇴 확인 모달 */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteModal(false)} />
-          <div className="relative w-full max-w-sm rounded-3xl bg-white dark:bg-gray-800 p-6 shadow-xl animate-fade-in">
-            <button
-              aria-label="닫기"
-              onClick={() => setShowDeleteModal(false)}
-              className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
-            >
-              <X size={20} className="text-gray-500" />
-            </button>
+        <DeleteModal
+          deleteConfirmText={deleteConfirmText}
+          setDeleteConfirmText={setDeleteConfirmText}
+          onClose={() => setShowDeleteModal(false)}
+        />
+      )}
+    </div>
+  );
+}
 
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 mb-4">
-                <AlertTriangle size={28} className="text-red-500" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
+function DeleteModal({
+  deleteConfirmText,
+  setDeleteConfirmText,
+  onClose,
+}: {
+  deleteConfirmText: string;
+  setDeleteConfirmText: (v: string) => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((el) => !el.hasAttribute('disabled'));
+        if (focusable.length === 0) { e.preventDefault(); return; }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      prev?.focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-modal-title"
+        tabIndex={-1}
+        className="relative w-full max-w-sm rounded-3xl bg-white dark:bg-gray-800 p-6 shadow-xl animate-fade-in outline-none"
+      >
+        <button
+          aria-label="닫기"
+          onClick={onClose}
+          className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+        >
+          <X size={20} className="text-gray-500" />
+        </button>
+
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 mb-4">
+            <AlertTriangle size={28} className="text-red-500" />
+          </div>
+          <h3 id="delete-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
               <p className="text-base text-gray-500 dark:text-gray-400 mb-6">
                 탈퇴하면 모든 매치 기록, 채팅 내역, 팀 정보가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.
               </p>
 
               <div className="w-full mb-4">
-                <p className="text-sm text-gray-500 mb-2 text-left">확인을 위해 &quot;탈퇴합니다&quot;를 입력하세요</p>
+                <label htmlFor="account-delete-confirm" className="text-sm text-gray-500 mb-2 text-left block">확인을 위해 &quot;탈퇴합니다&quot;를 입력하세요</label>
                 <input
+                  id="account-delete-confirm"
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
@@ -154,24 +217,22 @@ export default function AccountPage() {
                 />
               </div>
 
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 rounded-2xl bg-gray-100 dark:bg-gray-700 py-3 text-md font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  disabled={deleteConfirmText !== '탈퇴합니다'}
-                  className="flex-1 rounded-2xl bg-red-500 py-3 text-md font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  탈퇴하기
-                </button>
-              </div>
-            </div>
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-2xl bg-gray-100 dark:bg-gray-700 py-3 text-md font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              disabled={deleteConfirmText !== '탈퇴합니다'}
+              className="flex-1 rounded-2xl bg-red-500 py-3 text-md font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              탈퇴하기
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

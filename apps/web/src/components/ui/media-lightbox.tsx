@@ -198,7 +198,7 @@ export function MediaLightbox({
           ) : null}
 
           <div
-            className="flex h-full w-full items-center justify-center"
+            className="relative h-full w-full"
             onTouchStart={(event) => setTouchStartX(event.changedTouches[0]?.clientX ?? null)}
             onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
             data-testid="media-lightbox-surface"
@@ -207,7 +207,10 @@ export function MediaLightbox({
               src={currentImage.src}
               fallbackSrc={currentImage.fallbackSrc}
               alt={currentImage.alt}
-              className="max-h-full max-w-full rounded-2xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+              fill
+              className="rounded-2xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+              sizes="100vw"
+              priority
             />
           </div>
 
@@ -232,7 +235,7 @@ export function MediaLightbox({
                   type="button"
                   onClick={() => setCurrentIndex(index)}
                   aria-label={`${index + 1}번째 이미지 보기`}
-                  className={`overflow-hidden rounded-xl border transition-colors ${
+                  className={`relative h-14 w-14 overflow-hidden rounded-xl border transition-colors sm:h-16 sm:w-16 ${
                     index === currentIndex ? 'border-white' : 'border-white/20'
                   }`}
                 >
@@ -240,7 +243,9 @@ export function MediaLightbox({
                     src={image.src}
                     fallbackSrc={image.fallbackSrc}
                     alt=""
-                    className="h-14 w-14 object-cover sm:h-16 sm:w-16"
+                    fill
+                    className="object-cover"
+                    sizes="64px"
                   />
                 </button>
               ))}

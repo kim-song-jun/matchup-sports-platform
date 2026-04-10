@@ -114,7 +114,9 @@ export default function AdminUserDetailPage() {
                 ? '정지 사유를 남기면 사용자 상세의 운영 로그와 상태 배지에 반영됩니다.'
                 : '활성화 사유를 남기면 복구 이력으로 저장됩니다.'}
           </p>
+          <label htmlFor="admin-user-action-note" className="sr-only">운영 메모</label>
           <textarea
+            id="admin-user-action-note"
             value={actionNote}
             onChange={(e) => setActionNote(e.target.value)}
             rows={4}

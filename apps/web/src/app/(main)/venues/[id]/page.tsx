@@ -206,13 +206,16 @@ export default function VenueDetailPage() {
                 type="button"
                 onClick={openHeroImage}
                 aria-label={`${venue.name} 대표 이미지 보기`}
-                className="mb-2 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
+                className="relative mb-2 h-[220px] w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700"
               >
                 <SafeImage
                   src={heroImage}
                   fallbackSrc={fallbackVenueImages[0]}
                   alt={venue.name}
-                  className="h-[220px] w-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  priority
                 />
               </button>
             )}
@@ -224,7 +227,7 @@ export default function VenueDetailPage() {
                     type="button"
                     onClick={() => openMediaBySource(image)}
                     aria-label={`${venue.name} 이미지 ${index + 1} 보기`}
-                    className={`overflow-hidden rounded-xl border transition-colors ${
+                    className={`relative aspect-[4/3] overflow-hidden rounded-xl border transition-colors ${
                       heroImage === image
                         ? 'border-blue-500'
                         : 'border-gray-100 dark:border-gray-700'
@@ -234,7 +237,9 @@ export default function VenueDetailPage() {
                       src={image}
                       fallbackSrc={fallbackVenueImages[index] ?? fallbackVenueImages[0]}
                       alt={`${venue.name} 이미지 ${index + 1}`}
-                      className="aspect-[4/3] h-full w-full object-cover"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 33vw, 20vw"
                     />
                   </button>
                 ))}

@@ -93,7 +93,9 @@ export default function TeamMatchesPage() {
 
       {/* 필터 행 */}
       <div className="px-5 @3xl:px-0 mb-4 flex flex-wrap items-center gap-2">
+        <label htmlFor="team-match-date-filter" className="sr-only">경기 날짜 필터</label>
         <input
+          id="team-match-date-filter"
           type="date"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}

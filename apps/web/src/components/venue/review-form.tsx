@@ -178,10 +178,11 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
 
       {/* Comment */}
       <div className="mb-4">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+        <label htmlFor={`venue-review-comment-${venueId}`} className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
           후기 작성
         </label>
         <textarea
+          id={`venue-review-comment-${venueId}`}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="이용 후기를 자유롭게 작성해주세요"

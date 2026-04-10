@@ -205,13 +205,14 @@ export default function EditMatchPage() {
         <FormSection label="대표 이미지 미리보기">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {fallbackImages.map((src, index) => (
-              <div key={`${src}-${index}`} className="shrink-0 h-20 w-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+              <div key={`${src}-${index}`} className="relative shrink-0 h-20 w-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
                 <SafeImage
                   src={src}
                   fallbackSrc={fallbackImages[index + 1] ?? fallbackImages[0]}
                   alt={`${form.title || apiMatch?.title || '매치'} 이미지 ${index + 1}`}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
+                  fill
+                  className="object-cover"
+                  sizes="80px"
                 />
               </div>
             ))}
@@ -247,8 +248,10 @@ export default function EditMatchPage() {
           <div className="grid grid-cols-3 gap-3">
             <input id="edit-matchDate" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+            <label htmlFor="edit-startTime" className="sr-only">시작 시간</label>
             <input id="edit-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+            <label htmlFor="edit-endTime" className="sr-only">종료 시간</label>
             <input id="edit-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
           </div>
@@ -277,6 +280,7 @@ export default function EditMatchPage() {
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
             </select>
+            <label htmlFor="edit-levelMax" className="sr-only">최대 레벨</label>
             <select id="edit-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: parseInt(e.target.value) })}
               className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}

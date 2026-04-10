@@ -12,6 +12,8 @@ interface AdminToolbarProps {
     value: string;
     onChange: (v: string) => void;
     placeholder?: string;
+    /** Unique id for the search input. Defaults to "admin-toolbar-search". */
+    id?: string;
   };
   filters?: FilterOption[];
   activeFilter?: string;
@@ -37,7 +39,11 @@ export function AdminToolbar({
         {search && (
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400" size={14} />
+            <label htmlFor={search.id ?? 'admin-toolbar-search'} className="sr-only">
+              {search.placeholder || '검색'}
+            </label>
             <input
+              id={search.id ?? 'admin-toolbar-search'}
               type="text"
               value={search.value}
               onChange={(e) => search.onChange(e.target.value)}

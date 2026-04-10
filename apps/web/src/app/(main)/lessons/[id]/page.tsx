@@ -119,13 +119,16 @@ export default function LessonDetailPage() {
                 type="button"
                 onClick={() => openMediaAt(heroImage)}
                 aria-label={`${lesson.title} 대표 이미지 보기`}
-                className="h-full w-full"
+                className="relative h-full w-full"
               >
                 <SafeImage
                   src={heroImage}
                   fallbackSrc={heroFallbackImage}
                   alt={lesson.title}
-                  className="h-full w-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  priority
                 />
               </button>
             ) : (
@@ -251,14 +254,15 @@ export default function LessonDetailPage() {
                   type="button"
                   onClick={() => openMediaAt(image)}
                   aria-label={`${lesson.title} 이미지 ${index + 2} 보기`}
-                  className="aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
+                  className="relative aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
                 >
                   <SafeImage
                     src={image}
                     fallbackSrc={fallbackLessonImages[index + 1] ?? heroFallbackImage}
                     alt={`${lesson.title} 사진 ${index + 2}`}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 33vw, 20vw"
                   />
                 </button>
               ))}

@@ -333,8 +333,9 @@ export default function AdminLessonDetailPage() {
 
             {/* Status change */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">상태 변경</label>
+              <label htmlFor="admin-lesson-status" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">상태 변경</label>
               <select
+                id="admin-lesson-status"
                 value={lesson.status}
                 onChange={(e) => statusMutation.mutate(e.target.value)}
                 disabled={statusChanging}

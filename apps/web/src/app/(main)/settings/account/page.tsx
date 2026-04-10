@@ -21,7 +21,7 @@ export default function AccountPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Header */}
       <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-colors min-w-11 min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
@@ -118,7 +118,7 @@ export default function AccountPage() {
         <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="w-full rounded-2xl border-2 border-red-200 text-red-500 py-3.5 text-md font-semibold hover:bg-red-50 active:bg-red-100 transition-colors"
+            className="w-full rounded-2xl border-2 border-red-200 text-red-500 py-3.5 text-md font-semibold hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 dark:active:bg-red-800/40 transition-colors"
           >
             회원 탈퇴
           </button>
@@ -193,7 +193,7 @@ function DeleteModal({
         <button
           aria-label="닫기"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors min-w-11 min-h-[44px] flex items-center justify-center"
+          className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
         >
           <X size={20} className="text-gray-500" />
         </button>
@@ -228,7 +228,7 @@ function DeleteModal({
             </button>
             <button
               disabled={deleteConfirmText !== '탈퇴합니다'}
-              className="flex-1 rounded-2xl bg-red-500 py-3 text-md font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 rounded-2xl bg-red-500 py-3 text-md font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
               탈퇴하기
             </button>
@@ -272,7 +272,7 @@ function SocialAccount({ provider, name, email, connected }: { provider: string;
         {email && <p className="text-sm text-gray-500 mt-0.5">{email}</p>}
       </div>
       {connected ? (
-        <span className="rounded-lg bg-green-50 px-2.5 py-1 text-xs font-medium text-green-600">연결됨</span>
+        <span className="rounded-lg bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400">연결됨</span>
       ) : (
         <button className="rounded-xl bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
           연결하기

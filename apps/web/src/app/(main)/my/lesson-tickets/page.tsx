@@ -484,7 +484,7 @@ function ExpirationBanner({
       <button
         type="button"
         onClick={onScrollToFirst}
-        className="shrink-0 rounded-lg px-3 py-1.5 min-h-[36px] text-xs font-semibold bg-amber-100 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-700/40 transition-colors"
+        className="shrink-0 rounded-lg px-3 py-1.5 min-h-9 text-xs font-semibold bg-amber-100 dark:bg-amber-800/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-700/40 transition-colors"
       >
         확인하기
       </button>
@@ -587,7 +587,7 @@ export default function MyLessonTicketsPage() {
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>

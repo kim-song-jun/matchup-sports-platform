@@ -123,7 +123,7 @@ export default function NotificationsPage() {
           )}
         </div>
         {mounted && isAuthenticated && unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="text-xs text-gray-500 font-medium min-h-[44px] min-w-[44px] px-3 py-2 flex items-center hover:text-gray-600 transition-colors" disabled={markAllRead.isPending}>
+          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="text-xs text-gray-500 font-medium min-h-[44px] min-w-11 px-3 py-2 flex items-center hover:text-gray-600 transition-colors" disabled={markAllRead.isPending}>
             {t('markAllRead')}
           </button>
         )}

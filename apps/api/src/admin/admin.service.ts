@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { MatchStatus, LessonStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { PAGINATION } from '../common/constants/pagination';
 import { CreateLessonAdminDto } from './dto/create-lesson-admin.dto';
 import { CreateTeamAdminDto } from './dto/create-team-admin.dto';
 import { CreateVenueAdminDto, UpdateVenueAdminDto } from './dto/create-venue-admin.dto';
@@ -56,7 +57,7 @@ export class AdminService {
   }
 
   async getUsers(filter: { search?: string; cursor?: string }) {
-    const limit = 20;
+    const limit = PAGINATION.DEFAULT_LIMIT;
     const where: { deletedAt: null; nickname?: { contains: string; mode: 'insensitive' } } = {
       deletedAt: null,
     };
@@ -166,7 +167,7 @@ export class AdminService {
   }
 
   async getMatches(filter: { status?: string; cursor?: string }) {
-    const limit = 20;
+    const limit = PAGINATION.DEFAULT_LIMIT;
     const where: { status?: MatchStatus } = {};
     if (filter.status) where.status = filter.status as MatchStatus;
 
@@ -288,7 +289,7 @@ export class AdminService {
   async getVenues() {
     return this.prisma.venue.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: PAGINATION.ADMIN_EXPORT_LIMIT,
     });
   }
 
@@ -354,7 +355,7 @@ export class AdminService {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: PAGINATION.ADMIN_EXPORT_LIMIT,
     });
   }
 

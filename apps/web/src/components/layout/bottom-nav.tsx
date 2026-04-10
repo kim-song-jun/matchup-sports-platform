@@ -40,7 +40,7 @@ export function BottomNav() {
               href={href}
               data-testid={testId}
               className={cn(
-                'bottom-nav-link flex min-h-[56px] min-w-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-3 py-2 text-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
+                'bottom-nav-link flex min-h-14 min-w-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-3 py-2 text-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
                 isActive ? 'is-active text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',
               )}
             >

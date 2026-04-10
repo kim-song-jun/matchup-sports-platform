@@ -232,7 +232,7 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center justify-center min-w-11 min-h-[44px] rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <X size={18} />
           </button>
@@ -386,7 +386,7 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
                 <p className="text-xs text-blue-600 dark:text-blue-400">
                   변경 후: <span className="font-semibold">{adjUsed} / {adjTotal}회</span> 사용
                 </p>
-                <div className="h-[4px] w-full rounded-full bg-blue-100 dark:bg-blue-800 overflow-hidden">
+                <div className="h-1 w-full rounded-full bg-blue-100 dark:bg-blue-800 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-blue-500"
                     style={{ width: `${Math.min(100, adjTotal > 0 ? (adjUsed / adjTotal) * 100 : 0)}%` }}
@@ -463,7 +463,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
         aria-label="수강권 관리"
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex items-center gap-1 min-h-[36px] px-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
+        className="flex items-center gap-1 min-h-9 px-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
       >
         관리
         <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
@@ -478,7 +478,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
             type="button"
             role="menuitem"
             onClick={() => trigger('extend')}
-            className="flex items-center gap-2.5 w-full px-4 min-h-[40px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <CalendarDays size={14} className="text-gray-400" aria-hidden="true" />
             만료일 연장
@@ -488,7 +488,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
             type="button"
             role="menuitem"
             onClick={() => trigger('status')}
-            className="flex items-center gap-2.5 w-full px-4 min-h-[40px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <RefreshCw size={14} className="text-gray-400" aria-hidden="true" />
             상태 변경
@@ -499,7 +499,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
               type="button"
               role="menuitem"
               onClick={() => trigger('adjust')}
-              className="flex items-center gap-2.5 w-full px-4 min-h-[40px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               <MoreHorizontal size={14} className="text-gray-400" aria-hidden="true" />
               횟수 조정
@@ -512,7 +512,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
             href={`/admin/lessons/${ticket.lessonId}`}
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 w-full px-4 min-h-[40px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <ExternalLink size={14} className="text-gray-400" aria-hidden="true" />
             상세 보기
@@ -558,7 +558,7 @@ function BulkToolbar({ count, onExpire, onStatusChange, onClear }: BulkToolbarPr
           type="button"
           onClick={onClear}
           aria-label="선택 해제"
-          className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center min-h-[44px] min-w-11 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           <X size={14} />
         </button>
@@ -607,7 +607,7 @@ function BulkStatusModal({ count, onClose, onSave }: BulkStatusModalProps) {
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center justify-center min-w-11 min-h-[44px] rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <X size={18} />
           </button>
@@ -849,7 +849,7 @@ export default function AdminLessonTicketsPage() {
               key={key}
               type="button"
               onClick={() => handleFilter(key)}
-              className={`min-h-[36px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`min-h-9 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
                 filter === key
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

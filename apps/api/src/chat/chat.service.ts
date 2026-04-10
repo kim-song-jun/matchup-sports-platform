@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PAGINATION } from '../common/constants/pagination';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { PostMessageDto } from './dto/post-message.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -15,7 +16,7 @@ export class ChatService {
   ) {}
 
   /** List rooms the user participates in, cursor-paginated by lastMessageAt desc. */
-  async listRooms(userId: string, cursor?: string, limit = 20) {
+  async listRooms(userId: string, cursor?: string, limit: number = PAGINATION.DEFAULT_LIMIT) {
     const take = Math.min(limit, 100);
     const rooms = await this.prisma.chatRoom.findMany({
       where: {
@@ -57,7 +58,7 @@ export class ChatService {
         },
         messages: {
           orderBy: { createdAt: 'desc' },
-          take: 30,
+          take: PAGINATION.CHAT_MESSAGE_LIMIT,
           include: {
             sender: { select: { id: true, nickname: true, profileImageUrl: true } },
           },
@@ -73,7 +74,7 @@ export class ChatService {
   }
 
   /** List messages for a room with cursor pagination. */
-  async listMessages(roomId: string, userId: string, before?: string, limit = 30) {
+  async listMessages(roomId: string, userId: string, before?: string, limit: number = PAGINATION.CHAT_MESSAGE_LIMIT) {
     await this.assertParticipant(roomId, userId);
 
     const take = Math.min(limit, 100);

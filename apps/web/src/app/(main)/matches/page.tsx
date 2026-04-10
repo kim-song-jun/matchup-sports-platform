@@ -284,7 +284,7 @@ export default function MatchesPage() {
                 aria-label="리스트 뷰"
                 aria-pressed={viewMode === 'list'}
                 onClick={() => setViewMode('list')}
-                className={`min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
+                className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
                   viewMode === 'list'
                     ? 'bg-blue-500 text-white'
                     : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
@@ -297,7 +297,7 @@ export default function MatchesPage() {
                 aria-label="지도 뷰"
                 aria-pressed={viewMode === 'map'}
                 onClick={() => setViewMode('map')}
-                className={`min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors ${
+                className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
                   viewMode === 'map'
                     ? 'bg-blue-500 text-white'
                     : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'

@@ -85,12 +85,12 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         {title ? (
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
-            <button onClick={onClose} aria-label="닫기" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <button onClick={onClose} aria-label="닫기" className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 transition-colors min-w-11 min-h-[44px] flex items-center justify-center">
               <X size={20} />
             </button>
           </div>
         ) : (
-          <button onClick={onClose} aria-label="닫기" className="absolute top-3 right-3 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <button onClick={onClose} aria-label="닫기" className="absolute top-3 right-3 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 transition-colors min-w-11 min-h-[44px] flex items-center justify-center">
             <X size={20} />
           </button>
         )}

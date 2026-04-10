@@ -67,7 +67,7 @@ export default function NotificationsPage() {
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="rounded-xl p-1.5 -ml-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="rounded-xl p-1.5 -ml-1.5 min-h-[44px] min-w-11 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>

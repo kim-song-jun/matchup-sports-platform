@@ -88,7 +88,7 @@ export default function ProfilePage() {
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-xl font-bold text-gray-500 dark:text-gray-500">
+                <div className="flex h-14 w-[56px] items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-xl font-bold text-gray-500 dark:text-gray-500">
                   {user.nickname?.charAt(0)}
                 </div>
                 <div>
@@ -104,7 +104,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-              <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
                 <Pencil size={16} />
               </button>
             </div>
@@ -231,7 +231,7 @@ export default function ProfilePage() {
                       href={mounted && isAuthenticated ? item.href : '/login'}
                       tabIndex={-1}
                       aria-hidden="true"
-                      className="flex items-center min-w-[44px] min-h-[44px] justify-end"
+                      className="flex items-center min-w-11 min-h-[44px] justify-end"
                     >
                       <ChevronRight size={18} className="text-gray-300" />
                     </Link>

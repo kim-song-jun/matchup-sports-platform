@@ -172,7 +172,7 @@ export default function HomePage() {
       {/* 배너 (로그인 유저) */}
       {canRenderAuthenticated && (
         <section className="mt-4 px-5 @3xl:px-0">
-          <div className="relative rounded-xl overflow-hidden h-[96px]" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
+          <div className="relative rounded-xl overflow-hidden h-24" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
             {/* Crossfade layers */}
             {banners.map((banner, i) => {
               const BannerIcon = banner.icon;

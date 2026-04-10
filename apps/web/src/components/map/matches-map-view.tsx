@@ -122,7 +122,7 @@ export function MatchesMapView({ matches }: MatchesMapViewProps) {
                 type="button"
                 aria-label="매치 팝업 닫기"
                 onClick={() => setSelectedMatch(null)}
-                className="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center -mr-1 -mt-1"
+                className="rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-w-11 min-h-[44px] flex items-center justify-center -mr-1 -mt-1"
               >
                 <X size={16} className="text-gray-500" />
               </button>

@@ -181,11 +181,11 @@ export default function VenueDetailPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in dark:bg-gray-900">
       {/* Mobile header */}
       <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1 ml-3">{venue.name}</h1>
-        <button aria-label="공유하기" className="rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center">
+        <button aria-label="공유하기" className="rounded-xl p-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
           <Share2 size={18} className="text-gray-500" />
         </button>
       </header>

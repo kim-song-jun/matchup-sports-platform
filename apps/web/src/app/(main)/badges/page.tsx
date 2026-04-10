@@ -171,7 +171,7 @@ export default function BadgesPage() {
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] @3xl:hidden min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] @3xl:hidden min-w-11 min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>

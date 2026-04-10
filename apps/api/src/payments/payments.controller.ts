@@ -7,6 +7,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PreparePaymentDto } from './dto/prepare-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
+import { TossWebhookDto } from './dto/toss-webhook.dto';
 
 @ApiTags('결제')
 @Controller('payments')
@@ -35,10 +36,11 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Toss Payments 웹훅 수신 (내부용)' })
   @ApiHeader({ name: 'toss-signature', description: 'HMAC-SHA256 서명 (Toss 발급)', required: false })
+  @ApiBody({ type: TossWebhookDto })
   async webhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('toss-signature') signature: string | undefined,
-    @Body() body: Record<string, unknown>,
+    @Body() body: TossWebhookDto,
   ) {
     const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(body));
     return this.paymentsService.handleWebhook(rawBody, signature, body);

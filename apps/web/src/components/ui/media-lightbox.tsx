@@ -179,7 +179,7 @@ export function MediaLightbox({
             type="button"
             onClick={onClose}
             aria-label="이미지 뷰어 닫기"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            className="flex min-h-[44px] min-w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
           >
             <X size={20} />
           </button>
@@ -191,7 +191,7 @@ export function MediaLightbox({
               type="button"
               onClick={goPrev}
               aria-label="이전 이미지"
-              className="absolute left-3 top-1/2 z-10 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:min-h-[48px] sm:min-w-[48px]"
+              className="absolute left-3 top-1/2 z-10 flex min-h-[44px] min-w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:min-h-12 sm:min-w-[48px]"
             >
               <ChevronLeft size={22} />
             </button>
@@ -216,7 +216,7 @@ export function MediaLightbox({
               type="button"
               onClick={goNext}
               aria-label="다음 이미지"
-              className="absolute right-3 top-1/2 z-10 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:min-h-[48px] sm:min-w-[48px]"
+              className="absolute right-3 top-1/2 z-10 flex min-h-[44px] min-w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:min-h-12 sm:min-w-[48px]"
             >
               <ChevronRight size={22} />
             </button>

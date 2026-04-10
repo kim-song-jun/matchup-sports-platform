@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { NotificationType, PaymentMethod } from '@prisma/client';
+import { TossWebhookDto } from './dto/toss-webhook.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -365,7 +366,7 @@ export class PaymentsService implements OnModuleInit {
 
   // ── webhook ────────────────────────────────────────────────────────────────
 
-  async handleWebhook(rawBody: Buffer, signatureHeader: string | undefined, payload: Record<string, unknown>) {
+  async handleWebhook(rawBody: Buffer, signatureHeader: string | undefined, payload: TossWebhookDto) {
     // Verify HMAC-SHA256 signature when secret is configured
     if (this.tossWebhookSecret) {
       this.verifyWebhookSignature(rawBody, signatureHeader);
@@ -375,13 +376,13 @@ export class PaymentsService implements OnModuleInit {
       this.logger.warn('TOSS_WEBHOOK_SECRET not set — skipping webhook signature verification (dev only)');
     }
 
-    const eventType = payload.eventType as string;
-    const data = payload.data as Record<string, unknown> | undefined;
+    const eventType = payload.eventType;
+    const data = payload.data;
 
     switch (eventType) {
       case 'PAYMENT_STATUS_CHANGED': {
-        const paymentKey = data?.paymentKey as string | undefined;
-        const status = data?.status as string | undefined;
+        const paymentKey = data?.paymentKey;
+        const status = data?.status;
 
         if (!paymentKey || !status) {
           this.logger.warn('Webhook PAYMENT_STATUS_CHANGED missing paymentKey or status');

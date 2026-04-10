@@ -122,7 +122,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
         <button
           onClick={goToPrevMonth}
           aria-label="이전 달"
-          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-[36px] flex items-center justify-center"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-9 flex items-center justify-center"
         >
           <ChevronLeft size={18} />
         </button>
@@ -132,7 +132,7 @@ export function MiniCalendar({ matches }: MiniCalendarProps) {
         <button
           onClick={goToNextMonth}
           aria-label="다음 달"
-          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-[36px] flex items-center justify-center"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 transition-[colors,transform] min-w-[36px] min-h-9 flex items-center justify-center"
         >
           <ChevronRight size={18} />
         </button>

@@ -24,7 +24,8 @@ const categoryFilterKeys = [
   { labelKey: 'categoryProtective' as const, match: (item: MarketplaceListing) => item.title?.toLowerCase().includes('보호') || item.title?.toLowerCase().includes('장갑') },
 ];
 
-const conditionKeyMap: Record<string, string> = {
+type ConditionKey = 'conditionNew' | 'conditionLikeNew' | 'conditionGood' | 'conditionFair' | 'conditionPoor';
+const conditionKeyMap: Record<string, ConditionKey> = {
   new: 'conditionNew',
   like_new: 'conditionLikeNew',
   good: 'conditionGood',
@@ -134,7 +135,7 @@ export default function MarketplacePage() {
                           {sportLabel[item.sportType] || t('other')}
                         </span>
                         <span className="text-sm text-gray-500 truncate">
-                          {item.locationDistrict || item.locationCity || t('locationUndecided')} · {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition] as any) : item.condition}
+                          {item.locationDistrict || item.locationCity || t('locationUndecided')} · {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition]) : item.condition}
                         </span>
                       </div>
 

@@ -110,12 +110,12 @@ export default function MercenaryDetailPage() {
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center justify-center min-h-[44px] min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <span className="text-base font-semibold text-gray-900 dark:text-white">용병 모집</span>
-        <div className="min-w-[44px]" aria-hidden="true" />
+        <div className="min-w-11" aria-hidden="true" />
       </header>
 
       <div className="px-5 @3xl:px-0 pb-28">

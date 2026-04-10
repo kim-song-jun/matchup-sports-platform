@@ -12,6 +12,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
 import { randomUUID } from 'crypto';
 import { CreateListingDto } from './dto/create-listing.dto';
+import { PAGINATION } from '../common/constants/pagination';
 
 // Toss Payments confirm response shape (shared subset used here)
 interface TossConfirmResponse {
@@ -49,7 +50,7 @@ export class MarketplaceService {
   }
 
   async findListings(filter: { sportType?: string; category?: string; condition?: string; cursor?: string }) {
-    const limit = 20;
+    const limit = PAGINATION.DEFAULT_LIMIT;
     const where: Prisma.MarketplaceListingWhereInput = { status: 'active' };
     if (filter.sportType) where.sportType = filter.sportType as SportType;
     if (filter.category) where.category = filter.category;

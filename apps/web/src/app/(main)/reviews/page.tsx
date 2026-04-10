@@ -25,7 +25,7 @@ export default function ReviewsPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 평가</h1>
       </header>
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
@@ -118,7 +118,7 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
       <span className="text-sm font-semibold text-gray-700 mb-1 block">{label}</span>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} onClick={() => onChange(n)} aria-label={`${n}점`} className="p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center">
+          <button key={n} onClick={() => onChange(n)} aria-label={`${n}점`} className="p-1.5 min-w-11 min-h-[44px] flex items-center justify-center">
             <Star size={24} className={n <= value ? 'text-amber-400' : 'text-gray-200'} fill={n <= value ? 'currentColor' : 'none'} />
           </button>
         ))}

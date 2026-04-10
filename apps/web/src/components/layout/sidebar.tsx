@@ -144,7 +144,7 @@ export function Sidebar() {
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.nickname}</p>
             </div>
             <button onClick={() => { logout(); router.push('/login'); }}
-              className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label={tc('logout')}>
+              className="flex items-center justify-center min-h-[44px] min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" aria-label={tc('logout')}>
               <LogOut size={14} />
             </button>
           </div>

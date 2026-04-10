@@ -143,7 +143,7 @@ export default function AdminStatisticsPage() {
                 <div key={m.month} className="flex-1 flex flex-col items-center justify-end h-full">
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{m.count}</span>
                   <div
-                    className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-[4px]"
+                    className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-1"
                     style={{ height: `${heightPercent}%` }}
                   />
                   <span className="text-xs text-gray-400 mt-2">{m.month}</span>
@@ -166,7 +166,7 @@ export default function AdminStatisticsPage() {
                 <div key={r.month} className="flex-1 flex flex-col items-center justify-end h-full">
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{formatCurrencyCompact(r.revenue)}</span>
                   <div
-                    className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-[4px]"
+                    className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-1"
                     style={{ height: `${heightPercent}%` }}
                   />
                   <span className="text-xs text-gray-400 mt-2">{r.month}</span>
@@ -193,7 +193,7 @@ export default function AdminStatisticsPage() {
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{s.sport}</span>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{s.count}건</span>
                   </div>
-                  <div className="h-[8px] rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                  <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                     <div
                       className={`h-full rounded-full ${s.color} transition-[width] duration-300`}
                       style={{ width: `${widthPercent}%` }}

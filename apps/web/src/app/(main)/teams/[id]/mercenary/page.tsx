@@ -30,7 +30,7 @@ export default function TeamMercenaryPage() {
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center min-h-[44px] min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
@@ -41,7 +41,7 @@ export default function TeamMercenaryPage() {
           <Link
             href={`/mercenary/new?teamId=${teamId}`}
             aria-label="용병 모집 추가"
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl bg-blue-500 hover:bg-blue-600 transition-colors"
+            className="flex items-center justify-center min-h-[44px] min-w-11 rounded-xl bg-blue-500 hover:bg-blue-600 transition-colors"
           >
             <Plus size={18} className="text-white" />
           </Link>

@@ -236,7 +236,7 @@ export default function ChatRoomEmbed({
             <button
               onClick={onBack}
               aria-label="뒤로 가기"
-              className="rounded-lg p-1.5 min-w-[44px] min-h-[44px] text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="rounded-lg p-1.5 min-w-11 min-h-[44px] text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -251,7 +251,7 @@ export default function ChatRoomEmbed({
           <button
             aria-label={showMatchInfo ? '정보 닫기' : '정보 보기'}
             onClick={() => setShowMatchInfo(!showMatchInfo)}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
           >
             {showMatchInfo ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
           </button>
@@ -259,7 +259,7 @@ export default function ChatRoomEmbed({
             <button
               aria-label="더보기 메뉴"
               onClick={() => setShowMenu(!showMenu)}
-              className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
             >
               <MoreVertical size={18} />
             </button>
@@ -382,7 +382,7 @@ export default function ChatRoomEmbed({
               <button
                 key={emoji}
                 onClick={() => { setInput((prev) => prev + emoji); setShowEmoji(false); }}
-                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-[colors,transform] min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className="text-2xl p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-90 transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
               >
                 {emoji}
               </button>

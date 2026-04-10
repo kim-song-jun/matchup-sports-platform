@@ -173,7 +173,7 @@ export default function LoginPage() {
       <div className="flex items-center px-4 pt-4">
         <Link
           href="/home"
-          className="inline-flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-[44px] min-w-11 px-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           aria-label="홈으로 돌아가기"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">

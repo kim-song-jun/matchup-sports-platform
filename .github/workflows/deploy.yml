@@ -166,7 +166,7 @@ jobs:
           #   docker run --rm matchup-api npx prisma migrate resolve --rolled-back <migration>
           echo "[INFO] Running database migrations..."
           ${COMPOSE} -f deploy/docker-compose.prod.yml --env-file deploy/.env \
-            run --rm --no-deps api npx prisma migrate deploy
+            run --rm --no-deps -T api npx prisma migrate deploy </dev/null
 
           cd deploy
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down

@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell, UserPlus, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
-import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
 
 export function Sidebar() {
@@ -14,9 +13,6 @@ export function Sidebar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const chatUnread = useChatUnreadTotal();
-  const { data: unreadData } = useUnreadCount();
-  const notifUnread = unreadData?.count ?? 0;
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const t = useTranslations('nav');
@@ -91,7 +87,6 @@ export function Sidebar() {
             <div className="space-y-0.5">
               {section.items.map(({ href, icon: Icon, label }) => {
                 const isActive = pathname.startsWith(href);
-                const badge = href === '/chat' ? chatUnread : href === '/notifications' ? notifUnread : 0;
                 return (
                   <Link key={href} href={href}
                     className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
@@ -101,11 +96,6 @@ export function Sidebar() {
                     }`}>
                     <Icon size={16} strokeWidth={isActive ? 2 : 1.5} />
                     <span className="flex-1">{label}</span>
-                    {badge > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-2xs font-bold text-white">
-                        {badge > 99 ? '99+' : badge}
-                      </span>
-                    )}
                   </Link>
                 );
               })}

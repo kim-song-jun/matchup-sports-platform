@@ -144,7 +144,7 @@ export default function TeamMatchesPage() {
           />
         ) : (
           <div className="space-y-6">
-            {isAuthenticated && (myTeams?.length ?? 0) > 0 && (
+            {isAuthenticated && myHostTeamIds.size > 0 && (
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
                 {myTeamMatches.length === 0 ? (
@@ -165,14 +165,23 @@ export default function TeamMatchesPage() {
               </div>
             )}
             <div>
-              {isAuthenticated && (myTeams?.length ?? 0) > 0 && (
+              {isAuthenticated && myHostTeamIds.size > 0 && (
                 <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
               )}
-              <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-                {otherMatches.map((match: TeamMatch) => (
-                  <TeamMatchCard key={match.id} match={match} />
-                ))}
-              </div>
+              {otherMatches.length === 0 && isAuthenticated && myHostTeamIds.size > 0 ? (
+                <EmptyState
+                  icon={Search}
+                  title="다른 팀의 모집글이 없어요"
+                  description="내 팀이 모든 매칭을 호스트하고 있어요"
+                  size="sm"
+                />
+              ) : (
+                <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
+                  {otherMatches.map((match: TeamMatch) => (
+                    <TeamMatchCard key={match.id} match={match} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

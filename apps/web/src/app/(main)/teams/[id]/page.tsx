@@ -26,7 +26,7 @@ export default function TeamDetailPage() {
   const { isAuthenticated } = useAuthStore();
   const { data: team, isLoading } = useTeam(teamId);
   const { data: apiBadges } = useTeamBadges(teamId);
-  const { data: myTeams } = useMyTeams();
+  const { data: myTeams, isLoading: isMyTeamsLoading } = useMyTeams();
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
@@ -339,8 +339,8 @@ export default function TeamDetailPage() {
             </div>
           )}
 
-          {/* 비멤버: 가입 신청 + 연락하기 */}
-          {!isMyTeam && (
+          {/* 비멤버: 가입 신청 + 연락하기 (myTeams 로딩 완료 후에만 렌더) */}
+          {!isMyTeamsLoading && !isMyTeam && (
             <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
               {!team.isRecruiting ? (
                 <button
@@ -382,16 +382,8 @@ export default function TeamDetailPage() {
                 </Link>
               )}
 
-              {/* 연락하기 — contactInfo 유무에 따라 disabled */}
-              {team.contactInfo ? (
-                <button
-                  onClick={handleContact}
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <MessageCircle size={18} />
-                  연락하기
-                </button>
-              ) : (
+              {/* 연락하기 — 비로그인/contactInfo 있음: 활성(→ 로그인 redirect 또는 연락처 표시), 로그인+contactInfo 없음: disabled */}
+              {isAuthenticated && !team.contactInfo ? (
                 <button
                   disabled
                   aria-label="연락처 미등록"
@@ -399,6 +391,14 @@ export default function TeamDetailPage() {
                 >
                   <MessageCircle size={18} />
                   연락처 미등록
+                </button>
+              ) : (
+                <button
+                  onClick={handleContact}
+                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={18} />
+                  연락하기
                 </button>
               )}
             </div>

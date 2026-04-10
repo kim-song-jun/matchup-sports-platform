@@ -14,7 +14,13 @@ output/
 e2e/.auth/
 *.log
 .claude/agents/*.bak.*
+*.bak.*
 ec2-info
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
 
 # env
 .env

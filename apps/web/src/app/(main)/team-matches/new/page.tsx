@@ -6,18 +6,17 @@ import { ArrowLeft, ArrowRight, Check, ChevronRight, Users } from 'lucide-react'
 import Link from 'next/link';
 import { useCreateTeamMatch, useMyTeams } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
+import { ErrorState } from '@/components/ui/error-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { SKILL_GRADES, MATCH_TYPES, getGradeInfo } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 import type { CreateTeamMatchInput } from '@/types/api';
 import { formatCurrency } from '@/lib/utils';
+import { sportLabel } from '@/lib/constants';
 
 const STEPS = ['종목', '구장/일시', '경기조건', '비용/규정', '확인'];
 
-const sportOptions = [
-  { value: 'soccer', label: '축구' },
-  { value: 'futsal', label: '풋살' },
-];
+const sportOptions = Object.entries(sportLabel).map(([value, label]) => ({ value, label }));
 
 const quarterOptions = [2, 4, 6, 8, 10];
 
@@ -85,7 +84,7 @@ export default function NewTeamMatchPage() {
   const router = useRouter();
   const { toast } = useToast();
   useRequireAuth();
-  const { data: myTeams, isLoading: teamsLoading, isError: teamsError } = useMyTeams();
+  const { data: myTeams, isLoading: teamsLoading, isError: teamsError, refetch: refetchTeams } = useMyTeams();
   // Only owner/manager can host a team match
   const eligibleTeams = (myTeams ?? []).filter((t) => t.role === 'owner' || t.role === 'manager');
   const [selectedHostTeamId, setSelectedHostTeamId] = useState('');
@@ -151,16 +150,8 @@ export default function NewTeamMatchPage() {
 
   if (teamsError) {
     return (
-      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
-        <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <p className="text-base text-gray-600 dark:text-gray-400">팀 정보를 불러올 수 없습니다</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="inline-block mt-4 rounded-xl bg-blue-500 px-6 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors"
-          >
-            다시 시도
-          </button>
-        </div>
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0 mt-20">
+        <ErrorState message="팀 정보를 불러올 수 없어요" onRetry={() => refetchTeams()} />
       </div>
     );
   }
@@ -271,8 +262,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">모집글 제목</label>
+              <label htmlFor="match-title" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">모집글 제목</label>
               <input
+                id="match-title"
                 type="text"
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
@@ -287,8 +279,9 @@ export default function NewTeamMatchPage() {
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">경기 날짜</label>
+              <label htmlFor="match-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">경기 날짜</label>
               <input
+                id="match-date"
                 type="date"
                 value={form.matchDate}
                 onChange={(e) => update('matchDate', e.target.value)}
@@ -298,8 +291,9 @@ export default function NewTeamMatchPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">시작 시간</label>
+                <label htmlFor="match-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">시작 시간</label>
                 <input
+                  id="match-start-time"
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
@@ -307,8 +301,9 @@ export default function NewTeamMatchPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">종료 시간</label>
+                <label htmlFor="match-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">종료 시간</label>
                 <input
+                  id="match-end-time"
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
@@ -318,8 +313,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 경기 시간 (분, 선택)</label>
+              <label htmlFor="match-total-minutes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 경기 시간 (분, 선택)</label>
               <input
+                id="match-total-minutes"
                 type="number"
                 value={form.totalMinutes}
                 onChange={(e) => update('totalMinutes', e.target.value)}
@@ -348,8 +344,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장명</label>
+              <label htmlFor="venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장명</label>
               <input
+                id="venue-name"
                 type="text"
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
@@ -359,8 +356,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장 주소 (선택)</label>
+              <label htmlFor="venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장 주소 (선택)</label>
               <input
+                id="venue-address"
                 type="text"
                 value={form.venueAddress}
                 onChange={(e) => update('venueAddress', e.target.value)}
@@ -399,8 +397,9 @@ export default function NewTeamMatchPage() {
 
             {/* 선출선수(명) */}
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">선출선수 (명)</label>
+              <label htmlFor="pro-player-count" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">선출선수 (명)</label>
               <input
+                id="pro-player-count"
                 type="number"
                 min={0}
                 max={10}
@@ -489,8 +488,9 @@ export default function NewTeamMatchPage() {
 
             {/* 유니폼 색상 */}
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">유니폼 색상</label>
+              <label htmlFor="uniform-color" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">유니폼 색상</label>
               <input
+                id="uniform-color"
                 type="text"
                 value={form.uniformColor}
                 onChange={(e) => update('uniformColor', e.target.value)}
@@ -527,8 +527,9 @@ export default function NewTeamMatchPage() {
         {step === 3 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 비용 (원)</label>
+              <label htmlFor="total-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 비용 (원)</label>
               <input
+                id="total-fee"
                 type="number"
                 value={form.totalFee}
                 onChange={(e) => update('totalFee', e.target.value)}
@@ -541,8 +542,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+              <label htmlFor="opponent-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
               <input
+                id="opponent-fee"
                 type="number"
                 value={form.opponentFee}
                 onChange={(e) => update('opponentFee', e.target.value)}
@@ -555,8 +557,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">추가 안내 (선택)</label>
+              <label htmlFor="match-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">추가 안내 (선택)</label>
               <textarea
+                id="match-notes"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}
                 placeholder="유니폼 색상, 주차 안내, 기타 규정 등"

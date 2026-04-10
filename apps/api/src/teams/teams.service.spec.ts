@@ -27,6 +27,8 @@ describe('TeamsService', () => {
     },
     teamMembership: {
       create: jest.fn(),
+      findFirst: jest.fn(),
+      upsert: jest.fn(),
     },
     teamInvitation: {
       findUnique: jest.fn(),
@@ -536,6 +538,103 @@ describe('TeamsService', () => {
       await expect(
         service.declineInvitation('team-1', 'inv-1', 'invitee-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('applyToTeam', () => {
+    const mockTeamRecruiting = {
+      id: 'team-1',
+      name: 'FC 서울',
+      isRecruiting: true,
+    };
+
+    const mockPendingMembership = {
+      id: 'mem-1',
+      teamId: 'team-1',
+      userId: 'user-1',
+      role: 'member',
+      status: 'pending',
+      createdAt: new Date(),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue(mockTeamRecruiting);
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue(null);
+      mockPrismaService.teamMembership.upsert.mockResolvedValue(mockPendingMembership);
+    });
+
+    it('should upsert and return a pending membership on success', async () => {
+      const result = await service.applyToTeam('team-1', 'user-1');
+
+      expect(result).toEqual(mockPendingMembership);
+      expect(mockPrismaService.teamMembership.upsert).toHaveBeenCalledWith({
+        where: { teamId_userId: { teamId: 'team-1', userId: 'user-1' } },
+        create: { teamId: 'team-1', userId: 'user-1', role: 'member', status: 'pending' },
+        update: { role: 'member', status: 'pending' },
+      });
+    });
+
+    it('should allow re-application after left/removed status via upsert', async () => {
+      const reapplyMembership = { ...mockPendingMembership, id: 'mem-2' };
+      mockPrismaService.teamMembership.upsert.mockResolvedValue(reapplyMembership);
+
+      const result = await service.applyToTeam('team-1', 'user-1');
+
+      expect(result).toEqual(reapplyMembership);
+      expect(mockPrismaService.teamMembership.upsert).toHaveBeenCalled();
+    });
+
+    it('should throw ConflictException (TEAM_APPLY_DUPLICATE) on P2002 race condition', async () => {
+      const p2002 = Object.assign(new Error('Unique constraint'), {
+        code: 'P2002',
+        clientVersion: '6.0.0',
+      });
+      Object.setPrototypeOf(p2002, (await import('@prisma/client')).Prisma.PrismaClientKnownRequestError.prototype);
+      mockPrismaService.teamMembership.upsert.mockRejectedValue(p2002);
+
+      await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException when team does not exist', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue(null);
+
+      await expect(service.applyToTeam('non-existent', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException when team is not recruiting', async () => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({
+        ...mockTeamRecruiting,
+        isRecruiting: false,
+      });
+
+      await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw ConflictException (TEAM_ALREADY_MEMBER) when user is already an active member', async () => {
+      mockPrismaService.teamMembership.findFirst.mockImplementation(({ where }: { where: { status: string } }) => {
+        if (where.status === 'active') return Promise.resolve({ id: 'mem-active', status: 'active' });
+        return Promise.resolve(null);
+      });
+
+      await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('should throw ConflictException (TEAM_APPLY_PENDING_EXISTS) when a pending application already exists', async () => {
+      mockPrismaService.teamMembership.findFirst.mockImplementation(({ where }: { where: { status: string } }) => {
+        if (where.status === 'active') return Promise.resolve(null);
+        if (where.status === 'pending') return Promise.resolve({ id: 'mem-pending', status: 'pending' });
+        return Promise.resolve(null);
+      });
+
+      await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 

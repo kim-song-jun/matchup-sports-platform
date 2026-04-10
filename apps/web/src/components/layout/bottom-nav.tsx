@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, GraduationCap, ShoppingBag, User } from 'lucide-react';
+import { Home, Search, Users, ShoppingBag, User } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,7 @@ export function BottomNav() {
   const navItems = [
     { href: '/home', icon: Home, label: t('home'), testId: 'bottom-nav-home' },
     { href: '/matches', icon: Search, label: t('matches'), testId: 'bottom-nav-matches' },
-    { href: '/lessons', icon: GraduationCap, label: t('lessons'), testId: 'bottom-nav-lessons' },
+    { href: '/teams', icon: Users, label: t('teams'), testId: 'bottom-nav-teams' },
     { href: '/marketplace', icon: ShoppingBag, label: t('marketplace'), testId: 'bottom-nav-marketplace' },
     { href: '/profile', icon: User, label: t('profile'), testId: 'bottom-nav-profile' },
   ];
@@ -30,7 +30,9 @@ export function BottomNav() {
     >
       <div className="floating-bottom-nav flex w-full max-w-xl items-center justify-between rounded-[28px] px-2 py-2">
         {navItems.map(({ href, icon: Icon, label, testId }) => {
-          const isActive = pathname.startsWith(href);
+          const isActive = href === '/teams'
+            ? pathname.startsWith('/teams') || pathname.startsWith('/team-matches') || pathname.startsWith('/mercenary')
+            : pathname.startsWith(href);
           const isProfile = href === '/profile';
           return (
             <Link

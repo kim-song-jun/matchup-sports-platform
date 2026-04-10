@@ -461,6 +461,17 @@ export interface ChatMessage {
 }
 
 // ── Mercenary ──
+export interface MercenaryApplication {
+  id: string;
+  postId: string;
+  userId: string;
+  message: string | null;
+  status: string;
+  appliedAt: string;
+  decidedAt: string | null;
+  user?: { id: string; nickname: string; profileImageUrl: string | null };
+}
+
 export interface MercenaryPost {
   id: string;
   teamId: string;
@@ -477,6 +488,8 @@ export interface MercenaryPost {
   description?: string | null;
   status: string;
   team?: SportTeam;
+  applications?: MercenaryApplication[];
+  author?: { id: string; nickname: string; profileImageUrl?: string | null };
 }
 
 // ── Badge ──

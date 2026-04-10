@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell } from 'lucide-react';
+import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell, UserPlus, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
@@ -42,6 +42,8 @@ export function Sidebar() {
         { href: '/lessons', icon: GraduationCap, label: t('lessons') },
         { href: '/marketplace', icon: ShoppingBag, label: t('marketplace') },
         { href: '/teams', icon: Users, label: t('teams') },
+        { href: '/mercenary', icon: UserPlus, label: t('mercenary') },
+        { href: '/venues', icon: MapPin, label: '구장' },
       ],
     },
     ...(mounted && isAuthenticated ? [{

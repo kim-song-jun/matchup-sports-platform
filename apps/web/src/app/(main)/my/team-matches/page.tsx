@@ -3,53 +3,28 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Info, Swords } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Swords } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
-import { useTeamMatches, useMyTeamMatchApplications } from '@/hooks/use-api';
-import { sportLabel } from '@/lib/constants';
+import { useTeamMatches, useMyTeams, useMyTeamMatchApplications, queryKeys } from '@/hooks/use-api';
+import { useQueryClient } from '@tanstack/react-query';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatDateDot } from '@/lib/utils';
 
-const mockTeamMatches = [
-  {
-    id: 'tm-1',
-    title: '주말 풋살 팀매치 모집',
-    sportType: 'futsal',
-    matchDate: '2026-04-05',
-    startTime: '15:00',
-    endTime: '17:00',
-    venue: '잠실 풋살파크',
-    teamName: 'FC 서울라이트',
-    status: 'recruiting',
-    applicants: 3,
-  },
-  {
-    id: 'tm-2',
-    title: '농구 3:3 팀전 상대 구합니다',
-    sportType: 'basketball',
-    matchDate: '2026-04-12',
-    startTime: '19:00',
-    endTime: '21:00',
-    venue: '강남 실내체육관',
-    teamName: '강남 슬래머즈',
-    status: 'matched',
-    applicants: 5,
-  },
-];
-
 const statusLabel: Record<string, { text: string; style: string }> = {
-  recruiting: { text: '모집중', style: 'bg-gray-100 text-gray-500' },
-  matched: { text: '매칭완료', style: 'text-blue-500' },
-  cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500' },
+  recruiting: { text: '모집중', style: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
+  matched: { text: '매칭완료', style: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
+  cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
 };
 
 const appStatusConfig: Record<string, { label: string; style: string }> = {
-  pending: { label: '대기중', style: 'bg-blue-50 text-blue-600' },
-  approved: { label: '승인됨', style: 'bg-green-50 text-green-600' },
-  rejected: { label: '거절됨', style: 'bg-red-50 text-red-500' },
-  withdrawn: { label: '취소됨', style: 'bg-gray-100 text-gray-500' },
+  pending: { label: '대기중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
+  approved: { label: '승인됨', style: 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' },
+  rejected: { label: '거절됨', style: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
+  withdrawn: { label: '취소됨', style: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
 };
 
 type TabKey = 'hosted' | 'applied';
@@ -63,12 +38,17 @@ export default function MyTeamMatchesPage() {
   const initialTab = (searchParams.get('tab') as TabKey) || 'hosted';
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const { data: apiData } = useTeamMatches();
+  const { data: myTeams = [] } = useMyTeams();
+  const myManagedTeamIds = new Set(
+    myTeams.filter(t => t.role === 'owner' || t.role === 'manager').map(t => t.id)
+  );
+
+  const { data: apiData, isLoading: postsLoading } = useTeamMatches();
   const { data: myApplications = [], isLoading: appsLoading } = useMyTeamMatchApplications();
 
-  const usingMock = !apiData?.items;
-  const apiPosts = apiData?.items?.map((tm) => ({
+  const posts = (apiData?.items ?? []).filter((tm) => myManagedTeamIds.has(tm.hostTeamId)).map((tm) => ({
     id: tm.id,
     title: tm.title,
     sportType: tm.sportType,
@@ -80,16 +60,11 @@ export default function MyTeamMatchesPage() {
     status: tm.status,
     applicants: tm.applicationCount ?? 0,
   }));
-  const [localPosts, setLocalPosts] = useState(mockTeamMatches);
-  const posts = apiPosts ?? localPosts;
-  const setPosts = setLocalPosts;
-
-
 
   const handleDelete = async (id: string) => {
     try {
       await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
-      setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p));
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
       toast('success', '모집글이 취소되었어요');
     } catch {
       toast('error', '취소하지 못했어요. 다시 시도해주세요');
@@ -113,7 +88,7 @@ export default function MyTeamMatchesPage() {
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h2>
-          <p className="text-base text-gray-500 mt-1">팀 매칭 모집 및 신청 현황을 관리하세요</p>
+          <p className="text-base text-gray-500 dark:text-gray-400 mt-1">팀 매칭 모집 및 신청 현황을 관리하세요</p>
         </div>
         {activeTab === 'hosted' && (
           <Link
@@ -150,15 +125,14 @@ export default function MyTeamMatchesPage() {
       {/* Tab: 내가 만든 매치 */}
       {activeTab === 'hosted' && (
         <>
-          {usingMock && (
-            <div className="mx-5 @3xl:mx-0 mt-3 mb-1 flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 px-4 py-2.5">
-              <Info size={16} className="text-gray-500 shrink-0" />
-              <span className="text-sm text-gray-500">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
-            </div>
-          )}
-
           <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
-            {posts.length === 0 ? (
+            {postsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-40 animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
+                ))}
+              </div>
+            ) : posts.length === 0 ? (
               <EmptyState
                 icon={Swords}
                 title="팀 매칭 모집글이 없어요"
@@ -170,7 +144,7 @@ export default function MyTeamMatchesPage() {
               return (
                 <div key={post.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
                       {sportLabel[post.sportType]}
                     </span>
                     <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
@@ -185,13 +159,13 @@ export default function MyTeamMatchesPage() {
 
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Calendar size={12} /><span>{post.matchDate}</span>
+                      <Calendar size={12} aria-hidden="true" /><span>{formatDateDot(post.matchDate)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Clock size={12} /><span>{post.startTime} ~ {post.endTime}</span>
+                      <Clock size={12} aria-hidden="true" /><span>{post.startTime} ~ {post.endTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <MapPin size={12} /><span>{post.venue}</span>
+                      <MapPin size={12} aria-hidden="true" /><span>{post.venue}</span>
                     </div>
                   </div>
 
@@ -199,24 +173,27 @@ export default function MyTeamMatchesPage() {
                     <div className="mt-3 flex gap-2">
                       <Link
                         href={`/team-matches/${post.id}`}
+                        aria-label={`${post.title || ''} 신청현황 보기`}
                         className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
                       >
-                        <Eye size={14} />
+                        <Eye size={14} aria-hidden="true" />
                         신청현황
                         <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">{post.applicants}</span>
                       </Link>
                       <Link
                         href={`/team-matches/${post.id}/edit`}
+                        aria-label={`${post.title || ''} 수정`}
                         className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={14} aria-hidden="true" />
                         수정
                       </Link>
                       <button
                         onClick={() => setDeleteTarget(post.id)}
-                        className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-100 transition-colors"
+                        aria-label={`${post.title || ''} 취소`}
+                        className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 px-4 py-2.5 text-sm font-semibold text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} aria-hidden="true" />
                         취소
                       </button>
                     </div>
@@ -257,7 +234,7 @@ export default function MyTeamMatchesPage() {
                       </span>
                       {tm.hostTeam && (
                         <span className="text-xs text-gray-500 ml-auto flex items-center gap-1">
-                          <Users size={11} />
+                          <Users size={11} aria-hidden="true" />
                           {tm.hostTeam.name}
                         </span>
                       )}
@@ -267,15 +244,15 @@ export default function MyTeamMatchesPage() {
 
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                        <Calendar size={12} />
+                        <Calendar size={12} aria-hidden="true" />
                         <span>{formatDateDot(tm.matchDate)}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                        <Clock size={12} />
+                        <Clock size={12} aria-hidden="true" />
                         <span>{tm.startTime} ~ {tm.endTime}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                        <MapPin size={12} />
+                        <MapPin size={12} aria-hidden="true" />
                         <span>{tm.venueName}</span>
                       </div>
                     </div>
@@ -298,21 +275,27 @@ export default function MyTeamMatchesPage() {
         </Link>
       )}
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
-              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">취소하기</button>
-            </div>
-          </div>
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="모집글 취소">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500 dark:text-red-400" aria-hidden="true" />
         </div>
-      )}
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
+        <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={() => setDeleteTarget(null)}
+            className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            돌아가기
+          </button>
+          <button
+            onClick={() => deleteTarget && handleDelete(deleteTarget)}
+            className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
+          >
+            취소하기
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

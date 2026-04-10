@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TeamRole, InvitationStatus } from '@prisma/client';
+import { Prisma, TeamRole, InvitationStatus } from '@prisma/client';
 import { TeamMembershipService } from './team-membership.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -112,6 +112,45 @@ export class TeamsService {
 
       return team;
     });
+  }
+
+  async applyToTeam(teamId: string, userId: string) {
+    const team = await this.prisma.sportTeam.findUnique({ where: { id: teamId } });
+    if (!team) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: 'Team not found' });
+    }
+    if (!team.isRecruiting) {
+      throw new BadRequestException({ code: 'TEAM_NOT_RECRUITING', message: 'This team is not recruiting' });
+    }
+
+    const existing = await this.prisma.teamMembership.findFirst({
+      where: { teamId, userId, status: 'active' },
+    });
+    if (existing) {
+      throw new ConflictException({ code: 'TEAM_ALREADY_MEMBER', message: 'Already a member of this team' });
+    }
+
+    const pendingApp = await this.prisma.teamMembership.findFirst({
+      where: { teamId, userId, status: 'pending' },
+    });
+    if (pendingApp) {
+      throw new ConflictException({ code: 'TEAM_APPLY_PENDING_EXISTS', message: 'Application already pending' });
+    }
+
+    // upsert handles re-application after left/removed status, and guards against
+    // race-condition duplicates via the @@unique([teamId, userId]) constraint.
+    try {
+      return await this.prisma.teamMembership.upsert({
+        where: { teamId_userId: { teamId, userId } },
+        create: { teamId, userId, role: 'member', status: 'pending' },
+        update: { role: 'member', status: 'pending' },
+      });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException({ code: 'TEAM_APPLY_DUPLICATE', message: 'Duplicate application request' });
+      }
+      throw e;
+    }
   }
 
   // ─── Invitation Methods ────────────────────────────────────────────────────

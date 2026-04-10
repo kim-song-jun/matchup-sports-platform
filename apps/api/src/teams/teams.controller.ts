@@ -17,6 +17,7 @@ import { TeamMembershipService } from './team-membership.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto, InviteMemberDto } from './dto/membership.dto';
+import { ApplyTeamDto } from './dto/apply-team.dto';
 import { TeamRole } from '@prisma/client';
 
 @ApiTags('팀/클럽')
@@ -111,6 +112,19 @@ export class TeamsController {
   ) {
     await this.teamMembershipService.assertRole(teamId, userId, TeamRole.owner);
     await this.teamMembershipService.removeMember(teamId, targetUserId);
+  }
+
+  @Post(':id/apply')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: '팀 가입 신청 (비멤버 전용)' })
+  async applyToTeam(
+    @Param('id') teamId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ApplyTeamDto,
+  ) {
+    return this.teamsService.applyToTeam(teamId, userId);
   }
 
   @Post(':id/leave')

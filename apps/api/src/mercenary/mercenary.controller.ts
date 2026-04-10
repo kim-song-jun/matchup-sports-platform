@@ -44,7 +44,20 @@ export class MercenaryController {
   @Get(':id')
   @ApiOperation({ summary: '용병 모집글 상세' })
   async findOne(@Param('id') id: string, @CurrentUser('id') userId?: string) {
-    return this.mercenaryService.findOne(id, userId);
+    const post = await this.mercenaryService.findOne(id, userId);
+
+    // Strip applicant personal info (nickname, profileImageUrl) for unauthenticated requests.
+    // Public viewers may see that applications exist, but not who applied.
+    if (!userId && post?.applications) {
+      return {
+        ...post,
+        applications: post.applications.map(
+          ({ user: _user, ...rest }: { user: unknown; [key: string]: unknown }) => rest,
+        ),
+      };
+    }
+
+    return post;
   }
 
   @Post()

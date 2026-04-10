@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
@@ -63,6 +63,13 @@ export default function ProfilePage() {
         { label: t('myReviews'), icon: Star, href: '/reviews' },
         { label: t('receivedReviews'), icon: MessageSquare, href: '/my/reviews-received' },
         { label: t('paymentHistory'), icon: CreditCard, href: '/payments' },
+      ],
+    },
+    {
+      label: '활동 & 기록',
+      items: [
+        { label: '내 뱃지', icon: Award, href: '/badges' },
+        { label: '활동 피드', icon: Activity, href: '/feed' },
       ],
     },
   ];

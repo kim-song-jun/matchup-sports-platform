@@ -16,8 +16,7 @@ import type { MercenaryPost } from '@/types/api';
 
 const sportFilters = [
   { key: '', label: '전체' },
-  { key: 'soccer', label: '축구' },
-  { key: 'futsal', label: '풋살' },
+  ...Object.entries(sportLabel).map(([key, label]) => ({ key, label })),
 ];
 
 const positionLabel: Record<string, string> = {
@@ -135,9 +134,10 @@ export default function MercenaryPage() {
                   const count = post.count ?? 1;
 
                   return (
-                    <div
+                    <Link
                       key={post.id}
-                      className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 duration-200"
+                      href={`/mercenary/${post.id}`}
+                      className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 duration-200"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
@@ -150,7 +150,7 @@ export default function MercenaryPage() {
                             {fee === 0 && (
                               <>
                                 <span className="text-gray-200 dark:text-gray-600" aria-hidden="true">·</span>
-                                <span className="text-green-600 font-semibold">무료</span>
+                                <span className="text-green-600 dark:text-green-400 font-semibold">무료</span>
                               </>
                             )}
                           </div>
@@ -176,7 +176,7 @@ export default function MercenaryPage() {
                       <p className="mt-1 text-sm text-gray-500">
                         {levelLabel[level] ?? `레벨 ${level}`} 이상
                         <span className="text-gray-300 dark:text-gray-600 mx-1" aria-hidden="true">·</span>
-                        <span className={`font-semibold ${fee === 0 ? 'text-green-600' : 'text-gray-800 dark:text-gray-200'}`}>
+                        <span className={`font-semibold ${fee === 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-gray-200'}`}>
                           {formatCurrency(fee)}
                         </span>
                       </p>
@@ -190,7 +190,7 @@ export default function MercenaryPage() {
                           {count}명 모집
                         </span>
                         <button
-                          onClick={() => handleApply(post.id)}
+                          onClick={(e) => { e.preventDefault(); handleApply(post.id); }}
                           disabled={isApplied}
                           aria-label={isApplied ? '신청 완료됨' : `${teamName} 용병 신청`}
                           className={`rounded-xl px-5 py-2.5 min-h-[44px] text-sm font-bold transition-colors ${
@@ -202,7 +202,7 @@ export default function MercenaryPage() {
                           {isApplied ? '신청완료' : '신청'}
                         </button>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

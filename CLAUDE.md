@@ -400,12 +400,6 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
    ```
    Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요.
 
-2. **`/mercenary/[id]` 상세 페이지 미존재** (UX Critical): 디렉토리는 있으나 `page.tsx`가 없고 `edit/` 하위만 존재. 용병 목록 → 상세 이동 링크가 dead-end. Task 26 후보.
+2. **`/my/mercenary/page.tsx` API 필드 매핑 미완성**: `useMercenaryPosts()`가 전체 목록을 반환하며 작성자 필터 없음. `startTime`, `endTime`, `venue` 등 필드가 빈값으로 매핑됨. Task 28 후보.
 
-3. **팀 매칭 모집글 종목 2종목 하드코딩** (`/team-matches/new/page.tsx`): `sportOptions`가 `soccer`/`futsal`만 포함. 다른 종목 팀은 모집글 생성 불가. `lib/constants.ts`의 `SPORT_TYPES` 상수로 교체 필요. Task 26 후보.
-
-4. **`/mercenary` 종목 필터 2종목 하드코딩** (`/mercenary/page.tsx`): 필터가 `soccer`/`futsal`만 있어 다른 종목 용병 탐색 불가. Task 26 후보.
-
-5. **`POST /teams/:id/apply` 미구현**: 팀 가입 신청 API가 백엔드에 없음. 팀 상세 페이지 "가입 신청" CTA가 dead-end. Task 26 후보.
-
-6. **`/my/team-matches/page.tsx` mock 데이터 잔존**: `mockTeamMatches` 상수로 하드코딩된 데이터가 남아 있어 실제 API 연동 전까지 동작은 되나 실제 데이터 미반영. Task 26 후보.
+3. **`/mercenary/[id]/edit/page.tsx` 현재값 미로드**: 수정 페이지에 mock 초기값 사용. `useMercenaryPost(id)` 훅으로 API 연동 필요. Task 28 후보.

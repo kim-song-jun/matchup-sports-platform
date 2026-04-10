@@ -342,14 +342,29 @@ export default function TeamDetailPage() {
           {/* 비멤버: 가입 신청 + 연락하기 */}
           {!isMyTeam && (
             <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
-              {isAuthenticated ? (
+              {!team.isRecruiting ? (
+                <button
+                  disabled
+                  aria-disabled="true"
+                  className="w-full rounded-xl bg-gray-200 dark:bg-gray-700 py-3.5 text-base font-bold text-gray-500 dark:text-gray-400 opacity-50 cursor-not-allowed"
+                >
+                  모집 마감
+                </button>
+              ) : isAuthenticated ? (
                 <button
                   onClick={async () => {
                     try {
                       await api.post(`/teams/${teamId}/apply`);
                       toast('success', '팀 가입 신청이 완료되었어요');
-                    } catch {
-                      toast('error', '신청에 실패했어요. 이미 신청했거나 권한이 없을 수 있어요');
+                    } catch (err: unknown) {
+                      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                      if (msg === 'This team is not recruiting') {
+                        toast('error', '모집이 마감된 팀이에요');
+                      } else if (msg?.includes('TEAM_ALREADY_MEMBER')) {
+                        toast('error', '이미 이 팀의 멤버예요');
+                      } else {
+                        toast('error', '신청하지 못했어요. 다시 시도해주세요');
+                      }
                     }
                   }}
                   className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors"

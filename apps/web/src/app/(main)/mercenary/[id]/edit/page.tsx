@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, UserPlus } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { useMercenaryPost } from '@/hooks/use-api';
 
 const positionOptions = [
   { value: 'gk', label: 'GK' },
@@ -24,37 +26,13 @@ const levelOptions = [
   { value: 'pro', label: '프로' },
 ];
 
-// Mock data for pre-fill since mercenary is in-memory
-const mockMercenaryData: Record<string, {
-  team: string;
-  matchDate: string;
-  venue: string;
-  position: string;
-  count: number;
-  level: string;
-  fee: number;
-  notes: string;
-}> = {
-  'merc-1': {
-    team: 'FC 서울라이트',
-    matchDate: '2026-03-28',
-    venue: '강남 풋살파크',
-    position: 'mf',
-    count: 1,
-    level: 'middle',
-    fee: 10000,
-    notes: '14:00~16:00 풋살 경기 용병 구합니다. 기본기 있는 분 환영!',
-  },
-  'merc-2': {
-    team: '강남 슬래머즈',
-    matchDate: '2026-04-01',
-    venue: '잠실 실내체육관',
-    position: 'any',
-    count: 2,
-    level: 'lower',
-    fee: 0,
-    notes: '농구 3:3 용병 모집합니다. 즐겁게 하실 분!',
-  },
+// Maps numeric level from API (1–5) to levelOptions value string
+const LEVEL_NUM_TO_KEY: Record<number, string> = {
+  1: 'beginner',
+  2: 'lower',
+  3: 'middle',
+  4: 'upper',
+  5: 'pro',
 };
 
 interface FormData {
@@ -74,24 +52,36 @@ export default function EditMercenaryPage() {
   const { toast } = useToast();
   const id = params.id as string;
 
-  const mockData = process.env.NODE_ENV === 'development' ? mockMercenaryData[id] : undefined;
-  const initialData: FormData = mockData
-    ? { ...mockData }
-    : {
-        team: '',
-        matchDate: '',
-        venue: '',
-        position: 'any',
-        count: 1,
-        level: 'middle',
-        fee: 0,
-        notes: '',
-      };
+  const { data: post, isLoading } = useMercenaryPost(id);
 
-  const [form, setForm] = useState<FormData>(initialData);
+  const [form, setForm] = useState<FormData>({
+    team: '',
+    matchDate: '',
+    venue: '',
+    position: 'any',
+    count: 1,
+    level: 'middle',
+    fee: 0,
+    notes: '',
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (post) {
+      setForm({
+        team: post.team?.name ?? '',
+        matchDate: post.matchDate ?? '',
+        venue: post.venue ?? '',
+        position: post.position ?? 'any',
+        count: post.count ?? 1,
+        level: (post.level != null ? LEVEL_NUM_TO_KEY[post.level] : undefined) ?? 'middle',
+        fee: post.fee ?? 0,
+        notes: post.notes ?? post.description ?? '',
+      });
+    }
+  }, [post]);
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -130,7 +120,13 @@ export default function EditMercenaryPage() {
     }
   };
 
-  if (!mockData) {
+  if (isLoading) {
+    return (
+      <div className="px-5 pt-8 text-center text-gray-500 dark:text-gray-400">로딩 중...</div>
+    );
+  }
+
+  if (!isLoading && !post) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
@@ -310,32 +306,28 @@ export default function EditMercenaryPage() {
       </div>
 
       {/* Delete confirmation modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                돌아가기
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
-              >
-                {isDeleting ? '삭제 중...' : '삭제하기'}
-              </button>
-            </div>
-          </div>
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="모집글 삭제" size="sm">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500" />
         </div>
-      )}
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
+        <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={() => setShowDeleteModal(false)}
+            className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            돌아가기
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+          >
+            {isDeleting ? '삭제 중...' : '삭제하기'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

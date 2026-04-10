@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Users, MapPin, Pencil, Trash2, AlertTriangle, UserCog } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { useMyTeams, queryKeys } from '@/hooks/use-api';
 import { useQueryClient } from '@tanstack/react-query';
-import { sportLabel, levelLabel } from '@/lib/constants';
+import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 
 export default function MyTeamsPage() {
   const router = useRouter();
@@ -19,13 +20,6 @@ export default function MyTeamsPage() {
   const queryClient = useQueryClient();
   const { data: teams = [], isLoading } = useMyTeams();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!deleteTarget) return;
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setDeleteTarget(null); };
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [deleteTarget]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -69,7 +63,7 @@ export default function MyTeamsPage() {
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-500">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[team.sportType]?.badge ?? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'}`}>
                       {sportLabel[team.sportType]}
                     </span>
                     <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -86,12 +80,12 @@ export default function MyTeamsPage() {
 
               <div className="mt-3 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                 <div className="flex items-center gap-1">
-                  <Users size={12} />
+                  <Users size={12} aria-hidden="true" />
                   <span>{team.memberCount}명</span>
                 </div>
                 {(team.city || team.district) && (
                   <div className="flex items-center gap-1">
-                    <MapPin size={12} />
+                    <MapPin size={12} aria-hidden="true" />
                     <span>{[team.city, team.district].filter(Boolean).join(' ')}</span>
                   </div>
                 )}
@@ -100,23 +94,26 @@ export default function MyTeamsPage() {
               <div className="mt-3 flex gap-2">
                 <Link
                   href={`/teams/${team.id}/edit`}
+                  aria-label={`${team.name} 수정`}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-700 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                 >
-                  <Pencil size={14} />
+                  <Pencil size={14} aria-hidden="true" />
                   수정
                 </Link>
                 <Link
                   href={`/teams/${team.id}/members`}
+                  aria-label={`${team.name} 멤버 관리`}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
                 >
-                  <UserCog size={14} />
+                  <UserCog size={14} aria-hidden="true" />
                   멤버관리
                 </Link>
                 <button
                   onClick={() => setDeleteTarget(team.id)}
+                  aria-label={`${team.name} 삭제`}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 py-2.5 text-sm font-semibold text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={14} aria-hidden="true" />
                   삭제
                 </button>
               </div>
@@ -125,21 +122,17 @@ export default function MyTeamsPage() {
         )}
       </div>
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5" onClick={() => setDeleteTarget(null)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="delete-team-modal-title" className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 id="delete-team-modal-title" className="text-lg font-bold text-gray-900 dark:text-white text-center">팀을 삭제하시겠어요?</h3>
-            <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">팀을 삭제하면 모든 멤버에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
-              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>
-            </div>
-          </div>
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500 dark:text-red-400" aria-hidden="true" />
         </div>
-      )}
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">팀을 삭제하시겠어요?</h3>
+        <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">팀을 삭제하면 모든 멤버에게 알림이 발송돼요. 이 작업은 되돌릴 수 없어요.</p>
+        <div className="mt-6 flex gap-3">
+          <button onClick={() => setDeleteTarget(null)} className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
+          <button onClick={() => deleteTarget && handleDelete(deleteTarget)} className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function Sidebar() {
         { href: '/marketplace', icon: ShoppingBag, label: t('marketplace') },
         { href: '/teams', icon: Users, label: t('teams') },
         { href: '/mercenary', icon: UserPlus, label: t('mercenary') },
-        { href: '/venues', icon: MapPin, label: '구장' },
+        { href: '/venues', icon: MapPin, label: t('venues') },
       ],
     },
     ...(mounted && isAuthenticated ? [{

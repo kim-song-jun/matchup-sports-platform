@@ -52,7 +52,7 @@ export function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className={cn('text-[10px] font-semibold tracking-[0.01em]', isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400')}>{label}</span>
+              <span className={cn('text-2xs font-semibold tracking-[0.01em]', isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400')}>{label}</span>
             </Link>
           );
         })}

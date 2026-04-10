@@ -17,7 +17,6 @@ import { TeamMembershipService } from './team-membership.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto, InviteMemberDto } from './dto/membership.dto';
-import { ApplyTeamDto } from './dto/apply-team.dto';
 import { TeamRole } from '@prisma/client';
 
 @ApiTags('팀/클럽')
@@ -122,7 +121,6 @@ export class TeamsController {
   async applyToTeam(
     @Param('id') teamId: string,
     @CurrentUser('id') userId: string,
-    @Body() dto: ApplyTeamDto,
   ) {
     return this.teamsService.applyToTeam(teamId, userId);
   }

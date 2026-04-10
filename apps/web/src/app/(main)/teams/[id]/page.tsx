@@ -357,13 +357,15 @@ export default function TeamDetailPage() {
                       await api.post(`/teams/${teamId}/apply`);
                       toast('success', '팀 가입 신청이 완료되었어요');
                     } catch (err: unknown) {
-                      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-                      if (msg === 'This team is not recruiting') {
-                        toast('error', '모집이 마감된 팀이에요');
-                      } else if (msg?.includes('TEAM_ALREADY_MEMBER')) {
-                        toast('error', '이미 이 팀의 멤버예요');
+                      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+                      if (code === 'TEAM_NOT_RECRUITING') {
+                        toast('error', '현재 모집 중인 팀이 아닙니다.');
+                      } else if (code === 'TEAM_ALREADY_MEMBER') {
+                        toast('error', '이미 소속된 팀입니다.');
+                      } else if (code === 'TEAM_APPLY_PENDING_EXISTS') {
+                        toast('error', '이미 신청이 접수되어 있습니다.');
                       } else {
-                        toast('error', '신청하지 못했어요. 다시 시도해주세요');
+                        toast('error', '팀 가입 신청에 실패했습니다.');
                       }
                     }
                   }}

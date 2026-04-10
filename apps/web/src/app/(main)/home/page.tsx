@@ -37,6 +37,7 @@ export default function HomePage() {
   const te = useTranslations('empty');
   const ts = useTranslations('sports');
   const tc = useTranslations('common');
+  const tn = useTranslations('nav');
   const { data: matchData, isLoading } = useMatches();
   const { data: teamData } = useTeams();
   const { data: lessonData } = useLessons();
@@ -209,15 +210,16 @@ export default function HomePage() {
 
       {/* 빠른 탐색 칩 — 하단 네비에 없는 기능 접근 */}
       <section className="px-5 @3xl:px-0 mt-4 pb-2">
+        <p className="text-2xs font-semibold text-gray-400 uppercase tracking-wider mb-2">더 찾아보기</p>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {[
-            { href: '/lessons', icon: GraduationCap, label: '강좌' },
-            { href: '/team-matches', icon: Swords, label: '팀 매칭' },
-            { href: '/mercenary', icon: UserPlus, label: '용병' },
-            { href: '/venues', icon: MapPin, label: '구장' },
+            { href: '/lessons', icon: GraduationCap, label: tn('lessons') },
+            { href: '/team-matches', icon: Swords, label: tn('teamMatching') },
+            { href: '/mercenary', icon: UserPlus, label: tn('mercenary') },
+            { href: '/venues', icon: MapPin, label: tn('venues') },
           ].map(({ href, icon: Icon, label }) => (
             <Link key={href} href={href}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3.5 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              className="flex shrink-0 items-center min-h-[44px] gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3.5 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
               <Icon size={15} strokeWidth={1.7} aria-hidden="true" />
               {label}
             </Link>

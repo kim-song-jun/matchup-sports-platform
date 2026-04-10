@@ -40,7 +40,8 @@
     "explore": "탐색",
     "communication": "소통",
     "findMatch": "매치 찾기",
-    "createMatch": "매치 만들기"
+    "createMatch": "매치 만들기",
+    "venues": "구장"
   },
   "sports": {
     "all": "전체",

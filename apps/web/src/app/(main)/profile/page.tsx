@@ -224,12 +224,12 @@ export default function ProfilePage() {
                 >
                   <Link
                     href={mounted && isAuthenticated ? item.href : '/login'}
-                    className={`flex flex-1 items-center gap-3 py-3.5 min-h-[44px] ${isLast ? '' : 'border-b border-gray-100'}`}
+                    className={`flex flex-1 items-center gap-3 py-3.5 min-h-[44px] ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}`}
                   >
                     <item.icon size={20} className="text-gray-500" />
                     <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
                   </Link>
-                  <div className={`flex items-center gap-1 pl-2 py-3.5 ${isLast ? '' : 'border-b border-gray-100'}`}>
+                  <div className={`flex items-center gap-1 pl-2 py-3.5 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}`}>
                     {item.quickAction && mounted && isAuthenticated && (
                       <Link
                         href={item.quickAction.href}

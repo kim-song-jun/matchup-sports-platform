@@ -124,26 +124,27 @@ export class TeamsService {
     }
 
     const existing = await this.prisma.teamMembership.findFirst({
-      where: { teamId, userId, status: 'active' },
+      where: { teamId, userId },
     });
     if (existing) {
-      throw new ConflictException({ code: 'TEAM_ALREADY_MEMBER', message: 'Already a member of this team' });
+      if (existing.status === 'active') {
+        throw new ConflictException({ code: 'TEAM_ALREADY_MEMBER', message: 'Already a member of this team' });
+      }
+      if (existing.status === 'pending') {
+        throw new ConflictException({ code: 'TEAM_APPLY_PENDING_EXISTS', message: 'Application already pending' });
+      }
+      // left or removed — allow re-application; role intentionally resets to member
+      // (prior owners/managers re-apply as regular members; promotion is granted separately)
+      return this.prisma.teamMembership.update({
+        where: { id: existing.id },
+        data: { role: 'member', status: 'pending' },
+      });
     }
 
-    const pendingApp = await this.prisma.teamMembership.findFirst({
-      where: { teamId, userId, status: 'pending' },
-    });
-    if (pendingApp) {
-      throw new ConflictException({ code: 'TEAM_APPLY_PENDING_EXISTS', message: 'Application already pending' });
-    }
-
-    // upsert handles re-application after left/removed status, and guards against
-    // race-condition duplicates via the @@unique([teamId, userId]) constraint.
+    // No existing record — create fresh application
     try {
-      return await this.prisma.teamMembership.upsert({
-        where: { teamId_userId: { teamId, userId } },
-        create: { teamId, userId, role: 'member', status: 'pending' },
-        update: { role: 'member', status: 'pending' },
+      return await this.prisma.teamMembership.create({
+        data: { teamId, userId, role: 'member', status: 'pending' },
       });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

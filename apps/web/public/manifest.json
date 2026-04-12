@@ -1,6 +1,6 @@
 {
-  "name": "MatchUp",
-  "short_name": "MatchUp",
+  "name": "TeamMeet",
+  "short_name": "TeamMeet",
   "description": "AI 기반 멀티스포츠 소셜 매칭 플랫폼",
   "start_url": "/",
   "display": "standalone",

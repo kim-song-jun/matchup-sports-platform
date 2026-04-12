@@ -18,6 +18,10 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
 jobs:
   # ── Test job: runs on every push and PR ─────────────────────────────────────
   test:

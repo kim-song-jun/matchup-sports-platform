@@ -9,6 +9,7 @@ import { ChevronRight, Star, Trophy, MapPin, AlertTriangle, Ban, User, Shield, R
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useAdminUser } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
@@ -124,13 +125,13 @@ export default function AdminUserDetailPage() {
             <p className="text-xs font-medium text-red-500">계정 정지 사유는 필수입니다.</p>
           ) : null}
           <label htmlFor="admin-user-action-note" className="sr-only">운영 메모</label>
-          <textarea
+          <Textarea
             id="admin-user-action-note"
             value={actionNote}
             onChange={(e) => setActionNote(e.target.value)}
             rows={4}
             placeholder="운영 메모를 입력하세요"
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+            className="resize-none"
           />
           <div className="flex gap-3">
             <button

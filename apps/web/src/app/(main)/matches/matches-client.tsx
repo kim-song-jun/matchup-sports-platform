@@ -228,7 +228,7 @@ export function MatchesPage() {
         </div>
       </MobilePageTopZone>
 
-      <div className="mb-3 px-5 @3xl:px-0">
+      <div className="mb-3 px-5 @3xl:px-0" data-testid="match-filter-bar">
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />

@@ -7,9 +7,13 @@ import { ArrowLeft, ChevronRight, Save, XCircle, AlertTriangle, Swords } from 'l
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { FormField } from '@/components/ui/form-field';
 import { useTeamMatch } from '@/hooks/use-api';
 import { SKILL_GRADES, MATCH_TYPES } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
+import { formatAmount } from '@/lib/utils';
 import { api } from '@/lib/api';
 
 const sportOptions = [
@@ -118,9 +122,6 @@ export default function EditTeamMatchPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const formatCurrency = (n: string) =>
-    n ? new Intl.NumberFormat('ko-KR').format(Number(n)) + '원' : '';
-
   const handleSave = async () => {
     if (!form.title || !form.sportType || !form.matchDate || !form.startTime || !form.endTime || !form.venueName || !form.totalFee) {
       toast('error', '필수 항목을 입력해주세요');
@@ -184,8 +185,6 @@ export default function EditTeamMatchPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
-
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
@@ -227,61 +226,45 @@ export default function EditTeamMatchPage() {
         </section>
 
         {/* 모집글 제목 */}
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-title" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
-            모집글 제목 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="모집글 제목" required htmlFor="team-match-edit-title" className="mb-5">
+          <Input
             id="team-match-edit-title"
             type="text"
             value={form.title}
             onChange={(e) => update('title', e.target.value)}
             placeholder="예: 일요일 오전 친선경기 모집합니다"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 경기 날짜 */}
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-date" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
-            경기 날짜 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="경기 날짜" required htmlFor="team-match-edit-date" className="mb-5">
+          <Input
             id="team-match-edit-date"
             type="date"
             value={form.matchDate}
             onChange={(e) => update('matchDate', e.target.value)}
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 시간 */}
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="team-match-edit-start-time" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
-                시작 시간 <span className="text-red-400">*</span>
-              </label>
-              <input
+            <FormField label="시작 시간" required htmlFor="team-match-edit-start-time">
+              <Input
                 id="team-match-edit-start-time"
                 type="time"
                 value={form.startTime}
                 onChange={(e) => update('startTime', e.target.value)}
-                className={inputClass}
               />
-            </div>
-            <div>
-              <label htmlFor="team-match-edit-end-time" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
-                종료 시간 <span className="text-red-400">*</span>
-              </label>
-              <input
+            </FormField>
+            <FormField label="종료 시간" required htmlFor="team-match-edit-end-time">
+              <Input
                 id="team-match-edit-end-time"
                 type="time"
                 value={form.endTime}
                 onChange={(e) => update('endTime', e.target.value)}
-                className={inputClass}
               />
-            </div>
+            </FormField>
           </div>
         </section>
 
@@ -306,31 +289,25 @@ export default function EditTeamMatchPage() {
         </section>
 
         {/* 구장 */}
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-venue-name" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
-            구장명 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="구장명" required htmlFor="team-match-edit-venue-name" className="mb-5">
+          <Input
             id="team-match-edit-venue-name"
             type="text"
             value={form.venueName}
             onChange={(e) => update('venueName', e.target.value)}
             placeholder="예: 난지천 풋살장"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-venue-address" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">구장 주소 (선택)</label>
-          <input
+        <FormField label="구장 주소 (선택)" htmlFor="team-match-edit-venue-address" className="mb-5">
+          <Input
             id="team-match-edit-venue-address"
             type="text"
             value={form.venueAddress}
             onChange={(e) => update('venueAddress', e.target.value)}
             placeholder="예: 서울시 마포구 상암동 481-6"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 실력등급 */}
         <section className="mb-5">
@@ -356,9 +333,13 @@ export default function EditTeamMatchPage() {
         </section>
 
         {/* 선출선수 */}
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-pro-player-count" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">선출선수 (명)</label>
-          <input
+        <FormField
+          label="선출선수 (명)"
+          htmlFor="team-match-edit-pro-player-count"
+          hint="팀 내 축구/풋살 선출 출신 선수 수 (0~10명)"
+          className="mb-5"
+        >
+          <Input
             id="team-match-edit-pro-player-count"
             type="number"
             min={0}
@@ -366,10 +347,8 @@ export default function EditTeamMatchPage() {
             value={form.proPlayerCount}
             onChange={(e) => update('proPlayerCount', Math.min(10, Math.max(0, Number(e.target.value))))}
             placeholder="0"
-            className={inputClass}
           />
-          <p className="text-xs text-gray-500 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
-        </section>
+        </FormField>
 
         {/* 경기방식 */}
         <section className="mb-5">
@@ -447,17 +426,15 @@ export default function EditTeamMatchPage() {
         </section>
 
         {/* 유니폼 색상 */}
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-uniform-color" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">유니폼 색상</label>
-          <input
+        <FormField label="유니폼 색상" htmlFor="team-match-edit-uniform-color" className="mb-5">
+          <Input
             id="team-match-edit-uniform-color"
             type="text"
             value={form.uniformColor}
             onChange={(e) => update('uniformColor', e.target.value)}
             placeholder="예: 빨강 상의 + 검정 하의"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 토글 필드들 */}
         <section className="mb-5 space-y-3">
@@ -474,50 +451,48 @@ export default function EditTeamMatchPage() {
         </section>
 
         {/* 비용 */}
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-total-fee" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
-            총 비용 (원) <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField
+          label="총 비용 (원)"
+          required
+          htmlFor="team-match-edit-total-fee"
+          hint={form.totalFee ? formatAmount(Number(form.totalFee)) : undefined}
+          className="mb-5"
+        >
+          <Input
             id="team-match-edit-total-fee"
             type="number"
             value={form.totalFee}
             onChange={(e) => update('totalFee', e.target.value)}
             placeholder="예: 200000"
-            className={inputClass}
           />
-          {form.totalFee && (
-            <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.totalFee)}</p>
-          )}
-        </section>
+        </FormField>
 
-        <section className="mb-5">
-          <label htmlFor="team-match-edit-opponent-fee" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
-          <input
+        <FormField
+          label="상대팀 부담금 (원, 선택)"
+          htmlFor="team-match-edit-opponent-fee"
+          hint={form.opponentFee ? formatAmount(Number(form.opponentFee)) : undefined}
+          className="mb-5"
+        >
+          <Input
             id="team-match-edit-opponent-fee"
             type="number"
             value={form.opponentFee}
             onChange={(e) => update('opponentFee', e.target.value)}
             placeholder="비워두면 총 비용의 절반"
-            className={inputClass}
           />
-          {form.opponentFee && (
-            <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.opponentFee)}</p>
-          )}
-        </section>
+        </FormField>
 
         {/* 추가 안내 */}
-        <section className="mb-6">
-          <label htmlFor="team-match-edit-notes" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">추가 안내 (선택)</label>
-          <textarea
+        <FormField label="추가 안내 (선택)" htmlFor="team-match-edit-notes" className="mb-6">
+          <Textarea
             id="team-match-edit-notes"
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             placeholder="유니폼 색상, 주차 안내, 기타 규정 등"
             rows={4}
-            className={`${inputClass} resize-none`}
+            className="resize-none"
           />
-        </section>
+        </FormField>
 
         {/* Action buttons */}
         <div className="flex gap-3 mb-8">

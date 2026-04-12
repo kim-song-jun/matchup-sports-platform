@@ -10,6 +10,8 @@ import {
   Star,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useMyTeams, useSubmitTeamMatchEvaluation, useTeamMatch } from '@/hooks/use-api';
 import {
@@ -224,16 +226,16 @@ export default function TeamMatchEvaluatePage() {
                 <label htmlFor="evaluation-team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   평가를 남길 팀 선택
                 </label>
-                <select
+                <Select
                   id="evaluation-team-select"
                   value={selectedTeamId}
                   onChange={(event) => setSelectedTeamId(event.target.value)}
-                  className="mt-2 w-full min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                  className="mt-2"
                 >
                   {myParticipantTeams.map((team) => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 
@@ -302,13 +304,13 @@ export default function TeamMatchEvaluatePage() {
                   <label htmlFor="team-match-eval-comment" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     한줄 코멘트 (선택)
                   </label>
-                  <textarea
+                  <Textarea
                     id="team-match-eval-comment"
                     value={comment}
                     onChange={(event) => setComment(event.target.value)}
                     placeholder="상대 팀과 경기하며 느낀 점을 남겨주세요"
                     rows={3}
-                    className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
+                    className="resize-none"
                   />
                 </div>
 

@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { formatAmount, formatFullDate } from '@/lib/utils';
 import { getPaymentMethodMeta, getPaymentSource, paymentStatusConfig } from '@/lib/payment-ui';
+import { Input } from '@/components/ui/input';
 
 const tabs = [
   { id: 'all', label: '전체' },
@@ -69,28 +70,30 @@ export default function PaymentsPage() {
       <div className="px-5 @3xl:px-0">
         <div className="flex items-center gap-2 mb-4">
           <label htmlFor="payment-date-from" className="sr-only">시작 날짜</label>
-          <input
+          <Input
             id="payment-date-from"
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1"
           />
           <span className="text-sm text-gray-500" aria-hidden="true">~</span>
           <label htmlFor="payment-date-to" className="sr-only">종료 날짜</label>
-          <input
+          <Input
             id="payment-date-to"
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex-1"
           />
         </div>
 
-        <div className="flex items-center gap-1 mb-5 rounded-xl bg-gray-100 p-1 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 mb-5 rounded-xl bg-gray-100 p-1 overflow-x-auto scrollbar-hide" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 activeTab === tab.id

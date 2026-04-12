@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useVenues } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { VenueCard } from '@/components/venue/venue-card';
 import type { Venue } from '@/types/api';
@@ -78,9 +79,9 @@ export default function VenuesPage() {
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
           <label htmlFor="venues-search" className="sr-only">시설 검색</label>
-          <input id="venues-search" type="text" placeholder="시설명, 지역 검색" value={searchQuery}
+          <Input id="venues-search" type="text" placeholder="시설명, 지역 검색" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-gray-100 bg-white py-3 pl-10 pr-4 text-base text-gray-900 outline-none transition-colors focus:border-blue-200 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-600" />
+            className="pl-10" />
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useToast } from '@/components/ui/toast';
 import { usePayment, useRefundPayment } from '@/hooks/use-api';
@@ -296,13 +297,13 @@ export default function RefundRequestPage() {
             ))}
           </div>
           <label htmlFor="refund-additional-reason" className="sr-only">추가 사유</label>
-          <textarea
+          <Textarea
             id="refund-additional-reason"
             value={additionalReason}
             onChange={(e) => setAdditionalReason(e.target.value)}
             placeholder="추가 사유를 입력해 주세요 (선택)"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+            className="resize-none"
           />
         </div>
       </div>

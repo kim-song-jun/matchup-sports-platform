@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { ApplicationsSection } from '@/components/team-matches/applications-section';
 import {
   useTeamMatch, useTeamMatchRefereeSchedule,
@@ -383,6 +385,7 @@ export default function TeamMatchDetailPage() {
                     }
                     setShowApplyModal(true);
                   }}
+                  aria-haspopup="dialog"
                   className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
                   <span className="flex items-center justify-center gap-2">경기 신청하기</span>
@@ -468,16 +471,15 @@ export default function TeamMatchDetailPage() {
         ) : applicableTeams.length > 1 ? (
           <div className="mb-4">
             <label htmlFor="team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">신청 팀 선택</label>
-            <select
+            <Select
               id="team-select"
               value={selectedTeamId || applicableTeams[0].id}
               onChange={(e) => setSelectedTeamId(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             >
               {applicableTeams.map((team) => (
                 <option key={team.id} value={team.id}>{team.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
         ) : (
           <div className="mb-4 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
@@ -487,13 +489,13 @@ export default function TeamMatchDetailPage() {
 
         <div className="mb-4">
           <label htmlFor="apply-message" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">메시지 (선택)</label>
-          <textarea
+          <Textarea
             id="apply-message"
             value={applyMessage}
             onChange={(e) => setApplyMessage(e.target.value)}
             placeholder="호스트에게 전달할 메시지를 작성하세요"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
+            className="resize-none"
           />
         </div>
 

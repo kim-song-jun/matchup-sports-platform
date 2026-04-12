@@ -7,6 +7,9 @@ import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
 import { useMatch, useUpdateMatch, useVenues } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel } from '@/lib/constants';
@@ -226,14 +229,12 @@ export default function EditMatchPage() {
 
         {/* Title */}
         <FormSection label="제목" id="edit-title">
-          <input id="edit-title" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+          <Input id="edit-title" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         </FormSection>
 
         {/* Description */}
         <FormSection label="설명" id="edit-description">
-          <textarea id="edit-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
+          <Textarea id="edit-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="resize-none" />
         </FormSection>
 
         {/* Images */}
@@ -303,14 +304,11 @@ export default function EditMatchPage() {
         {/* Date & Time */}
         <FormSection label="일시" id="edit-matchDate">
           <div className="grid grid-cols-3 gap-3">
-            <input id="edit-matchDate" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+            <Input id="edit-matchDate" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} />
             <label htmlFor="edit-startTime" className="sr-only">시작 시간</label>
-            <input id="edit-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+            <Input id="edit-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
             <label htmlFor="edit-endTime" className="sr-only">종료 시간</label>
-            <input id="edit-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+            <Input id="edit-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
           </div>
         </FormSection>
 
@@ -319,13 +317,11 @@ export default function EditMatchPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="edit-maxPlayers" className="block text-xs text-gray-500 mb-1">최대 인원</label>
-              <input id="edit-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: parseInt(e.target.value) || 0 })}
-                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+              <Input id="edit-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: parseInt(e.target.value) || 0 })} />
             </div>
             <div>
               <label htmlFor="edit-fee" className="block text-xs text-gray-500 mb-1">참가비 (원)</label>
-              <input id="edit-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: parseInt(e.target.value) || 0 })}
-                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
+              <Input id="edit-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: parseInt(e.target.value) || 0 })} />
             </div>
           </div>
         </FormSection>
@@ -333,15 +329,13 @@ export default function EditMatchPage() {
         {/* Level Range */}
         <FormSection label="레벨 범위" id="edit-levelMin">
           <div className="grid grid-cols-2 gap-3">
-            <select id="edit-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: parseInt(e.target.value) })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
+            <Select id="edit-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: parseInt(e.target.value) })}>
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
-            </select>
+            </Select>
             <label htmlFor="edit-levelMax" className="sr-only">최대 레벨</label>
-            <select id="edit-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: parseInt(e.target.value) })}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
+            <Select id="edit-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: parseInt(e.target.value) })}>
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
-            </select>
+            </Select>
           </div>
         </FormSection>
 

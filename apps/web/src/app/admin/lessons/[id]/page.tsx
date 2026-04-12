@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { ChevronRight, Calendar, MapPin, Users, CreditCard, User, GraduationCap, AlertCircle, CheckCircle, Ticket } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
+import { Select } from '@/components/ui/select';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLesson } from '@/hooks/use-api';
 import type { LessonParticipant } from '@/types/api';
@@ -334,17 +335,16 @@ export default function AdminLessonDetailPage() {
             {/* Status change */}
             <div className="mb-4">
               <label htmlFor="admin-lesson-status" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">상태 변경</label>
-              <select
+              <Select
                 id="admin-lesson-status"
                 value={lesson.status}
                 onChange={(e) => statusMutation.mutate(e.target.value)}
                 disabled={statusChanging}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors disabled:opacity-50"
               >
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{statusLabel[s]}</option>
                 ))}
-              </select>
+              </Select>
               {statusMutation.isSuccess && (
                 <p className="flex items-center gap-1 text-xs text-green-500 mt-1.5">
                   <CheckCircle size={12} className="text-green-500" />

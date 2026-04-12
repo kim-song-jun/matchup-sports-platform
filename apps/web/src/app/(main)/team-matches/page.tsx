@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useTeamMatches, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ErrorState } from '@/components/ui/error-state';
+import { Input } from '@/components/ui/input';
 import { TeamMatchCard } from '@/components/match/team-match-card';
 import { sportLabel } from '@/lib/constants';
 import type { TeamMatch } from '@/types/api';
@@ -87,12 +88,12 @@ export default function TeamMatchesPage() {
       {/* 필터 행 */}
       <div className="px-5 @3xl:px-0 mb-4 flex flex-wrap items-center gap-2">
         <label htmlFor="team-match-date-filter" className="sr-only">경기 날짜 필터</label>
-        <input
+        <Input
           id="team-match-date-filter"
           type="date"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
+          className="w-auto"
         />
         {[
           { key: '', label: '전체' },

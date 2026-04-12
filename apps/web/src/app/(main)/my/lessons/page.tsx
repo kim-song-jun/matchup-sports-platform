@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, MapPin, Users, ListChecks, GraduationCap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useLessons, useMe } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
@@ -74,13 +73,6 @@ export default function MyLessonsPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 mt-4 space-y-3 pb-8 stagger-children">
-        <TrustSignalBanner
-          tone="warning"
-          label="제한된 보기"
-          title="현재는 공개 중인 내 강좌만 표시돼요"
-          description="취소되었거나 마감된 강좌는 이 화면에 포함되지 않습니다. 수정·취소 같은 관리 기능도 아직 실데이터와 연결되지 않았어요."
-        />
-
         {isLoading || isOwnerPending ? (
           Array.from({ length: 2 }).map((_, index) => (
             <div

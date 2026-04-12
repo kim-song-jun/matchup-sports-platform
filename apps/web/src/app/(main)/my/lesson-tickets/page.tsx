@@ -165,19 +165,12 @@ export default function MyLessonTicketsPage() {
           />
         ) : !tickets || tickets.length === 0 ? (
           <div className="space-y-4">
-            {showPendingHighlightNotice ? (
+            {showPendingHighlightNotice && (
               <TrustSignalBanner
                 tone="info"
                 label="반영 확인"
                 title="방금 등록한 수강권을 아직 찾지 못했어요"
                 description="결제가 끝났더라도 목록 반영이 조금 늦을 수 있어요. 잠시 후 다시 확인하거나 새로고침해 주세요."
-              />
-            ) : (
-              <TrustSignalBanner
-                tone="warning"
-                label="실데이터"
-                title="결제 완료된 수강권만 이 화면에 표시돼요"
-                description="구매를 시작했지만 결제를 끝내지 않은 티켓이나 샘플 데이터는 여기서 보여주지 않습니다."
               />
             )}
             <div className="rounded-2xl border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
@@ -191,19 +184,12 @@ export default function MyLessonTicketsPage() {
           </div>
         ) : (
           <>
-            {showPendingHighlightNotice ? (
+            {showPendingHighlightNotice && (
               <TrustSignalBanner
                 tone="info"
                 label="반영 확인"
                 title="방금 등록한 수강권을 아직 찾지 못했어요"
                 description="다른 보유 티켓은 정상적으로 보이고 있어요. 신규 티켓 반영이 조금 늦을 수 있으니 잠시 후 다시 확인해 주세요."
-              />
-            ) : (
-              <TrustSignalBanner
-                tone="success"
-                label="실데이터"
-                title="결제 완료된 수강권만 보고 있어요"
-                description="현재 목록은 `/lessons/tickets/me` 기준이며, payment 완료 티켓만 표시됩니다."
               />
             )}
 

@@ -74,7 +74,7 @@ export default function CreateTeamPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
@@ -102,16 +102,17 @@ export default function CreateTeamPage() {
 
         {/* 종목 */}
         <FormField label="종목" required className="mb-5">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="종목 선택">
             {sportTypes.map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                aria-pressed={form.sportType === type}
+                className={`rounded-lg px-3.5 py-2 min-h-11 text-sm font-medium transition-colors ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 {sportLabel[type] || type}

@@ -9,6 +9,7 @@ import { useLessons } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { LessonCard } from '@/components/lesson/lesson-card';
 import type { Lesson } from '@/types/api';
 
@@ -77,13 +78,13 @@ export default function LessonsPage() {
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} aria-hidden="true" />
           <label htmlFor="lessons-search" className="sr-only">강좌 검색</label>
-          <input
+          <Input
             id="lessons-search"
             type="text"
             placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-gray-100 bg-white py-3 pl-10 pr-4 text-base text-gray-900 shadow-sm outline-none transition-colors focus:border-blue-200 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-600"
+            className="pl-10"
           />
         </div>
       </div>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import type { ApiResponse, UserProfile } from '@/types/api';
+import { Button } from '@/components/ui/button';
 
 type OAuthResult = {
   accessToken: string;
@@ -33,10 +34,10 @@ function KakaoCallbackPageInner() {
     }
 
     api
-      .post('/auth/kakao', { code })
+      .post<ApiResponse<OAuthResult>>('/auth/kakao', { code })
       .then((res) => {
-        const { accessToken, refreshToken, user } = (res as unknown as ApiResponse<OAuthResult>).data;
-        login(accessToken, refreshToken, user as never);
+        const { accessToken, refreshToken, user } = res.data;
+        login(accessToken, refreshToken, user);
         router.replace('/home');
       })
       .catch(() => {
@@ -48,12 +49,9 @@ function KakaoCallbackPageInner() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white dark:bg-gray-900 px-6">
         <p className="text-base text-gray-700 dark:text-gray-300 text-center">{errorMessage}</p>
-        <button
-          onClick={() => router.replace('/login')}
-          className="min-h-[44px] rounded-xl bg-blue-500 px-6 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
-        >
+        <Button variant="primary" onClick={() => router.replace('/login')}>
           로그인 페이지로
-        </button>
+        </Button>
       </div>
     );
   }
@@ -73,7 +71,7 @@ function KakaoCallbackPageInner() {
 
 export default function KakaoCallbackPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="min-h-dvh bg-white dark:bg-gray-900" />}>
       <KakaoCallbackPageInner />
     </Suspense>
   );

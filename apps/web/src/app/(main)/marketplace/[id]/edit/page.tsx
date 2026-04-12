@@ -7,7 +7,9 @@ import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
 import { useListing } from '@/hooks/use-api';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
@@ -204,23 +206,22 @@ export default function EditListingPage() {
 
         <div className="mb-5">
           <label htmlFor="edit-listing-title" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>
-          <input
+          <Input
             id="edit-listing-title"
             type="text"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
           />
         </div>
 
         <div className="mb-5">
           <label htmlFor="edit-listing-description" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">설명</label>
-          <textarea
+          <Textarea
             id="edit-listing-description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={4}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors resize-none"
+            className="resize-none"
           />
         </div>
 
@@ -277,12 +278,11 @@ export default function EditListingPage() {
 
         <div className="mb-5">
           <label htmlFor="edit-listing-price" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">가격 (원)</label>
-          <input
+          <Input
             id="edit-listing-price"
             type="number"
             value={form.price}
             onChange={(e) => setForm({ ...form, price: parseInt(e.target.value, 10) || 0 })}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
           />
         </div>
 

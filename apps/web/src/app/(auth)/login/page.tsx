@@ -302,7 +302,7 @@ function LoginPageInner() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="min-h-dvh bg-white dark:bg-gray-900" />}>
       <LoginPageInner />
     </Suspense>
   );

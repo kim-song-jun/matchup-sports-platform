@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Star, User } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 
 const mockReviewsReceived = [
   {
@@ -88,15 +87,6 @@ export default function ReviewsReceivedPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 mt-4 pb-8">
-        <div className="mb-4">
-          <TrustSignalBanner
-            tone="warning"
-            label="샘플 데이터"
-            title="받은 평가는 아직 실데이터와 연결되지 않았어요"
-            description="현재 이 화면의 리뷰 목록과 통계는 UI 검증용 샘플입니다. 실제 리뷰 API가 연결되기 전까지 신뢰 지표로 사용하면 안 됩니다."
-          />
-        </div>
-
         {/* Summary */}
         <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-6">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -82,22 +82,16 @@ export default function ChatListPage() {
   const { data: chatRooms = [], isLoading, isError, refetch } = useChatRooms();
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  // Defer auth check to after hydration so SSR and initial client render match
+  const [clientAuth, setClientAuth] = useState(false);
+  useEffect(() => {
+    setClientAuth(isAuthenticated);
+  }, [isAuthenticated]);
+
   const selectedRoom = chatRooms.find((r) => r.id === selectedRoomId);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-        <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
-        <div className="px-5 @3xl:px-0">
-          <EmptyState
-            icon={MessageCircle}
-            title={te('noChat')}
-            description={te('noChatDesc')}
-            action={{ label: tc('login'), href: '/login' }}
-          />
-        </div>
-      </div>
-    );
+  if (!clientAuth) {
+    return null;
   }
 
   const emptyState = (

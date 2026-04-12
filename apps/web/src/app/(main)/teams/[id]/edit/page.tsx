@@ -8,6 +8,10 @@ import { useDeleteTeam, useMyTeams, useTeam, useUpdateTeam } from '@/hooks/use-a
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
 import type { CreateTeamInput } from '@/types/api';
 
 const sportOptions = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis'];
@@ -163,9 +167,6 @@ export default function EditTeamPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-colors';
-  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
-
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
@@ -184,41 +185,35 @@ export default function EditTeamPage() {
       <div className="px-5 @3xl:px-0 pb-8 max-w-[760px] space-y-5">
         <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
           <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">기본 정보</h2>
-          <div>
-            <label htmlFor="team-name" className={labelClass}>팀 이름</label>
-            <input id="team-name" className={inputClass} value={form.name} onChange={(event) => updateField('name', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-sport" className={labelClass}>종목</label>
-            <select id="team-sport" className={inputClass} value={form.sportType} onChange={(event) => updateField('sportType', event.target.value)} disabled={formDisabled}>
+          <FormField label="팀 이름" htmlFor="team-name">
+            <Input id="team-name" value={form.name} onChange={(event) => updateField('name', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="종목" htmlFor="team-sport">
+            <Select id="team-sport" value={form.sportType} onChange={(event) => updateField('sportType', event.target.value)} disabled={formDisabled}>
               {sportOptions.map((sportType) => (
                 <option key={sportType} value={sportType}>{sportLabel[sportType] || sportType}</option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="team-description" className={labelClass}>팀 소개</label>
-            <textarea id="team-description" className={`${inputClass} min-h-[100px]`} value={form.description} onChange={(event) => updateField('description', event.target.value)} disabled={formDisabled} />
+            </Select>
+          </FormField>
+          <FormField label="팀 소개" htmlFor="team-description">
+            <Textarea id="team-description" value={form.description} onChange={(event) => updateField('description', event.target.value)} disabled={formDisabled} className="resize-none" />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="도시" htmlFor="team-city">
+              <Input id="team-city" value={form.city} onChange={(event) => updateField('city', event.target.value)} disabled={formDisabled} />
+            </FormField>
+            <FormField label="구/군" htmlFor="team-district">
+              <Input id="team-district" value={form.district} onChange={(event) => updateField('district', event.target.value)} disabled={formDisabled} />
+            </FormField>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="team-city" className={labelClass}>도시</label>
-              <input id="team-city" className={inputClass} value={form.city} onChange={(event) => updateField('city', event.target.value)} disabled={formDisabled} />
-            </div>
-            <div>
-              <label htmlFor="team-district" className={labelClass}>구/군</label>
-              <input id="team-district" className={inputClass} value={form.district} onChange={(event) => updateField('district', event.target.value)} disabled={formDisabled} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="team-level" className={labelClass}>팀 레벨</label>
-              <select id="team-level" className={inputClass} value={form.level} onChange={(event) => updateField('level', Number(event.target.value))} disabled={formDisabled}>
+            <FormField label="팀 레벨" htmlFor="team-level">
+              <Select id="team-level" value={form.level} onChange={(event) => updateField('level', Number(event.target.value))} disabled={formDisabled}>
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>{value}</option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </FormField>
             <div className="flex items-end">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input type="checkbox" checked={!!form.isRecruiting} onChange={(event) => updateField('isRecruiting', event.target.checked)} disabled={formDisabled} />
@@ -230,46 +225,37 @@ export default function EditTeamPage() {
 
         <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
           <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">연락 및 링크</h2>
-          <div>
-            <label htmlFor="team-contact" className={labelClass}>연락처 / 오픈채팅</label>
-            <input id="team-contact" className={inputClass} value={form.contactInfo} onChange={(event) => updateField('contactInfo', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-instagram" className={labelClass}>Instagram URL</label>
-            <input id="team-instagram" className={inputClass} value={form.instagramUrl} onChange={(event) => updateField('instagramUrl', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-youtube" className={labelClass}>YouTube URL</label>
-            <input id="team-youtube" className={inputClass} value={form.youtubeUrl} onChange={(event) => updateField('youtubeUrl', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-shorts" className={labelClass}>Shorts URL</label>
-            <input id="team-shorts" className={inputClass} value={form.shortsUrl} onChange={(event) => updateField('shortsUrl', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-kakao" className={labelClass}>카카오 오픈채팅 URL</label>
-            <input id="team-kakao" className={inputClass} value={form.kakaoOpenChat} onChange={(event) => updateField('kakaoOpenChat', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-website" className={labelClass}>웹사이트 URL</label>
-            <input id="team-website" className={inputClass} value={form.websiteUrl} onChange={(event) => updateField('websiteUrl', event.target.value)} disabled={formDisabled} />
-          </div>
+          <FormField label="연락처 / 오픈채팅" htmlFor="team-contact">
+            <Input id="team-contact" value={form.contactInfo} onChange={(event) => updateField('contactInfo', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="Instagram URL" htmlFor="team-instagram">
+            <Input id="team-instagram" value={form.instagramUrl} onChange={(event) => updateField('instagramUrl', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="YouTube URL" htmlFor="team-youtube">
+            <Input id="team-youtube" value={form.youtubeUrl} onChange={(event) => updateField('youtubeUrl', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="Shorts URL" htmlFor="team-shorts">
+            <Input id="team-shorts" value={form.shortsUrl} onChange={(event) => updateField('shortsUrl', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="카카오 오픈채팅 URL" htmlFor="team-kakao">
+            <Input id="team-kakao" value={form.kakaoOpenChat} onChange={(event) => updateField('kakaoOpenChat', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="웹사이트 URL" htmlFor="team-website">
+            <Input id="team-website" value={form.websiteUrl} onChange={(event) => updateField('websiteUrl', event.target.value)} disabled={formDisabled} />
+          </FormField>
         </section>
 
         <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
           <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">이미지</h2>
-          <div>
-            <label htmlFor="team-logo" className={labelClass}>로고 URL</label>
-            <input id="team-logo" className={inputClass} value={form.logoUrl} onChange={(event) => updateField('logoUrl', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-cover" className={labelClass}>커버 URL</label>
-            <input id="team-cover" className={inputClass} value={form.coverImageUrl} onChange={(event) => updateField('coverImageUrl', event.target.value)} disabled={formDisabled} />
-          </div>
-          <div>
-            <label htmlFor="team-photos" className={labelClass}>갤러리 URL (줄바꿈 구분)</label>
-            <textarea id="team-photos" className={`${inputClass} min-h-[120px]`} value={photosText} onChange={(event) => setPhotosText(event.target.value)} disabled={formDisabled} />
-          </div>
+          <FormField label="로고 URL" htmlFor="team-logo">
+            <Input id="team-logo" value={form.logoUrl} onChange={(event) => updateField('logoUrl', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="커버 URL" htmlFor="team-cover">
+            <Input id="team-cover" value={form.coverImageUrl} onChange={(event) => updateField('coverImageUrl', event.target.value)} disabled={formDisabled} />
+          </FormField>
+          <FormField label="갤러리 URL (줄바꿈 구분)" htmlFor="team-photos">
+            <Textarea id="team-photos" value={photosText} onChange={(event) => setPhotosText(event.target.value)} disabled={formDisabled} className="resize-none min-h-[120px]" />
+          </FormField>
         </section>
 
         <div className="flex items-center gap-3">

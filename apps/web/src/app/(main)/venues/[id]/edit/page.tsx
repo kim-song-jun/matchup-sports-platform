@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { useUpdateVenue, useVenue, useVenueHub } from '@/hooks/use-api';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import type { Venue } from '@/types/api';
 
@@ -96,7 +98,6 @@ export default function VenueEditPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20';
   const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
 
   return (
@@ -118,33 +119,33 @@ export default function VenueEditPage() {
         <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
           <div>
             <label htmlFor="venue-name" className={labelClass}>시설명</label>
-            <input id="venue-name" className={inputClass} value={form.name} onChange={(event) => updateField('name', event.target.value)} />
+            <Input id="venue-name" value={form.name} onChange={(event) => updateField('name', event.target.value)} />
           </div>
           <div>
             <label htmlFor="venue-address" className={labelClass}>주소</label>
-            <input id="venue-address" className={inputClass} value={form.address} onChange={(event) => updateField('address', event.target.value)} />
+            <Input id="venue-address" value={form.address} onChange={(event) => updateField('address', event.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="venue-city" className={labelClass}>도시</label>
-              <input id="venue-city" className={inputClass} value={form.city} onChange={(event) => updateField('city', event.target.value)} />
+              <Input id="venue-city" value={form.city} onChange={(event) => updateField('city', event.target.value)} />
             </div>
             <div>
               <label htmlFor="venue-district" className={labelClass}>구/군</label>
-              <input id="venue-district" className={inputClass} value={form.district} onChange={(event) => updateField('district', event.target.value)} />
+              <Input id="venue-district" value={form.district} onChange={(event) => updateField('district', event.target.value)} />
             </div>
           </div>
           <div>
             <label htmlFor="venue-phone" className={labelClass}>전화번호</label>
-            <input id="venue-phone" className={inputClass} value={form.phone ?? ''} onChange={(event) => updateField('phone', event.target.value)} />
+            <Input id="venue-phone" value={form.phone ?? ''} onChange={(event) => updateField('phone', event.target.value)} />
           </div>
           <div>
             <label htmlFor="venue-price" className={labelClass}>시간당 이용요금</label>
-            <input id="venue-price" type="number" className={inputClass} value={form.pricePerHour ?? ''} onChange={(event) => updateField('pricePerHour', event.target.value ? Number(event.target.value) : null)} />
+            <Input id="venue-price" type="number" value={form.pricePerHour ?? ''} onChange={(event) => updateField('pricePerHour', event.target.value ? Number(event.target.value) : null)} />
           </div>
           <div>
             <label htmlFor="venue-description" className={labelClass}>시설 소개</label>
-            <textarea id="venue-description" className={`${inputClass} min-h-[110px]`} value={form.description ?? ''} onChange={(event) => updateField('description', event.target.value)} />
+            <Textarea id="venue-description" value={form.description ?? ''} onChange={(event) => updateField('description', event.target.value)} />
           </div>
         </div>
 

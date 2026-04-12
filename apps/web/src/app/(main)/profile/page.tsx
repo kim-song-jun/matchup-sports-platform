@@ -114,7 +114,7 @@ export default function ProfilePage() {
       <div className={`px-5 @3xl:px-0 ${mounted && isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
         <div>
         {mounted && isAuthenticated && user ? (
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div data-testid="profile-summary" className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-start gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-bold text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
                   {user.nickname?.charAt(0)}

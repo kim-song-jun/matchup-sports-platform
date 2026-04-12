@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, UserPlus } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useDeleteMercenaryPost, useMercenaryPost, useUpdateMercenaryPost } from '@/hooks/use-api';
 import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
@@ -166,7 +168,6 @@ export default function EditMercenaryPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
   const accent = sportCardAccent[post.sportType];
 
   return (
@@ -201,7 +202,7 @@ export default function EditMercenaryPage() {
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             팀명
           </label>
-          <div className={`${inputClass} cursor-not-allowed opacity-80`}>
+          <div className="ds-input w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 cursor-not-allowed opacity-60">
             {post.team?.name ?? '—'}
           </div>
         </section>
@@ -210,12 +211,11 @@ export default function EditMercenaryPage() {
           <label htmlFor="mercenary-edit-match-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
-          <input
+          <Input
             id="mercenary-edit-match-date"
             type="date"
             value={form.matchDate}
             onChange={(e) => update('matchDate', e.target.value)}
-            className={inputClass}
           />
         </section>
 
@@ -223,13 +223,12 @@ export default function EditMercenaryPage() {
           <label htmlFor="mercenary-edit-venue" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소 <span className="text-red-400">*</span>
           </label>
-          <input
+          <Input
             id="mercenary-edit-venue"
             type="text"
             value={form.venue}
             onChange={(e) => update('venue', e.target.value)}
             placeholder="예: 강남 풋살파크"
-            className={inputClass}
           />
         </section>
 
@@ -256,26 +255,24 @@ export default function EditMercenaryPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="mercenary-edit-count" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">모집 인원</label>
-              <input
+              <Input
                 id="mercenary-edit-count"
                 type="number"
                 value={form.count}
                 onChange={(e) => update('count', Math.max(1, Number(e.target.value) || 1))}
                 min={1}
                 max={10}
-                className={inputClass}
               />
             </div>
             <div>
               <label htmlFor="mercenary-edit-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">참가비 (원)</label>
-              <input
+              <Input
                 id="mercenary-edit-fee"
                 type="number"
                 value={form.fee}
                 onChange={(e) => update('fee', Math.max(0, Number(e.target.value) || 0))}
                 min={0}
                 step={1000}
-                className={inputClass}
               />
               <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.fee)}</p>
             </div>
@@ -303,13 +300,13 @@ export default function EditMercenaryPage() {
 
         <section className="mb-6">
           <label htmlFor="mercenary-edit-notes" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
-          <textarea
+          <Textarea
             id="mercenary-edit-notes"
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             placeholder="추가 안내사항을 입력해주세요"
             rows={4}
-            className={`${inputClass} resize-none`}
+            className="resize-none"
           />
         </section>
 

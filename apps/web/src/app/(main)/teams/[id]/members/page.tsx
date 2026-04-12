@@ -262,6 +262,7 @@ export default function TeamMembersPage() {
                   <button
                     onClick={() => setShowLeaveModal(true)}
                     aria-label={`${member.user?.nickname ?? '내 계정'} 팀 탈퇴`}
+                    aria-haspopup="dialog"
                     data-testid="team-member-leave-self"
                     className="flex items-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors min-h-[44px]"
                   >

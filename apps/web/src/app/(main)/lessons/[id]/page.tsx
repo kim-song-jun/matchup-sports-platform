@@ -368,13 +368,6 @@ export default function LessonDetailPage() {
                 title="이미 이 강좌의 수강권을 보유하고 있어요"
                 description="결제 완료된 수강권은 내 수강권 화면에서 이용 상태와 유효기간을 계속 확인할 수 있어요."
               />
-            ) : activeTicketPlans.length > 0 && !isHost ? (
-              <TrustSignalBanner
-                tone="info"
-                label="실구매 흐름"
-                title="선택한 수강권 기준으로 결제가 진행돼요"
-                description="이제는 mock plan 대신 lesson detail API가 내려준 실제 ticket plan만 구매할 수 있습니다. 결제 완료 후 내 수강권에서 확인할 수 있어요."
-              />
             ) : null}
 
             {isHost && (

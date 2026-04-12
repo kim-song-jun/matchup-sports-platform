@@ -9,6 +9,7 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
 import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch, useArriveMatch, queryKeys } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
@@ -52,8 +53,8 @@ export default function MatchDetailPage() {
 
   const joinMutation = useMutation<MatchParticipant, unknown, { openCheckout: boolean }>({
     mutationFn: async () => {
-      const res = await api.post(`/matches/${matchId}/join`);
-      return (res as unknown as ApiResponse<MatchParticipant>).data;
+      const res = await api.post<ApiResponse<MatchParticipant>>(`/matches/${matchId}/join`);
+      return res.data;
     },
     onSuccess: (participant, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
@@ -262,10 +263,10 @@ export default function MatchDetailPage() {
       // Upload photo
       const formData = new FormData();
       formData.append('files', arrivalPhoto);
-      const uploadRes = await api.post('/uploads', formData, {
+      const uploadRes = await api.post<ApiResponse<Upload[]>>('/uploads', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const uploads = (uploadRes as unknown as ApiResponse<Upload[]>).data;
+      const uploads = uploadRes.data;
       const photoUrl = uploads[0]?.path;
       if (!photoUrl) {
         toast('error', '사진 업로드에 실패했어요. 다시 시도해주세요.');
@@ -476,6 +477,7 @@ export default function MatchDetailPage() {
                       <button
                         onClick={() => setShowCloseModal(true)}
                         disabled={updateMatchMutation.isPending}
+                        aria-haspopup="dialog"
                         data-testid="match-host-close-button"
                         className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
                       >
@@ -503,6 +505,7 @@ export default function MatchDetailPage() {
                     <button
                       onClick={() => setShowCancelModal(true)}
                       disabled={updateMatchMutation.isPending}
+                      aria-haspopup="dialog"
                       data-testid="match-host-cancel-button"
                       className="w-full rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
                     >
@@ -547,6 +550,7 @@ export default function MatchDetailPage() {
                   ) : (
                     <button
                       onClick={() => setShowArrivalModal(true)}
+                      aria-haspopup="dialog"
                       data-testid="match-arrive-button"
                       className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3 text-sm font-semibold text-white hover:bg-green-600 transition-colors min-h-[44px]"
                     >
@@ -714,13 +718,13 @@ export default function MatchDetailPage() {
             <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               취소 사유 <span className="text-gray-400 font-normal">(선택)</span>
             </label>
-            <textarea
+            <Textarea
               id="cancel-reason"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="참가자들에게 전달할 취소 사유를 입력해주세요"
               rows={3}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none transition-colors resize-none"
+              className="resize-none"
             />
           </div>
           <div className="flex gap-3">

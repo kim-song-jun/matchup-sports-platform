@@ -15,6 +15,10 @@ import { useDeleteAdminVenue, useAdminVenue } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
 
 const sportOptions = [
   { value: 'soccer', label: '축구' },
@@ -194,9 +198,6 @@ export default function AdminVenueEditPage() {
     }
   };
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-colors';
-  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
-
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse max-w-2xl">
@@ -253,23 +254,21 @@ export default function AdminVenueEditPage() {
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h2 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h2>
 
-          <div>
-            <label htmlFor="venue-name" className={labelClass}>시설명</label>
-            <input id="venue-name" type="text" value={form.name} onChange={(event) => updateField('name', event.target.value)} className={inputClass} />
-          </div>
+          <FormField label="시설명" htmlFor="venue-name">
+            <Input id="venue-name" type="text" value={form.name} onChange={(event) => updateField('name', event.target.value)} />
+          </FormField>
 
-          <div>
-            <label htmlFor="venue-type" className={labelClass}>시설 유형</label>
-            <select id="venue-type" value={form.type} onChange={(event) => updateField('type', event.target.value)} className={inputClass}>
+          <FormField label="시설 유형" htmlFor="venue-type">
+            <Select id="venue-type" value={form.type} onChange={(event) => updateField('type', event.target.value)}>
               <option value="">유형 선택</option>
               {venueTypes.map((type) => (
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </FormField>
 
           <div>
-            <label className={labelClass}>가능 종목</label>
+            <p className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">가능 종목</p>
             <div className="flex flex-wrap gap-2">
               {sportOptions.map((sport) => {
                 const selected = form.sportTypes.includes(sport.value);
@@ -291,40 +290,34 @@ export default function AdminVenueEditPage() {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="venue-address" className={labelClass}>주소</label>
-            <input id="venue-address" type="text" value={form.address} onChange={(event) => updateField('address', event.target.value)} className={inputClass} />
-          </div>
+          <FormField label="주소" htmlFor="venue-address">
+            <Input id="venue-address" type="text" value={form.address} onChange={(event) => updateField('address', event.target.value)} />
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="venue-city" className={labelClass}>도시</label>
-              <input id="venue-city" type="text" value={form.city} onChange={(event) => updateField('city', event.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="venue-district" className={labelClass}>구/군</label>
-              <input id="venue-district" type="text" value={form.district} onChange={(event) => updateField('district', event.target.value)} className={inputClass} />
-            </div>
+            <FormField label="도시" htmlFor="venue-city">
+              <Input id="venue-city" type="text" value={form.city} onChange={(event) => updateField('city', event.target.value)} />
+            </FormField>
+            <FormField label="구/군" htmlFor="venue-district">
+              <Input id="venue-district" type="text" value={form.district} onChange={(event) => updateField('district', event.target.value)} />
+            </FormField>
           </div>
 
-          <div>
-            <label htmlFor="venue-phone" className={labelClass}>연락처</label>
-            <input id="venue-phone" type="text" value={form.phone} onChange={(event) => updateField('phone', event.target.value)} className={inputClass} />
-          </div>
+          <FormField label="연락처" htmlFor="venue-phone">
+            <Input id="venue-phone" type="text" value={form.phone} onChange={(event) => updateField('phone', event.target.value)} />
+          </FormField>
 
-          <div>
-            <label htmlFor="venue-description" className={labelClass}>설명</label>
-            <textarea id="venue-description" rows={4} value={form.description} onChange={(event) => updateField('description', event.target.value)} className={`${inputClass} resize-none`} />
-          </div>
+          <FormField label="설명" htmlFor="venue-description">
+            <Textarea id="venue-description" rows={4} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="resize-none" />
+          </FormField>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h2 className="text-md font-bold text-gray-900 dark:text-white">부대시설 / 운영정보</h2>
 
-          <div>
-            <label htmlFor="facility-input" className={labelClass}>부대시설</label>
+          <FormField label="부대시설" htmlFor="facility-input">
             <div className="flex gap-2">
-              <input
+              <Input
                 id="facility-input"
                 type="text"
                 value={facilityInput}
@@ -336,7 +329,6 @@ export default function AdminVenueEditPage() {
                   }
                 }}
                 placeholder="예: 샤워실"
-                className={inputClass}
               />
               <button type="button" onClick={addFacility} className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">
                 추가
@@ -356,30 +348,25 @@ export default function AdminVenueEditPage() {
                 ))}
               </div>
             ) : null}
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="venue-price" className={labelClass}>시간당 대여료</label>
-            <input id="venue-price" type="number" min="0" value={form.pricePerHour} onChange={(event) => updateField('pricePerHour', event.target.value)} className={inputClass} />
-          </div>
+          <FormField label="시간당 대여료" htmlFor="venue-price">
+            <Input id="venue-price" type="number" min="0" value={form.pricePerHour} onChange={(event) => updateField('pricePerHour', event.target.value)} />
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="weekday-open" className={labelClass}>평일 오픈</label>
-              <input id="weekday-open" type="time" value={form.weekdayOpen} onChange={(event) => updateField('weekdayOpen', event.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="weekday-close" className={labelClass}>평일 마감</label>
-              <input id="weekday-close" type="time" value={form.weekdayClose} onChange={(event) => updateField('weekdayClose', event.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="weekend-open" className={labelClass}>주말 오픈</label>
-              <input id="weekend-open" type="time" value={form.weekendOpen} onChange={(event) => updateField('weekendOpen', event.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="weekend-close" className={labelClass}>주말 마감</label>
-              <input id="weekend-close" type="time" value={form.weekendClose} onChange={(event) => updateField('weekendClose', event.target.value)} className={inputClass} />
-            </div>
+            <FormField label="평일 오픈" htmlFor="weekday-open">
+              <Input id="weekday-open" type="time" value={form.weekdayOpen} onChange={(event) => updateField('weekdayOpen', event.target.value)} />
+            </FormField>
+            <FormField label="평일 마감" htmlFor="weekday-close">
+              <Input id="weekday-close" type="time" value={form.weekdayClose} onChange={(event) => updateField('weekdayClose', event.target.value)} />
+            </FormField>
+            <FormField label="주말 오픈" htmlFor="weekend-open">
+              <Input id="weekend-open" type="time" value={form.weekendOpen} onChange={(event) => updateField('weekendOpen', event.target.value)} />
+            </FormField>
+            <FormField label="주말 마감" htmlFor="weekend-close">
+              <Input id="weekend-close" type="time" value={form.weekendClose} onChange={(event) => updateField('weekendClose', event.target.value)} />
+            </FormField>
           </div>
         </div>
 

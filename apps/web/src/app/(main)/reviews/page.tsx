@@ -10,6 +10,7 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
 import { useState } from 'react';
 import { usePendingReviews } from '@/hooks/use-api';
+import { Textarea } from '@/components/ui/textarea';
 import type { PendingReview } from '@/types/api';
 import type { QueryClient } from '@tanstack/react-query';
 
@@ -99,8 +100,8 @@ function ReviewCard({ review, toast, queryClient }: { review: PendingReview; toa
           <RatingRow label="매너" value={mannerRating} onChange={setMannerRating} />
           <div>
             <label htmlFor={commentId} className="text-sm font-semibold text-gray-700 mb-1 block">코멘트 (선택)</label>
-            <textarea id={commentId} value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="한 마디 남겨주세요"
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 dark:bg-gray-700 px-3 py-2.5 text-base outline-none focus:border-blue-300 resize-none" />
+            <Textarea id={commentId} value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="한 마디 남겨주세요"
+              className="min-h-0 resize-none" />
           </div>
           <button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}
             className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">

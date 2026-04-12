@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
+import { Textarea } from '@/components/ui/textarea';
 import { useAdminDispute, useUpdateDisputeStatus } from '@/hooks/use-api';
 
 const typeLabel: Record<string, string> = {
@@ -116,13 +117,13 @@ export default function AdminDisputeDetailPage() {
                 : '기각 사유를 남기면 감사 로그에 기록됩니다.'}
           </p>
           <label htmlFor="admin-dispute-note" className="sr-only">운영 메모</label>
-          <textarea
+          <Textarea
             id="admin-dispute-note"
             value={adminNote}
             onChange={(e) => setAdminNote(e.target.value)}
             rows={4}
             placeholder="운영 메모를 입력하세요"
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+            className="resize-none"
           />
           <div className="flex gap-3">
             <button

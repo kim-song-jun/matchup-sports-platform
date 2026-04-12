@@ -11,6 +11,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useMyTeams, useSubmitTeamMatchResult, useTeamMatch } from '@/hooks/use-api';
 import {
@@ -265,7 +266,7 @@ export default function ScoreInputPage() {
                       <label htmlFor={`home-${key}`} className="mb-1 block text-center text-xs text-gray-500 dark:text-gray-400">
                         {hostTeam.name}
                       </label>
-                      <input
+                      <Input
                         id={`home-${key}`}
                         type="text"
                         inputMode="numeric"
@@ -273,7 +274,7 @@ export default function ScoreInputPage() {
                         onChange={(event) => updateScore('home', key, event.target.value)}
                         placeholder="0"
                         disabled={isCompleted || submitResultMutation.isPending}
-                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 py-3 text-center text-xl font-bold text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 transition-colors"
+                        className="text-center text-xl font-bold py-3"
                       />
                     </div>
 
@@ -283,7 +284,7 @@ export default function ScoreInputPage() {
                       <label htmlFor={`away-${key}`} className="mb-1 block text-center text-xs text-gray-500 dark:text-gray-400">
                         {guestTeam.name}
                       </label>
-                      <input
+                      <Input
                         id={`away-${key}`}
                         type="text"
                         inputMode="numeric"
@@ -291,7 +292,7 @@ export default function ScoreInputPage() {
                         onChange={(event) => updateScore('away', key, event.target.value)}
                         placeholder="0"
                         disabled={isCompleted || submitResultMutation.isPending}
-                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 py-3 text-center text-xl font-bold text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 transition-colors"
+                        className="text-center text-xl font-bold py-3"
                       />
                     </div>
                   </div>

@@ -9,7 +9,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import dynamic from 'next/dynamic';
 import { Modal } from '@/components/ui/modal';
 import { SafeImage } from '@/components/ui/safe-image';
-import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 
 const MediaLightbox = dynamic(
   () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
@@ -300,14 +299,6 @@ export default function ListingDetailPage() {
                   <MessageCircle size={18} />
                   채팅하기
                 </button>
-                {user?.id !== listing?.sellerId && (
-                  <TrustSignalBanner
-                    tone="warning"
-                    label="결제 준비 중"
-                    title={listing.listingType === 'rent' ? '대여 결제는 아직 열리지 않았어요' : '장터 구매 결제는 아직 열리지 않았어요'}
-                    description="현재는 판매자와 채팅으로 거래 조건을 확인하는 단계까지만 지원합니다. 결제 페이지로 보내는 가짜 흐름은 제거되었습니다."
-                  />
-                )}
                 {user?.id === listing?.sellerId && (
                   <div className="flex gap-2 mt-2">
                     <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600">

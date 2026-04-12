@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Moon, Sun, Monitor, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
@@ -48,8 +49,13 @@ export function ThemePicker() {
 export function LogoutButton() {
   const router = useRouter();
   const { isAuthenticated, logout } = useAuthStore();
+  // Defer auth check to after hydration so SSR and initial client render both produce null
+  const [clientAuth, setClientAuth] = useState(false);
+  useEffect(() => {
+    setClientAuth(isAuthenticated);
+  }, [isAuthenticated]);
 
-  if (!isAuthenticated) return null;
+  if (!clientAuth) return null;
 
   return (
     <div className="mb-6">

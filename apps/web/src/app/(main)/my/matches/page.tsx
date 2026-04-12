@@ -7,7 +7,6 @@ import { ArrowLeft, MapPin, Calendar, Clock, Users, Trophy } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useMyMatches } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
@@ -67,18 +66,20 @@ export default function MyMatchesPage() {
       </header>
       <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 히스토리</h2>
-        <p className="mt-1 text-sm text-gray-500">참가 기록과 개설 기능 연결 상태를 확인하세요</p>
+        <p className="mt-1 text-sm text-gray-500">참가한 매치와 개설 매치를 확인하세요</p>
       </div>
 
       {/* Tabs */}
       <div className="px-5 @3xl:px-0 pt-4 pb-1">
-        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700">
+        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700" role="tablist">
           {([
             { key: 'participated' as Tab, label: '참가 매치' },
             { key: 'created' as Tab, label: '내가 만든 매치' },
           ]).map((tab) => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 activeTab === tab.key
@@ -96,15 +97,6 @@ export default function MyMatchesPage() {
       {/* ── Tab: 참가 매치 ── */}
       {activeTab === 'participated' && (
         <div className="px-5 @3xl:px-0 pb-8 space-y-3 mt-4">
-          <div className="mt-3 mb-4">
-            <TrustSignalBanner
-              tone="success"
-              label="실데이터"
-              title="현재는 내가 참가한 매치만 정확하게 보여드려요"
-              description="이 탭은 참가 이력 API 기준으로 동작합니다. 호스트 여부와 무관하게 내가 참여한 매치만 표시됩니다."
-            />
-          </div>
-
           <div className="space-y-3 stagger-children">
             {isLoading ? (
               Array.from({ length: 3 }).map((_, index) => (
@@ -192,13 +184,6 @@ export default function MyMatchesPage() {
       {/* ── Tab: 내가 만든 매치 ── */}
       {activeTab === 'created' && (
         <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
-          <TrustSignalBanner
-            tone="warning"
-            label="연결 예정"
-            title="내가 만든 매치 관리는 아직 실데이터와 연결되지 않았어요"
-            description="현재 API는 참가한 매치 기준으로만 이력을 제공합니다. 내가 개설한 매치 전용 목록과 관리 액션은 준비 중입니다."
-          />
-
           <EmptyState
             icon={Calendar}
             title="개설한 매치 목록은 곧 제공돼요"

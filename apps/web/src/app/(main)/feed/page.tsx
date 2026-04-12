@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Bell, Trophy, Users, CreditCard, Award, AlertCircle } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -122,6 +122,11 @@ export default function FeedPage() {
   const t = useTranslations('feed');
   const { isAuthenticated } = useRequireAuth();
   const [now] = useState(() => new Date());
+  // Defer auth check to after hydration so SSR and initial client render both produce null
+  const [clientAuth, setClientAuth] = useState(false);
+  useEffect(() => {
+    setClientAuth(isAuthenticated);
+  }, [isAuthenticated]);
 
   const { data: notifications = [], isLoading } = useNotifications();
 
@@ -129,7 +134,7 @@ export default function FeedPage() {
   const hasAny =
     groups.today.length + groups.thisWeek.length + groups.lastMonth.length + groups.older.length > 0;
 
-  if (!isAuthenticated) return null;
+  if (!clientAuth) return null;
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">

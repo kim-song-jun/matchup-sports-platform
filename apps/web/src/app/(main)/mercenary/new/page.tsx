@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Shield, Users } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
@@ -11,6 +11,10 @@ import { useCreateMercenaryPost, useMyTeams } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
 
 const positionOptions = [
   { value: 'GK', label: '골키퍼 (GK)' },
@@ -168,34 +172,24 @@ export default function NewMercenaryPage() {
 
       <div className="px-5 @3xl:px-0 @3xl:max-w-[720px] pb-10">
         <div className="mt-4 space-y-5">
-          <div>
-            <label htmlFor="merc-team" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-              팀 선택 <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                id="merc-team"
-                value={form.teamId}
-                onChange={(event) => update('teamId', event.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
-              >
-                <option value="">팀을 선택하세요</option>
-                {teamsLoading ? (
-                  <option disabled>불러오는 중...</option>
-                ) : (
-                  myTeams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name}
-                    </option>
-                  ))
-                )}
-              </select>
-              <ChevronDown
-                size={16}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none"
-              />
-            </div>
-          </div>
+          <FormField label="팀 선택" htmlFor="merc-team" required>
+            <Select
+              id="merc-team"
+              value={form.teamId}
+              onChange={(event) => update('teamId', event.target.value)}
+            >
+              <option value="">팀을 선택하세요</option>
+              {teamsLoading ? (
+                <option disabled>불러오는 중...</option>
+              ) : (
+                myTeams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))
+              )}
+            </Select>
+          </FormField>
 
           {selectedTeam && (
             <div className={`rounded-2xl border border-gray-100 dark:border-gray-700 p-4 ${selectedAccent?.tint ?? 'bg-gray-50 dark:bg-gray-800/60'}`}>
@@ -221,33 +215,25 @@ export default function NewMercenaryPage() {
             </div>
           )}
 
-          <div>
-            <label htmlFor="merc-match-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-              경기 날짜 <span className="text-red-500">*</span>
-            </label>
-            <input
+          <FormField label="경기 날짜" htmlFor="merc-match-date" required>
+            <Input
               id="merc-match-date"
               type="date"
               value={form.matchDate}
               onChange={(event) => update('matchDate', event.target.value)}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="merc-venue" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-              장소 <span className="text-red-500">*</span>
-            </label>
-            <input
+          <FormField label="장소" htmlFor="merc-venue" required>
+            <Input
               id="merc-venue"
               type="text"
               value={form.venue}
               onChange={(event) => update('venue', event.target.value)}
               maxLength={200}
               placeholder="예: 난지천 풋살장 A"
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             />
-          </div>
+          </FormField>
 
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
@@ -311,38 +297,31 @@ export default function NewMercenaryPage() {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="merc-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-              참가비 (원)
-            </label>
-            <input
+          <FormField label="참가비 (원)" htmlFor="merc-fee">
+            <Input
               id="merc-fee"
               type="number"
               value={form.fee}
               onChange={(event) => update('fee', event.target.value)}
               min={0}
               placeholder="0 = 무료"
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {formatCurrency(Number(form.fee) || 0)}
             </p>
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="merc-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-              요청사항 (선택)
-            </label>
-            <textarea
+          <FormField label="요청사항 (선택)" htmlFor="merc-notes">
+            <Textarea
               id="merc-notes"
               value={form.notes}
               onChange={(event) => update('notes', event.target.value)}
               maxLength={500}
               placeholder="유니폼 색상, 준비물, 기타 안내 등"
               rows={4}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
+              className="resize-none"
             />
-          </div>
+          </FormField>
 
           <div className="mt-6">
             <button

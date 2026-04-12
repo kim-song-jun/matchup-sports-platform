@@ -6,9 +6,14 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
+import { formatCurrency, formatAmount } from '@/lib/utils';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -92,7 +97,7 @@ export default function CreateLessonPage() {
     switch (step) {
       case 0: return !!form.sportType && !!form.type;
       case 1: return !!form.title && !!form.coachName;
-      case 2: return !!form.venueName && !!form.lessonDate && !!form.startTime && !!form.endTime;
+      case 2: return !!form.venueName && !!form.lessonDate && !!form.startTime && !!form.endTime && form.levelMin <= form.levelMax;
       case 3: return true;
       default: return false;
     }
@@ -140,7 +145,7 @@ export default function CreateLessonPage() {
         <button
           onClick={() => (step > 0 ? setStep(step - 1) : router.back())}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
@@ -152,7 +157,7 @@ export default function CreateLessonPage() {
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
+              <div className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`} />
             </div>
           ))}
         </div>
@@ -183,6 +188,7 @@ export default function CreateLessonPage() {
                     <button
                       key={s.type}
                       onClick={() => update('sportType', s.type)}
+                      aria-pressed={form.sportType === s.type}
                       className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                         selected
                           ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
@@ -204,6 +210,7 @@ export default function CreateLessonPage() {
                   <button
                     key={t.value}
                     onClick={() => update('type', t.value)}
+                    aria-pressed={form.type === t.value}
                     className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
                       form.type === t.value
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
@@ -224,61 +231,51 @@ export default function CreateLessonPage() {
         {/* Step 1: Title, description, coach */}
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
-            <div>
-              <label htmlFor="lesson-title" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                강좌 제목 <span className="text-red-400">*</span>
-              </label>
-              <input
+            <FormField label="강좌 제목" htmlFor="lesson-title" required>
+              <Input
                 id="lesson-title"
                 type="text"
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
                 maxLength={100}
                 placeholder="예: 초보자를 위한 풋살 기초 레슨"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="lesson-description" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">강좌 설명</label>
-              <textarea
+            <FormField label="강좌 설명" htmlFor="lesson-description">
+              <Textarea
                 id="lesson-description"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
                 maxLength={1000}
                 placeholder="강좌에 대한 자세한 설명을 입력해주세요"
                 rows={4}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
+                className="resize-none"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="lesson-coach-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                코치명 <span className="text-red-400">*</span>
-              </label>
-              <input
+            <FormField label="코치명" htmlFor="lesson-coach-name" required>
+              <Input
                 id="lesson-coach-name"
                 type="text"
                 value={form.coachName}
                 onChange={(e) => update('coachName', e.target.value)}
                 maxLength={50}
                 placeholder="예: 김코치"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="lesson-coach-bio" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">코치 소개</label>
-              <textarea
+            <FormField label="코치 소개" htmlFor="lesson-coach-bio">
+              <Textarea
                 id="lesson-coach-bio"
                 value={form.coachBio}
                 onChange={(e) => update('coachBio', e.target.value)}
                 maxLength={500}
                 placeholder="코치 경력 및 자격증 등을 입력해주세요"
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
+                className="resize-none"
               />
-            </div>
+            </FormField>
 
             <div>
               <ImageUpload
@@ -310,119 +307,94 @@ export default function CreateLessonPage() {
         {/* Step 2: Venue, date/time, details */}
         {step === 2 && (
           <div className="space-y-5 animate-fade-in">
-            <div>
-              <label htmlFor="lesson-venue" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                장소명 <span className="text-red-400">*</span>
-              </label>
-              <input
+            <FormField label="장소명" htmlFor="lesson-venue" required>
+              <Input
                 id="lesson-venue"
                 type="text"
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label htmlFor="lesson-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                날짜 <span className="text-red-400">*</span>
-              </label>
-              <input
+            <FormField label="날짜" htmlFor="lesson-date" required>
+              <Input
                 id="lesson-date"
                 type="date"
                 value={form.lessonDate}
                 onChange={(e) => update('lessonDate', e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </div>
+            </FormField>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="lesson-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                  시작 시간 <span className="text-red-400">*</span>
-                </label>
-                <input
+              <FormField label="시작 시간" htmlFor="lesson-start-time" required>
+                <Input
                   id="lesson-start-time"
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </div>
-              <div>
-                <label htmlFor="lesson-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-                  종료 시간 <span className="text-red-400">*</span>
-                </label>
-                <input
+              </FormField>
+              <FormField label="종료 시간" htmlFor="lesson-end-time" required>
+                <Input
                   id="lesson-end-time"
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </div>
+              </FormField>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="lesson-max-participants" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최대 인원</label>
-                <input
+              <FormField label="최대 인원" htmlFor="lesson-max-participants">
+                <Input
                   id="lesson-max-participants"
                   type="number"
                   value={form.maxParticipants}
                   onChange={(e) => update('maxParticipants', +e.target.value)}
                   min={1}
                   max={50}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </div>
-              <div>
-                <label htmlFor="lesson-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">수강료 (원)</label>
-                <input
+              </FormField>
+              <FormField
+                label="수강료 (원)"
+                htmlFor="lesson-fee"
+                hint={form.fee > 0 ? formatAmount(form.fee) : undefined}
+              >
+                <Input
                   id="lesson-fee"
                   type="number"
                   value={form.fee}
                   onChange={(e) => update('fee', +e.target.value)}
                   min={0}
                   step={1000}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-                {form.fee > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Intl.NumberFormat('ko-KR').format(form.fee)}원
-                  </p>
-                )}
-              </div>
+              </FormField>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="lesson-level-min" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최소 레벨</label>
-                <select
+              <FormField label="최소 레벨" htmlFor="lesson-level-min">
+                <Select
                   id="lesson-level-min"
                   value={form.levelMin}
                   onChange={(e) => update('levelMin', +e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="lesson-level-max" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최대 레벨</label>
-                <select
+                </Select>
+              </FormField>
+              <FormField label="최대 레벨" htmlFor="lesson-level-max">
+                <Select
                   id="lesson-level-max"
                   value={form.levelMax}
                   onChange={(e) => update('levelMax', +e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </FormField>
             </div>
           </div>
         )}
@@ -444,10 +416,7 @@ export default function CreateLessonPage() {
                 <SummaryRow label="시간" value={`${form.startTime} ~ ${form.endTime}`} />
                 <SummaryRow label="인원" value={`최대 ${form.maxParticipants}명`} />
                 {imageAssets.length > 0 && <SummaryRow label="이미지" value={`${imageAssets.length}장`} />}
-                <SummaryRow
-                  label="수강료"
-                  value={form.fee === 0 ? '무료' : `${new Intl.NumberFormat('ko-KR').format(form.fee)}원`}
-                />
+                <SummaryRow label="수강료" value={formatCurrency(form.fee)} />
                 <SummaryRow label="레벨" value={`${levelLabel[form.levelMin]} ~ ${levelLabel[form.levelMax]}`} />
               </div>
             </div>

@@ -8,7 +8,12 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
 import { useLesson } from '@/hooks/use-api';
+import { formatAmount } from '@/lib/utils';
 import { api } from '@/lib/api';
 
 const sports = [
@@ -155,9 +160,6 @@ export default function EditLessonPage() {
     );
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
-  const selectClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
-
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
@@ -227,184 +229,149 @@ export default function EditLessonPage() {
         </section>
 
         {/* 강좌 제목 */}
-        <section className="mb-5">
-          <label htmlFor="lesson-edit-title" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-            강좌 제목 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="강좌 제목" required htmlFor="lesson-edit-title" className="mb-5">
+          <Input
             id="lesson-edit-title"
             type="text"
             value={form.title}
             onChange={(e) => update('title', e.target.value)}
             placeholder="예: 초보자를 위한 풋살 기초 레슨"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 강좌 설명 */}
-        <section className="mb-5">
-          <label htmlFor="lesson-edit-description" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">강좌 설명</label>
-          <textarea
+        <FormField label="강좌 설명" htmlFor="lesson-edit-description" className="mb-5">
+          <Textarea
             id="lesson-edit-description"
             value={form.description}
             onChange={(e) => update('description', e.target.value)}
             placeholder="강좌에 대한 자세한 설명을 입력해주세요"
             rows={4}
-            className={`${inputClass} resize-none`}
+            className="resize-none"
           />
-        </section>
+        </FormField>
 
         {/* 코치명 */}
-        <section className="mb-5">
-          <label htmlFor="lesson-edit-coach-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-            코치명 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="코치명" required htmlFor="lesson-edit-coach-name" className="mb-5">
+          <Input
             id="lesson-edit-coach-name"
             type="text"
             value={form.coachName}
             onChange={(e) => update('coachName', e.target.value)}
             placeholder="예: 김코치"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 코치 소개 */}
-        <section className="mb-5">
-          <label htmlFor="lesson-edit-coach-bio" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">코치 소개</label>
-          <textarea
+        <FormField label="코치 소개" htmlFor="lesson-edit-coach-bio" className="mb-5">
+          <Textarea
             id="lesson-edit-coach-bio"
             value={form.coachBio}
             onChange={(e) => update('coachBio', e.target.value)}
             placeholder="코치 경력 및 자격증 등을 입력해주세요"
             rows={3}
-            className={`${inputClass} resize-none`}
+            className="resize-none"
           />
-        </section>
+        </FormField>
 
         {/* 장소명 */}
-        <section className="mb-5">
-          <label htmlFor="lesson-edit-venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-            장소명 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="장소명" required htmlFor="lesson-edit-venue-name" className="mb-5">
+          <Input
             id="lesson-edit-venue-name"
             type="text"
             value={form.venueName}
             onChange={(e) => update('venueName', e.target.value)}
             placeholder="예: 난지천 풋살장"
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 날짜 */}
-        <section className="mb-5">
-          <label htmlFor="lesson-edit-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-            날짜 <span className="text-red-400">*</span>
-          </label>
-          <input
+        <FormField label="날짜" required htmlFor="lesson-edit-date" className="mb-5">
+          <Input
             id="lesson-edit-date"
             type="date"
             value={form.lessonDate}
             onChange={(e) => update('lessonDate', e.target.value)}
-            className={inputClass}
           />
-        </section>
+        </FormField>
 
         {/* 시간 */}
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="lesson-edit-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-                시작 시간 <span className="text-red-400">*</span>
-              </label>
-              <input
+            <FormField label="시작 시간" required htmlFor="lesson-edit-start-time">
+              <Input
                 id="lesson-edit-start-time"
                 type="time"
                 value={form.startTime}
                 onChange={(e) => update('startTime', e.target.value)}
-                className={inputClass}
               />
-            </div>
-            <div>
-              <label htmlFor="lesson-edit-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-                종료 시간 <span className="text-red-400">*</span>
-              </label>
-              <input
+            </FormField>
+            <FormField label="종료 시간" required htmlFor="lesson-edit-end-time">
+              <Input
                 id="lesson-edit-end-time"
                 type="time"
                 value={form.endTime}
                 onChange={(e) => update('endTime', e.target.value)}
-                className={inputClass}
               />
-            </div>
+            </FormField>
           </div>
         </section>
 
         {/* 인원 / 수강료 */}
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="lesson-edit-max-participants" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 인원</label>
-              <input
+            <FormField label="최대 인원" htmlFor="lesson-edit-max-participants">
+              <Input
                 id="lesson-edit-max-participants"
                 type="number"
                 value={form.maxParticipants}
                 onChange={(e) => update('maxParticipants', +e.target.value)}
                 min={1}
                 max={50}
-                className={inputClass}
               />
-            </div>
-            <div>
-              <label htmlFor="lesson-edit-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">수강료 (원)</label>
-              <input
+            </FormField>
+            <FormField
+              label="수강료 (원)"
+              htmlFor="lesson-edit-fee"
+              hint={form.fee > 0 ? formatAmount(form.fee) : undefined}
+            >
+              <Input
                 id="lesson-edit-fee"
                 type="number"
                 value={form.fee}
                 onChange={(e) => update('fee', +e.target.value)}
                 min={0}
                 step={1000}
-                className={inputClass}
               />
-              {form.fee > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Intl.NumberFormat('ko-KR').format(form.fee)}원
-                </p>
-              )}
-            </div>
+            </FormField>
           </div>
         </section>
 
         {/* 레벨 */}
         <section className="mb-6">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="lesson-edit-level-min" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최소 레벨</label>
-              <select
+            <FormField label="최소 레벨" htmlFor="lesson-edit-level-min">
+              <Select
                 id="lesson-edit-level-min"
                 value={form.levelMin}
                 onChange={(e) => update('levelMin', +e.target.value)}
-                className={selectClass}
               >
                 {[1, 2, 3, 4, 5].map((l) => (
                   <option key={l} value={l}>{levelLabel[l]}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="lesson-edit-level-max" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 레벨</label>
-              <select
+              </Select>
+            </FormField>
+            <FormField label="최대 레벨" htmlFor="lesson-edit-level-max">
+              <Select
                 id="lesson-edit-level-max"
                 value={form.levelMax}
                 onChange={(e) => update('levelMax', +e.target.value)}
-                className={selectClass}
               >
                 {[1, 2, 3, 4, 5].map((l) => (
                   <option key={l} value={l}>{levelLabel[l]}</option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </FormField>
           </div>
         </section>
 

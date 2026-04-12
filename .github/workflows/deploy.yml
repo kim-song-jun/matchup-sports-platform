@@ -268,8 +268,10 @@ jobs:
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts </dev/null
 
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
+          echo "[INFO] Stopping all containers..."
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env down --remove-orphans
+          echo "[INFO] Starting all services with force-recreate..."
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate
 
           echo "[INFO] Waiting for matchup_api health..."
           for i in $(seq 1 45); do

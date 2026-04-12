@@ -77,7 +77,7 @@ export function routeSlugFromTemplate(template) {
 }
 
 export function collectVisualRouteTemplates(repoRoot) {
-  const output = execSync("rg --files 'apps/web/src/app' -g 'page.tsx' | sort", {
+  const output = execSync("find apps/web/src/app -name 'page.tsx' | sort", {
     cwd: repoRoot,
     encoding: 'utf8',
   });
@@ -357,6 +357,39 @@ export function readyContractForTemplate(template) {
     return readyContract(
       ['main h1', 'main h2', '[data-testid="admin-auth-wall"]'],
       ['main table', 'main a[href]', 'main button', 'main section', 'main article'],
+    );
+  }
+
+  // /matches/new is a multi-step wizard: step 0 has no <form>, <input>, <textarea>, or
+  // <select>. The generic handler's anySelectors would all miss. h1 is inside @3xl:hidden
+  // so it's invisible on desktop viewports. Only h3 and data-testid sport buttons are
+  // unconditionally present at step 0 across all viewports.
+  if (template === '/matches/new') {
+    return readyContract(
+      ['[data-testid^="match-sport-"]', 'main h3', 'main button', 'h1'],
+      ['[data-testid^="match-sport-"]', 'main button'],
+      {
+        postReadyDelayMs: 800,
+        selectorTimeoutMs: 45_000,
+        transientTimeoutMs: 25_000,
+      },
+    );
+  }
+
+  // /team-matches/new is also a multi-step wizard. Step 0 has no <form>, no <select>
+  // (host-team-select is conditional on eligibleTeams.length > 1), no <h2>/<h3>, and
+  // no data-testid sport buttons. h1 is inside @3xl:hidden so it is invisible on
+  // desktop viewports. #match-title (text input for the match title) and the sport
+  // selection buttons are unconditionally present at step 0 across all viewports.
+  if (template === '/team-matches/new') {
+    return readyContract(
+      ['#match-title', 'main button', 'h1'],
+      ['#match-title', 'main button'],
+      {
+        postReadyDelayMs: 800,
+        selectorTimeoutMs: 45_000,
+        transientTimeoutMs: 25_000,
+      },
     );
   }
 

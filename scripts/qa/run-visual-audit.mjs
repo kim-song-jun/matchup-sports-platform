@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import {
   buildRouteCatalog,
@@ -34,7 +35,7 @@ let activeRunContext = null;
 function usage() {
   console.error(`Usage:
   node scripts/qa/run-visual-audit.mjs manifest [--run-id <id>] [--batch <batch-id>] [--family <family>] [--route <template>] [--limit <n>] [--headed] [--allow-bootstrap-writes]
-  node scripts/qa/run-visual-audit.mjs capture [--run-id <id>] [--batch <batch-id>] [--family <family>] [--route <template>] [--viewports <csv>] [--states <csv>] [--limit <n>] [--headed] [--include-blocked] [--allow-bootstrap-writes]`);
+  node scripts/qa/run-visual-audit.mjs capture [--run-id <id>] [--batch <batch-id>] [--family <family>] [--route <template>] [--viewports <csv>] [--states <csv>] [--limit <n>] [--headed] [--include-blocked] [--allow-bootstrap-writes] [--max-concurrent-contexts <n>]`);
   process.exit(1);
 }
 
@@ -64,6 +65,7 @@ function parseArgs(argv) {
     allowBootstrapWrites: false,
     viewports: Object.keys(VIEWPORT_MATRIX),
     states: null,
+    maxConcurrentContexts: 3,
   };
 
   for (let index = 3; index < argv.length; index += 1) {
@@ -89,6 +91,8 @@ function parseArgs(argv) {
       options.includeBlocked = true;
     } else if (token === '--allow-bootstrap-writes') {
       options.allowBootstrapWrites = true;
+    } else if (token === '--max-concurrent-contexts') {
+      options.maxConcurrentContexts = Math.max(1, Number(argv[++index] ?? '3') || 3);
     } else {
       throw new Error(`Unknown option: ${token}`);
     }
@@ -492,7 +496,9 @@ async function refreshSessionAuthentication(session) {
   const tokens = await loginViaApi(persona.nickname);
   session.tokens = tokens;
   session.apiCache?.clear();
-  await injectTokens(session.page, tokens);
+  if (session.page) {
+    await injectTokens(session.page, tokens);
+  }
   return true;
 }
 
@@ -556,6 +562,113 @@ function requireBootstrapWrites(session, resourceLabel) {
   }
 
   throw new Error(`bootstrap write disabled for ${resourceLabel}; rerun with --allow-bootstrap-writes on localhost only`);
+}
+
+function escapeSqlForBootstrap(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+function runPostgresCommand(sql) {
+  const result = spawnSync(
+    'docker',
+    [
+      'compose', 'exec', '-T', 'postgres',
+      'psql', '-U', 'matchup', '-d', 'matchup',
+      '-v', 'ON_ERROR_STOP=1',
+      '-c', sql,
+    ],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf-8',
+      timeout: 30_000,
+    },
+  );
+
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim() ?? 'unknown error';
+    throw new Error(`docker compose postgres query failed: ${stderr}`);
+  }
+
+  return result.stdout?.trim() ?? '';
+}
+
+async function promotePersonaRole(nickname, role) {
+  try {
+    const safeNickname = escapeSqlForBootstrap(nickname);
+    const safeRole = escapeSqlForBootstrap(role);
+    runPostgresCommand(
+      `UPDATE users SET role = '${safeRole}' WHERE nickname = '${safeNickname}' AND deleted_at IS NULL;`,
+    );
+    console.log(`[bootstrap] promoted "${nickname}" to role="${role}"`);
+  } catch (error) {
+    console.warn(`[bootstrap] promotePersonaRole failed (non-fatal): ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function ensureTeamsForPersona(session, personaKey) {
+  if (personaKey !== 'teamOwner') {
+    return;
+  }
+
+  const memberships = asArray(await apiGet(session, '/teams/me', 'teams:me'));
+  const ownedCount = memberships.filter(
+    (m) => String(m?.role ?? '') === 'owner',
+  ).length;
+
+  if (ownedCount >= 1) {
+    console.log(`[bootstrap] teamOwner already has ${ownedCount} owned team(s), skipping team creation`);
+    return;
+  }
+
+  requireBootstrapWrites(session, 'teams');
+
+  const teamDefs = [
+    { name: '시각감사팀A', sportType: 'futsal', city: '서울', district: '마포구', level: 3 },
+    { name: '시각감사팀B', sportType: 'basketball', city: '서울', district: '강남구', level: 3 },
+  ];
+
+  for (const teamDef of teamDefs) {
+    const created = await apiPost(session, '/teams', teamDef);
+    console.log(`[bootstrap] created team "${teamDef.name}" (id=${created?.id ?? 'unknown'})`);
+  }
+
+  session.apiCache?.delete('teams:me');
+}
+
+async function runInfrastructureBootstrap(sessions, apiBase) {
+  const venueCheck = await fetch(`${apiBase}/api/v1/venues`, {
+    headers: { Accept: 'application/json' },
+  }).catch(() => null);
+
+  if (!venueCheck || !venueCheck.ok) {
+    throw new Error('Bootstrap abort: venue check request failed');
+  }
+
+  const venuePayload = unwrapApiPayload(await venueCheck.json().catch(() => null));
+  const venues = asArray(venuePayload);
+  if (venues.length === 0) {
+    throw new Error('Bootstrap abort: run make db-seed-mocks first');
+  }
+
+  console.log(`[bootstrap] venue seed confirmed (${venues.length} venues)`);
+
+  const teamOwnerPersona = PERSONA_MATRIX['teamOwner'];
+  const teamOwnerTokens = await loginViaApi(teamOwnerPersona.nickname);
+  const teamOwnerSession = {
+    tokens: teamOwnerTokens,
+    personaKey: 'teamOwner',
+    apiCache: new Map(),
+    allowBootstrapWrites: true,
+  };
+  await ensureTeamsForPersona(teamOwnerSession, 'teamOwner');
+
+  await promotePersonaRole(PERSONA_MATRIX['admin'].nickname, 'admin');
+
+  const adminSession = await sessions.getSession('admin', 'desktop-md');
+  const refreshed = await refreshSessionAuthentication(adminSession);
+  if (refreshed) {
+    console.log('[bootstrap] admin session re-authenticated with promoted role');
+  }
 }
 
 function futureDate(daysFromNow = 7) {
@@ -1276,6 +1389,9 @@ class SessionManager {
     this.browser = browser;
     this.cache = new Map();
     this.allowBootstrapWrites = Boolean(options.allowBootstrapWrites);
+    this.maxConcurrentContexts = typeof options.maxConcurrentContexts === 'number'
+      ? Math.max(1, options.maxConcurrentContexts)
+      : 3;
   }
 
   async getSession(personaKey, viewportKey) {
@@ -1287,6 +1403,13 @@ class SessionManager {
     const persona = PERSONA_MATRIX[personaKey];
     if (!persona) {
       throw new Error(`Unknown persona: ${personaKey}`);
+    }
+
+    if (this.cache.size >= this.maxConcurrentContexts) {
+      const evictKey = this.cache.keys().next().value;
+      const evictSession = this.cache.get(evictKey);
+      await evictSession.context.close().catch(() => {});
+      this.cache.delete(evictKey);
     }
 
     const context = await this.browser.newContext(mobileContextOptions(viewportKey));
@@ -1999,7 +2122,10 @@ async function captureArtifacts(options) {
     throw new Error('no routes selected for capture');
   }
   const browser = await chromium.launch({ headless: !options.headed });
-  const sessions = new SessionManager(browser, { allowBootstrapWrites: options.allowBootstrapWrites });
+  const sessions = new SessionManager(browser, {
+    allowBootstrapWrites: options.allowBootstrapWrites,
+    maxConcurrentContexts: options.maxConcurrentContexts,
+  });
   const captureResults = [];
   const issueByFamily = new Map();
   const metadata = {
@@ -2030,6 +2156,11 @@ async function captureArtifacts(options) {
     metadata,
     flush: () => flushCaptureArtifacts(options, routes, captureResults, issueByFamily, metadata),
   });
+
+  if (options.allowBootstrapWrites && isLocalApiBase()) {
+    await runInfrastructureBootstrap(sessions, API_BASE);
+  }
+
   const totalStates = options.viewports.reduce((count, viewportKey) => {
     if (!VIEWPORT_MATRIX[viewportKey]) {
       return count;

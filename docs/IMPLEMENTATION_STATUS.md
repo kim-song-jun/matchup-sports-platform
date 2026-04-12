@@ -189,16 +189,40 @@
 
 ---
 
-## 4. 핵심 라우트 맵 (2026-04-11 snapshot)
+## 4. 핵심 라우트 맵 (2026-04-12 snapshot)
 
-### 사용자 페이지 (대표 surface)
+총 page.tsx 파일 수: 95개
+
+### 공개(소개) 페이지
 
 ```
-인증
-  /login                          소셜 로그인 + 개발자 빠른 로그인
+  /                               루트 (랜딩으로 리디렉트)
+  /landing                        랜딩 페이지 (히어로 + 통계 + 종목 그리드 + CTA)
+  /guide                          이용 가이드 (6단계 튜토리얼)
+  /pricing                        요금 안내 (무료/프로/팀 3단 요금제)
+  /faq                            FAQ 아코디언 (카테고리 필터)
+  /about                          서비스 소개 (비전/미션/팀)
+```
 
-메인
+### 인증 페이지
+
+```
+  /login                          소셜 로그인 + 개발자 빠른 로그인
+  /callback/kakao                 카카오 OAuth 콜백
+  /callback/naver                 네이버 OAuth 콜백
+```
+
+### 메인 앱 — 핵심 피처
+
+```
+온보딩
+  /onboarding                     최초 가입 온보딩 플로우
+
+홈 / 피드
   /home                           홈 (종목 선택 + 추천 매치)
+  /feed                           소셜 피드
+
+매치
   /matches                        매치 찾기 (검색 + 필터)
   /matches/new                    매치 만들기 (4단계 폼)
   /matches/[id]                   매치 상세 (참가/탈퇴/캘린더)
@@ -208,6 +232,7 @@
   /team-matches                   팀 매칭 모집글 목록
   /team-matches/new               모집글 작성 (5단계 폼)
   /team-matches/[id]              모집글 상세 (신청/승인/거절)
+  /team-matches/[id]/edit         모집글 수정
   /team-matches/[id]/arrival      도착 인증 (GPS/사진/상대확인)
   /team-matches/[id]/score        쿼터별 스코어 입력
   /team-matches/[id]/evaluate     경기 후 6항목 평가
@@ -218,10 +243,14 @@
   /teams/[id]                     팀 허브 (overview/goods/passes/events + 기존 팀 정보)
   /teams/[id]/edit                팀 수정/삭제
   /teams/[id]/members             멤버 관리 (역할/추방/초대)
+  /teams/[id]/matches             해당 팀이 참여한 팀 매칭 목록
+  /teams/[id]/mercenary           해당 팀의 용병 모집 목록
 
 강좌
   /lessons                        강좌 목록 (타입 필터)
+  /lessons/new                    강좌 등록
   /lessons/[id]                   강좌 상세 (커리큘럼/수강신청)
+  /lessons/[id]/edit              강좌 수정
 
 장터
   /marketplace                    매물 목록 (카테고리 필터)
@@ -263,8 +292,10 @@
   /profile                        프로필 (매너점수/ELO/일정)
   /my/matches                     내가 만든 매치 (수정/취소)
   /my/team-matches                내 팀 매칭 모집글
+  /my/team-match-applications     내가 보낸 팀 매칭 신청 목록
   /my/teams                       내 팀 (수정/멤버관리/삭제)
   /my/lessons                     내가 등록한 강좌
+  /my/lesson-tickets              내 강좌 수강권
   /my/listings                    내 장터 매물 (상태변경)
   /my/mercenary                   내 용병 모집
   /my/reviews-received            내가 받은 평가
@@ -277,7 +308,7 @@
   /settings/privacy               개인정보 처리방침
 ```
 
-### Admin 페이지 (대표 surface)
+### Admin 페이지
 
 ```
   /admin/dashboard                대시보드 (통계 카드)
@@ -287,12 +318,17 @@
   /admin/users/[id]               사용자 상세 (경고/정지)
   /admin/lessons                  강좌 관리
   /admin/lessons/[id]             강좌 상세 (상태 변경)
+  /admin/lesson-tickets           강좌 수강권 관리
   /admin/teams                    팀 관리
   /admin/teams/[id]               팀 상세 (뱃지/정지)
+  /admin/team-matches             팀 매칭 관리
+  /admin/team-matches/[id]        팀 매칭 상세
   /admin/venues                   시설 관리
   /admin/venues/new               시설 등록
   /admin/venues/[id]              시설 수정/삭제
   /admin/payments                 결제 관리
+  /admin/reviews                  리뷰/평가 관리
+  /admin/mercenary                용병 모집 관리
   /admin/disputes                 신고/분쟁 관리
   /admin/disputes/[id]            분쟁 상세 (해결/기각/경고/정지)
   /admin/statistics               통계 (차트)

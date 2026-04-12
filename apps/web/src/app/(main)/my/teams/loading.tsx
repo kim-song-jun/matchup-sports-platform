@@ -1,5 +1,3 @@
-'use client';
-
 import { Skeleton, ListSkeleton } from '@/components/ui/skeleton';
 
 export default function Loading() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -14,11 +14,17 @@ import { ApplicationsSection } from '@/components/team-matches/applications-sect
 import {
   useTeamMatch, useTeamMatchRefereeSchedule,
   useApplyTeamMatch,
-  useTeamMatchArrival, useMyTeams,
+  useMyTeams,
 } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { getGradeInfo, MATCH_TYPES } from '@/lib/skill-grades';
 import { sportLabel } from '@/lib/constants';
+import {
+  getMyParticipantTeams,
+  getParticipantTeams,
+  getTeamMatchStatusMeta,
+  isArrivalOpen,
+} from '@/lib/team-match-operations';
 import { getTeamLogo } from '@/lib/sport-image';
 import { formatDateDot, formatAmount } from '@/lib/utils';
 
@@ -33,18 +39,29 @@ export default function TeamMatchDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { user, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const { data: match, isLoading } = useTeamMatch(id);
   const { data: refereeSchedule } = useTeamMatchRefereeSchedule(id);
   const { data: myTeams } = useMyTeams();
   const applyMutation = useApplyTeamMatch();
 
-  const arrivalMutation = useTeamMatchArrival();
-
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyMessage, setApplyMessage] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState('');
+
+  const isHost = Boolean(
+    isAuthenticated
+    && match?.hostTeam?.id
+    && myTeams?.some((team) => team.id === match.hostTeam?.id && (team.role === 'owner' || team.role === 'manager')),
+  );
+  const applications = match?.applications ?? [];
+  const applicableTeams = (myTeams ?? []).filter((team) => {
+    if (team.role !== 'owner' && team.role !== 'manager') return false;
+    if (team.id === match?.hostTeam?.id) return false;
+    if (applications.some((application) => application.applicantTeamId === team.id)) return false;
+    return true;
+  });
 
   if (isLoading) {
     return (
@@ -73,14 +90,18 @@ export default function TeamMatchDetailPage() {
     );
   }
 
-  // isHost: user must belong to the host team with owner or manager role
-  const isHost = useMemo(() => {
-    if (!isAuthenticated || !match?.hostTeam?.id) return false;
-    return myTeams?.some((t) => t.id === match.hostTeam!.id && (t.role === 'owner' || t.role === 'manager')) ?? false;
-  }, [isAuthenticated, match?.hostTeam?.id, myTeams]);
-  const isMatchDay = new Date(match.matchDate).toDateString() === new Date().toDateString();
   const isCompleted = match.status === 'completed';
   const isRecruiting = match.status === 'recruiting';
+  const participantTeams = getParticipantTeams(match);
+  const myParticipantTeams = getMyParticipantTeams(match, myTeams);
+  const isParticipant = myParticipantTeams.length > 0;
+  const isParticipantManager = myParticipantTeams.some((team) => team.role === 'owner' || team.role === 'manager');
+  const hasConfirmedOpponent = participantTeams.length === 2;
+  const canOpenArrival = hasConfirmedOpponent && isParticipant && isArrivalOpen(match.status);
+  const canOpenScore =
+    hasConfirmedOpponent &&
+    (match.status === 'completed' || (isParticipantManager && ['scheduled', 'checking_in', 'in_progress'].includes(match.status)));
+  const canOpenEvaluate = isCompleted && isParticipant;
   const hostTeamLogo = match.hostTeam
     ? getTeamLogo(
         match.hostTeam.name,
@@ -89,39 +110,26 @@ export default function TeamMatchDetailPage() {
         match.hostTeam.id || match.id,
       )
     : null;
-  const applications = match.applications ?? [];
 
-  const statusMap: Record<string, { label: string; className: string }> = {
-    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-    matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
-    in_progress: { label: '경기중', className: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
-    completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-    cancelled: { label: '취소됨', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
-  };
-  const status = statusMap[match.status] ?? statusMap.recruiting;
-
-  // Teams eligible to apply: owner/manager role, not the host team, not already applied
-  const applicableTeams = useMemo(() => {
-    if (!myTeams) return [];
-    return myTeams.filter((t) => {
-      if (t.role !== 'owner' && t.role !== 'manager') return false;
-      if (t.id === match?.hostTeam?.id) return false;
-      if (applications.some((a) => a.applicantTeamId === t.id)) return false;
-      return true;
-    });
-  }, [myTeams, match?.hostTeam?.id, applications]);
+  const status = getTeamMatchStatusMeta(match.status);
+  const refereeRows = Object.entries(refereeSchedule?.schedule ?? {}).map(([quarterKey, assignedTeam]) => ({
+    quarter: quarterKey.replace(/^Q(\d+)$/, '$1쿼터'),
+    teamName:
+      assignedTeam === 'home'
+        ? match.hostTeam?.name ?? '호스트 팀'
+        : assignedTeam === 'away'
+          ? match.guestTeam?.name ?? '게스트 팀'
+          : assignedTeam,
+  }));
 
   function handleApply() {
     if (!confirmed) return;
     const teamId = applicableTeams.length > 0 ? (selectedTeamId || applicableTeams[0].id) : undefined;
+    if (!teamId) return;
     applyMutation.mutate(
-      { id, data: { message: applyMessage, ...(teamId ? { teamId } : {}) } },
+      { id, data: { applicantTeamId: teamId, message: applyMessage } },
       { onSuccess: () => setShowApplyModal(false) },
     );
-  }
-
-  function handleArrival() {
-    arrivalMutation.mutate(id);
   }
 
   return (
@@ -293,7 +301,7 @@ export default function TeamMatchDetailPage() {
             </div>
 
             {/* 심판 배정 표 */}
-            {match.hasReferee && refereeSchedule && refereeSchedule.length > 0 && (
+            {!match.hasReferee && refereeRows.length > 0 && (
               <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Shield size={16} className="text-blue-500" />
@@ -308,9 +316,9 @@ export default function TeamMatchDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {refereeSchedule.map((item: { quarter: number; teamName: string }, idx: number) => (
+                      {refereeRows.map((item, idx) => (
                         <tr key={idx} className="border-b border-gray-50 last:border-0">
-                          <td className="py-2.5 px-3 font-medium text-gray-900 dark:text-white">{item.quarter}쿼터</td>
+                          <td className="py-2.5 px-3 font-medium text-gray-900 dark:text-white">{item.quarter}</td>
                           <td className="py-2.5 px-3 text-gray-700 dark:text-gray-300">{item.teamName}</td>
                         </tr>
                       ))}
@@ -381,18 +389,27 @@ export default function TeamMatchDetailPage() {
                 </button>
               )}
 
-              {isMatchDay && !isCompleted && (
-                <button
-                  onClick={handleArrival}
-                  disabled={arrivalMutation.isPending}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-50"
+              {canOpenArrival && (
+                <Link
+                  href={`/team-matches/${id}/arrival`}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
                   <MapPinCheck size={18} />
                   도착 인증
-                </button>
+                </Link>
               )}
 
-              {isCompleted && (
+              {canOpenScore && (
+                <Link
+                  href={`/team-matches/${id}/score`}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-900 py-3.5 text-md font-semibold text-white hover:bg-gray-800 transition-colors"
+                >
+                  <Trophy size={18} />
+                  {isCompleted ? '저장된 경기 결과 보기' : '경기 결과 입력'}
+                </Link>
+              )}
+
+              {canOpenEvaluate && (
                 <Link
                   href={`/team-matches/${id}/evaluate`}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
@@ -452,7 +469,7 @@ export default function TeamMatchDetailPage() {
             <label htmlFor="team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">신청 팀 선택</label>
             <select
               id="team-select"
-              value={selectedTeamId}
+              value={selectedTeamId || applicableTeams[0].id}
               onChange={(e) => setSelectedTeamId(e.target.value)}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             >

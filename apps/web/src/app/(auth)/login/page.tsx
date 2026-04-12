@@ -6,6 +6,9 @@ import Link from 'next/link';
 import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/ui/form-field';
 
 // Allows only same-origin relative paths. Blocks absolute URLs, protocol-relative
 // paths (//), javascript:, data:, and any scheme-containing strings.
@@ -186,7 +189,7 @@ export default function LoginPage() {
 
       {/* 상단 — 브랜드 */}
       <div className="flex flex-col items-center justify-center px-6 pt-8 pb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
         <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
         </p>
@@ -210,23 +213,41 @@ export default function LoginPage() {
 
           {/* 폼 */}
           <form onSubmit={handleEmailSubmit} className="space-y-3" noValidate>
-            <label htmlFor="login-email" className="sr-only">이메일 주소</label>
-            <input id="login-email" type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
-            <label htmlFor="login-password" className="sr-only">비밀번호</label>
-            <input id="login-password" type="password" placeholder="비밀번호 (6자 이상)" value={password} onChange={e => setPassword(e.target.value)}
-              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
+            <FormField label="이메일 주소" htmlFor="login-email" labelClassName="sr-only">
+              <Input
+                id="login-email"
+                type="email"
+                placeholder="이메일"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="text-base"
+              />
+            </FormField>
+            <FormField label="비밀번호" htmlFor="login-password" labelClassName="sr-only">
+              <Input
+                id="login-password"
+                type="password"
+                placeholder="비밀번호 (6자 이상)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="text-base"
+              />
+            </FormField>
             {mode === 'register' && (
-              <>
-                <label htmlFor="login-nickname" className="sr-only">닉네임</label>
-                <input id="login-nickname" type="text" placeholder="닉네임" value={nickname} onChange={e => setNickname(e.target.value)}
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors" />
-              </>
+              <FormField label="닉네임" htmlFor="login-nickname" labelClassName="sr-only">
+                <Input
+                  id="login-nickname"
+                  type="text"
+                  placeholder="닉네임"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  className="text-base"
+                />
+              </FormField>
             )}
-            <button type="submit" disabled={isLoading} data-testid="auth-submit"
-              className="w-full rounded-xl bg-blue-500 py-3 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] disabled:opacity-50 transition-[background-color,color,transform]">
+            <Button type="submit" disabled={isLoading} data-testid="auth-submit" size="lg" fullWidth>
               {isLoading ? (mode === 'login' ? '로그인 중...' : '가입 중...') : mode === 'login' ? '로그인' : '가입하기'}
-            </button>
+            </Button>
           </form>
 
           {/* 소셜 로그인 */}
@@ -252,13 +273,19 @@ export default function LoginPage() {
       {process.env.NODE_ENV !== 'production' && <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6" data-testid="dev-login-panel">
         <p className="text-center text-xs text-gray-400 mb-3">개발 모드</p>
         <div className="flex gap-2 max-w-sm mx-auto">
-          <input type="text" placeholder="닉네임" aria-label="테스트 닉네임" data-testid="dev-login-input" value={devNickname} onChange={e => setDevNickname(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleDevLogin()}
-            className="flex-1 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none" />
-          <button onClick={() => handleDevLogin()} disabled={isLoading} data-testid="dev-login-submit"
-            className="rounded-xl bg-gray-900 dark:bg-white px-5 py-2.5 text-sm font-bold text-white dark:text-gray-900 disabled:opacity-50 transition-colors">
+          <Input
+            type="text"
+            placeholder="닉네임"
+            aria-label="테스트 닉네임"
+            data-testid="dev-login-input"
+            value={devNickname}
+            onChange={(e) => setDevNickname(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleDevLogin()}
+            className="flex-1 bg-white dark:bg-gray-900"
+          />
+          <Button onClick={() => handleDevLogin()} disabled={isLoading} data-testid="dev-login-submit" variant="secondary">
             입장
-          </button>
+          </Button>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
           {['축구왕민수', '농구러버지영', '하키마스터준호'].map(name => (

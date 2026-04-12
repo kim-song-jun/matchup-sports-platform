@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
 import { useMyMatches, useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
@@ -78,35 +79,65 @@ export default function ProfilePage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
-      </header>
+      <MobileGlassHeader
+        title={t('title')}
+        subtitle="기록, 일정, 알림을 한 곳에서 정리하세요."
+        actions={(
+          <Link
+            href="/settings"
+            aria-label={tc('settings')}
+            className="flex min-h-[44px] min-w-11 items-center justify-center rounded-xl border border-gray-200/80 bg-white/78 text-gray-700 shadow-sm transition-colors hover:bg-white dark:border-white/10 dark:bg-gray-800/82 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            <Settings size={16} />
+          </Link>
+        )}
+      />
+
+      <div className="mb-6 hidden items-start justify-between gap-4 @3xl:flex">
+        <div className="min-w-0">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">
+            내 계정
+          </div>
+          <h1 className="text-2xl font-bold tracking-[-0.03em] text-gray-900 dark:text-white">
+            {t('title')}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            기록, 일정, 알림을 한 곳에서 정리하세요.
+          </p>
+        </div>
+        <Link href="/settings" className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+          <Settings size={15} />
+          {tc('settings')}
+        </Link>
+      </div>
 
       <div className={`px-5 @3xl:px-0 ${mounted && isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
         <div>
         {mounted && isAuthenticated && user ? (
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-[56px] items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-xl font-bold text-gray-500 dark:text-gray-500">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-bold text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
                   {user.nickname?.charAt(0)}
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
-                  {user.bio && <p className="text-sm text-gray-500 mt-0.5">{user.bio}</p>}
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-500">
-                      <Star size={12} fill="currentColor" />
-                      <span className="font-semibold">{user.mannerScore?.toFixed(1)}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
+                    {user.bio && <p className="mt-0.5 text-sm text-gray-500">{user.bio}</p>}
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400">
+                        <Star size={12} fill="currentColor" />
+                        <span className="font-semibold">{user.mannerScore?.toFixed(1)}</span>
+                      </div>
+                      <span className="text-gray-200">|</span>
+                      <span className="text-sm text-gray-500">{t('matchCount', { count: user.totalMatches })}</span>
                     </div>
-                    <span className="text-gray-200">|</span>
-                    <span className="text-sm text-gray-500">{t('matchCount', { count: user.totalMatches })}</span>
                   </div>
+                  <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="flex min-h-[40px] min-w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition-[colors,transform] hover:bg-gray-100 active:scale-[0.98] dark:bg-gray-700 dark:hover:bg-gray-600">
+                    <Pencil size={16} />
+                  </button>
                 </div>
               </div>
-              <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-                <Pencil size={16} />
-              </button>
             </div>
 
             {user.sportProfiles && user.sportProfiles.length > 0 && (
@@ -114,36 +145,42 @@ export default function ProfilePage() {
                 {user.sportProfiles.map((sp: SportProfile) => {
                   const SportIcon = SportIconMap[sp.sportType];
                   return (
-                    <div key={sp.id} className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        {SportIcon && <SportIcon size={16} className="text-gray-500" />}
-                        <span className="text-base font-medium text-gray-800 dark:text-gray-200">{sportLabel[sp.sportType]}</span>
-                        <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          {levelLabel[sp.level]}
+                    <div key={sp.id} className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-700/60">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          {SportIcon && <SportIcon size={15} className="shrink-0 text-gray-500" />}
+                          <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{sportLabel[sp.sportType]}</span>
+                          <span className="rounded-md bg-white px-1.5 py-0.5 text-2xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                            {levelLabel[sp.level]}
+                          </span>
+                        </div>
+                        <span className="shrink-0 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          ELO {sp.eloRating}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {t('matchRecord', { matchCount: sp.matchCount, winCount: sp.winCount })} · {t('elo')} <span className="animate-scale-in inline-block font-semibold text-gray-900 dark:text-white">{sp.eloRating}</span>
-                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {t('matchRecord', { matchCount: sp.matchCount, winCount: sp.winCount })}
+                      </p>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* 활동 통계 */}
-            <div className="mt-4 flex items-center divide-x divide-gray-100 dark:divide-gray-700">
-              <div className="flex-1 text-center py-2">
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">{t('totalMatches')}</p>
-              </div>
-              <div className="flex-1 text-center py-2">
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                <p className="text-xs text-gray-500 mt-1">{t('mannerScore')}</p>
-              </div>
-              <div className="flex-1 text-center py-2">
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{t('badgeCount', { count: user.sportProfiles?.length || 0 })}</p>
-                <p className="text-xs text-gray-500 mt-1">{t('badges')}</p>
+            <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/40">
+              <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-700">
+                <div className="px-3 py-3 text-center">
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
+                  <p className="mt-1 text-xs text-gray-500">{t('totalMatches')}</p>
+                </div>
+                <div className="px-3 py-3 text-center">
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
+                  <p className="mt-1 text-xs text-gray-500">{t('mannerScore')}</p>
+                </div>
+                <div className="px-3 py-3 text-center">
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
+                  <p className="mt-1 text-xs text-gray-500">종목</p>
+                </div>
               </div>
             </div>
           </div>
@@ -165,80 +202,60 @@ export default function ProfilePage() {
       {/* 소통 바로가기 */}
       {mounted && isAuthenticated && (
         <div className="px-5 @3xl:px-0 pt-4 pb-2">
-          <div className="grid grid-cols-2 gap-3">
-            <Link href="/chat">
-              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.98] transition-colors min-h-[44px]">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
-                  <MessageCircle size={20} className="text-blue-500" />
-                </div>
-                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">{t('chatLabel')}</span>
-                {chatUnread > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-                    {chatUnread > 99 ? '99+' : chatUnread}
-                  </span>
-                )}
-              </div>
-            </Link>
-            <Link href="/notifications">
-              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-[0.98] transition-colors min-h-[44px]">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
-                  <Bell size={20} className="text-blue-500" />
-                </div>
-                <span className="text-base font-medium text-gray-800 dark:text-gray-200 flex-1">{t('notificationsLabel')}</span>
-                {notifUnread > 0 && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-                    {notifUnread > 99 ? '99+' : notifUnread}
-                  </span>
-                )}
-              </div>
-            </Link>
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700">
+              <QuickAccessLink href="/chat" icon={MessageCircle} label={t('chatLabel')} count={chatUnread} />
+              <QuickAccessLink href="/notifications" icon={Bell} label={t('notificationsLabel')} count={notifUnread} />
+            </div>
           </div>
         </div>
       )}
 
       <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
         {menuGroups.map((group, gIdx) => (
-          <div key={group.label} className={gIdx === 0 ? '' : 'mt-5'}>
-            <p className="px-2 py-1.5 text-2xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div key={group.label} className={gIdx === 0 ? '' : 'mt-4'}>
+            <p className="px-1 py-1.5 text-2xs font-semibold uppercase tracking-[0.12em] text-gray-400">
               {group.label}
             </p>
-            {group.items.map((item, idx) => {
-              const isLast = idx === group.items.length - 1;
-              return (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between rounded-lg -mx-2 px-2 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform]"
-                >
-                  <Link
-                    href={mounted && isAuthenticated ? item.href : '/login'}
-                    className={`flex flex-1 items-center gap-3 py-3.5 min-h-[44px] ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}`}
+            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
+              {group.items.map((item, idx) => {
+                const isLast = idx === group.items.length - 1;
+                return (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between px-3.5 transition-[colors,transform] hover:bg-gray-50 dark:hover:bg-gray-700/70 active:scale-[0.98]"
                   >
-                    <item.icon size={20} className="text-gray-500" />
-                    <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
-                  </Link>
-                  <div className={`flex items-center gap-1 pl-2 py-3.5 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-800'}`}>
-                    {item.quickAction && mounted && isAuthenticated && (
-                      <Link
-                        href={item.quickAction.href}
-                        aria-label={`${item.label} ${item.quickAction.label}`}
-                        className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors min-h-[44px]"
-                      >
-                        <Plus size={12} />
-                        {item.quickAction.label}
-                      </Link>
-                    )}
                     <Link
                       href={mounted && isAuthenticated ? item.href : '/login'}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      className="flex items-center min-w-11 min-h-[44px] justify-end"
+                      className={`flex min-h-[44px] flex-1 items-center gap-3 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}
                     >
-                      <ChevronRight size={18} className="text-gray-300" />
+                      <item.icon size={18} className="text-gray-500" />
+                      <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
                     </Link>
+                    <div className={`flex items-center gap-2 pl-2 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}>
+                      {item.quickAction && mounted && isAuthenticated && (
+                        <Link
+                          href={item.quickAction.href}
+                          aria-label={`${item.label} ${item.quickAction.label}`}
+                          className="flex min-h-[36px] items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-500 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
+                        >
+                          <Plus size={12} />
+                          {item.quickAction.label}
+                        </Link>
+                      )}
+                      <Link
+                        href={mounted && isAuthenticated ? item.href : '/login'}
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        className="flex min-h-[44px] min-w-10 items-center justify-end"
+                      >
+                        <ChevronRight size={18} className="text-gray-300" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>
@@ -246,12 +263,8 @@ export default function ProfilePage() {
       <div className="h-2 bg-gray-50 dark:bg-gray-800 @3xl:hidden" />
 
       <div className="px-5 @3xl:px-0 py-2">
-        <Link href="/settings" className="flex items-center justify-between min-h-[44px] py-3">
-          <div className="flex items-center gap-3"><Settings size={20} className="text-gray-500" /><span className="text-md font-medium text-gray-800 dark:text-gray-200">{tc('settings')}</span></div>
-          <ChevronRight size={18} className="text-gray-300" aria-hidden="true" />
-        </Link>
         {mounted && isAuthenticated && (
-          <button onClick={() => { logout(); router.push('/login'); }} className="flex items-center gap-3 min-h-[44px] py-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 rounded-xl transition-colors">
+          <button onClick={() => { logout(); router.push('/login'); }} className="flex min-h-[44px] w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
             <LogOut size={20} className="text-gray-500" />
             <span className="text-md font-medium text-gray-500">{tc('logout')}</span>
           </button>
@@ -264,10 +277,35 @@ export default function ProfilePage() {
   );
 }
 
+function QuickAccessLink({
+  href,
+  icon: Icon,
+  label,
+  count,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  count: number;
+}) {
+  return (
+    <Link href={href} className="flex min-h-[44px] items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/60">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/30">
+        <Icon size={18} className="text-blue-500" />
+      </div>
+      <span className="min-w-0 flex-1 text-sm font-semibold text-gray-800 dark:text-gray-200">{label}</span>
+      {count > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function UpcomingSchedule() {
   const t = useTranslations('profile');
   const te = useTranslations('empty');
-  const tc = useTranslations('common');
   const { data } = useMyMatches({ limit: '20' });
   const [view, setView] = useState<'list' | 'calendar'>('list');
 
@@ -284,67 +322,75 @@ function UpcomingSchedule() {
   }));
 
   return (
-    <div className="mt-4 @3xl:mt-0 px-5 @3xl:px-0">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
-        <div className="flex items-center gap-1" role="tablist">
-          <button
-            role="tab"
-            aria-selected={view === 'list'}
-            onClick={() => setView('list')}
-            className={`p-1.5 rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            aria-label={t('listView')}
-          >
-            <List size={16} />
-          </button>
-          <button
-            role="tab"
-            aria-selected={view === 'calendar'}
-            onClick={() => setView('calendar')}
-            className={`p-1.5 rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            aria-label={t('calendarView')}
-          >
-            <CalendarDays size={16} />
-          </button>
-          <Link href="/matches" className="text-sm text-blue-500 font-medium ml-2">매칭 찾기</Link>
+    <div className="mt-4 @3xl:mt-0">
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">다가오는 매치와 일정을 빠르게 확인하세요.</p>
+          </div>
+          <div className="flex items-center gap-1" role="tablist">
+            <button
+              role="tab"
+              aria-selected={view === 'list'}
+              onClick={() => setView('list')}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              aria-label={t('listView')}
+            >
+              <List size={16} />
+            </button>
+            <button
+              role="tab"
+              aria-selected={view === 'calendar'}
+              onClick={() => setView('calendar')}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              aria-label={t('calendarView')}
+            >
+              <CalendarDays size={16} />
+            </button>
+            <Link href="/matches" className="ml-2 text-sm font-semibold text-blue-500">매칭 찾기</Link>
+          </div>
         </div>
-      </div>
 
-      {view === 'calendar' ? (
-        <MiniCalendar matches={calendarMatches} />
-      ) : listMatches.length === 0 ? (
-        <EmptyState
-          icon={Calendar}
-          title={te('noSchedule')}
-          description={te('noScheduleDesc')}
-          size="sm"
-          action={{ label: t('findMatch'), href: '/matches' }}
-        />
-      ) : (
-        <div className="space-y-2">
-          {listMatches.map((m: Match) => {
-            const d = new Date(m.matchDate);
-            const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-            return (
-              <Link key={m.id} href={`/matches/${m.id}`}>
-                <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform]">
-                  <div className="flex flex-col items-center justify-center h-12 w-12 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                    <span className="text-xs font-semibold">{d.getMonth() + 1}월</span>
-                    <span className="text-lg font-black leading-none">{d.getDate()}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-medium text-gray-900 dark:text-white truncate">{m.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                      <span className="flex items-center gap-0.5"><Clock size={12} /> {m.startTime}</span>
-                      <span>({weekdays[d.getDay()]})</span>
+        {view === 'calendar' ? (
+          <MiniCalendar matches={calendarMatches} />
+        ) : listMatches.length === 0 ? (
+          <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-6 text-center dark:border-gray-700 dark:bg-gray-900/40">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300">
+              <Calendar size={20} />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{te('noSchedule')}</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{te('noScheduleDesc')}</p>
+            <Link href="/matches" className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:bg-gray-800 dark:hover:bg-gray-700">
+              {t('findMatch')}
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {listMatches.map((m: Match) => {
+              const d = new Date(m.matchDate);
+              const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+              return (
+                <Link key={m.id} href={`/matches/${m.id}`}>
+                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-3 transition-[colors,transform] hover:bg-gray-50 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-900/30 dark:hover:bg-gray-700/60">
+                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-white text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                      <span className="text-xs font-semibold">{d.getMonth() + 1}월</span>
+                      <span className="text-base font-black leading-none">{d.getDate()}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{m.title}</p>
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                        <span className="flex items-center gap-0.5"><Clock size={12} /> {m.startTime}</span>
+                        <span>({weekdays[d.getDay()]})</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,37 +3,61 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Users, MapPin, MessageCircle, Share2, Globe, Video, Star, Instagram, Youtube, UserPlus, Trophy } from 'lucide-react';
+import { ArrowLeft, ChevronRight, MessageCircle, Share2, Trophy, Users } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { Button, buttonStyles } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SportIconMap } from '@/components/icons/sport-icons';
-import { BadgeDisplay } from '@/components/ui/badge-display';
+import dynamic from 'next/dynamic';
 import { SafeImage } from '@/components/ui/safe-image';
-import { MediaLightbox } from '@/components/ui/media-lightbox';
-import { useTeam, useTeamBadges, useMyTeams } from '@/hooks/use-api';
+
+const MediaLightbox = dynamic(
+  () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
+  { ssr: false, loading: () => null }
+);
+import { useLeaveTeam, useMyTeams, useTeam, useTeamHub } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
-import { getGradeInfo } from '@/lib/skill-grades';
 import { api } from '@/lib/api';
-import { sportLabel, levelLabel } from '@/lib/constants';
-import { getTeamImage, getTeamImageSet, getTeamLogo } from '@/lib/sport-image';
+import { sportLabel } from '@/lib/constants';
+import { getTeamImage, getTeamImageSet, getTeamLogo, getListingImage, getSportImage } from '@/lib/sport-image';
+import type { Lesson, MarketplaceListing, Tournament } from '@/types/api';
+
+type HubSection = 'overview' | 'goods' | 'passes' | 'events';
+
+function ticketSummary(lesson: Lesson): string {
+  if (!lesson.ticketPlans || lesson.ticketPlans.length === 0) {
+    return lesson.fee > 0 ? `${lesson.fee.toLocaleString('ko-KR')}원` : '무료';
+  }
+  const activePlans = lesson.ticketPlans.filter((plan) => plan.isActive);
+  if (activePlans.length === 0) return '수강권 준비중';
+  const minPrice = Math.min(...activePlans.map((plan) => plan.price));
+  return `수강권 ${activePlans.length}종 · ${minPrice.toLocaleString('ko-KR')}원부터`;
+}
 
 export default function TeamDetailPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = params.id as string;
-
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
   const { data: team, isLoading } = useTeam(teamId);
-  const { data: apiBadges } = useTeamBadges(teamId);
+  const { data: hubData } = useTeamHub(teamId);
   const { data: myTeams, isLoading: isMyTeamsLoading } = useMyTeams();
+  const leaveTeamMutation = useLeaveTeam();
+
+  const [activeSection, setActiveSection] = useState<HubSection>('overview');
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
-  // Determine membership role from flattened useMyTeams() response
-  const myMembership = myTeams?.find((t) => t.id === teamId);
+  const myMembership = myTeams?.find((myTeam) => myTeam.id === teamId);
   const isMyTeam = !!myMembership;
-  const myRole = myMembership?.role;
+  const canManageTeam = myMembership?.role === 'owner' || myMembership?.role === 'manager';
+  const canEditProfile = hubData?.capabilities?.canEditProfile ?? canManageTeam;
+  const canManageCatalog = canManageTeam
+    || hubData?.capabilities?.canManageGoods
+    || hubData?.capabilities?.canManagePasses
+    || hubData?.capabilities?.canManageEvents;
 
   if (isLoading) {
     return (
@@ -59,32 +83,31 @@ export default function TeamDetailPage() {
       </div>
     );
   }
+  const currentTeam = team;
 
-  const SportIcon = SportIconMap[team.sportType];
-  const hasSns = team.instagramUrl || team.youtubeUrl || team.kakaoOpenChat || team.websiteUrl;
-  const coverImage = getTeamImage(team.sportType, team.coverImageUrl, team.id);
-  const teamGallery = getTeamImageSet(team.sportType, team.photos, team.id, 3);
-  const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
-  const fallbackCoverImage = getTeamImage(team.sportType, undefined, team.id);
-  const fallbackTeamGallery = getTeamImageSet(team.sportType, undefined, team.id, 3);
-  const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
-  const mediaImages = [coverImage, ...teamGallery]
+  const hubGoods = hubData?.goods ?? [];
+  const hubPasses = hubData?.passes ?? [];
+  const hubEvents = hubData?.events ?? [];
+
+  const coverImage = getTeamImage(currentTeam.sportType, currentTeam.coverImageUrl, currentTeam.id);
+  const gallery = getTeamImageSet(currentTeam.sportType, currentTeam.photos, currentTeam.id, 4);
+  const logo = getTeamLogo(currentTeam.name, currentTeam.sportType, currentTeam.logoUrl, currentTeam.id);
+  const fallbackCover = getTeamImage(currentTeam.sportType, undefined, currentTeam.id);
+  const fallbackGallery = getTeamImageSet(currentTeam.sportType, undefined, currentTeam.id, 4);
+  const fallbackLogo = getTeamLogo(currentTeam.name, currentTeam.sportType, undefined, currentTeam.id);
+  const mediaImages = [coverImage, ...gallery]
     .filter((image): image is string => Boolean(image))
     .map((image, index) => ({
       src: image,
-      alt: `${team.name} 사진 ${index + 1}`,
-      fallbackSrc: index === 0 ? fallbackCoverImage : (fallbackTeamGallery[index - 1] ?? fallbackCoverImage),
+      alt: `${currentTeam.name} 이미지 ${index + 1}`,
+      fallbackSrc: index === 0 ? fallbackCover : (fallbackGallery[index - 1] ?? fallbackCover),
     }));
 
-  function openMediaAt(index: number) {
-    if (index < 0 || index >= mediaImages.length) return;
+  function openMedia(src: string) {
+    const index = mediaImages.findIndex((image) => image.src === src);
+    if (index < 0) return;
     setMediaIndex(index);
     setShowMediaLightbox(true);
-  }
-
-  function openMediaBySource(src: string) {
-    const index = mediaImages.findIndex((image) => image.src === src);
-    openMediaAt(index);
   }
 
   function handleContact() {
@@ -92,392 +115,322 @@ export default function TeamDetailPage() {
       router.push(`/login?redirect=/teams/${teamId}`);
       return;
     }
-    const contactInfo = team!.contactInfo;
-    if (contactInfo) {
-      // contactInfo may be tel: or plain text — open if URI, otherwise toast
-      if (contactInfo.startsWith('http') || contactInfo.startsWith('tel:') || contactInfo.startsWith('mailto:')) {
-        window.open(contactInfo, '_blank', 'noopener,noreferrer');
-      } else {
-        toast('info', `연락처: ${contactInfo}`);
-      }
-    } else {
-      toast('info', '연락처가 등록되어 있지 않아요');
+    if (!currentTeam.contactInfo) {
+      toast('info', '연락처가 등록되어 있지 않아요.');
+      return;
     }
+    if (currentTeam.contactInfo.startsWith('http') || currentTeam.contactInfo.startsWith('tel:') || currentTeam.contactInfo.startsWith('mailto:')) {
+      window.open(currentTeam.contactInfo, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    toast('info', `연락처: ${currentTeam.contactInfo}`);
   }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-700">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1 ml-3">{team.name}</h1>
+      <MobileGlassHeader className="justify-between">
+        <button
+          onClick={() => router.back()}
+          aria-label="뒤로 가기"
+          className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"
+        >
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1 ml-3">{currentTeam.name}</h1>
         <button
           onClick={async () => {
             try {
               if (navigator.share) {
-                await navigator.share({ title: team.name, url: window.location.href });
+                await navigator.share({ title: currentTeam.name, url: window.location.href });
               } else {
                 await navigator.clipboard.writeText(window.location.href);
-                toast('success', '링크가 복사되었어요');
+                toast('success', '링크를 복사했어요.');
               }
-            } catch { /* user cancelled share */ }
+            } catch {
+              // user cancelled share
+            }
           }}
           aria-label="공유하기"
-          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
+          className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"
         >
           <Share2 size={18} className="text-gray-500" />
         </button>
-      </header>
+      </MobileGlassHeader>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/teams" className="hover:text-gray-600">팀&middot;클럽</Link>
+        <Link href="/teams" className="hover:text-gray-600">팀/클럽</Link>
         <ChevronRight size={14} />
-        <span className="text-gray-700">{team.name}</span>
+        <span className="text-gray-700">{currentTeam.name}</span>
       </div>
 
-      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
-        {/* Left */}
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_360px] @3xl:gap-8">
         <div className="px-5 @3xl:px-0">
-          {/* Cover + Team header */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <Card padding="none" className="overflow-hidden">
             <button
               type="button"
-              onClick={() => openMediaBySource(coverImage)}
-              aria-label={`${team.name} 커버 이미지 보기`}
-              className="h-32 @3xl:h-44 w-full bg-gray-800 flex items-center justify-center relative"
+              onClick={() => openMedia(coverImage)}
+              aria-label={`${currentTeam.name} 커버 이미지 보기`}
+              className="relative h-36 @3xl:h-48 w-full bg-gray-800"
             >
-              <SafeImage
-                src={coverImage}
-                fallbackSrc={fallbackCoverImage}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 60vw"
-                priority
-              />
+              <SafeImage src={coverImage} fallbackSrc={fallbackCover} alt="" fill className="object-cover" sizes="(max-width: 768px) 100vw, 60vw" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               <div className="absolute -bottom-6 left-5">
-                <div className="rounded-[22px] bg-white/94 p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.24)] backdrop-blur-sm">
+                <div className="rounded-[20px] bg-white/95 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.2)]">
                   <div className="relative h-14 w-14">
-                    <SafeImage
-                      src={teamLogo}
-                      fallbackSrc={fallbackTeamLogo}
-                      alt={`${team.name} logo`}
-                      fill
-                      className="rounded-[18px] object-cover"
-                      sizes="56px"
-                    />
+                    <SafeImage src={logo} fallbackSrc={fallbackLogo} alt={`${currentTeam.name} logo`} fill className="rounded-[15px] object-cover" sizes="56px" />
                   </div>
                 </div>
               </div>
             </button>
-
             <div className="pt-8 px-5 pb-5">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{team.name}</h2>
-                {team.isRecruiting && (
-                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>
-                )}
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{currentTeam.name}</h2>
+                {currentTeam.isRecruiting && <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-300">모집중</span>}
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500 flex-wrap">
-                {SportIcon && <SportIcon size={14} />}
-                <span>{sportLabel[team.sportType]}</span>
-                <span className="text-gray-200">|</span>
-                {team.skillGrade ? (() => {
-                  const grade = getGradeInfo(team.skillGrade);
-                  return (
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal ${grade.color}`}>
-                      {grade.label}등급
-                    </span>
-                  );
-                })() : (
-                  <span>{levelLabel[team.level]}</span>
-                )}
-                <span className="text-gray-200">|</span>
-                <span>{team.memberCount}명</span>
-                {team.proPlayerCount != null && team.proPlayerCount > 0 && (
-                  <>
-                    <span className="text-gray-200">|</span>
-                    <span>선출 {team.proPlayerCount}명</span>
-                  </>
-                )}
-              </div>
-              {team.uniformColor && (
-                <p className="text-xs text-gray-500 mt-1">유니폼: {team.uniformColor}</p>
-              )}
+              <p className="text-sm text-gray-500">
+                {sportLabel[currentTeam.sportType] || currentTeam.sportType} · {currentTeam.memberCount}명
+                {(currentTeam.city || currentTeam.district) ? ` · ${[currentTeam.city, currentTeam.district].filter(Boolean).join(' ')}` : ''}
+              </p>
+              {currentTeam.description && <p className="mt-3 text-base text-gray-600 whitespace-pre-line">{currentTeam.description}</p>}
+            </div>
+          </Card>
 
-              {/* Badge display — API data only, no mock fallback */}
-              {apiBadges && apiBadges.length > 0 && (
-                <div className="mt-3">
-                  <BadgeDisplay badges={apiBadges} size="md" />
+          <div className="mt-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            <HubSectionTab label="소개" active={activeSection === 'overview'} onClick={() => setActiveSection('overview')} />
+            <HubSectionTab label={`굿즈 ${hubData?.sections.goodsCount ?? hubGoods.length}`} active={activeSection === 'goods'} onClick={() => setActiveSection('goods')} />
+            <HubSectionTab label={`수강권 ${hubData?.sections.passesCount ?? hubPasses.length}`} active={activeSection === 'passes'} onClick={() => setActiveSection('passes')} />
+            <HubSectionTab label={`대회 ${hubData?.sections.eventsCount ?? hubEvents.length}`} active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
+          </div>
+
+          {activeSection === 'overview' && (
+            <div className="space-y-4 mt-4">
+              <Card>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 여정</h3>
+                <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-2">
+                  <Link href={`/teams/${teamId}/matches`} className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-3 text-sm font-medium text-gray-700 dark:text-gray-200">경기 기록</Link>
+                  <Link href={`/teams/${teamId}/mercenary`} className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-3 text-sm font-medium text-gray-700 dark:text-gray-200">용병 모집</Link>
+                  <Link href={`/teams/${teamId}/members`} className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-3 text-sm font-medium text-gray-700 dark:text-gray-200">멤버</Link>
                 </div>
-              )}
-
-              {team.description && (
-                <p className="mt-4 text-base text-gray-600 leading-relaxed whitespace-pre-line">{team.description}</p>
-              )}
-            </div>
-          </div>
-
-          {/* 최근 경기 결과 — API only */}
-          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">최근 경기</h3>
-              <Link href={`/teams/${teamId}/matches`} className="text-sm text-blue-500 font-medium">전체보기</Link>
-            </div>
-            <EmptyState
-              icon={Trophy}
-              title="경기 기록이 없어요"
-              description="팀 매칭에 참여하면 기록이 쌓여요"
-              size="sm"
-            />
-          </div>
-
-          {/* 활동 정보 */}
-          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">활동 정보</h3>
-            <div className="grid grid-cols-2 gap-3 @3xl:gap-5">
-              <InfoItem icon={<MapPin size={16} />} label="활동 지역" value={`${team.city || ''} ${team.district || ''}`.trim() || '미등록'} />
-              <InfoItem icon={<Users size={16} />} label="팀 규모" value={`${team.memberCount}명`} />
-            </div>
-          </div>
-
-          {/* SNS & 링크 */}
-          {hasSns && (
-            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">SNS & 링크</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {team.instagramUrl && (
-                  <SnsButton href={team.instagramUrl} icon={<Instagram size={16} />} label="Instagram" color="bg-gray-800 text-white" />
-                )}
-                {team.youtubeUrl && (
-                  <SnsButton href={team.youtubeUrl} icon={<Youtube size={16} />} label="YouTube" color="bg-gray-800 text-white" />
-                )}
-                {team.kakaoOpenChat && (
-                  <SnsButton href={team.kakaoOpenChat} icon={<MessageCircle size={16} />} label="오픈채팅" color="bg-gray-700 text-white" />
-                )}
-                {team.websiteUrl && (
-                  <SnsButton href={team.websiteUrl} icon={<Globe size={16} />} label="웹사이트" color="bg-gray-700 text-white" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 홍보 영상 */}
-          {team.shortsUrl && (
-            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">홍보 영상</h3>
-              <a href={team.shortsUrl} target="_blank" rel="noopener noreferrer"
-                className="block rounded-xl bg-gray-900 h-48 @3xl:h-64 flex items-center justify-center text-white/60 hover:text-white/80 transition-colors relative overflow-hidden">
-                <div className="text-center z-10">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm mx-auto mb-2">
-                    <Video size={24} />
+              </Card>
+              {gallery.length > 0 && (
+                <Card>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">갤러리</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {gallery.map((photo, index) => (
+                      <button key={`${photo}-${index}`} type="button" onClick={() => openMedia(photo)} className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700">
+                        <SafeImage src={photo} fallbackSrc={fallbackGallery[index] ?? fallbackCover} alt={`${team.name} 사진 ${index + 1}`} fill className="object-cover" sizes="(max-width: 768px) 33vw, 20vw" />
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-sm font-medium">영상 보기</p>
-                </div>
-              </a>
+                </Card>
+              )}
             </div>
           )}
 
-          {/* 갤러리 — 실제 사진이 있을 때만 표시 */}
-          {teamGallery.length > 0 && (
-            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">갤러리</h3>
-              <div className="grid grid-cols-3 gap-2">
-                {teamGallery.map((photo: string, i: number) => (
-                  <button
-                    key={`${photo}-${i}`}
-                    type="button"
-                    onClick={() => openMediaBySource(photo)}
-                    aria-label={`${team.name} 갤러리 이미지 ${i + 1} 보기`}
-                    className="relative aspect-square rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden"
-                  >
-                    <SafeImage
-                      src={photo}
-                      fallbackSrc={fallbackTeamGallery[i] ?? fallbackCoverImage}
-                      alt={`팀 사진 ${i + 1}`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 33vw, 20vw"
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
+          {activeSection === 'goods' && (
+            <HubGoodsSection items={hubGoods} />
+          )}
+
+          {activeSection === 'passes' && (
+            <HubPassesSection items={hubPasses} />
+          )}
+
+          {activeSection === 'events' && (
+            <HubEventsSection items={hubEvents} />
           )}
         </div>
 
-        {/* Right sidebar */}
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
-
-          {/* 내 팀: 역할별 관리 버튼 */}
-          {isMyTeam && (
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
-              {(myRole === 'owner' || myRole === 'manager') && (
-                <Link
-                  href={`/teams/${teamId}/edit`}
-                  className="block w-full text-center rounded-xl bg-gray-900 dark:bg-white py-3.5 text-base font-bold text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors"
-                >
-                  팀 정보 수정
+            {canEditProfile && (
+              <Card padding="sm">
+                <Link href={`/teams/${teamId}/edit`} className={buttonStyles({ fullWidth: true })}>
+                  팀 페이지 수정
                 </Link>
-              )}
-              <Link
-                href={`/teams/${teamId}/members`}
-                className="block w-full text-center rounded-xl bg-gray-50 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-              >
-                멤버 관리
-              </Link>
-              {myRole === 'member' && (
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.post(`/teams/${teamId}/leave`);
-                      toast('success', '팀에서 나갔어요');
-                    } catch {
-                      toast('error', '팀 나가기에 실패했어요');
-                    }
-                  }}
-                  className="w-full rounded-xl bg-red-50 dark:bg-red-950/30 py-3 text-base font-semibold text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
-                >
-                  팀 나가기
-                </button>
-              )}
-            </div>
-          )}
+              </Card>
+            )}
 
-          {/* 비멤버: 가입 신청 + 연락하기 (myTeams 로딩 완료 후에만 렌더) */}
-          {!isMyTeamsLoading && !isMyTeam && (
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 space-y-2">
-              {!team.isRecruiting ? (
-                <button
-                  disabled
-                  aria-disabled="true"
-                  className="w-full rounded-xl bg-gray-200 dark:bg-gray-700 py-3.5 text-base font-bold text-gray-500 dark:text-gray-400 opacity-50 cursor-not-allowed"
+            {canManageCatalog && (
+              <Card padding="sm">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 등록</h3>
+                <div className="space-y-1.5 text-sm">
+                  <Link href={`/marketplace/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
+                    굿즈 등록
+                  </Link>
+                  <Link href={`/lessons/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
+                    수강권 등록
+                  </Link>
+                  <Link href={`/tournaments/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
+                    대회 등록
+                  </Link>
+                </div>
+              </Card>
+            )}
+
+            {isMyTeam && myMembership?.role === 'member' && (
+              <Card padding="sm">
+                <Button
+                  onClick={() => {
+                    leaveTeamMutation.mutate(teamId, {
+                      onSuccess: () => {
+                        toast('success', '팀에서 나갔어요.');
+                        router.push('/my/teams');
+                      },
+                      onError: () => toast('error', '팀 나가기에 실패했어요.'),
+                    });
+                  }}
+                  disabled={leaveTeamMutation.isPending}
+                  variant="dangerSoft"
+                  fullWidth
                 >
-                  모집 마감
-                </button>
-              ) : isAuthenticated ? (
-                <button
-                  onClick={async () => {
-                    try {
-                      await api.post(`/teams/${teamId}/apply`);
-                      toast('success', '팀 가입 신청이 완료되었어요');
-                    } catch (err: unknown) {
-                      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
-                      if (code === 'TEAM_NOT_RECRUITING') {
-                        toast('error', '현재 모집 중인 팀이 아닙니다.');
-                      } else if (code === 'TEAM_ALREADY_MEMBER') {
-                        toast('error', '이미 소속된 팀입니다.');
-                      } else if (code === 'TEAM_APPLY_PENDING_EXISTS') {
-                        toast('error', '이미 신청이 접수되어 있습니다.');
-                      } else {
-                        toast('error', '팀 가입 신청에 실패했습니다.');
+                  {leaveTeamMutation.isPending ? '처리 중...' : '팀 나가기'}
+                </Button>
+              </Card>
+            )}
+
+            {!isMyTeamsLoading && !isMyTeam && (
+              <Card padding="sm" className="space-y-2">
+                {!currentTeam.isRecruiting ? (
+                  <Button disabled variant="subtle" fullWidth>모집 마감</Button>
+                ) : isAuthenticated ? (
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await api.post(`/teams/${teamId}/apply`);
+                        toast('success', '팀 가입 신청이 접수되었어요.');
+                      } catch {
+                        toast('error', '팀 가입 신청에 실패했어요.');
                       }
-                    }
-                  }}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 transition-colors"
-                >
-                  팀 가입 신청
-                </button>
-              ) : (
-                <Link
-                  href={`/login?redirect=/teams/${teamId}`}
-                  className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
-                >
-                  로그인 후 가입 신청
-                </Link>
-              )}
-
-              {/* 연락하기 — 비로그인/contactInfo 있음: 활성(→ 로그인 redirect 또는 연락처 표시), 로그인+contactInfo 없음: disabled */}
-              {isAuthenticated && !team.contactInfo ? (
-                <button
-                  disabled
-                  aria-label="연락처 미등록"
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-700 py-3 text-base font-semibold text-gray-400 dark:text-gray-500 cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <MessageCircle size={18} />
-                  연락처 미등록
-                </button>
-              ) : (
-                <button
-                  onClick={handleContact}
-                  className="w-full rounded-xl bg-gray-50 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <MessageCircle size={18} />
-                  연락하기
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* 용병 모집 — 전체보기 링크 */}
-          <Link href={`/teams/${teamId}/mercenary`} className="block">
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700">
-                  <UserPlus size={18} className="text-gray-500" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-gray-900 dark:text-white">용병 모집</p>
-                  <p className="text-xs text-gray-500 mt-0.5">이 팀의 용병 모집 전체보기</p>
-                </div>
-                <ChevronRight size={16} className="text-gray-500" />
-              </div>
-            </div>
-          </Link>
-
-          {/* Owner */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영자</h3>
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-base font-bold text-gray-500">
-                {team.owner?.nickname?.charAt(0) || '?'}
-              </div>
-              <div className="flex-1">
-                <p className="text-base font-semibold text-gray-900 dark:text-white">{team.owner?.nickname || '알 수 없음'}</p>
-                {team.owner?.mannerScore && (
-                  <div className="flex items-center gap-1 text-sm text-amber-500 mt-0.5">
-                    <Star size={12} fill="currentColor" />
-                    <span>{team.owner.mannerScore.toFixed(1)}</span>
-                  </div>
+                    }}
+                    fullWidth
+                  >
+                    팀 가입 신청
+                  </Button>
+                ) : (
+                  <Link href={`/login?redirect=/teams/${teamId}`} className={buttonStyles({ fullWidth: true })}>
+                    로그인 후 가입 신청
+                  </Link>
                 )}
+
+                <Button onClick={handleContact} variant="subtle" fullWidth className="justify-center gap-2">
+                  <MessageCircle size={17} />
+                  연락하기
+                </Button>
+              </Card>
+            )}
+
+            <Card padding="sm">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 섹션</h3>
+              <div className="space-y-1.5 text-sm">
+                <button onClick={() => setActiveSection('goods')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
+                  굿즈 {hubData?.sections.goodsCount ?? hubGoods.length}
+                </button>
+                <button onClick={() => setActiveSection('passes')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
+                  수강권 {hubData?.sections.passesCount ?? hubPasses.length}
+                </button>
+                <button onClick={() => setActiveSection('events')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
+                  대회 {hubData?.sections.eventsCount ?? hubEvents.length}
+                </button>
               </div>
-            </div>
-          </div>
+            </Card>
           </div>
         </div>
       </div>
 
-      <MediaLightbox
-        isOpen={showMediaLightbox}
-        images={mediaImages}
-        initialIndex={mediaIndex}
-        onClose={() => setShowMediaLightbox(false)}
-        title={`${team.name} 이미지`}
-      />
+      <MediaLightbox isOpen={showMediaLightbox} images={mediaImages} initialIndex={mediaIndex} onClose={() => setShowMediaLightbox(false)} title={`${currentTeam.name} 이미지`} />
     </div>
   );
 }
 
-function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function HubSectionTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <div className="rounded-xl bg-gray-50 dark:bg-gray-700 p-3">
-      <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-1">
-        {icon}
-        <span className="text-xs">{label}</span>
-      </div>
-      <p className="text-base font-semibold text-gray-900 dark:text-white">{value}</p>
-    </div>
-  );
-}
-
-function SnsButton({ href, icon, label, color }: { href: string; icon: React.ReactNode; label: string; color: string }) {
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 ${color}`}>
-      {icon}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+        active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+      }`}
+    >
       {label}
-    </a>
+    </button>
+  );
+}
+
+function HubGoodsSection({ items }: { items: MarketplaceListing[] }) {
+  if (items.length === 0) {
+    return (
+      <Card className="mt-4">
+        <EmptyState icon={Trophy} title="등록된 굿즈가 없어요" description="전역 장터에서 먼저 등록하면 팀 허브에서 함께 보여요." action={{ label: '장터 보기', href: '/marketplace' }} size="sm" />
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-4">
+      {items.map((item) => (
+        <Link key={item.id} href={`/marketplace/${item.id}`} className="block">
+          <Card padding="sm" className="flex gap-3">
+            <div className="relative h-20 w-20 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 shrink-0">
+              <SafeImage src={getListingImage(item.imageUrls, item.id)} fallbackSrc={getListingImage(undefined, item.id)} alt={item.title} fill className="object-cover" sizes="80px" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
+              <p className="text-xs text-gray-500 mt-1">{item.price.toLocaleString('ko-KR')}원</p>
+            </div>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function HubPassesSection({ items }: { items: Lesson[] }) {
+  if (items.length === 0) {
+    return (
+      <Card className="mt-4">
+        <EmptyState icon={Trophy} title="등록된 수강권이 없어요" description="소속 레슨이 생기면 이 섹션에 자동으로 표시됩니다." action={{ label: '레슨 보기', href: '/lessons' }} size="sm" />
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-4">
+      {items.map((item) => (
+        <Link key={item.id} href={`/lessons/${item.id}`} className="block">
+          <Card padding="sm" className="flex gap-3">
+            <div className="relative h-20 w-20 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700 shrink-0">
+              <SafeImage src={getSportImage(item.sportType, item.imageUrls?.[0] ?? item.imageUrl, item.id)} fallbackSrc={getSportImage(item.sportType, undefined, item.id)} alt={item.title} fill className="object-cover" sizes="80px" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
+              <p className="text-xs text-gray-500 mt-1 truncate">{ticketSummary(item)}</p>
+            </div>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function HubEventsSection({ items }: { items: Tournament[] }) {
+  if (items.length === 0) {
+    return (
+      <Card className="mt-4">
+        <EmptyState icon={Trophy} title="예정 대회가 없어요" description="대회가 등록되면 팀 허브에서 바로 확인할 수 있어요." action={{ label: '대회 보기', href: '/tournaments' }} size="sm" />
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-4">
+      {items.map((event) => (
+        <Link key={event.id} href={`/tournaments/${event.id}`} className="block">
+          <Card padding="sm">
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{event.title}</p>
+            <p className="text-xs text-gray-500 mt-1">{event.eventDate}</p>
+          </Card>
+        </Link>
+      ))}
+    </div>
   );
 }

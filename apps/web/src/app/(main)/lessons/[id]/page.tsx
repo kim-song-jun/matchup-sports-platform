@@ -7,9 +7,14 @@ import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, Use
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
+import dynamic from 'next/dynamic';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useAuthStore } from '@/stores/auth-store';
-import { MediaLightbox } from '@/components/ui/media-lightbox';
+
+const MediaLightbox = dynamic(
+  () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
+  { ssr: false, loading: () => null }
+);
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLesson, useMyLessonTickets } from '@/hooks/use-api';
 import { sportLabel, lessonTypeLabel, levelLabel } from '@/lib/constants';

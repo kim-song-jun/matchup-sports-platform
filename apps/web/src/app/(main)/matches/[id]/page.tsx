@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, AlertTriangle, CheckCircle2, Camera } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
-import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { Modal } from '@/components/ui/modal';
 import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch, useArriveMatch, queryKeys } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -18,7 +19,11 @@ import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportDetailImageSet, getVenueImageSet } from '@/lib/sport-image';
 import { formatFullDate, formatAmount } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import dynamic from 'next/dynamic';
+
+const MediaLightbox = dynamic(
+  () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
+  { ssr: false, loading: () => null }
+);
 const CheckoutModal = dynamic(() => import('@/components/payment/checkout-modal').then(m => ({ default: m.CheckoutModal })), { ssr: false });
 
 export default function MatchDetailPage() {
@@ -284,8 +289,8 @@ export default function MatchDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+      <MobileGlassHeader className="gap-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
@@ -301,11 +306,11 @@ export default function MatchDetailPage() {
             } catch { /* user cancelled share */ }
           }}
           aria-label="공유하기"
-          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
+          className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"
         >
           <Share2 size={18} className="text-gray-500" />
         </button>
-      </header>
+      </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">

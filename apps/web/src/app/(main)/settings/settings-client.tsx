@@ -19,8 +19,8 @@ export function ThemePicker() {
   const { theme, setTheme } = useThemeStore();
 
   return (
-    <div className="px-4 py-4">
-      <p className="text-md font-medium text-gray-900 dark:text-white mb-3">테마 설정</p>
+    <div className="px-3.5 py-3.5">
+      <p className="mb-2.5 text-sm font-semibold text-gray-900 dark:text-white">테마 설정</p>
       <div className="grid grid-cols-3 gap-2">
         {[
           { value: 'light' as const, icon: Sun, label: '라이트' },
@@ -30,13 +30,13 @@ export function ThemePicker() {
           <button
             key={opt.value}
             onClick={() => setTheme(opt.value)}
-            className={`flex flex-col items-center gap-1.5 rounded-xl py-3 transition-colors ${
+            className={`flex flex-col items-center gap-1 rounded-xl border py-3 transition-colors ${
               theme === opt.value
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-gray-50 dark:bg-gray-700 text-gray-500 hover:bg-gray-100'
+                ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/20 dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600'
             }`}
           >
-            <opt.icon size={20} />
+            <opt.icon size={18} />
             <span className="text-xs font-medium">{opt.label}</span>
           </button>
         ))}
@@ -54,11 +54,11 @@ export function LogoutButton() {
   return (
     <div className="mb-6">
       <button onClick={() => { logout(); router.push('/login'); }}
-        className="w-full rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-3.5 flex items-center gap-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+        className="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-3.5 py-3 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 group">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-gray-700">
           <LogOut size={18} />
         </div>
-        <span className="text-md font-medium text-red-500">로그아웃</span>
+        <span className="text-sm font-semibold text-red-500">로그아웃</span>
       </button>
     </div>
   );

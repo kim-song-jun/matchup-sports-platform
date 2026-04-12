@@ -2,12 +2,13 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, UserPlus, Plus, Star, Calendar, MapPin } from 'lucide-react';
+import { ArrowLeft, UserPlus, Plus, Calendar } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useTeam, useMercenaryPosts, useMyTeams } from '@/hooks/use-api';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
-import { formatMatchDate, formatCurrency } from '@/lib/utils';
+import { formatMatchDate } from '@/lib/utils';
 import type { MercenaryPost } from '@/types/api';
 
 export default function TeamMercenaryPage() {
@@ -26,11 +27,11 @@ export default function TeamMercenaryPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-700">
+      <MobileGlassHeader className="gap-3">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-[44px] min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="glass-mobile-icon-button flex items-center justify-center min-h-[44px] min-w-11 rounded-xl"
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
@@ -46,7 +47,7 @@ export default function TeamMercenaryPage() {
             <Plus size={18} className="text-white" />
           </Link>
         )}
-      </header>
+      </MobileGlassHeader>
 
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 mb-4">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
@@ -98,17 +99,23 @@ export default function TeamMercenaryPage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       post.status === 'open'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300'
-                        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'
+                        : post.status === 'filled'
+                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'
                     }`}>
-                      {post.status === 'open' ? '모집중' : '마감'}
+                      {post.status === 'open' ? '모집중' : post.status === 'filled' ? '모집 완료' : '마감'}
                     </span>
                   </div>
-                  {post.description && (
-                    <p className="text-base font-medium text-gray-900 dark:text-white mt-1 line-clamp-2">{post.description}</p>
+                  {(post.notes || post.description) && (
+                    <p className="text-base font-medium text-gray-900 dark:text-white mt-1 line-clamp-2">{post.notes ?? post.description}</p>
                   )}
                   <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mt-2">
                     <Calendar size={12} />
                     <span>{formatMatchDate(post.matchDate)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                    <span>{post.venue ?? '장소 미정'}</span>
+                    <span>신청 {post.applicationCount ?? 0}명</span>
                   </div>
                 </div>
               </Link>

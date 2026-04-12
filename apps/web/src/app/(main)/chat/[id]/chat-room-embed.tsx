@@ -23,7 +23,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useChatMessages, useSendMessage, useMarkChatRead, queryKeys } from '@/hooks/use-api';
 import { useChatRoomSocket } from '@/hooks/use-realtime';
 import { formatMatchDate } from '@/lib/utils';
-import type { ChatMessage, ChatRoom } from '@/types/api';
+import type { ChatMessage, ChatRoom, CursorPage } from '@/types/api';
 import type { ChatMessagePayload } from '@/lib/realtime-client';
 
 function groupMessagesByDate(messages: ChatMessage[]): { date: string; label: string; messages: ChatMessage[] }[] {
@@ -70,7 +70,10 @@ export default function ChatRoomEmbed({
   const queryClient = useQueryClient();
 
   const { data: messagesData, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useChatMessages(chatRoomId);
-  const messages = useMemo(() => (messagesData?.pages.flat() ?? []).slice().reverse(), [messagesData]);
+  const messages = useMemo(
+    () => (messagesData?.pages.flatMap((page) => page.data) ?? []).slice().reverse(),
+    [messagesData],
+  );
   const sendMessageMutation = useSendMessage();
   const markReadMutation = useMarkChatRead();
 
@@ -88,14 +91,35 @@ export default function ChatRoomEmbed({
   const menuRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
   const isFirstLoad = useRef(true);
+  const lastReadMessageIdRef = useRef<string | null>(null);
+  const didShowReadSyncErrorRef = useRef(false);
 
-  // Mark as read on mount
-  useEffect(() => {
-    if (chatRoomId) {
-      markReadMutation.mutate(chatRoomId);
+  const markLatestMessageAsRead = useCallback(() => {
+    const latestMessageId = messages[messages.length - 1]?.id;
+    if (!chatRoomId || !latestMessageId || lastReadMessageIdRef.current === latestMessageId) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatRoomId]);
+
+    const previousLastReadMessageId = lastReadMessageIdRef.current;
+    lastReadMessageIdRef.current = latestMessageId;
+    markReadMutation.mutate(
+      { roomId: chatRoomId, messageId: latestMessageId },
+      {
+        onSuccess: () => {
+          didShowReadSyncErrorRef.current = false;
+        },
+        onError: () => {
+          if (lastReadMessageIdRef.current === latestMessageId) {
+            lastReadMessageIdRef.current = previousLastReadMessageId;
+          }
+          if (!didShowReadSyncErrorRef.current) {
+            didShowReadSyncErrorRef.current = true;
+            toast('info', '읽음 상태 동기화가 지연되고 있어요');
+          }
+        },
+      },
+    );
+  }, [chatRoomId, markReadMutation, messages, toast]);
 
   // Reset state on room change
   useEffect(() => {
@@ -105,7 +129,17 @@ export default function ChatRoomEmbed({
     setShowLeaveModal(false);
     setOptimisticMessages([]);
     isFirstLoad.current = true;
+    lastReadMessageIdRef.current = null;
+    didShowReadSyncErrorRef.current = false;
   }, [chatRoomId]);
+
+  useEffect(() => {
+    if (!isNearBottom.current && lastReadMessageIdRef.current !== null) {
+      return;
+    }
+
+    markLatestMessageAsRead();
+  }, [markLatestMessageAsRead]);
 
   // Realtime: receive new messages via WebSocket
   const handleWsMessage = useCallback((payload: ChatMessagePayload) => {
@@ -121,12 +155,20 @@ export default function ChatRoomEmbed({
     // Insert into the first page of the infinite query cache (newest messages)
     queryClient.setQueryData(
       queryKeys.chat.messages(chatRoomId),
-      (prev: { pages: ChatMessage[][]; pageParams: unknown[] } | undefined) => {
-        if (!prev) return { pages: [[newMsg]], pageParams: [undefined] };
+      (prev: { pages: Array<CursorPage<ChatMessage>>; pageParams: unknown[] } | undefined) => {
+        if (!prev) {
+          return {
+            pages: [{ data: [newMsg], nextCursor: null, hasMore: false }],
+            pageParams: [undefined],
+          };
+        }
         const [firstPage, ...rest] = prev.pages;
         // Avoid duplicates from optimistic inserts
-        if (firstPage.some((m: ChatMessage) => m.id === newMsg.id)) return prev;
-        return { ...prev, pages: [[...firstPage, newMsg], ...rest] };
+        if (firstPage.data.some((message) => message.id === newMsg.id)) return prev;
+        return {
+          ...prev,
+          pages: [{ ...firstPage, data: [newMsg, ...firstPage.data] }, ...rest],
+        };
       },
     );
 
@@ -156,6 +198,9 @@ export default function ChatRoomEmbed({
     const el = messagesContainerRef.current;
     if (!el) return;
     isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (isNearBottom.current) {
+      markLatestMessageAsRead();
+    }
   };
 
   useEffect(() => {

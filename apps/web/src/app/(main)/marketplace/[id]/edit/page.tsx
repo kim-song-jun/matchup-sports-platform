@@ -1,18 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Trash2, AlertTriangle, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Trash2, AlertTriangle, ChevronRight, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { Modal } from '@/components/ui/modal';
+import { useListing } from '@/hooks/use-api';
 import { api } from '@/lib/api';
+import { sportLabel } from '@/lib/constants';
+import { extractUploadUrls, toExistingUploadAsset, type UploadAsset } from '@/lib/uploads';
 
-const sports = [
-  { type: 'futsal', label: '풋살' },
-  { type: 'basketball', label: '농구' },
-  { type: 'badminton', label: '배드민턴' },
-  { type: 'ice_hockey', label: '아이스하키' },
-];
+const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
 const categories = [
   '축구화/풋살화', '농구화', '라켓', '유니폼', '보호장비', '하키장비', '스케이트', '기타',
@@ -27,25 +28,35 @@ const conditions = [
 ];
 
 const statusOptions = [
-  { value: 'on_sale', label: '판매중' },
+  { value: 'active', label: '판매중' },
   { value: 'reserved', label: '예약중' },
   { value: 'sold', label: '판매완료' },
 ];
 
-const mockListingData: Record<string, {
-  title: string; description: string; sportType: string; category: string;
-  condition: string; price: number; status: string;
-}> = {
-  'listing-1': {
-    title: '나이키 팬텀 GX 풋살화 265', sportType: 'futsal', category: '축구화/풋살화',
-    condition: 'like_new', price: 85000, status: 'on_sale',
-    description: '2번 착용한 풋살화입니다. 실내용. 사이즈 265. 발볼 넓은 편이에요. 직거래 강남역 선호.',
-  },
-  'listing-2': {
-    title: 'CCM 아이스하키 스틱 (좌)', sportType: 'ice_hockey', category: '하키장비',
-    condition: 'good', price: 120000, status: 'reserved',
-    description: 'CCM Jetspeed FT5 Pro. 플렉스 85. 좌타용. 블레이드 P29 커브. 약 6개월 사용.',
-  },
+interface ListingFormState {
+  title: string;
+  description: string;
+  sportType: string;
+  category: string;
+  condition: string;
+  price: number;
+  status: string;
+  listingType: 'sell' | 'rent';
+  rentalPricePerDay: number;
+  rentalDeposit: number;
+}
+
+const initialForm: ListingFormState = {
+  title: '',
+  description: '',
+  sportType: '',
+  category: '',
+  condition: '',
+  price: 0,
+  status: 'active',
+  listingType: 'sell',
+  rentalPricePerDay: 0,
+  rentalDeposit: 0,
 };
 
 export default function EditListingPage() {
@@ -53,18 +64,60 @@ export default function EditListingPage() {
   const params = useParams();
   const { toast } = useToast();
   const listingId = params.id as string;
+  const { data: listing, isLoading } = useListing(listingId);
+  const hydratedListingIdRef = useRef<string | null>(null);
 
-  const initialData = mockListingData[listingId] || mockListingData['listing-1'];
-  const [form, setForm] = useState(initialData);
+  const [form, setForm] = useState<ListingFormState>(initialForm);
+  const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
+  const [uploadState, setUploadState] = useState<ImageUploadState>({
+    hasPendingUploads: false,
+    hasUploadErrors: false,
+    pendingCount: 0,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  useEffect(() => {
+    if (!listing || hydratedListingIdRef.current === listing.id) return;
+    setForm({
+      title: listing.title,
+      description: listing.description,
+      sportType: listing.sportType,
+      category: listing.category,
+      condition: listing.condition,
+      price: listing.price,
+      status: listing.status,
+      listingType: listing.listingType === 'rent' ? 'rent' : 'sell',
+      rentalPricePerDay: listing.rentalPricePerDay ?? 0,
+      rentalDeposit: listing.rentalDeposit ?? 0,
+    });
+    setImageAssets((listing.imageUrls ?? []).map((url) => toExistingUploadAsset(url)));
+    hydratedListingIdRef.current = listing.id;
+  }, [listing]);
+
+  const guardImageUpload = () => {
+    if (uploadState.hasPendingUploads) {
+      toast('error', '이미지 업로드가 끝난 뒤 저장할 수 있어요');
+      return false;
+    }
+    if (uploadState.hasUploadErrors) {
+      toast('error', '실패한 이미지를 다시 시도하거나 제거해주세요');
+      return false;
+    }
+    return true;
+  };
+
   const handleSave = async () => {
+    if (!guardImageUpload()) return;
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (form.price <= 0) return toast('error', '가격을 입력해주세요');
+
     setIsSaving(true);
     try {
-      await api.patch(`/marketplace/listings/${listingId}`, form);
+      await api.patch(`/marketplace/listings/${listingId}`, {
+        ...form,
+        imageUrls: extractUploadUrls(imageAssets),
+      });
       toast('success', '매물 정보가 저장되었어요');
       router.push(`/marketplace/${listingId}`);
     } catch {
@@ -84,6 +137,31 @@ export default function EditListingPage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <div className="space-y-4 animate-pulse">
+          <div className="h-12 rounded-xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-28 rounded-xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-28 rounded-xl bg-gray-100 dark:bg-gray-800" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!listing) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-10">
+        <EmptyState
+          icon={SearchX}
+          title="매물을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 매물이에요"
+          action={{ label: '장터 목록으로', href: '/marketplace' }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
@@ -99,7 +177,31 @@ export default function EditListingPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 pb-8 max-w-lg @3xl:max-w-[700px]">
-        {/* Title */}
+        <div className="mb-5">
+          <ImageUpload
+            value={imageAssets}
+            onChange={setImageAssets}
+            onStateChange={setUploadState}
+            max={10}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            maxSizeMB={10}
+            label="상품 이미지"
+          />
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            이미지 변경은 저장 후 실제 매물에 반영돼요.
+          </p>
+          {uploadState.hasPendingUploads && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              이미지 업로드가 끝난 뒤 저장할 수 있어요.
+            </p>
+          )}
+          {uploadState.hasUploadErrors && (
+            <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+              실패한 이미지를 다시 시도하거나 제거해주세요.
+            </p>
+          )}
+        </div>
+
         <div className="mb-5">
           <label htmlFor="edit-listing-title" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>
           <input
@@ -111,7 +213,6 @@ export default function EditListingPage() {
           />
         </div>
 
-        {/* Description */}
         <div className="mb-5">
           <label htmlFor="edit-listing-description" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">설명</label>
           <textarea
@@ -123,25 +224,23 @@ export default function EditListingPage() {
           />
         </div>
 
-        {/* Sport Type */}
         <div className="mb-5">
           <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">종목</label>
           <div className="flex gap-2 flex-wrap">
-            {sports.map((s) => (
+            {sportTypes.map((type) => (
               <button
-                key={s.type}
-                onClick={() => setForm({ ...form, sportType: s.type })}
+                key={type}
+                onClick={() => setForm({ ...form, sportType: type })}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  form.sportType === s.type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  form.sportType === type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                {s.label}
+                {sportLabel[type] || type}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Category */}
         <div className="mb-5">
           <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">카테고리</label>
           <div className="flex gap-2 flex-wrap">
@@ -159,7 +258,6 @@ export default function EditListingPage() {
           </div>
         </div>
 
-        {/* Condition */}
         <div className="mb-5">
           <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">상품 상태</label>
           <div className="flex gap-2 flex-wrap">
@@ -177,19 +275,17 @@ export default function EditListingPage() {
           </div>
         </div>
 
-        {/* Price */}
         <div className="mb-5">
           <label htmlFor="edit-listing-price" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">가격 (원)</label>
           <input
             id="edit-listing-price"
             type="number"
             value={form.price}
-            onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })}
+            onChange={(e) => setForm({ ...form, price: parseInt(e.target.value, 10) || 0 })}
             className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3 text-base text-gray-900 dark:text-white dark:bg-gray-800/50 focus:border-blue-500 focus:outline-none transition-colors"
           />
         </div>
 
-        {/* Status */}
         <div className="mb-8">
           <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">판매 상태</label>
           <div className="flex gap-2">
@@ -207,7 +303,6 @@ export default function EditListingPage() {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-3">
           <button
             onClick={() => setShowDeleteModal(true)}
@@ -224,7 +319,7 @@ export default function EditListingPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
             className="flex-1 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             {isSaving ? '저장 중...' : '저장'}
@@ -233,19 +328,19 @@ export default function EditListingPage() {
       </div>
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+        <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="매물 삭제" size="sm">
+          <div className="pt-1">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+            <h3 className="text-center text-lg font-bold text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
+            <p className="mt-2 text-center text-base text-gray-500">삭제된 매물은 복구할 수 없습니다.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
               <button onClick={handleDelete} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

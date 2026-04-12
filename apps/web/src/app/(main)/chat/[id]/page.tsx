@@ -1,7 +1,19 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import ChatRoomEmbed from './chat-room-embed';
+import dynamic from 'next/dynamic';
+
+const ChatRoomEmbed = dynamic(
+  () => import('./chat-room-embed'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="animate-pulse text-gray-400">Loading...</div>
+      </div>
+    ),
+  }
+);
 
 export default function ChatRoomPage() {
   const params = useParams();

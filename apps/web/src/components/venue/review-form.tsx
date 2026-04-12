@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, Camera, X, Send } from 'lucide-react';
+import { Star, Send } from 'lucide-react';
+import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
 
 interface ReviewFormProps {
   venueId: string;
   venueType: string;
-  onSubmit: (data: ReviewData) => void;
+  onSubmit: (data: ReviewData) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -46,7 +48,7 @@ function StarRating({
               onMouseEnter={() => setHovered(star)}
               onMouseLeave={() => setHovered(0)}
               aria-label={`${star}점`}
-              className="p-1.5 transition-transform active:scale-110"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1.5 transition-transform active:scale-110 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <Star
                 size={size}
@@ -73,7 +75,12 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
   const [costRating, setCostRating] = useState(0);
   const [iceQualityRating, setIceQualityRating] = useState(0);
   const [comment, setComment] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
+  const [uploadState, setUploadState] = useState<ImageUploadState>({
+    hasPendingUploads: false,
+    hasUploadErrors: false,
+    pendingCount: 0,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isIceRink = venueType === 'ice_rink';
@@ -83,19 +90,10 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
     accessRating > 0 &&
     costRating > 0 &&
     (!isIceRink || iceQualityRating > 0);
+  const canSubmit = isValid && !isSubmitting && !uploadState.hasPendingUploads && !uploadState.hasUploadErrors;
 
-  function handlePhotoClick() {
-    // Placeholder: in real implementation, this would open a file picker
-    const mockUrl = `/mock-photo-${photos.length + 1}.jpg`;
-    setPhotos((prev) => [...prev, mockUrl]);
-  }
-
-  function removePhoto(idx: number) {
-    setPhotos((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function handleSubmit() {
-    if (!isValid) return;
+  async function handleSubmit() {
+    if (!canSubmit) return;
     setIsSubmitting(true);
 
     const data: ReviewData = {
@@ -104,15 +102,15 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
       accessRating,
       costRating,
       comment,
-      photos,
+      photos: extractUploadUrls(imageAssets),
     };
     if (isIceRink) data.iceQualityRating = iceQualityRating;
 
-    // Simulate submit delay
-    setTimeout(() => {
-      onSubmit(data);
+    try {
+      await onSubmit(data);
+    } finally {
       setIsSubmitting(false);
-    }, 600);
+    }
   }
 
   return (
@@ -129,7 +127,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
               type="button"
               onClick={() => setOverallRating(star)}
               aria-label={`${star}점`}
-              className="p-1.5 transition-transform active:scale-110"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-xl p-1.5 transition-transform active:scale-110 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <Star
                 size={36}
@@ -193,40 +191,25 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
 
       {/* Photo upload */}
       <div className="mb-6">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-          사진 첨부
-        </label>
-        <div className="flex gap-2 flex-wrap">
-          {photos.map((photo, idx) => (
-            <div
-              key={idx}
-              className="relative h-20 w-20 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden"
-            >
-              <Camera size={20} className="text-gray-500 dark:text-gray-400" />
-              <span className="absolute bottom-1 text-2xs text-gray-500 dark:text-gray-400">
-                사진 {idx + 1}
-              </span>
-              <button
-                type="button"
-                onClick={() => removePhoto(idx)}
-                className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900/60 text-white"
-              >
-                <X size={10} />
-              </button>
-            </div>
-          ))}
-          {photos.length < 5 && (
-            <button
-              type="button"
-              onClick={handlePhotoClick}
-              className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-blue-300 hover:text-blue-400 transition-colors"
-            >
-              <Camera size={20} />
-              <span className="text-2xs">추가</span>
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">최대 5장까지 첨부 가능</p>
+        <ImageUpload
+          value={imageAssets}
+          onChange={setImageAssets}
+          onStateChange={setUploadState}
+          max={5}
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          maxSizeMB={10}
+          label="시설 사진 (선택)"
+        />
+        {uploadState.hasPendingUploads && (
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            이미지 업로드가 끝난 뒤 리뷰를 등록할 수 있어요.
+          </p>
+        )}
+        {uploadState.hasUploadErrors && (
+          <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+            실패한 이미지를 다시 시도하거나 제거한 뒤 등록해주세요.
+          </p>
+        )}
       </div>
 
       {/* Actions */}
@@ -241,7 +224,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!isValid || isSubmitting}
+          disabled={!canSubmit}
           className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Send size={14} />

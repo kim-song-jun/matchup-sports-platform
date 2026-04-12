@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowLeft, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,10 +25,7 @@ export default function ReviewsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"><ArrowLeft size={20} className="text-gray-700" /></button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 평가</h1>
-      </header>
+      <MobileGlassHeader title="내 평가" subtitle="매치가 끝나면 함께한 선수들을 평가해주세요." showBack />
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 평가</h1>
         <p className="text-sm text-gray-500 mt-0.5">매치가 끝나면 함께한 선수들을 평가해주세요</p>

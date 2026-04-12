@@ -6,10 +6,15 @@ import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import dynamic from 'next/dynamic';
 import { Modal } from '@/components/ui/modal';
 import { SafeImage } from '@/components/ui/safe-image';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
-import { MediaLightbox } from '@/components/ui/media-lightbox';
+
+const MediaLightbox = dynamic(
+  () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
+  { ssr: false, loading: () => null }
+);
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';

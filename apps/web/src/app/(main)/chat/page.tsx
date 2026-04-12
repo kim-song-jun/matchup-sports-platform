@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useAuthStore } from '@/stores/auth-store';
@@ -86,9 +87,7 @@ export default function ChatListPage() {
   if (!isAuthenticated) {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-        <header className="px-5 @3xl:px-0 pt-4 pb-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
-        </header>
+        <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
         <div className="px-5 @3xl:px-0">
           <EmptyState
             icon={MessageCircle}
@@ -180,10 +179,7 @@ export default function ChatListPage() {
 
       {/* MOBILE: Full-width list */}
       <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
-        <header className="px-5 pt-4 pb-3">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{t('subtitle')}</p>
-        </header>
+        <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
         <div className="px-5">
           {isLoading ? loadingState : isError ? (
             <ErrorState onRetry={refetch} message="채팅방을 불러오지 못했어요" />

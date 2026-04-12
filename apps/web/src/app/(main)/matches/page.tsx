@@ -21,7 +21,9 @@ export default async function Page({ searchParams }: PageProps) {
   const filters = parseMatchDiscoveryFilters(paramsGetter);
   const apiParams = buildMatchApiParams(filters);
 
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: 120_000 } },
+  });
 
   if (process.env.CAPACITOR_BUILD !== 'true') {
     await Promise.allSettled([

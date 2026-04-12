@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, type MouseEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useAuthStore } from '@/stores/auth-store';
 import { Bell, Trophy, Users, MessageCircle, CreditCard, ChevronRight } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -115,19 +116,16 @@ export default function NotificationsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
-          {unreadCount > 0 && (
-            <p className="text-xs text-blue-500 mt-0.5">{t('unreadCount', { count: unreadCount })}</p>
-          )}
-        </div>
-        {mounted && isAuthenticated && unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="text-xs text-gray-500 font-medium min-h-[44px] min-w-11 px-3 py-2 flex items-center hover:text-gray-600 transition-colors" disabled={markAllRead.isPending}>
+      <MobileGlassHeader
+        title={t('title')}
+        subtitle={unreadCount > 0 ? t('unreadCount', { count: unreadCount }) : '중요한 업데이트와 알림을 모아봤어요.'}
+        showBack
+        actions={mounted && isAuthenticated && unreadCount > 0 ? (
+          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="glass-mobile-icon-button flex min-h-[44px] items-center justify-center rounded-2xl px-3.5 text-xs font-semibold text-gray-600 dark:text-gray-300" disabled={markAllRead.isPending}>
             {t('markAllRead')}
           </button>
-        )}
-      </header>
+        ) : undefined}
+      />
 
       <div className="px-5 @3xl:px-0">
         {!mounted || !isAuthenticated ? (

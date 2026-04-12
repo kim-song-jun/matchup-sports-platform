@@ -1,103 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Star, ChevronRight, TrendingUp } from 'lucide-react';
+import { ChevronRight, Star, TrendingUp } from 'lucide-react';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
-
-interface Review {
-  id: string;
-  matchTitle: string;
-  reviewerName: string;
-  targetName: string;
-  mannerScore: number;
-  skillScore: number;
-  date: string;
-}
-
-const mockReviews: Review[] = [
-  {
-    id: 'RV-001',
-    matchTitle: '주말 풋살 한판',
-    reviewerName: '김민수',
-    targetName: '이영진',
-    mannerScore: 5,
-    skillScore: 4,
-    date: '2026-03-22',
-  },
-  {
-    id: 'RV-002',
-    matchTitle: '농구 3:3 매치',
-    reviewerName: '박지원',
-    targetName: '최서현',
-    mannerScore: 4,
-    skillScore: 5,
-    date: '2026-03-21',
-  },
-  {
-    id: 'RV-003',
-    matchTitle: '배드민턴 복식 매치',
-    reviewerName: '정대현',
-    targetName: '한지훈',
-    mannerScore: 3,
-    skillScore: 3,
-    date: '2026-03-20',
-  },
-  {
-    id: 'RV-004',
-    matchTitle: '풋살 리그전',
-    reviewerName: '윤서연',
-    targetName: '오준혁',
-    mannerScore: 5,
-    skillScore: 5,
-    date: '2026-03-19',
-  },
-  {
-    id: 'RV-005',
-    matchTitle: '토요일 오전 친선전',
-    reviewerName: '장민호',
-    targetName: '송태양',
-    mannerScore: 4,
-    skillScore: 4,
-    date: '2026-03-18',
-  },
-  {
-    id: 'RV-006',
-    matchTitle: '아이스하키 입문 매치',
-    reviewerName: '이코치',
-    targetName: '김하늘',
-    mannerScore: 5,
-    skillScore: 3,
-    date: '2026-03-17',
-  },
-  {
-    id: 'RV-007',
-    matchTitle: '농구 5:5 매치',
-    reviewerName: '최영진',
-    targetName: '박준서',
-    mannerScore: 2,
-    skillScore: 4,
-    date: '2026-03-16',
-  },
-  {
-    id: 'RV-008',
-    matchTitle: '풋살 경쟁전',
-    reviewerName: '한지훈',
-    targetName: '정대현',
-    mannerScore: 4,
-    skillScore: 3,
-    date: '2026-03-15',
-  },
-];
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { useAdminReviews } from '@/hooks/use-api';
+import type { AdminReview } from '@/types/api';
 
 function renderStars(score: number) {
   return (
     <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((s) => (
+      {[1, 2, 3, 4, 5].map((value) => (
         <Star
-          key={s}
+          key={value}
           size={14}
-          className={s <= score ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'}
+          className={value <= score ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'}
         />
       ))}
       <span className="ml-1 text-xs font-semibold text-gray-700 dark:text-gray-300">{score.toFixed(1)}</span>
@@ -105,41 +24,57 @@ function renderStars(score: number) {
   );
 }
 
+function getMatchTitle(review: AdminReview) {
+  return review.match?.title ?? review.matchTitle ?? '매치 정보 없음';
+}
+
+function getReviewerName(review: AdminReview) {
+  return review.author?.nickname ?? review.reviewerName ?? '알 수 없음';
+}
+
+function getTargetName(review: AdminReview) {
+  return review.target?.nickname ?? review.targetName ?? '알 수 없음';
+}
+
 export default function AdminReviewsPage() {
   const [search, setSearch] = useState('');
+  const { data = [], isLoading, isError, refetch } = useAdminReviews();
 
-  const filtered = mockReviews.filter((r) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      r.matchTitle.toLowerCase().includes(q) ||
-      r.reviewerName.toLowerCase().includes(q) ||
-      r.targetName.toLowerCase().includes(q)
-    );
-  });
+  const filtered = useMemo(() => {
+    return data.filter((review) => {
+      const query = search.toLowerCase();
+      return !search
+        || getMatchTitle(review).toLowerCase().includes(query)
+        || getReviewerName(review).toLowerCase().includes(query)
+        || getTargetName(review).toLowerCase().includes(query);
+    });
+  }, [data, search]);
 
-  const totalReviews = mockReviews.length;
-  const avgManner = mockReviews.reduce((sum, r) => sum + r.mannerScore, 0) / totalReviews;
-  const avgSkill = mockReviews.reduce((sum, r) => sum + r.skillScore, 0) / totalReviews;
-  const avgTotal = (avgManner + avgSkill) / 2;
+  const totalReviews = filtered.length;
+  const avgManner = totalReviews > 0
+    ? filtered.reduce((sum, review) => sum + (review.mannerRating ?? 0), 0) / totalReviews
+    : 0;
+  const avgSkill = totalReviews > 0
+    ? filtered.reduce((sum, review) => sum + (review.skillRating ?? 0), 0) / totalReviews
+    : 0;
+  const avgTotal = totalReviews > 0 ? (avgManner + avgSkill) / 2 : 0;
 
   const handleDownloadCSV = () => {
     downloadCSV(
-      filtered.map((r) => ({
-        매치: r.matchTitle,
-        평가자: r.reviewerName,
-        대상: r.targetName,
-        매너점수: r.mannerScore,
-        실력점수: r.skillScore,
-        날짜: r.date,
+      filtered.map((review) => ({
+        매치: getMatchTitle(review),
+        평가자: getReviewerName(review),
+        대상: getTargetName(review),
+        매너점수: review.mannerRating ?? 0,
+        실력점수: review.skillRating ?? 0,
+        날짜: review.createdAt,
       })),
-      '평가'
+      '평가',
     );
   };
 
   return (
     <div className="animate-fade-in">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-4">
         <Link href="/admin/dashboard" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">관리자</Link>
         <ChevronRight size={12} />
@@ -149,48 +84,15 @@ export default function AdminReviewsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">평가 관리</h1>
-          <p className="text-base text-gray-400 mt-1">매치 후 평가 현황을 확인하세요</p>
+          <p className="text-base text-gray-400 mt-1">실제 리뷰와 평점만 표시합니다</p>
         </div>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4 mb-6">
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-              <TrendingUp size={20} />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalReviews}</p>
-          <p className="text-sm text-gray-400 mt-0.5">총 평가수</p>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
-              <Star size={20} />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgTotal.toFixed(1)}</p>
-          <p className="text-sm text-gray-400 mt-0.5">전체 평균</p>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-500">
-              <Star size={20} />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgManner.toFixed(1)}</p>
-          <p className="text-sm text-gray-400 mt-0.5">평균 매너점수</p>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-500">
-              <Star size={20} />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgSkill.toFixed(1)}</p>
-          <p className="text-sm text-gray-400 mt-0.5">평균 스킬점수</p>
-        </div>
+        <SummaryCard label="총 평가수" value={totalReviews} icon={TrendingUp} iconColor="bg-blue-50 text-blue-500" />
+        <SummaryCard label="전체 평균" value={avgTotal.toFixed(1)} icon={Star} iconColor="bg-amber-50 text-amber-500" />
+        <SummaryCard label="평균 매너점수" value={avgManner.toFixed(1)} icon={Star} iconColor="bg-green-50 text-green-500" />
+        <SummaryCard label="평균 스킬점수" value={avgSkill.toFixed(1)} icon={Star} iconColor="bg-blue-50 text-blue-500" />
       </div>
 
       <AdminToolbar
@@ -200,51 +102,87 @@ export default function AdminReviewsPage() {
         countLabel="건"
       />
 
-      {/* Table */}
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매치</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">평가자</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">대상</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매너점수</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">스킬점수</th>
-                <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">날짜</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-              {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <p className="text-base font-medium text-gray-900 dark:text-white truncate max-w-[180px]">{r.matchTitle}</p>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-xs font-bold text-blue-500 dark:text-blue-400">
-                        {r.reviewerName.charAt(0)}
-                      </div>
-                      <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{r.reviewerName}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300">
-                        {r.targetName.charAt(0)}
-                      </div>
-                      <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{r.targetName}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">{renderStars(r.mannerScore)}</td>
-                  <td className="px-5 py-3.5">{renderStars(r.skillScore)}</td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{r.date}</td>
+      {isLoading ? (
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 space-y-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-12 animate-pulse rounded-lg bg-gray-50 dark:bg-gray-700" />
+          ))}
+        </div>
+      ) : isError ? (
+        <ErrorState message="평가 목록을 불러오지 못했어요" onRetry={() => void refetch()} />
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+          <EmptyState
+            icon={Star}
+            title="표시할 평가가 없어요"
+            description="실제 리뷰가 등록되면 여기에 표시돼요"
+            size="sm"
+          />
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매치</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">평가자</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">대상</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">매너점수</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">스킬점수</th>
+                  <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase whitespace-nowrap">날짜</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {filtered.map((review) => (
+                  <tr key={review.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <p className="text-base font-medium text-gray-900 dark:text-white truncate max-w-[220px]">
+                        {getMatchTitle(review)}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {getReviewerName(review)}
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {getTargetName(review)}
+                    </td>
+                    <td className="px-5 py-3.5">{renderStars(review.mannerRating ?? 0)}</td>
+                    <td className="px-5 py-3.5">{renderStars(review.skillRating ?? 0)}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {new Date(review.createdAt).toLocaleDateString('ko-KR')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  iconColor,
+}: {
+  label: string;
+  value: string | number;
+  icon: typeof TrendingUp;
+  iconColor: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-[colors,shadow]">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconColor}`}>
+          <Icon size={20} />
         </div>
       </div>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
     </div>
   );
 }

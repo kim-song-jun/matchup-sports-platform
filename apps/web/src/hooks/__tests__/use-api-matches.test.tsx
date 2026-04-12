@@ -14,14 +14,24 @@ vi.mock('@/lib/api', () => {
   const mockApi = {
     post: vi.fn(),
     get: vi.fn(),
+    patch: vi.fn(),
   };
   return { api: mockApi };
 });
 
-import { useMatches, useApplyTeamMatch } from '../use-api';
+import {
+  useApplyTeamMatch,
+  useMatches,
+  useRespondTeamMatchApplication,
+  useTeamMatchRefereeSchedule,
+} from '../use-api';
 import { api } from '@/lib/api';
 
-const mockApi = api as unknown as { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
+const mockApi = api as unknown as {
+  post: ReturnType<typeof vi.fn>;
+  get: ReturnType<typeof vi.fn>;
+  patch: ReturnType<typeof vi.fn>;
+};
 
 const mockMatch = {
   id: 'match-1',
@@ -117,11 +127,11 @@ describe('useApplyTeamMatch', () => {
     const wrapper = makeWrapper();
     const { result } = renderHook(() => useApplyTeamMatch(), { wrapper });
 
-    result.current.mutate({ id: 'tm-1', data: { teamId: 'team-1', message: '신청합니다' } });
+    result.current.mutate({ id: 'tm-1', data: { applicantTeamId: 'team-1', message: '신청합니다' } });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.post).toHaveBeenCalledWith('/team-matches/tm-1/apply', {
-      teamId: 'team-1',
+      applicantTeamId: 'team-1',
       message: '신청합니다',
     });
   });
@@ -132,8 +142,68 @@ describe('useApplyTeamMatch', () => {
     const wrapper = makeWrapper();
     const { result } = renderHook(() => useApplyTeamMatch(), { wrapper });
 
-    result.current.mutate({ id: 'tm-1', data: { teamId: 'team-1' } });
+    result.current.mutate({ id: 'tm-1', data: { applicantTeamId: 'team-1' } });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+describe('useRespondTeamMatchApplication', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls the approve route when action is approve', async () => {
+    mockApi.patch.mockResolvedValueOnce({
+      status: 'success',
+      data: { id: 'app-1' },
+    });
+
+    const wrapper = makeWrapper();
+    const { result } = renderHook(() => useRespondTeamMatchApplication(), { wrapper });
+
+    result.current.mutate({ id: 'tm-1', applicationId: 'app-1', action: 'approve' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockApi.patch).toHaveBeenCalledWith('/team-matches/tm-1/applications/app-1/approve');
+  });
+
+  it('calls the reject route when action is reject', async () => {
+    mockApi.patch.mockResolvedValueOnce({
+      status: 'success',
+      data: { id: 'app-1' },
+    });
+
+    const wrapper = makeWrapper();
+    const { result } = renderHook(() => useRespondTeamMatchApplication(), { wrapper });
+
+    result.current.mutate({ id: 'tm-1', applicationId: 'app-1', action: 'reject' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockApi.patch).toHaveBeenCalledWith('/team-matches/tm-1/applications/app-1/reject');
+  });
+});
+
+describe('useTeamMatchRefereeSchedule', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the backend object shape 그대로', async () => {
+    mockApi.get.mockResolvedValueOnce({
+      status: 'success',
+      data: {
+        hasReferee: true,
+        quarterCount: 4,
+        schedule: { Q1: 'home', Q2: 'away' },
+      },
+    });
+
+    const wrapper = makeWrapper();
+    const { result } = renderHook(() => useTeamMatchRefereeSchedule('tm-1'), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockApi.get).toHaveBeenCalledWith('/team-matches/tm-1/referee-schedule');
+    expect(result.current.data?.schedule).toEqual({ Q1: 'home', Q2: 'away' });
   });
 });

@@ -4,34 +4,6 @@ import { useState, useMemo, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Users, CalendarX, CircleCheck } from 'lucide-react';
 import { LessonSchedule } from '@/types/api';
 
-// Stable mock schedules — generated once at module level to avoid re-renders
-const MOCK_SCHEDULES: LessonSchedule[] = (() => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const sessions: LessonSchedule[] = [];
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(y, m, d);
-    const dow = date.getDay();
-    if (dow === 1 || dow === 3 || dow === 5) {
-      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      sessions.push({
-        id: `mock-${dateStr}`,
-        lessonId: '',
-        sessionDate: dateStr,
-        startTime: '10:00',
-        endTime: '11:30',
-        maxParticipants: 8,
-        isCancelled: false,
-        attendeeCount: (d * 3) % 7, // deterministic, not random
-      });
-    }
-  }
-  return sessions;
-})();
-
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -54,7 +26,18 @@ interface LessonCalendarProps {
 }
 
 export function LessonCalendar({ schedules, onReserve }: LessonCalendarProps) {
-  const activeSessions = schedules && schedules.length > 0 ? schedules : MOCK_SCHEDULES;
+  const activeSessions = schedules ?? [];
+
+  if (activeSessions.length === 0) {
+    return (
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">수업 일정</h3>
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+          등록된 수업 일정이 아직 없어요. 예시 달력을 대신 보여주지 않고, 실제 일정이 생기면 이 영역에 표시됩니다.
+        </div>
+      </div>
+    );
+  }
 
   const today = useMemo(() => new Date(), []);
   const [viewDate, setViewDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));

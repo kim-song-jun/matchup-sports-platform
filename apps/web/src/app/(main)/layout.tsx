@@ -21,7 +21,7 @@ export default function MainLayout({
 
       {/* Mobile + Tablet: bottom nav */}
       <div className="lg:hidden">
-        <div className="@container mx-auto max-w-3xl bg-white dark:bg-gray-900 min-h-dvh shadow-[0_0_40px_rgba(0,0,0,0.04)]">
+        <div className="@container mobile-shell-atmosphere mx-auto min-h-dvh max-w-3xl overflow-x-clip bg-white shadow-[0_0_40px_rgba(15,23,42,0.04)] dark:bg-gray-900">
           <main className="pb-safe">
             {children}
             <Footer />

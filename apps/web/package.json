@@ -6,7 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "rm -rf .next && next dev --hostname 0.0.0.0 --port 3003",
+    "dev": "sh -c 'mkdir -p .next && find .next -mindepth 1 -maxdepth 1 -exec rm -rf {} + && next dev --hostname 0.0.0.0 --port 3003'",
+    "dev:e2e": "next dev --hostname 0.0.0.0 --port 3003",
     "build": "next build",
     "start": "next start",
     "lint": "echo '[web] lint delegated to tsc --noEmit (CI runs it separately); ESLint setup is tracked as tech debt'",
@@ -16,6 +17,7 @@
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
+    "@swc/helpers": "^0.5.17",
     "@capacitor/core": "^6.0.0",
     "@capacitor/push-notifications": "^6.0.5",
     "@tanstack/react-query": "^5.62.0",

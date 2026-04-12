@@ -3,56 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart, Info } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
-import { useListings } from '@/hooks/use-api';
+import { queryKeys, useListings } from '@/hooks/use-api';
 import { getListingImage } from '@/lib/sport-image';
 import { formatAmount } from '@/lib/utils';
-
-const mockMyListings = [
-  {
-    id: 'listing-1',
-    title: '나이키 팬텀 GX 풋살화 265',
-    sportType: 'futsal',
-    category: '축구화/풋살화',
-    condition: 'like_new',
-    price: 85000,
-    status: 'on_sale',
-    viewCount: 42,
-    likeCount: 5,
-    createdAt: '2026-03-15',
-    imageUrls: [],
-  },
-  {
-    id: 'listing-2',
-    title: 'CCM 아이스하키 스틱 (좌)',
-    sportType: 'ice_hockey',
-    category: '하키장비',
-    condition: 'good',
-    price: 120000,
-    status: 'reserved',
-    viewCount: 28,
-    likeCount: 3,
-    createdAt: '2026-03-10',
-    imageUrls: [],
-  },
-  {
-    id: 'listing-3',
-    title: '요넥스 배드민턴 라켓 아스트록스',
-    sportType: 'badminton',
-    category: '라켓',
-    condition: 'new',
-    price: 150000,
-    status: 'sold',
-    viewCount: 65,
-    likeCount: 8,
-    createdAt: '2026-03-05',
-    imageUrls: [],
-  },
-];
+import { useAuthStore } from '@/stores/auth-store';
+import { useQueryClient } from '@tanstack/react-query';
 
 const conditionLabel: Record<string, string> = {
   new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자',
@@ -74,9 +34,12 @@ export default function MyListingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   useRequireAuth();
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const { data: apiData } = useListings();
-  const usingMock = !apiData?.items;
-  const apiListings = apiData?.items?.map((l) => ({
+  const apiListings = apiData?.items
+    ?.filter((listing) => listing.sellerId === user?.id)
+    .map((l) => ({
     id: l.id,
     title: l.title,
     sportType: l.sportType || '',
@@ -89,9 +52,7 @@ export default function MyListingsPage() {
     createdAt: '',
     imageUrls: l.imageUrls ?? [],
   }));
-  const [localListings, setLocalListings] = useState(mockMyListings);
-  const listings = apiListings ?? localListings;
-  const setListings = setLocalListings;
+  const listings = apiListings ?? [];
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
 
@@ -105,7 +66,7 @@ export default function MyListingsPage() {
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       await api.patch(`/marketplace/listings/${id}`, { status: newStatus });
-      setListings(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+      queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
       toast('success', '상태가 변경되었어요');
     } catch {
       toast('error', '변경에 실패했어요. 다시 시도해주세요');
@@ -116,7 +77,7 @@ export default function MyListingsPage() {
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/marketplace/listings/${id}`);
-      setListings(prev => prev.filter(l => l.id !== id));
+      queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
       toast('success', '매물이 삭제되었어요');
     } catch {
       toast('error', '삭제하지 못했어요. 다시 시도해주세요');
@@ -136,13 +97,6 @@ export default function MyListingsPage() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 장터 매물</h2>
         <p className="text-base text-gray-500 dark:text-gray-400 mt-1">등록한 매물을 관리하세요</p>
       </div>
-
-      {usingMock && (
-        <div className="mx-5 @3xl:mx-0 mb-3 flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 px-4 py-2.5">
-          <Info size={16} className="text-amber-500 shrink-0" />
-          <span className="text-sm text-amber-700 dark:text-amber-400">API 연동 전 샘플 데이터가 표시되고 있습니다</span>
-        </div>
-      )}
 
       <div className="px-5 @3xl:px-0 space-y-3 pb-8">
         {listings.length === 0 ? (

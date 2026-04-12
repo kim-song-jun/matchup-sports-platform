@@ -1,20 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 
 export function PrivacyNavHeader() {
   const router = useRouter();
 
   return (
     <>
-      {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="rounded-xl p-1.5 -ml-1.5 min-h-[44px] min-w-11 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
-        </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 처리방침</h1>
-      </header>
+      <MobileGlassHeader title="개인정보 처리방침" showBack />
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 mb-6 text-sm text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600 dark:hover:text-gray-400">설정</button>

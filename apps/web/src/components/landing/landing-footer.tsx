@@ -9,14 +9,14 @@ export function LandingFooter() {
             <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center">
               <span className="text-white font-bold text-xs">M</span>
             </div>
-            <span className="font-semibold text-gray-900 dark:text-white text-md">TeamMeet</span>
+            <span className="font-semibold text-gray-900 dark:text-white text-md">MatchUp</span>
           </Link>
           <div className="flex items-center gap-4">
             <a href="#" className="min-h-[44px] inline-flex items-center text-xs text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">이용약관</a>
             <a href="#" className="min-h-[44px] inline-flex items-center text-xs text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">개인정보처리방침</a>
           </div>
         </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">&copy; 2026 TeamMeet. All rights reserved.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">&copy; 2026 MatchUp. All rights reserved.</p>
       </div>
     </footer>
   );

@@ -1,17 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, ChevronRight, SearchX } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SafeImage } from '@/components/ui/safe-image';
+import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { useMatch, useUpdateMatch, useVenues } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { getSportDetailImageSet } from '@/lib/sport-image';
 import type { UpdateMatchInput, Venue } from '@/types/api';
+import {
+  firstUploadUrl,
+  toExistingUploadAsset,
+  type UploadAsset,
+} from '@/lib/uploads';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -32,6 +37,7 @@ function buildUpdatePayload(form: {
   levelMin: number;
   levelMax: number;
   gender: string;
+  imageUrl?: string | null;
 }): UpdateMatchInput {
   return {
     sportType: form.sportType,
@@ -46,6 +52,7 @@ function buildUpdatePayload(form: {
     levelMin: Number(form.levelMin),
     levelMax: Number(form.levelMax),
     gender: form.gender,
+    imageUrl: form.imageUrl ?? null,
   };
 }
 
@@ -57,6 +64,7 @@ export default function EditMatchPage() {
   const matchId = params.id as string;
   const { data: apiMatch, isLoading } = useMatch(matchId);
   const updateMatchMutation = useUpdateMatch();
+  const hydratedMatchIdRef = useRef<string | null>(null);
 
   const [form, setForm] = useState({
     sportType: '',
@@ -72,24 +80,42 @@ export default function EditMatchPage() {
     levelMax: 5,
     gender: 'any',
   });
+  const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
+  const [uploadState, setUploadState] = useState<ImageUploadState>({
+    hasPendingUploads: false,
+    hasUploadErrors: false,
+    pendingCount: 0,
+  });
   const fallbackImages = getSportDetailImageSet(
     form.sportType || apiMatch?.sportType || 'soccer',
-    apiMatch?.imageUrl ? [apiMatch.imageUrl] : undefined,
+    [firstUploadUrl(imageAssets), apiMatch?.imageUrl].filter(Boolean) as string[],
     `${matchId}-edit-form`,
     3,
   );
-  const hasExistingMatchImage = Boolean(apiMatch?.imageUrl);
+  const hasExistingMatchImage = imageAssets.length > 0;
 
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
-  const venues = (venuesData || []) as Venue[];
+  const venues: Venue[] = Array.isArray(venuesData) ? venuesData : (venuesData?.items ?? []);
+
+  const guardImageUpload = () => {
+    if (uploadState.hasPendingUploads) {
+      toast('error', '이미지 업로드가 끝난 뒤 저장할 수 있어요');
+      return false;
+    }
+    if (uploadState.hasUploadErrors) {
+      toast('error', '실패한 이미지를 다시 시도하거나 제거해주세요');
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
-    if (apiMatch) {
+    if (apiMatch && hydratedMatchIdRef.current !== apiMatch.id) {
       setForm({
         sportType: apiMatch.sportType || '',
         title: apiMatch.title || '',
         description: apiMatch.description || '',
-        venueId: apiMatch.venue?.id || '',
+        venueId: apiMatch.venueId || apiMatch.venue?.id || '',
         matchDate: toDateInputValue(apiMatch.matchDate),
         startTime: apiMatch.startTime || '',
         endTime: apiMatch.endTime || '',
@@ -99,17 +125,26 @@ export default function EditMatchPage() {
         levelMax: apiMatch.levelMax || 5,
         gender: apiMatch.gender || 'any',
       });
+      setImageAssets(apiMatch.imageUrl ? [toExistingUploadAsset(apiMatch.imageUrl)] : []);
+      hydratedMatchIdRef.current = apiMatch.id;
     }
   }, [apiMatch]);
 
   const handleSave = async () => {
+    if (!guardImageUpload()) return;
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (!form.venueId) return toast('error', '시설을 선택해주세요');
     if (form.levelMin > form.levelMax) {
       return toast('error', '최소 레벨은 최대 레벨보다 높을 수 없어요');
     }
     try {
-      await updateMatchMutation.mutateAsync({ id: matchId, data: buildUpdatePayload(form) });
+      await updateMatchMutation.mutateAsync({
+        id: matchId,
+        data: buildUpdatePayload({
+          ...form,
+          imageUrl: firstUploadUrl(imageAssets) ?? null,
+        }),
+      });
       toast('success', '매치 정보가 저장되었어요');
       router.push(`/matches/${matchId}`);
     } catch (error) {
@@ -202,26 +237,48 @@ export default function EditMatchPage() {
         </FormSection>
 
         {/* Images */}
-        <FormSection label="대표 이미지 미리보기">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {fallbackImages.map((src, index) => (
-              <div key={`${src}-${index}`} className="relative shrink-0 h-20 w-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                <SafeImage
-                  src={src}
-                  fallbackSrc={fallbackImages[index + 1] ?? fallbackImages[0]}
-                  alt={`${form.title || apiMatch?.title || '매치'} 이미지 ${index + 1}`}
-                  fill
-                  className="object-cover"
-                  sizes="80px"
-                />
-              </div>
-            ))}
-          </div>
+        <FormSection label="대표 이미지">
+          <ImageUpload
+            value={imageAssets}
+            onChange={setImageAssets}
+            onStateChange={setUploadState}
+            max={1}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            maxSizeMB={10}
+          />
+          {!hasExistingMatchImage && fallbackImages.length > 0 && (
+            <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+              {fallbackImages.map((src, index) => (
+                <div key={`${src}-${index}`} className="relative shrink-0 h-20 w-20 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                  <img
+                    src={src}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-full object-cover opacity-60"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
           <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
             {hasExistingMatchImage
-              ? '이미지 업로드 수정은 아직 지원하지 않아요. 현재 대표 이미지를 미리보기로만 확인할 수 있어요.'
-              : '이미지 업로드 수정은 아직 지원하지 않아요. 대표 이미지가 없으면 기본 스포츠 이미지를 사용해요.'}
+              ? '저장된 이미지는 제거/교체할 수 있어요.'
+              : '대표 이미지가 없으면 기본 스포츠 이미지가 노출돼요.'}
           </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            이미지 변경은 저장 후 실제 매치에 반영돼요.
+          </p>
+          {uploadState.hasPendingUploads && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              이미지 업로드가 끝난 뒤 저장할 수 있어요.
+            </p>
+          )}
+          {uploadState.hasUploadErrors && (
+            <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+              실패한 이미지를 다시 시도하거나 제거해주세요.
+            </p>
+          )}
         </FormSection>
 
         {/* Venue */}
@@ -308,7 +365,7 @@ export default function EditMatchPage() {
             className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-800 py-3 text-base font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
             돌아가기
           </button>
-          <button onClick={handleSave} disabled={updateMatchMutation.isPending} data-testid="match-edit-save"
+          <button onClick={handleSave} disabled={updateMatchMutation.isPending || uploadState.hasPendingUploads || uploadState.hasUploadErrors} data-testid="match-edit-save"
             className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
             {updateMatchMutation.isPending ? '수정 중...' : '수정 완료'}
           </button>
@@ -321,7 +378,11 @@ export default function EditMatchPage() {
 function FormSection({ label, id, children }: { label: string; id?: string; children: React.ReactNode }) {
   return (
     <div className="mb-5">
-      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</label>
+      {id ? (
+        <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</label>
+      ) : (
+        <p className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</p>
+      )}
       {children}
     </div>
   );

@@ -24,9 +24,15 @@ export default function AdminUserDetailPage() {
   const [actionType, setActionType] = useState<ModerationAction>(null);
   const [actionNote, setActionNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const requiresActionNote = actionType === 'suspend';
 
   const handleModerationAction = async () => {
     if (!user || !actionType) {
+      return;
+    }
+
+    if (requiresActionNote && !actionNote.trim()) {
+      toast('error', '계정 정지 사유를 입력해주세요.');
       return;
     }
 
@@ -114,6 +120,9 @@ export default function AdminUserDetailPage() {
                 ? '정지 사유를 남기면 사용자 상세의 운영 로그와 상태 배지에 반영됩니다.'
                 : '활성화 사유를 남기면 복구 이력으로 저장됩니다.'}
           </p>
+          {requiresActionNote ? (
+            <p className="text-xs font-medium text-red-500">계정 정지 사유는 필수입니다.</p>
+          ) : null}
           <label htmlFor="admin-user-action-note" className="sr-only">운영 메모</label>
           <textarea
             id="admin-user-action-note"
@@ -136,7 +145,7 @@ export default function AdminUserDetailPage() {
             </button>
             <button
               onClick={() => void handleModerationAction()}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (requiresActionNote && !actionNote.trim())}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-base font-semibold text-white hover:bg-gray-800 transition-colors disabled:opacity-60"
             >
               {isSubmitting ? <RefreshCw size={16} className="animate-spin" /> : null}

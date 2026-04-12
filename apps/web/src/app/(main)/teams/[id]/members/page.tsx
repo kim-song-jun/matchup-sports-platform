@@ -39,12 +39,15 @@ export default function TeamMembersPage() {
   const leaveTeamMutation = useLeaveTeam();
 
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
-    if (!menuOpen) return;
+    const activeMenuId = menuOpen;
+    if (!activeMenuId) return;
+    const menuId: string = activeMenuId;
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const activeMenu = menuRefs.current[menuId];
+      if (activeMenu && !activeMenu.contains(e.target as Node)) {
         setMenuOpen(null);
       }
     }
@@ -52,14 +55,22 @@ export default function TeamMembersPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
 
-  const [kickTarget, setKickTarget] = useState<{ memberId: string; name: string } | null>(null);
+  const [kickTarget, setKickTarget] = useState<{ userId: string; name: string } | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [transferTarget, setTransferTarget] = useState<{ userId: string; nickname: string } | null>(null);
   // TODO: invite modal pending backend nickname-search support — hidden until ready
 
   const myMembership = members.find((m) => m.userId === user?.id);
   const isOwner = myMembership?.role === 'owner';
-  const isManager = isOwner || myMembership?.role === 'manager';
+  const membersPageTitle = myMembership?.role === 'member' ? '멤버 목록' : '멤버 관리';
+
+  function setMenuRef(memberId: string, node: HTMLDivElement | null) {
+    if (node) {
+      menuRefs.current[memberId] = node;
+      return;
+    }
+    delete menuRefs.current[memberId];
+  }
 
   function handleRoleChange(memberUserId: string, newRole: string) {
     updateRoleMutation.mutate(
@@ -74,9 +85,9 @@ export default function TeamMembersPage() {
     );
   }
 
-  function handleKick(memberId: string) {
+  function handleKick(userId: string) {
     removeMemberMutation.mutate(
-      { teamId, memberId },
+      { teamId, userId },
       {
         onSuccess: () => {
           toast('success', '멤버가 추방되었어요');
@@ -108,14 +119,14 @@ export default function TeamMembersPage() {
           >
             <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">멤버 관리</h1>
+          <h1 data-testid="team-members-heading" className="text-lg font-semibold text-gray-900 dark:text-white">{membersPageTitle}</h1>
         </div>
         {/* Invite button hidden — backend nickname-search not yet available */}
       </header>
 
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">멤버 관리</h2>
+          <h2 data-testid="team-members-heading" className="text-2xl font-bold text-gray-900 dark:text-white">{membersPageTitle}</h2>
           <p className="text-base text-gray-500 mt-1">
             {isLoading ? '불러오는 중...' : `팀 멤버 ${members.length}명`}
           </p>
@@ -146,7 +157,11 @@ export default function TeamMembersPage() {
             const canManage = isOwner && !isSelf && member.role !== 'owner';
 
             return (
-              <div key={member.id} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3">
+              <div
+                key={member.id}
+                data-testid={`team-member-row-${member.userId}`}
+                className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 flex items-center gap-3"
+              >
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 shrink-0">
                   {member.role === 'owner' ? (
                     <Crown size={18} className="text-amber-500" aria-hidden="true" />
@@ -159,7 +174,10 @@ export default function TeamMembersPage() {
                     <span className="text-md font-semibold text-gray-900 dark:text-white">
                       {member.user?.nickname ?? '알 수 없음'}
                     </span>
-                    <span className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${role.style}`}>
+                    <span
+                      data-testid={`team-member-role-${member.userId}`}
+                      className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${role.style}`}
+                    >
                       {role.label}
                     </span>
                     {isSelf && (
@@ -176,10 +194,11 @@ export default function TeamMembersPage() {
 
                 {/* Owner: manage other members */}
                 {canManage && (
-                  <div className="relative" ref={menuRef}>
+                  <div className="relative" ref={(node) => setMenuRef(member.id, node)}>
                     <button
                       onClick={() => setMenuOpen(menuOpen === member.id ? null : member.id)}
-                      aria-label="멤버 메뉴"
+                      aria-label={`${member.user?.nickname ?? '멤버'} 멤버 메뉴`}
+                      data-testid={`team-member-menu-${member.userId}`}
                       className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       <MoreVertical size={16} className="text-gray-500 dark:text-gray-400" />
@@ -188,6 +207,7 @@ export default function TeamMembersPage() {
                       <div role="menu" className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 shadow-lg z-10 overflow-hidden min-w-[160px]">
                         {member.role === 'member' ? (
                           <button
+                            data-testid={`team-member-set-manager-${member.userId}`}
                             role="menuitem"
                             onClick={() => handleRoleChange(member.userId, 'manager')}
                             disabled={updateRoleMutation.isPending}
@@ -198,6 +218,7 @@ export default function TeamMembersPage() {
                           </button>
                         ) : (
                           <button
+                            data-testid={`team-member-set-member-${member.userId}`}
                             role="menuitem"
                             onClick={() => handleRoleChange(member.userId, 'member')}
                             disabled={updateRoleMutation.isPending}
@@ -208,6 +229,7 @@ export default function TeamMembersPage() {
                           </button>
                         )}
                         <button
+                          data-testid={`team-member-transfer-${member.userId}`}
                           role="menuitem"
                           onClick={() => {
                             setTransferTarget({ userId: member.userId, nickname: member.user?.nickname ?? '이 멤버' });
@@ -219,9 +241,10 @@ export default function TeamMembersPage() {
                           소유권 이전
                         </button>
                         <button
+                          data-testid={`team-member-kick-${member.userId}`}
                           role="menuitem"
                           onClick={() => {
-                            setKickTarget({ memberId: member.id, name: member.user?.nickname ?? '이 멤버' });
+                            setKickTarget({ userId: member.userId, name: member.user?.nickname ?? '이 멤버' });
                             setMenuOpen(null);
                           }}
                           className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 border-t border-gray-100 dark:border-gray-700 min-h-[44px]"
@@ -238,6 +261,8 @@ export default function TeamMembersPage() {
                 {isSelf && !isOwner && (
                   <button
                     onClick={() => setShowLeaveModal(true)}
+                    aria-label={`${member.user?.nickname ?? '내 계정'} 팀 탈퇴`}
+                    data-testid="team-member-leave-self"
                     className="flex items-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors min-h-[44px]"
                   >
                     <LogOut size={14} />
@@ -259,7 +284,7 @@ export default function TeamMembersPage() {
           <p className="text-base text-gray-700 dark:text-gray-200 text-center">
             <span className="font-bold">{kickTarget.name}</span>님을 강퇴하시겠어요?
           </p>
-          <p className="text-sm text-gray-500 text-center mt-1">강퇴된 멤버에게 알림이 발송됩니다.</p>
+          <p className="text-sm text-gray-500 text-center mt-1">강퇴 후에는 멤버 목록에서 즉시 제거됩니다.</p>
           <div className="mt-6 flex gap-3">
             <button
               onClick={() => setKickTarget(null)}
@@ -268,7 +293,7 @@ export default function TeamMembersPage() {
               돌아가기
             </button>
             <button
-              onClick={() => handleKick(kickTarget.memberId)}
+              onClick={() => handleKick(kickTarget.userId)}
               disabled={removeMemberMutation.isPending}
               className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
             >

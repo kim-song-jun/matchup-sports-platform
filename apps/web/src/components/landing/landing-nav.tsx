@@ -34,15 +34,15 @@ export function LandingNav() {
     <>
       <nav aria-label="메인 네비게이션" className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,box-shadow] duration-300 ${
         scrolled || mobileOpen
-          ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-sm'
+          ? 'border-b border-gray-100/80 bg-white/92 backdrop-blur-md shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-gray-900/88'
           : 'bg-transparent'
       }`}>
         <div className="max-w-[1100px] mx-auto px-5 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
               <span className="text-white font-black text-sm">M</span>
             </div>
-            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">TeamMeet</span>
+            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">MatchUp</span>
           </Link>
 
           {/* Desktop links */}
@@ -67,7 +67,7 @@ export function LandingNav() {
             </Link>
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden flex items-center justify-center w-11 h-11 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="md:hidden flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
               aria-label={mobileOpen ? '메뉴 닫기' : '메뉴 열기'}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
@@ -77,7 +77,7 @@ export function LandingNav() {
 
         {/* Mobile dropdown */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 animate-fade-in">
+          <div className="md:hidden animate-fade-in border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-[1100px] mx-auto px-5 py-3 space-y-1">
               {NAV_LINKS.map((link) => {
                 const isActive = pathname === link.href;

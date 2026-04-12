@@ -11,7 +11,14 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { getSportImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { FormField } from '@/components/ui/form-field';
+import { Card } from '@/components/ui/card';
+import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { firstUploadUrl, type UploadAsset } from '@/lib/uploads';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -21,7 +28,12 @@ export default function CreateMatchPage() {
   const { toast } = useToast();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
+  const [uploadState, setUploadState] = useState<ImageUploadState>({
+    hasPendingUploads: false,
+    hasUploadErrors: false,
+    pendingCount: 0,
+  });
 
   const [form, setForm] = useState({
     sportType: '',
@@ -42,13 +54,27 @@ export default function CreateMatchPage() {
 
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
   const venues: Venue[] = Array.isArray(venuesData) ? venuesData : (venuesData?.items ?? []);
-  const sampleImages = imageUrls.length === 0
+  const sampleImages = imageAssets.length === 0
     ? getSportImageSet(form.sportType || 'futsal', `match-create-${form.sportType || 'default'}`, 3)
     : [];
 
   const steps = ['종목', '정보', '장소·일시', '확인'];
 
+  const guardImageUpload = () => {
+    if (uploadState.hasPendingUploads) {
+      toast('error', '이미지 업로드가 끝난 뒤 계속할 수 있어요');
+      return false;
+    }
+    if (uploadState.hasUploadErrors) {
+      toast('error', '실패한 이미지를 다시 시도하거나 제거해주세요');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (!guardImageUpload()) return;
+
     setIsSubmitting(true);
     try {
       if (!form.venueId) {
@@ -69,7 +95,7 @@ export default function CreateMatchPage() {
         levelMin: form.levelMin,
         levelMax: form.levelMax,
         gender: form.gender,
-        ...(imageUrls.length > 0 ? { imageUrl: imageUrls[0] } : {}),
+        ...(imageAssets.length > 0 ? { imageUrl: firstUploadUrl(imageAssets) } : {}),
       });
       toast('success', '매치가 만들어졌어요!');
       router.push('/matches?created=true');
@@ -135,22 +161,35 @@ export default function CreateMatchPage() {
         {step === 1 && (
           <div className="space-y-4 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">매치 정보</h3>
-            <Field label="매치 제목" required id="match-title">
-              <input id="match-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-                maxLength={100} placeholder="예: 주말 풋살 한판!" className="form-input" />
-            </Field>
-            <Field label="설명" id="match-description">
-              <textarea id="match-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                maxLength={1000} placeholder="매치에 대한 설명을 적어주세요" rows={3} className="form-input resize-none" />
-            </Field>
+            <FormField label="매치 제목" required htmlFor="match-title">
+              <Input
+                id="match-title"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                maxLength={100}
+                placeholder="예: 주말 풋살 한판!"
+              />
+            </FormField>
+            <FormField label="설명" htmlFor="match-description">
+              <Textarea
+                id="match-description"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                maxLength={1000}
+                placeholder="매치에 대한 설명을 적어주세요"
+                rows={3}
+                className="min-h-[96px] resize-none"
+              />
+            </FormField>
 
             {/* Image upload — ImageUpload renders its own label, do not wrap in Field (avoids orphan label) */}
             <div>
               <ImageUpload
-                value={imageUrls}
-                onChange={setImageUrls}
-                max={5}
-                accept="image/jpeg,image/png,image/webp"
+                value={imageAssets}
+                onChange={setImageAssets}
+                onStateChange={setUploadState}
+                max={1}
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 maxSizeMB={10}
                 label="이미지 (선택)"
               />
@@ -175,33 +214,53 @@ export default function CreateMatchPage() {
               {sampleImages.length > 0 && (
                 <p className="mt-1.5 text-xs text-gray-500">대표 이미지가 비어 있으면 위 예시처럼 노출됩니다.</p>
               )}
+              {uploadState.hasPendingUploads && (
+                <p className="mt-1.5 text-xs text-gray-500">이미지 업로드가 끝난 뒤 다음 단계로 진행할 수 있어요.</p>
+              )}
+              {uploadState.hasUploadErrors && (
+                <p className="mt-1.5 text-xs text-red-500">실패한 이미지를 다시 시도하거나 제거해주세요.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="최대 인원" id="match-maxPlayers">
-                <input id="match-maxPlayers" type="number" inputMode="numeric" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: +e.target.value })}
-                  min={2} max={30} className="form-input" />
-              </Field>
-              <Field label="참가비 (원)" id="match-fee">
-                <input id="match-fee" type="number" inputMode="numeric" value={form.fee} onChange={(e) => setForm({ ...form, fee: +e.target.value })}
-                  min={0} step={1000} className="form-input" />
-              </Field>
+              <FormField label="최대 인원" htmlFor="match-maxPlayers">
+                <Input
+                  id="match-maxPlayers"
+                  type="number"
+                  inputMode="numeric"
+                  value={form.maxPlayers}
+                  onChange={(e) => setForm({ ...form, maxPlayers: +e.target.value })}
+                  min={2}
+                  max={30}
+                />
+              </FormField>
+              <FormField label="참가비 (원)" htmlFor="match-fee">
+                <Input
+                  id="match-fee"
+                  type="number"
+                  inputMode="numeric"
+                  value={form.fee}
+                  onChange={(e) => setForm({ ...form, fee: +e.target.value })}
+                  min={0}
+                  step={1000}
+                />
+              </FormField>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="최소 레벨" id="match-levelMin">
-                <select id="match-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: +e.target.value })} className="form-input">
+              <FormField label="최소 레벨" htmlFor="match-levelMin">
+                <Select id="match-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: +e.target.value })}>
                   {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
-                </select>
-              </Field>
-              <Field label="최대 레벨" id="match-levelMax">
-                <select id="match-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: +e.target.value })} className="form-input">
+                </Select>
+              </FormField>
+              <FormField label="최대 레벨" htmlFor="match-levelMax">
+                <Select id="match-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: +e.target.value })}>
                   {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
-                </select>
-              </Field>
+                </Select>
+              </FormField>
             </div>
 
             {/* Gender */}
-            <Field label="성별 제한">
+            <FormField label="성별 제한">
               <div className="flex gap-2">
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
                   <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
@@ -212,15 +271,23 @@ export default function CreateMatchPage() {
                   </button>
                 ))}
               </div>
-            </Field>
+            </FormField>
 
             {/* Rules */}
-            <Field label="추가 규칙 (선택)" id="match-rules">
-              <textarea id="match-rules" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })}
-                maxLength={500} placeholder="참가자에게 알릴 규칙이나 공지사항" rows={2} className="form-input resize-none" />
-            </Field>
+            <FormField label="추가 규칙 (선택)" htmlFor="match-rules">
+              <Textarea
+                id="match-rules"
+                value={form.rules}
+                onChange={(e) => setForm({ ...form, rules: e.target.value })}
+                maxLength={500}
+                placeholder="참가자에게 알릴 규칙이나 공지사항"
+                rows={2}
+                className="min-h-[88px] resize-none"
+              />
+            </FormField>
 
-            <button onClick={() => {
+            <Button onClick={() => {
+                if (!guardImageUpload()) return;
                 if (!form.title) { toast('error', '매치 제목을 입력해주세요'); return; }
                 if (form.levelMin > form.levelMax) {
                   setForm(prev => ({ ...prev, levelMin: prev.levelMax, levelMax: prev.levelMin }));
@@ -230,9 +297,12 @@ export default function CreateMatchPage() {
                 setStep(2);
               }}
               data-testid="match-create-next-info"
-              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
+              disabled={uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+              fullWidth
+              size="lg"
+              className="mt-2">
               다음
-            </button>
+            </Button>
           </div>
         )}
 
@@ -240,7 +310,7 @@ export default function CreateMatchPage() {
         {step === 2 && (
           <div className="space-y-4 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">장소와 시간</h3>
-            <Field label="시설 선택" required>
+            <FormField label="시설 선택" required>
               {Array.isArray(venues) && venues.length > 0 && (
                 <div className="space-y-2 mb-3">
                   {venues.map((v: Venue) => (
@@ -257,28 +327,27 @@ export default function CreateMatchPage() {
               )}
               <div className="mt-2">
                 <label htmlFor="match-customVenue" className="block text-xs text-gray-500 mb-1.5">또는 직접 입력</label>
-                <input
+                <Input
                   id="match-customVenue"
                   value={form.customVenue}
                   onChange={(e) => setForm({ ...form, customVenue: e.target.value, venueId: '' })}
                   maxLength={200}
                   placeholder="예: 한강공원 축구장, 동네 체육관 등"
-                  className="form-input"
                 />
               </div>
-            </Field>
+            </FormField>
             <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-3">
-              <Field label="날짜" id="match-date">
-                <input id="match-date" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} className="form-input" />
-              </Field>
-              <Field label="시작 시간" id="match-startTime">
-                <input id="match-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} className="form-input" />
-              </Field>
-              <Field label="종료 시간" id="match-endTime">
-                <input id="match-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} className="form-input" />
-              </Field>
+              <FormField label="날짜" htmlFor="match-date">
+                <Input id="match-date" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} />
+              </FormField>
+              <FormField label="시작 시간" htmlFor="match-startTime">
+                <Input id="match-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+              </FormField>
+              <FormField label="종료 시간" htmlFor="match-endTime">
+                <Input id="match-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+              </FormField>
             </div>
-            <button onClick={() => {
+            <Button onClick={() => {
                 if (!form.venueId) { toast('error', '현재는 등록된 시설만 선택할 수 있어요'); return; }
                 if (!form.matchDate) { toast('error', '날짜를 선택해주세요'); return; }
                 if (!form.startTime) { toast('error', '시작 시간을 입력해주세요'); return; }
@@ -287,9 +356,11 @@ export default function CreateMatchPage() {
                 setStep(3);
               }}
               data-testid="match-create-next-schedule"
-              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors mt-2">
+              fullWidth
+              size="lg"
+              className="mt-2">
               다음
-            </button>
+            </Button>
           </div>
         )}
 
@@ -297,7 +368,7 @@ export default function CreateMatchPage() {
         {step === 3 && (
           <div className="space-y-4 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">확인</h3>
-            <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-4 space-y-2.5">
+            <Card variant="subtle" className="space-y-2.5">
               <ConfirmRow label="종목" value={sportLabel[form.sportType] || form.sportType} />
               {(form.venueId || form.customVenue) && (
                 <ConfirmRow label="장소" value={form.venueId ? (venues.find((v: Venue) => v.id === form.venueId)?.name || form.venueId) : form.customVenue} />
@@ -310,56 +381,18 @@ export default function CreateMatchPage() {
               <ConfirmRow label="레벨" value={`${levelLabel[form.levelMin]} ~ ${levelLabel[form.levelMax]}`} />
               <ConfirmRow label="성별" value={form.gender === 'any' ? '무관' : form.gender === 'male' ? '남성' : '여성'} />
               {form.rules && <ConfirmRow label="규칙" value={form.rules} />}
-              {imageUrls.length > 0 && <ConfirmRow label="이미지" value={`${imageUrls.length}장`} />}
-            </div>
-            <button onClick={handleSubmit} disabled={isSubmitting} aria-busy={isSubmitting}
+              {imageAssets.length > 0 && <ConfirmRow label="이미지" value={`${imageAssets.length}장`} />}
+            </Card>
+            <Button onClick={handleSubmit} disabled={isSubmitting || uploadState.hasUploadErrors} aria-busy={isSubmitting}
               data-testid="match-create-submit"
-              className="w-full rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
+              fullWidth
+              size="lg"
+              className="gap-1.5">
               {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
-            </button>
+            </Button>
           </div>
         )}
       </div>
-
-
-      <style jsx>{`
-        .form-input {
-          width: 100%;
-          border-radius: 12px;
-          border: 1px solid #E5E8EB;
-          background: #F9FAFB;
-          padding: 10px 12px;
-          font-size: 14px;
-          color: #191F28;
-          outline: none;
-          transition: all 0.2s;
-        }
-        .form-input:focus {
-          border-color: #3182F6;
-          background: white;
-          box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
-        }
-        :global(.dark) .form-input {
-          border-color: #374151;
-          background: #1F2937;
-          color: #F3F4F6;
-        }
-        :global(.dark) .form-input:focus {
-          border-color: #3182F6;
-          background: #111827;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-function Field({ label, required, id, children }: { label: string; required?: boolean; id?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-500 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      {children}
     </div>
   );
 }

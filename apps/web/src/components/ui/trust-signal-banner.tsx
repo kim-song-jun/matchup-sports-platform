@@ -12,21 +12,21 @@ interface TrustSignalBannerProps {
 const toneConfig = {
   info: {
     Icon: Info,
-    wrapper: 'border-slate-200 bg-slate-50 text-slate-700',
-    label: 'bg-white text-slate-600',
-    iconClass: 'text-slate-500',
+    wrapper: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100',
+    label: 'bg-white text-slate-600 dark:bg-slate-800 dark:text-slate-200',
+    iconClass: 'text-slate-500 dark:text-slate-200',
   },
   warning: {
     Icon: AlertTriangle,
-    wrapper: 'border-amber-200 bg-amber-50 text-amber-800',
-    label: 'bg-white text-amber-700',
-    iconClass: 'text-amber-600',
+    wrapper: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-100',
+    label: 'bg-white text-amber-700 dark:bg-amber-900/80 dark:text-amber-100',
+    iconClass: 'text-amber-600 dark:text-amber-200',
   },
   success: {
     Icon: CheckCircle2,
-    wrapper: 'border-green-200 bg-green-50 text-green-800',
-    label: 'bg-white text-green-700',
-    iconClass: 'text-green-600',
+    wrapper: 'border-green-200 bg-green-50 text-green-800 dark:border-green-800/70 dark:bg-green-950/35 dark:text-green-100',
+    label: 'bg-white text-green-700 dark:bg-green-900/80 dark:text-green-100',
+    iconClass: 'text-green-600 dark:text-green-200',
   },
 } as const;
 

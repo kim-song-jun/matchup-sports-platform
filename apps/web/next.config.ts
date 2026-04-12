@@ -17,6 +17,9 @@ const internalApiOrigin =
 const nextConfig: NextConfig = {
   // 프로덕션: standalone, Capacitor: export
   output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'next-intl', '@tanstack/react-query'],
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = { ...config.resolve.fallback, buffer: false };
@@ -25,6 +28,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     unoptimized: isCapacitorBuild,
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
     ],

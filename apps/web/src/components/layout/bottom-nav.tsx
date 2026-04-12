@@ -25,40 +25,53 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(var(--safe-area-bottom)+0.75rem)]"
+      className="fixed inset-x-0 bottom-0 z-50 @3xl:hidden"
       data-testid="bottom-nav"
     >
-      <div className="floating-bottom-nav flex w-full max-w-xl items-center justify-between rounded-[28px] px-2 py-2">
-        {navItems.map(({ href, icon: Icon, label, testId }) => {
-          const isActive = href === '/teams'
-            ? pathname.startsWith('/teams') || pathname.startsWith('/team-matches') || pathname.startsWith('/mercenary')
-            : pathname.startsWith(href);
-          const isProfile = href === '/profile';
-          return (
-            <Link
-              key={href}
-              href={href}
-              data-testid={testId}
-              className={cn(
-                'bottom-nav-link flex min-h-14 min-w-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-[22px] px-3 py-2 text-center focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-                isActive ? 'is-active text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400',
-              )}
-            >
-              <div className="relative">
-                <Icon size={22} strokeWidth={isActive ? 1.9 : 1.6} />
-                {isProfile && totalUnread > 0 && (
-                  <span
-                    className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-2xs font-bold text-white animate-badge-pulse"
-                    aria-label={`읽지 않은 알림 ${totalUnread > 99 ? '99개 이상' : `${totalUnread}개`}`}
-                  >
-                    <span aria-hidden="true">{totalUnread > 99 ? '99+' : totalUnread}</span>
-                  </span>
+      <div className="glass-mobile-nav mx-auto max-w-lg border-t border-gray-200/40 dark:border-white/5 pb-[var(--safe-area-bottom)]">
+        <div className="flex items-center justify-around px-2 pt-1.5 pb-1">
+          {navItems.map(({ href, icon: Icon, label, testId }) => {
+            const isActive = href === '/teams'
+              ? pathname.startsWith('/teams') || pathname.startsWith('/team-matches') || pathname.startsWith('/mercenary')
+              : pathname.startsWith(href);
+            const isProfile = href === '/profile';
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                data-testid={testId}
+                aria-label={label}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-[44px] min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1',
+                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                  isActive
+                    ? 'text-blue-500 dark:text-blue-400'
+                    : 'text-gray-400 dark:text-gray-500',
                 )}
-              </div>
-              <span className={cn('text-2xs font-semibold tracking-[0.01em]', isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400')}>{label}</span>
-            </Link>
-          );
-        })}
+              >
+                <div className="relative">
+                  <Icon size={22} strokeWidth={isActive ? 2 : 1.5} />
+                  {isProfile && totalUnread > 0 && (
+                    <span
+                      className="absolute -right-1.5 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white"
+                      aria-label={`읽지 않은 알림 ${totalUnread > 99 ? '99개 이상' : `${totalUnread}개`}`}
+                    >
+                      <span aria-hidden="true">{totalUnread > 99 ? '99+' : totalUnread}</span>
+                    </span>
+                  )}
+                </div>
+                <span className={cn(
+                  'text-[10px] font-medium leading-tight',
+                  isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500',
+                )}>
+                  {label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

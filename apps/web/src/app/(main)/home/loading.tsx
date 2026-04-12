@@ -1,5 +1,3 @@
-'use client';
-
 import { Skeleton, CardSkeleton } from '@/components/ui/skeleton';
 
 export default function Loading() {

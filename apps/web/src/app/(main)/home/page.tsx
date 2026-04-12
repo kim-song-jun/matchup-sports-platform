@@ -3,7 +3,9 @@ import { serverFetch } from '@/lib/server-fetch';
 import { HomePage } from './home-client';
 
 export default async function Page() {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: 120_000 } },
+  });
 
   // Skip server prefetch in Capacitor export builds — fetches run at build time
   // and the API may be unavailable, producing stale or empty dehydrated caches.

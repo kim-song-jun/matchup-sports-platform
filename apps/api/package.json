@@ -23,7 +23,7 @@
     "test": "jest --selectProjects unit",
     "test:watch": "jest --selectProjects unit --watch",
     "test:cov": "jest --coverage",
-    "test:integration": "jest --selectProjects integration --runInBand"
+    "test:integration": "jest --selectProjects integration --runInBand --forceExit"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.18",

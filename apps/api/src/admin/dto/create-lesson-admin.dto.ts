@@ -20,11 +20,11 @@ export class CreateLessonAdminDto {
   @IsUUID()
   hostId!: string;
 
-  @ApiProperty({ enum: SportType, description: '종목' })
+  @ApiProperty({ enum: SportType, enumName: 'SportType', description: '종목' })
   @IsEnum(SportType)
   sportType!: SportType;
 
-  @ApiProperty({ enum: LessonType, description: '강좌 유형' })
+  @ApiProperty({ enum: LessonType, enumName: 'LessonType', description: '강좌 유형' })
   @IsEnum(LessonType)
   type!: LessonType;
 

@@ -4,7 +4,7 @@ import { AdminUserStatus } from '@prisma/client';
 import { IsEnum, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
 
 export class UpdateUserStatusAdminDto {
-  @ApiProperty({ enum: AdminUserStatus, description: '변경할 관리자 상태' })
+  @ApiProperty({ enum: AdminUserStatus, enumName: 'AdminUserStatus', description: '변경할 관리자 상태' })
   @IsEnum(AdminUserStatus)
   status!: AdminUserStatus;
 

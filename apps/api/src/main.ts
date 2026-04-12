@@ -47,7 +47,7 @@ async function bootstrap() {
     .setTitle('TeamMeet API')
     .setDescription('AI 기반 멀티스포츠 소셜 매칭 플랫폼 API')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);

@@ -3,12 +3,12 @@ import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { SportType, TournamentStatus } from '@prisma/client';
 
 export class TournamentQueryDto {
-  @ApiPropertyOptional({ enum: SportType, description: '종목 필터' })
+  @ApiPropertyOptional({ enum: SportType, enumName: 'SportType', description: '종목 필터' })
   @IsEnum(SportType)
   @IsOptional()
   sportType?: SportType;
 
-  @ApiPropertyOptional({ enum: TournamentStatus, description: '상태 필터' })
+  @ApiPropertyOptional({ enum: TournamentStatus, enumName: 'TournamentStatus', description: '상태 필터' })
   @IsEnum(TournamentStatus)
   @IsOptional()
   status?: TournamentStatus;

@@ -4,7 +4,7 @@ import { SportType, MatchStyle } from '@prisma/client';
 
 export class CreateTeamMatchDto {
   @ApiProperty() @IsUUID() hostTeamId!: string;
-  @ApiProperty({ enum: SportType }) @IsEnum(SportType) sportType!: SportType;
+  @ApiProperty({ enum: SportType, enumName: 'SportType' }) @IsEnum(SportType) sportType!: SportType;
   @ApiProperty() @IsString() title!: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() description?: string;
   @ApiProperty() @Matches(/^\d{4}-\d{2}-\d{2}$/) matchDate!: string;
@@ -22,7 +22,7 @@ export class CreateTeamMatchDto {
   @ApiProperty({ required: false }) @IsOptional() @IsInt() @Min(1) @Max(5) requiredLevel?: number;
   @ApiProperty({ required: false, default: false }) @IsOptional() @IsBoolean() hasProPlayers?: boolean;
   @ApiProperty({ required: false, default: true }) @IsOptional() @IsBoolean() allowMercenary?: boolean;
-  @ApiProperty({ required: false, enum: MatchStyle }) @IsOptional() @IsEnum(MatchStyle) matchStyle?: MatchStyle;
+  @ApiProperty({ required: false, enum: MatchStyle, enumName: 'MatchStyle' }) @IsOptional() @IsEnum(MatchStyle) matchStyle?: MatchStyle;
   @ApiProperty({ required: false, default: false }) @IsOptional() @IsBoolean() hasReferee?: boolean;
   @ApiProperty({ required: false }) @IsOptional() @IsString() notes?: string;
 

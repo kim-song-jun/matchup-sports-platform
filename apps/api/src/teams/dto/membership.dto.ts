@@ -7,14 +7,14 @@ export class AddMemberDto {
   @IsString()
   userId!: string;
 
-  @ApiPropertyOptional({ enum: TeamRole, description: 'Role to assign (defaults to member)' })
+  @ApiPropertyOptional({ enum: TeamRole, enumName: 'TeamRole', description: 'Role to assign (defaults to member)' })
   @IsOptional()
   @IsEnum(TeamRole)
   role?: TeamRole;
 }
 
 export class UpdateMemberRoleDto {
-  @ApiProperty({ enum: TeamRole, description: 'New role to assign' })
+  @ApiProperty({ enum: TeamRole, enumName: 'TeamRole', description: 'New role to assign' })
   @IsEnum(TeamRole)
   role!: TeamRole;
 }

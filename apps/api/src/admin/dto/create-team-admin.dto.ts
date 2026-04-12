@@ -26,7 +26,7 @@ export class CreateTeamAdminDto {
   @MaxLength(100)
   name!: string;
 
-  @ApiProperty({ enum: SportType, description: '종목' })
+  @ApiProperty({ enum: SportType, enumName: 'SportType', description: '종목' })
   @IsEnum(SportType)
   sportType!: SportType;
 

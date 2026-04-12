@@ -249,8 +249,8 @@
     "thisWeek": "이번 주",
     "lastMonth": "지난달",
     "older": "이전",
-    "loginPromptTitle": "활동 내역이 기다려요",
-    "loginPromptDesc": "로그인하면 내 활동 피드를 볼 수 있어요",
+    "emptyTitle": "아직 활동 내역이 없어요",
+    "emptyDesc": "매칭에 참여하면 피드가 채워져요",
     "viewAllActivity": "전체 활동 보기"
   },
   "report": {

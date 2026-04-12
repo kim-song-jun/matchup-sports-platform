@@ -11,7 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SportType } from '@prisma/client';
 
 export class CreateTournamentDto {
-  @ApiProperty({ enum: SportType, description: '종목' })
+  @ApiProperty({ enum: SportType, enumName: 'SportType', description: '종목' })
   @IsEnum(SportType)
   sportType!: SportType;
 

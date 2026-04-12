@@ -4,10 +4,10 @@ import { inputStyles } from '@/components/ui/input';
 
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
-export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, ...props }, ref) => (
-    <textarea ref={ref} className={cn(inputStyles, 'min-h-[112px]', className)} {...props} />
-  ),
-);
-
-Textarea.displayName = 'Textarea';
+export function Textarea({
+  className,
+  ref,
+  ...props
+}: TextareaProps & { ref?: React.Ref<HTMLTextAreaElement> }) {
+  return <textarea ref={ref} className={cn(inputStyles, 'min-h-[112px]', className)} {...props} />;
+}

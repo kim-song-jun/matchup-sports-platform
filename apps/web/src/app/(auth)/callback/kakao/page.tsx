@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -12,7 +12,7 @@ type OAuthResult = {
   user: UserProfile;
 };
 
-export default function KakaoCallbackPage() {
+function KakaoCallbackPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuthStore();
@@ -68,5 +68,13 @@ export default function KakaoCallbackPage() {
       />
       <p className="text-sm text-gray-500 dark:text-gray-400">로그인 중...</p>
     </div>
+  );
+}
+
+export default function KakaoCallbackPage() {
+  return (
+    <Suspense fallback={null}>
+      <KakaoCallbackPageInner />
+    </Suspense>
   );
 }

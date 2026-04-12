@@ -4,8 +4,10 @@ import { inputStyles } from '@/components/ui/input';
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {}
 
-export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ className, ...props }, ref) => (
-  <select ref={ref} className={cn(inputStyles, className)} {...props} />
-));
-
-Select.displayName = 'Select';
+export function Select({
+  className,
+  ref,
+  ...props
+}: SelectProps & { ref?: React.Ref<HTMLSelectElement> }) {
+  return <select ref={ref} className={cn(inputStyles, className)} {...props} />;
+}

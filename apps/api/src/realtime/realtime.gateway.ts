@@ -43,7 +43,7 @@ export class RealtimeGateway
     private readonly chatService: ChatService,
   ) {}
 
-  async handleConnection(client: Socket) {
+  async handleConnection(client: Socket, ...args: any[]) {
     try {
       const token =
         (client.handshake.auth?.token as string | undefined) ||

@@ -1,11 +1,11 @@
 # Task 52 — Current Design Drift Audit And Remediation Plan
 
-> Active design remediation task. Read `DESIGN.md` first for visual rules and `docs/DESIGN_DOCUMENT_MAP.md` for document navigation. Use this file as the current execution contract, not as a rule-definition document.
+> **Superseded by `.github/tasks/58-design-system-audit.md`** (2026-04-12). This file remains as evidence/history. The Evidence Snapshot section below is referenced by Task 58.
 
 Owner: project-director -> frontend-dev -> frontend-review -> design/qa/docs
 Date drafted: 2026-04-11
-Status: Planned
-Priority: P1
+Status: Superseded (by Task 58)
+Priority: --
 
 ## Planning Report
 

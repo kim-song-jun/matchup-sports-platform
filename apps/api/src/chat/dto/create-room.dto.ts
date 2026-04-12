@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ChatRoomType } from '@prisma/client';
 
 export class CreateRoomDto {
-  @ApiProperty({ enum: ChatRoomType, description: 'Room type' })
+  @ApiProperty({ enum: ChatRoomType, enumName: 'ChatRoomType', description: 'Room type' })
   @IsEnum(ChatRoomType)
   type!: ChatRoomType;
 

@@ -4,12 +4,12 @@ import { Type } from 'class-transformer';
 import { SportType, MercenaryPostStatus } from '@prisma/client';
 
 export class MercenaryQueryDto {
-  @ApiProperty({ required: false, enum: SportType, description: 'Filter by sport type' })
+  @ApiProperty({ required: false, enum: SportType, enumName: 'SportType', description: 'Filter by sport type' })
   @IsOptional()
   @IsEnum(SportType)
   sportType?: SportType;
 
-  @ApiProperty({ required: false, enum: MercenaryPostStatus, description: 'Filter by post status' })
+  @ApiProperty({ required: false, enum: MercenaryPostStatus, enumName: 'MercenaryPostStatus', description: 'Filter by post status' })
   @IsOptional()
   @IsEnum(MercenaryPostStatus)
   status?: MercenaryPostStatus;

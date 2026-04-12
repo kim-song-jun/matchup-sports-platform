@@ -24,7 +24,7 @@ export class CreateListingDto {
   @IsNotEmpty()
   description!: string;
 
-  @ApiProperty({ enum: SportType, description: '관련 종목' })
+  @ApiProperty({ enum: SportType, enumName: 'SportType', description: '관련 종목' })
   @IsEnum(SportType)
   sportType!: SportType;
 
@@ -34,7 +34,7 @@ export class CreateListingDto {
   @MaxLength(100)
   category!: string;
 
-  @ApiProperty({ enum: ItemCondition, description: '상품 상태' })
+  @ApiProperty({ enum: ItemCondition, enumName: 'ItemCondition', description: '상품 상태' })
   @IsEnum(ItemCondition)
   condition!: ItemCondition;
 
@@ -43,7 +43,7 @@ export class CreateListingDto {
   @Min(0)
   price!: number;
 
-  @ApiPropertyOptional({ enum: ListingType, description: '거래 유형 (기본: sell)' })
+  @ApiPropertyOptional({ enum: ListingType, enumName: 'ListingType', description: '거래 유형 (기본: sell)' })
   @IsEnum(ListingType)
   @IsOptional()
   listingType?: ListingType;

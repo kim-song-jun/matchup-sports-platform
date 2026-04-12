@@ -51,14 +51,19 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   fullWidth?: boolean;
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', fullWidth = false, ...props }, ref) => (
+export function Button({
+  className,
+  variant = 'primary',
+  size = 'md',
+  fullWidth = false,
+  ref,
+  ...props
+}: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
+  return (
     <button
       ref={ref}
       className={cn(buttonStyles({ variant, size, fullWidth }), className)}
       {...props}
     />
-  ),
-);
-
-Button.displayName = 'Button';
+  );
+}

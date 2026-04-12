@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ReportTargetType, ReportStatus } from '@prisma/client';
 
 export class CreateReportDto {
-  @ApiProperty({ enum: ReportTargetType, description: '신고 대상 유형' })
+  @ApiProperty({ enum: ReportTargetType, enumName: 'ReportTargetType', description: '신고 대상 유형' })
   @IsEnum(ReportTargetType)
   targetType!: ReportTargetType;
 
@@ -24,7 +24,7 @@ export class CreateReportDto {
 }
 
 export class UpdateReportStatusDto {
-  @ApiProperty({ enum: ReportStatus, description: '변경할 신고 상태' })
+  @ApiProperty({ enum: ReportStatus, enumName: 'ReportStatus', description: '변경할 신고 상태' })
   @IsEnum(ReportStatus)
   status!: ReportStatus;
 }

@@ -7,7 +7,7 @@ export class CreateMercenaryPostDto {
   @IsUUID()
   teamId!: string;
 
-  @ApiProperty({ enum: SportType, description: 'Sport type' })
+  @ApiProperty({ enum: SportType, enumName: 'SportType', description: 'Sport type' })
   @IsEnum(SportType)
   sportType!: SportType;
 

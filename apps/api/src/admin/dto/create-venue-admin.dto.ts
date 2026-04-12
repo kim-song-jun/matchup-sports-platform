@@ -22,11 +22,11 @@ export class CreateVenueAdminDto {
   @MaxLength(200)
   name!: string;
 
-  @ApiProperty({ enum: VenueType, description: '구장 유형' })
+  @ApiProperty({ enum: VenueType, enumName: 'VenueType', description: '구장 유형' })
   @IsEnum(VenueType)
   type!: VenueType;
 
-  @ApiProperty({ enum: SportType, isArray: true, description: '지원 종목 목록' })
+  @ApiProperty({ enum: SportType, enumName: 'SportType', isArray: true, description: '지원 종목 목록' })
   @IsArray()
   @IsEnum(SportType, { each: true })
   sportTypes!: SportType[];
@@ -116,12 +116,12 @@ export class UpdateVenueAdminDto {
   @MaxLength(200)
   name?: string;
 
-  @ApiPropertyOptional({ enum: VenueType, description: '구장 유형' })
+  @ApiPropertyOptional({ enum: VenueType, enumName: 'VenueType', description: '구장 유형' })
   @IsEnum(VenueType)
   @IsOptional()
   type?: VenueType;
 
-  @ApiPropertyOptional({ enum: SportType, isArray: true, description: '지원 종목 목록' })
+  @ApiPropertyOptional({ enum: SportType, enumName: 'SportType', isArray: true, description: '지원 종목 목록' })
   @IsArray()
   @IsEnum(SportType, { each: true })
   @IsOptional()

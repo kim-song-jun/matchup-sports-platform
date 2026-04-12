@@ -4,7 +4,7 @@ import { ListingStatus } from '@prisma/client';
 import { CreateListingDto } from './create-listing.dto';
 
 export class UpdateListingDto extends PartialType(CreateListingDto) {
-  @ApiPropertyOptional({ enum: ListingStatus, description: '매물 상태' })
+  @ApiPropertyOptional({ enum: ListingStatus, enumName: 'ListingStatus', description: '매물 상태' })
   @IsEnum(ListingStatus)
   @IsOptional()
   status?: ListingStatus;

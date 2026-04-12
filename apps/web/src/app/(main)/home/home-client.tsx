@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users, GraduationCap, UserPlus, MapPin } from 'lucide-react';
+import { Plus, ArrowRight, Calendar, Swords, GraduationCap, UserPlus, MapPin } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -20,10 +20,34 @@ const sportFilters = [
 ] as const;
 
 const banners = [
-  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-slate-800 dark:bg-slate-900', iconBg: 'bg-white/10', iconColor: 'text-emerald-300' },
-  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-gray-900 dark:bg-gray-950', iconBg: 'bg-white/10', iconColor: 'text-blue-300' },
-  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-slate-900 dark:bg-slate-950', iconBg: 'bg-white/10', iconColor: 'text-amber-300' },
-] as const;
+  {
+    title: '팀 매칭 찾기',
+    subtitle: 'AI가 우리 팀 실력에 맞는 상대를 추천해드려요',
+    cta: '매칭 보기',
+    href: '/team-matches',
+    emoji: '🏆',
+    bg: 'bg-gradient-to-br from-blue-400 to-blue-600',
+    dark: true,
+  },
+  {
+    title: '첫 매치 무료',
+    subtitle: '지금 가입하면 첫 참가비 0원으로 즐길 수 있어요',
+    cta: '지금 시작',
+    href: '/matches',
+    emoji: '🎉',
+    bg: 'bg-gradient-to-br from-gray-700 to-gray-900',
+    dark: true,
+  },
+  {
+    title: '용병 구하기',
+    subtitle: '팀 빈 자리를 용병으로 채워 완벽한 라인업을',
+    cta: '용병 찾기',
+    href: '/mercenary',
+    emoji: '💪',
+    bg: 'bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-800 dark:to-gray-700',
+    dark: false,
+  },
+];
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -176,38 +200,81 @@ export function HomePage() {
         </section>
       )}
 
-      {/* 배너 (로그인 유저) — 토스 스타일 카드형 배너 */}
+      {/* 배너 (로그인 유저) — translateX 슬라이드 (배경 겹침 없음) */}
       {canRenderAuthenticated && (
         <section className="mt-6 px-5 @3xl:px-0">
-          <div className="relative h-20 overflow-hidden rounded-2xl" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
-            {banners.map((banner, i) => {
-              const BannerIcon = banner.icon;
-              return (
-                <Link key={i} href={banner.href}
-                  className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${bannerIdx === i ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                  aria-hidden={bannerIdx !== i}
-                  tabIndex={bannerIdx === i ? 0 : -1}
-                >
-                  <div className="h-full bg-gray-900 dark:bg-gray-800 px-5 py-4 flex items-center justify-between">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white tracking-tight">{banner.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{banner.desc}</p>
+          <div
+            className="relative h-32 overflow-hidden rounded-2xl"
+            onMouseEnter={() => setBannerPaused(true)}
+            onMouseLeave={() => setBannerPaused(false)}
+            onFocus={() => setBannerPaused(true)}
+            onBlur={() => setBannerPaused(false)}
+          >
+            {/* 슬라이드 레일 — translateX로 배너 전환, 배경 겹침 없음 */}
+            <div
+              className="flex h-full transition-transform duration-500 ease-in-out"
+              style={{
+                width: `${banners.length * 100}%`,
+                transform: `translateX(-${bannerIdx * (100 / banners.length)}%)`,
+              }}
+            >
+              {banners.map((banner, i) => {
+                const isDark = banner.dark;
+                return (
+                  <Link
+                    key={i}
+                    href={banner.href}
+                    style={{ width: `${100 / banners.length}%` }}
+                    className="shrink-0 h-full"
+                    tabIndex={bannerIdx === i ? 0 : -1}
+                    aria-hidden={bannerIdx !== i}
+                  >
+                    <div className={`relative h-full ${banner.bg} px-5 py-5 flex items-center justify-between overflow-hidden`}>
+                      {/* 장식 원 — 배경에 입체감 부여 */}
+                      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
+                      <div className="absolute -right-2 top-10 w-14 h-14 rounded-full bg-white/5 pointer-events-none" />
+
+                      <div className="min-w-0 flex-1 relative z-10">
+                        <p className={`text-base font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                          {banner.title}
+                        </p>
+                        <p className={`text-sm mt-1 leading-snug ${isDark ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
+                          {banner.subtitle}
+                        </p>
+                        <div className={`flex items-center gap-1 mt-2 text-xs font-semibold ${isDark ? 'text-white/80' : 'text-blue-500'}`}>
+                          {banner.cta} <ArrowRight size={12} aria-hidden="true" />
+                        </div>
+                      </div>
+
+                      {/* 이모지 — Apple/Android 렌더러가 3D 스타일로 표시 */}
+                      <div className="shrink-0 ml-4 relative z-10 text-5xl leading-none select-none" aria-hidden="true">
+                        {banner.emoji}
+                      </div>
                     </div>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 shrink-0 ml-3">
-                      <BannerIcon size={18} className={banner.iconColor} aria-hidden="true" />
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-            <div className="absolute bottom-2 right-3 flex gap-1 z-20">
-              {banners.map((_, i) => (
-                <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
-                  aria-label={`배너 ${i + 1}`}
-                  className="p-1">
-                  <span className={`block h-1 rounded-full transition-[width,background-color] duration-300 ${bannerIdx === i ? 'w-3 bg-white' : 'w-1 bg-white/30'}`} />
-                </button>
-              ))}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* 인디케이터 — 현재 배너 밝기에 따라 색상 분기 */}
+            <div className="absolute bottom-3 right-4 flex gap-1.5 z-20">
+              {banners.map((_, i) => {
+                const activeDark = banners[bannerIdx].dark;
+                return (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
+                    aria-label={`배너 ${i + 1}`}
+                    className="p-1"
+                  >
+                    <span className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${
+                      bannerIdx === i
+                        ? `w-4 ${activeDark ? 'bg-white' : 'bg-gray-700 dark:bg-white'}`
+                        : `w-1.5 ${activeDark ? 'bg-white/40' : 'bg-gray-700/30 dark:bg-white/40'}`
+                    }`} />
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>

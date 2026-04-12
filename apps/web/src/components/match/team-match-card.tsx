@@ -62,7 +62,7 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
               </span>
               {match.matchStyle && (
                 <>
-                  <span className="text-gray-200" aria-hidden="true">·</span>
+                  <span className="text-gray-200 dark:text-gray-700" aria-hidden="true">·</span>
                   <span className="text-xs text-gray-500">
                     {matchStyleLabel[match.matchStyle] ?? match.matchStyle}
                   </span>
@@ -82,12 +82,12 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
 
         <p className="mt-2.5 text-sm leading-relaxed text-gray-500">
           {formatMatchDate(match.matchDate)} {match.startTime}
-          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
           {match.venueName}
         </p>
         <p className="mt-1 text-sm text-gray-500">
           {match.quarterCount}쿼터
-          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
           {match.skillGrade
             ? getGradeInfo(match.skillGrade).label
             : match.requiredLevel
@@ -95,11 +95,11 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
               : '제한없음'}
           {match.gameFormat && (
             <>
-              <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+              <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
               {match.gameFormat}
             </>
           )}
-          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
           <span className="font-semibold text-gray-800 dark:text-gray-200">
             {formatCurrency(match.opponentFee ?? match.totalFee)}
           </span>

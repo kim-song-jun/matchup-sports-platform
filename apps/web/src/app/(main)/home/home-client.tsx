@@ -290,7 +290,7 @@ export function HomePage() {
                 const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors h-full">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
                       <div className="flex items-center gap-2.5">
                         <div className={`relative h-9 w-9 rounded-xl ${accent?.tint || 'bg-gray-100'} shrink-0 overflow-hidden`}>
                           <SafeImage src={teamLogo} fallbackSrc={fallbackTeamLogo} alt={`${team.name} logo`} fill className="rounded-[10px] object-cover" sizes="36px" />
@@ -319,7 +319,7 @@ export function HomePage() {
                 const accent = sportCardAccent[l.sportType];
                 return (
                   <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors h-full">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{l.title}</p>
                       <p className="text-xs text-gray-500 mt-1">{sportLabel[l.sportType]}</p>
                       <div className="flex items-center justify-between mt-3">
@@ -349,7 +349,7 @@ export function HomePage() {
                 const fallbackListingImage = getListingImage(undefined, item.id);
                 return (
                   <Link key={item.id} href={`/marketplace/${item.id}`}>
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <div className="relative aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <SafeImage src={listingImage} fallbackSrc={fallbackListingImage} alt={item.title} fill className="object-cover" sizes="(max-width: 768px) 50vw, 33vw" />
                       </div>
@@ -388,7 +388,7 @@ const MatchCard = React.memo(function MatchCard({ match, priority = false }: { m
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex h-[100px] bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex h-[100px] bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
         {/* 이미지 */}
         <div className="relative w-[100px] shrink-0 bg-gray-100 dark:bg-gray-700 overflow-hidden">
           <SafeImage

@@ -158,6 +158,8 @@ body {
 .dark .bg-orange-50 { background-color: #2A1A0D !important; }
 .dark .bg-indigo-50 { background-color: #1A0D2A !important; }
 .dark .bg-slate-50 { background-color: #1A1D23 !important; }
+.dark .bg-teal-50 { background-color: #0D2A1F !important; }
+.dark .text-teal-600 { color: #2DD4BF !important; }
 .dark .text-green-600 { color: #34C759 !important; }
 .dark .text-amber-600 { color: #FF9500 !important; }
 .dark .text-red-500 { color: #FF3B30 !important; }

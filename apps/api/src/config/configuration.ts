@@ -7,7 +7,11 @@ export default () => ({
     url: process.env.REDIS_URL || 'redis://localhost:6379/0',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'dev-secret',
+    secret: (() => {
+      if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+      if (process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET must be set in production');
+      return 'dev-secret';
+    })(),
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },

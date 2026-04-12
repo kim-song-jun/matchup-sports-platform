@@ -13,20 +13,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-
-const MATCH_SPORT_TYPES = [
-  'soccer',
-  'futsal',
-  'basketball',
-  'badminton',
-  'ice_hockey',
-  'figure_skating',
-  'short_track',
-  'swimming',
-  'tennis',
-  'baseball',
-  'volleyball',
-] as const;
+import { SportType } from '@prisma/client';
 
 export class CreateMatchDto {
   @ApiProperty({ description: '매치 제목' })
@@ -43,9 +30,9 @@ export class CreateMatchDto {
   @IsOptional()
   imageUrl?: string;
 
-  @ApiProperty({ enum: MATCH_SPORT_TYPES })
-  @IsEnum(MATCH_SPORT_TYPES)
-  sportType!: string;
+  @ApiProperty({ enum: SportType, enumName: 'SportType' })
+  @IsEnum(SportType)
+  sportType!: SportType;
 
   @ApiProperty({ description: '시설 ID' })
   @IsString()
@@ -106,10 +93,10 @@ export class MatchFilterDto {
   @IsOptional()
   q?: string;
 
-  @ApiPropertyOptional()
-  @IsEnum(MATCH_SPORT_TYPES)
+  @ApiPropertyOptional({ enum: SportType, enumName: 'SportType' })
+  @IsEnum(SportType)
   @IsOptional()
-  sportType?: string;
+  sportType?: SportType;
 
   @ApiPropertyOptional()
   @IsString()
@@ -202,10 +189,10 @@ export class UpdateMatchDto {
   @IsOptional()
   imageUrl?: string | null;
 
-  @ApiPropertyOptional({ enum: MATCH_SPORT_TYPES })
-  @IsEnum(MATCH_SPORT_TYPES)
+  @ApiPropertyOptional({ enum: SportType, enumName: 'SportType' })
+  @IsEnum(SportType)
   @IsOptional()
-  sportType?: string;
+  sportType?: SportType;
 
   @ApiPropertyOptional({ description: '매치 날짜 (YYYY-MM-DD)' })
   @IsDateString()

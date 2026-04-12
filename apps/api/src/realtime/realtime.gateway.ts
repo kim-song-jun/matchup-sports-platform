@@ -13,13 +13,16 @@ import { Server, Socket } from 'socket.io';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatService } from '../chat/chat.service';
 
-const realtimeAllowedOrigins = (
-  process.env.REALTIME_ALLOWED_ORIGINS ??
-  'http://localhost:3000,http://localhost:3003,capacitor://localhost'
-)
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const realtimeAllowedOrigins = (() => {
+  const envOrigins = process.env.REALTIME_ALLOWED_ORIGINS;
+  if (!envOrigins && process.env.NODE_ENV === 'production') {
+    throw new Error('REALTIME_ALLOWED_ORIGINS must be set in production');
+  }
+  return (envOrigins ?? 'http://localhost:3000,http://localhost:3003,capacitor://localhost')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+})();
 
 @WebSocketGateway({
   cors: {

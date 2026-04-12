@@ -305,7 +305,15 @@ export function readyContractForTemplate(template) {
     );
   }
 
-  if (['/team-matches', '/teams', '/lessons', '/marketplace', '/mercenary', '/venues', '/tournaments'].includes(template)) {
+  if (template === '/lessons') {
+    return readyContract(
+      ['[data-testid="mobile-page-top-zone"]', 'main h1', 'main h2'],
+      ['main a[href]', 'main article', 'main button', 'main section'],
+      { postReadyDelayMs: 1200 },
+    );
+  }
+
+  if (['/team-matches', '/teams', '/marketplace', '/mercenary', '/venues', '/tournaments'].includes(template)) {
     return readyContract(
       ['[data-testid="mobile-page-top-zone"]', 'main h1', 'main h2'],
       ['main a[href]', 'main article', 'main button', 'main section'],

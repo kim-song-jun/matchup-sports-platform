@@ -183,7 +183,7 @@ export default function BadgesPage() {
           onClick={() => setActiveTab('my')}
           className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
             activeTab === 'my'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+              ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >
@@ -195,7 +195,7 @@ export default function BadgesPage() {
           onClick={() => setActiveTab('all')}
           className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
             activeTab === 'all'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+              ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >

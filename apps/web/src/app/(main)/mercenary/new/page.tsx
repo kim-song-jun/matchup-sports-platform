@@ -234,7 +234,7 @@ export default function NewMercenaryPage() {
                   onClick={() => update('position', option.value)}
                   className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px] ${
                     form.position === option.value
-                      ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                      ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                       : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
@@ -254,7 +254,7 @@ export default function NewMercenaryPage() {
                   onClick={() => update('count', count)}
                   className={`flex-1 rounded-xl border py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
                     form.count === count
-                      ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                      ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                       : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
@@ -274,7 +274,7 @@ export default function NewMercenaryPage() {
                   onClick={() => update('level', level)}
                   className={`rounded-xl border px-5 py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
                     form.level === level
-                      ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                      ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                       : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >

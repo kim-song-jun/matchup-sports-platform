@@ -279,7 +279,7 @@ export default function RefundRequestPage() {
                 onClick={() => setSelectedReason(reason.id)}
                 className={`rounded-xl py-3 px-4 text-base font-medium transition-colors ${
                   selectedReason === reason.id
-                    ? 'ring-2 ring-gray-900 dark:ring-white border border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                    ? 'ring-2 ring-blue-500 dark:ring-blue-500 border border-blue-500 bg-blue-500 text-white dark:bg-blue-500 dark:text-white dark:border-blue-500'
                     : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'
                 }`}
               >

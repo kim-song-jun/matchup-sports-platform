@@ -190,7 +190,7 @@ export default function CreateLessonPage() {
                       aria-pressed={form.sportType === s.type}
                       className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                         selected
-                          ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                          ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                           : 'border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300'
                       }`}
                     >
@@ -212,11 +212,11 @@ export default function CreateLessonPage() {
                     aria-pressed={form.type === t.value}
                     className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
                       form.type === t.value
-                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
+                        ? 'border-blue-500 bg-blue-500 dark:border-blue-500 dark:bg-blue-500'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 dark:bg-gray-800'
                     }`}
                   >
-                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-gray-100'}`}>
+                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>
                       {t.label}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>

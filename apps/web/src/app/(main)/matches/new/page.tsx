@@ -260,7 +260,7 @@ export default function CreateMatchPage() {
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
                   <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
                     className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                      form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
+                      form.gender === g.value ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                     }`}>
                     {g.label}
                   </button>
@@ -312,10 +312,10 @@ export default function CreateMatchPage() {
                     <button key={v.id} onClick={() => setForm({ ...form, venueId: v.id, customVenue: '' })}
                       data-testid={`match-venue-${v.id}`}
                       className={`w-full text-left rounded-xl p-3 transition-colors ${
-                        form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        form.venueId === v.id ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}>
                       <p className={`text-sm font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
-                      <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'text-white/60 dark:text-gray-900/60' : 'text-gray-500'}`}>{v.address}</p>
+                      <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'text-white/60 dark:text-white/60' : 'text-gray-500'}`}>{v.address}</p>
                     </button>
                   ))}
                 </div>

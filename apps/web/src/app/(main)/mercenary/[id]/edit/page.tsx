@@ -229,7 +229,7 @@ export default function EditMercenaryPage() {
                 onClick={() => update('position', option.value)}
                 className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
                   form.position === option.value
-                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                    ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                     : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
@@ -276,7 +276,7 @@ export default function EditMercenaryPage() {
                 onClick={() => update('level', option.value)}
                 className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
                   form.level === option.value
-                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                    ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                     : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >

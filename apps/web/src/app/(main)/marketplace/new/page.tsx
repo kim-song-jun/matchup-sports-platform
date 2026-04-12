@@ -236,7 +236,7 @@ export default function CreateListingPage() {
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`w-full text-left rounded-xl border p-3.5 transition-colors ${
                   form.condition === c.value
-                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
+                    ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -257,7 +257,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'sell' })}
               className={`rounded-xl border py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'sell'
-                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                  ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                   : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
               }`}
             >
@@ -268,7 +268,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'rent' })}
               className={`rounded-xl border py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'rent'
-                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                  ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                   : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
               }`}
             >

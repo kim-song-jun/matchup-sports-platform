@@ -229,7 +229,7 @@ export default function EditListingPage() {
                 key={type}
                 onClick={() => setForm({ ...form, sportType: type })}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  form.sportType === type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  form.sportType === type ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {sportLabel[type] || type}
@@ -246,7 +246,7 @@ export default function EditListingPage() {
                 key={cat}
                 onClick={() => setForm({ ...form, category: cat })}
                 className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
-                  form.category === cat ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  form.category === cat ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {cat}
@@ -263,7 +263,7 @@ export default function EditListingPage() {
                 key={c.value}
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
-                  form.condition === c.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  form.condition === c.value ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {c.label}
@@ -290,7 +290,7 @@ export default function EditListingPage() {
                 key={opt.value}
                 onClick={() => setForm({ ...form, status: opt.value })}
                 className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  form.status === opt.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  form.status === opt.value ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {opt.label}

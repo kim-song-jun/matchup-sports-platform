@@ -8,6 +8,7 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useCreateTournament } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
+import { extractErrorMessage } from '@/lib/utils';
 import type { CreateTournamentInput } from '@/types/api';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,8 +55,7 @@ export default function TournamentNewPage() {
       toast('success', '대회를 등록했어요.');
       router.push(`/tournaments/${created.id}`);
     } catch (error) {
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', message || '대회 등록에 실패했어요.');
+      toast('error', extractErrorMessage(error, '대회 등록에 실패했어요.'));
     }
   }
 

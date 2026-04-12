@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FormField } from '@/components/ui/form-field';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
+import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -92,8 +93,7 @@ export default function CreateListingPage() {
       toast('success', '매물이 등록되었어요!');
       router.push('/marketplace');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '등록에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }

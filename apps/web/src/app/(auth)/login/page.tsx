@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
+import { extractErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
@@ -156,8 +157,7 @@ function LoginPageInner() {
         router.push(redirectTo);
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', msg || (mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));
+      toast('error', extractErrorMessage(err, mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));
     } finally {
       setIsLoading(false);
     }

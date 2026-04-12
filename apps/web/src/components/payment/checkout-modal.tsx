@@ -8,7 +8,7 @@ import { useConfirmPayment, usePreparePayment } from '@/hooks/use-api';
 import { getCheckoutPaymentMode } from '@/lib/payment-ui';
 import { CreditCard, Wallet, Loader2, CheckCircle } from 'lucide-react';
 import type { Payment } from '@/types/api';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount, extractErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface CheckoutModalProps {
@@ -66,8 +66,7 @@ export function CheckoutModal({
       onSuccess(confirmed);
       onClose();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      const message = axiosErr?.response?.data?.message || '결제 처리 중 오류가 발생했습니다.';
+      const message = extractErrorMessage(err, '결제 처리 중 오류가 발생했습니다.');
       toast('error', message);
       onError(message);
     }

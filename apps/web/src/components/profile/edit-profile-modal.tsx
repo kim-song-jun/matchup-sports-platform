@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { extractErrorMessage } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse, UserProfile } from '@/types/api';
@@ -39,8 +40,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
       toast('success', '프로필이 수정되었어요');
       onClose();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '수정에 실패했어요. 잠시 후 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }

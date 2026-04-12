@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { extractErrorMessage } from '@/lib/utils';
 import { useDeleteAdminVenue, useAdminVenue } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/error-state';
@@ -180,8 +181,7 @@ export default function AdminVenueEditPage() {
       toast('success', '시설 정보가 저장되었어요');
       await refetch();
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr.response?.data?.message || '저장하지 못했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(error, '저장하지 못했어요. 다시 시도해주세요'));
     } finally {
       setSaving(false);
     }
@@ -193,8 +193,7 @@ export default function AdminVenueEditPage() {
       toast('success', '시설이 삭제되었어요');
       router.push('/admin/venues');
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr.response?.data?.message || '삭제하지 못했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(error, '삭제하지 못했어요. 다시 시도해주세요'));
     }
   };
 

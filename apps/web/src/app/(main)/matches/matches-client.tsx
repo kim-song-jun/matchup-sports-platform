@@ -469,7 +469,7 @@ export function MatchesPage() {
 
       <div className="px-5 @3xl:px-0">
         {isLoading ? (
-          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 @3xl:gap-4">
             {[1, 2, 3, 4].map((value) => (
               <Card key={value} variant="subtle" padding="none" className="skeleton-shimmer">
                 <div className="aspect-[16/9]" />

@@ -19,6 +19,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useAdminDispute, useUpdateDisputeStatus } from '@/hooks/use-api';
+import { extractErrorMessage } from '@/lib/utils';
 
 const typeLabel: Record<string, string> = {
   no_show: '노쇼',
@@ -76,8 +77,7 @@ export default function AdminDisputeDetailPage() {
       setAdminNote('');
       await refetch();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '분쟁 상태를 업데이트하지 못했어요.');
+      toast('error', extractErrorMessage(err, '분쟁 상태를 업데이트하지 못했어요.'));
     }
   };
 

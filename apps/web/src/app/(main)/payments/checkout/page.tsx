@@ -22,7 +22,7 @@ import {
   usePurchaseLessonTicket,
 } from '@/hooks/use-api';
 import { getCheckoutPaymentMode } from '@/lib/payment-ui';
-import { formatAmount, formatDateTime } from '@/lib/utils';
+import { formatAmount, formatDateTime, extractErrorMessage } from '@/lib/utils';
 
 const paymentMethods = [
   { id: 'card', label: '신용/체크카드', icon: CreditCard, description: '모든 카드 가능' },
@@ -117,8 +117,7 @@ export default function CheckoutPage() {
         router.push(`/my/lesson-tickets?ticketId=${confirmedTicket.id}`);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '결제를 완료하지 못했어요.');
+      toast('error', extractErrorMessage(err, '결제를 완료하지 못했어요.'));
     }
   };
 

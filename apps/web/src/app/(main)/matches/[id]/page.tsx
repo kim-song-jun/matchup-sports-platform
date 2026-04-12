@@ -18,7 +18,7 @@ import type { ApiResponse, MatchParticipant, Payment, Upload } from '@/types/api
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportDetailImageSet, getVenueImageSet } from '@/lib/sport-image';
-import { formatFullDate, formatAmount } from '@/lib/utils';
+import { formatFullDate, formatAmount, extractErrorMessage } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const MediaLightbox = dynamic(
@@ -70,8 +70,7 @@ export default function MatchDetailPage() {
       toast('success', '참가 완료! 경기에서 만나요');
     },
     onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '참가에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '참가에 실패했어요. 잠시 후 다시 시도해주세요'));
     },
   });
 
@@ -82,8 +81,7 @@ export default function MatchDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
     },
     onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '탈퇴에 실패했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '탈퇴에 실패했어요. 다시 시도해주세요'));
     },
   });
 
@@ -194,8 +192,7 @@ export default function MatchDetailPage() {
       await updateMatchMutation.mutateAsync({ id: matchId, data: { status } });
       toast('success', successMessage);
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '상태 변경에 실패했어요');
+      toast('error', extractErrorMessage(error, '상태 변경에 실패했어요'));
     }
   }
 
@@ -205,8 +202,7 @@ export default function MatchDetailPage() {
       toast('success', '모집을 마감했어요');
       setShowCloseModal(false);
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '상태 변경에 실패했어요');
+      toast('error', extractErrorMessage(error, '상태 변경에 실패했어요'));
     }
   }
 
@@ -217,8 +213,7 @@ export default function MatchDetailPage() {
       setShowCancelModal(false);
       setCancelReason('');
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '취소에 실패했어요');
+      toast('error', extractErrorMessage(error, '취소에 실패했어요'));
     }
   }
 
@@ -280,8 +275,7 @@ export default function MatchDetailPage() {
       setArrivalPhoto(null);
       setArrivalPhotoPreview(null);
     } catch (err) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '도착 인증에 실패했어요.');
+      toast('error', extractErrorMessage(err, '도착 인증에 실패했어요.'));
     } finally {
       setIsArriving(false);
     }

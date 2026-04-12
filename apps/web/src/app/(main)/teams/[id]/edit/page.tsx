@@ -10,6 +10,7 @@ import { useDeleteTeam, useMyTeams, useTeam, useUpdateTeam } from '@/hooks/use-a
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
+import { extractErrorMessage } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
@@ -126,8 +127,7 @@ export default function EditTeamPage() {
       toast('success', '팀 정보가 저장되었어요.');
       router.push(`/teams/${teamId}`);
     } catch (error) {
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', message || '팀 정보를 저장하지 못했어요.');
+      toast('error', extractErrorMessage(error, '팀 정보를 저장하지 못했어요.'));
     }
   }
 
@@ -137,8 +137,7 @@ export default function EditTeamPage() {
       toast('success', '팀을 삭제했어요.');
       router.push('/my/teams');
     } catch (error) {
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', message || '팀을 삭제하지 못했어요.');
+      toast('error', extractErrorMessage(error, '팀을 삭제하지 못했어요.'));
     }
   }
 

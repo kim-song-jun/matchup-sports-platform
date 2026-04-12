@@ -17,7 +17,7 @@ import {
 } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { sportLabel } from '@/lib/constants';
-import { formatCurrency, formatMatchDate } from '@/lib/utils';
+import { formatCurrency, formatMatchDate, extractErrorMessage } from '@/lib/utils';
 
 type TabKey = 'created' | 'applied';
 
@@ -33,18 +33,6 @@ function statusBadgeClass(status: string): string {
   if (status === 'rejected') return 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300';
   if (status === 'withdrawn') return 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300';
   return 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300';
-}
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string | string[] } } };
-  const message = maybe.response?.data?.message;
-  if (Array.isArray(message)) {
-    return message[0] ?? fallback;
-  }
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message;
-  }
-  return fallback;
 }
 
 export default function MyMercenaryPage() {

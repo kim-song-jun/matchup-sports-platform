@@ -14,6 +14,7 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import { useAdminUser } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { extractErrorMessage } from '@/lib/utils';
 
 type ModerationAction = 'warn' | 'suspend' | 'reactivate' | null;
 
@@ -55,8 +56,7 @@ export default function AdminUserDetailPage() {
       setActionNote('');
       await refetch();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '관리 액션을 적용하지 못했어요.');
+      toast('error', extractErrorMessage(err, '관리 액션을 적용하지 못했어요.'));
     } finally {
       setIsSubmitting(false);
     }

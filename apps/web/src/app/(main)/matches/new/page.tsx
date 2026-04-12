@@ -20,6 +20,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Card } from '@/components/ui/card';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { firstUploadUrl, type UploadAsset } from '@/lib/uploads';
+import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -101,8 +102,7 @@ export default function CreateMatchPage() {
       toast('success', '매치가 만들어졌어요!');
       router.push('/matches?created=true');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '생성에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '생성에 실패했어요. 잠시 후 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }

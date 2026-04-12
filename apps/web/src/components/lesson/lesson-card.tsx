@@ -55,7 +55,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           <SafeImage
             src={lessonImage}
             fallbackSrc={fallbackLessonImage}
-            alt=""
+            alt={`${sportLabel[lesson.sportType] ?? lesson.sportType} 강좌 - ${lesson.title}`}
             fill
             className="object-cover group-hover:scale-[1.02] transition-transform duration-300"
             sizes="(max-width: 768px) 100vw, 50vw"

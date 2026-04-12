@@ -10,6 +10,7 @@ import { sportLabel } from '@/lib/constants';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import { useAdminMercenaryPosts, useDeleteAdminMercenaryPost } from '@/hooks/use-api';
 import type { MercenaryPost } from '@/types/api';
+import { extractErrorMessage } from '@/lib/utils';
 
 const statusLabel: Record<string, string> = {
   open: '모집중',
@@ -58,8 +59,7 @@ export default function AdminMercenaryPage() {
       await deletePost.mutateAsync(id);
       toast('success', '용병 모집글이 삭제되었어요');
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr.response?.data?.message || '삭제하지 못했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(error, '삭제하지 못했어요. 다시 시도해주세요'));
     }
   };
 

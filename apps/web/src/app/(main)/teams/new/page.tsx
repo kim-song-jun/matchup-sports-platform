@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
+import { extractErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -65,8 +66,7 @@ export default function CreateTeamPage() {
       toast('success', '팀이 등록되었어요!');
       router.push('/teams');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '등록에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }

@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { useLesson } from '@/hooks/use-api';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount, extractErrorMessage } from '@/lib/utils';
 import { api } from '@/lib/api';
 
 const sports = [
@@ -114,8 +114,7 @@ export default function EditLessonPage() {
       toast('success', '강좌 정보가 저장되었어요');
       router.push(`/lessons/${lessonId}`);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }
@@ -128,8 +127,7 @@ export default function EditLessonPage() {
       toast('success', '강좌가 삭제되었어요');
       router.push('/my/lessons');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '강좌 삭제에 실패했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '강좌 삭제에 실패했어요. 다시 시도해주세요'));
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);

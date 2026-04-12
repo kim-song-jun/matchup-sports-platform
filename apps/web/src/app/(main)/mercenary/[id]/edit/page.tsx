@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useDeleteMercenaryPost, useMercenaryPost, useUpdateMercenaryPost } from '@/hooks/use-api';
 import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, extractErrorMessage } from '@/lib/utils';
 import type { UpdateMercenaryPostInput } from '@/types/api';
 
 const positionOptions = [
@@ -39,18 +39,6 @@ interface FormData {
   level: number;
   fee: number;
   notes: string;
-}
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string | string[] } } };
-  const message = maybe.response?.data?.message;
-  if (Array.isArray(message)) {
-    return message[0] ?? fallback;
-  }
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message;
-  }
-  return fallback;
 }
 
 function toDateInputValue(value: string): string {

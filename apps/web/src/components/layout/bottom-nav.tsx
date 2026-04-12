@@ -25,12 +25,12 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 @3xl:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 @3xl:hidden flex justify-center px-4 pb-[max(var(--safe-area-bottom),0.5rem)]"
       data-testid="bottom-nav"
     >
-      {/* Apple-style frosted glass bar — full width, translucent, blur */}
-      <div className="glass-mobile-nav pb-[var(--safe-area-bottom)]">
-        <div className="flex items-center justify-around px-2 pt-2 pb-1.5">
+      {/* Floating Apple-style frosted glass pill */}
+      <div className="glass-mobile-nav w-full max-w-lg rounded-2xl">
+        <div className="flex items-center justify-around px-1 py-1.5">
           {navItems.map(({ href, icon: Icon, label, testId }) => {
             const isActive = href === '/teams'
               ? pathname.startsWith('/teams') || pathname.startsWith('/team-matches') || pathname.startsWith('/mercenary')
@@ -44,11 +44,11 @@ export function BottomNav() {
                 data-testid={testId}
                 aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
-                className="flex min-h-[44px] min-w-[48px] flex-1 flex-col items-center justify-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex min-h-[48px] min-w-[48px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <div className="relative">
                   <Icon
-                    size={22}
+                    size={21}
                     strokeWidth={isActive ? 2 : 1.5}
                     className={cn(
                       'transition-colors',

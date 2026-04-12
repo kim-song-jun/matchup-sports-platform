@@ -128,50 +128,65 @@ export class SchedulerService {
   }
 
   private async awardNoShowStreakBadges(): Promise<void> {
-    const users = await this.prisma.user.findMany({
-      select: { id: true },
+    // Fetch the last 10 completed participations per user in a single aggregated query.
+    // Using $queryRaw to rank rows per user and filter to rank <= 10 efficiently.
+    const recentRows = await this.prisma.$queryRaw<
+      Array<{ userId: string; id: string; arrivedAt: Date | null; rn: bigint }>
+    >`
+      SELECT user_id AS "userId", id, arrived_at AS "arrivedAt", row_number() OVER (
+        PARTITION BY user_id ORDER BY joined_at DESC
+      ) AS rn
+      FROM match_participants mp
+      WHERE mp.status = 'confirmed'
+        AND EXISTS (
+          SELECT 1 FROM matches m WHERE m.id = mp.match_id AND m.status = 'completed'
+        )
+    `;
+
+    // Group by user; only keep users who have at least 10 recent participations
+    const byUser = new Map<string, Array<{ id: string; arrivedAt: Date | null }>>();
+    for (const row of recentRows) {
+      if (Number(row.rn) > 10) continue;
+      const list = byUser.get(row.userId) ?? [];
+      list.push({ id: row.id, arrivedAt: row.arrivedAt });
+      byUser.set(row.userId, list);
+    }
+
+    const eligibleUserIds = Array.from(byUser.entries())
+      .filter(([, parts]) => parts.length >= 10)
+      .map(([userId]) => userId);
+
+    if (eligibleUserIds.length === 0) return;
+
+    // Fetch all no-show penalty notifications for eligible users in one query
+    const penaltyNotifications = await this.prisma.notification.findMany({
+      where: {
+        userId: { in: eligibleUserIds },
+        type: 'no_show_penalty',
+      },
+      select: { userId: true, data: true },
     });
 
-    for (const user of users) {
-      const recentParticipations = await this.prisma.matchParticipant.findMany({
-        where: {
-          userId: user.id,
-          status: 'confirmed',
-          match: { status: 'completed' },
-        },
-        orderBy: { joinedAt: 'desc' },
-        take: 10,
-        select: {
-          id: true,
-          arrivedAt: true,
-        },
-      });
+    // Build per-user set of penalised participant IDs
+    const penalisedByUser = new Map<string, Set<string>>();
+    for (const n of penaltyNotifications) {
+      const participantId = (n.data as Record<string, unknown> | null)?.['participantId'];
+      if (typeof participantId !== 'string') continue;
+      const set = penalisedByUser.get(n.userId) ?? new Set<string>();
+      set.add(participantId);
+      penalisedByUser.set(n.userId, set);
+    }
 
-      if (recentParticipations.length < 10) {
-        continue;
-      }
+    for (const userId of eligibleUserIds) {
+      const participations = byUser.get(userId) ?? [];
+      const penalisedIds = penalisedByUser.get(userId) ?? new Set<string>();
 
-      // Check whether any of the last 10 completed participations have a no-show penalty notification
-      const penaltyNotifications = await this.prisma.notification.findMany({
-        where: {
-          userId: user.id,
-          type: 'no_show_penalty',
-        },
-        select: { data: true },
-      });
-
-      const penalisedIds = new Set<string>(
-        penaltyNotifications
-          .map((n) => (n.data as Record<string, unknown> | null)?.['participantId'] as string | undefined)
-          .filter((id): id is string => typeof id === 'string'),
-      );
-
-      const hasNoShow = recentParticipations.some(
+      const hasNoShow = participations.some(
         (p) => penalisedIds.has(p.id) || p.arrivedAt === null,
       );
 
       if (!hasNoShow) {
-        await this.badges.awardIfEligible(user.id, NO_SHOW_BADGE.type, {
+        await this.badges.awardIfEligible(userId, NO_SHOW_BADGE.type, {
           name: NO_SHOW_BADGE.name,
           description: NO_SHOW_BADGE.description,
         });

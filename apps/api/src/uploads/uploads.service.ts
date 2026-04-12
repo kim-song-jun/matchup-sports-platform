@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -22,6 +24,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -180,15 +184,35 @@ export class UploadsService {
       throw new ForbiddenException('You do not own this upload');
     }
 
-    await this.prisma.upload.delete({ where: { id } });
-
     const mainAbsPath = path.join(process.cwd(), upload.path);
     const thumbAbsPath = mainAbsPath.replace('.webp', '_thumb.webp');
 
-    await Promise.allSettled([
+    const deletionResults = await Promise.allSettled([
       fs.unlink(mainAbsPath),
       fs.unlink(thumbAbsPath),
     ]);
+
+    const fatalDeletionErrors = deletionResults
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason)
+      .filter((reason) => {
+        const errorCode =
+          reason !== null && typeof reason === 'object' && 'code' in reason
+            ? (reason as { code?: string }).code
+            : undefined;
+        return errorCode !== 'ENOENT';
+      });
+
+    if (fatalDeletionErrors.length > 0) {
+      this.logger.error(
+        `Failed to remove upload files for ${id}: ${fatalDeletionErrors
+          .map((error) => (error instanceof Error ? error.message : String(error)))
+          .join('; ')}`,
+      );
+      throw new InternalServerErrorException('업로드 파일을 제거하지 못했습니다. 다시 시도해주세요.');
+    }
+
+    await this.prisma.upload.delete({ where: { id } });
 
     return { deleted: true };
   }

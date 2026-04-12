@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { VenuesService } from './venues.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisCacheService } from '../redis/redis-cache.service';
 
 describe('VenuesService', () => {
   let service: VenuesService;
@@ -13,6 +14,18 @@ describe('VenuesService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    marketplaceListing: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    lesson: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    tournament: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
     venueReview: {
       create: jest.fn(),
       aggregate: jest.fn(),
@@ -22,11 +35,19 @@ describe('VenuesService', () => {
     },
   };
 
+  const mockCacheService = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+    delPattern: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VenuesService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: RedisCacheService, useValue: mockCacheService },
       ],
     }).compile();
 
@@ -34,6 +55,10 @@ describe('VenuesService', () => {
     prisma = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
+    mockCacheService.get.mockResolvedValue(null);
+    mockCacheService.set.mockResolvedValue(undefined);
+    mockCacheService.del.mockResolvedValue(undefined);
+    mockCacheService.delPattern.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -67,11 +92,14 @@ describe('VenuesService', () => {
 
       const result = await service.findAll({});
 
-      expect(result).toEqual(mockVenues);
-      expect(prisma.venue.findMany).toHaveBeenCalledWith({
-        where: {},
-        orderBy: { rating: 'desc' },
-      });
+      expect(result.items).toEqual(mockVenues);
+      expect(result.nextCursor).toBeNull();
+      expect(prisma.venue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {},
+          orderBy: { rating: 'desc' },
+        }),
+      );
     });
 
     it('should filter venues by sportType', async () => {
@@ -80,11 +108,13 @@ describe('VenuesService', () => {
 
       const result = await service.findAll({ sportType: 'futsal' });
 
-      expect(result).toEqual(futsalVenues);
-      expect(prisma.venue.findMany).toHaveBeenCalledWith({
-        where: { sportTypes: { has: 'futsal' } },
-        orderBy: { rating: 'desc' },
-      });
+      expect(result.items).toEqual(futsalVenues);
+      expect(prisma.venue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { sportTypes: { has: 'futsal' } },
+          orderBy: { rating: 'desc' },
+        }),
+      );
     });
 
     it('should filter venues by city', async () => {
@@ -93,11 +123,13 @@ describe('VenuesService', () => {
 
       const result = await service.findAll({ city: '서울' });
 
-      expect(result).toEqual(seoulVenues);
-      expect(prisma.venue.findMany).toHaveBeenCalledWith({
-        where: { city: '서울' },
-        orderBy: { rating: 'desc' },
-      });
+      expect(result.items).toEqual(seoulVenues);
+      expect(prisma.venue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { city: '서울' },
+          orderBy: { rating: 'desc' },
+        }),
+      );
     });
 
     it('should filter venues by both city and sportType', async () => {
@@ -108,11 +140,33 @@ describe('VenuesService', () => {
         sportType: 'futsal',
       });
 
-      expect(result).toEqual([mockVenues[0]]);
-      expect(prisma.venue.findMany).toHaveBeenCalledWith({
-        where: { city: '서울', sportTypes: { has: 'futsal' } },
-        orderBy: { rating: 'desc' },
-      });
+      expect(result.items).toEqual([mockVenues[0]]);
+      expect(prisma.venue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { city: '서울', sportTypes: { has: 'futsal' } },
+          orderBy: { rating: 'desc' },
+        }),
+      );
+    });
+
+    it('should return nextCursor when there are more items than take', async () => {
+      const twoVenues = [...mockVenues, { ...mockVenues[0], id: 'venue-3' }];
+      mockPrismaService.venue.findMany.mockResolvedValue(twoVenues);
+
+      const result = await service.findAll({ take: 2 });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBe('venue-2');
+    });
+
+    it('should return cached result when cache hit', async () => {
+      const cached = { items: mockVenues, nextCursor: null };
+      mockCacheService.get.mockResolvedValueOnce(cached);
+
+      const result = await service.findAll({});
+
+      expect(result).toEqual(cached);
+      expect(prisma.venue.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -158,6 +212,13 @@ describe('VenuesService', () => {
       expect(prisma.venue.findUnique).toHaveBeenCalledWith({
         where: { id: 'venue-1' },
         include: {
+          owner: {
+            select: {
+              id: true,
+              nickname: true,
+              profileImageUrl: true,
+            },
+          },
           venueReviews: {
             include: {
               user: {
@@ -252,6 +313,8 @@ describe('VenuesService', () => {
           reviewCount: 5,
         },
       });
+
+      expect(mockCacheService.delPattern).toHaveBeenCalledWith('venues:*');
     });
 
     it('should handle review with image URLs', async () => {
@@ -312,6 +375,58 @@ describe('VenuesService', () => {
           reviewCount: 0,
         },
       });
+    });
+  });
+
+  describe('findHub', () => {
+    it('returns aggregated hub sections with capabilities', async () => {
+      mockPrismaService.venue.findUnique.mockResolvedValue({
+        id: 'venue-1',
+        ownerId: 'owner-1',
+        name: '서울 풋살파크',
+        reviewCount: 10,
+        description: 'desc',
+        phone: '02-1234-5678',
+        venueReviews: [],
+      });
+      mockPrismaService.marketplaceListing.findMany.mockResolvedValue([{ id: 'listing-1' }]);
+      mockPrismaService.lesson.findMany.mockResolvedValue([{ id: 'lesson-1' }]);
+      mockPrismaService.tournament.findMany.mockResolvedValue([{ id: 'tournament-1' }]);
+      mockPrismaService.marketplaceListing.count.mockResolvedValue(1);
+      mockPrismaService.lesson.count.mockResolvedValue(1);
+      mockPrismaService.tournament.count.mockResolvedValue(1);
+      mockPrismaService.match.findMany.mockResolvedValue([]);
+
+      const result = await service.findHub('venue-1', 'owner-1', 'user');
+
+      expect(result.sections.goodsCount).toBe(1);
+      expect(result.sections.passesCount).toBe(1);
+      expect(result.sections.eventsCount).toBe(1);
+      expect(result.goods).toHaveLength(1);
+      expect(result.passes).toHaveLength(1);
+      expect(result.events).toHaveLength(1);
+      expect(result.capabilities.canEditProfile).toBe(true);
+    });
+  });
+
+  describe('update', () => {
+    it('allows owner to update venue', async () => {
+      mockPrismaService.venue.findUnique.mockResolvedValue({ id: 'venue-1', ownerId: 'owner-1' });
+      mockPrismaService.venue.update.mockResolvedValue({ id: 'venue-1', name: 'updated' });
+
+      const result = await service.update('venue-1', 'owner-1', 'user', { name: 'updated' });
+
+      expect(result).toEqual({ id: 'venue-1', name: 'updated' });
+      expect(mockPrismaService.venue.update).toHaveBeenCalled();
+      expect(mockCacheService.delPattern).toHaveBeenCalledWith('venues:*');
+    });
+
+    it('throws ForbiddenException when non-owner non-admin attempts update', async () => {
+      mockPrismaService.venue.findUnique.mockResolvedValue({ id: 'venue-1', ownerId: 'owner-1' });
+
+      await expect(service.update('venue-1', 'user-2', 'user', { name: 'updated' })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

@@ -13,9 +13,17 @@ import { Server, Socket } from 'socket.io';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatService } from '../chat/chat.service';
 
+const realtimeAllowedOrigins = (
+  process.env.REALTIME_ALLOWED_ORIGINS ??
+  'http://localhost:3000,http://localhost:3003,capacitor://localhost'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:3003', 'capacitor://localhost'],
+    origin: realtimeAllowedOrigins,
     credentials: true,
   },
 })

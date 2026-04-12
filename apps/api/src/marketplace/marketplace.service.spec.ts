@@ -4,6 +4,7 @@ import { MarketplaceService } from './marketplace.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
+import { TeamMembershipService } from '../teams/team-membership.service';
 
 const settlementsServiceMock = {
   recordSettlement: jest.fn().mockResolvedValue(undefined),
@@ -65,10 +66,17 @@ const prismaMock = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  venue: {
+    findUnique: jest.fn(),
+  },
 };
 
 const notificationsServiceMock = {
   create: jest.fn(),
+};
+
+const teamMembershipServiceMock = {
+  assertRole: jest.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +96,7 @@ describe('MarketplaceService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: NotificationsService, useValue: notificationsServiceMock },
         { provide: SettlementsService, useValue: settlementsServiceMock },
+        { provide: TeamMembershipService, useValue: teamMembershipServiceMock },
       ],
     }).compile();
 
@@ -142,7 +151,7 @@ describe('MarketplaceService', () => {
       const listing = mockListing();
       prismaMock.marketplaceListing.create.mockResolvedValue(listing);
 
-      const result = await service.createListing('user-1', {
+      const result = await service.createListing('user-1', 'user', {
         title: 'Test Listing',
         description: 'Good item',
         sportType: 'futsal',
@@ -180,6 +189,94 @@ describe('MarketplaceService', () => {
       prismaMock.marketplaceListing.findUnique.mockResolvedValue(null);
 
       await expect(service.findListing('no-such-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when listing was deleted', async () => {
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(mockListing({ status: 'deleted' }));
+
+      await expect(service.findListing('listing-1')).rejects.toThrow(NotFoundException);
+      expect(prismaMock.marketplaceListing.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── updateListing ───────────────────────────────────────────────────────────
+
+  describe('updateListing', () => {
+    it('updates listing when seller owns it', async () => {
+      const listing = mockListing({ sellerId: 'user-1' });
+      const updated = mockListing({ id: 'listing-1', title: 'Updated', imageUrls: ['uploads/a.webp'] });
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(listing);
+      prismaMock.marketplaceListing.update.mockResolvedValue(updated);
+
+      const result = await service.updateListing('listing-1', 'user-1', 'user', {
+        title: 'Updated',
+        imageUrls: ['uploads/a.webp'],
+        status: 'reserved',
+      });
+
+      expect(result.title).toBe('Updated');
+      expect(prismaMock.marketplaceListing.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'listing-1' },
+          data: expect.objectContaining({
+            title: 'Updated',
+            imageUrls: ['uploads/a.webp'],
+            status: 'reserved',
+          }),
+        }),
+      );
+    });
+
+    it('throws NotFoundException when listing does not exist', async () => {
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateListing('missing', 'user-1', 'user', { title: 'Updated' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when non-owner updates listing', async () => {
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(mockListing({ sellerId: 'owner-1' }));
+
+      await expect(
+        service.updateListing('listing-1', 'user-1', 'user', { title: 'Updated' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects deleted status via patch and requires the delete endpoint', async () => {
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(mockListing({ sellerId: 'user-1' }));
+
+      await expect(
+        service.updateListing('listing-1', 'user-1', 'user', { status: 'deleted' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prismaMock.marketplaceListing.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── deleteListing ───────────────────────────────────────────────────────────
+
+  describe('deleteListing', () => {
+    it('soft-deletes listing for owner', async () => {
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(mockListing({ sellerId: 'user-1' }));
+      prismaMock.marketplaceListing.update.mockResolvedValue(mockListing({ status: 'deleted' }));
+
+      const result = await service.deleteListing('listing-1', 'user-1');
+
+      expect(result).toEqual({ deleted: true });
+      expect(prismaMock.marketplaceListing.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'listing-1' },
+          data: expect.objectContaining({ status: 'deleted' }),
+        }),
+      );
+    });
+
+    it('throws ForbiddenException when non-owner deletes listing', async () => {
+      prismaMock.marketplaceListing.findUnique.mockResolvedValue(mockListing({ sellerId: 'owner-1' }));
+
+      await expect(
+        service.deleteListing('listing-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

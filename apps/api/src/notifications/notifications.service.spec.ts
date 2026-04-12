@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService } from './web-push.service';
 import { UserBlocksService } from '../user-blocks/user-blocks.service';
+import { RedisCacheService } from '../redis/redis-cache.service';
 import { NotificationType } from '@prisma/client';
 
 const mockUserBlocksService = {
@@ -34,6 +35,13 @@ const mockWebPushService = {
   isEnabled: true,
 };
 
+const mockCacheService = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(undefined),
+  del: jest.fn().mockResolvedValue(undefined),
+  delPattern: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('NotificationsService', () => {
   let service: NotificationsService;
 
@@ -45,11 +53,13 @@ describe('NotificationsService', () => {
         { provide: RealtimeGateway, useValue: mockRealtime },
         { provide: WebPushService, useValue: mockWebPushService },
         { provide: UserBlocksService, useValue: mockUserBlocksService },
+        { provide: RedisCacheService, useValue: mockCacheService },
       ],
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
     jest.clearAllMocks();
+    mockCacheService.get.mockResolvedValue(null);
   });
 
   describe('create', () => {

@@ -14,6 +14,7 @@ import { MercenaryApplicationStatus } from '@prisma/client';
 import { MercenaryService } from './mercenary.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { CreateMercenaryPostDto } from './dto/create-mercenary-post.dto';
 import { UpdateMercenaryPostDto } from './dto/update-mercenary-post.dto';
 import { ApplyMercenaryDto } from './dto/apply-mercenary.dto';
@@ -42,6 +43,7 @@ export class MercenaryController {
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: '용병 모집글 상세' })
   async findOne(@Param('id') id: string, @CurrentUser('id') userId?: string) {
     const post = await this.mercenaryService.findOne(id, userId);

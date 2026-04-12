@@ -109,13 +109,20 @@ export class ChatService {
       throw new BadRequestException({ code: 'CHAT_EMPTY_MESSAGE', message: '내용 또는 이미지가 필요합니다.' });
     }
 
-    // Block check: if any other participant has blocked the sender, reject the message
+    // Block check: batch query — if any other participant has blocked the sender, reject the message
     const otherParticipants = await this.prisma.chatRoomParticipant.findMany({
       where: { roomId, userId: { not: userId } },
       select: { userId: true },
     });
-    for (const { userId: otherId } of otherParticipants) {
-      if (await this.userBlocksService.isBlocked(otherId, userId)) {
+    const otherParticipantUserIds = otherParticipants.map((p) => p.userId);
+    if (otherParticipantUserIds.length > 0) {
+      const blocks = await this.prisma.userBlock.findMany({
+        where: {
+          blockerId: { in: otherParticipantUserIds },
+          blockedId: userId,
+        },
+      });
+      if (blocks.length > 0) {
         throw new ForbiddenException({ code: 'CHAT_BLOCKED', message: '차단된 사용자에게 메시지를 보낼 수 없습니다.' });
       }
     }

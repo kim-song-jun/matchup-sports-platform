@@ -1,16 +1,16 @@
 import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { LessonsService } from './lessons.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 
 class ConfirmTicketPaymentDto {
-  @ApiProperty({ description: '토스페이먼츠 paymentKey' })
+  @ApiProperty({ description: '토스페이먼츠 paymentKey', required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  paymentKey!: string;
+  paymentKey?: string;
 }
 
 @ApiTags('강좌')
@@ -23,6 +23,8 @@ export class LessonsController {
   async findAll(
     @Query('sportType') sportType?: string,
     @Query('type') type?: string,
+    @Query('teamId') teamId?: string,
+    @Query('venueId') venueId?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
@@ -30,7 +32,15 @@ export class LessonsController {
     const safeLimit = parsed !== undefined
       ? Math.min(Math.max(1, Number.isNaN(parsed) ? 20 : parsed), 100)
       : undefined;
-    return this.lessonsService.findAll({ sportType, type, cursor, limit: safeLimit });
+    return this.lessonsService.findAll({ sportType, type, teamId, venueId, cursor, limit: safeLimit });
+  }
+
+  @Get('tickets/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '내 수강권 목록' })
+  async findMyTickets(@CurrentUser('id') userId: string) {
+    return this.lessonsService.findMyTickets(userId);
   }
 
   @Get(':id')
@@ -43,8 +53,12 @@ export class LessonsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '강좌 생성' })
-  async create(@CurrentUser('id') userId: string, @Body() body: CreateLessonDto) {
-    return this.lessonsService.create(userId, body);
+  async create(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: string,
+    @Body() body: CreateLessonDto,
+  ) {
+    return this.lessonsService.create(userId, userRole, body);
   }
 
   @Post('plans/:planId/purchase')

@@ -4,6 +4,7 @@ import { LessonsService } from './lessons.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
+import { TeamMembershipService } from '../teams/team-membership.service';
 import { SportType, LessonType } from '@prisma/client';
 
 const lessonsSettlementsMock = {
@@ -25,13 +26,22 @@ describe('LessonsService', () => {
     },
     lessonTicket: {
       create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+    },
+    venue: {
+      findUnique: jest.fn(),
     },
   };
 
   const notificationsServiceMock = {
     create: jest.fn(),
+  };
+
+  const teamMembershipServiceMock = {
+    assertRole: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -43,6 +53,7 @@ describe('LessonsService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: NotificationsService, useValue: notificationsServiceMock },
         { provide: SettlementsService, useValue: lessonsSettlementsMock },
+        { provide: TeamMembershipService, useValue: teamMembershipServiceMock },
       ],
     }).compile();
 
@@ -191,6 +202,37 @@ describe('LessonsService', () => {
         profileImageUrl: 'https://example.com/img.jpg',
         mannerScore: 4.8,
       },
+      ticketPlans: [
+        {
+          id: 'plan-1',
+          lessonId: 'lesson-1',
+          name: '10회권',
+          type: 'multi',
+          price: 80000,
+          originalPrice: null,
+          totalSessions: 10,
+          validDays: null,
+          description: '주 2회 수강권',
+          isActive: true,
+          sortOrder: 0,
+        },
+      ],
+      schedules: [
+        {
+          id: 'schedule-1',
+          lessonId: 'lesson-1',
+          sessionDate: new Date('2026-04-02'),
+          startTime: '19:00',
+          endTime: '20:30',
+          maxParticipants: 12,
+          note: '실내 코트 B',
+          isCancelled: false,
+          cancelReason: null,
+          _count: {
+            attendances: 4,
+          },
+        },
+      ],
     };
 
     it('should return lesson with host details', async () => {
@@ -198,20 +240,73 @@ describe('LessonsService', () => {
 
       const result = await service.findById('lesson-1');
 
-      expect(result).toEqual(mockLessonDetail);
-      expect(prisma.lesson.findUnique).toHaveBeenCalledWith({
-        where: { id: 'lesson-1' },
-        include: {
-          host: {
-            select: {
-              id: true,
-              nickname: true,
-              profileImageUrl: true,
-              mannerScore: true,
-            },
+      expect(result).toEqual({
+        ...(({ schedules, ...lessonData }) => lessonData)(mockLessonDetail),
+        upcomingSchedules: [
+          {
+            id: 'schedule-1',
+            lessonId: 'lesson-1',
+            sessionDate: '2026-04-02',
+            startTime: '19:00',
+            endTime: '20:30',
+            maxParticipants: 12,
+            note: '실내 코트 B',
+            isCancelled: false,
+            attendeeCount: 4,
           },
-        },
+        ],
       });
+      expect(prisma.lesson.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'lesson-1' },
+          include: expect.objectContaining({
+            host: {
+              select: {
+                id: true,
+                nickname: true,
+                profileImageUrl: true,
+                mannerScore: true,
+              },
+            },
+            ticketPlans: {
+              where: { isActive: true },
+              orderBy: { sortOrder: 'asc' },
+              select: {
+                id: true,
+                lessonId: true,
+                name: true,
+                type: true,
+                price: true,
+                originalPrice: true,
+                totalSessions: true,
+                validDays: true,
+                description: true,
+                isActive: true,
+                sortOrder: true,
+              },
+            },
+            schedules: expect.objectContaining({
+              where: expect.objectContaining({
+                sessionDate: expect.objectContaining({
+                  gte: expect.any(Date),
+                }),
+              }),
+              orderBy: [{ sessionDate: 'asc' }, { startTime: 'asc' }],
+              select: expect.objectContaining({
+                id: true,
+                lessonId: true,
+                sessionDate: true,
+                startTime: true,
+                endTime: true,
+                maxParticipants: true,
+                note: true,
+                isCancelled: true,
+                cancelReason: true,
+              }),
+            }),
+          }),
+        }),
+      );
     });
 
     it('should throw NotFoundException when lesson does not exist', async () => {
@@ -255,7 +350,7 @@ describe('LessonsService', () => {
     it('should create a new lesson', async () => {
       mockPrismaService.lesson.create.mockResolvedValue(createdLesson);
 
-      const result = await service.create('user-1', createData);
+      const result = await service.create('user-1', 'user', createData);
 
       expect(result).toEqual(createdLesson);
       expect(prisma.lesson.create).toHaveBeenCalledWith({
@@ -270,6 +365,11 @@ describe('LessonsService', () => {
           coachBio: '프로 경력 10년',
           startTime: '18:00',
           endTime: '20:00',
+        }),
+        include: expect.objectContaining({
+          host: expect.any(Object),
+          team: expect.any(Object),
+          ticketPlans: expect.any(Object),
         }),
       });
     });
@@ -292,7 +392,7 @@ describe('LessonsService', () => {
         lessonDate: new Date('2026-04-15'),
       });
 
-      await service.create('user-1', minimalData);
+      await service.create('user-1', 'user', minimalData);
 
       expect(prisma.lesson.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -302,6 +402,117 @@ describe('LessonsService', () => {
           levelMax: 5,
           imageUrls: [],
         }),
+        include: expect.objectContaining({
+          host: expect.any(Object),
+          team: expect.any(Object),
+          ticketPlans: expect.any(Object),
+        }),
+      });
+    });
+  });
+
+  describe('findMyTickets', () => {
+    it('returns only paid tickets for the authenticated user', async () => {
+      const mockTickets = [
+        {
+          id: 'ticket-1',
+          userId: 'user-1',
+          status: 'active',
+          paymentId: 'payment-1',
+          paidAmount: 80000,
+          purchasedAt: new Date('2026-04-11T09:00:00.000Z'),
+          usedSessions: 2,
+          totalSessions: 10,
+          startDate: new Date('2026-04-11'),
+          expiresAt: new Date('2026-05-11'),
+          plan: {
+            id: 'plan-1',
+            lessonId: 'lesson-1',
+            name: '10회권',
+            type: 'multi',
+            price: 80000,
+            originalPrice: null,
+            totalSessions: 10,
+            validDays: null,
+            description: '주 2회 수강권',
+            isActive: true,
+            sortOrder: 0,
+          },
+          lesson: {
+            id: 'lesson-1',
+            hostId: 'host-1',
+            sportType: 'FUTSAL',
+            type: 'group_lesson',
+            title: '풋살 기초 레슨',
+            description: null,
+            venueName: '강남 풋살파크',
+            lessonDate: new Date('2026-04-12'),
+            startTime: '10:00',
+            endTime: '12:00',
+            maxParticipants: 12,
+            currentParticipants: 5,
+            fee: 80000,
+            levelMin: 1,
+            levelMax: 3,
+            status: 'open',
+            coachName: '김코치',
+            coachBio: null,
+            imageUrls: [],
+          },
+        },
+      ];
+
+      mockPrismaService.lessonTicket.findMany.mockResolvedValue(mockTickets);
+
+      const result = await service.findMyTickets('user-1');
+
+      expect(result).toEqual(mockTickets);
+      expect(prisma.lessonTicket.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          paymentId: { not: null },
+        },
+        orderBy: { purchasedAt: 'desc' },
+        include: {
+          plan: {
+            select: {
+              id: true,
+              lessonId: true,
+              name: true,
+              type: true,
+              price: true,
+              originalPrice: true,
+              totalSessions: true,
+              validDays: true,
+              description: true,
+              isActive: true,
+              sortOrder: true,
+            },
+          },
+          lesson: {
+            select: {
+              id: true,
+              hostId: true,
+              sportType: true,
+              type: true,
+              title: true,
+              description: true,
+              venueName: true,
+              lessonDate: true,
+              startTime: true,
+              endTime: true,
+              maxParticipants: true,
+              currentParticipants: true,
+              fee: true,
+              levelMin: true,
+              levelMax: true,
+              status: true,
+              coachName: true,
+              coachBio: true,
+              imageUrls: true,
+            },
+          },
+        },
       });
     });
   });
@@ -338,6 +549,7 @@ describe('LessonsService', () => {
 
     it('creates a ticket and returns ticket + payment prepare info', async () => {
       mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue(mockPlan);
+      mockPrismaService.lessonTicket.findFirst.mockResolvedValue(null);
       mockPrismaService.lessonTicket.create.mockResolvedValue(mockTicket);
 
       const result = await service.purchaseTicket('user-1', 'plan-1');
@@ -350,6 +562,25 @@ describe('LessonsService', () => {
       expect(result.payment).toHaveProperty('ticketId', 'ticket-1');
     });
 
+    it('reuses the latest unpaid draft ticket for the same plan', async () => {
+      const draftTicket = {
+        ...mockTicket,
+        id: 'ticket-draft',
+      };
+
+      mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue(mockPlan);
+      mockPrismaService.lessonTicket.findFirst.mockResolvedValue(draftTicket);
+
+      const result = await service.purchaseTicket('user-1', 'plan-1');
+
+      expect(mockPrismaService.lessonTicket.create).not.toHaveBeenCalled();
+      expect(result.payment).toEqual({
+        orderId: 'MU-LESSON-ticket-draft',
+        amount: 80000,
+        ticketId: 'ticket-draft',
+      });
+    });
+
     it('throws NotFoundException when plan does not exist', async () => {
       mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue(null);
 
@@ -360,6 +591,12 @@ describe('LessonsService', () => {
       mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue({ ...mockPlan, isActive: false });
 
       await expect(service.purchaseTicket('user-1', 'plan-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when host tries to buy own lesson ticket', async () => {
+      mockPrismaService.lessonTicketPlan.findUnique.mockResolvedValue(mockPlan);
+
+      await expect(service.purchaseTicket('instructor-1', 'plan-1')).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -374,7 +611,7 @@ describe('LessonsService', () => {
       status: 'active',
       paidAmount: 80000,
       paymentId: null,
-      plan: { price: 80000 },
+      plan: { price: 80000, validDays: null },
       lesson: { title: '풋살 기초 레슨', hostId: 'instructor-1' },
     };
 
@@ -388,7 +625,12 @@ describe('LessonsService', () => {
       expect(result.paymentId).toBe('pk-mock');
       expect(mockPrismaService.lessonTicket.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ paymentId: 'pk-mock', status: 'active' }),
+          data: expect.objectContaining({
+            paymentId: 'pk-mock',
+            status: 'active',
+            purchasedAt: expect.any(Date),
+            startDate: expect.any(Date),
+          }),
         }),
       );
       expect(notificationsServiceMock.create).toHaveBeenCalledWith(
@@ -427,6 +669,37 @@ describe('LessonsService', () => {
       await expect(
         service.confirmTicketPayment('ticket-1', 'pk-mock', 'user-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException when a paid ticket is confirmed without paymentKey', async () => {
+      mockPrismaService.lessonTicket.findUnique.mockResolvedValue(mockTicketWithRelations);
+
+      await expect(
+        service.confirmTicketPayment('ticket-1', undefined, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('uses a backend-generated paymentId for free tickets', async () => {
+      const freeTicket = {
+        ...mockTicketWithRelations,
+        paidAmount: 0,
+        plan: { price: 0, validDays: 30 },
+      };
+      const updated = { ...freeTicket, paymentId: 'FREE-LESSON-ticket-1' };
+      mockPrismaService.lessonTicket.findUnique.mockResolvedValue(freeTicket);
+      mockPrismaService.lessonTicket.update.mockResolvedValue(updated);
+
+      const result = await service.confirmTicketPayment('ticket-1', undefined, 'user-1');
+
+      expect(result.paymentId).toBe('FREE-LESSON-ticket-1');
+      expect(mockPrismaService.lessonTicket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentId: 'FREE-LESSON-ticket-1',
+            expiresAt: expect.any(Date),
+          }),
+        }),
+      );
     });
   });
 });

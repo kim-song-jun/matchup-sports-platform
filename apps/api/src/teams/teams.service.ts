@@ -10,6 +10,7 @@ import { Prisma, TeamRole, InvitationStatus, SportType } from '@prisma/client';
 import { TeamMembershipService } from './team-membership.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTeamDto } from './dto/create-team.dto';
+import { UpdateTeamDto } from './dto/update-team.dto';
 
 // Expiration duration for team invitations in days
 const INVITATION_EXPIRY_DAYS = 7;
@@ -117,6 +118,156 @@ export class TeamsService {
 
       return team;
     });
+  }
+
+  async update(teamId: string, userId: string, data: UpdateTeamDto) {
+    await this.membershipService.assertRole(teamId, userId, TeamRole.manager);
+    await this.findById(teamId);
+
+    return this.prisma.sportTeam.update({
+      where: { id: teamId },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.sportType !== undefined ? { sportType: data.sportType } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.logoUrl !== undefined ? { logoUrl: data.logoUrl } : {}),
+        ...(data.coverImageUrl !== undefined ? { coverImageUrl: data.coverImageUrl } : {}),
+        ...(data.photos !== undefined ? { photos: data.photos } : {}),
+        ...(data.city !== undefined ? { city: data.city } : {}),
+        ...(data.district !== undefined ? { district: data.district } : {}),
+        ...(data.level !== undefined ? { level: data.level } : {}),
+        ...(data.isRecruiting !== undefined ? { isRecruiting: data.isRecruiting } : {}),
+        ...(data.contactInfo !== undefined ? { contactInfo: data.contactInfo } : {}),
+        ...(data.instagramUrl !== undefined ? { instagramUrl: data.instagramUrl } : {}),
+        ...(data.youtubeUrl !== undefined ? { youtubeUrl: data.youtubeUrl } : {}),
+        ...(data.shortsUrl !== undefined ? { shortsUrl: data.shortsUrl } : {}),
+        ...(data.kakaoOpenChat !== undefined ? { kakaoOpenChat: data.kakaoOpenChat } : {}),
+        ...(data.websiteUrl !== undefined ? { websiteUrl: data.websiteUrl } : {}),
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            nickname: true,
+            profileImageUrl: true,
+            mannerScore: true,
+          },
+        },
+      },
+    });
+  }
+
+  async remove(teamId: string, userId: string) {
+    await this.membershipService.assertRole(teamId, userId, TeamRole.owner);
+    await this.findById(teamId);
+    await this.prisma.sportTeam.delete({ where: { id: teamId } });
+  }
+
+  async findHub(teamId: string, viewerId?: string) {
+    const [team, goods, passes, events] = await Promise.all([
+      this.findById(teamId),
+      this.prisma.marketplaceListing.findMany({
+        where: {
+          teamId,
+          status: 'active',
+        },
+        include: {
+          seller: {
+            select: { id: true, nickname: true, profileImageUrl: true, mannerScore: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 4,
+      }),
+      this.prisma.lesson.findMany({
+        where: {
+          teamId,
+          status: 'open',
+        },
+        include: {
+          host: {
+            select: { id: true, nickname: true, profileImageUrl: true },
+          },
+          ticketPlans: {
+            where: { isActive: true },
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              id: true,
+              lessonId: true,
+              name: true,
+              type: true,
+              price: true,
+              originalPrice: true,
+              totalSessions: true,
+              validDays: true,
+              description: true,
+              isActive: true,
+              sortOrder: true,
+            },
+          },
+        },
+        orderBy: { lessonDate: 'asc' },
+        take: 4,
+      }),
+      this.prisma.tournament.findMany({
+        where: {
+          teamId,
+          status: { in: ['recruiting', 'full', 'ongoing'] },
+        },
+        include: {
+          organizer: {
+            select: { id: true, nickname: true, profileImageUrl: true },
+          },
+          venue: {
+            select: { id: true, name: true, city: true, district: true },
+          },
+        },
+        orderBy: { startDate: 'asc' },
+        take: 4,
+      }),
+    ]);
+
+    const counts = await Promise.all([
+      this.prisma.marketplaceListing.count({
+        where: { teamId, status: 'active' },
+      }),
+      this.prisma.lesson.count({
+        where: { teamId, status: 'open' },
+      }),
+      this.prisma.tournament.count({
+        where: { teamId, status: { in: ['recruiting', 'full', 'ongoing'] } },
+      }),
+    ]);
+
+    let membership: Awaited<ReturnType<TeamMembershipService['getMembership']>> | null = null;
+    if (viewerId) {
+      membership = await this.membershipService.getMembership(teamId, viewerId);
+    }
+
+    const myRole = membership?.role ?? null;
+    const canManage = myRole === TeamRole.owner || myRole === TeamRole.manager;
+
+    return {
+      team,
+      sections: {
+        goodsCount: counts[0],
+        passesCount: counts[1],
+        eventsCount: counts[2],
+      },
+      goods,
+      passes,
+      events: events.map((event) => ({
+        ...event,
+        eventDate: event.startDate,
+        venueName: event.venue?.name ?? null,
+      })),
+      capabilities: {
+        canEditProfile: canManage,
+        canManageGoods: canManage,
+        canManagePasses: canManage,
+        canManageEvents: canManage,
+      },
+    };
   }
 
   async applyToTeam(teamId: string, userId: string) {

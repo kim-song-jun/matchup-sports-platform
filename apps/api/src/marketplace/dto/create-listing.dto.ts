@@ -60,6 +60,16 @@ export class CreateListingDto {
   @MaxLength(50)
   locationCity?: string;
 
+  @ApiPropertyOptional({ description: '소속 팀 ID (팀 허브 귀속)' })
+  @IsString()
+  @IsOptional()
+  teamId?: string;
+
+  @ApiPropertyOptional({ description: '소속 장소 ID (장소 허브 귀속)' })
+  @IsString()
+  @IsOptional()
+  venueId?: string;
+
   @ApiPropertyOptional({ description: '거래 희망 구/군', maxLength: 50 })
   @IsString()
   @IsOptional()

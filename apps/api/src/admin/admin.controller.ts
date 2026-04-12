@@ -1,16 +1,29 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { AdminService } from './admin.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AdminUserStatus, MercenaryPostStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { AdminGuard } from '../common/guards/admin.guard';
+import { AdminService } from './admin.service';
 import {
   CreateLessonAdminDto,
   CreateTeamAdminDto,
   CreateVenueAdminDto,
-  UpdateVenueAdminDto,
-  UpdateMatchStatusDto,
   UpdateLessonStatusDto,
+  UpdateMatchStatusDto,
+  UpdateUserStatusAdminDto,
+  UpdateVenueAdminDto,
+  WarnUserAdminDto,
 } from './dto';
 
 @ApiTags('관리자')
@@ -23,6 +36,12 @@ export class AdminController {
   @ApiOperation({ summary: '대시보드 통계' })
   async getStats() {
     return this.adminService.getDashboardStats();
+  }
+
+  @Get('statistics')
+  @ApiOperation({ summary: '관리자 통계 개요' })
+  async getStatisticsOverview() {
+    return this.adminService.getStatisticsOverview();
   }
 
   @Get('users')
@@ -41,24 +60,30 @@ export class AdminController {
   @ApiOperation({ summary: '사용자 경고 부여' })
   async warnUser(
     @Param('id') id: string,
-    @CurrentUser('nickname') actor: string,
-    @Body('note') note?: string,
+    @CurrentUser('id') actorId: string,
+    @CurrentUser('nickname') actorLabel: string,
+    @Body() body: WarnUserAdminDto,
   ) {
-    return this.adminService.warnUser(id, { actor: actor || 'admin', note });
+    return this.adminService.warnUser(id, {
+      actorId,
+      actorLabel: actorLabel || 'admin',
+      note: body.note,
+    });
   }
 
   @Patch('users/:id/status')
   @ApiOperation({ summary: '사용자 상태 변경' })
   async updateUserStatus(
     @Param('id') id: string,
-    @CurrentUser('nickname') actor: string,
-    @Body('status') status: 'active' | 'suspended',
-    @Body('note') note?: string,
+    @CurrentUser('id') actorId: string,
+    @CurrentUser('nickname') actorLabel: string,
+    @Body() body: UpdateUserStatusAdminDto,
   ) {
     return this.adminService.updateUserStatus(id, {
-      actor: actor || 'admin',
-      status,
-      note,
+      actorId,
+      actorLabel: actorLabel || 'admin',
+      status: body.status as AdminUserStatus,
+      note: body.note,
     });
   }
 
@@ -72,6 +97,27 @@ export class AdminController {
   @ApiOperation({ summary: '매치 상태 변경' })
   async updateMatchStatus(@Param('id') id: string, @Body() body: UpdateMatchStatusDto) {
     return this.adminService.updateMatchStatus(id, body.status);
+  }
+
+  @Get('reviews')
+  @ApiOperation({ summary: '평가 목록' })
+  async getReviews(@Query('search') search?: string) {
+    return this.adminService.getReviews({ search });
+  }
+
+  @Get('mercenary')
+  @ApiOperation({ summary: '용병 모집글 목록' })
+  async getMercenaryPosts(
+    @Query('search') search?: string,
+    @Query('status') status?: MercenaryPostStatus,
+  ) {
+    return this.adminService.getMercenaryPosts({ search, status });
+  }
+
+  @Delete('mercenary/:id')
+  @ApiOperation({ summary: '관리자 용병 모집글 삭제' })
+  async deleteMercenaryPost(@Param('id') id: string) {
+    return this.adminService.deleteMercenaryPost(id);
   }
 
   @Get('lessons')
@@ -98,6 +144,12 @@ export class AdminController {
     return this.adminService.getTeams();
   }
 
+  @Get('teams/:id')
+  @ApiOperation({ summary: '팀 상세 (관리자)' })
+  async getTeamDetail(@Param('id') id: string) {
+    return this.adminService.getTeamDetail(id);
+  }
+
   @Post('teams')
   @ApiOperation({ summary: '팀 생성 (관리자)' })
   async createTeam(@Body() body: CreateTeamAdminDto) {
@@ -110,6 +162,12 @@ export class AdminController {
     return this.adminService.getVenues();
   }
 
+  @Get('venues/:id')
+  @ApiOperation({ summary: '시설 상세 (관리자)' })
+  async getVenueDetail(@Param('id') id: string) {
+    return this.adminService.getVenueDetail(id);
+  }
+
   @Post('venues')
   @ApiOperation({ summary: '시설 등록 (관리자)' })
   async createVenue(@Body() body: CreateVenueAdminDto) {
@@ -120,6 +178,12 @@ export class AdminController {
   @ApiOperation({ summary: '시설 수정 (관리자)' })
   async updateVenue(@Param('id') id: string, @Body() body: UpdateVenueAdminDto) {
     return this.adminService.updateVenue(id, body);
+  }
+
+  @Delete('venues/:id')
+  @ApiOperation({ summary: '시설 삭제 (관리자)' })
+  async deleteVenue(@Param('id') id: string) {
+    return this.adminService.deleteVenue(id);
   }
 
   @Get('payments')

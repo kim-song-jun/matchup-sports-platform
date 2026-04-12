@@ -19,6 +19,7 @@ const prismaMock = {
   user: {
     findMany: jest.fn(),
   },
+  $queryRaw: jest.fn(),
 };
 
 const scoringMock = {
@@ -112,7 +113,7 @@ describe('SchedulerService', () => {
       prismaMock.matchParticipant.groupBy.mockResolvedValue([
         { userId: 'u1', _count: { id: 10 } },
       ]);
-      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.$queryRaw.mockResolvedValue([]);
       badgesMock.awardIfEligible.mockResolvedValue(undefined);
 
       await service.awardBadges();
@@ -128,7 +129,7 @@ describe('SchedulerService', () => {
       prismaMock.matchParticipant.groupBy.mockResolvedValue([
         { userId: 'u1', _count: { id: 100 } },
       ]);
-      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.$queryRaw.mockResolvedValue([]);
       badgesMock.awardIfEligible.mockResolvedValue(undefined);
 
       await service.awardBadges();
@@ -143,13 +144,15 @@ describe('SchedulerService', () => {
 
     it('awards no_show_free_10 badge when last 10 participations have no no-show', async () => {
       prismaMock.matchParticipant.groupBy.mockResolvedValue([]);
-      prismaMock.user.findMany.mockResolvedValue([{ id: 'u1' }]);
 
-      const recentParticipations = Array.from({ length: 10 }, (_, i) => ({
+      // $queryRaw returns 10 rows for user u1 with arrivedAt set (no no-shows)
+      const recentRows = Array.from({ length: 10 }, (_, i) => ({
+        userId: 'u1',
         id: `p${i}`,
         arrivedAt: new Date(),
+        rn: BigInt(i + 1),
       }));
-      prismaMock.matchParticipant.findMany.mockResolvedValue(recentParticipations);
+      prismaMock.$queryRaw.mockResolvedValue(recentRows);
       prismaMock.notification.findMany.mockResolvedValue([]);
       badgesMock.awardIfEligible.mockResolvedValue(undefined);
 
@@ -164,10 +167,15 @@ describe('SchedulerService', () => {
 
     it('does not award no_show_free_10 when fewer than 10 participations', async () => {
       prismaMock.matchParticipant.groupBy.mockResolvedValue([]);
-      prismaMock.user.findMany.mockResolvedValue([{ id: 'u1' }]);
-      prismaMock.matchParticipant.findMany.mockResolvedValue(
-        Array.from({ length: 5 }, (_, i) => ({ id: `p${i}`, arrivedAt: new Date() })),
-      );
+
+      // Only 5 rows for u1 — not enough
+      const recentRows = Array.from({ length: 5 }, (_, i) => ({
+        userId: 'u1',
+        id: `p${i}`,
+        arrivedAt: new Date(),
+        rn: BigInt(i + 1),
+      }));
+      prismaMock.$queryRaw.mockResolvedValue(recentRows);
 
       await service.awardBadges();
 
@@ -180,6 +188,7 @@ describe('SchedulerService', () => {
 
     it('does not throw on unexpected error', async () => {
       prismaMock.matchParticipant.groupBy.mockRejectedValue(new Error('DB error'));
+      prismaMock.$queryRaw.mockResolvedValue([]);
 
       await expect(service.awardBadges()).resolves.not.toThrow();
     });

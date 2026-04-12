@@ -26,10 +26,12 @@ describe('TeamMatchesService', () => {
       updateMany: jest.fn(),
     },
     arrivalCheck: {
-      upsert: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
     },
     matchEvaluation: {
       create: jest.fn(),
+      findUnique: jest.fn(),
       findMany: jest.fn(),
     },
     teamTrustScore: {
@@ -56,6 +58,8 @@ describe('TeamMatchesService', () => {
     jest.clearAllMocks();
     // Reset assertRole to default (permit) after each clear
     mockTeamMembershipService.assertRole.mockResolvedValue({ role: 'manager' });
+    mockPrismaService.$transaction.mockImplementation((callback: (client: typeof mockPrismaService) => Promise<unknown>) =>
+      callback(mockPrismaService as typeof mockPrismaService));
   });
 
   it('should be defined', () => {
@@ -270,6 +274,7 @@ describe('TeamMatchesService', () => {
       title: '풋살 팀 매치',
       sportType: 'FUTSAL',
       status: 'recruiting',
+      guestTeamId: 't2',
       hostTeam: {
         id: 't1',
         name: 'FC 서울',
@@ -284,8 +289,21 @@ describe('TeamMatchesService', () => {
       applications: [
         {
           id: 'app-1',
-          status: 'pending',
-          applicantTeam: { id: 't2', name: '판교 FC', level: 3, city: '성남', memberCount: 8 },
+          applicantTeamId: 't2',
+          status: 'approved',
+          applicantTeam: {
+            id: 't2',
+            name: '판교 FC',
+            sportType: 'FUTSAL',
+            description: null,
+            city: '성남',
+            district: '분당구',
+            memberCount: 8,
+            level: 3,
+            contactInfo: null,
+            logoUrl: null,
+            isRecruiting: true,
+          },
         },
       ],
       arrivalChecks: [],
@@ -304,7 +322,10 @@ describe('TeamMatchesService', () => {
 
       const result = await service.findOne('tm-1');
 
-      expect(result).toEqual(mockMatchDetail);
+      expect(result).toMatchObject({
+        ...mockMatchDetail,
+        guestTeam: mockMatchDetail.applications[0].applicantTeam,
+      });
       expect(prisma.teamMatch.findUnique).toHaveBeenCalledWith({
         where: { id: 'tm-1' },
         include: expect.objectContaining({
@@ -721,6 +742,337 @@ describe('TeamMatchesService', () => {
         where: { id: 'app-1' },
         data: { status: 'rejected' },
       });
+    });
+  });
+
+  describe('checkIn', () => {
+    const userId = 'user-1';
+
+    it('should check in a participant team and set status to checking_in from scheduled', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'scheduled',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+      const tx = {
+        teamMatch: {
+          update: jest.fn().mockResolvedValue({ id: 'tm-1', status: 'checking_in' }),
+        },
+        arrivalCheck: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 'arrival-1' }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation((callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
+
+      const result = await service.checkIn('tm-1', userId, { teamId: 'team-host' });
+
+      expect(result).toEqual({ id: 'arrival-1' });
+      expect(tx.teamMatch.update).toHaveBeenCalledWith({
+        where: { id: 'tm-1' },
+        data: { status: 'checking_in' },
+      });
+      expect(tx.arrivalCheck.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            teamId: 'team-host',
+            isHome: true,
+          }),
+        }),
+      );
+    });
+
+    it('should throw when match is not found', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue(null);
+
+      await expect(service.checkIn('tm-404', userId, { teamId: 'team-host' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw when guest team is not confirmed', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'scheduled',
+        hostTeamId: 'team-host',
+        guestTeamId: null,
+        applications: [],
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-host' })).rejects.toThrow(BadRequestException);
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-host' })).rejects.toThrow(
+        '상대 팀이 확정된 경기만 도착 인증할 수 있습니다',
+      );
+    });
+
+    it('should use approved application as guest team fallback when guestTeamId is missing', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'scheduled',
+        hostTeamId: 'team-host',
+        guestTeamId: null,
+        applications: [{ applicantTeamId: 'team-guest', status: 'approved' }],
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-guest' });
+      mockPrismaService.arrivalCheck.findUnique.mockResolvedValue(null);
+      mockPrismaService.teamMatch.update.mockResolvedValue({ id: 'tm-1', status: 'checking_in' });
+      mockPrismaService.arrivalCheck.create.mockResolvedValue({ id: 'arrival-guest' });
+
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-guest' })).resolves.toEqual({ id: 'arrival-guest' });
+    });
+
+    it('should throw when team is not a participant', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'scheduled',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-other' });
+
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-other' })).rejects.toThrow(BadRequestException);
+      expect(prisma.arrivalCheck.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw when status does not allow check-in', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'completed',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-host' })).rejects.toThrow(BadRequestException);
+      expect(prisma.arrivalCheck.create).not.toHaveBeenCalled();
+    });
+
+    it('should block duplicate arrival submission', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'checking_in',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+      mockPrismaService.arrivalCheck.findUnique.mockResolvedValue({ id: 'arrival-existing' });
+
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-host' })).rejects.toThrow(BadRequestException);
+      await expect(service.checkIn('tm-1', userId, { teamId: 'team-host' })).rejects.toThrow(
+        '이미 도착 인증을 완료했습니다',
+      );
+      expect(prisma.arrivalCheck.create).not.toHaveBeenCalled();
+    });
+
+    it('should not update match status when already checking_in', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'checking_in',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+      mockPrismaService.arrivalCheck.findUnique.mockResolvedValue(null);
+      mockPrismaService.arrivalCheck.create.mockResolvedValue({ id: 'arrival-2' });
+
+      await service.checkIn('tm-1', userId, { teamId: 'team-host' });
+
+      expect(prisma.teamMatch.update).not.toHaveBeenCalled();
+      expect(mockTeamMembershipService.assertRole).toHaveBeenCalledWith('team-host', userId, 'member');
+    });
+  });
+
+  describe('submitResult', () => {
+    const userId = 'user-1';
+
+    const validPayload = {
+      scoreHome: { Q1: 1, Q2: 2, Q3: 0, Q4: 1 },
+      scoreAway: { Q1: 0, Q2: 1, Q3: 0, Q4: 1 },
+      resultHome: 'win' as const,
+      resultAway: 'lose' as const,
+    };
+
+    it('should save result and complete match when payload is valid', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'checking_in',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+      });
+      mockPrismaService.teamMatch.update.mockResolvedValue({ id: 'tm-1', status: 'completed' });
+
+      const result = await service.submitResult('tm-1', userId, validPayload);
+
+      expect(result).toEqual({ id: 'tm-1', status: 'completed' });
+      expect(prisma.teamMatch.update).toHaveBeenCalledWith({
+        where: { id: 'tm-1' },
+        data: expect.objectContaining({
+          status: 'completed',
+          scoreHome: validPayload.scoreHome,
+          scoreAway: validPayload.scoreAway,
+          resultHome: 'win',
+          resultAway: 'lose',
+        }),
+      });
+    });
+
+    it('should throw when match status is not allowed', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'completed',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+      });
+
+      await expect(service.submitResult('tm-1', userId, validPayload)).rejects.toThrow(BadRequestException);
+      expect(prisma.teamMatch.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw when quarter score map does not match quarterCount', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'in_progress',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+      });
+
+      await expect(
+        service.submitResult('tm-1', userId, {
+          ...validPayload,
+          scoreHome: { Q1: 1, Q2: 2, Q3: 1 },
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.teamMatch.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw when result pair is inconsistent with scores', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'in_progress',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+      });
+
+      await expect(
+        service.submitResult('tm-1', userId, {
+          ...validPayload,
+          resultHome: 'draw',
+          resultAway: 'draw',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.teamMatch.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow guest manager when host manager check fails', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'checking_in',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+      });
+      mockPrismaService.teamMatch.update.mockResolvedValue({ id: 'tm-1', status: 'completed' });
+      mockTeamMembershipService.assertRole
+        .mockRejectedValueOnce(new ForbiddenException())
+        .mockResolvedValueOnce({ role: 'manager' });
+
+      await service.submitResult('tm-1', userId, validPayload);
+
+      expect(mockTeamMembershipService.assertRole).toHaveBeenNthCalledWith(1, 'team-host', userId, 'manager');
+      expect(mockTeamMembershipService.assertRole).toHaveBeenNthCalledWith(2, 'team-guest', userId, 'manager');
+      expect(prisma.teamMatch.update).toHaveBeenCalled();
+    });
+
+    it('should throw when neither host nor guest has manager permission', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'checking_in',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+      });
+      mockTeamMembershipService.assertRole.mockRejectedValue(new ForbiddenException());
+
+      await expect(service.submitResult('tm-1', userId, validPayload)).rejects.toThrow(ForbiddenException);
+      expect(prisma.teamMatch.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('evaluate', () => {
+    const userId = 'user-1';
+
+    const validEvaluation = {
+      evaluatorTeamId: 'team-host',
+      evaluatedTeamId: 'team-guest',
+      levelAccuracy: 5,
+      infoAccuracy: 4,
+      mannerRating: 5,
+      punctuality: 4,
+      paymentClarity: 4,
+      cooperation: 5,
+      comment: 'good game',
+    };
+
+    it('should create evaluation when match is completed and team pair is valid', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'completed',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.matchEvaluation.findUnique.mockResolvedValue(null);
+      mockPrismaService.matchEvaluation.create.mockResolvedValue({ id: 'eval-1' });
+      mockPrismaService.matchEvaluation.findMany.mockResolvedValue([
+        {
+          levelAccuracy: 5,
+          infoAccuracy: 4,
+          mannerRating: 5,
+        },
+      ]);
+      mockPrismaService.teamTrustScore.upsert.mockResolvedValue({ id: 'trust-1' });
+
+      const result = await service.evaluate('tm-1', userId, validEvaluation);
+
+      expect(result).toEqual({ id: 'eval-1' });
+      expect(mockTeamMembershipService.assertRole).toHaveBeenCalledWith('team-host', userId, 'member');
+      expect(prisma.matchEvaluation.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          teamMatchId: 'tm-1',
+          evaluatorTeamId: 'team-host',
+          evaluatedTeamId: 'team-guest',
+        }),
+      });
+    });
+
+    it('should throw when match is not completed', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'in_progress',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+
+      await expect(service.evaluate('tm-1', userId, validEvaluation)).rejects.toThrow(BadRequestException);
+      expect(prisma.matchEvaluation.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw when evaluator/evaluated team pair is invalid', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'completed',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+
+      await expect(
+        service.evaluate('tm-1', userId, {
+          ...validEvaluation,
+          evaluatorTeamId: 'team-other',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.matchEvaluation.create).not.toHaveBeenCalled();
+    });
+
+    it('should block duplicate evaluation by evaluator team', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'completed',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+      });
+      mockPrismaService.matchEvaluation.findUnique.mockResolvedValue({ id: 'existing-eval' });
+
+      await expect(service.evaluate('tm-1', userId, validEvaluation)).rejects.toThrow(BadRequestException);
+      await expect(service.evaluate('tm-1', userId, validEvaluation)).rejects.toThrow('이미 평가를 완료했습니다');
+      expect(prisma.matchEvaluation.create).not.toHaveBeenCalled();
     });
   });
 });

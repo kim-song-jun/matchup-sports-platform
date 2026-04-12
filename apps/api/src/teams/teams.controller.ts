@@ -16,8 +16,10 @@ import { TeamsService } from './teams.service';
 import { TeamMembershipService } from './team-membership.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto, InviteMemberDto } from './dto/membership.dto';
 import { CreateTeamDto } from './dto/create-team.dto';
+import { UpdateTeamDto } from './dto/update-team.dto';
 import { TeamRole } from '@prisma/client';
 
 @ApiTags('팀/클럽')
@@ -52,6 +54,16 @@ export class TeamsController {
     return this.teamMembershipService.listUserTeams(userId);
   }
 
+  @Get(':id/hub')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: '팀 허브 집계 데이터' })
+  async findHub(
+    @Param('id') id: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.teamsService.findHub(id, userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '팀 상세' })
   async findById(@Param('id') id: string) {
@@ -64,6 +76,30 @@ export class TeamsController {
   @ApiOperation({ summary: '팀 생성' })
   async create(@CurrentUser('id') userId: string, @Body() body: CreateTeamDto) {
     return this.teamsService.create(userId, body);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 수정 (manager+)' })
+  async update(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() body: UpdateTeamDto,
+  ) {
+    return this.teamsService.update(id, userId, body);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: '팀 삭제 (owner 전용)' })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.teamsService.remove(id, userId);
   }
 
   // ─── Membership Endpoints ─────────────────────────────────────────────

@@ -197,10 +197,30 @@ export class UpdateMatchDto {
   @IsOptional()
   description?: string;
 
+  @ApiPropertyOptional({ description: '대표 이미지 URL' })
+  @IsString()
+  @IsOptional()
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({ enum: MATCH_SPORT_TYPES })
+  @IsEnum(MATCH_SPORT_TYPES)
+  @IsOptional()
+  sportType?: string;
+
   @ApiPropertyOptional({ description: '매치 날짜 (YYYY-MM-DD)' })
   @IsDateString()
   @IsOptional()
   matchDate?: string;
+
+  @ApiPropertyOptional({ description: '시작 시간 (HH:mm)' })
+  @IsString()
+  @IsOptional()
+  startTime?: string;
+
+  @ApiPropertyOptional({ description: '종료 시간 (HH:mm)' })
+  @IsString()
+  @IsOptional()
+  endTime?: string;
 
   @ApiPropertyOptional({ description: '최대 인원' })
   @IsInt()
@@ -218,6 +238,30 @@ export class UpdateMatchDto {
   @IsString()
   @IsOptional()
   venueId?: string;
+
+  @ApiPropertyOptional({ description: '최소 레벨 (1-5)' })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @IsOptional()
+  levelMin?: number;
+
+  @ApiPropertyOptional({ description: '최대 레벨 (1-5)' })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @IsOptional()
+  levelMax?: number;
+
+  @ApiPropertyOptional({ enum: ['any', 'male', 'female'] })
+  @IsEnum(['any', 'male', 'female'])
+  @IsOptional()
+  gender?: string;
+
+  @ApiPropertyOptional({ description: '팀 구성 설정' })
+  @IsObject()
+  @IsOptional()
+  teamConfig?: Record<string, unknown>;
 }
 
 export class CancelMatchDto {

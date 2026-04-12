@@ -12,10 +12,12 @@ const prismaMock = {
   matchParticipant: { findUnique: jest.fn() },
   userSportProfile: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
   },
   $executeRaw: jest.fn(),
+  $transaction: jest.fn(),
 };
 
 const notificationsMock = {
@@ -31,6 +33,16 @@ describe('ScoringService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    // Default: $transaction resolves all operations
+    prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
+      if (typeof arg === 'function') {
+        return arg(prismaMock);
+      }
+      if (Array.isArray(arg)) {
+        return Promise.all(arg);
+      }
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -136,13 +148,17 @@ describe('ScoringService', () => {
         ],
       });
 
-      prismaMock.userSportProfile.findUnique.mockResolvedValue({ eloRating: 1000 });
+      prismaMock.userSportProfile.findMany.mockResolvedValue([
+        { userId: 'u1', eloRating: 1000 },
+        { userId: 'u2', eloRating: 1000 },
+      ]);
       prismaMock.userSportProfile.update.mockResolvedValue({});
       notificationsMock.create.mockResolvedValue({});
 
       await service.updateEloAfterMatch('match-1');
 
-      expect(prismaMock.userSportProfile.update).toHaveBeenCalledTimes(2);
+      // $transaction is called once with all updates batched
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     });
 
     it('does not throw on unexpected error (fire-and-forget safety)', async () => {
@@ -174,6 +190,8 @@ describe('ScoringService', () => {
 
       await service.applyNoShowPenalty('participant-1');
 
+      // All 3 DB operations run inside a single $transaction
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
       expect(prismaMock.userSportProfile.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: 'u1', sportType: 'futsal' },

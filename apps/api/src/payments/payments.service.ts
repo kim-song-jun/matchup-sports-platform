@@ -438,12 +438,18 @@ export class PaymentsService {
 
   // ── queries ────────────────────────────────────────────────────────────────
 
-  async getByUserId(userId: string) {
-    return this.prisma.payment.findMany({
+  async getByUserId(userId: string, cursor?: string, take = 50) {
+    const items = await this.prisma.payment.findMany({
       where: { userId },
       include: this.paymentInclude,
       orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+
+    const hasMore = items.length > take;
+    if (hasMore) items.pop();
+    return { items, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null };
   }
 
   async getById(userId: string, paymentId: string) {

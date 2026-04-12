@@ -143,26 +143,29 @@ export class ScoringService {
     const { userId } = participant;
     const sportType = participant.match.sportType;
 
-    // Decrement ELO by 30 (floor at 0)
-    await this.prisma.userSportProfile.updateMany({
-      where: { userId, sportType },
-      data: { eloRating: { decrement: 30 } },
+    // Apply ELO decrement and manner score penalty atomically
+    await this.prisma.$transaction(async (tx) => {
+      // Decrement ELO by 30 (floor at 0)
+      await tx.userSportProfile.updateMany({
+        where: { userId, sportType },
+        data: { eloRating: { decrement: 30 } },
+      });
+
+      // Clamp eloRating to minimum 0
+      await tx.$executeRaw`
+        UPDATE user_sport_profiles
+        SET elo_rating = GREATEST(elo_rating, 0)
+        WHERE user_id = ${userId}
+          AND sport_type = ${sportType}::"SportType"
+      `;
+
+      // Decrement manner score by 0.5 (floor at 0)
+      await tx.$executeRaw`
+        UPDATE users
+        SET manner_score = GREATEST(manner_score - 0.5, 0)
+        WHERE id = ${userId}
+      `;
     });
-
-    // Clamp eloRating to minimum 0
-    await this.prisma.$executeRaw`
-      UPDATE user_sport_profiles
-      SET elo_rating = GREATEST(elo_rating, 0)
-      WHERE user_id = ${userId}
-        AND sport_type = ${sportType}::"SportType"
-    `;
-
-    // Decrement manner score by 0.5 (floor at 0)
-    await this.prisma.$executeRaw`
-      UPDATE users
-      SET manner_score = GREATEST(manner_score - 0.5, 0)
-      WHERE id = ${userId}
-    `;
 
     void this.notifications.create({
       userId,
@@ -181,49 +184,57 @@ export class ScoringService {
     loserUserIds: string[],
     matchId: string,
   ): Promise<void> {
-    for (const uid of winnerUserIds) {
-      await this.updateSingleUserElo(uid, sportType, matchId, true);
-    }
-    for (const uid of loserUserIds) {
-      await this.updateSingleUserElo(uid, sportType, matchId, false);
-    }
-  }
+    const allUserIds = [...winnerUserIds, ...loserUserIds];
 
-  private async updateSingleUserElo(
-    userId: string,
-    sportType: SportType,
-    matchId: string,
-    isWinner: boolean,
-  ): Promise<void> {
-    const profile = await this.prisma.userSportProfile.findUnique({
-      where: { userId_sportType: { userId, sportType } },
-      select: { eloRating: true },
+    // Fetch all sport profiles in a single query
+    const profiles = await this.prisma.userSportProfile.findMany({
+      where: { userId: { in: allUserIds }, sportType },
+      select: { userId: true, eloRating: true },
     });
 
-    if (!profile) {
-      return;
-    }
+    const profileMap = new Map(profiles.map((p) => [p.userId, p.eloRating]));
 
-    // Use a neutral opponent rating of 1000 for single-side update
+    // Compute deltas in memory
     const opponentRating = 1000;
-    const [newWinner, newLoser] = this.calculateElo(
-      isWinner ? profile.eloRating : opponentRating,
-      isWinner ? opponentRating : profile.eloRating,
+    const updates: Array<{ userId: string; newRating: number; isWinner: boolean }> = [];
+
+    for (const uid of winnerUserIds) {
+      const current = profileMap.get(uid);
+      if (current === undefined) continue;
+      const [newWinner] = this.calculateElo(current, opponentRating);
+      updates.push({ userId: uid, newRating: newWinner, isWinner: true });
+    }
+
+    for (const uid of loserUserIds) {
+      const current = profileMap.get(uid);
+      if (current === undefined) continue;
+      const [, newLoser] = this.calculateElo(opponentRating, current);
+      updates.push({ userId: uid, newRating: newLoser, isWinner: false });
+    }
+
+    if (updates.length === 0) return;
+
+    // Apply all rating updates in a single transaction
+    await this.prisma.$transaction(
+      updates.map(({ userId, newRating }) =>
+        this.prisma.userSportProfile.update({
+          where: { userId_sportType: { userId, sportType } },
+          data: { eloRating: newRating },
+        }),
+      ),
     );
-    const newRating = isWinner ? newWinner : newLoser;
-    const delta = newRating - profile.eloRating;
 
-    await this.prisma.userSportProfile.update({
-      where: { userId_sportType: { userId, sportType } },
-      data: { eloRating: newRating },
-    });
-
-    void this.notifications.create({
-      userId,
-      type: NotificationType.elo_changed,
-      title: isWinner ? 'ELO가 올랐어요!' : 'ELO가 내려갔어요',
-      body: `ELO ${delta > 0 ? '+' : ''}${delta} (현재: ${newRating})`,
-      data: { matchId, delta, newRating },
-    });
+    // Fire-and-forget ELO notifications for all updated users
+    for (const { userId, newRating, isWinner } of updates) {
+      const current = profileMap.get(userId) ?? newRating;
+      const delta = newRating - current;
+      void this.notifications.create({
+        userId,
+        type: NotificationType.elo_changed,
+        title: isWinner ? 'ELO가 올랐어요!' : 'ELO가 내려갔어요',
+        body: `ELO ${delta > 0 ? '+' : ''}${delta} (현재: ${newRating})`,
+        data: { matchId, delta, newRating },
+      });
+    }
   }
 }

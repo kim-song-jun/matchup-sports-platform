@@ -10,6 +10,7 @@ import {
   MaxLength,
   IsNotEmpty,
   IsObject,
+  IsUUID,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SportType, VenueType } from '@prisma/client';
@@ -72,6 +73,11 @@ export class CreateVenueAdminDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({ description: '시설 소유자 userId' })
+  @IsUUID()
+  @IsOptional()
+  ownerId?: string;
 
   @ApiPropertyOptional({ description: '구장 이미지 URL 목록', type: [String] })
   @IsArray()
@@ -165,6 +171,11 @@ export class UpdateVenueAdminDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({ description: '시설 소유자 userId' })
+  @IsUUID()
+  @IsOptional()
+  ownerId?: string;
 
   @ApiPropertyOptional({ description: '구장 이미지 URL 목록', type: [String] })
   @IsArray()

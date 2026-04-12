@@ -6,6 +6,9 @@ import { WebPushService } from './web-push.service';
 import { presentNotification, notificationCategory } from './notification-presentation';
 import { UpdateNotificationPreferenceDto } from './dto/notification-preference.dto';
 import { UserBlocksService } from '../user-blocks/user-blocks.service';
+import { RedisCacheService } from '../redis/redis-cache.service';
+
+const UNREAD_COUNT_TTL = 30; // 30 seconds
 
 @Injectable()
 export class NotificationsService {
@@ -15,6 +18,7 @@ export class NotificationsService {
     private readonly realtime: RealtimeGateway,
     private readonly webPushService: WebPushService,
     private readonly userBlocksService: UserBlocksService,
+    private readonly cache: RedisCacheService,
   ) {}
 
   async create(data: {
@@ -58,6 +62,8 @@ export class NotificationsService {
         data: data.data ? JSON.parse(JSON.stringify(data.data)) : undefined,
       },
     });
+
+    await this.cache.del(`notifications:unread:${data.userId}`);
 
     const payload = presentNotification(notification);
 
@@ -110,6 +116,8 @@ export class NotificationsService {
       data: { isRead: true },
     });
 
+    await this.cache.del(`notifications:unread:${userId}`);
+
     const payload = presentNotification(updated);
     this.realtime.emitToUser(userId, 'notification:read', {
       notificationId,
@@ -123,6 +131,9 @@ export class NotificationsService {
       where: { userId, isRead: false },
       data: { isRead: true },
     });
+
+    await this.cache.del(`notifications:unread:${userId}`);
+
     this.realtime.emitToUser(userId, 'notification:read-all', {
       count: result.count,
     });
@@ -130,10 +141,16 @@ export class NotificationsService {
   }
 
   async getUnreadCount(userId: string) {
+    const cacheKey = `notifications:unread:${userId}`;
+    const cached = await this.cache.get<{ count: number }>(cacheKey);
+    if (cached) return cached;
+
     const count = await this.prisma.notification.count({
       where: { userId, isRead: false },
     });
-    return { count };
+    const result = { count };
+    await this.cache.set(cacheKey, result, UNREAD_COUNT_TTL);
+    return result;
   }
 
   async getPreferences(userId: string) {

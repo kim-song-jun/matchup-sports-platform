@@ -434,7 +434,8 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
 
       const result = await service.getByUserId('user-1');
 
-      expect(result).toHaveLength(2);
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBeNull();
       expect(prismaMock.payment.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: 'user-1' },
@@ -447,7 +448,21 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
     it('returns empty array when user has no payments', async () => {
       prismaMock.payment.findMany.mockResolvedValue([]);
       const result = await service.getByUserId('user-no-payments');
-      expect(result).toHaveLength(0);
+      expect(result.items).toHaveLength(0);
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('returns nextCursor when there are more items than take', async () => {
+      const payments = [
+        mockPayment({ id: 'pay-1', createdAt: new Date('2026-03-20') }),
+        mockPayment({ id: 'pay-2', createdAt: new Date('2026-03-10') }),
+      ];
+      prismaMock.payment.findMany.mockResolvedValue(payments);
+
+      const result = await service.getByUserId('user-1', undefined, 1);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.nextCursor).toBe('pay-1');
     });
   });
 

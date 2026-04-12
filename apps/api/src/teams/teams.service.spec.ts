@@ -24,6 +24,8 @@ describe('TeamsService', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
     teamMembership: {
       create: jest.fn(),
@@ -40,6 +42,18 @@ describe('TeamsService', () => {
     },
     user: {
       findFirst: jest.fn(),
+    },
+    marketplaceListing: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    lesson: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    tournament: {
+      findMany: jest.fn(),
+      count: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   };
@@ -657,6 +671,61 @@ describe('TeamsService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('update/remove/findHub', () => {
+    beforeEach(() => {
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({
+        id: 'team-1',
+        owner: { id: 'owner-1', nickname: 'owner', profileImageUrl: null, mannerScore: 4.5 },
+      });
+    });
+
+    it('updates team data when manager+ role is verified', async () => {
+      mockMembershipService.assertRole.mockResolvedValue({ role: TeamRole.manager });
+      mockPrismaService.sportTeam.update.mockResolvedValue({ id: 'team-1', name: 'new-name' });
+
+      const result = await service.update('team-1', 'manager-1', { name: 'new-name' });
+
+      expect(result).toEqual({ id: 'team-1', name: 'new-name' });
+      expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
+      expect(mockPrismaService.sportTeam.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'team-1' },
+          data: expect.objectContaining({ name: 'new-name' }),
+        }),
+      );
+    });
+
+    it('deletes team when owner role is verified', async () => {
+      mockMembershipService.assertRole.mockResolvedValue({ role: TeamRole.owner });
+      mockPrismaService.sportTeam.delete.mockResolvedValue({ id: 'team-1' });
+
+      await service.remove('team-1', 'owner-1');
+
+      expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'owner-1', TeamRole.owner);
+      expect(mockPrismaService.sportTeam.delete).toHaveBeenCalledWith({ where: { id: 'team-1' } });
+    });
+
+    it('returns team hub aggregate payload', async () => {
+      mockPrismaService.marketplaceListing.findMany.mockResolvedValue([{ id: 'listing-1' }]);
+      mockPrismaService.lesson.findMany.mockResolvedValue([{ id: 'lesson-1' }]);
+      mockPrismaService.tournament.findMany.mockResolvedValue([{ id: 'tournament-1' }]);
+      mockPrismaService.marketplaceListing.count.mockResolvedValue(1);
+      mockPrismaService.lesson.count.mockResolvedValue(1);
+      mockPrismaService.tournament.count.mockResolvedValue(1);
+      mockMembershipService.getMembership.mockResolvedValue({ role: TeamRole.owner });
+
+      const result = await service.findHub('team-1', 'owner-1');
+
+      expect(result.sections.goodsCount).toBe(1);
+      expect(result.sections.passesCount).toBe(1);
+      expect(result.sections.eventsCount).toBe(1);
+      expect(result.goods).toHaveLength(1);
+      expect(result.passes).toHaveLength(1);
+      expect(result.events).toHaveLength(1);
+      expect(result.capabilities.canEditProfile).toBe(true);
     });
   });
 });

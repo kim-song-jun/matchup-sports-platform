@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import * as fs from 'fs/promises';
 import { UploadsService } from './uploads.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -174,6 +176,21 @@ describe('UploadsService', () => {
       expect(mockPrisma.upload.delete).toHaveBeenCalledWith({
         where: { id: 'upload-1' },
       });
+    });
+
+    it('throws when file deletion fails with a non-ENOENT error and keeps the DB record', async () => {
+      mockPrisma.upload.findUnique.mockResolvedValue({
+        id: 'upload-1',
+        userId: 'user-1',
+        path: 'uploads/2026/04/some-uuid.webp',
+        filename: 'some-uuid.webp',
+      });
+      jest.mocked(fs.unlink).mockRejectedValueOnce(Object.assign(new Error('disk locked'), { code: 'EACCES' }));
+
+      await expect(service.deleteUpload('upload-1', 'user-1')).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(mockPrisma.upload.delete).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when upload does not exist', async () => {

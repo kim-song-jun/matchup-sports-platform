@@ -25,6 +25,7 @@ import { ScoringModule } from './scoring/scoring.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { ReportsModule } from './reports/reports.module';
 import { UserBlocksModule } from './user-blocks/user-blocks.module';
+import { TournamentsModule } from './tournaments/tournaments.module';
 import configuration from './config/configuration';
 import { RedisModule } from './redis/redis.module';
 
@@ -60,6 +61,7 @@ import { RedisModule } from './redis/redis.module';
     SchedulerModule,
     ReportsModule,
     UserBlocksModule,
+    TournamentsModule,
   ],
 })
 export class AppModule {}

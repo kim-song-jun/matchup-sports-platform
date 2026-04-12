@@ -39,6 +39,11 @@ export class CreateLessonDto {
   @IsOptional()
   venueId?: string;
 
+  @ApiPropertyOptional({ description: '소속 팀 ID (팀 허브 귀속)' })
+  @IsString()
+  @IsOptional()
+  teamId?: string;
+
   @ApiPropertyOptional({ description: '구장 직접 입력 이름', maxLength: 200 })
   @IsString()
   @IsOptional()

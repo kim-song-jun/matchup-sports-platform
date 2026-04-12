@@ -62,7 +62,9 @@ describe('Payments (e2e)', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.data).toHaveLength(0);
+      // GET /payments/me returns paginated response { items, nextCursor }
+      expect(res.body.data.items).toHaveLength(0);
+      expect(res.body.data.nextCursor).toBeNull();
     });
 
     it('returns 401 when unauthenticated', async () => {

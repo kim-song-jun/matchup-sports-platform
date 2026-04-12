@@ -164,7 +164,7 @@ dev-api: ## Start API container only (with Docker dependencies)
 
 .PHONY: dev-web
 dev-web: ## Start Web container only (with Docker dependencies)
-	@$(DOCKER_DEV) up --build web
+	@$(DOCKER_DEV) up --build deps web
 
 .PHONY: dev-stop
 dev-stop: stop ## Alias for stop
@@ -189,9 +189,21 @@ db-migrate: ## Run prisma migrate dev inside the api container
 db-push: ## Run prisma db push inside the api container
 	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:push"
 
+.PHONY: db-bootstrap-deploy
+db-bootstrap-deploy: ## Run deploy DB bootstrap logic (empty DB fallback + migrate deploy)
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:bootstrap:deploy"
+
 .PHONY: db-seed
 db-seed: ## Insert seed data inside the api container
 	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed"
+
+.PHONY: db-seed-mocks
+db-seed-mocks: ## Insert or refresh canonical mock data without wiping unrelated records
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:mocks"
+
+.PHONY: db-seed-mocks-deploy
+db-seed-mocks-deploy: ## Run checksum-gated mock sync as deploy would
+	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:mocks:deploy"
 
 .PHONY: db-seed-images
 db-seed-images: ## Fill or refresh DB-backed image data without wiping records
@@ -240,6 +252,59 @@ test-integration: ## Backend integration tests (runs in api container, needs db)
 .PHONY: test-e2e
 test-e2e: ## Playwright E2E tests (assumes `make dev` is running)
 	@npx playwright test
+
+.PHONY: qa-visual-audit-manifest
+qa-visual-audit-manifest: ## Generate visual audit manifest (set RUN/BATCH/FAMILY/LIMIT)
+	@node scripts/qa/run-visual-audit.mjs manifest \
+		$(if $(RUN),--run-id $(RUN),) \
+		$(if $(BATCH),--batch '$(BATCH)',) \
+		$(if $(FAMILY),--family '$(FAMILY)',) \
+		$(if $(ROUTE),--route '$(ROUTE)',) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(EXTRA)
+
+.PHONY: qa-visual-audit-capture
+qa-visual-audit-capture: ## Capture visual audit screenshots (set RUN/BATCH/FAMILY/VIEWPORTS/STATES/LIMIT/HEADED=1)
+	@node scripts/qa/run-visual-audit.mjs capture \
+		$(if $(RUN),--run-id $(RUN),) \
+		$(if $(BATCH),--batch '$(BATCH)',) \
+		$(if $(FAMILY),--family '$(FAMILY)',) \
+		$(if $(ROUTE),--route '$(ROUTE)',) \
+		$(if $(VIEWPORTS),--viewports '$(VIEWPORTS)',) \
+		$(if $(STATES),--states '$(STATES)',) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(if $(HEADED),--headed,) \
+		$(if $(INCLUDE_BLOCKED),--include-blocked,) \
+		$(EXTRA)
+
+.PHONY: qa-visual-audit-rerun
+qa-visual-audit-rerun: ## Re-run blocked routes for an existing RUN (set RUN plus optional FAMILY/ROUTE/VIEWPORTS/STATES/LIMIT)
+	@node scripts/qa/run-visual-audit.mjs capture \
+		--run-id $(RUN) \
+		--batch batch-8-rerun \
+		$(if $(FAMILY),--family '$(FAMILY)',) \
+		$(if $(ROUTE),--route '$(ROUTE)',) \
+		$(if $(VIEWPORTS),--viewports '$(VIEWPORTS)',) \
+		$(if $(STATES),--states '$(STATES)',) \
+		$(if $(LIMIT),--limit $(LIMIT),) \
+		$(if $(HEADED),--headed,) \
+		$(EXTRA)
+
+.PHONY: e2e-isolated-up
+e2e-isolated-up: ## Start an isolated Playwright runtime (set RUN=<id>)
+	@node scripts/qa/run-e2e-isolated.mjs up $(or $(RUN),r1)
+
+.PHONY: test-e2e-isolated
+test-e2e-isolated: ## Run the full Playwright suite against an isolated runtime (set RUN=<id>)
+	@node scripts/qa/run-e2e-isolated.mjs run $(or $(RUN),r1)
+
+.PHONY: test-e2e-isolated-spec
+test-e2e-isolated-spec: ## Run one isolated spec (set RUN=<id> SPEC=<path> [PROJECT='Desktop Chrome'] [GREP='pattern'])
+	@node scripts/qa/run-e2e-isolated.mjs run $(or $(RUN),r1) -- $(SPEC) $(if $(PROJECT),"--project=$(PROJECT)",) $(if $(GREP),"--grep=$(GREP)",)
+
+.PHONY: e2e-isolated-down
+e2e-isolated-down: ## Stop an isolated Playwright runtime (set RUN=<id>)
+	@node scripts/qa/run-e2e-isolated.mjs down $(or $(RUN),r1)
 
 .PHONY: test-load
 test-load: ## k6 load test (requires k6 installed)

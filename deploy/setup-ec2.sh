@@ -138,21 +138,34 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# 9. Prisma migrate deploy
-echo "🗄️ DB 마이그레이션 적용..."
-$COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T api npx prisma migrate deploy
+# 9. DB bootstrap / migrate deploy
+echo "🗄️ DB bootstrap 적용..."
+$COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts
 
 # 10. 전체 스택 시작
 echo "🚀 애플리케이션 스택 시작..."
 $COMPOSE -f docker-compose.prod.yml up -d
 
-# 11. 시드 데이터 (선택)
-echo "🌱 시드 데이터 입력..."
-docker exec matchup_api node -e "
-  const { PrismaClient } = require('@prisma/client');
-  const prisma = new PrismaClient();
-  prisma.\$connect().then(() => console.log('DB 연결 성공')).catch(e => console.error('DB 연결 실패:', e));
-" 2>/dev/null || echo "시드 데이터는 수동으로 실행해주세요."
+# 11. API 준비 대기 + deploy-safe seed sync
+echo "⏳ API 헬스체크 대기 중..."
+for i in $(seq 1 45); do
+  if curl -fsS http://localhost:8100/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' >/dev/null 2>&1; then
+    echo "✅ API 준비 완료"
+    break
+  fi
+  if [ "$i" -eq 45 ]; then
+    echo "❌ API가 제시간에 준비되지 않았습니다."
+    sudo docker logs matchup_api --tail 120 || true
+    exit 1
+  fi
+  sleep 2
+done
+
+echo "🧩 checksum-gated mock sync 실행..."
+sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+
+echo "🖼️ 이미지 backfill sync 실행..."
+sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
 
 # 12. 상태 확인
 echo ""

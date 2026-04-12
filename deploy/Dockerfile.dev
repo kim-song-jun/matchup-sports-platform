@@ -17,12 +17,12 @@ COPY apps/api/prisma apps/api/prisma
 COPY apps/web/package.json apps/web/package.json
 
 RUN pnpm install --frozen-lockfile
-RUN mkdir -p /opt/deps/node_modules /opt/deps/apps/api/node_modules /opt/deps/apps/web/node_modules \
-    && cp -a /app/node_modules/. /opt/deps/node_modules/ \
-    && cp -a /app/apps/api/node_modules/. /opt/deps/apps/api/node_modules/ \
-    && cp -a /app/apps/web/node_modules/. /opt/deps/apps/web/node_modules/
 
 COPY apps/api apps/api
 COPY apps/web apps/web
 
 RUN pnpm --filter api db:generate
+RUN mkdir -p /opt/deps/node_modules /opt/deps/apps/api/node_modules /opt/deps/apps/web/node_modules \
+    && cp -a /app/node_modules/. /opt/deps/node_modules/ \
+    && cp -a /app/apps/api/node_modules/. /opt/deps/apps/api/node_modules/ \
+    && cp -a /app/apps/web/node_modules/. /opt/deps/apps/web/node_modules/

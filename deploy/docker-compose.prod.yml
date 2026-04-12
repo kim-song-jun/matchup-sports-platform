@@ -3,6 +3,12 @@ services:
     image: postgres:16-alpine
     container_name: matchup_postgres
     restart: always
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=512MB
+      -c max_connections=100
+      -c work_mem=4MB
     environment:
       POSTGRES_USER: ${DB_USER:-matchup}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -14,11 +20,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   redis:
     image: redis:7-alpine
     container_name: matchup_redis
     restart: always
+    command: >
+      redis-server
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lru
+      --appendonly no
     volumes:
       - redis_data:/data
     healthcheck:
@@ -26,11 +41,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   api:
     image: matchup-api:latest
     container_name: matchup_api
     restart: always
+    volumes:
+      - uploads_data:/app/apps/api/uploads
     environment:
       DATABASE_URL: postgresql://${DB_USER:-matchup}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-matchup}
       REDIS_URL: redis://redis:6379/0
@@ -38,6 +59,7 @@ services:
       TOSS_CLIENT_KEY: ${TOSS_CLIENT_KEY:-}
       TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
       TOSS_WEBHOOK_SECRET: ${TOSS_WEBHOOK_SECRET:-}
+      DEPLOY_SYNC_MOCK_DATA: ${DEPLOY_SYNC_MOCK_DATA:-true}
       API_PORT: 8100
       NODE_ENV: production
     healthcheck:
@@ -59,6 +81,10 @@ services:
         condition: service_healthy
     ports:
       - "8100:8100"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   web:
     image: matchup-web:latest
@@ -87,6 +113,10 @@ services:
       start_period: 20s
     ports:
       - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   nginx:
     image: nginx:alpine
@@ -108,3 +138,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:

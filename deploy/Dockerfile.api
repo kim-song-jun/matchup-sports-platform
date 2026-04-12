@@ -12,9 +12,14 @@ WORKDIR /app/apps/api
 RUN npx prisma generate
 RUN npx nest build
 
-# Production — 전체 workspace를 유지 (pnpm hoisted 구조)
-FROM node:22-alpine
+# Runtime — copy only the artifacts needed to run the API.
+# NOTE: ts-node is kept in this image intentionally. The deploy workflow runs
+# prisma/bootstrap-deploy-db.ts, prisma/seed-mocks.ts, and prisma/seed-images.ts
+# via `docker exec matchup_api npx ts-node ...` after the container starts.
+# Switching to --prod install would drop ts-node and break those steps.
+FROM node:22-alpine AS runtime
 WORKDIR /app
+RUN corepack enable pnpm
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
@@ -22,6 +27,7 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 ENV NODE_ENV=production
 EXPOSE 8100

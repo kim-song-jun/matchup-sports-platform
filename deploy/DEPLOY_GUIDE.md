@@ -124,12 +124,13 @@ GitHub Actions 트리거
 8. API / Web Docker 이미지 빌드
 9. Web 이미지는 `deploy/Dockerfile.web`로 직접 빌드하고, browser API base를 `/api/v1`, internal rewrite origin을 `http://api:8100`으로 주입
 10. postgres / redis 선기동
-11. `prisma migrate deploy` 실행
+11. `prisma/bootstrap-deploy-db.ts` 실행
 12. compose 스택 재기동 (`docker compose` 또는 `docker-compose`)
 13. Next standalone `web` runtime은 `HOSTNAME=0.0.0.0`로 bind를 고정해 localhost healthcheck와 nginx dependency gate를 통과시킴
 14. API health + Web internal rewrite + Nginx localhost health 검증
-15. `prisma/seed-images.ts`로 DB-backed 이미지 보강
-16. 선택적 full seed 실행
+15. `prisma/seed-mocks.ts --checksum-gate`로 canonical mock dataset checksum 검증 및 필요 시 sync
+16. `prisma/seed-images.ts`로 DB-backed 이미지 보강
+17. 선택적 full seed 실행
   ↓
 🎉 배포 완료
 ```
@@ -164,11 +165,18 @@ NAVER_CLIENT_SECRET=
 TOSS_CLIENT_KEY=
 TOSS_SECRET_KEY=
 TOSS_WEBHOOK_SECRET=
+
+# Deploy-safe canonical mock sync (disable only with literal "false")
+DEPLOY_SYNC_MOCK_DATA=true
 ```
 
 `TOSS_SECRET_KEY`와 `TOSS_CLIENT_KEY`가 비어 있으면 결제 기능은 mock mode로 남고, 애플리케이션 배포 자체는 계속된다. GitHub Actions deploy는 `TOSS_*` repo secret을 EC2 `deploy/.env`의 source of truth로 취급하므로, secret이 비어 있거나 없으면 해당 runtime 값도 빈 값으로 동기화된다.
 
+`DEPLOY_SYNC_MOCK_DATA`는 기본값이 `true`다. 운영자가 이 값을 정확히 `false`로 넣지 않는 한, 배포 시마다 checksum-gated mock sync가 실행되고 catalog checksum이 바뀌었을 때만 canonical mock dataset을 다시 반영한다. catalog는 KST 날짜 anchor를 포함하므로 날짜가 넘어가면 mock 일정도 다음 배포에서 함께 앞으로 이동한다.
+
 `HOSTNAME`은 운영 compose에서 `0.0.0.0`으로 고정한다. Next standalone가 container IP에만 bind하면 앱은 떠 있어도 `localhost` healthcheck가 실패해 `web`/`nginx` dependency gate가 깨질 수 있다.
+
+`prisma/bootstrap-deploy-db.ts`는 public schema가 비어 있는 운영 DB에서 현재 migration chain을 처음부터 재생하지 않는다. 비어 있는 DB에 `_prisma_migrations`만 남아 있어도 먼저 history를 재설정한 뒤 `prisma db push --skip-generate`로 현재 schema를 만들고, 저장소에 있는 migration 디렉터리를 `resolve --applied`로 기록한 다음 `migrate deploy`를 검증한다. 반대로 public table이 이미 있는데 migration history만 없으면 drift 가능성이 크므로 자동 복구하지 않고 배포를 실패시킨다.
 
 ---
 
@@ -283,11 +291,12 @@ ssh -i matchup-key.pem ec2-user@<EC2_IP> '
   fi
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-    run --rm --no-deps -T api npx prisma migrate deploy
+    run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
   curl -fsS http://localhost:8100/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null
   curl -fsS http://localhost/landing > /dev/null
+  sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
   sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
 '
 ```
@@ -310,6 +319,22 @@ docker exec -it matchup_api npx prisma studio
 ```bash
 docker exec matchup_api npx ts-node prisma/seed.ts
 ```
+
+### DB bootstrap / migration (deploy-safe)
+
+```bash
+docker exec matchup_api npx ts-node prisma/bootstrap-deploy-db.ts
+```
+
+빈 DB는 현재 schema bootstrap + migration history 정렬까지 자동 처리하고, migration history가 없는 비어 있지 않은 DB는 drift로 간주해 실패한다.
+
+### checksum-gated canonical mock sync (deploy 기본값)
+
+```bash
+docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+```
+
+`DEPLOY_SYNC_MOCK_DATA=false`가 아닌 한 배포 시 이 명령이 자동 실행된다. checksum이 같으면 skip되고, catalog 또는 KST 날짜 anchor가 바뀌었을 때만 canonical mock dataset을 다시 sync한다.
 
 ### 이미지 데이터 보강 (운영 안전)
 

@@ -371,7 +371,7 @@ export default function ScoreInputPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={!allFilled || submitResultMutation.isPending}
-                  className="w-full min-h-[52px] rounded-2xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                  className="w-full min-h-[48px] rounded-2xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
                 >
                   {submitResultMutation.isPending ? '저장 중...' : '경기 결과 저장'}
                 </button>

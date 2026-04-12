@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useCreateTeamMatch, useMyTeams } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { SKILL_GRADES, MATCH_TYPES, getGradeInfo } from '@/lib/skill-grades';
@@ -186,17 +187,12 @@ export default function NewTeamMatchPage() {
   if (myTeams !== undefined && eligibleTeams.length === 0) {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
-        <div className="max-w-[500px] mx-auto mt-20 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 mx-auto mb-4">
-            <Users size={28} className="text-gray-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">권한이 없어요</h2>
-          <p className="text-sm text-gray-500 mt-2">매니저 이상 권한을 가진 팀이 없어요</p>
-          <p className="text-xs text-gray-400 mt-1">모집글을 작성하려면 팀의 owner 또는 manager여야 해요</p>
-          <Link href="/teams/new" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
-            새 팀 만들기
-          </Link>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="권한이 없어요"
+          description="모집글을 작성하려면 팀의 owner 또는 manager여야 해요"
+          action={{ label: '새 팀 만들기', href: '/teams/new' }}
+        />
       </div>
     );
   }

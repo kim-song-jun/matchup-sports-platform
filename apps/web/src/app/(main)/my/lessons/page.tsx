@@ -182,7 +182,7 @@ export default function MyLessonsPage() {
 
               {/* Curriculum section */}
               {lesson.curriculum && lesson.curriculum.length > 0 && (
-                <div className="border-t border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
+                <div className="bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <ListChecks size={12} className="text-gray-500" />
                     <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">커리큘럼 요약</span>
@@ -200,7 +200,7 @@ export default function MyLessonsPage() {
                 </div>
               )}
 
-              <div className="border-t border-gray-50 dark:border-gray-800 px-5 py-3">
+              <div className="mt-3 px-5 py-3">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   상세 페이지에서 공개 정보만 확인할 수 있어요.
                 </p>

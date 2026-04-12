@@ -13,10 +13,12 @@ import {
   Clock,
   DollarSign,
   MapPin,
+  Package,
   PenLine,
   Phone,
   Share2,
   Star,
+  Ticket,
   Trophy,
   Users,
 } from 'lucide-react';
@@ -549,7 +551,7 @@ function HubSectionTab({ label, active, onClick }: { label: string; active: bool
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+      className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
         active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
       }`}
     >
@@ -571,7 +573,7 @@ function GoodsSection({ goods }: { goods: MarketplaceListing[] }) {
   if (goods.length === 0) {
     return (
       <Card className="mt-4">
-        <EmptyState icon={Trophy} title="등록된 굿즈가 없어요" description="장터에서 등록한 항목이 있으면 이 섹션에 표시됩니다." action={{ label: '장터 보기', href: '/marketplace' }} size="sm" />
+        <EmptyState icon={Package} title="등록된 굿즈가 없어요" description="장터에서 등록한 항목이 있으면 이 섹션에 표시됩니다." action={{ label: '장터 보기', href: '/marketplace' }} size="sm" />
       </Card>
     );
   }
@@ -599,7 +601,7 @@ function PassesSection({ passes }: { passes: Lesson[] }) {
   if (passes.length === 0) {
     return (
       <Card className="mt-4">
-        <EmptyState icon={Trophy} title="등록된 수강권이 없어요" description="소속 레슨이 연결되면 수강권 섹션이 활성화됩니다." action={{ label: '레슨 보기', href: '/lessons' }} size="sm" />
+        <EmptyState icon={Ticket} title="등록된 수강권이 없어요" description="소속 레슨이 연결되면 수강권 섹션이 활성화됩니다." action={{ label: '레슨 보기', href: '/lessons' }} size="sm" />
       </Card>
     );
   }

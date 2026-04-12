@@ -304,7 +304,7 @@ export function HomePage() {
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
             <button key={type} onClick={() => handleSportClick(type)} aria-pressed={activeSport === type}
-              className={`shrink-0 rounded-full px-3 min-h-[44px] flex items-center text-sm font-medium transition-colors ${
+              className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 flex items-center text-sm font-medium transition-colors ${
                 activeSport === type
                   ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                   : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'

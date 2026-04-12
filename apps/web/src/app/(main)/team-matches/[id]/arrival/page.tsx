@@ -311,7 +311,7 @@ export default function ArrivalCheckPage() {
                   <button
                     onClick={handleCheckIn}
                     disabled={!selectedTeam || arrivalMutation.isPending}
-                    className="mt-4 w-full min-h-[52px] rounded-2xl bg-blue-500 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                    className="mt-4 w-full min-h-[48px] rounded-2xl bg-blue-500 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                   >
                     {arrivalMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                     {selectedTeam ? `${selectedTeam.name} 도착 기록하기` : '도착 기록하기'}

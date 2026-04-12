@@ -289,7 +289,7 @@ export function MatchesPage() {
               data-testid={testId}
               aria-pressed={isActive}
               onClick={() => updateFilters({ sport: isActive ? '' : filter.key })}
-              className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+              className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -307,7 +307,7 @@ export function MatchesPage() {
           data-testid="match-quick-today"
           aria-pressed={draftFilters.date === today}
           onClick={() => updateFilters({ date: draftFilters.date === today ? '' : today })}
-          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.date === today
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -320,7 +320,7 @@ export function MatchesPage() {
           data-testid="match-quick-free"
           aria-pressed={draftFilters.fee === 'free'}
           onClick={() => updateFilters({ fee: draftFilters.fee === 'free' ? 'all' : 'free' })}
-          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.fee === 'free'
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -333,7 +333,7 @@ export function MatchesPage() {
           data-testid="match-quick-beginner"
           aria-pressed={draftFilters.level === 'beginner'}
           onClick={() => updateFilters({ level: draftFilters.level === 'beginner' ? 'all' : 'beginner' })}
-          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.level === 'beginner'
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -346,7 +346,7 @@ export function MatchesPage() {
           data-testid="match-quick-available"
           aria-pressed={draftFilters.available}
           onClick={() => updateFilters({ available: !draftFilters.available })}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.available
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'

@@ -53,7 +53,7 @@ export default function MercenaryPage() {
             key={filter.key}
             type="button"
             onClick={() => setActiveSport(filter.key)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === filter.key
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 active:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'

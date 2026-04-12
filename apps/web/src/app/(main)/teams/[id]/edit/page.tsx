@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ChevronRight, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Search, ShieldOff, Trash2 } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { Modal } from '@/components/ui/modal';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useDeleteTeam, useMyTeams, useTeam, useUpdateTeam } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
@@ -155,7 +156,12 @@ export default function EditTeamPage() {
   if (!team) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
-        <p className="text-gray-500">팀 정보를 찾을 수 없어요.</p>
+        <EmptyState
+          icon={Search}
+          title="팀 정보를 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 팀이에요"
+          action={{ label: '팀 목록으로', href: '/teams' }}
+        />
       </div>
     );
   }
@@ -163,7 +169,12 @@ export default function EditTeamPage() {
   if (!canEdit) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
-        <p className="text-gray-500">팀 수정 권한이 없습니다.</p>
+        <EmptyState
+          icon={ShieldOff}
+          title="팀 수정 권한이 없어요"
+          description="manager 이상 권한이 있는 팀만 수정할 수 있어요"
+          action={{ label: '팀 상세로', href: `/teams/${teamId}` }}
+        />
       </div>
     );
   }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Users, Pencil, Trash2, AlertTriangle, UserCheck, ChevronRight } from 'lucide-react';
+import { ArrowLeft, MapPin, Users, Pencil, Trash2, AlertTriangle, UserCheck, UserPlus, ChevronRight } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -296,7 +296,7 @@ export default function MercenaryDetailPage() {
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
             <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">지원 목록</h2>
             {applications.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">아직 지원자가 없어요.</p>
+              <EmptyState icon={UserPlus} title="아직 지원자가 없어요" size="sm" />
             ) : (
               <div className="space-y-3">
                 {applications.map((application) => {

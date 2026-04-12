@@ -14,8 +14,10 @@ import {
   Instagram,
   MapPin,
   MessageCircle,
+  Package,
   Share2,
   Star,
+  Ticket,
   Trophy,
   UserPlus,
   Users,
@@ -629,7 +631,7 @@ function HubSectionTab({ label, active, onClick }: { label: string; active: bool
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+      className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
         active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
       }`}
     >
@@ -680,7 +682,7 @@ function HubGoodsSection({ items }: { items: MarketplaceListing[] }) {
   if (items.length === 0) {
     return (
       <Card className="mt-4">
-        <EmptyState icon={Trophy} title="등록된 굿즈가 없어요" description="전역 장터에서 먼저 등록하면 팀 허브에서 함께 보여요." action={{ label: '장터 보기', href: '/marketplace' }} size="sm" />
+        <EmptyState icon={Package} title="등록된 굿즈가 없어요" description="전역 장터에서 먼저 등록하면 팀 허브에서 함께 보여요." action={{ label: '장터 보기', href: '/marketplace' }} size="sm" />
       </Card>
     );
   }
@@ -708,7 +710,7 @@ function HubPassesSection({ items }: { items: Lesson[] }) {
   if (items.length === 0) {
     return (
       <Card className="mt-4">
-        <EmptyState icon={Trophy} title="등록된 수강권이 없어요" description="소속 레슨이 생기면 이 섹션에 자동으로 표시됩니다." action={{ label: '레슨 보기', href: '/lessons' }} size="sm" />
+        <EmptyState icon={Ticket} title="등록된 수강권이 없어요" description="소속 레슨이 생기면 이 섹션에 자동으로 표시됩니다." action={{ label: '레슨 보기', href: '/lessons' }} size="sm" />
       </Card>
     );
   }

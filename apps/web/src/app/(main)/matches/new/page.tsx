@@ -139,7 +139,7 @@ export default function CreateMatchPage() {
                   key={type}
                   onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
                   data-testid={`match-sport-${type}`}
-                  className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+                  className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                     form.sportType === type
                       ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                       : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'

@@ -266,7 +266,7 @@ export default function ListingDetailPage() {
                 </div>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-gray-50 text-right">
+            <div className="mt-6 text-right">
               <button
                 onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
                 className="text-xs text-gray-500 hover:text-red-500 transition-colors"

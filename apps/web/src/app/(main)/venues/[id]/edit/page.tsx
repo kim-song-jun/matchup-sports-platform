@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Search, ShieldOff } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useUpdateVenue, useVenue, useVenueHub } from '@/hooks/use-api';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,16 +86,26 @@ export default function VenueEditPage() {
 
   if (!venue) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-gray-500">
-        시설 정보를 찾을 수 없어요.
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={Search}
+          title="시설 정보를 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 시설이에요"
+          action={{ label: '시설 목록으로', href: '/venues' }}
+        />
       </div>
     );
   }
 
   if (!canEdit) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-gray-500">
-        시설 수정 권한이 없습니다.
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={ShieldOff}
+          title="시설 수정 권한이 없어요"
+          description="시설 관리자만 수정할 수 있어요"
+          action={{ label: '시설 상세로', href: `/venues/${venueId}` }}
+        />
       </div>
     );
   }

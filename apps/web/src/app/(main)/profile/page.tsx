@@ -133,7 +133,7 @@ export default function ProfilePage() {
                       <span className="text-sm text-gray-500">{t('matchCount', { count: user.totalMatches })}</span>
                     </div>
                   </div>
-                  <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="flex min-h-[40px] min-w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition-[colors,transform] hover:bg-gray-100 active:scale-[0.98] dark:bg-gray-700 dark:hover:bg-gray-600">
+                  <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition-[colors,transform] hover:bg-gray-100 active:scale-[0.98] dark:bg-gray-700 dark:hover:bg-gray-600">
                     <Pencil size={16} />
                   </button>
                 </div>
@@ -237,7 +237,7 @@ export default function ProfilePage() {
                         <Link
                           href={item.quickAction.href}
                           aria-label={`${item.label} ${item.quickAction.label}`}
-                          className="flex min-h-[36px] items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-500 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
+                          className="flex min-h-[44px] items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-500 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
                         >
                           <Plus size={12} />
                           {item.quickAction.label}

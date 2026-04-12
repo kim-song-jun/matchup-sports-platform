@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Delete, UseGuards, Get, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Body, Delete, UseGuards, Get, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -50,9 +50,9 @@ export class AuthController {
   }
 
   @Post('apple')
-  @ApiOperation({ summary: '애플 로그인' })
-  async appleLogin(@Body() dto: OAuthLoginDto) {
-    return this.authService.oauthLogin('apple', dto.code, dto.redirectUri);
+  @ApiOperation({ summary: 'Apple Sign-In (not yet available)', deprecated: true })
+  async appleLogin(@Body() _dto: OAuthLoginDto) {
+    throw new HttpException('Apple Sign-In is not yet available', HttpStatus.NOT_IMPLEMENTED);
   }
 
   @Post('refresh')

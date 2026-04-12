@@ -1,6 +1,8 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BadgesService } from './badges.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../common/guards/admin.guard';
 
 @ApiTags('뱃지')
 @Controller('badges')
@@ -20,7 +22,9 @@ export class BadgesController {
   }
 
   @Post('team/:teamId')
-  @ApiOperation({ summary: '팀 뱃지 부여 (관리자)' })
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 뱃지 부여 (관리자 전용)' })
   async awardBadge(
     @Param('teamId') teamId: string,
     @Body() body: { type: string; name: string; description?: string },

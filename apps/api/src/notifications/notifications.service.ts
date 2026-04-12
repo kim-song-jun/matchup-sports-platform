@@ -84,19 +84,28 @@ export class NotificationsService {
   ) {
     const { isRead, cursor, limit = 20 } = opts;
 
+    // Fetch one extra to determine hasMore
     const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
         ...(isRead !== undefined ? { isRead } : {}),
       },
       orderBy: [{ isRead: 'asc' }, { createdAt: 'desc' }],
-      take: limit,
+      take: limit + 1,
       ...(cursor
         ? { skip: 1, cursor: { id: cursor } }
         : {}),
     });
 
-    return notifications.map((notification) => presentNotification(notification));
+    const hasMore = notifications.length > limit;
+    const page = hasMore ? notifications.slice(0, limit) : notifications;
+    const nextCursor = hasMore ? page[page.length - 1].id : null;
+
+    return {
+      items: page.map((notification) => presentNotification(notification)),
+      nextCursor,
+      hasMore,
+    };
   }
 
   async markRead(notificationId: string, userId: string) {

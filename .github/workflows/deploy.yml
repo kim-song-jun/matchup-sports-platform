@@ -82,12 +82,18 @@ jobs:
           wait $pid1 || exit 1
           wait $pid2 || exit 1
 
-      - name: Test (parallel)
+      - name: Unit tests (parallel)
         run: |
           pnpm --filter api test & pid1=$!
           pnpm --filter web test & pid2=$!
           wait $pid1 || exit 1
           wait $pid2 || exit 1
+
+      - name: Prisma DB push (integration test schema)
+        run: cd apps/api && pnpm prisma db push
+
+      - name: Integration tests
+        run: pnpm --filter api test:integration
 
   # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
   deploy:

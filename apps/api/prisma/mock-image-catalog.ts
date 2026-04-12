@@ -5,6 +5,9 @@ const sportImages: Record<string, string[]> = {
     '/mock/photoreal/soccer/soccer-01.jpg',
     '/mock/photoreal/soccer/soccer-02.jpg',
     '/mock/photoreal/soccer/soccer-03.jpg',
+    '/mock/photoreal/soccer/soccer-04.jpg',
+    '/mock/photoreal/soccer/soccer-05.jpg',
+    '/mock/photoreal/soccer/soccer-06.jpg',
   ],
   futsal: [
     '/mock/photoreal/futsal/futsal-01.jpg',
@@ -22,19 +25,31 @@ const sportImages: Record<string, string[]> = {
     '/mock/photoreal/basketball/basketball-01.jpg',
     '/mock/photoreal/basketball/basketball-02.jpg',
     '/mock/photoreal/basketball/basketball-03.jpg',
+    '/mock/photoreal/basketball/basketball-04.jpg',
+    '/mock/photoreal/basketball/basketball-05.jpg',
+    '/mock/photoreal/basketball/basketball-06.jpg',
   ],
   badminton: [
     '/mock/photoreal/badminton/badminton-01.jpg',
     '/mock/photoreal/badminton/badminton-02.jpg',
+    '/mock/photoreal/badminton/badminton-03.jpg',
+    '/mock/photoreal/badminton/badminton-04.jpg',
+    '/mock/photoreal/badminton/badminton-05.jpg',
   ],
   ice_hockey: [
     '/mock/photoreal/ice-hockey/ice-hockey-01.jpg',
     '/mock/photoreal/ice-hockey/ice-hockey-02.jpg',
     '/mock/photoreal/ice-hockey/ice-hockey-03.jpg',
+    '/mock/photoreal/ice-hockey/ice-hockey-04.jpg',
+    '/mock/photoreal/ice-hockey/ice-hockey-05.jpg',
+    '/mock/photoreal/ice-hockey/ice-hockey-06.jpg',
   ],
   swimming: [
     '/mock/photoreal/swimming/swimming-01.jpg',
     '/mock/photoreal/swimming/swimming-02.jpg',
+    '/mock/photoreal/swimming/swimming-03.jpg',
+    '/mock/photoreal/swimming/swimming-04.jpg',
+    '/mock/photoreal/swimming/swimming-05.jpg',
   ],
   tennis: [
     '/mock/photoreal/tennis/tennis-01.jpg',
@@ -43,15 +58,28 @@ const sportImages: Record<string, string[]> = {
   baseball: [
     '/mock/photoreal/baseball/baseball-01.jpg',
     '/mock/photoreal/baseball/baseball-02.jpg',
+    '/mock/photoreal/baseball/baseball-03.jpg',
+    '/mock/photoreal/baseball/baseball-04.jpg',
+    '/mock/photoreal/baseball/baseball-05.jpg',
   ],
   volleyball: [
     '/mock/photoreal/volleyball/volleyball-01.jpg',
     '/mock/photoreal/volleyball/volleyball-02.jpg',
+    '/mock/photoreal/volleyball/volleyball-03.jpg',
+    '/mock/photoreal/volleyball/volleyball-04.jpg',
+    '/mock/photoreal/volleyball/volleyball-05.jpg',
   ],
-  figure_skating: ['/mock/photoreal/figure-skating/figure-skating-01.jpg'],
+  figure_skating: [
+    '/mock/photoreal/figure-skating/figure-skating-01.jpg',
+    '/mock/photoreal/figure-skating/figure-skating-02.png',
+    '/mock/photoreal/figure-skating/figure-skating-03.jpg',
+  ],
   short_track: [
     '/mock/photoreal/short-track/short-track-01.jpg',
     '/mock/photoreal/short-track/short-track-03.jpg',
+    '/mock/photoreal/short-track/short-track-04.jpg',
+    '/mock/photoreal/short-track/short-track-05.jpg',
+    '/mock/photoreal/short-track/short-track-06.jpg',
   ],
 };
 
@@ -59,6 +87,8 @@ const teamFallbackImages = [
   '/mock/photoreal/team/team-01.jpg',
   '/mock/photoreal/team/team-02.jpg',
   '/mock/photoreal/team/team-03.jpg',
+  '/mock/photoreal/team/team-04.jpg',
+  '/mock/photoreal/team/team-05.jpg',
 ];
 
 const venueFallbackImages = [

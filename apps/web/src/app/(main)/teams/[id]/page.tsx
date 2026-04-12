@@ -184,7 +184,7 @@ export default function TeamDetailPage() {
             </button>
             <div className="pt-8 px-5 pb-5">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{currentTeam.name}</h2>
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{currentTeam.name}</h2>
                 {currentTeam.isRecruiting && <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-300">모집중</span>}
               </div>
               <p className="text-sm text-gray-500">
@@ -205,7 +205,7 @@ export default function TeamDetailPage() {
           {activeSection === 'overview' && (
             <div className="space-y-4 mt-4">
               <Card>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 여정</h3>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">팀 여정</h3>
                 <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-2">
                   <Link href={`/teams/${teamId}/matches`} className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-3 text-sm font-medium text-gray-700 dark:text-gray-200">경기 기록</Link>
                   <Link href={`/teams/${teamId}/mercenary`} className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-3 text-sm font-medium text-gray-700 dark:text-gray-200">용병 모집</Link>
@@ -214,7 +214,7 @@ export default function TeamDetailPage() {
               </Card>
               {gallery.length > 0 && (
                 <Card>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">갤러리</h3>
+                  <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">갤러리</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {gallery.map((photo, index) => (
                       <button key={`${photo}-${index}`} type="button" onClick={() => openMedia(photo)} className="relative aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-700">
@@ -252,7 +252,7 @@ export default function TeamDetailPage() {
 
             {canManageCatalog && (
               <Card padding="sm">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 등록</h3>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">허브 등록</h3>
                 <div className="space-y-1.5 text-sm">
                   <Link href={`/marketplace/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
                     굿즈 등록
@@ -320,7 +320,7 @@ export default function TeamDetailPage() {
             )}
 
             <Card padding="sm">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 섹션</h3>
+              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">허브 섹션</h3>
               <div className="space-y-1.5 text-sm">
                 <button onClick={() => setActiveSection('goods')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
                   굿즈 {hubData?.sections.goodsCount ?? hubGoods.length}
@@ -338,6 +338,7 @@ export default function TeamDetailPage() {
       </div>
 
       <MediaLightbox isOpen={showMediaLightbox} images={mediaImages} initialIndex={mediaIndex} onClose={() => setShowMediaLightbox(false)} title={`${currentTeam.name} 이미지`} />
+      <div className="h-24" />
     </div>
   );
 }

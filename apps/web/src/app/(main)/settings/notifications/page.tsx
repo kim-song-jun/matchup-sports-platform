@@ -144,8 +144,8 @@ export default function NotificationsPage() {
         </span>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] py-6 space-y-5">
-        <section className="rounded-[24px] border border-blue-100 bg-blue-50/80 dark:border-blue-900/60 dark:bg-blue-950/30 p-5">
+      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] mt-4 space-y-4 pb-8">
+        <section className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
               <BellRing size={18} />
@@ -162,7 +162,7 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+        <section className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4 dark:border-gray-700 dark:bg-gray-800">
           <SectionHeading
             title="계정 전체에 저장되는 알림"
             description="서버에 저장되는 category preference입니다."
@@ -200,7 +200,7 @@ export default function NotificationsPage() {
           )}
         </section>
 
-        <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+        <section className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4 dark:border-gray-700 dark:bg-gray-800">
           <SectionHeading
             title="이 기기에서만 적용되는 항목"
             description="브라우저 권한과 방해금지 시간은 디바이스별로 따로 관리됩니다."
@@ -225,7 +225,7 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/50 p-5 space-y-2">
+        <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-4 space-y-2 dark:border-gray-700 dark:bg-gray-900/50">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
             현재 지원하지 않는 범위
           </h3>
@@ -235,6 +235,7 @@ export default function NotificationsPage() {
             노출합니다.
           </p>
         </section>
+        <div className="h-24" />
       </div>
     </div>
   );
@@ -249,10 +250,10 @@ function SectionHeading({
 }) {
   return (
     <div className="space-y-1">
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+      <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">
         {title}
       </h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
     </div>
   );
 }

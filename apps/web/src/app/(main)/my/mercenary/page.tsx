@@ -99,20 +99,20 @@ export default function MyMercenaryPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 용병 모집/신청</h1>
       </MobileGlassHeader>
-      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 용병 모집/신청</h2>
-        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">내 모집글과 지원 상태를 관리하세요</p>
+      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 용병 모집/신청</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">내 모집글과 지원 상태를 관리하세요</p>
       </div>
 
       <div className="px-5 @3xl:px-0 pb-8">
-        <div className="mb-4 flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1" role="tablist">
+        <div className="mb-4 mt-4 flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700" role="tablist">
           <button
             role="tab"
             aria-selected={activeTab === 'created'}
             onClick={() => setActiveTab('created')}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === 'created'
-                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white'
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                 : 'text-gray-600 dark:text-gray-300'
             }`}
           >
@@ -122,9 +122,9 @@ export default function MyMercenaryPage() {
             role="tab"
             aria-selected={activeTab === 'applied'}
             onClick={() => setActiveTab('applied')}
-            className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === 'applied'
-                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white'
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                 : 'text-gray-600 dark:text-gray-300'
             }`}
           >
@@ -162,7 +162,7 @@ export default function MyMercenaryPage() {
                 </div>
 
                 <Link href={`/mercenary/${post.id}`}>
-                  <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">
+                  <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">
                     {post.notes ?? post.description ?? '용병 모집'}
                   </h3>
                 </Link>
@@ -230,7 +230,7 @@ export default function MyMercenaryPage() {
                   </div>
 
                   <Link href={`/mercenary/${application.post.id}`}>
-                    <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">
+                    <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">
                       {application.post.team?.name ?? '용병 모집글'}
                     </h3>
                   </Link>
@@ -260,6 +260,7 @@ export default function MyMercenaryPage() {
             })}
           </div>
         )}
+        <div className="h-24" />
       </div>
 
       <Modal

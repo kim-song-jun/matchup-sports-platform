@@ -105,7 +105,7 @@ export default function CreateListingPage() {
           <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매물을 등록해보세요</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매물을 등록해보세요</h2>
           <p className="text-base text-gray-500 mt-2">로그인하면 장비를 등록하고 거래할 수 있어요</p>
           <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
@@ -122,7 +122,7 @@ export default function CreateListingPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매물 등록</h1>
+        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">매물 등록</h1>
       </header>
 
       {/* Desktop breadcrumb */}
@@ -141,7 +141,7 @@ export default function CreateListingPage() {
           </div>
         )}
         {/* 사진 추가 영역 */}
-        <div className="mb-6">
+        <div className="mb-6 mt-4">
           <p className="block text-sm font-semibold text-gray-700 mb-2">
             상품 이미지
           </p>
@@ -353,11 +353,12 @@ export default function CreateListingPage() {
           disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
           fullWidth
           size="lg"
-          className="mb-8 mt-2"
+          className="mb-8 mt-10"
         >
           {isSubmitting ? '등록 중...' : '매물 등록하기'}
         </Button>
       </div>
+      <div className="h-24" />
     </div>
   );
 }

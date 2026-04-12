@@ -5,7 +5,7 @@ export default function PrivacyPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <PrivacyNavHeader />
 
-      <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-8">
+      <div className="px-5 @3xl:px-0 max-w-2xl mt-4 space-y-4 pb-8">
         <Section title="1. 수집하는 정보">
           <p>
             MatchUp(이하 &quot;회사&quot;)은 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다. 회원가입 시 필수적으로 수집하는 정보는 이메일 주소, 닉네임이며, 소셜 로그인(카카오, 네이버, Apple)을 통해 가입하는 경우 해당 플랫폼에서 제공하는 프로필 정보(이름, 이메일, 프로필 사진)가 수집됩니다.
@@ -66,9 +66,10 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <div className="text-center py-4 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-sm text-gray-500">최종 수정일: 2026년 1월 1일</p>
+        <div className="border-t border-gray-100 py-4 text-center dark:border-gray-700">
+          <p className="text-xs text-gray-500">최종 수정일: 2026년 1월 1일</p>
         </div>
+        <div className="h-24" />
       </div>
     </div>
   );
@@ -76,9 +77,9 @@ export default function PrivacyPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">{title}</h3>
-      <div className="space-y-3 text-base leading-relaxed text-gray-600 dark:text-gray-400">
+    <div className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <h3 className="mb-3 text-base font-bold tracking-tight text-gray-900 dark:text-white">{title}</h3>
+      <div className="space-y-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
         {children}
       </div>
     </div>

@@ -31,7 +31,7 @@ export default function AccountPage() {
         <span className="text-gray-900 dark:text-white font-medium">개인정보 관리</span>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-6">
+      <div className="px-5 @3xl:px-0 max-w-2xl mt-4 space-y-4 pb-8">
         {/* 닉네임 */}
         <Card variant="surface">
           <FormField
@@ -131,7 +131,7 @@ export default function AccountPage() {
         </Button>
 
         {/* 회원 탈퇴 */}
-        <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="border-t border-gray-100 pt-4 dark:border-gray-700">
           <Button
             onClick={() => setShowDeleteModal(true)}
             variant="dangerSoft"
@@ -141,8 +141,9 @@ export default function AccountPage() {
           >
             회원 탈퇴
           </Button>
-          <p className="text-xs text-gray-500 text-center mt-2">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
+          <p className="mt-2 text-center text-xs text-gray-500">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
         </div>
+        <div className="h-24" />
       </div>
 
       {/* 회원 탈퇴 확인 모달 */}

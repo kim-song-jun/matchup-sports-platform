@@ -128,14 +128,14 @@ export default function MyLessonTicketsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 수강권</h1>
       </header>
 
-      <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 수강권</h2>
-        <p className="mt-1 text-base text-gray-500 dark:text-gray-400">
+      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 수강권</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           결제 완료된 수강권만 실제 데이터 기준으로 보여드려요
         </p>
       </div>
 
-      <div className="space-y-4 px-5 pb-10 pt-4 @3xl:px-0">
+      <div className="space-y-3 px-5 pb-10 pt-4 @3xl:px-0">
         {isLoading ? (
           Array.from({ length: 2 }).map((_, index) => (
             <div
@@ -315,6 +315,7 @@ export default function MyLessonTicketsPage() {
             </div>
           </>
         )}
+        <div className="h-24" />
       </div>
     </div>
   );

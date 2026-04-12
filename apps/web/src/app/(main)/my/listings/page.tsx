@@ -93,12 +93,12 @@ export default function MyListingsPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 장터 매물</h1>
       </header>
-      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 장터 매물</h2>
-        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">등록한 매물을 관리하세요</p>
+      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 장터 매물</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">등록한 매물을 관리하세요</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 space-y-3 pb-8">
+      <div className="px-5 @3xl:px-0 mt-4 space-y-3 pb-8">
         {listings.length === 0 ? (
           <EmptyState
             icon={Package}
@@ -126,7 +126,7 @@ export default function MyListingsPage() {
                       <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">{conditionLabel[listing.condition]}</span>
                     </div>
                     <Link href={`/marketplace/${listing.id}`}>
-                      <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{listing.title}</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{listing.title}</h3>
                     </Link>
                     <p className="text-md font-bold text-gray-900 dark:text-white mt-0.5">{formatAmount(listing.price)}</p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -182,6 +182,7 @@ export default function MyListingsPage() {
           })
         )}
       </div>
+      <div className="h-24" />
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5" onClick={() => setDeleteTarget(null)}>

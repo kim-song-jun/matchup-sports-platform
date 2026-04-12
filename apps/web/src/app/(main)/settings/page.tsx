@@ -15,7 +15,7 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">계정과 화면 환경을 가볍게 정리하세요.</p>
       </div>
 
-      <div className="max-w-2xl px-5 @3xl:px-0">
+      <div className="max-w-2xl px-5 @3xl:px-0 mt-4">
         {/* 계정 */}
         <SettingsSection title="계정">
           <SettingsLink icon={User} label="프로필 수정" desc="닉네임, 프로필 사진 변경" href="/profile" />
@@ -66,6 +66,7 @@ export default function SettingsPage() {
         <div className="text-center">
           <p className="text-xs text-gray-300">MatchUp v1.0.0</p>
         </div>
+        <div className="h-24" />
       </div>
 
     </div>

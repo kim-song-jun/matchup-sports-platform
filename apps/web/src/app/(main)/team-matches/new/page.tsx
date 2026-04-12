@@ -203,7 +203,7 @@ export default function NewTeamMatchPage() {
         <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">모집글 작성</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">모집글 작성</h1>
       </header>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -229,7 +229,7 @@ export default function NewTeamMatchPage() {
 
       {eligibleTeams.length > 1 && (
         <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mb-5">
-          <label htmlFor="host-team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">호스트 팀 선택</label>
+          <label htmlFor="host-team-select" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">호스트 팀 선택</label>
           <select
             id="host-team-select"
             value={selectedHostTeamId}
@@ -248,7 +248,7 @@ export default function NewTeamMatchPage() {
         {step === 0 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">종목 선택</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">종목 선택</label>
               <div className="grid grid-cols-2 gap-2">
                 {sportOptions.map((opt) => (
                   <button
@@ -267,7 +267,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="match-title" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">모집글 제목</label>
+              <label htmlFor="match-title" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">모집글 제목</label>
               <input
                 id="match-title"
                 type="text"
@@ -284,7 +284,7 @@ export default function NewTeamMatchPage() {
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label htmlFor="match-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">경기 날짜</label>
+              <label htmlFor="match-date" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">경기 날짜</label>
               <input
                 id="match-date"
                 type="date"
@@ -296,7 +296,7 @@ export default function NewTeamMatchPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="match-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">시작 시간</label>
+                <label htmlFor="match-start-time" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">시작 시간</label>
                 <input
                   id="match-start-time"
                   type="time"
@@ -306,7 +306,7 @@ export default function NewTeamMatchPage() {
                 />
               </div>
               <div>
-                <label htmlFor="match-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">종료 시간</label>
+                <label htmlFor="match-end-time" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">종료 시간</label>
                 <input
                   id="match-end-time"
                   type="time"
@@ -318,7 +318,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="match-total-minutes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 경기 시간 (분, 선택)</label>
+              <label htmlFor="match-total-minutes" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">총 경기 시간 (분, 선택)</label>
               <input
                 id="match-total-minutes"
                 type="number"
@@ -330,7 +330,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">쿼터 수</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">쿼터 수</label>
               <div className="flex gap-2">
                 {quarterOptions.map((q) => (
                   <button
@@ -349,7 +349,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장명</label>
+              <label htmlFor="venue-name" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">구장명</label>
               <input
                 id="venue-name"
                 type="text"
@@ -361,7 +361,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장 주소 (선택)</label>
+              <label htmlFor="venue-address" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">구장 주소 (선택)</label>
               <input
                 id="venue-address"
                 type="text"
@@ -379,7 +379,7 @@ export default function NewTeamMatchPage() {
           <div className="space-y-5 animate-fade-in">
             {/* 실력등급 S~D */}
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">실력등급</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">실력등급</label>
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {SKILL_GRADES.map((g) => (
                   <button
@@ -402,7 +402,7 @@ export default function NewTeamMatchPage() {
 
             {/* 선출선수(명) */}
             <div>
-              <label htmlFor="pro-player-count" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">선출선수 (명)</label>
+              <label htmlFor="pro-player-count" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">선출선수 (명)</label>
               <input
                 id="pro-player-count"
                 type="number"
@@ -418,7 +418,7 @@ export default function NewTeamMatchPage() {
 
             {/* 경기방식 */}
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">경기방식</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">경기방식</label>
               <div className="flex gap-2">
                 {gameFormatOptions.map((fmt) => (
                   <button
@@ -438,7 +438,7 @@ export default function NewTeamMatchPage() {
 
             {/* 매치 유형 */}
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">매치 유형</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">매치 유형</label>
               <div className="space-y-2">
                 {MATCH_TYPES.map((mt) => (
                   <label
@@ -470,7 +470,7 @@ export default function NewTeamMatchPage() {
 
             {/* 경기 스타일 */}
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">경기 스타일</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">경기 스타일</label>
               <div className="space-y-2">
                 {matchStyleOptions.map((opt) => (
                   <button
@@ -493,7 +493,7 @@ export default function NewTeamMatchPage() {
 
             {/* 유니폼 색상 */}
             <div>
-              <label htmlFor="uniform-color" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">유니폼 색상</label>
+              <label htmlFor="uniform-color" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">유니폼 색상</label>
               <input
                 id="uniform-color"
                 type="text"
@@ -532,7 +532,7 @@ export default function NewTeamMatchPage() {
         {step === 3 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label htmlFor="total-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 비용 (원)</label>
+              <label htmlFor="total-fee" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">총 비용 (원)</label>
               <input
                 id="total-fee"
                 type="number"
@@ -547,7 +547,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="opponent-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+              <label htmlFor="opponent-fee" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
               <input
                 id="opponent-fee"
                 type="number"
@@ -562,7 +562,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="match-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">추가 안내 (선택)</label>
+              <label htmlFor="match-notes" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">추가 안내 (선택)</label>
               <textarea
                 id="match-notes"
                 value={form.notes}
@@ -578,8 +578,8 @@ export default function NewTeamMatchPage() {
         {/* Step 4: 확인 */}
         {step === 4 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">모집글 요약</h3>
+            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">모집글 요약</h3>
 
               <div className="space-y-3">
                 <SummaryRow label="제목" value={form.title} />
@@ -611,7 +611,7 @@ export default function NewTeamMatchPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8 pb-4">
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => setStep(step + 1)}
@@ -632,6 +632,7 @@ export default function NewTeamMatchPage() {
           </button>
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

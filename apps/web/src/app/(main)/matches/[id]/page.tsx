@@ -328,7 +328,7 @@ export default function MatchDetailPage() {
                 type="button"
                 onClick={() => openMediaAt(0)}
                 aria-label={`${match.title} 대표 이미지 보기`}
-                className="relative h-[220px] w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+                className="relative h-[220px] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
               >
                 <SafeImage
                   src={heroImage}
@@ -348,7 +348,7 @@ export default function MatchDetailPage() {
                       type="button"
                       onClick={() => openMediaAt(mediaImageIndex.get(image) ?? index + 1)}
                       aria-label={`${match.title} 이미지 ${index + 2} 보기`}
-                      className="relative aspect-[4/3] overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
+                      className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
                     >
                       <SafeImage
                         src={image}
@@ -366,7 +366,7 @@ export default function MatchDetailPage() {
           )}
 
           {/* Title card */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 @3xl:p-6">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 @3xl:p-6">
             <div className="flex items-start gap-3">
               {SportIcon && (
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
@@ -401,8 +401,8 @@ export default function MatchDetailPage() {
 
           {/* Venue card */}
           {match.venue && (
-            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">시설 정보</h3>
+            <div className="mt-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">시설 정보</h3>
               <div className="flex items-center gap-3">
                 {venuePreviewImage && (
                   <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
@@ -435,7 +435,7 @@ export default function MatchDetailPage() {
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Action button */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">참가 현황</span>
@@ -446,7 +446,7 @@ export default function MatchDetailPage() {
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
               <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
-            <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+            <div className="mb-4 flex items-center justify-between rounded-2xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
               <span className="text-sm text-gray-500">매치 상태</span>
               <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass}`}>
                 {statusLabel}
@@ -617,8 +617,8 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Participants */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
             <div className="space-y-2.5">
@@ -868,6 +868,7 @@ export default function MatchDetailPage() {
           }}
         />
       )}
+      <div className="h-24" />
     </div>
   );
 }
@@ -880,7 +881,7 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
+    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
         <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>

@@ -106,10 +106,10 @@ function Section({ label, items }: { label: string; items: Notification[] }) {
   if (items.length === 0) return null;
   return (
     <div className="mb-4">
-      <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-1">
+      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500">
         {label}
       </h2>
-      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 px-4">
+      <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white px-4 dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
         {items.map((n) => (
           <ActivityItem key={n.id} notification={n} />
         ))}
@@ -133,15 +133,15 @@ export default function FeedPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+      <header className="px-5 pb-3 pt-4 @3xl:px-0">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{t('title')}</h1>
       </header>
 
-      <div className="px-5 @3xl:px-0">
+      <div className="px-5 mt-4 @3xl:px-0">
         {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 animate-pulse">
+              <div key={i} className="rounded-2xl border border-gray-100 bg-white p-4 animate-pulse dark:border-gray-700 dark:bg-gray-800">
                 <div className="flex items-start gap-3">
                   <div className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-gray-700" />
                   <div className="flex-1 space-y-2">
@@ -167,6 +167,7 @@ export default function FeedPage() {
             <Section label={t('older')} items={groups.older} />
           </>
         )}
+        <div className="h-24" />
       </div>
     </div>
   );

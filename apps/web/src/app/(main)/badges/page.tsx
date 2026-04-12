@@ -167,19 +167,19 @@ export default function BadgesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
+      <header className="flex items-center gap-3 px-5 py-3 @3xl:px-0 @3xl:pt-4 @3xl:pb-3">
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] @3xl:hidden min-w-11 min-h-[44px] flex items-center justify-center"
+          className="flex min-h-[44px] min-w-11 items-center justify-center rounded-xl p-2 text-gray-500 transition-[colors,transform] hover:bg-gray-50 active:scale-[0.98] dark:hover:bg-gray-800 @3xl:hidden"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">뱃지</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">뱃지</h1>
       </header>
 
       {/* Summary */}
-      <div className="px-5 @3xl:px-0 mb-4">
+      <div className="px-5 @3xl:px-0 mt-4 mb-4">
         <div className="mb-4">
           <TrustSignalBanner
             tone={hasLiveCatalog ? 'info' : 'warning'}
@@ -245,10 +245,10 @@ export default function BadgesPage() {
             return (
               <div
                 key={badge.id || `badge-${idx}`}
-                className={`rounded-xl border p-4 transition-colors ${
+                className={`rounded-2xl border p-4 transition-colors ${
                   badge.earned
-                    ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
-                    : 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-100/60 dark:border-gray-700/60'
+                    ? 'border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800'
+                    : 'border-gray-100/60 bg-gray-50/50 dark:border-gray-700/60 dark:bg-gray-800/50'
                 }`}
               >
                 <div className="flex items-start gap-3.5">
@@ -262,7 +262,7 @@ export default function BadgesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3
-                        className={`text-md font-semibold ${
+                        className={`text-sm font-semibold ${
                           badge.earned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
                         }`}
                       >
@@ -301,6 +301,7 @@ export default function BadgesPage() {
         </div>
       </div>
 
+      <div className="h-24" />
     </div>
   );
 }

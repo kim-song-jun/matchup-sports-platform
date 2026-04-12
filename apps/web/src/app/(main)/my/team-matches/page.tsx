@@ -85,10 +85,10 @@ export default function MyTeamMatchesPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h1>
       </header>
-      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
+      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-4 px-5 @3xl:px-0 pt-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h2>
-          <p className="text-base text-gray-500 dark:text-gray-400 mt-1">팀 매칭 모집 및 신청 현황을 관리하세요</p>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀 매칭</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">팀 매칭 모집 및 신청 현황을 관리하세요</p>
         </div>
         {activeTab === 'hosted' && (
           <Link
@@ -102,18 +102,18 @@ export default function MyTeamMatchesPage() {
       </div>
 
       {/* Tab navigation */}
-      <div className="px-5 @3xl:px-0 pt-3 pb-1">
-        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1" role="tablist">
+      <div className="px-5 @3xl:px-0 pt-4 pb-1">
+        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               role="tab"
               aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
+              className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors ${
                 activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
             >
               {tab.label}
@@ -125,7 +125,7 @@ export default function MyTeamMatchesPage() {
       {/* Tab: 내가 만든 매치 */}
       {activeTab === 'hosted' && (
         <>
-          <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
+          <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
             {postsLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
@@ -154,7 +154,7 @@ export default function MyTeamMatchesPage() {
                   </div>
 
                   <Link href={`/team-matches/${post.id}`}>
-                    <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{post.title}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{post.title}</h3>
                   </Link>
 
                   <div className="mt-2 space-y-1.5">
@@ -202,12 +202,13 @@ export default function MyTeamMatchesPage() {
               );
             })}
           </div>
+          <div className="h-24" />
         </>
       )}
 
       {/* Tab: 내가 신청한 매치 */}
       {activeTab === 'applied' && (
-        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
+        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
           {appsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -261,6 +262,7 @@ export default function MyTeamMatchesPage() {
               );
             })
           )}
+          <div className="h-24" />
         </div>
       )}
 

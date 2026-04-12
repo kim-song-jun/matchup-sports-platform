@@ -197,7 +197,7 @@ export default function CreateTeamPage() {
         <Card className="mb-5" padding="sm">
           <div className="flex items-center gap-2 mb-3">
             <Globe size={16} className="text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">SNS 링크</h3>
+            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">SNS 링크</h3>
           </div>
           <div className="space-y-3">
             <div>
@@ -234,7 +234,7 @@ export default function CreateTeamPage() {
         <Card className="mb-5" padding="sm">
           <div className="flex items-center gap-2 mb-3">
             <Video size={16} className="text-gray-500" />
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
+            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
           </div>
           <label htmlFor="team-shortsUrl" className="sr-only">홍보 영상 URL</label>
           <Input
@@ -252,11 +252,12 @@ export default function CreateTeamPage() {
           disabled={isSubmitting}
           fullWidth
           size="lg"
-          className="mb-8"
+          className="mb-6"
         >
           {isSubmitting ? '등록 중...' : '팀 등록하기'}
         </Button>
       </div>
+      <div className="h-24" />
     </div>
   );
 }

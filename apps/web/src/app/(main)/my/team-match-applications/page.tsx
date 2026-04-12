@@ -34,12 +34,12 @@ export default function MyTeamMatchApplicationsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀매칭 신청</h1>
       </header>
 
-      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀매칭 신청</h2>
-        <p className="text-base text-gray-500 mt-1">신청한 팀 매칭의 현황을 확인하세요</p>
+      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 mb-4">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀매칭 신청</h2>
+        <p className="mt-1 text-sm text-gray-500">신청한 팀 매칭의 현황을 확인하세요</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
+      <div className="px-5 @3xl:px-0 mt-4 space-y-3 pb-8">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -88,7 +88,7 @@ export default function MyTeamMatchApplicationsPage() {
                     )}
                   </div>
 
-                  <h3 className="text-md font-semibold text-gray-900 dark:text-white truncate">{tm.title}</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 truncate dark:text-white">{tm.title}</h3>
 
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -116,6 +116,7 @@ export default function MyTeamMatchApplicationsPage() {
           })
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

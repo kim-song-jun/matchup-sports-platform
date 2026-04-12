@@ -132,12 +132,12 @@ export default function CheckoutPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h1>
+        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h1>
       </header>
 
       <div className="hidden @3xl:block mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
-        <p className="text-base text-gray-500 mt-1">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
+        <p className="text-xs text-gray-500 mt-1">
           {isMockMode
             ? '현재 환경에서는 결제 시뮬레이션만 기록되고 실제 청구는 발생하지 않습니다'
             : '실제 결제 컨텍스트가 있는 주문만 처리됩니다'}
@@ -163,8 +163,8 @@ export default function CheckoutPage() {
           />
         ) : null}
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">주문 정보</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">주문 정보</h3>
           <div className="space-y-3">
             <div>
               <span className="inline-block rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 text-blue-500 mb-1">
@@ -189,8 +189,8 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="space-y-2">
             {paymentMethods.map((method) => {
               const Icon = method.icon;
@@ -228,15 +228,15 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
-            <span className="text-md font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
+            <span className="text-sm font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
             <span className="text-xl font-bold text-blue-500">{formatAmount(Number.isFinite(amount) ? amount : 0)}</span>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
           <button onClick={() => setAgreedToTerms(!agreedToTerms)} className="flex items-center gap-3 w-full text-left">
             <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
               agreedToTerms ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-500'

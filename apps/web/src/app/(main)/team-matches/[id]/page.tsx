@@ -157,8 +157,8 @@ export default function TeamMatchDetailPage() {
           {/* 왼쪽: 경기 정보 */}
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">경기 정보</h2>
+            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 정보</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
@@ -224,8 +224,8 @@ export default function TeamMatchDetailPage() {
             </div>
 
             {/* 경기 조건 */}
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">경기 조건</h2>
+            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 조건</h2>
 
               {/* 실력등급 배지 + 무료초청 태그 */}
               <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -245,49 +245,49 @@ export default function TeamMatchDetailPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 @3xl:gap-5">
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">실력등급</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {match.skillGrade ? `${getGradeInfo(match.skillGrade).label} - ${getGradeInfo(match.skillGrade).desc}` : (match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한 없음')}
                   </p>
                 </div>
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">선출선수</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.proPlayerCount != null ? `${match.proPlayerCount}명` : (match.hasProPlayers ? '있음' : '없음')}</p>
                 </div>
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">경기방식</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.gameFormat || '-'}</p>
                 </div>
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">매치 유형</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {match.matchType ? (MATCH_TYPES.find(mt => mt.value === match.matchType)?.label ?? match.matchType) : '-'}
                   </p>
                 </div>
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">경기 스타일</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {match.matchStyle ? matchStyleLabel[match.matchStyle] ?? match.matchStyle : '미정'}
                   </p>
                 </div>
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">종목</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {sportLabel[match.sportType] ?? match.sportType}
                   </p>
                 </div>
                 {match.uniformColor && (
-                  <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                  <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                     <p className="text-xs text-gray-500 mb-0.5">유니폼 색상</p>
                     <p className="text-base font-semibold text-gray-900 dark:text-white">{match.uniformColor}</p>
                   </div>
                 )}
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">용병 허용</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.allowMercenary ? '허용' : '불가'}</p>
                 </div>
-                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">심판 유무</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.hasReferee ? '있음' : '없음'}</p>
                 </div>
@@ -302,8 +302,8 @@ export default function TeamMatchDetailPage() {
 
             {/* 심판 배정 표 */}
             {!match.hasReferee && refereeRows.length > 0 && (
-              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Shield size={16} className="text-blue-500" />
                   심판 배정표
                 </h2>
@@ -330,8 +330,8 @@ export default function TeamMatchDetailPage() {
 
             {/* 호스트 팀 카드 */}
             {match.hostTeam && (
-              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">호스트 팀</h2>
+              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">호스트 팀</h2>
                 <Link
                   href={`/teams/${match.hostTeam.id}`}
                   aria-label="호스트 팀 상세 보기"
@@ -373,7 +373,7 @@ export default function TeamMatchDetailPage() {
           <div className="mt-4 @3xl:mt-0 detail-sidebar">
             <div className="sidebar-sticky space-y-3">
             {/* CTA 버튼 영역 */}
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-3">
+            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-3">
               {isRecruiting && !isHost && (
                 <button
                   onClick={() => {
@@ -443,6 +443,7 @@ export default function TeamMatchDetailPage() {
       </div>
 
 
+      <div className="h-24" />
       {/* 신청 모달 */}
       <Modal isOpen={showApplyModal} onClose={() => setShowApplyModal(false)} title="경기 신청">
         <label className="flex items-start gap-3 rounded-xl bg-gray-50 dark:bg-gray-700 p-4 mb-4 cursor-pointer">

@@ -231,7 +231,7 @@ export default function MercenaryDetailPage() {
           </span>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-1">
           {post.team?.name ?? '—'}
         </h1>
 
@@ -283,7 +283,7 @@ export default function MercenaryDetailPage() {
 
         {(post.notes || post.description) && (
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">모집 내용</h2>
+            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">모집 내용</h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
               {post.notes ?? post.description}
             </p>
@@ -292,7 +292,7 @@ export default function MercenaryDetailPage() {
 
         {post.author && (
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">작성자</h2>
+            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">작성자</h2>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-300">
                 {post.author.nickname.charAt(0)}
@@ -306,7 +306,7 @@ export default function MercenaryDetailPage() {
 
         {canManageApplications && (
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">지원 목록</h2>
+            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">지원 목록</h2>
             {applications.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">아직 지원자가 없어요.</p>
             ) : (
@@ -357,7 +357,7 @@ export default function MercenaryDetailPage() {
 
         {myApplicationStatus && !canManageApplications && (
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">내 신청 상태</h2>
+            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">내 신청 상태</h2>
             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(myApplicationStatus)}`}>
               {applicationStatusLabel[myApplicationStatus] ?? myApplicationStatus}
             </span>
@@ -440,6 +440,7 @@ export default function MercenaryDetailPage() {
           </button>
         </div>
       </Modal>
+      <div className="h-24" />
     </div>
   );
 }

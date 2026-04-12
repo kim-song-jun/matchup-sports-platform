@@ -37,19 +37,19 @@ function ChatRoomItem({
 }) {
   return (
     <div
-      className={`rounded-xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
+      className={`rounded-2xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
         isActive
           ? 'bg-gray-50 border-gray-100 dark:border-gray-700'
           : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl text-md font-bold shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">
           {(room.name ?? '?').charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
               {room.name}
             </h3>
             {room.lastMessageAt && (
@@ -110,9 +110,9 @@ export default function ChatListPage() {
   );
 
   const loadingState = (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="h-[72px] animate-pulse rounded-xl bg-gray-100 dark:bg-gray-700" />
+        <div key={i} className="h-[72px] animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-700" />
       ))}
     </div>
   );
@@ -132,7 +132,7 @@ export default function ChatListPage() {
       }
 
       return (
-        <Link key={room.id} href={`/chat/${room.id}`}>
+        <Link key={room.id} href={`/chat/${room.id}`} className="block">
           <ChatRoomItem room={room} />
         </Link>
       );
@@ -180,14 +180,15 @@ export default function ChatListPage() {
       {/* MOBILE: Full-width list */}
       <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
         <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
-        <div className="px-5">
+        <div className="px-5 mt-4">
           {isLoading ? loadingState : isError ? (
             <ErrorState onRetry={refetch} message="채팅방을 불러오지 못했어요" />
           ) : chatRooms.length === 0 ? (
             emptyState
           ) : (
-            <div className="space-y-2">{roomList(false)}</div>
+            <div className="space-y-3">{roomList(false)}</div>
           )}
+          <div className="h-24" />
         </div>
       </div>
     </>

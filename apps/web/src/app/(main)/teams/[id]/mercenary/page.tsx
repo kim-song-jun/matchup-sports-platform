@@ -58,7 +58,7 @@ export default function TeamMercenaryPage() {
           <span className="text-gray-700">용병 모집</span>
         </div>
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">용병 모집</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">용병 모집</h2>
           {canManage && (
             <Link
               href={`/mercenary/new?teamId=${teamId}`}
@@ -71,7 +71,7 @@ export default function TeamMercenaryPage() {
         </div>
       </div>
 
-      <div className="px-5 @3xl:px-0 pb-8">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
           <div className="space-y-3 mt-3">
             {[1, 2].map((i) => (
@@ -107,7 +107,7 @@ export default function TeamMercenaryPage() {
                     </span>
                   </div>
                   {(post.notes || post.description) && (
-                    <p className="text-base font-medium text-gray-900 dark:text-white mt-1 line-clamp-2">{post.notes ?? post.description}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1 line-clamp-2">{post.notes ?? post.description}</p>
                   )}
                   <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mt-2">
                     <Calendar size={12} />
@@ -123,6 +123,7 @@ export default function TeamMercenaryPage() {
           </div>
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

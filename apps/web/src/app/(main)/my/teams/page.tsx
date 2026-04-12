@@ -43,12 +43,12 @@ export default function MyTeamsPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀</h1>
       </header>
-      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀</h2>
-        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">소속 팀과 현재 역할을 확인하세요</p>
+      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">소속 팀과 현재 역할을 확인하세요</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 space-y-3 pb-8">
+      <div className="px-5 @3xl:px-0 mt-4 space-y-3 pb-8">
         {teams.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -84,7 +84,7 @@ export default function MyTeamsPage() {
                     </span>
                   </div>
                   <Link href={`/teams/${team.id}`}>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{team.name}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{team.name}</h3>
                   </Link>
                 </div>
               </div>
@@ -127,6 +127,7 @@ export default function MyTeamsPage() {
           ))
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

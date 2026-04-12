@@ -82,12 +82,12 @@ export default function ReviewsReceivedPage() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h1>
       </header>
-      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h2>
-        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
+      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내가 받은 평가</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">다른 사용자들이 남긴 평가를 확인하세요</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 pb-8">
+      <div className="px-5 @3xl:px-0 mt-4 pb-8">
         <div className="mb-4">
           <TrustSignalBanner
             tone="warning"
@@ -98,7 +98,7 @@ export default function ReviewsReceivedPage() {
         </div>
 
         {/* Summary */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
+        <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-6">
             <div className="text-center">
               <p className="text-4xl font-black text-gray-900 dark:text-white">{avgScore.toFixed(1)}</p>
@@ -125,26 +125,27 @@ export default function ReviewsReceivedPage() {
         {/* Review List */}
         <div className="space-y-3">
           {mockReviewsReceived.map((review) => (
-            <div key={review.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <div key={review.id} className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 shrink-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
                   <User size={18} className="text-gray-500 dark:text-gray-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-base font-semibold text-gray-900 dark:text-white">{review.reviewerName}</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{review.reviewerName}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{review.date}</span>
                   </div>
                   <div className="mt-0.5">
                     <StarRating rating={review.rating} />
                   </div>
-                  <p className="text-base text-gray-700 dark:text-gray-300 mt-2">{review.comment}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{review.matchTitle}</p>
+                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{review.comment}</p>
+                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{review.matchTitle}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
+        <div className="h-24" />
       </div>
     </div>
   );

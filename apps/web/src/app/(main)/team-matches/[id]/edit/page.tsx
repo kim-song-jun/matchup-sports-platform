@@ -193,7 +193,7 @@ export default function EditTeamMatchPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
       </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
@@ -208,7 +208,7 @@ export default function EditTeamMatchPage() {
       <div className="px-5 @3xl:px-0 max-w-2xl">
         {/* 종목 선택 */}
         <section className="mb-6">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">종목 선택</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">종목 선택</label>
           <div className="grid grid-cols-2 gap-2">
             {sportOptions.map((opt) => (
               <button
@@ -228,7 +228,7 @@ export default function EditTeamMatchPage() {
 
         {/* 모집글 제목 */}
         <section className="mb-5">
-          <label htmlFor="team-match-edit-title" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-title" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
             모집글 제목 <span className="text-red-400">*</span>
           </label>
           <input
@@ -243,7 +243,7 @@ export default function EditTeamMatchPage() {
 
         {/* 경기 날짜 */}
         <section className="mb-5">
-          <label htmlFor="team-match-edit-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-date" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
           <input
@@ -259,7 +259,7 @@ export default function EditTeamMatchPage() {
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="team-match-edit-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label htmlFor="team-match-edit-start-time" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
                 시작 시간 <span className="text-red-400">*</span>
               </label>
               <input
@@ -271,7 +271,7 @@ export default function EditTeamMatchPage() {
               />
             </div>
             <div>
-              <label htmlFor="team-match-edit-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+              <label htmlFor="team-match-edit-end-time" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
                 종료 시간 <span className="text-red-400">*</span>
               </label>
               <input
@@ -287,7 +287,7 @@ export default function EditTeamMatchPage() {
 
         {/* 쿼터 수 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">쿼터 수</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">쿼터 수</label>
           <div className="flex gap-2">
             {quarterOptions.map((q) => (
               <button
@@ -307,7 +307,7 @@ export default function EditTeamMatchPage() {
 
         {/* 구장 */}
         <section className="mb-5">
-          <label htmlFor="team-match-edit-venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-venue-name" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
             구장명 <span className="text-red-400">*</span>
           </label>
           <input
@@ -321,7 +321,7 @@ export default function EditTeamMatchPage() {
         </section>
 
         <section className="mb-5">
-          <label htmlFor="team-match-edit-venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">구장 주소 (선택)</label>
+          <label htmlFor="team-match-edit-venue-address" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">구장 주소 (선택)</label>
           <input
             id="team-match-edit-venue-address"
             type="text"
@@ -334,7 +334,7 @@ export default function EditTeamMatchPage() {
 
         {/* 실력등급 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">실력등급</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">실력등급</label>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {SKILL_GRADES.map((g) => (
               <button
@@ -357,7 +357,7 @@ export default function EditTeamMatchPage() {
 
         {/* 선출선수 */}
         <section className="mb-5">
-          <label htmlFor="team-match-edit-pro-player-count" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">선출선수 (명)</label>
+          <label htmlFor="team-match-edit-pro-player-count" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">선출선수 (명)</label>
           <input
             id="team-match-edit-pro-player-count"
             type="number"
@@ -373,7 +373,7 @@ export default function EditTeamMatchPage() {
 
         {/* 경기방식 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">경기방식</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">경기방식</label>
           <div className="flex gap-2">
             {gameFormatOptions.map((fmt) => (
               <button
@@ -393,7 +393,7 @@ export default function EditTeamMatchPage() {
 
         {/* 매치 유형 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">매치 유형</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">매치 유형</label>
           <div className="space-y-2">
             {MATCH_TYPES.map((mt) => (
               <label
@@ -425,7 +425,7 @@ export default function EditTeamMatchPage() {
 
         {/* 경기 스타일 */}
         <section className="mb-5">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">경기 스타일</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">경기 스타일</label>
           <div className="space-y-2">
             {matchStyleOptions.map((opt) => (
               <button
@@ -448,7 +448,7 @@ export default function EditTeamMatchPage() {
 
         {/* 유니폼 색상 */}
         <section className="mb-5">
-          <label htmlFor="team-match-edit-uniform-color" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">유니폼 색상</label>
+          <label htmlFor="team-match-edit-uniform-color" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">유니폼 색상</label>
           <input
             id="team-match-edit-uniform-color"
             type="text"
@@ -475,7 +475,7 @@ export default function EditTeamMatchPage() {
 
         {/* 비용 */}
         <section className="mb-5">
-          <label htmlFor="team-match-edit-total-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+          <label htmlFor="team-match-edit-total-fee" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">
             총 비용 (원) <span className="text-red-400">*</span>
           </label>
           <input
@@ -492,7 +492,7 @@ export default function EditTeamMatchPage() {
         </section>
 
         <section className="mb-5">
-          <label htmlFor="team-match-edit-opponent-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+          <label htmlFor="team-match-edit-opponent-fee" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
           <input
             id="team-match-edit-opponent-fee"
             type="number"
@@ -508,7 +508,7 @@ export default function EditTeamMatchPage() {
 
         {/* 추가 안내 */}
         <section className="mb-6">
-          <label htmlFor="team-match-edit-notes" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">추가 안내 (선택)</label>
+          <label htmlFor="team-match-edit-notes" className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">추가 안내 (선택)</label>
           <textarea
             id="team-match-edit-notes"
             value={form.notes}
@@ -539,6 +539,7 @@ export default function EditTeamMatchPage() {
         </div>
       </div>
 
+      <div className="h-24" />
       {/* Cancel confirmation modal */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">

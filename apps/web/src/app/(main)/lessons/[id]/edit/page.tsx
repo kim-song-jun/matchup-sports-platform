@@ -165,7 +165,7 @@ export default function EditLessonPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">강좌 수정</h1>
+        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white truncate flex-1">강좌 수정</h1>
       </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
@@ -409,7 +409,7 @@ export default function EditLessonPage() {
         </section>
 
         {/* Action buttons */}
-        <div className="flex gap-3 mb-8">
+        <div className="flex gap-3 mb-8 mt-10">
           <button
             onClick={() => setShowDeleteModal(true)}
             className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 transition-colors"
@@ -428,6 +428,8 @@ export default function EditLessonPage() {
         </div>
       </div>
 
+      <div className="h-24" />
+
       {/* Delete confirmation modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
@@ -435,8 +437,8 @@ export default function EditLessonPage() {
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">강좌를 삭제하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
+            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white text-center">강좌를 삭제하시겠어요?</h3>
+            <p className="text-sm text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}

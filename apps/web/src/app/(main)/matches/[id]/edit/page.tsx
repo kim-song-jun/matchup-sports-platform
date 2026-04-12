@@ -199,7 +199,7 @@ export default function EditMatchPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={18} className="text-gray-600 dark:text-gray-300" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 수정</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 수정</h1>
       </header>
       <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
@@ -371,6 +371,7 @@ export default function EditMatchPage() {
           </button>
         </div>
       </div>
+      <div className="h-24" />
     </div>
   );
 }
@@ -379,9 +380,9 @@ function FormSection({ label, id, children }: { label: string; id?: string; chil
   return (
     <div className="mb-5">
       {id ? (
-        <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</label>
+        <label htmlFor={id} className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       ) : (
-        <p className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</p>
+        <p className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</p>
       )}
       {children}
     </div>

@@ -144,7 +144,7 @@ export default function CreateLessonPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">강좌 등록</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">강좌 등록</h1>
       </header>
 
       {/* Progress */}
@@ -430,8 +430,8 @@ export default function CreateLessonPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 정보 확인</h3>
+            <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">강좌 정보 확인</h3>
               <div className="space-y-3">
                 <SummaryRow label="종목" value={selectedSport?.label || ''} />
                 <SummaryRow label="유형" value={selectedType?.label || ''} />
@@ -484,6 +484,7 @@ export default function CreateLessonPage() {
           </button>
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

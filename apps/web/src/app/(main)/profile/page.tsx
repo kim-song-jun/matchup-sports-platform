@@ -272,6 +272,7 @@ export default function ProfilePage() {
       </div>
 
 
+      <div className="h-24" />
       {showEditModal && <EditProfileModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} />}
     </div>
   );

@@ -183,7 +183,7 @@ export default function EditTeamPage() {
 
       <div className="px-5 @3xl:px-0 pb-8 max-w-[760px] space-y-5">
         <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
-          <h2 className="text-base font-bold text-gray-900 dark:text-white">기본 정보</h2>
+          <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">기본 정보</h2>
           <div>
             <label htmlFor="team-name" className={labelClass}>팀 이름</label>
             <input id="team-name" className={inputClass} value={form.name} onChange={(event) => updateField('name', event.target.value)} disabled={formDisabled} />
@@ -229,7 +229,7 @@ export default function EditTeamPage() {
         </section>
 
         <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
-          <h2 className="text-base font-bold text-gray-900 dark:text-white">연락 및 링크</h2>
+          <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">연락 및 링크</h2>
           <div>
             <label htmlFor="team-contact" className={labelClass}>연락처 / 오픈채팅</label>
             <input id="team-contact" className={inputClass} value={form.contactInfo} onChange={(event) => updateField('contactInfo', event.target.value)} disabled={formDisabled} />
@@ -257,7 +257,7 @@ export default function EditTeamPage() {
         </section>
 
         <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
-          <h2 className="text-base font-bold text-gray-900 dark:text-white">이미지</h2>
+          <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">이미지</h2>
           <div>
             <label htmlFor="team-logo" className={labelClass}>로고 URL</label>
             <input id="team-logo" className={inputClass} value={form.logoUrl} onChange={(event) => updateField('logoUrl', event.target.value)} disabled={formDisabled} />
@@ -273,14 +273,14 @@ export default function EditTeamPage() {
         </section>
 
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="rounded-xl bg-gray-100 dark:bg-gray-700 px-5 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          <button onClick={() => router.back()} className="min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 px-5 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
             취소
           </button>
-          <button onClick={() => void handleSave()} disabled={formDisabled || invalidName} className="rounded-xl bg-blue-500 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
+          <button onClick={() => void handleSave()} disabled={formDisabled || invalidName} className="min-h-[44px] rounded-xl bg-blue-500 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
             {updateTeam.isPending ? '저장 중...' : '저장'}
           </button>
           {canDelete && (
-            <button onClick={() => setShowDeleteModal(true)} disabled={deleteDisabled} className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50">
+            <button onClick={() => setShowDeleteModal(true)} disabled={deleteDisabled} className="ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50">
               <Trash2 size={15} />
               팀 삭제
             </button>
@@ -297,16 +297,17 @@ export default function EditTeamPage() {
             <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">팀을 삭제할까요?</h3>
             <p className="mt-2 text-sm text-gray-500 text-center">삭제하면 되돌릴 수 없습니다.</p>
             <div className="mt-5 flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
                 취소
               </button>
-              <button onClick={() => void handleDelete()} disabled={deleteDisabled} className="flex-1 rounded-xl bg-red-500 py-3 text-sm font-semibold text-white disabled:opacity-50">
+              <button onClick={() => void handleDelete()} disabled={deleteDisabled} className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-sm font-semibold text-white disabled:opacity-50">
                 {deleteTeam.isPending ? '삭제 중...' : '삭제'}
               </button>
             </div>
           </div>
         </div>
       )}
+      <div className="h-24" />
     </div>
   );
 }

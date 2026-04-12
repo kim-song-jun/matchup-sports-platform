@@ -183,14 +183,14 @@ export default function RefundRequestPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h1>
+        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h1>
       </header>
 
       <div className="hidden @3xl:block mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-base text-gray-500 hover:text-gray-600 mb-2 transition-colors">
           <ArrowLeft size={16} /> 결제 상세
         </button>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h2>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
@@ -203,8 +203,8 @@ export default function RefundRequestPage() {
           />
         ) : null}
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 정보</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 정보</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">상품명</span>
@@ -239,8 +239,8 @@ export default function RefundRequestPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">환불 규정</h3>
           <div className="space-y-2">
             {[
               { key: 'full', label: '경기 24시간 전', result: '전액 환불', active: refundPolicy.percentage === 100 },
@@ -265,7 +265,7 @@ export default function RefundRequestPage() {
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-5 ${refundPolicy.bgColor} border-transparent`}>
+        <div className={`rounded-2xl border p-4 ${refundPolicy.bgColor} border-transparent`}>
           <div className="flex items-center gap-3 mb-3">
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${refundPolicy.color}`}>
               <RotateCcw size={20} />
@@ -278,8 +278,8 @@ export default function RefundRequestPage() {
           <p className="text-xs text-gray-500">{refundPolicy.description}</p>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 사유</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">환불 사유</h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {refundReasons.map((reason) => (
               <button
@@ -306,6 +306,8 @@ export default function RefundRequestPage() {
           />
         </div>
       </div>
+
+      <div className="h-24" />
 
       <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
         <div className="flex items-center justify-between mb-3 @3xl:hidden">

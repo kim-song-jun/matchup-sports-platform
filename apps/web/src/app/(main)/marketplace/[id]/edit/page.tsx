@@ -168,7 +168,7 @@ export default function EditListingPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매물 수정</h1>
+        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">매물 수정</h1>
       </header>
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">장터</Link>
@@ -203,7 +203,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-5">
-          <label htmlFor="edit-listing-title" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>
+          <label htmlFor="edit-listing-title" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">제목</label>
           <input
             id="edit-listing-title"
             type="text"
@@ -214,7 +214,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-5">
-          <label htmlFor="edit-listing-description" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">설명</label>
+          <label htmlFor="edit-listing-description" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">설명</label>
           <textarea
             id="edit-listing-description"
             value={form.description}
@@ -225,7 +225,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">종목</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">종목</label>
           <div className="flex gap-2 flex-wrap">
             {sportTypes.map((type) => (
               <button
@@ -242,7 +242,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">카테고리</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">카테고리</label>
           <div className="flex gap-2 flex-wrap">
             {categories.map((cat) => (
               <button
@@ -259,7 +259,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-5">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">상품 상태</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">상품 상태</label>
           <div className="flex gap-2 flex-wrap">
             {conditions.map((c) => (
               <button
@@ -276,7 +276,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-5">
-          <label htmlFor="edit-listing-price" className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">가격 (원)</label>
+          <label htmlFor="edit-listing-price" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">가격 (원)</label>
           <input
             id="edit-listing-price"
             type="number"
@@ -287,7 +287,7 @@ export default function EditListingPage() {
         </div>
 
         <div className="mb-8">
-          <label className="block text-base font-semibold text-gray-700 dark:text-gray-200 mb-2">판매 상태</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">판매 상태</label>
           <div className="flex gap-2">
             {statusOptions.map((opt) => (
               <button
@@ -303,10 +303,10 @@ export default function EditListingPage() {
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 mt-10">
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-5 py-3.5 text-md font-semibold text-red-500 hover:bg-red-100 transition-colors"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-5 py-3.5 text-sm font-semibold text-red-500 hover:bg-red-100 transition-colors"
           >
             <Trash2 size={16} />
             삭제
@@ -327,14 +327,16 @@ export default function EditListingPage() {
         </div>
       </div>
 
+      <div className="h-24" />
+
       {showDeleteModal && (
         <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="매물 삭제" size="sm">
           <div className="pt-1">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
               <AlertTriangle size={24} className="text-red-500" />
             </div>
-            <h3 className="text-center text-lg font-bold text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
-            <p className="mt-2 text-center text-base text-gray-500">삭제된 매물은 복구할 수 없습니다.</p>
+            <h3 className="text-center text-base font-bold tracking-tight text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
+            <p className="mt-2 text-center text-sm text-gray-500">삭제된 매물은 복구할 수 없습니다.</p>
             <div className="mt-6 flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
               <button onClick={handleDelete} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>

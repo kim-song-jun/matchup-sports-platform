@@ -58,12 +58,12 @@ export default function PaymentsPage() {
         >
           <ArrowLeft size={20} className="text-gray-700" />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 내역</h1>
       </header>
 
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 내역</h1>
-        <p className="text-sm text-gray-500 mt-0.5">실제 결제와 환불 상태를 확인하세요</p>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 내역</h1>
+        <p className="text-xs text-gray-500 mt-0.5">실제 결제와 환불 상태를 확인하세요</p>
       </div>
 
       <div className="px-5 @3xl:px-0">
@@ -128,7 +128,7 @@ export default function PaymentsPage() {
                 <Link
                   key={payment.id}
                   href={`/payments/${payment.id}`}
-                  className="block rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors"
+                  className="block rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -175,6 +175,7 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

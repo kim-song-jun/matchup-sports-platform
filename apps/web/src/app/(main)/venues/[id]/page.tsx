@@ -121,7 +121,7 @@ export default function VenueDetailPage() {
             </button>
             <div className="p-5">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{venue.name}</h2>
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{venue.name}</h2>
                 {venue.reviewCount > 0 && (
                   <span className="inline-flex items-center gap-1 text-sm text-amber-500">
                     <Star size={12} fill="currentColor" />
@@ -147,14 +147,14 @@ export default function VenueDetailPage() {
           {activeSection === 'overview' && (
             <div className="space-y-4 mt-4">
               <Card>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">기본 정보</h3>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">기본 정보</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300">{venue.address}</p>
                 <p className="text-sm text-gray-500 mt-1">
                   {venue.pricePerHour ? `시간당 ${venue.pricePerHour.toLocaleString('ko-KR')}원` : '요금 정보 없음'}
                 </p>
               </Card>
               <Card>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
                 {schedule.length === 0 ? (
                   <EmptyState icon={CalendarDays} title="예약이 없어요" size="sm" />
                 ) : (
@@ -166,7 +166,7 @@ export default function VenueDetailPage() {
                 )}
               </Card>
               <Card>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">리뷰</h3>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">리뷰</h3>
                 {venue.reviewCount === 0 ? (
                   <EmptyState icon={Star} title="아직 리뷰가 없어요" size="sm" />
                 ) : (
@@ -194,7 +194,7 @@ export default function VenueDetailPage() {
             )}
             {canManageCatalog && (
               <Card padding="sm">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 등록</h3>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">허브 등록</h3>
                 <div className="space-y-1.5 text-sm">
                   <Link href={`/marketplace/new?venueId=${venueId}&venueName=${encodeURIComponent(venue.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
                     굿즈 등록
@@ -209,7 +209,7 @@ export default function VenueDetailPage() {
               </Card>
             )}
             <Card padding="sm">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 섹션</h3>
+              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">허브 섹션</h3>
               <div className="space-y-1.5 text-sm">
                 <button onClick={() => setActiveSection('goods')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">굿즈 {hubData?.sections.goodsCount ?? goods.length}</button>
                 <button onClick={() => setActiveSection('passes')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">수강권 {hubData?.sections.passesCount ?? passes.length}</button>
@@ -227,6 +227,7 @@ export default function VenueDetailPage() {
         onClose={() => setShowMediaLightbox(false)}
         title={`${venue.name} 이미지`}
       />
+      <div className="h-24" />
     </div>
   );
 }

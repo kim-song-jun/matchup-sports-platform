@@ -55,10 +55,10 @@ export default function TeamMatchesPage() {
           <span>/</span>
           <span className="text-gray-700">경기 기록</span>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">경기 기록</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">경기 기록</h2>
       </div>
 
-      <div className="px-5 @3xl:px-0 pb-8">
+      <div className="px-5 @3xl:px-0">
         {isLoading ? (
           <div className="space-y-3 mt-3">
             {[1, 2, 3].map((i) => (
@@ -91,7 +91,7 @@ export default function TeamMatchesPage() {
                         </span>
                       </div>
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                         <Calendar size={12} />
@@ -109,6 +109,7 @@ export default function TeamMatchesPage() {
           </div>
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

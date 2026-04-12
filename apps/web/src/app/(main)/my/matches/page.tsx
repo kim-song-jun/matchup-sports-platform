@@ -66,13 +66,13 @@ export default function MyMatchesPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
       </header>
       <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h2>
-        <p className="text-base text-gray-500 mt-1">참가 기록과 개설 기능 연결 상태를 확인하세요</p>
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 히스토리</h2>
+        <p className="mt-1 text-sm text-gray-500">참가 기록과 개설 기능 연결 상태를 확인하세요</p>
       </div>
 
       {/* Tabs */}
-      <div className="px-5 @3xl:px-0 pt-3 pb-1">
-        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1">
+      <div className="px-5 @3xl:px-0 pt-4 pb-1">
+        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700">
           {([
             { key: 'participated' as Tab, label: '참가 매치' },
             { key: 'created' as Tab, label: '내가 만든 매치' },
@@ -80,9 +80,9 @@ export default function MyMatchesPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-base font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
@@ -95,7 +95,7 @@ export default function MyMatchesPage() {
 
       {/* ── Tab: 참가 매치 ── */}
       {activeTab === 'participated' && (
-        <div className="px-5 @3xl:px-0 pb-8 space-y-3 mt-3">
+        <div className="px-5 @3xl:px-0 pb-8 space-y-3 mt-4">
           <div className="mt-3 mb-4">
             <TrustSignalBanner
               tone="success"
@@ -159,7 +159,7 @@ export default function MyMatchesPage() {
                     </div>
 
                     <Link href={`/matches/${match.id}`}>
-                      <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{match.title}</h3>
+                      <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{match.title}</h3>
                     </Link>
 
                     <div className="mt-2 space-y-1.5">
@@ -185,12 +185,13 @@ export default function MyMatchesPage() {
               })
             )}
           </div>
+          <div className="h-24" />
         </div>
       )}
 
       {/* ── Tab: 내가 만든 매치 ── */}
       {activeTab === 'created' && (
-        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
+        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
           <TrustSignalBanner
             tone="warning"
             label="연결 예정"
@@ -204,6 +205,7 @@ export default function MyMatchesPage() {
             description="지금은 매치를 새로 만들 수 있지만, 개설 목록과 수정·취소 관리는 전용 API가 준비된 뒤 연결됩니다"
             action={{ label: '매치 만들기', href: '/matches/new' }}
           />
+          <div className="h-24" />
         </div>
       )}
     </div>

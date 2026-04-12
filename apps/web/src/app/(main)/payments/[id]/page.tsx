@@ -104,7 +104,7 @@ export default function PaymentDetailPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제 상세</h1>
+        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">결제 상세</h1>
       </header>
 
       <div className="hidden @3xl:block mb-6">
@@ -113,7 +113,7 @@ export default function PaymentDetailPage() {
           <ChevronRight size={14} />
           <span className="text-gray-700 dark:text-gray-300">상세</span>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제 상세</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 상세</h2>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
@@ -136,8 +136,8 @@ export default function PaymentDetailPage() {
           />
         ) : null}
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-base text-gray-500">결제 금액</span>
@@ -152,8 +152,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/50">
               <method.icon size={20} className="text-gray-500" />
@@ -165,8 +165,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">연결된 일정</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">연결된 일정</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${source.color}`}>
@@ -200,8 +200,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">영수증 정보</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">영수증 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">주문번호</span>
@@ -217,8 +217,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100 dark:bg-gray-700" />
             {timelineSteps.map((step, index) => (
@@ -236,8 +236,8 @@ export default function PaymentDetailPage() {
         </div>
 
         {payment.status === 'completed' && source.kind === 'match' ? (
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
+          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">환불 규정</h3>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 mb-4">
               <p className={`text-sm font-semibold ${refundPolicy.color}`}>{refundPolicy.label}</p>
               <p className="text-sm text-gray-500 mt-1">{refundPolicy.description}</p>
@@ -267,6 +267,7 @@ export default function PaymentDetailPage() {
           </div>
         ) : null}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

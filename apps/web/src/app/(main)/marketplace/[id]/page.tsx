@@ -226,15 +226,15 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Description */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2">상품 설명</h3>
-            <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
+          <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">상품 설명</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
           </div>
 
           {/* Rental info */}
           {listing.listingType === 'rent' && (
-            <div className="rounded-xl bg-blue-50 border border-blue-100 p-5 mb-4">
-              <h3 className="text-md font-semibold text-blue-800 mb-2">대여 정보</h3>
+            <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              <h3 className="text-sm font-semibold text-blue-800 mb-2">대여 정보</h3>
               <div className="space-y-2 text-base text-blue-700">
                 <p>일일 대여비: {formatAmount(listing.rentalPricePerDay || 0)}</p>
                 <p>보증금: {formatAmount(listing.rentalDeposit || 0)}</p>
@@ -247,8 +247,8 @@ export default function ListingDetailPage() {
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Seller */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">판매자</h3>
+          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">판매자</h3>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">
                 {listing.seller?.nickname?.charAt(0)}
@@ -272,7 +272,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Safety notice */}
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 p-4">
+          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 p-4">
             <div className="flex items-start gap-2">
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
@@ -283,7 +283,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* CTA */}
-          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             {!isAuthenticated ? (
               <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
                 로그인 후 구매하기
@@ -360,6 +360,8 @@ export default function ListingDetailPage() {
           </button>
         </div>
       </Modal>
+
+      <div className="h-24" />
 
       <MediaLightbox
         isOpen={showMediaLightbox}

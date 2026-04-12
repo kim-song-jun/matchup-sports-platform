@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const API_ROOT = join(__dirname, '..');
-const MIGRATIONS_DIR = join(__dirname, 'migrations');
+// Use process.cwd() instead of __dirname for Node.js 22 / ts-node ESM compat
+const API_ROOT = process.cwd();
+const MIGRATIONS_DIR = join(process.cwd(), 'prisma', 'migrations');
 
 type BootstrapState = {
   hasMigrationHistory: boolean;

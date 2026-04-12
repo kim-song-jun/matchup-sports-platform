@@ -19,7 +19,7 @@ export function EmptyState({ icon: Icon, title, description, action, secondaryAc
   return (
     <div
       className={`flex flex-col items-center justify-center text-center ${isSm ? 'p-8' : 'p-12'}`}
-      data-testid={isAuthWall ? 'auth-wall' : undefined}
+      data-testid={isAuthWall ? 'auth-wall' : 'empty-state'}
     >
       <div className={`flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30 ${isSm ? 'h-12 w-12' : 'h-20 w-20'}`}>
         <Icon size={isSm ? 24 : 40} className="text-blue-400 dark:text-blue-300 animate-gentle-bounce" />

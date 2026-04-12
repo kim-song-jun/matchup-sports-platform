@@ -49,6 +49,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
 export function Button({
@@ -58,7 +59,7 @@ export function Button({
   fullWidth = false,
   ref,
   ...props
-}: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
+}: ButtonProps) {
   return (
     <button
       ref={ref}

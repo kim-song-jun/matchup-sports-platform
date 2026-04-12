@@ -27,7 +27,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
   const t = useTranslations('marketplace');
 
   return (
-    <Link href={`/marketplace/${item.id}`} className="block active:scale-[0.98]">
+    <Link href={`/marketplace/${item.id}`} className="block active:scale-[0.98]" data-testid="marketplace-card">
       <Card
         variant="default"
         padding="sm"

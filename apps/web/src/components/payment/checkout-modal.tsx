@@ -9,6 +9,7 @@ import { getCheckoutPaymentMode } from '@/lib/payment-ui';
 import { CreditCard, Wallet, Loader2, CheckCircle } from 'lucide-react';
 import type { Payment } from '@/types/api';
 import { formatAmount } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -74,10 +75,10 @@ export function CheckoutModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isMockMode ? '테스트 결제' : '결제하기'} size="md">
-      <div className="rounded-xl bg-gray-50 p-4 mb-5">
-        <p className="text-xs text-gray-500 mb-1">주문 내역</p>
-        <p className="text-md font-semibold text-gray-900">{itemName}</p>
-        <p className="text-xl font-bold text-gray-900 mt-2">{formatAmount(amount)}</p>
+      <div className="rounded-xl bg-gray-50 dark:bg-gray-800 p-4 mb-5">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">주문 내역</p>
+        <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{itemName}</p>
+        <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-2">{formatAmount(amount)}</p>
       </div>
 
       {isMockMode ? (
@@ -92,7 +93,7 @@ export function CheckoutModal({
       ) : null}
 
       <div className="mb-6">
-        <p className="text-base font-semibold text-gray-900 mb-3">결제 수단</p>
+        <p className="text-base font-semibold text-gray-900 dark:text-white mb-3">결제 수단</p>
         <div className="space-y-2">
           {paymentMethods.map((method) => {
             const isSelected = selectedMethod === method.key;
@@ -103,20 +104,20 @@ export function CheckoutModal({
                 disabled={isProcessing}
                 className={`w-full flex items-center gap-3.5 rounded-xl border p-4 text-left transition-colors ${
                   isSelected
-                    ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/20'
-                    : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
+                    ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500/20 dark:bg-blue-900/20 dark:ring-blue-500/30'
+                    : 'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 dark:hover:bg-gray-700'
                 } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                  isSelected ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-500'
+                  isSelected ? 'bg-blue-100 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                 }`}>
                   <method.icon size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-base font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-900'}`}>
+                  <p className={`text-base font-semibold ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
                     {method.label}
                   </p>
-                  <p className="text-xs text-gray-500">{method.description}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{method.description}</p>
                 </div>
                 <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
                   isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-500'
@@ -129,24 +130,21 @@ export function CheckoutModal({
         </div>
       </div>
 
-      <button
+      <Button
         onClick={handlePayment}
         disabled={isProcessing || !participantId}
-        className={`w-full rounded-xl py-4 text-md font-semibold text-white transition-[colors,transform] ${
-          isProcessing
-            ? 'bg-gray-400 cursor-not-allowed'
-            : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.98]'
-        }`}
+        fullWidth
+        size="lg"
       >
         {isProcessing ? (
-          <span className="flex items-center justify-center gap-2">
+          <>
             <Loader2 size={18} className="animate-spin" />
             {isMockMode ? '테스트 결제 처리 중...' : '결제 처리 중...'}
-          </span>
+          </>
         ) : (
           `${isMockMode ? '테스트 결제' : '결제하기'} · ${formatAmount(amount)}`
         )}
-      </button>
+      </Button>
     </Modal>
   );
 }

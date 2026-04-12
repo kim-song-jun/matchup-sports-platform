@@ -43,7 +43,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
   const nextTime = lesson.upcomingSchedules?.[0]?.startTime ?? lesson.startTime;
 
   return (
-    <Link href={`/lessons/${lesson.id}`} className="block">
+    <Link href={`/lessons/${lesson.id}`} className="block" data-testid="lesson-card">
       <Card
         variant="default"
         padding="none"

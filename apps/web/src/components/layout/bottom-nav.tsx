@@ -44,7 +44,7 @@ export function BottomNav() {
                 data-testid={testId}
                 aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
-                className="flex min-h-[48px] min-w-[48px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="flex min-h-12 min-w-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <div className="relative">
                   <Icon
@@ -57,7 +57,7 @@ export function BottomNav() {
                   />
                   {isProfile && totalUnread > 0 && (
                     <span
-                      className="absolute -right-1.5 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white"
+                      className="absolute -right-1.5 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-2xs font-bold text-white"
                       aria-label={`읽지 않은 알림 ${totalUnread > 99 ? '99개 이상' : `${totalUnread}개`}`}
                     >
                       <span aria-hidden="true">{totalUnread > 99 ? '99+' : totalUnread}</span>
@@ -65,7 +65,7 @@ export function BottomNav() {
                   )}
                 </div>
                 <span className={cn(
-                  'text-[10px] font-medium leading-tight transition-colors',
+                  'text-xs font-medium leading-tight transition-colors',
                   isActive ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500',
                 )}>
                   {label}

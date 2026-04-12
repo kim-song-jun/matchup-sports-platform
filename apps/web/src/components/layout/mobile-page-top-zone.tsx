@@ -29,7 +29,7 @@ export function MobilePageTopZone({
       <section data-testid={testId} className={cn('@3xl:hidden px-5 pt-4 pb-3', className)}>
         <div
           className={cn(
-            surface === 'panel' && 'glass-mobile-panel rounded-[24px] px-4 py-4',
+            surface === 'panel' && 'glass-mobile-panel rounded-3xl px-4 py-4',
           )}
         >
           <div className="flex items-start justify-between gap-4">
@@ -39,14 +39,14 @@ export function MobilePageTopZone({
                   className={cn(
                     'font-semibold uppercase',
                     surface === 'panel'
-                      ? 'mb-3 inline-flex min-h-[32px] items-center rounded-full border border-white/40 bg-white/55 px-3 py-1 text-2xs text-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] dark:border-white/10 dark:bg-white/5 dark:text-blue-300'
-                      : 'mb-1 text-[11px] tracking-[0.14em] text-gray-400 dark:text-gray-500',
+                      ? 'mb-3 inline-flex min-h-8 items-center rounded-full border border-white/40 bg-white/55 px-3 py-1 text-2xs text-blue-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] dark:border-white/10 dark:bg-white/5 dark:text-blue-300'
+                      : 'mb-1 text-xs tracking-[0.14em] text-gray-400 dark:text-gray-500',
                   )}
                 >
                   {eyebrow}
                 </div>
               )}
-              <h1 className="text-[1.85rem] font-bold tracking-[-0.04em] text-gray-900 dark:text-white">
+              <h1 className="text-3xl font-bold tracking-[-0.04em] text-gray-900 dark:text-white">
                 {title}
               </h1>
               {subtitle && (

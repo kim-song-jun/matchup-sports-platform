@@ -24,7 +24,7 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
   const fallbackTeamCoverImage = getTeamImage(team.sportType, undefined, team.id);
 
   return (
-    <Link href={`/teams/${team.id}`}>
+    <Link href={`/teams/${team.id}`} data-testid="team-card">
       <Card
         variant="default"
         padding="none"

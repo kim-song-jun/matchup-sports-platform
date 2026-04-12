@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Flag } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Modal } from '@/components/ui/modal';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useCreateReport } from '@/hooks/use-api';
 
@@ -124,14 +125,14 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, targetName 
           >
             {t('detailLabel')}
           </label>
-          <textarea
+          <Textarea
             id="report-detail"
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
             placeholder={t('detailPlaceholder')}
             maxLength={500}
             rows={3}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors resize-none"
+            className="resize-none"
           />
           <p className="mt-1 text-right text-2xs text-gray-400 dark:text-gray-500">
             {detail.length}/500

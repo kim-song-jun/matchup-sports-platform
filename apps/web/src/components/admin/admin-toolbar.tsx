@@ -1,6 +1,7 @@
 'use client';
 
 import { Search, Download } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface FilterOption {
   key: string;
@@ -42,13 +43,13 @@ export function AdminToolbar({
             <label htmlFor={search.id ?? 'admin-toolbar-search'} className="sr-only">
               {search.placeholder || '검색'}
             </label>
-            <input
+            <Input
               id={search.id ?? 'admin-toolbar-search'}
               type="text"
               value={search.value}
               onChange={(e) => search.onChange(e.target.value)}
               placeholder={search.placeholder || '검색'}
-              className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-700 transition-colors border border-transparent dark:border-gray-700"
+              className="pl-9"
             />
           </div>
         )}

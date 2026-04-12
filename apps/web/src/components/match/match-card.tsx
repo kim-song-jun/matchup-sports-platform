@@ -36,7 +36,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
   const fallbackMatchImage = getSportImage(match.sportType, undefined, match.id);
 
   return (
-    <Link href={`/matches/${match.id}`} className={cn('block', className)}>
+    <Link href={`/matches/${match.id}`} className={cn('block', className)} data-testid="match-card">
       <Card
         variant="default"
         padding="none"

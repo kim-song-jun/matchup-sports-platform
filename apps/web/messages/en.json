@@ -249,8 +249,8 @@
     "thisWeek": "This Week",
     "lastMonth": "Last Month",
     "older": "Older",
-    "loginPromptTitle": "Your activity feed is waiting",
-    "loginPromptDesc": "Login to view your activity history",
+    "emptyTitle": "No activity yet",
+    "emptyDesc": "Join a match and your feed will fill up",
     "viewAllActivity": "View all activity"
   },
   "report": {

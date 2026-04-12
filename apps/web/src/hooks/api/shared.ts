@@ -2,8 +2,8 @@
 
 import type { ApiResponse, CursorPage } from '@/types/api';
 
-// Helper: the axios response interceptor returns `response.data` (the ApiResponse),
-// so `api.get(...)` resolves to `ApiResponse<T>`. We cast accordingly.
+// Helper: the axios response interceptor returns `response.data` (the ApiResponse wrapper),
+// so each `api` call resolves to `ApiResponse<T>`. Cast once here rather than at each call site.
 export function extractData<T>(res: unknown): T {
   return (res as ApiResponse<T>).data;
 }

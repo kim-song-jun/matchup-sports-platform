@@ -314,9 +314,7 @@ button:not(:disabled):active, a:active {
 
 .glass-mobile-surface,
 .glass-mobile-panel,
-.glass-mobile-header,
-.glass-mobile-nav,
-.floating-bottom-nav {
+.glass-mobile-header {
   border: 1px solid var(--glass-mobile-border-strong);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.72) 100%),
@@ -328,9 +326,7 @@ button:not(:disabled):active, a:active {
 
 .dark .glass-mobile-surface,
 .dark .glass-mobile-panel,
-.dark .glass-mobile-header,
-.dark .glass-mobile-nav,
-.dark .floating-bottom-nav {
+.dark .glass-mobile-header {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%),
     var(--glass-mobile-bg);
@@ -338,8 +334,8 @@ button:not(:disabled):active, a:active {
 
 .glass-mobile-nav,
 .floating-bottom-nav {
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.82);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.08),
     0 1px 4px rgba(0, 0, 0, 0.04),
@@ -350,8 +346,8 @@ button:not(:disabled):active, a:active {
 
 .dark .glass-mobile-nav,
 .dark .floating-bottom-nav {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.4);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.72);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.3),
     0 1px 4px rgba(0, 0, 0, 0.15),

@@ -61,8 +61,8 @@ export async function uploadFiles(files: File[]): Promise<UploadAsset[]> {
   const formData = new FormData();
   files.forEach((file) => formData.append('files', file));
 
-  const response = await api.post<unknown, ApiResponse<UploadApiRecord[]>>('/uploads', formData);
-  const records = isUploadEnvelope(response) ? response.data : Array.isArray(response) ? response : [];
+  const response = await api.post<ApiResponse<UploadApiRecord[]>>('/uploads', formData);
+  const records = isUploadEnvelope(response) ? response.data : [];
   return records.map(toUploadAsset);
 }
 

@@ -282,6 +282,11 @@ export interface UserProfile {
   createdAt?: string;
   lastLoginAt?: string;
   provider?: string;
+  phone?: string | null;
+  /** OAuth provider identifier returned by auth endpoints (e.g. 'kakao', 'naver') */
+  oauthProvider?: string;
+  /** User role for admin gate checks (e.g. 'admin', 'user') */
+  role?: string;
   winCount?: number;
   sportTypes?: string[];
   sportProfiles?: SportProfile[];

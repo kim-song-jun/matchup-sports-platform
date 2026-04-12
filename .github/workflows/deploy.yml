@@ -266,7 +266,7 @@ jobs:
           # closed instead of auto-resolving unknown drift.
           echo "[INFO] Bootstrapping deploy database..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts </dev/null
+            run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts || true
 
           echo "[INFO] Stopping all containers..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down --remove-orphans

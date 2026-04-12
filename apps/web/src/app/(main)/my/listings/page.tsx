@@ -117,8 +117,8 @@ export default function MyListingsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>{st.text}</span>
-                      <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">{conditionLabel[listing.condition]}</span>
+                      <span className={`rounded-md px-2 py-0.5 text-2xs font-semibold ${st.style}`}>{st.text}</span>
+                      <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">{conditionLabel[listing.condition]}</span>
                     </div>
                     <Link href={`/marketplace/${listing.id}`}>
                       <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{listing.title}</h3>

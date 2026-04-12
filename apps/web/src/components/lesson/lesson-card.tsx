@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Clock, Users } from 'lucide-react';
+import { Clock, MapPin, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent, lessonTypeLabel, ticketTypeLabel } from '@/lib/constants';
@@ -118,6 +118,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
             {lesson.venueName && (
               <>
                 <span className="opacity-30 shrink-0" aria-hidden="true">·</span>
+                <MapPin size={11} className="shrink-0 opacity-40" aria-hidden="true" />
                 <span className="truncate">{lesson.venueName}</span>
               </>
             )}
@@ -145,8 +146,9 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
                 </span>
               )}
               {lesson.venue && (
-                <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5">
-                  장소: {lesson.venue.name}
+                <span className="flex items-center gap-0.5 rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5">
+                  <MapPin size={10} className="shrink-0" aria-hidden="true" />
+                  {lesson.venue.name}
                 </span>
               )}
             </div>

@@ -173,7 +173,7 @@ export default function LessonDetailPage() {
           {/* 타이틀 */}
           <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-normal ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
+              <span className={`rounded-full px-2 py-0.5 text-2xs font-normal ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>

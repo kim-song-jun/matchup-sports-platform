@@ -52,11 +52,11 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2">
-              <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${status.className}`}>
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-2xs font-semibold ${status.className}`}>
                 {status.label}
               </span>
               <span
-                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}
+                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}
               >
                 {sportLabel[match.sportType] ?? match.sportType}
               </span>

@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -48,14 +49,15 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
 
         {/* Content */}
         <div className="flex flex-1 flex-col min-w-0 py-0.5">
-          <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
 
           {/* meta: 지역 · 종목 · 상태 */}
           <div className="flex items-center gap-1.5 mt-1">
-            <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
+            <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}>
               {sportLabel[item.sportType] || t('other')}
             </span>
-            <span className="text-sm text-gray-500 truncate">
+            <span className="flex items-center gap-0.5 text-xs text-gray-500 truncate">
+              <MapPin size={11} className="shrink-0" aria-hidden="true" />
               {item.locationDistrict || item.locationCity || t('locationUndecided')} · {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition]) : item.condition}
             </span>
           </div>
@@ -65,7 +67,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
 
           {/* 하단: 타입 + 통계 */}
           <div className="flex items-center justify-between mt-auto pt-1">
-            <span className="rounded-full px-2 py-0.5 text-xs font-normal bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+            <span className="rounded-full px-2 py-0.5 text-2xs font-normal bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
               {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
             </span>
             <span className="text-xs text-gray-400 dark:text-gray-500">

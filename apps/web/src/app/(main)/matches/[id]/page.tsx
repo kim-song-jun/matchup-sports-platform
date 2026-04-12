@@ -369,7 +369,7 @@ export default function MatchDetailPage() {
                 </div>
               )}
               <div>
-                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[match.sportType]}</span>
+                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}>{sportLabel[match.sportType]}</span>
                 <h2 data-testid="match-detail-title" className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
                   {match.title}
                 </h2>
@@ -492,7 +492,7 @@ export default function MatchDetailPage() {
                       onClick={() => handleHostStatusChange('completed', '매치를 완료 처리했어요')}
                       disabled={updateMatchMutation.isPending}
                       data-testid="match-host-complete-button"
-                      className="w-full rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-60"
+                      className="w-full rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-60"
                     >
                       매치 완료
                     </button>
@@ -528,7 +528,7 @@ export default function MatchDetailPage() {
                       setPendingParticipantId(currentParticipant?.id ?? null);
                       setShowCheckout(true);
                     }}
-                    className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
+                    className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                   >
                     결제 마무리하기 · {formatAmount(match.fee)}
                   </button>
@@ -629,7 +629,7 @@ export default function MatchDetailPage() {
                     <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
                       {p.user?.nickname}
                       {p.userId === match.hostId && (
-                        <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
+                        <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
                       )}
                     </p>
                   </div>
@@ -637,7 +637,7 @@ export default function MatchDetailPage() {
                     {p.arrivedAt && (
                       <CheckCircle2 size={14} className="text-green-500" aria-label="도착 완료" />
                     )}
-                    <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
+                    <span className={`text-2xs font-medium rounded-full px-2 py-0.5 ${
                       p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {p.status === 'confirmed' ? '확정' : '대기'}

@@ -120,7 +120,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
                 return (
                   <span
                     key={reason.type}
-                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600 dark:bg-blue-950/30 dark:text-blue-300"
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-2xs text-blue-600 dark:bg-blue-950/30 dark:text-blue-300"
                   >
                     <ReasonIcon size={10} aria-hidden="true" />
                     {reason.label}

@@ -104,7 +104,7 @@ export default function CreateTeamPage() {
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
                 aria-pressed={form.sportType === type}
-                className={`rounded-lg px-3.5 py-2 min-h-11 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3.5 py-2 min-h-11 text-sm font-medium transition-colors ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'

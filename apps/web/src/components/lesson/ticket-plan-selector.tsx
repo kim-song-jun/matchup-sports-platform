@@ -130,7 +130,7 @@ export function TicketPlanSelector({
             >
               {/* Popular badge */}
               {meta.popular && (
-                <span className="absolute -top-2.5 left-4 rounded-full bg-blue-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                <span className="absolute -top-2.5 left-4 rounded-full bg-blue-500 px-2.5 py-0.5 text-2xs font-bold text-white shadow-sm">
                   가장 인기
                 </span>
               )}
@@ -175,7 +175,7 @@ export function TicketPlanSelector({
                     </span>
 
                     {discountPct !== null && (
-                      <span className="rounded-full bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 text-xs font-bold text-red-500 dark:text-red-400">
+                      <span className="rounded-full bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 text-2xs font-bold text-red-500 dark:text-red-400">
                         {discountPct}% 할인
                       </span>
                     )}

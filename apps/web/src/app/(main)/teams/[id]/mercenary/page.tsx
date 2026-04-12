@@ -93,10 +93,10 @@ export default function TeamMercenaryPage() {
               <Link key={post.id} href={`/mercenary/${post.id}`} className="block">
                 <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.99]">
                   <div className="flex items-start justify-between gap-3 mb-1">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
+                    <span className={`rounded-md px-2 py-0.5 text-2xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                       {sportLabel[post.sportType] || post.sportType}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${
                       post.status === 'open'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300'
                         : post.status === 'filled'

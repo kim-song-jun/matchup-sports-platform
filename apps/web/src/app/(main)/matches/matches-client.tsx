@@ -362,7 +362,7 @@ export function MatchesPage() {
           {activeSummary.map((item) => (
             <span
               key={item}
-              className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+              className="rounded-full bg-blue-50 px-3 py-1.5 text-2xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
             >
               {item}
             </span>
@@ -417,7 +417,7 @@ export function MatchesPage() {
                       aria-pressed={isActive}
                       data-testid={`match-level-${filter.key}`}
                       onClick={() => updateFilters({ level: filter.key })}
-                      className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                      className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-blue-500 text-white'
                           : 'border border-gray-200 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300'
@@ -444,7 +444,7 @@ export function MatchesPage() {
                       aria-pressed={isActive}
                       data-testid={`match-sort-${filter.key}`}
                       onClick={() => updateFilters({ sort: filter.key })}
-                      className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                      className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-blue-500 text-white'
                           : 'border border-gray-200 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300'

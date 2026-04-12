@@ -149,7 +149,7 @@ export default function TeamMatchDetailPage() {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-normal ${status.className}`}>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-normal ${status.className}`}>
           {status.label}
         </span>
       </header>
@@ -234,13 +234,13 @@ export default function TeamMatchDetailPage() {
                 {match.skillGrade && (() => {
                   const grade = getGradeInfo(match.skillGrade);
                   return (
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-normal ${grade.color}`}>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-normal ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
                 })()}
                 {match.isFreeInvitation && (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal bg-green-50 text-green-600">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-normal bg-green-50 text-green-600">
                     무료초청
                   </span>
                 )}
@@ -415,7 +415,7 @@ export default function TeamMatchDetailPage() {
               {canOpenEvaluate && (
                 <Link
                   href={`/team-matches/${id}/evaluate`}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
                   <ClipboardCheck size={18} />
                   경기 평가하기
@@ -509,7 +509,7 @@ export default function TeamMatchDetailPage() {
           <button
             onClick={handleApply}
             disabled={!confirmed || applyMutation.isPending || applicableTeams.length === 0}
-            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {applyMutation.isPending ? (
                 <span className="flex items-center justify-center gap-2">

@@ -276,7 +276,7 @@ export default function AdminVenueEditPage() {
                     key={sport.value}
                     type="button"
                     onClick={() => toggleSport(sport.value)}
-                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                       selected
                         ? 'bg-gray-900 dark:bg-gray-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'

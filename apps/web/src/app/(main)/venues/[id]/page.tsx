@@ -549,7 +549,7 @@ function HubSectionTab({ label, active, onClick }: { label: string; active: bool
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+      className={`rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
         active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
       }`}
     >

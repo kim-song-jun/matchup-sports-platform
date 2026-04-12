@@ -308,7 +308,7 @@ export default function MercenaryDetailPage() {
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
                           {application.user?.nickname ?? '지원자'}
                         </p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(application.status)}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${statusBadgeClass(application.status)}`}>
                           {applicationStatusLabel[application.status] ?? application.status}
                         </span>
                       </div>
@@ -346,7 +346,7 @@ export default function MercenaryDetailPage() {
         {myApplicationStatus && !canManageApplications && (
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
             <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">내 신청 상태</h2>
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(myApplicationStatus)}`}>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold ${statusBadgeClass(myApplicationStatus)}`}>
               {applicationStatusLabel[myApplicationStatus] ?? myApplicationStatus}
             </span>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">호스트의 승인/거절 결과가 여기에 반영됩니다.</p>

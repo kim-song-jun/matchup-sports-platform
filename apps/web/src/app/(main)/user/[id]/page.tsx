@@ -79,7 +79,7 @@ export default function UserProfilePage() {
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${mannerInfo.color}`}>
+                <span className={`rounded-full px-2.5 py-0.5 text-2xs font-semibold ${mannerInfo.color}`}>
                   매너 {mannerInfo.text}
                 </span>
                 {user.city && (

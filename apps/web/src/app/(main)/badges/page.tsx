@@ -181,7 +181,7 @@ export default function BadgesPage() {
           role="tab"
           aria-selected={activeTab === 'my'}
           onClick={() => setActiveTab('my')}
-          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+          className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
             activeTab === 'my'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -193,7 +193,7 @@ export default function BadgesPage() {
           role="tab"
           aria-selected={activeTab === 'all'}
           onClick={() => setActiveTab('all')}
-          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+          className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
             activeTab === 'all'
               ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'

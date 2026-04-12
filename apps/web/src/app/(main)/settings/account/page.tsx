@@ -248,7 +248,7 @@ function SocialAccount({ provider, name, email, connected }: { provider: string;
         {email && <p className="text-sm text-gray-500 mt-0.5">{email}</p>}
       </div>
       {connected ? (
-        <span className="rounded-lg bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400">연결됨</span>
+        <span className="rounded-lg bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-2xs font-medium text-green-600 dark:text-green-400">연결됨</span>
       ) : (
         <Button variant="subtle" size="sm" className="px-2.5 py-1 text-xs">
           연결하기

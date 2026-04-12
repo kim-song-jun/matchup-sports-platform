@@ -194,7 +194,7 @@ export default function CreateListingPage() {
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 dark:bg-gray-700 text-gray-600 hover:bg-gray-100'
@@ -214,7 +214,7 @@ export default function CreateListingPage() {
                 key={cat}
                 type="button"
                 onClick={() => setForm({ ...form, category: cat })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.category === cat
                     ? 'bg-blue-500 text-white'
                     : 'bg-white dark:bg-gray-800 text-gray-600 border border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'

@@ -245,7 +245,7 @@ export default function TeamDetailPage() {
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{currentTeam.name}</h2>
                 {currentTeam.isRecruiting && (
-                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>
+                  <span className="text-2xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">모집중</span>
                 )}
               </div>
 
@@ -257,7 +257,7 @@ export default function TeamDetailPage() {
                   (() => {
                     const grade = getGradeInfo(currentTeam.skillGrade);
                     return (
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal ${grade.color}`}>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-normal ${grade.color}`}>
                         {grade.label}등급
                       </span>
                     );
@@ -526,7 +526,7 @@ export default function TeamDetailPage() {
                 {!currentTeam.isRecruiting ? (
                   <>
                     <div className="text-center mb-3">
-                      <span className="inline-block rounded-full bg-gray-100 dark:bg-gray-700 px-3 py-1 text-sm font-semibold text-gray-500 dark:text-gray-400">모집 마감</span>
+                      <span className="inline-block rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-semibold text-gray-500 dark:text-gray-400">모집 마감</span>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">현재 팀원을 모집하고 있지 않아요</p>
                     </div>
                     <Button disabled variant="subtle" fullWidth>모집 마감</Button>
@@ -534,7 +534,7 @@ export default function TeamDetailPage() {
                 ) : isAuthenticated ? (
                   <>
                     <div className="text-center mb-3">
-                      <span className="inline-block text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 mb-1">팀원 모집중</span>
+                      <span className="inline-block text-2xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 mb-1">팀원 모집중</span>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">아래 버튼으로 가입 신청해보세요</p>
                     </div>
                     <Button
@@ -629,7 +629,7 @@ function HubSectionTab({ label, active, onClick }: { label: string; active: bool
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+      className={`rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
         active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
       }`}
     >

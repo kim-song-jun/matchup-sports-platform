@@ -210,7 +210,7 @@ export default function ArrivalCheckPage() {
               <p className="text-sm text-blue-500 font-semibold">TEAM MATCH</p>
               <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{match.title}</h2>
             </div>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta?.className ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+            <span className={`rounded-full px-2.5 py-1 text-2xs font-medium ${statusMeta?.className ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
               {statusMeta?.label ?? match.status}
             </span>
           </div>

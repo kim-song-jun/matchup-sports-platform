@@ -295,7 +295,7 @@ function StatusRow({
         <p className="text-md font-medium text-gray-900 dark:text-gray-50">{label}</p>
         <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
       </div>
-      <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+      <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-2xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
         {value}
       </span>
     </div>

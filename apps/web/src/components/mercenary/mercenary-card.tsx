@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Star, Users } from 'lucide-react';
+import { MapPin, Star, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { sportCardAccent, sportLabel, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate } from '@/lib/utils';
@@ -53,17 +53,17 @@ export function MercenaryCard({ post, className }: MercenaryCardProps) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 mb-1 text-xs text-gray-500 flex-wrap">
-              <span className={`rounded-md px-1.5 py-0.5 font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
+              <span className={`rounded-md px-1.5 py-0.5 font-medium ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                 {sportLabel[post.sportType] ?? post.sportType}
               </span>
-              <span className={`rounded-md px-1.5 py-0.5 font-semibold ${statusStyle[post.status] ?? statusStyle.closed}`}>
+              <span className={`rounded-md px-1.5 py-0.5 font-medium ${statusStyle[post.status] ?? statusStyle.closed}`}>
                 {statusLabel[post.status] ?? post.status}
               </span>
               <span>{positionLabel[positionKey] ?? positionKey}</span>
             </div>
-            <h2 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
               {teamName}
-            </h2>
+            </h3>
           </div>
           <div className="flex items-center gap-1 text-xs text-amber-500 shrink-0">
             <Star size={12} fill="currentColor" aria-hidden="true" />
@@ -71,16 +71,17 @@ export function MercenaryCard({ post, className }: MercenaryCardProps) {
           </div>
         </div>
 
-        <p className="mt-2.5 text-sm text-gray-500 leading-relaxed">
-          {formatMatchDate(post.matchDate)}
+        <p className="mt-2.5 flex items-center gap-1 text-xs text-gray-500 leading-relaxed">
+          <span>{formatMatchDate(post.matchDate)}</span>
           {post.venue && (
             <>
-              <span className="text-gray-300 dark:text-gray-600 mx-1" aria-hidden="true">·</span>
-              {post.venue}
+              <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+              <MapPin size={11} className="shrink-0" aria-hidden="true" />
+              <span>{post.venue}</span>
             </>
           )}
         </p>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-xs text-gray-500">
           {levelLabel[level] ?? `레벨 ${level}`} 이상
           <span className="text-gray-300 dark:text-gray-600 mx-1" aria-hidden="true">·</span>
           <span className={`font-semibold ${fee === 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-gray-200'}`}>

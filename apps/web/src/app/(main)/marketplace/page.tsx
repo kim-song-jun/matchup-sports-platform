@@ -85,7 +85,7 @@ export default function MarketplacePage() {
             type="button"
             aria-pressed={activeCategoryKey === cat.labelKey}
             onClick={() => setActiveCategoryKey(cat.labelKey)}
-            className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
               activeCategoryKey === cat.labelKey
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'

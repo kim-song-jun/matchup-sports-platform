@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -61,16 +62,16 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
         {/* Text content */}
         <div className="flex min-w-0 flex-1 flex-col justify-center bg-white px-3.5 py-3 dark:bg-gray-800">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">{team.name}</h3>
+            <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{team.name}</h3>
             {team.isRecruiting && (
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                 {t('recruiting')}
               </span>
             )}
           </div>
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
             <span
-              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}
+              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}
             >
               {sportLabel[team.sportType] || team.sportType}
             </span>
@@ -80,7 +81,10 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
             <p className="mt-1 line-clamp-1 text-xs text-gray-500">{team.description}</p>
           )}
           {team.city && (
-            <p className="mt-0.5 text-2xs text-gray-500">{team.city} {team.district}</p>
+            <p className="mt-0.5 flex items-center gap-0.5 text-2xs text-gray-500">
+              <MapPin size={10} className="shrink-0" aria-hidden="true" />
+              {team.city} {team.district}
+            </p>
           )}
         </div>
       </Card>

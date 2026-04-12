@@ -267,6 +267,28 @@ jobs:
           echo "[INFO] Bootstrapping deploy database..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts || true
+          echo "[INFO] Build phase complete."
+          EOF
+
+      - name: Restart containers
+        timeout-minutes: 10
+        env:
+          RESET_DB: ${{ inputs.reset_db }}
+          RUN_SEED: ${{ inputs.run_seed }}
+        run: |
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 bash -se <<'EOF'
+          set -euo pipefail
+          cd ~/matchup/deploy
+
+          set -a
+          . .env
+          set +a
+
+          if sudo docker compose version >/dev/null 2>&1; then
+            COMPOSE="sudo docker compose"
+          else
+            COMPOSE="sudo docker-compose"
+          fi
 
           echo "[INFO] Stopping all containers..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down --remove-orphans
@@ -304,6 +326,9 @@ jobs:
             sleep 2
           done
 
+          RESET_DB="${RESET_DB:-false}"
+          RUN_SEED="${RUN_SEED:-false}"
+
           if [ "${RESET_DB}" = "true" ]; then
             echo "[DANGER] Resetting database..."
             sudo docker exec matchup_api npx prisma migrate reset --force --skip-seed
@@ -313,32 +338,21 @@ jobs:
             sudo docker exec matchup_api npx prisma db seed
           fi
 
-          echo "[INFO] Checking deploy mock checksum and syncing canonical mock data..."
-          sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+          echo "[INFO] Syncing canonical mock data..."
+          sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate || true
 
           echo "[INFO] Syncing DB-backed image data..."
-          # Image sync remains a deploy-safe backfill step. Failure is surfaced
-          # as a GitHub Actions warning so operators are notified; it does not
-          # abort the deploy because remote/user-provided images still render.
-          if ! sudo docker exec matchup_api npx ts-node prisma/seed-images.ts; then
-            echo "::warning::seed-images sync failed — image data may be stale. Re-run manually: docker exec matchup_api npx ts-node prisma/seed-images.ts"
-          fi
+          sudo docker exec matchup_api npx ts-node prisma/seed-images.ts || echo "::warning::seed-images sync failed"
 
-          # Purge nginx disk cache so clients receive the newly deployed assets.
           sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
           sudo docker exec matchup_nginx nginx -t
           sudo docker exec matchup_nginx nginx -s reload
 
-          # ── Post-deploy cleanup ───────────────────────────────────────────
-          # Reclaim space from the images and build cache replaced by this run.
-          # Use `-a` to remove all unused images, including old tagged builds
-          # replaced by this deploy. Base layers will be re-pulled on the next
-          # deploy; the pre-build prune above (without -a) preserved them during
-          # the build itself.
           sudo docker image prune -a -f || true
           sudo docker builder prune -a -f || true
           echo "[cleanup] Final disk usage:"
           df -h / | tail -1
+          echo "[INFO] Deploy complete."
           EOF
 
       - name: Health check

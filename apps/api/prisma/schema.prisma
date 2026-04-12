@@ -77,6 +77,17 @@ enum UserRole {
   admin
 }
 
+enum AdminUserStatus {
+  active
+  suspended
+}
+
+enum AdminUserAuditAction {
+  warn
+  suspend
+  reactivate
+}
+
 enum Gender {
   male
   female
@@ -177,6 +188,15 @@ enum OrderStatus {
   cancelled
 }
 
+enum TournamentStatus {
+  draft
+  recruiting
+  full
+  ongoing
+  completed
+  cancelled
+}
+
 // ─── Models ──────────────────────────────────────────────
 
 model User {
@@ -185,6 +205,8 @@ model User {
   passwordHash    String?  @map("password_hash")
   nickname        String   @unique
   role            UserRole @default(user)
+  adminStatus     AdminUserStatus @default(active) @map("admin_status")
+  adminSuspensionReason String? @map("admin_suspension_reason")
   profileImageUrl String?  @map("profile_image_url")
   phone           String?
   gender          Gender?
@@ -222,9 +244,11 @@ model User {
   marketplaceReviews  MarketplaceReview[]  @relation("MarketplaceReviewAuthor")
   receivedMarketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewTarget")
   hostedLessons       Lesson[]             @relation("LessonHost")
+  ownedVenues         Venue[]              @relation("VenueOwner")
   lessonTickets       LessonTicket[]       @relation("UserLessonTickets")
   lessonAttendances   LessonAttendance[]   @relation("UserLessonAttendances")
   ownedTeams          SportTeam[]          @relation("TeamOwner")
+  organizedTournaments Tournament[]        @relation("TournamentOrganizer")
   favorites           Favorite[]
   teamMemberships     TeamMembership[]     @relation("TeamMemberships")
   mercenaryApplications MercenaryApplication[] @relation("UserMercenaryApplications")
@@ -240,11 +264,30 @@ model User {
   sentReports            Report[]             @relation("ReportsSent")
   blocksFrom             UserBlock[]          @relation("BlocksFrom")
   blocksTo               UserBlock[]          @relation("BlocksTo")
+  receivedAdminAuditLogs AdminUserAuditLog[]  @relation("AdminAuditTarget")
+  actedAdminAuditLogs    AdminUserAuditLog[]  @relation("AdminAuditActor")
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
   @@index([deletedAt])
   @@map("users")
+}
+
+model AdminUserAuditLog {
+  id         String               @id @default(cuid())
+  userId     String               @map("user_id")
+  actorId    String?              @map("actor_id")
+  actorLabel String               @map("actor_label")
+  action     AdminUserAuditAction
+  note       String?
+  createdAt  DateTime             @default(now()) @map("created_at")
+
+  user   User  @relation("AdminAuditTarget", fields: [userId], references: [id], onDelete: Cascade)
+  actor  User? @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([actorId])
+  @@map("admin_user_audit_logs")
 }
 
 model UserSportProfile {
@@ -268,6 +311,7 @@ model UserSportProfile {
 
 model Venue {
   id             String    @id @default(uuid())
+  ownerId        String?   @map("owner_id")
   name           String
   type           VenueType
   sportTypes     SportType[] @map("sport_types")
@@ -293,9 +337,13 @@ model Venue {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  owner        User?      @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   matches      Match[]
+  listings     MarketplaceListing[] @relation("VenueListings")
+  tournaments  Tournament[]         @relation("VenueTournaments")
   venueReviews VenueReview[]
 
+  @@index([ownerId])
   @@index([city, district])
   @@index([type])
   @@map("venues")
@@ -318,6 +366,7 @@ model VenueReview {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([venueId, userId])
+  @@index([venueId])
   @@map("venue_reviews")
 }
 
@@ -374,6 +423,8 @@ model MatchParticipant {
   payment Payment?
 
   @@unique([matchId, userId])
+  @@index([userId])
+  @@index([userId, status])
   @@map("match_participants")
 }
 
@@ -405,6 +456,9 @@ model Review {
   target User  @relation("ReviewTarget", fields: [targetId], references: [id])
 
   @@unique([matchId, authorId, targetId])
+  @@index([targetId])
+  @@index([authorId])
+  @@index([matchId])
   @@map("reviews")
 }
 
@@ -458,6 +512,8 @@ model Notification {
 model MarketplaceListing {
   id           String        @id @default(uuid())
   sellerId     String        @map("seller_id")
+  teamId       String?       @map("team_id")
+  venueId      String?       @map("venue_id")
   title        String
   description  String
   sportType    SportType     @map("sport_type")
@@ -486,11 +542,15 @@ model MarketplaceListing {
   expiresAt    DateTime?    @map("expires_at")
 
   seller  User               @relation("ListingSeller", fields: [sellerId], references: [id])
+  team    SportTeam?         @relation("TeamListings", fields: [teamId], references: [id], onDelete: SetNull)
+  venue   Venue?             @relation("VenueListings", fields: [venueId], references: [id], onDelete: SetNull)
   orders  MarketplaceOrder[]
 
   @@index([sportType, category])
   @@index([status])
   @@index([locationCity])
+  @@index([teamId, status, createdAt])
+  @@index([venueId, status, createdAt])
   @@map("marketplace_listings")
 }
 
@@ -586,6 +646,7 @@ enum AttendanceStatus {
 model Lesson {
   id            String       @id @default(uuid())
   hostId        String       @map("host_id")
+  teamId        String?      @map("team_id")
   sportType     SportType    @map("sport_type")
   type          LessonType
   title         String
@@ -617,12 +678,15 @@ model Lesson {
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
   host          User               @relation("LessonHost", fields: [hostId], references: [id])
+  team          SportTeam?         @relation("TeamLessons", fields: [teamId], references: [id], onDelete: SetNull)
   ticketPlans   LessonTicketPlan[]
   tickets       LessonTicket[]
   schedules     LessonSchedule[]
 
   @@index([sportType, status])
   @@index([lessonDate])
+  @@index([teamId, status, lessonDate])
+  @@index([venueId, status, lessonDate])
   @@map("lessons")
 }
 
@@ -748,12 +812,44 @@ model SportTeam {
 
   teamMatches         TeamMatch[]         @relation("TeamMatchHost")
   teamApplications    TeamMatchApplication[] @relation("TeamAppApplicant")
+  lessons             Lesson[]            @relation("TeamLessons")
+  listings            MarketplaceListing[] @relation("TeamListings")
+  tournaments         Tournament[]        @relation("TeamTournaments")
   memberships         TeamMembership[]
   mercenaryPosts      MercenaryPost[]
   invitations         TeamInvitation[]
 
   @@index([sportType])
+  @@index([city, isRecruiting])
   @@map("sport_teams")
+}
+
+model Tournament {
+  id              String           @id @default(uuid())
+  organizerId     String           @map("organizer_id")
+  teamId          String?          @map("team_id")
+  venueId         String?          @map("venue_id")
+  sportType       SportType        @map("sport_type")
+  title           String
+  description     String?
+  startDate       DateTime         @map("start_date") @db.Date
+  endDate         DateTime         @map("end_date") @db.Date
+  entryFee        Int              @default(0) @map("entry_fee")
+  maxParticipants Int?             @map("max_participants")
+  currentParticipants Int          @default(0) @map("current_participants")
+  status          TournamentStatus @default(recruiting)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  organizer       User             @relation("TournamentOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  team            SportTeam?       @relation("TeamTournaments", fields: [teamId], references: [id], onDelete: SetNull)
+  venue           Venue?           @relation("VenueTournaments", fields: [venueId], references: [id], onDelete: SetNull)
+
+  @@index([sportType, status])
+  @@index([startDate, status])
+  @@index([teamId, status, startDate])
+  @@index([venueId, status, startDate])
+  @@map("tournaments")
 }
 
 // ─── Team Membership ────────────────────────────────────
@@ -945,6 +1041,7 @@ model TeamMatchApplication {
   applicantTeam   SportTeam       @relation("TeamAppApplicant", fields: [applicantTeamId], references: [id])
 
   @@unique([teamMatchId, applicantTeamId])
+  @@index([applicantTeamId])
   @@map("team_match_applications")
 }
 
@@ -1035,6 +1132,16 @@ model Badge {
 
   @@index([teamId])
   @@map("badges")
+}
+
+model SeedSyncState {
+  key       String   @id
+  checksum  String
+  payload   Json?
+  appliedAt DateTime @default(now()) @map("applied_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("seed_sync_states")
 }
 
 // ─── Favorites ──────────────────────────────────────────
@@ -1277,5 +1384,6 @@ model UserBlock {
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
+  @@index([blockedId])
   @@map("user_blocks")
 }

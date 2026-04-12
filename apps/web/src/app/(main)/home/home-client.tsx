@@ -176,41 +176,39 @@ export function HomePage() {
         </section>
       )}
 
-      {/* 배너 (로그인 유저) */}
+      {/* 배너 (로그인 유저) — 토스 스타일 카드형 배너 */}
       {canRenderAuthenticated && (
-        <section className="mt-4 px-5 @3xl:px-0">
-          <div className="relative h-24 overflow-hidden rounded-xl" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
-            {/* Crossfade layers */}
-              {banners.map((banner, i) => {
-                const BannerIcon = banner.icon;
-                return (
-                  <Link key={i} href={banner.href}
-                    className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${bannerIdx === i ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-                    aria-hidden={bannerIdx !== i}
-                    tabIndex={bannerIdx === i ? 0 : -1}
-                  >
-                    <div className={`h-full ${banner.bg} px-5 py-4 flex items-center justify-between`}>
-                      <div>
-                        <p className="text-md font-bold text-white">{banner.title}</p>
-                        <p className="text-xs text-white/60 mt-1">{banner.desc}</p>
-                      </div>
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${banner.iconBg} shrink-0`}>
-                        <BannerIcon size={20} className={banner.iconColor} />
-                      </div>
+        <section className="mt-6 px-5 @3xl:px-0">
+          <div className="relative h-20 overflow-hidden rounded-2xl" onMouseEnter={() => setBannerPaused(true)} onMouseLeave={() => setBannerPaused(false)} onFocus={() => setBannerPaused(true)} onBlur={() => setBannerPaused(false)}>
+            {banners.map((banner, i) => {
+              const BannerIcon = banner.icon;
+              return (
+                <Link key={i} href={banner.href}
+                  className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${bannerIdx === i ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  aria-hidden={bannerIdx !== i}
+                  tabIndex={bannerIdx === i ? 0 : -1}
+                >
+                  <div className="h-full bg-gray-900 dark:bg-gray-800 px-5 py-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white tracking-tight">{banner.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{banner.desc}</p>
                     </div>
-                  </Link>
-                );
-              })}
-              {/* Indicator dots */}
-              <div className="absolute bottom-0 right-2 flex gap-0 z-20">
-                {banners.map((_, i) => (
-                  <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
-                    aria-label={`배너 ${i + 1}`}
-                    className="relative flex min-h-[44px] min-w-[44px] items-center justify-center p-2.5">
-                    <span className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
-                  </button>
-                ))}
-              </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 shrink-0 ml-3">
+                      <BannerIcon size={18} className={banner.iconColor} aria-hidden="true" />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+            <div className="absolute bottom-2 right-3 flex gap-1 z-20">
+              {banners.map((_, i) => (
+                <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
+                  aria-label={`배너 ${i + 1}`}
+                  className="p-1">
+                  <span className={`block h-1 rounded-full transition-[width,background-color] duration-300 ${bannerIdx === i ? 'w-3 bg-white' : 'w-1 bg-white/30'}`} />
+                </button>
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -262,13 +260,16 @@ export function HomePage() {
             {[1,2,3].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : filteredMatches.length === 0 ? (
-          <EmptyState
-            icon={Calendar}
-            title={te('noMatches')}
-            description={te('noMatchesDesc')}
-            size="sm"
-            secondaryAction={activeSport !== 'all' ? { label: t('viewAllMatches'), onClick: () => setActiveSport('all') } : undefined}
-          />
+          <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 py-8 text-center">
+            <Calendar size={28} className="mx-auto text-gray-300 dark:text-gray-600" aria-hidden="true" />
+            <p className="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">{te('noMatches')}</p>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{te('noMatchesDesc')}</p>
+            {activeSport !== 'all' && (
+              <button onClick={() => setActiveSport('all')} className="mt-3 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors">
+                {t('viewAllMatches')}
+              </button>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {filteredMatches.slice(0, 6).map((m: Match, idx) => <MatchCard key={m.id} match={m} priority={idx === 0} />)}
@@ -386,42 +387,43 @@ const MatchCard = React.memo(function MatchCard({ match, priority = false }: { m
   const fallbackMatchImage = getSportDetailImageSet(match.sportType, undefined, match.id, 1)[0];
 
   return (
-    <Link href={`/matches/${match.id}`} className="cursor-pointer">
-      <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex h-24 hover:border-gray-200 dark:hover:border-gray-700 active:scale-[0.98] transition-[border-color,transform] duration-150">
-        {/* 이미지: 1:1 정사각형 고정 */}
-        <div className="relative w-24 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
+    <Link href={`/matches/${match.id}`}>
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex h-[100px] bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+        {/* 이미지 */}
+        <div className="relative w-[100px] shrink-0 bg-gray-100 dark:bg-gray-700 overflow-hidden">
           <SafeImage
             src={matchImage}
             fallbackSrc={fallbackMatchImage}
             alt={match.title}
             fill
             className="object-cover"
-            sizes="96px"
+            sizes="100px"
             priority={priority}
           />
           {timeBadge && (
             <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
         </div>
-        {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-900 px-3.5 py-3 min-w-0 flex flex-col justify-center">
-          <p className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
+        {/* 정보 — 3줄: 제목 / 종목·날짜 / 인원·가격 */}
+        <div className="flex-1 px-3.5 py-3 min-w-0 flex flex-col justify-center">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate tracking-tight">
             {match.title}
           </p>
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5 truncate">
-            <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}>
-              {sportLabel[match.sportType]}
-            </span>
-            <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
-            {match.venue?.name && <><span className="shrink-0">·</span><span className="truncate">{match.venue.name}</span></>}
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+            {sportLabel[match.sportType]} · {formatMatchDate(match.matchDate)} {match.startTime}
+            {match.venue?.name && ` · ${match.venue.name}`}
           </p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-xs font-normal ${isAlmostFull ? 'text-amber-500' : 'text-gray-700 dark:text-gray-300'}`}>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <span className={`text-xs font-medium ${isAlmostFull ? 'text-amber-500' : 'text-gray-600 dark:text-gray-300'}`}>
               {match.currentPlayers}/{match.maxPlayers}명
             </span>
-            <span className="text-xs text-gray-500">{formatCurrency(match.fee)}</span>
+            <span className="text-xs text-gray-400">·</span>
+            <span className="text-xs font-medium text-gray-900 dark:text-gray-100">{formatCurrency(match.fee)}</span>
             {match.levelMin != null && match.levelMax != null && (
-              <span className="text-2xs text-gray-500 dark:text-gray-400">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
+              <>
+                <span className="text-xs text-gray-400">·</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
+              </>
             )}
           </div>
         </div>

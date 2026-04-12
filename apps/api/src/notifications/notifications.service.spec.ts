@@ -62,7 +62,115 @@ describe('NotificationsService', () => {
     mockCacheService.get.mockResolvedValue(null);
   });
 
+  describe('findMine', () => {
+    it('returns paginated notifications for the user', async () => {
+      const items = [
+        {
+          id: 'n1', userId: 'u1', type: NotificationType.match_created,
+          title: 'Match!', body: 'Ready', data: {}, isRead: false, createdAt: new Date(),
+        },
+        {
+          id: 'n2', userId: 'u1', type: NotificationType.match_created,
+          title: 'Match2!', body: 'Ready2', data: {}, isRead: false, createdAt: new Date(),
+        },
+      ];
+      mockPrisma.notification.findMany.mockResolvedValue(items);
+
+      const result = await service.findMine('u1');
+
+      expect(result.items).toHaveLength(2);
+      expect(result.hasMore).toBe(false);
+      expect(result.nextCursor).toBeNull();
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 'u1' } }),
+      );
+    });
+
+    it('returns hasMore=true and nextCursor when there are more items', async () => {
+      const items = Array.from({ length: 21 }, (_, i) => ({
+        id: `n${i}`, userId: 'u1', type: NotificationType.match_created,
+        title: `N${i}`, body: 'Body', data: {}, isRead: false, createdAt: new Date(),
+      }));
+      mockPrisma.notification.findMany.mockResolvedValue(items);
+
+      const result = await service.findMine('u1', { limit: 20 });
+
+      expect(result.items).toHaveLength(20);
+      expect(result.hasMore).toBe(true);
+      expect(result.nextCursor).toBe('n19');
+    });
+
+    it('filters by isRead=true when specified', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+
+      await service.findMine('u1', { isRead: true });
+
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'u1', isRead: true },
+        }),
+      );
+    });
+
+    it('uses cursor-based pagination when cursor is provided', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+
+      await service.findMine('u1', { cursor: 'n5' });
+
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 1,
+          cursor: { id: 'n5' },
+        }),
+      );
+    });
+  });
+
+  describe('getUnreadCount', () => {
+    it('returns cached value without hitting DB when cache is warm', async () => {
+      mockCacheService.get.mockResolvedValue({ count: 3 });
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toEqual({ count: 3 });
+      expect(mockPrisma.notification.count).not.toHaveBeenCalled();
+    });
+
+    it('queries DB and caches result when cache is cold', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      mockPrisma.notification.count.mockResolvedValue(5);
+
+      const result = await service.getUnreadCount('u1');
+
+      expect(result).toEqual({ count: 5 });
+      expect(mockPrisma.notification.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 'u1', isRead: false } }),
+      );
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'notifications:unread:u1',
+        { count: 5 },
+        expect.any(Number),
+      );
+    });
+  });
+
   describe('create', () => {
+    it('suppresses notification when recipient has blocked the sender', async () => {
+      mockUserBlocksService.isBlocked.mockResolvedValue(true);
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.match_created,
+        title: 'Test',
+        body: 'Body',
+        fromUserId: 'blocked-user',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+      expect(mockRealtime.emitToUser).not.toHaveBeenCalled();
+    });
+
     it('persists notification, emits realtime event, and calls webPushService.sendToUser', async () => {
       const notification = {
         id: 'n1',

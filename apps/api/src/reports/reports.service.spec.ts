@@ -71,6 +71,92 @@ describe('ReportsService', () => {
       ).rejects.toThrow(NotFoundException);
       expect(mockPrisma.report.create).not.toHaveBeenCalled();
     });
+
+    it('creates a report for a chat message target', async () => {
+      mockPrisma.chatMessage.findUnique.mockResolvedValue({ id: 'msg-1' });
+      const expected = {
+        id: 'report-2',
+        targetType: ReportTargetType.message,
+        targetId: 'msg-1',
+        reason: 'abuse',
+        description: null,
+        status: ReportStatus.pending,
+        createdAt: new Date(),
+      };
+      mockPrisma.report.create.mockResolvedValue(expected);
+
+      const result = await service.createReport('reporter-1', {
+        targetType: ReportTargetType.message,
+        targetId: 'msg-1',
+        reason: 'abuse',
+      });
+
+      expect(mockPrisma.chatMessage.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'msg-1' } }),
+      );
+      expect(result.targetType).toBe(ReportTargetType.message);
+    });
+
+    it('creates a report for a marketplace listing target', async () => {
+      mockPrisma.marketplaceListing.findUnique.mockResolvedValue({ id: 'listing-1' });
+      mockPrisma.report.create.mockResolvedValue({
+        id: 'report-3',
+        targetType: ReportTargetType.listing,
+        targetId: 'listing-1',
+        reason: 'fraud',
+        description: '사기 판매',
+        status: ReportStatus.pending,
+        createdAt: new Date(),
+      });
+
+      const result = await service.createReport('reporter-1', {
+        targetType: ReportTargetType.listing,
+        targetId: 'listing-1',
+        reason: 'fraud',
+        description: '사기 판매',
+      });
+
+      expect(mockPrisma.marketplaceListing.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'listing-1' } }),
+      );
+      expect(result.reason).toBe('fraud');
+    });
+
+    it('creates a report for a review target', async () => {
+      mockPrisma.review.findUnique.mockResolvedValue({ id: 'review-1' });
+      mockPrisma.report.create.mockResolvedValue({
+        id: 'report-4',
+        targetType: ReportTargetType.review,
+        targetId: 'review-1',
+        reason: 'fake_review',
+        description: null,
+        status: ReportStatus.pending,
+        createdAt: new Date(),
+      });
+
+      const result = await service.createReport('reporter-1', {
+        targetType: ReportTargetType.review,
+        targetId: 'review-1',
+        reason: 'fake_review',
+      });
+
+      expect(mockPrisma.review.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'review-1' } }),
+      );
+      expect(result.targetType).toBe(ReportTargetType.review);
+    });
+
+    it('throws NotFoundException when chat message target does not exist', async () => {
+      mockPrisma.chatMessage.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.createReport('reporter-1', {
+          targetType: ReportTargetType.message,
+          targetId: 'ghost-msg',
+          reason: 'abuse',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('getMyReports', () => {

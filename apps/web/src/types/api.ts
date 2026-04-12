@@ -10,6 +10,12 @@ export interface PaginatedResponse<T> {
   nextCursor: string | null;
 }
 
+export interface CursorPage<T> {
+  data: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 // ── Match types ──
 export type MatchStatus = 'recruiting' | 'full' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -87,6 +93,8 @@ export interface Venue {
   rating: number;
   reviewCount: number;
   imageUrls: string[];
+  ownerId?: string | null;
+  owner?: { id: string; nickname?: string; profileImageUrl?: string | null } | null;
   reviews?: Array<{ id: string; rating: number; facilityRating?: number; accessRating?: number; costRating?: number; iceQuality?: number | null; comment: string | null; createdAt: string; user?: { id: string; nickname: string; profileImageUrl: string | null } }>;
   venueReviews?: Array<{ id: string; rating: number; facilityRating?: number; accessRating?: number; costRating?: number; iceQuality?: number | null; comment: string | null; createdAt: string; user?: { id: string; nickname: string; profileImageUrl: string | null } }>;
 }
@@ -95,6 +103,8 @@ export interface Venue {
 export interface Lesson {
   id: string;
   hostId: string;
+  teamId?: string | null;
+  venueId?: string | null;
   sportType: string;
   type: string;
   title: string;
@@ -116,7 +126,9 @@ export interface Lesson {
   createdAt?: string;
   isRecurring?: boolean;
   recurringDays?: number[];
-  host?: { id: string; nickname: string; profileImageUrl: string | null };
+  team?: { id: string; name: string };
+  venue?: { id: string; name: string };
+  host?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore?: number };
   participants?: LessonParticipant[];
   ticketPlans?: LessonTicketPlan[];
   upcomingSchedules?: LessonSchedule[];
@@ -168,6 +180,15 @@ export interface LessonTicket {
   attendances?: LessonAttendance[];
 }
 
+export interface LessonTicketPurchaseResponse {
+  ticket: LessonTicket;
+  payment: {
+    orderId: string;
+    amount: number;
+    ticketId: string;
+  };
+}
+
 // Individual session in a lesson schedule
 export interface LessonSchedule {
   id: string;
@@ -197,6 +218,8 @@ export interface LessonAttendance {
 export interface MarketplaceListing {
   id: string;
   sellerId: string;
+  teamId?: string | null;
+  venueId?: string | null;
   title: string;
   description: string;
   sportType: string;
@@ -212,7 +235,33 @@ export interface MarketplaceListing {
   likeCount: number;
   rentalPricePerDay?: number;
   rentalDeposit?: number;
+  team?: { id: string; name: string };
+  venue?: { id: string; name: string };
   seller?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore: number };
+}
+
+export interface Tournament {
+  id: string;
+  title: string;
+  description?: string | null;
+  sportType: string;
+  city?: string | null;
+  district?: string | null;
+  venueName?: string | null;
+  eventDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  entryFee?: number | null;
+  status?: 'draft' | 'recruiting' | 'full' | 'ongoing' | 'completed' | 'cancelled';
+  imageUrl?: string | null;
+  teamId?: string | null;
+  venueId?: string | null;
+  team?: { id: string; name: string } | null;
+  venue?: { id: string; name: string } | null;
+  organizer?: { id: string; nickname: string; profileImageUrl?: string | null } | null;
+  participantCount?: number;
+  maxParticipants?: number;
+  createdAt?: string;
 }
 
 // ── User types ──
@@ -272,6 +321,7 @@ export interface MyTeam {
 // ── SportTeam ──
 export interface SportTeam {
   id: string;
+  ownerId?: string;
   name: string;
   sportType: string;
   description: string | null;
@@ -296,6 +346,44 @@ export interface SportTeam {
   matchCount?: number;
   applicationCount?: number;
   owner?: { id: string; nickname: string; mannerScore?: number };
+}
+
+export interface TeamHub {
+  team: SportTeam;
+  sections: {
+    goodsCount: number;
+    passesCount: number;
+    eventsCount: number;
+  };
+  goods: MarketplaceListing[];
+  passes: Lesson[];
+  events: Tournament[];
+  capabilities?: {
+    canEditProfile?: boolean;
+    canManageGoods?: boolean;
+    canManagePasses?: boolean;
+    canManageEvents?: boolean;
+  };
+}
+
+export interface VenueHub {
+  venue: Venue;
+  sections: {
+    goodsCount: number;
+    passesCount: number;
+    eventsCount: number;
+    scheduleCount?: number;
+    reviewCount?: number;
+  };
+  goods: MarketplaceListing[];
+  passes: Lesson[];
+  events: Tournament[];
+  capabilities?: {
+    canEditProfile?: boolean;
+    canManageGoods?: boolean;
+    canManagePasses?: boolean;
+    canManageEvents?: boolean;
+  };
 }
 
 export type TeamMatchOutcome = 'win' | 'draw' | 'lose';
@@ -387,6 +475,12 @@ export interface TeamMatchApplication {
   applicantTeam?: SportTeam;
 }
 
+export interface TeamMatchRefereeSchedule {
+  hasReferee: boolean;
+  quarterCount: number;
+  schedule: Record<string, string> | null;
+}
+
 // ── Notification ──
 export interface Notification {
   id: string;
@@ -465,6 +559,15 @@ export interface PreparedPayment {
   amount: number;
 }
 
+export interface PreparedLessonTicketPurchase {
+  ticket: LessonTicket;
+  payment: {
+    orderId: string;
+    amount: number;
+    ticketId: string;
+  };
+}
+
 // ── Admin stats ──
 export interface AdminStats {
   totalUsers: number;
@@ -522,10 +625,12 @@ export interface AdminStatisticsOverview {
 }
 
 // ── Chat (API contract) ──
+export type ChatRoomType = 'team_match' | 'direct' | 'team';
+
 export interface ChatRoom {
   id: string;
   name: string;
-  type: string;
+  type: ChatRoomType;
   lastMessage?: string;
   lastMessageAt?: string;
   unreadCount?: number;
@@ -540,6 +645,12 @@ export interface ChatMessage {
   imageUrl?: string | null;
   deletedAt?: string | null;
   sender?: { id: string; nickname: string; profileImageUrl: string | null };
+}
+
+export interface CreateChatRoomInput {
+  type: ChatRoomType;
+  teamMatchId?: string;
+  participantIds?: string[];
 }
 
 // ── Mercenary ──
@@ -707,12 +818,40 @@ export interface VenueScheduleSlot {
 }
 
 // ── Create input types ──
+export interface CreateMatchInput {
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  sportType: string;
+  venueId: string;
+  matchDate: string;
+  startTime: string;
+  endTime: string;
+  maxPlayers: number;
+  fee?: number;
+  levelMin?: number;
+  levelMax?: number;
+  gender?: string;
+  teamConfig?: Record<string, unknown>;
+}
+
 export interface CreateTeamInput {
   name: string;
   sportType: string;
   description?: string;
+  logoUrl?: string;
+  coverImageUrl?: string;
+  photos?: string[];
   city?: string;
   district?: string;
+  level?: number;
+  isRecruiting?: boolean;
+  contactInfo?: string;
+  instagramUrl?: string;
+  youtubeUrl?: string;
+  shortsUrl?: string;
+  kakaoOpenChat?: string;
+  websiteUrl?: string;
 }
 
 export interface UpdateMatchInput {
@@ -759,22 +898,30 @@ export interface CreateLessonInput {
   type: string;
   title: string;
   description?: string;
+  venueId?: string;
+  teamId?: string;
   venueName?: string;
   lessonDate: string;
   startTime: string;
   endTime: string;
   maxParticipants: number;
-  fee: number;
-  levelMin: number;
-  levelMax: number;
+  fee?: number;
+  levelMin?: number;
+  levelMax?: number;
   coachName?: string;
   coachBio?: string;
+  imageUrls?: string[];
+  isRecurring?: boolean;
+  recurringDays?: number[];
+  recurringUntil?: string;
 }
 
 export interface CreateListingInput {
   title: string;
   description: string;
   sportType: string;
+  teamId?: string;
+  venueId?: string;
   category: string;
   condition: string;
   price: number;
@@ -782,6 +929,22 @@ export interface CreateListingInput {
   imageUrls?: string[];
   locationCity?: string;
   locationDistrict?: string;
+  rentalPricePerDay?: number;
+  rentalDeposit?: number;
+  groupBuyTarget?: number;
+  groupBuyDeadline?: string;
+}
+
+export type UpdateListingInput = Partial<CreateListingInput> & { status?: string };
+
+export interface CreateTournamentInput {
+  title: string;
+  sportType: string;
+  eventDate: string;
+  description?: string;
+  entryFee?: number;
+  teamId?: string;
+  venueId?: string;
 }
 
 export interface CreateVenueReviewInput {
@@ -810,6 +973,11 @@ export interface ConfirmPaymentInput {
 export interface RefundPaymentInput {
   reason?: string;
   note?: string;
+}
+
+export interface ConfirmLessonTicketPaymentInput {
+  ticketId: string;
+  paymentKey?: string;
 }
 
 export interface AdminUserDetail extends UserProfile {
@@ -854,6 +1022,7 @@ export interface AdminTeamDetail extends SportTeam {
 }
 
 export interface CreateTeamMatchInput {
+  hostTeamId: string;
   sportType: string;
   title: string;
   matchDate: string;
@@ -881,8 +1050,7 @@ export interface CreateTeamMatchInput {
 }
 
 export interface ApplyTeamMatchInput {
-  teamId?: string;
-  applicantTeamId?: string;
+  applicantTeamId: string;
   message?: string;
   confirmedInfo?: boolean;
   confirmedLevel?: boolean;

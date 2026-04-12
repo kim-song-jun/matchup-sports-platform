@@ -10,14 +10,20 @@ import {
 } from '@/lib/notification-center';
 import type {
   ApiResponse,
+  CursorPage,
   PaginatedResponse,
   Match,
   Venue,
   VenueScheduleSlot,
   Lesson,
+  LessonTicket,
   MarketplaceListing,
+  TeamHub,
+  VenueHub,
+  Tournament,
   UserProfile,
   AdminUserDetail,
+  AdminTeamDetail,
   MyTeam,
   SportTeam,
   TeamMatch,
@@ -25,9 +31,14 @@ import type {
   MyTeamMatchApplication,
   Payment,
   PreparedPayment,
+  PreparedLessonTicketPurchase,
   AdminStats,
+  AdminReview,
+  AdminStatisticsOverview,
   ChatRoom,
+  CreateChatRoomInput,
   ChatMessage,
+  MercenaryApplication,
   MercenaryPost,
   Badge,
   Dispute,
@@ -37,20 +48,28 @@ import type {
   Notification,
   NotificationPreference,
   TeamInvitation,
+  CreateMatchInput,
   CreateTeamInput,
   UpdateMatchInput,
   CreateLessonInput,
   CreateListingInput,
+  UpdateListingInput,
   CreateVenueReviewInput,
+  CreateTournamentInput,
   PreparePaymentInput,
   ConfirmPaymentInput,
+  ConfirmLessonTicketPaymentInput,
   RefundPaymentInput,
   CreateTeamMatchInput,
   ApplyTeamMatchInput,
   TeamMatchEvaluationInput,
+  TeamMatchRefereeSchedule,
+  SubmitTeamMatchResultInput,
+  TeamMatchCheckInInput,
   SendMessageInput,
   CreateMercenaryPostInput,
   ApplyMercenaryInput,
+  UpdateMercenaryPostInput,
   UpdateStatusInput,
   CancelMatchPayload,
   Upload,
@@ -72,6 +91,10 @@ function extractCollection<T>(res: unknown): T[] {
   return data.items ?? [];
 }
 
+function extractCursorPage<T>(res: unknown): CursorPage<T> {
+  return extractData<CursorPage<T>>(res);
+}
+
 // ── Query Key Factory ──
 export const queryKeys = {
   me: ['me'] as const,
@@ -86,6 +109,7 @@ export const queryKeys = {
     all: ['teams'] as const,
     list: (params?: Record<string, string>) => ['teams', params] as const,
     detail: (id: string) => ['teams', id] as const,
+    hub: (id: string) => ['teams', id, 'hub'] as const,
     me: ['teams', 'me'] as const,
   },
   teamMatches: {
@@ -98,12 +122,19 @@ export const queryKeys = {
     all: ['lessons'] as const,
     list: (params?: Record<string, string>) => ['lessons', params] as const,
     detail: (id: string) => ['lessons', id] as const,
+    myTickets: ['lessons', 'tickets', 'me'] as const,
   },
   venues: {
     all: ['venues'] as const,
     list: (params?: Record<string, string>) => ['venues', params] as const,
     detail: (id: string) => ['venues', id] as const,
+    hub: (id: string) => ['venues', id, 'hub'] as const,
     schedule: (id: string) => ['venues', id, 'schedule'] as const,
+  },
+  tournaments: {
+    all: ['tournaments'] as const,
+    list: (params?: Record<string, string>) => ['tournaments', params] as const,
+    detail: (id: string) => ['tournaments', id] as const,
   },
   listings: {
     all: ['listings'] as const,
@@ -157,12 +188,17 @@ export const queryKeys = {
   admin: {
     users: (params?: Record<string, string>) => ['admin', 'users', params] as const,
     user: (id: string) => ['admin', 'user', id] as const,
+    team: (id: string) => ['admin', 'team', id] as const,
     matches: ['admin', 'matches'] as const,
     lessons: ['admin', 'lessons'] as const,
     teams: ['admin', 'teams'] as const,
     venues: ['admin', 'venues'] as const,
+    venue: (id: string) => ['admin', 'venue', id] as const,
     payments: ['admin', 'payments'] as const,
     stats: ['admin', 'stats'] as const,
+    reviews: ['admin', 'reviews'] as const,
+    mercenary: ['admin', 'mercenary'] as const,
+    statistics: ['admin', 'statistics'] as const,
     disputes: ['admin', 'disputes'] as const,
     dispute: (id: string) => ['admin', 'dispute', id] as const,
     settlements: ['admin', 'settlements'] as const,
@@ -267,6 +303,50 @@ export function useMatch(id: string) {
       return extractData<Match>(res);
     },
     enabled: !!id,
+  });
+}
+
+export function useCreateMatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateMatchInput) => {
+      const res = await api.post('/matches', data);
+      return extractData<Match>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+    },
+  });
+}
+
+export function useJoinMatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/matches/${id}/join`);
+      return extractData<{ id: string }>(res);
+    },
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+    },
+  });
+}
+
+export function useLeaveMatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/matches/${id}/leave`);
+      return { id };
+    },
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
+    },
   });
 }
 
@@ -376,6 +456,18 @@ export function useTeam(id: string) {
   });
 }
 
+export function useTeamHub(id: string) {
+  return useQuery<TeamHub>({
+    queryKey: queryKeys.teams.hub(id),
+    queryFn: async () => {
+      const res = await api.get(`/teams/${id}/hub`);
+      return extractData<TeamHub>(res);
+    },
+    enabled: !!id,
+    retry: 0,
+  });
+}
+
 // Backend returns Array<TeamMembership & { team: SportTeam }>.
 // We flatten to MyTeam[] so callers always get { id, name, role, sportType, ... }.
 interface RawMembership {
@@ -426,6 +518,37 @@ export function useCreateTeam() {
   });
 }
 
+export function useUpdateTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: CreateTeamInput }) => {
+      const res = await api.patch(`/teams/${id}`, data);
+      return extractData<SportTeam>(res);
+    },
+    onSuccess: (_team, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.hub(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.list() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.me });
+    },
+  });
+}
+
+export function useDeleteTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/teams/${id}`);
+      return { id };
+    },
+    onSuccess: ({ id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams.me });
+    },
+  });
+}
+
 // ── Lessons ──
 export function useLessons(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<Lesson>>({
@@ -462,13 +585,63 @@ export function useCreateLesson() {
   });
 }
 
+export function useMyLessonTickets() {
+  const { isAuthenticated } = useAuthStore();
+
+  return useQuery<LessonTicket[]>({
+    queryKey: queryKeys.lessons.myTickets,
+    queryFn: async () => {
+      const res = await api.get('/lessons/tickets/me');
+      return extractData<LessonTicket[]>(res);
+    },
+    enabled: isAuthenticated,
+  });
+}
+
+export function usePurchaseLessonTicket() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (planId: string) => {
+      const res = await api.post(`/lessons/plans/${planId}/purchase`);
+      return extractData<PreparedLessonTicketPurchase>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.myTickets });
+    },
+  });
+}
+
+export function useConfirmLessonTicketPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ ticketId, paymentKey }: ConfirmLessonTicketPaymentInput) => {
+      const res = await api.post(`/lessons/tickets/${ticketId}/confirm`, { paymentKey });
+      return extractData<LessonTicket>(res);
+    },
+    onSuccess: (ticket) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.myTickets });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.detail(ticket.lessonId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.all });
+    },
+  });
+}
+
 // ── Venues ──
 export function useVenues(params?: Record<string, string>) {
   return useQuery<PaginatedResponse<Venue>>({
     queryKey: queryKeys.venues.list(params),
     queryFn: async () => {
       const res = await api.get('/venues', { params });
-      return extractData<PaginatedResponse<Venue>>(res);
+      const data = extractData<PaginatedResponse<Venue> | Venue[]>(res);
+      if (Array.isArray(data)) {
+        return {
+          items: data,
+          nextCursor: null,
+        };
+      }
+      return data;
     },
   });
 }
@@ -481,6 +654,33 @@ export function useVenue(id: string) {
       return extractData<Venue>(res);
     },
     enabled: !!id,
+  });
+}
+
+export function useVenueHub(id: string) {
+  return useQuery<VenueHub>({
+    queryKey: queryKeys.venues.hub(id),
+    queryFn: async () => {
+      const res = await api.get(`/venues/${id}/hub`);
+      return extractData<VenueHub>(res);
+    },
+    enabled: !!id,
+    retry: 0,
+  });
+}
+
+export function useUpdateVenue() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Venue> }) => {
+      const res = await api.patch(`/venues/${id}`, data);
+      return extractData<Venue>(res);
+    },
+    onSuccess: (_venue, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues.hub(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.venues.list() });
+    },
   });
 }
 
@@ -540,6 +740,111 @@ export function useCreateListing() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
+    },
+  });
+}
+
+export function useUpdateListing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateListingInput }) => {
+      const res = await api.patch(`/marketplace/listings/${id}`, data);
+      return extractData<MarketplaceListing>(res);
+    },
+    onSuccess: (_, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.listings.detail(id) });
+    },
+  });
+}
+
+export function useDeleteListing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/marketplace/listings/${id}`);
+      return { id };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
+    },
+  });
+}
+
+export function useCreateMarketplaceOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (listingId: string) => {
+      const res = await api.post(`/marketplace/listings/${listingId}/order`);
+      return extractData<{ orderId: string; amount: number }>(res);
+    },
+    onSuccess: (_, listingId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.listings.detail(listingId) });
+    },
+  });
+}
+
+export function useConfirmMarketplaceOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ orderId, paymentKey }: { orderId: string; paymentKey: string }) => {
+      const res = await api.post(`/marketplace/orders/${orderId}/confirm`, { paymentKey });
+      return extractData<{ id: string }>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
+    },
+  });
+}
+
+// ── Tournaments ──
+export function useTournaments(params?: Record<string, string>) {
+  return useQuery<PaginatedResponse<Tournament>>({
+    queryKey: queryKeys.tournaments.list(params),
+    queryFn: async () => {
+      const res = await api.get('/tournaments', { params });
+      return extractData<PaginatedResponse<Tournament>>(res);
+    },
+    staleTime: 3 * 60 * 1000,
+  });
+}
+
+export function useTournament(id: string) {
+  return useQuery<Tournament>({
+    queryKey: queryKeys.tournaments.detail(id),
+    queryFn: async () => {
+      const res = await api.get(`/tournaments/${id}`);
+      return extractData<Tournament>(res);
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateTournament() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: CreateTournamentInput) => {
+      const payload = {
+        title: data.title,
+        sportType: data.sportType,
+        description: data.description,
+        startDate: data.eventDate,
+        endDate: data.eventDate,
+        entryFee: data.entryFee,
+        teamId: data.teamId,
+        venueId: data.venueId,
+      };
+      const res = await api.post('/tournaments', payload);
+      return extractData<Tournament>(res);
+    },
+    onSuccess: (_tournament, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tournaments.all });
+      if (variables.teamId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.teams.hub(variables.teamId) });
+      }
+      if (variables.venueId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.venues.hub(variables.venueId) });
+      }
     },
   });
 }
@@ -632,11 +937,11 @@ export function useTeamMatch(id: string) {
 }
 
 export function useTeamMatchRefereeSchedule(id: string) {
-  return useQuery({
+  return useQuery<TeamMatchRefereeSchedule>({
     queryKey: queryKeys.teamMatches.referee(id),
     queryFn: async () => {
       const res = await api.get(`/team-matches/${id}/referee-schedule`);
-      return extractData<Array<{ quarter: number; teamName: string }>>(res);
+      return extractData<TeamMatchRefereeSchedule>(res);
     },
     enabled: !!id,
   });
@@ -672,7 +977,7 @@ export function useRespondTeamMatchApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, applicationId, action }: { id: string; applicationId: string; action: 'approve' | 'reject' }) => {
-      const res = await api.patch(`/team-matches/${id}/applications/${applicationId}`, { action });
+      const res = await api.patch(`/team-matches/${id}/applications/${applicationId}/${action}`);
       return extractData<{ id: string }>(res);
     },
     onSuccess: (_, { id }) => {
@@ -690,6 +995,21 @@ export function useSubmitTeamMatchEvaluation() {
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
+    },
+  });
+}
+
+export function useSubmitTeamMatchResult() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: SubmitTeamMatchResultInput }) => {
+      const res = await api.post(`/team-matches/${id}/result`, data);
+      return extractData<{ id: string }>(res);
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
     },
   });
 }
@@ -697,12 +1017,13 @@ export function useSubmitTeamMatchEvaluation() {
 export function useTeamMatchArrival() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.post(`/team-matches/${id}/arrival`);
+    mutationFn: async ({ id, data }: { id: string; data: TeamMatchCheckInInput }) => {
+      const res = await api.post(`/team-matches/${id}/check-in`, data);
       return extractData<{ id: string }>(res);
     },
-    onSuccess: (_, id) => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
     },
   });
 }
@@ -759,6 +1080,17 @@ export function useAdminTeams() {
   });
 }
 
+export function useAdminTeam(id: string) {
+  return useQuery<AdminTeamDetail>({
+    queryKey: queryKeys.admin.team(id),
+    queryFn: async () => {
+      const res = await api.get(`/admin/teams/${id}`);
+      return extractData<AdminTeamDetail>(res);
+    },
+    enabled: !!id,
+  });
+}
+
 export function useAdminVenues() {
   return useQuery<Venue[]>({
     queryKey: queryKeys.admin.venues,
@@ -766,6 +1098,17 @@ export function useAdminVenues() {
       const res = await api.get('/admin/venues');
       return extractData<Venue[]>(res);
     },
+  });
+}
+
+export function useAdminVenue(id: string) {
+  return useQuery<Venue>({
+    queryKey: queryKeys.admin.venue(id),
+    queryFn: async () => {
+      const res = await api.get(`/admin/venues/${id}`);
+      return extractData<Venue>(res);
+    },
+    enabled: !!id,
   });
 }
 
@@ -785,6 +1128,65 @@ export function useAdminStats() {
     queryFn: async () => {
       const res = await api.get('/admin/stats');
       return extractData<AdminStats>(res);
+    },
+  });
+}
+
+export function useAdminReviews() {
+  return useQuery<AdminReview[]>({
+    queryKey: queryKeys.admin.reviews,
+    queryFn: async () => {
+      const res = await api.get('/admin/reviews');
+      return extractData<AdminReview[]>(res);
+    },
+  });
+}
+
+export function useAdminMercenaryPosts() {
+  return useQuery<MercenaryPost[]>({
+    queryKey: queryKeys.admin.mercenary,
+    queryFn: async () => {
+      const res = await api.get('/admin/mercenary');
+      return extractData<MercenaryPost[]>(res);
+    },
+  });
+}
+
+export function useDeleteAdminVenue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/admin/venues/${id}`);
+      return extractData<{ id: string }>(res);
+    },
+    onSuccess: (_result, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.venues });
+      queryClient.removeQueries({ queryKey: queryKeys.admin.venue(id) });
+    },
+  });
+}
+
+export function useDeleteAdminMercenaryPost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/admin/mercenary/${id}`);
+      return extractData<{ id: string }>(res);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.mercenary });
+    },
+  });
+}
+
+export function useAdminStatisticsOverview() {
+  return useQuery<AdminStatisticsOverview>({
+    queryKey: queryKeys.admin.statistics,
+    queryFn: async () => {
+      const res = await api.get('/admin/statistics');
+      return extractData<AdminStatisticsOverview>(res);
     },
   });
 }
@@ -852,16 +1254,15 @@ export function useChatUnreadTotal(): number {
 }
 
 export function useChatMessages(roomId: string) {
-  return useInfiniteQuery<ChatMessage[]>({
+  return useInfiniteQuery<CursorPage<ChatMessage>>({
     queryKey: queryKeys.chat.messages(roomId),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) => {
       const url = `/chat/rooms/${roomId}/messages?limit=20${pageParam ? `&before=${pageParam}` : ''}`;
       const res = await api.get(url);
-      return extractData<ChatMessage[]>(res);
+      return extractCursorPage<ChatMessage>(res);
     },
-    getNextPageParam: (lastPage) =>
-      lastPage.length === 20 ? lastPage[lastPage.length - 1].id : undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!roomId,
   });
 }
@@ -869,7 +1270,7 @@ export function useChatMessages(roomId: string) {
 export function useCreateChatRoom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { teamMatchId?: string; teamId?: string; participantIds?: string[] }) => {
+    mutationFn: async (data: CreateChatRoomInput) => {
       const res = await api.post('/chat/rooms', data);
       return extractData<ChatRoom>(res);
     },
@@ -896,12 +1297,13 @@ export function useSendMessage() {
 export function useMarkChatRead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (roomId: string) => {
-      const res = await api.post(`/chat/rooms/${roomId}/read`, {});
-      return extractData<{ success: boolean }>(res);
+    mutationFn: async ({ roomId, messageId }: { roomId: string; messageId: string }) => {
+      const res = await api.patch(`/chat/rooms/${roomId}/read`, { messageId });
+      return extractData<{ lastReadAt?: string }>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.unreadCount });
     },
   });
 }
@@ -944,7 +1346,7 @@ export function useCreateMercenaryPost() {
 export function useUpdateMercenaryPost() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateMercenaryPostInput> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateMercenaryPostInput }) => {
       const res = await api.patch(`/mercenary/${id}`, data);
       return extractData<MercenaryPost>(res);
     },
@@ -960,7 +1362,7 @@ export function useDeleteMercenaryPost() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await api.delete(`/mercenary/${id}`);
-      return extractData<{ id: string }>(res);
+      return extractData<{ message: string }>(res);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
@@ -973,10 +1375,12 @@ export function useApplyMercenary() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ApplyMercenaryInput }) => {
       const res = await api.post(`/mercenary/${id}/apply`, data);
-      return extractData<{ id: string }>(res);
+      return extractData<MercenaryApplication>(res);
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.myApplications() });
     },
   });
 }
@@ -1357,9 +1761,9 @@ export function useUpdateTeamMemberRole() {
 export function useRemoveTeamMember() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ teamId, memberId }: { teamId: string; memberId: string }) => {
-      const res = await api.delete(`/teams/${teamId}/members/${memberId}`);
-      return extractData<{ id: string }>(res);
+    mutationFn: async ({ teamId, userId }: { teamId: string; userId: string }) => {
+      await api.delete(`/teams/${teamId}/members/${userId}`);
+      return { userId };
     },
     onSuccess: (_, { teamId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teamMembers.list(teamId) });
@@ -1371,11 +1775,12 @@ export function useLeaveTeam() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (teamId: string) => {
-      const res = await api.delete(`/teams/${teamId}/members/me`);
-      return extractData<{ id: string }>(res);
+      await api.post(`/teams/${teamId}/leave`);
+      return { teamId };
     },
-    onSuccess: () => {
+    onSuccess: (_, teamId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.teams.me });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMembers.list(teamId) });
     },
   });
 }
@@ -1411,16 +1816,15 @@ export function useTransferTeamOwnership() {
 export interface MercenaryApplicationItem {
   id: string;
   postId: string;
-  applicantId: string;
-  status: string;
+  userId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   message: string | null;
-  position: string | null;
-  createdAt: string;
-  applicant: {
+  appliedAt: string;
+  decidedAt?: string | null;
+  user?: {
     id: string;
     nickname: string;
     profileImageUrl: string | null;
-    mannerScore?: number;
   };
 }
 
@@ -1429,7 +1833,7 @@ export function useAcceptMercenaryApplication() {
   return useMutation({
     mutationFn: async ({ postId, applicationId }: { postId: string; applicationId: string }) => {
       const res = await api.patch(`/mercenary/${postId}/applications/${applicationId}/accept`);
-      return extractData<{ id: string }>(res);
+      return extractData<MercenaryApplication>(res);
     },
     onSuccess: (_, { postId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.detail(postId) });
@@ -1440,9 +1844,9 @@ export function useAcceptMercenaryApplication() {
 export function useRejectMercenaryApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ postId, applicationId, reason }: { postId: string; applicationId: string; reason?: string }) => {
-      const res = await api.patch(`/mercenary/${postId}/applications/${applicationId}/reject`, { reason });
-      return extractData<{ id: string }>(res);
+    mutationFn: async ({ postId, applicationId }: { postId: string; applicationId: string }) => {
+      const res = await api.patch(`/mercenary/${postId}/applications/${applicationId}/reject`);
+      return extractData<MercenaryApplication>(res);
     },
     onSuccess: (_, { postId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.detail(postId) });
@@ -1452,15 +1856,16 @@ export function useRejectMercenaryApplication() {
 
 export interface MyMercenaryApplication {
   id: string;
-  status: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
   message: string | null;
-  createdAt: string;
+  appliedAt: string;
+  decidedAt: string | null;
   post: {
     id: string;
-    title: string;
     matchDate: string;
-    startTime: string;
-    venueName: string;
+    venue?: string | null;
+    position?: string | null;
+    fee?: number | null;
     sportType: string;
     team?: { id: string; name: string };
   };
@@ -1481,12 +1886,14 @@ export function useMyMercenaryApplications() {
 export function useWithdrawMercenaryApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ postId, applicationId }: { postId: string; applicationId: string }) => {
-      const res = await api.delete(`/mercenary/${postId}/applications/${applicationId}`);
-      return extractData<{ id: string }>(res);
+    mutationFn: async (postId: string) => {
+      const res = await api.delete(`/mercenary/${postId}/applications/me`);
+      return extractData<MercenaryApplication>(res);
     },
-    onSuccess: () => {
+    onSuccess: (_, postId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.detail(postId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.myApplications() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
     },
   });
 }
@@ -1501,7 +1908,9 @@ export function useNotificationPreferences() {
       return extractData<NotificationPreference>(res);
     },
     enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 

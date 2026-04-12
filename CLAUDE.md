@@ -12,10 +12,12 @@
    - 증명된 패턴: in-memory mock → Prisma 전환, `Record<string, unknown>` → DTO 전환 (Phase 1-5 참조).
 
 2. **Design System Consistency** (디자인 시스템 일관성)
-   - 우선순위: `.impeccable.md` > `DESIGN.md` > CSS 토큰(`globals.css` @theme) > `tailwind.config.*` > 코드 추론
+   - 우선순위: `DESIGN.md` > `.impeccable.md` > CSS 토큰(`globals.css` @theme) > `tailwind.config.*` > 코드 추론
+   - 문서 탐색은 `docs/DESIGN_DOCUMENT_MAP.md`를 사용하되, 이는 navigation only이며 규칙 정의 문서가 아니다.
    - 이 프로젝트는 **utility-first (Tailwind CSS v4)** 클래스 네이밍을 사용한다.
    - **토큰 우선**: 하드코딩 컬러/간격/폰트 금지. `text-2xs~text-6xl`, `sportCardAccent[sportType]`, `bg-blue-500` 사용.
    - **컴포넌트 재사용**: 인라인 마크업 전에 `components/ui/`의 `EmptyState`, `ErrorState`, `Modal`, `Toast`, `ChatBubble` 존재 여부 확인.
+   - **시각 절제**: 과한 shadow, 과한 border, content-first glass 사용 금지. 기본값은 Toss-like clean layout의 solid-first rhythm이다.
 
 3. **Security Always** (보안은 항상)
    - 태스크 종류 무관하게 모든 변경은 보안 관점에서 검토.
@@ -230,7 +232,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET :id/members` | `POST :id/members` | `PATCH :id/members/:userId` | `DELETE :id/members/:userId` | `POST :id/leave`
 
 **소유권 이전**:
-`POST :id/transfer-ownership` (owner 전용, `TransferOwnershipDto` — `targetUserId`, `demoteTo: 'manager'|'member'`)
+`POST :id/transfer-ownership` (owner 전용, `TransferOwnershipDto` — `toUserId`, `demoteTo: 'manager'|'member'`)
 
 **팀 신청** (Task 27 추가):
 `POST :id/apply` (JwtAuthGuard, 비멤버 대상, idempotent — 중복 신청 시 409)
@@ -255,7 +257,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `POST /` (멀티파트, 최대 5개 10MB, jpeg/png/webp/gif) | `GET :id` | `DELETE :id`
 
 ### 채팅 (`/chat`)
-`GET rooms` (cursor on lastMessageAt) | `GET rooms/:id` (cursor on message createdAt) | `POST rooms` (with optional teamMatchId) | `POST rooms/:id/messages` | `POST rooms/:id/read` | `GET unread-count`
+`GET rooms` (cursor on lastMessageAt) | `GET rooms/:id` (cursor on message createdAt) | `POST rooms` (with optional teamMatchId) | `POST rooms/:id/messages` | `PATCH rooms/:id/read` | `GET unread-count`
 
 ### 구장 (`/venues`)
 `GET /` | `GET :id` | `GET :id/schedule` | `POST :id/reviews`
@@ -341,7 +343,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **원칙**: 즉시 이해 / 신뢰 우선 / 절제된 에너지 / 모바일 본무대 / 개성 있는 깔끔함
 - **안티**: 올드한 웹 느낌, 과한 장식/효과, 복잡한 네비게이션
 
-상세 디자인 가이드: `.impeccable.md`
+상세 디자인 가이드: `DESIGN.md` (`.impeccable.md`는 compatibility summary)
 
 ### 디자인 시스템
 - **컬러**: 블루(#3182F6) 단일 액센트, Pretendard 폰트, 라이트+다크 모드
@@ -350,6 +352,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **종목 아이콘**: `components/icons/sport-icons.tsx`의 `SportIconMap` — 11종목 SVG
 - **모션**: `globals.css`에 fade-in/slide-up/scale-in/badge-pulse, `prefers-reduced-motion` 대응
 - **내비게이션**: 모바일 하단 플로팅 pill 바, 활성 탭 blue-500 액센트
+- **레이아웃 재질**: 본문은 solid-first, glass는 navbar/header/overlay/button/panel chrome에서만 허용
+- **스타일 절제**: shadow는 hairline-depth 중심, border는 subtle full-border 중심으로 사용
 
 ### 공유 UI 컴포넌트
 - `components/ui/empty-state.tsx` — 빈 상태 (인라인 빈 상태 대신 반드시 사용)

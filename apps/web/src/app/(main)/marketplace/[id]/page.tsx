@@ -4,15 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { SafeImage } from '@/components/ui/safe-image';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { useListing } from '@/hooks/use-api';
-import { api } from '@/lib/api';
+import { useListing, useDeleteListing } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { getListingImageSet } from '@/lib/sport-image';
 import { formatAmount } from '@/lib/utils';
@@ -36,6 +37,7 @@ export default function ListingDetailPage() {
   const listingId = params.id as string;
 
   const { data: listing, isLoading } = useListing(listingId);
+  const deleteListing = useDeleteListing();
 
   // task 18: All hooks must be called before any conditional early return
   // to satisfy React hooks rules (fix for production React error #310).
@@ -109,8 +111,8 @@ export default function ListingDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors"><ArrowLeft size={20} className="text-gray-700" /></button>
+      <MobileGlassHeader className="justify-between">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" /></button>
         <div className="flex gap-1">
           <button
             onClick={async () => {
@@ -122,24 +124,19 @@ export default function ListingDetailPage() {
               }
             }}
             aria-label="공유하기"
-            className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
+            className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"
           >
             <Share2 size={18} className="text-gray-500" />
           </button>
           <button
-            onClick={async () => {
-              setLiked(!liked);
-              try {
-                await api.post(`/marketplace/listings/${listingId}/like`);
-              } catch { /* silent fail for now */ }
-            }}
+            onClick={() => setLiked(!liked)}
             aria-label={liked ? '좋아요 취소' : '좋아요'}
-            className="flex items-center justify-center min-h-11 min-w-11 rounded-lg hover:bg-gray-100 transition-colors"
+            className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"
           >
             <Heart size={18} className={liked ? 'text-red-500' : 'text-gray-500'} fill={liked ? 'currentColor' : 'none'} />
           </button>
         </div>
-      </header>
+      </MobileGlassHeader>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600">장터</Link>
@@ -324,40 +321,40 @@ export default function ListingDetailPage() {
       </div>
 
       {/* 삭제 확인 모달 */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 rounded-xl bg-gray-100 py-3 text-base font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                돌아가기
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    await api.delete(`/marketplace/listings/${listingId}`);
-                    toast('success', '매물이 삭제되었어요');
-                    router.push('/marketplace');
-                  } catch {
-                    toast('error', '삭제하지 못했어요. 다시 시도해주세요');
-                  }
-                  setShowDeleteConfirm(false);
-                }}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
-              >
-                삭제하기
-              </button>
-            </div>
-          </div>
+      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} size="sm">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500" />
         </div>
-      )}
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
+        <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={() => setShowDeleteConfirm(false)}
+            className="flex-1 rounded-xl bg-gray-100 py-3 text-base font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            돌아가기
+          </button>
+          <button
+            onClick={() => {
+              deleteListing.mutate(listingId, {
+                onSuccess: () => {
+                  toast('success', '매물이 삭제되었어요');
+                  router.push('/marketplace');
+                },
+                onError: () => {
+                  toast('error', '삭제하지 못했어요. 다시 시도해주세요');
+                },
+                onSettled: () => {
+                  setShowDeleteConfirm(false);
+                },
+              });
+            }}
+            className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
+          >
+            삭제하기
+          </button>
+        </div>
+      </Modal>
 
       <MediaLightbox
         isOpen={showMediaLightbox}

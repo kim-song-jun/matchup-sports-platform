@@ -63,9 +63,6 @@ export default function SettingsPage() {
         {/* 로그아웃 */}
         <LogoutButton />
 
-        <div className="text-center">
-          <p className="text-xs text-gray-300">TeamMeet v1.0.0</p>
-        </div>
         <div className="h-24" />
       </div>
 
@@ -86,7 +83,7 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 
 function SettingsLink({ icon: Icon, label, desc, href }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; desc?: string; href: string }) {
   return (
-    <Link href={href} className="flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
+    <Link href={href} className="flex min-h-[44px] items-center gap-3 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 dark:bg-gray-700">
         <Icon size={17} />
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity, Info, HelpCircle, FileText, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
@@ -73,6 +73,15 @@ export default function ProfilePage() {
       items: [
         { label: '내 뱃지', icon: Award, href: '/badges' },
         { label: '활동 피드', icon: Activity, href: '/feed' },
+      ],
+    },
+    {
+      label: '서비스',
+      items: [
+        { label: '소개', icon: Info, href: '/about' },
+        { label: 'FAQ', icon: HelpCircle, href: '/faq' },
+        { label: '이용약관', icon: FileText, href: '/settings/terms' },
+        { label: '개인정보', icon: Shield, href: '/settings/privacy' },
       ],
     },
   ];
@@ -249,7 +258,7 @@ export default function ProfilePage() {
                         aria-hidden="true"
                         className="flex min-h-[44px] min-w-10 items-center justify-end"
                       >
-                        <ChevronRight size={18} className="text-gray-300" />
+                        <ChevronRight size={18} className="text-gray-300 dark:text-gray-600" />
                       </Link>
                     </div>
                   </div>

@@ -241,15 +241,12 @@ model User {
   listings            MarketplaceListing[] @relation("ListingSeller")
   orders              MarketplaceOrder[]   @relation("OrderBuyer")
   soldOrders          MarketplaceOrder[]   @relation("OrderSeller")
-  marketplaceReviews  MarketplaceReview[]  @relation("MarketplaceReviewAuthor")
-  receivedMarketplaceReviews MarketplaceReview[] @relation("MarketplaceReviewTarget")
   hostedLessons       Lesson[]             @relation("LessonHost")
   ownedVenues         Venue[]              @relation("VenueOwner")
   lessonTickets       LessonTicket[]       @relation("UserLessonTickets")
   lessonAttendances   LessonAttendance[]   @relation("UserLessonAttendances")
   ownedTeams          SportTeam[]          @relation("TeamOwner")
   organizedTournaments Tournament[]        @relation("TournamentOrganizer")
-  favorites           Favorite[]
   teamMemberships     TeamMembership[]     @relation("TeamMemberships")
   mercenaryApplications MercenaryApplication[] @relation("UserMercenaryApplications")
   authoredMercenaryPosts MercenaryPost[]  @relation("MercenaryAuthor")
@@ -579,30 +576,10 @@ model MarketplaceOrder {
   listing MarketplaceListing @relation(fields: [listingId], references: [id])
   buyer   User               @relation("OrderBuyer", fields: [buyerId], references: [id])
   seller  User               @relation("OrderSeller", fields: [sellerId], references: [id])
-  review  MarketplaceReview?
 
   @@index([buyerId])
   @@index([sellerId])
   @@map("marketplace_orders")
-}
-
-model MarketplaceReview {
-  id                String   @id @default(uuid())
-  orderId           String   @unique @map("order_id")
-  authorId          String   @map("author_id")
-  targetId          String   @map("target_id")
-  rating            Float
-  conditionAccuracy Float    @map("condition_accuracy")
-  communication     Float
-  deliverySpeed     Float    @map("delivery_speed")
-  comment           String?
-  createdAt         DateTime @default(now()) @map("created_at")
-
-  order  MarketplaceOrder @relation(fields: [orderId], references: [id])
-  author User             @relation("MarketplaceReviewAuthor", fields: [authorId], references: [id])
-  target User             @relation("MarketplaceReviewTarget", fields: [targetId], references: [id])
-
-  @@map("marketplace_reviews")
 }
 
 // ─── Lessons / 강좌 ─────────────────────────────────────
@@ -1142,22 +1119,6 @@ model SeedSyncState {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("seed_sync_states")
-}
-
-// ─── Favorites ──────────────────────────────────────────
-
-model Favorite {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  targetType String   @map("target_type") // match, team, venue, listing
-  targetId   String   @map("target_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, targetType, targetId])
-  @@index([userId])
-  @@map("favorites")
 }
 
 // ─── Chat ────────────────────────────────────────────────

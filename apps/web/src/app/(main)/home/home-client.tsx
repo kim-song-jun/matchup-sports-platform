@@ -89,7 +89,7 @@ export function HomePage() {
 
       {/* ═══ ZONE 1: 헤더 (토스 스타일 — 큰 인사, 부제, CTA) ═══ */}
       <header className="px-5 @3xl:px-0 pt-4 pb-2">
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 ��치</p>
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
           {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'MatchUp'}
         </h1>
@@ -368,6 +368,8 @@ export function HomePage() {
         )}
       </div>
 
+      {/* 하단 내비 여백 */}
+      <div className="h-24" />
     </div>
   );
 }

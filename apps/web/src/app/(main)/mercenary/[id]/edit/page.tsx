@@ -1,49 +1,60 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, UserPlus } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { api } from '@/lib/api';
-import { useMercenaryPost } from '@/hooks/use-api';
+import { useDeleteMercenaryPost, useMercenaryPost, useUpdateMercenaryPost } from '@/hooks/use-api';
+import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
+import { formatCurrency } from '@/lib/utils';
+import type { UpdateMercenaryPostInput } from '@/types/api';
 
 const positionOptions = [
-  { value: 'gk', label: 'GK' },
-  { value: 'df', label: 'DF' },
-  { value: 'mf', label: 'MF' },
-  { value: 'fw', label: 'FW' },
-  { value: 'any', label: '무관' },
+  { value: 'GK', label: 'GK' },
+  { value: 'DF', label: 'DF' },
+  { value: 'MF', label: 'MF' },
+  { value: 'FW', label: 'FW' },
+  { value: 'ALL', label: '무관' },
 ];
 
 const levelOptions = [
-  { value: 'beginner', label: '입문' },
-  { value: 'lower', label: '하' },
-  { value: 'middle', label: '중' },
-  { value: 'upper', label: '상' },
-  { value: 'pro', label: '프로' },
+  { value: 1, label: '입문' },
+  { value: 2, label: '초급' },
+  { value: 3, label: '중급' },
+  { value: 4, label: '상급' },
+  { value: 5, label: '고수' },
 ];
 
-// Maps numeric level from API (1–5) to levelOptions value string
-const LEVEL_NUM_TO_KEY: Record<number, string> = {
-  1: 'beginner',
-  2: 'lower',
-  3: 'middle',
-  4: 'upper',
-  5: 'pro',
-};
-
 interface FormData {
-  team: string;
   matchDate: string;
   venue: string;
   position: string;
   count: number;
-  level: string;
+  level: number;
   fee: number;
   notes: string;
+}
+
+function extractErrorMessage(error: unknown, fallback: string): string {
+  const maybe = error as { response?: { data?: { message?: string | string[] } } };
+  const message = maybe.response?.data?.message;
+  if (Array.isArray(message)) {
+    return message[0] ?? fallback;
+  }
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+  return fallback;
+}
+
+function toDateInputValue(value: string): string {
+  if (!value) return '';
+  if (value.length >= 10) return value.slice(0, 10);
+  return value;
 }
 
 export default function EditMercenaryPage() {
@@ -53,72 +64,75 @@ export default function EditMercenaryPage() {
   const id = params.id as string;
 
   const { data: post, isLoading } = useMercenaryPost(id);
+  const updateMutation = useUpdateMercenaryPost();
+  const deleteMutation = useDeleteMercenaryPost();
 
   const [form, setForm] = useState<FormData>({
-    team: '',
     matchDate: '',
     venue: '',
-    position: 'any',
+    position: 'ALL',
     count: 1,
-    level: 'middle',
+    level: 3,
     fee: 0,
     notes: '',
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (post) {
-      setForm({
-        team: post.team?.name ?? '',
-        matchDate: post.matchDate ?? '',
-        venue: post.venue ?? '',
-        position: post.position ?? 'any',
-        count: post.count ?? 1,
-        level: (post.level != null ? LEVEL_NUM_TO_KEY[post.level] : undefined) ?? 'middle',
-        fee: post.fee ?? 0,
-        notes: post.notes ?? post.description ?? '',
-      });
-    }
+    if (!post) return;
+    setForm({
+      matchDate: toDateInputValue(post.matchDate),
+      venue: post.venue ?? '',
+      position: post.position ?? 'ALL',
+      count: post.count ?? 1,
+      level: post.level ?? 3,
+      fee: post.fee ?? 0,
+      notes: post.notes ?? post.description ?? '',
+    });
   }, [post]);
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const handleSave = async () => {
-    if (!form.team || !form.matchDate || !form.venue) {
+  const canSubmit = !!form.matchDate && !!form.venue && !!form.position;
+
+  async function handleSave() {
+    if (!canSubmit) {
       toast('error', '필수 항목을 입력해주세요');
       return;
     }
-    setIsSubmitting(true);
-    try {
-      await api.patch(`/mercenary/${id}`, form);
-      toast('success', '용병 모집글이 수정되었어요');
-      router.push('/my/mercenary');
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요. 잠시 후 다시 시도해주세요');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
+    const payload: UpdateMercenaryPostInput = {
+      matchDate: form.matchDate,
+      venue: form.venue,
+      position: form.position,
+      count: form.count,
+      level: form.level,
+      fee: form.fee,
+      notes: form.notes.trim() ? form.notes : undefined,
+    };
+
     try {
-      await api.delete(`/mercenary/${id}`);
+      await updateMutation.mutateAsync({ id, data: payload });
+      toast('success', '용병 모집글이 수정되었어요');
+      router.push(`/mercenary/${id}`);
+    } catch (error) {
+      toast('error', extractErrorMessage(error, '수정에 실패했어요. 잠시 후 다시 시도해주세요'));
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteMutation.mutateAsync(id);
       toast('success', '용병 모집글이 삭제되었어요');
       router.push('/my/mercenary');
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '삭제하지 못했어요. 다시 시도해주세요');
+    } catch (error) {
+      toast('error', extractErrorMessage(error, '삭제하지 못했어요. 다시 시도해주세요'));
     } finally {
-      setIsDeleting(false);
       setShowDeleteModal(false);
     }
-  };
+  }
 
   if (isLoading) {
     return (
@@ -126,7 +140,7 @@ export default function EditMercenaryPage() {
     );
   }
 
-  if (!isLoading && !post) {
+  if (!post) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
         <EmptyState
@@ -139,19 +153,31 @@ export default function EditMercenaryPage() {
     );
   }
 
+  if (!post.viewer?.isAuthor && !post.viewer?.canManage) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={AlertTriangle}
+          title="수정 권한이 없어요"
+          description="작성자 또는 팀 매니저만 모집글을 수정할 수 있습니다."
+          action={{ label: '상세로 돌아가기', href: `/mercenary/${id}` }}
+        />
+      </div>
+    );
+  }
+
   const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
+  const accent = sportCardAccent[post.sportType];
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+      <MobileGlassHeader className="gap-3">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="glass-mobile-icon-button flex min-h-[44px] min-w-11 items-center justify-center rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">용병 모집 수정</h1>
-      </header>
+      </MobileGlassHeader>
 
-      {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/mercenary" className="hover:text-gray-600">용병</Link>
         <ChevronRight size={14} />
@@ -159,22 +185,27 @@ export default function EditMercenaryPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-2xl">
-        {/* 팀명 */}
-        <section className="mb-5">
-          <label htmlFor="mercenary-edit-team" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-            팀명 <span className="text-red-400">*</span>
-          </label>
-          <input
-            id="mercenary-edit-team"
-            type="text"
-            value={form.team}
-            onChange={(e) => update('team', e.target.value)}
-            placeholder="예: FC 서울라이트"
-            className={inputClass}
-          />
+        <section className={`mb-5 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 ${accent?.tint ?? 'bg-gray-50 dark:bg-gray-800/60'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{post.team?.name ?? '소속 팀'}</p>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">종목은 팀 정보 기준으로 고정됩니다.</p>
+            </div>
+            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${accent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+              {sportLabel[post.sportType] ?? post.sportType}
+            </span>
+          </div>
         </section>
 
-        {/* 경기 날짜 */}
+        <section className="mb-5">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+            팀명
+          </label>
+          <div className={`${inputClass} cursor-not-allowed opacity-80`}>
+            {post.team?.name ?? '—'}
+          </div>
+        </section>
+
         <section className="mb-5">
           <label htmlFor="mercenary-edit-match-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
@@ -188,7 +219,6 @@ export default function EditMercenaryPage() {
           />
         </section>
 
-        {/* 장소 */}
         <section className="mb-5">
           <label htmlFor="mercenary-edit-venue" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소 <span className="text-red-400">*</span>
@@ -203,27 +233,25 @@ export default function EditMercenaryPage() {
           />
         </section>
 
-        {/* 포지션 */}
         <section className="mb-5">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">포지션</label>
           <div className="flex gap-2">
-            {positionOptions.map((opt) => (
+            {positionOptions.map((option) => (
               <button
-                key={opt.value}
-                onClick={() => update('position', opt.value)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-colors ${
-                  form.position === opt.value
+                key={option.value}
+                onClick={() => update('position', option.value)}
+                className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
+                  form.position === option.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
-                {opt.label}
+                {option.label}
               </button>
             ))}
           </div>
         </section>
 
-        {/* 모집 인원 / 참가비 */}
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -232,7 +260,7 @@ export default function EditMercenaryPage() {
                 id="mercenary-edit-count"
                 type="number"
                 value={form.count}
-                onChange={(e) => update('count', Math.max(1, +e.target.value))}
+                onChange={(e) => update('count', Math.max(1, Number(e.target.value) || 1))}
                 min={1}
                 max={10}
                 className={inputClass}
@@ -244,41 +272,35 @@ export default function EditMercenaryPage() {
                 id="mercenary-edit-fee"
                 type="number"
                 value={form.fee}
-                onChange={(e) => update('fee', +e.target.value)}
+                onChange={(e) => update('fee', Math.max(0, Number(e.target.value) || 0))}
                 min={0}
                 step={1000}
                 className={inputClass}
               />
-              {form.fee > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Intl.NumberFormat('ko-KR').format(form.fee)}원
-                </p>
-              )}
+              <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.fee)}</p>
             </div>
           </div>
         </section>
 
-        {/* 요구 레벨 */}
         <section className="mb-5">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 block">요구 레벨</label>
           <div className="flex gap-2">
-            {levelOptions.map((opt) => (
+            {levelOptions.map((option) => (
               <button
-                key={opt.value}
-                onClick={() => update('level', opt.value)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold text-center transition-colors ${
-                  form.level === opt.value
+                key={option.value}
+                onClick={() => update('level', option.value)}
+                className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
+                  form.level === option.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
-                {opt.label}
+                {levelLabel[option.value] ?? option.label}
               </button>
             ))}
           </div>
         </section>
 
-        {/* 비고 */}
         <section className="mb-6">
           <label htmlFor="mercenary-edit-notes" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
           <textarea
@@ -291,7 +313,6 @@ export default function EditMercenaryPage() {
           />
         </section>
 
-        {/* Action buttons */}
         <div className="flex gap-3 mb-8">
           <button
             onClick={() => setShowDeleteModal(true)}
@@ -301,17 +322,16 @@ export default function EditMercenaryPage() {
             삭제
           </button>
           <button
-            onClick={handleSave}
-            disabled={isSubmitting}
+            onClick={() => void handleSave()}
+            disabled={!canSubmit || updateMutation.isPending}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
-            {isSubmitting ? '저장 중...' : '수정 완료'}
+            {updateMutation.isPending ? '저장 중...' : '수정 완료'}
           </button>
         </div>
       </div>
 
-      {/* Delete confirmation modal */}
       <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="모집글 삭제" size="sm">
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500" />
@@ -326,11 +346,11 @@ export default function EditMercenaryPage() {
             돌아가기
           </button>
           <button
-            onClick={handleDelete}
-            disabled={isDeleting}
+            onClick={() => void handleDelete()}
+            disabled={deleteMutation.isPending}
             className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
           >
-            {isDeleting ? '삭제 중...' : '삭제하기'}
+            {deleteMutation.isPending ? '삭제 중...' : '삭제하기'}
           </button>
         </div>
       </Modal>

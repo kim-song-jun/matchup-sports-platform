@@ -321,7 +321,7 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
                       onChange={() => setNewStatus(s)}
                       className="sr-only"
                     />
-                    <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                    <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
                       newStatus === s ? 'border-blue-500' : 'border-gray-300 dark:border-gray-500'
                     }`}>
                       {newStatus === s && <div className="h-2 w-2 rounded-full bg-blue-500" />}
@@ -630,7 +630,7 @@ function BulkStatusModal({ count, onClose, onSave }: BulkStatusModalProps) {
                 onChange={() => setStatus(s)}
                 className="sr-only"
               />
-              <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
                 status === s ? 'border-blue-500' : 'border-gray-300 dark:border-gray-500'
               }`}>
                 {status === s && <div className="h-2 w-2 rounded-full bg-blue-500" />}
@@ -884,7 +884,7 @@ export default function AdminLessonTicketsPage() {
                     type="button"
                     onClick={toggleAll}
                     aria-label={allOnPageSelected ? '이 페이지 전체 선택 해제' : '이 페이지 전체 선택'}
-                    className={`flex items-center justify-center w-5 h-5 rounded border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-1 ${
+                    className={`flex items-center justify-center w-5 h-5 rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-1 ${
                       allOnPageSelected
                         ? 'bg-blue-500 border-blue-500'
                         : someOnPageSelected
@@ -938,7 +938,7 @@ export default function AdminLessonTicketsPage() {
                         type="button"
                         onClick={() => toggleOne(t.id)}
                         aria-label={isChecked ? `${t.buyerName} 선택 해제` : `${t.buyerName} 선택`}
-                        className={`flex items-center justify-center w-5 h-5 rounded border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-1 ${
+                        className={`flex items-center justify-center w-5 h-5 rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-1 ${
                           isChecked
                             ? 'bg-blue-500 border-blue-500'
                             : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'

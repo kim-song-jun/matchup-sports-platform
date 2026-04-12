@@ -3,9 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { ArrowLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
+import { ChevronRight, AlertTriangle, X } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
 
 export default function AccountPage() {
   useRequireAuth();
@@ -19,13 +24,7 @@ export default function AccountPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      {/* Header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
-        </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">개인정보 관리</h1>
-      </header>
+      <MobileGlassHeader title="개인정보 관리" subtitle="계정 정보와 보안 상태를 정리하세요." showBack />
       <div className="hidden @3xl:flex items-center gap-2 mb-6 text-sm text-gray-500">
         <button onClick={() => router.push('/settings')} className="hover:text-gray-600 dark:hover:text-gray-400">설정</button>
         <ChevronRight size={14} />
@@ -34,47 +33,63 @@ export default function AccountPage() {
 
       <div className="px-5 @3xl:px-0 max-w-2xl py-6 space-y-6">
         {/* 닉네임 */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label htmlFor="account-nickname" className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">닉네임</label>
-          <input
-            id="account-nickname"
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors dark:placeholder:text-gray-500"
-            placeholder="닉네임을 입력하세요"
-          />
-          <p className="text-xs text-gray-500 mt-2">2~12자, 한글/영문/숫자 사용 가능</p>
-        </div>
+        <Card variant="surface">
+          <FormField
+            label="닉네임"
+            htmlFor="account-nickname"
+            hint="2~12자, 한글/영문/숫자 사용 가능"
+            labelClassName="text-gray-500 uppercase tracking-wider"
+          >
+            <Input
+              id="account-nickname"
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="닉네임을 입력하세요"
+              className="text-md bg-transparent"
+            />
+          </FormField>
+        </Card>
 
         {/* 이메일 */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label htmlFor="account-email" className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">이메일</label>
-          <input
-            id="account-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors dark:placeholder:text-gray-500"
-            placeholder="이메일을 입력하세요"
-          />
-        </div>
+        <Card variant="surface">
+          <FormField
+            label="이메일"
+            htmlFor="account-email"
+            labelClassName="text-gray-500 uppercase tracking-wider"
+          >
+            <Input
+              id="account-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="이메일을 입력하세요"
+              className="text-md bg-transparent"
+            />
+          </FormField>
+        </Card>
 
         {/* 전화번호 */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-          <label htmlFor="account-phone" className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">전화번호</label>
-          <input
-            id="account-phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors dark:placeholder:text-gray-500"
-            placeholder="전화번호를 입력하세요"
-          />
-        </div>
+        <Card variant="surface">
+          <FormField
+            label="전화번호"
+            htmlFor="account-phone"
+            labelClassName="text-gray-500 uppercase tracking-wider"
+          >
+            <Input
+              id="account-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="전화번호를 입력하세요"
+              className="text-md bg-transparent"
+              inputMode="tel"
+            />
+          </FormField>
+        </Card>
 
         {/* 비밀번호 */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <Card variant="surface">
           <p className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">비밀번호</p>
           <div className="flex items-center gap-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 px-4 py-3.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
@@ -87,20 +102,20 @@ export default function AccountPage() {
               <p className="text-xs text-blue-500 mt-0.5">카카오 계정으로 로그인되어 있어 비밀번호 변경이 불가합니다.</p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* 연결된 소셜 계정 */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+        <Card variant="surface">
           <p className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">연결된 소셜 계정</p>
           <div className="space-y-3">
             <SocialAccount provider="kakao" name="카카오" email="player@kakao.com" connected />
             <SocialAccount provider="naver" name="네이버" connected={false} />
             <SocialAccount provider="apple" name="Apple" connected={false} />
           </div>
-        </div>
+        </Card>
 
         {/* 저장 버튼 */}
-        <button
+        <Button
           onClick={async () => {
             try {
               await api.patch('/users/me', { nickname, email, phone });
@@ -109,19 +124,23 @@ export default function AccountPage() {
               toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요');
             }
           }}
-          className="w-full rounded-2xl bg-blue-500 text-white py-3.5 text-md font-bold hover:bg-blue-600 active:bg-blue-700 transition-colors"
+          size="lg"
+          fullWidth
         >
           변경사항 저장
-        </button>
+        </Button>
 
         {/* 회원 탈퇴 */}
         <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
-          <button
+          <Button
             onClick={() => setShowDeleteModal(true)}
-            className="w-full rounded-2xl border-2 border-red-200 text-red-500 py-3.5 text-md font-semibold hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 dark:active:bg-red-800/40 transition-colors"
+            variant="dangerSoft"
+            size="lg"
+            fullWidth
+            className="border border-red-300 dark:border-red-800"
           >
             회원 탈퇴
-          </button>
+          </Button>
           <p className="text-xs text-gray-500 text-center mt-2">탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.</p>
         </div>
       </div>
@@ -190,13 +209,15 @@ function DeleteModal({
         tabIndex={-1}
         className="relative w-full max-w-sm rounded-3xl bg-white dark:bg-gray-800 p-6 shadow-xl animate-fade-in outline-none"
       >
-        <button
+        <Button
           aria-label="닫기"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+          variant="ghost"
+          size="sm"
+          className="absolute top-4 right-4 p-2"
         >
           <X size={20} className="text-gray-500" />
-        </button>
+        </Button>
 
         <div className="flex flex-col items-center text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/30 mb-4">
@@ -208,30 +229,38 @@ function DeleteModal({
               </p>
 
               <div className="w-full mb-4">
-                <label htmlFor="account-delete-confirm" className="text-sm text-gray-500 mb-2 text-left block">확인을 위해 &quot;탈퇴합니다&quot;를 입력하세요</label>
-                <input
-                  id="account-delete-confirm"
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-md text-gray-900 dark:text-gray-100 bg-transparent focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors dark:placeholder:text-gray-500"
-                  placeholder="탈퇴합니다"
-                />
+                <FormField
+                  label={'확인을 위해 "탈퇴합니다"를 입력하세요'}
+                  htmlFor="account-delete-confirm"
+                  labelClassName="text-sm font-normal text-gray-500"
+                >
+                  <Input
+                    id="account-delete-confirm"
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="탈퇴합니다"
+                    className="text-md focus:ring-red-500/10 focus:border-red-500"
+                  />
+                </FormField>
               </div>
 
           <div className="flex gap-3 w-full">
-            <button
+            <Button
               onClick={onClose}
-              className="flex-1 rounded-2xl bg-gray-100 dark:bg-gray-700 py-3 text-md font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              variant="subtle"
+              fullWidth
             >
               취소
-            </button>
-            <button
+            </Button>
+            <Button
               disabled={deleteConfirmText !== '탈퇴합니다'}
-              className="flex-1 rounded-2xl bg-red-500 py-3 text-md font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+              variant="danger"
+              fullWidth
+              className="disabled:opacity-40"
             >
               탈퇴하기
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -274,9 +303,9 @@ function SocialAccount({ provider, name, email, connected }: { provider: string;
       {connected ? (
         <span className="rounded-lg bg-green-50 dark:bg-green-900/30 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400">연결됨</span>
       ) : (
-        <button className="rounded-xl bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+        <Button variant="subtle" size="sm" className="px-2.5 py-1 text-xs">
           연결하기
-        </button>
+        </Button>
       )}
     </div>
   );

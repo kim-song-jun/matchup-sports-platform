@@ -197,7 +197,7 @@ export default function GuidePage() {
               <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
                 가입부터 매칭, 경기, 평가까지.
                 <br className="hidden sm:block" />
-                TeamMeet 서비스 이용의 모든 것을 안내합니다.
+                MatchUp 서비스 이용의 모든 것을 안내합니다.
               </p>
             </ScrollReveal>
           </div>
@@ -236,7 +236,7 @@ export default function GuidePage() {
                     {/* Text Content */}
                     <div className="flex-1 mb-6 lg:mb-0">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="h-10 w-10 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md shrink-0 shadow-lg shadow-blue-500/20">
+                        <div className="h-10 w-10 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md shrink-0">
                           {step.num}
                         </div>
                         <div className="h-10 w-10 rounded-xl bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
@@ -335,7 +335,7 @@ export default function GuidePage() {
               const Icon = feature.icon;
               return (
                 <ScrollReveal key={feature.title} delay={idx * 100}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-[colors,transform,shadow] duration-300 h-full">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full">
                     <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
                       <Icon size={20} className="text-blue-600 dark:text-blue-400" />
                     </div>
@@ -507,7 +507,7 @@ export default function GuidePage() {
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             >
               지금 시작하기
               <ArrowRight size={18} strokeWidth={2.5} />

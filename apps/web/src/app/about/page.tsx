@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { ArrowRight, Heart, Brain, Shield, Target, TrendingUp } from 'lucide-react';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
@@ -114,7 +112,7 @@ export default function AboutPage() {
           <div className="max-w-[680px] mx-auto text-center">
             <ScrollReveal delay={0}>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-6">
-                TeamMeet을
+                MatchUp을
                 <br />
                 만든 이유
               </h1>
@@ -152,7 +150,7 @@ export default function AboutPage() {
                 <p className="text-md text-gray-500 dark:text-gray-400 mt-5 leading-relaxed max-w-[480px] mx-auto">
                   운동은 좋은 상대가 있어야 즐겁습니다.
                   <br className="hidden sm:block" />
-                  TeamMeet은 기술로 그 상대를 연결하는 플랫폼입니다.
+                  MatchUp은 기술로 그 상대를 연결하는 플랫폼입니다.
                 </p>
               </div>
             </div>
@@ -224,7 +222,7 @@ export default function AboutPage() {
             {APPROACHES.map((a, idx) => {
               const Icon = a.icon;
               return (
-                <div key={a.title} className="group bg-white dark:bg-gray-800 rounded-2xl p-6 sm:p-8 border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow duration-300 flex flex-col sm:flex-row gap-5 sm:gap-6 sm:items-start">
+                <div key={a.title} className="group bg-white dark:bg-gray-800 rounded-2xl p-6 sm:p-8 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors duration-300 flex flex-col sm:flex-row gap-5 sm:gap-6 sm:items-start">
                   <div className="flex items-center gap-4 sm:gap-5 shrink-0">
                     <span className="text-3xl font-black text-gray-200 dark:text-gray-700 tabular-nums">
                       {String(idx + 1).padStart(2, '0')}
@@ -260,7 +258,7 @@ export default function AboutPage() {
             {/* 숫자 */}
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-8">
-                숫자로 보는 TeamMeet
+                숫자로 보는 MatchUp
               </h2>
               <div className="grid grid-cols-2 gap-6">
                 {STATS.map((stat) => (
@@ -370,14 +368,14 @@ export default function AboutPage() {
             지금 시작하세요
           </h2>
           <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
-            당신의 피드백이 TeamMeet을 더 좋게 만듭니다.
+            당신의 피드백이 MatchUp을 더 좋게 만듭니다.
             <br className="hidden sm:block" />
             함께 생활체육의 새로운 기준을 세워주세요.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/login"
-              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             >
               지금 시작하기
               <ArrowRight size={18} strokeWidth={2.5} />

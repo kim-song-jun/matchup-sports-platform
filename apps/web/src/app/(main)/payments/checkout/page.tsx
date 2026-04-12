@@ -15,7 +15,12 @@ import {
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
-import { useConfirmPayment, usePreparePayment } from '@/hooks/use-api';
+import {
+  useConfirmLessonTicketPayment,
+  useConfirmPayment,
+  usePreparePayment,
+  usePurchaseLessonTicket,
+} from '@/hooks/use-api';
 import { getCheckoutPaymentMode } from '@/lib/payment-ui';
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
@@ -32,6 +37,8 @@ export default function CheckoutPage() {
   const { toast } = useToast();
   const preparePayment = usePreparePayment();
   const confirmPayment = useConfirmPayment();
+  const purchaseLessonTicket = usePurchaseLessonTicket();
+  const confirmLessonTicketPayment = useConfirmLessonTicketPayment();
   const paymentMode = getCheckoutPaymentMode();
   const isMockMode = paymentMode.state === 'mock';
 
@@ -40,13 +47,20 @@ export default function CheckoutPage() {
 
   const source = searchParams.get('source');
   const participantId = searchParams.get('participantId');
+  const ticketPlanId = searchParams.get('ticketPlanId');
   const name = searchParams.get('name');
   const amount = Number(searchParams.get('amount'));
   const scheduledAt = searchParams.get('scheduledAt');
   const venue = searchParams.get('venue');
 
   const isMatchCheckout = source === 'match' && !!participantId && !!name && Number.isFinite(amount) && amount > 0;
-  const isProcessing = preparePayment.isPending || confirmPayment.isPending;
+  const isLessonCheckout = source === 'lesson' && !!ticketPlanId && !!name && Number.isFinite(amount) && amount >= 0;
+  const isSupportedCheckout = isMatchCheckout || isLessonCheckout;
+  const isProcessing =
+    preparePayment.isPending ||
+    confirmPayment.isPending ||
+    purchaseLessonTicket.isPending ||
+    confirmLessonTicketPayment.isPending;
 
   if (!source) {
     return (
@@ -62,25 +76,46 @@ export default function CheckoutPage() {
   }
 
   const handlePayment = async () => {
-    if (!isMatchCheckout || !participantId || !agreedToTerms) {
+    if (!isSupportedCheckout || !agreedToTerms) {
       return;
     }
 
     try {
-      const prepared = await preparePayment.mutateAsync({
-        participantId,
-        amount,
-        method: selectedMethod,
-      });
+      if (isMatchCheckout && participantId) {
+        const prepared = await preparePayment.mutateAsync({
+          participantId,
+          amount,
+          method: selectedMethod,
+        });
 
-      const payment = await confirmPayment.mutateAsync({
-        orderId: prepared.orderId,
-        amount,
-        paymentKey: `dev-${Date.now()}`,
-      });
+        const payment = await confirmPayment.mutateAsync({
+          orderId: prepared.orderId,
+          amount,
+          paymentKey: `dev-${Date.now()}`,
+        });
 
-      toast('success', isMockMode ? '결제 시뮬레이션이 완료되었습니다' : '결제가 완료되었습니다');
-      router.push(`/payments/${payment.id}`);
+        toast('success', isMockMode ? '결제 시뮬레이션이 완료되었습니다' : '결제가 완료되었습니다');
+        router.push(`/payments/${payment.id}`);
+        return;
+      }
+
+      if (isLessonCheckout && ticketPlanId) {
+        const prepared = await purchaseLessonTicket.mutateAsync(ticketPlanId);
+        const confirmedTicket = await confirmLessonTicketPayment.mutateAsync({
+          ticketId: prepared.payment.ticketId,
+          paymentKey: prepared.payment.amount > 0 ? `mock-${Date.now()}` : undefined,
+        });
+
+        toast(
+          'success',
+          prepared.payment.amount === 0
+            ? '무료 수강권 등록이 완료되었어요'
+            : isMockMode
+            ? '테스트 결제가 완료되어 수강권이 등록되었어요'
+            : '수강권 결제가 완료되었어요',
+        );
+        router.push(`/my/lesson-tickets?ticketId=${confirmedTicket.id}`);
+      }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       toast('error', axiosErr?.response?.data?.message || '결제를 완료하지 못했어요.');
@@ -110,16 +145,16 @@ export default function CheckoutPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
-        {!isMatchCheckout ? (
+        {!isSupportedCheckout ? (
           <TrustSignalBanner
             tone="warning"
             label="지원 범위"
-            title="현재는 매치 참가 결제만 처리할 수 있어요"
-            description="강좌/장터 구매처럼 참가자 컨텍스트가 없는 결제는 아직 연결되지 않았습니다. 가짜 성공 처리 없이 이 화면에서 중단됩니다."
+            title="현재는 매치 참가와 강좌 수강권 결제만 처리할 수 있어요"
+            description="지원되지 않는 source는 가짜 성공 처리 없이 이 화면에서 중단됩니다."
           />
         ) : null}
 
-        {isMatchCheckout && isMockMode ? (
+        {isSupportedCheckout && isMockMode ? (
           <TrustSignalBanner
             tone={paymentMode.tone}
             label={paymentMode.label}
@@ -133,7 +168,7 @@ export default function CheckoutPage() {
           <div className="space-y-3">
             <div>
               <span className="inline-block rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 text-blue-500 mb-1">
-                {source === 'match' ? '매치' : '미지원'}
+                {source === 'match' ? '매치' : source === 'lesson' ? '강좌' : '미지원'}
               </span>
               <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{name || '미지원 주문'}</p>
             </div>
@@ -164,12 +199,12 @@ export default function CheckoutPage() {
                 <button
                   key={method.id}
                   onClick={() => setSelectedMethod(method.id)}
-                  disabled={!isMatchCheckout || isProcessing}
-                  className={`w-full flex items-center gap-3.5 rounded-xl border-2 p-4 transition-colors text-left ${
+                  disabled={!isSupportedCheckout || isProcessing}
+                  className={`w-full flex items-center gap-3.5 rounded-xl p-4 transition-colors text-left ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/30'
-                      : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600'
-                  } ${!isMatchCheckout ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                      : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+                  } ${!isSupportedCheckout ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
                     isSelected ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
@@ -182,8 +217,8 @@ export default function CheckoutPage() {
                     </p>
                     <p className="text-xs text-gray-500">{method.description}</p>
                   </div>
-                  <div className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                    isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                  <div className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
+                    isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-500'
                   }`}>
                     {isSelected && <div className="h-2 w-2 rounded-full bg-white dark:bg-gray-800" />}
                   </div>
@@ -203,8 +238,8 @@ export default function CheckoutPage() {
 
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <button onClick={() => setAgreedToTerms(!agreedToTerms)} className="flex items-center gap-3 w-full text-left">
-            <div className={`flex h-5 w-5 items-center justify-center rounded-md border-2 transition-colors ${
-              agreedToTerms ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+            <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+              agreedToTerms ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-500'
             }`}>
               {agreedToTerms && <CheckCircle size={12} className="text-white" />}
             </div>
@@ -227,9 +262,9 @@ export default function CheckoutPage() {
         </div>
         <button
           onClick={() => void handlePayment()}
-          disabled={!isMatchCheckout || !agreedToTerms || isProcessing}
+          disabled={!isSupportedCheckout || !agreedToTerms || isProcessing}
           className={`w-full flex items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-colors ${
-            isMatchCheckout && agreedToTerms
+            isSupportedCheckout && agreedToTerms
               ? 'bg-blue-500 text-white hover:bg-blue-600'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}
@@ -240,7 +275,9 @@ export default function CheckoutPage() {
               {isMockMode ? '테스트 결제 처리중...' : '결제 처리중...'}
             </>
           ) : (
-            `${formatAmount(Number.isFinite(amount) ? amount : 0)} ${isMockMode ? '테스트 결제하기' : '결제하기'}`
+            isLessonCheckout && amount === 0
+              ? '무료 수강권 등록하기'
+              : `${formatAmount(Number.isFinite(amount) ? amount : 0)} ${isMockMode ? '테스트 결제하기' : '결제하기'}`
           )}
         </button>
       </div>

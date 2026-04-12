@@ -223,8 +223,8 @@ export default function PaymentDetailPage() {
             <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100 dark:bg-gray-700" />
             {timelineSteps.map((step, index) => (
               <div key={`${step.label}-${index}`} className="relative pb-5 last:pb-0">
-                <div className={`absolute -left-6 top-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 ${
-                  step.done ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white dark:bg-gray-800'
+                <div className={`absolute -left-6 top-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border transition-colors ${
+                  step.done ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'
                 }`}>
                   {step.done && <CheckCircle size={10} className="text-white" />}
                 </div>

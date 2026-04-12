@@ -1,11 +1,8 @@
-'use client';
-
-import { useRef } from 'react';
 import Link from 'next/link';
-import { Target, Shield, Users, Zap, ChevronDown, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check } from 'lucide-react';
+import { Target, Shield, Users, Zap, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
-
+import { HeroScrollButton } from '@/components/landing/hero-scroll-button';
 import { LandingNav } from '@/components/landing/landing-nav';
 import { LandingFooter } from '@/components/landing/landing-footer';
 
@@ -53,8 +50,6 @@ const STATS = [
 /* ── Component ── */
 
 export default function LandingPage() {
-  const featuresRef = useRef<HTMLDivElement>(null);
-
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
 
@@ -94,14 +89,11 @@ export default function LandingPage() {
             {/* CTA */}
             <ScrollReveal delay={300}>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold rounded-2xl px-8 py-4 text-lg hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/20 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+                <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold rounded-2xl px-8 py-4 text-lg hover:bg-blue-600 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
                   무료로 시작하기
                   <ArrowRight size={18} strokeWidth={2.5} />
                 </Link>
-                <button onClick={() => featuresRef.current?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400 rounded-xl px-6 py-3.5 text-md font-semibold hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
-                  더 알아보기
-                  <ChevronDown size={18} />
-                </button>
+                <HeroScrollButton targetId="features-section" />
               </div>
             </ScrollReveal>
           </div>
@@ -113,7 +105,7 @@ export default function LandingPage() {
       <section className="pb-16 sm:pb-20">
         <div className="mx-5 lg:mx-auto lg:max-w-[800px]">
           <ScrollReveal>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg shadow-gray-900/5 dark:shadow-black/20 grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
               {STATS.map((stat) => (
                 <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
                   <span className="text-2xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
@@ -148,7 +140,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <p className="mt-10 text-lg text-gray-500 dark:text-gray-400">
-                TeamMeet이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
+                MatchUp이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
               </p>
             </div>
           </ScrollReveal>
@@ -156,7 +148,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ── */}
-      <section ref={featuresRef} className="py-24 sm:py-32 bg-gray-50 dark:bg-gray-800/30">
+      <section id="features-section" className="py-24 sm:py-32 bg-gray-50 dark:bg-gray-800/30">
         <div className="max-w-[1100px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-16">
@@ -171,7 +163,7 @@ export default function LandingPage() {
 
           {/* AI 매칭 히어로 카드 */}
           <ScrollReveal className="mb-6">
-            <div className="bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white hover:shadow-xl transition-[colors,shadow] duration-300 lg:flex lg:items-center lg:gap-10">
+            <div className="bg-gray-900 dark:bg-gray-800 rounded-2xl p-8 lg:p-10 text-white lg:flex lg:items-center lg:gap-10">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs font-semibold px-3 py-1 rounded-full mb-4">
                   <Target size={14} /> 핵심 기능
@@ -214,8 +206,8 @@ export default function LandingPage() {
               const Icon = f.icon;
               return (
                 <ScrollReveal key={f.title} delay={idx * 100}>
-                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-1.5 transition-[colors,transform,shadow] duration-300 h-full">
-                    <div className={`h-12 w-12 rounded-xl ${f.iconBg} flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full">
+                    <div className={`h-12 w-12 rounded-xl ${f.iconBg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
                       <Icon size={20} className="text-white" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{f.title}</h3>
@@ -248,7 +240,7 @@ export default function LandingPage() {
               {STEPS.map((step, idx) => (
                 <div key={step.num} className="relative flex gap-5">
                   <div className="flex flex-col items-center">
-                    <div className="h-11 w-11 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md shrink-0 z-10 shadow-lg shadow-blue-500/25">
+                    <div className="h-11 w-11 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md shrink-0 z-10">
                       {step.num}
                     </div>
                     {idx < STEPS.length - 1 && (
@@ -270,7 +262,7 @@ export default function LandingPage() {
             {STEPS.map((step, idx) => (
               <ScrollReveal key={step.num} delay={idx * 200}>
                 <div className="text-center relative">
-                  <div className="h-11 w-11 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md mx-auto mb-5 relative z-10 ring-4 ring-white dark:ring-gray-900 shadow-lg shadow-blue-500/25">
+                  <div className="h-11 w-11 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center text-md mx-auto mb-5 relative z-10 ring-2 ring-white dark:ring-gray-900">
                     {step.num}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{step.title}</h3>
@@ -319,7 +311,7 @@ export default function LandingPage() {
               {SPORTS.map((sport) => {
                 const Icon = SportIconMap[sport.key];
                 return (
-                  <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800 transition-[colors,transform,shadow] duration-300 cursor-default">
+                  <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:-translate-y-0.5 hover:border-blue-200 dark:hover:border-blue-800 transition-[colors,transform] duration-300 cursor-default">
                     <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={20} className={sport.iconColor} />}
                     </div>
@@ -351,7 +343,7 @@ export default function LandingPage() {
               const SportIcon = SportIconMap[t.sport];
               return (
                 <ScrollReveal key={t.author} delay={idx * 120}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:-translate-y-1 transition-[colors,transform,shadow] duration-300 h-full flex flex-col">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full flex flex-col">
                     <div className="flex gap-0.5 mb-4" role="img" aria-label={`${t.rating}점 만점`}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star key={i} size={14} className={i < t.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'} aria-hidden="true" />
@@ -393,7 +385,7 @@ export default function LandingPage() {
               <br className="hidden sm:block" />
               경기할수록 더 정확해지는 스마트 매칭.
             </p>
-            <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+            <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
               무료로 시작하기
               <ArrowRight size={18} strokeWidth={2.5} />
             </Link>

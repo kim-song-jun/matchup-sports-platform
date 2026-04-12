@@ -202,7 +202,7 @@ export default function BadgesPage() {
               return (
                 <div
                   key={badge.id || `earned-${idx}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-gray-800/20 backdrop-blur-sm"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-gray-800"
                 >
                   <Icon size={14} />
                 </div>

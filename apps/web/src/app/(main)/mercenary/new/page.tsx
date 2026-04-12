@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, Shield, Users } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { useMyTeams, useCreateMercenaryPost } from '@/hooks/use-api';
+import { useCreateMercenaryPost, useMyTeams } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
 
 const positionOptions = [
@@ -18,116 +20,121 @@ const positionOptions = [
   { value: 'ALL', label: '포지션 무관' },
 ];
 
-const levelOptions = [
-  { value: 1, label: '입문' },
-  { value: 2, label: '초급' },
-  { value: 3, label: '중급' },
-  { value: 4, label: '상급' },
-  { value: 5, label: '고수' },
-];
-
+const levelOptions = [1, 2, 3, 4, 5];
 const countOptions = [1, 2, 3, 4, 5];
 
-interface FormData {
+interface FormState {
   teamId: string;
   matchDate: string;
-  startTime: string;
   venue: string;
   position: string;
   count: number;
-  levelRequired: number;
+  level: number;
   fee: string;
   notes: string;
 }
 
-const initialForm: FormData = {
+const initialForm: FormState = {
   teamId: '',
   matchDate: '',
-  startTime: '',
   venue: '',
   position: '',
   count: 1,
-  levelRequired: 3,
+  level: 3,
   fee: '0',
   notes: '',
 };
 
+function extractErrorMessage(error: unknown, fallback: string) {
+  const maybeError = error as {
+    response?: { data?: { message?: string | string[] } };
+  };
+  const message = maybeError.response?.data?.message;
+
+  if (Array.isArray(message)) {
+    return message[0] ?? fallback;
+  }
+
+  return typeof message === 'string' ? message : fallback;
+}
+
 export default function NewMercenaryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTeamId = searchParams.get('teamId');
   const { toast } = useToast();
   useRequireAuth();
 
-  const { data: myTeams, isLoading: teamsLoading } = useMyTeams();
+  const { data: myTeams = [], isLoading: teamsLoading } = useMyTeams();
   const createMutation = useCreateMercenaryPost();
-  const [form, setForm] = useState<FormData>(initialForm);
-  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState<FormState>(initialForm);
 
-  function update<K extends keyof FormData>(key: K, value: FormData[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    if (!requestedTeamId || form.teamId) {
+      return;
+    }
+
+    if (myTeams.some((team) => team.id === requestedTeamId)) {
+      setForm((current) => ({ ...current, teamId: requestedTeamId }));
+    }
+  }, [form.teamId, myTeams, requestedTeamId]);
+
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((previous) => ({ ...previous, [key]: value }));
   }
 
-  const canSubmit =
-    !!form.teamId &&
-    !!form.matchDate &&
-    !!form.startTime &&
-    !!form.venue &&
-    !!form.position;
+  const selectedTeam = myTeams.find((team) => team.id === form.teamId) ?? null;
+  const selectedAccent = selectedTeam ? sportCardAccent[selectedTeam.sportType] : null;
+
+  const canSubmit = Boolean(
+    selectedTeam &&
+      form.matchDate &&
+      form.venue.trim() &&
+      form.position,
+  );
 
   function handleSubmit() {
-    if (!canSubmit) return;
+    if (!selectedTeam || !canSubmit) {
+      return;
+    }
+
     createMutation.mutate(
       {
-        teamId: form.teamId,
+        teamId: selectedTeam.id,
+        sportType: selectedTeam.sportType,
         matchDate: form.matchDate,
-        startTime: form.startTime,
-        venue: form.venue,
+        venue: form.venue.trim(),
         position: form.position,
         count: form.count,
-        level: form.levelRequired,
+        level: form.level,
         fee: Number(form.fee) || 0,
-        notes: form.notes || undefined,
-      } as unknown as Parameters<typeof createMutation.mutate>[0],
+        notes: form.notes.trim() || undefined,
+      },
       {
-        onSuccess: () => {
+        onSuccess: (createdPost) => {
           toast('success', '용병 모집글이 등록되었어요');
-          setSubmitted(true);
-          setTimeout(() => router.push('/mercenary'), 1200);
+          router.push(`/mercenary/${createdPost.id}`);
         },
-        onError: () => {
-          toast('error', '등록에 실패했어요. 잠시 후 다시 시도해주세요');
+        onError: (error) => {
+          toast('error', extractErrorMessage(error, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
         },
       },
     );
   }
 
-  if (submitted) {
-    return (
-      <div className="pt-[var(--safe-area-top)] animate-fade-in">
-        <div className="flex flex-col items-center justify-center py-32 px-5">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50 dark:bg-green-900/20 mb-4">
-            <Check size={28} className="text-green-500" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">모집글이 등록되었어요</h2>
-          <p className="text-base text-gray-500 dark:text-gray-400">용병 모집 목록에서 확인할 수 있습니다</p>
-        </div>
-      </div>
-    );
-  }
-
-  // No teams guard
-  if (!teamsLoading && (!myTeams || myTeams.length === 0)) {
+  if (!teamsLoading && myTeams.length === 0) {
     return (
       <div className="pt-[var(--safe-area-top)] animate-fade-in px-5 @3xl:px-0">
-        <header className="@3xl:hidden flex items-center gap-3 py-3 border-b border-gray-50 dark:border-gray-800 mb-4">
+        <MobileGlassHeader className="mb-4 gap-3">
           <button
             aria-label="뒤로 가기"
             onClick={() => router.back()}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors min-w-11 min-h-[44px] flex items-center justify-center"
+            className="glass-mobile-icon-button flex min-h-[44px] min-w-11 items-center justify-center rounded-xl"
           >
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
-        </header>
+        </MobileGlassHeader>
         <EmptyState
           icon={Users}
           title="팀을 먼저 만들어주세요"
@@ -140,27 +147,27 @@ export default function NewMercenaryPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
-      {/* Header */}
-      <header className="@3xl:hidden px-5 pt-4 pb-3 flex items-center gap-3 border-b border-gray-50 dark:border-gray-800">
+      <MobileGlassHeader className="gap-3">
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+          className="glass-mobile-icon-button flex min-h-[44px] min-w-11 items-center justify-center rounded-xl"
         >
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">용병 모집하기</h1>
-      </header>
+      </MobileGlassHeader>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6 px-5 @3xl:px-0 pt-4">
-        <Link href="/mercenary" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">용병 모집</Link>
+        <Link href="/mercenary" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+          용병 모집
+        </Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-200">새 모집글</span>
       </div>
 
-      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] pb-8">
-        <div className="space-y-5 mt-4">
-          {/* 팀 선택 */}
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[720px] pb-10">
+        <div className="mt-4 space-y-5">
           <div>
             <label htmlFor="merc-team" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
               팀 선택 <span className="text-red-500">*</span>
@@ -169,23 +176,51 @@ export default function NewMercenaryPage() {
               <select
                 id="merc-team"
                 value={form.teamId}
-                onChange={(e) => update('teamId', e.target.value)}
+                onChange={(event) => update('teamId', event.target.value)}
                 className="w-full appearance-none rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
               >
                 <option value="">팀을 선택하세요</option>
                 {teamsLoading ? (
                   <option disabled>불러오는 중...</option>
                 ) : (
-                  myTeams?.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
+                  myTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
                   ))
                 )}
               </select>
-              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none" />
+              <ChevronDown
+                size={16}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 pointer-events-none"
+              />
             </div>
           </div>
 
-          {/* 경기 날짜 */}
+          {selectedTeam && (
+            <div className={`rounded-2xl border border-gray-100 dark:border-gray-700 p-4 ${selectedAccent?.tint ?? 'bg-gray-50 dark:bg-gray-800/60'}`}>
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/80 dark:bg-gray-900/50">
+                  <Shield size={18} className="text-gray-700 dark:text-gray-200" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedTeam.name}</p>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    종목은 팀 정보 기준으로 자동 고정됩니다.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${selectedAccent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                      {sportLabel[selectedTeam.sportType] ?? selectedTeam.sportType}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      생성 후 상세 페이지에서 신청 현황을 바로 관리할 수 있어요.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label htmlFor="merc-match-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
               경기 날짜 <span className="text-red-500">*</span>
@@ -194,26 +229,11 @@ export default function NewMercenaryPage() {
               id="merc-match-date"
               type="date"
               value={form.matchDate}
-              onChange={(e) => update('matchDate', e.target.value)}
+              onChange={(event) => update('matchDate', event.target.value)}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             />
           </div>
 
-          {/* 시작 시간 */}
-          <div>
-            <label htmlFor="merc-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
-              시작 시간 <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="merc-start-time"
-              type="time"
-              value={form.startTime}
-              onChange={(e) => update('startTime', e.target.value)}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
-            />
-          </div>
-
-          {/* 장소 */}
           <div>
             <label htmlFor="merc-venue" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
               장소 <span className="text-red-500">*</span>
@@ -222,124 +242,128 @@ export default function NewMercenaryPage() {
               id="merc-venue"
               type="text"
               value={form.venue}
-              onChange={(e) => update('venue', e.target.value)}
+              onChange={(event) => update('venue', event.target.value)}
               maxLength={200}
               placeholder="예: 난지천 풋살장 A"
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             />
           </div>
 
-          {/* 포지션 */}
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               필요 포지션 <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2 flex-wrap">
-              {positionOptions.map((opt) => (
+              {positionOptions.map((option) => (
                 <button
-                  key={opt.value}
-                  onClick={() => update('position', opt.value)}
-                  className={`rounded-xl border-2 px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px] ${
-                    form.position === opt.value
+                  key={option.value}
+                  type="button"
+                  onClick={() => update('position', option.value)}
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors min-h-[44px] ${
+                    form.position === option.value
                       ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
-                      : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  {opt.label}
+                  {option.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 모집 인원 */}
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">모집 인원</label>
             <div className="flex gap-2">
-              {countOptions.map((c) => (
+              {countOptions.map((count) => (
                 <button
-                  key={c}
-                  onClick={() => update('count', c)}
-                  className={`flex-1 rounded-xl border-2 py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
-                    form.count === c
+                  key={count}
+                  type="button"
+                  onClick={() => update('count', count)}
+                  className={`flex-1 rounded-xl border py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
+                    form.count === count
                       ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
-                      : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  {c}명
+                  {count}명
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 레벨 요구 */}
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">레벨 요구</label>
             <div className="flex gap-2 flex-wrap">
-              {levelOptions.map((opt) => (
+              {levelOptions.map((level) => (
                 <button
-                  key={opt.value}
-                  onClick={() => update('levelRequired', opt.value)}
-                  className={`rounded-xl border-2 px-5 py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
-                    form.levelRequired === opt.value
+                  key={level}
+                  type="button"
+                  onClick={() => update('level', level)}
+                  className={`rounded-xl border px-5 py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
+                    form.level === level
                       ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
-                      : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  {opt.label}
+                  {levelLabel[level]}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 비용 */}
           <div>
-            <label htmlFor="merc-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">참가비 (원)</label>
+            <label htmlFor="merc-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+              참가비 (원)
+            </label>
             <input
               id="merc-fee"
               type="number"
               value={form.fee}
-              onChange={(e) => update('fee', e.target.value)}
+              onChange={(event) => update('fee', event.target.value)}
               min={0}
               placeholder="0 = 무료"
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{formatCurrency(Number(form.fee) || 0)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {formatCurrency(Number(form.fee) || 0)}
+            </p>
           </div>
 
-          {/* 요청사항 */}
           <div>
-            <label htmlFor="merc-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">요청사항 (선택)</label>
+            <label htmlFor="merc-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+              요청사항 (선택)
+            </label>
             <textarea
               id="merc-notes"
               value={form.notes}
-              onChange={(e) => update('notes', e.target.value)}
+              onChange={(event) => update('notes', event.target.value)}
               maxLength={500}
               placeholder="유니폼 색상, 준비물, 기타 안내 등"
               rows={4}
               className="w-full rounded-xl border border-gray-200 dark:border-gray-600 px-4 py-3.5 text-base text-gray-900 dark:text-white bg-white dark:bg-gray-800 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
             />
           </div>
-        </div>
 
-        {/* Submit */}
-        <div className="mt-6">
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit || createMutation.isPending}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
-          >
-            {createMutation.isPending ? (
-              <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                등록 중...
-              </>
-            ) : (
-              <>
-                <Check size={16} />
-                모집글 등록
-              </>
-            )}
-          </button>
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit || createMutation.isPending}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+            >
+              {createMutation.isPending ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  등록 중...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  상세로 등록하기
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

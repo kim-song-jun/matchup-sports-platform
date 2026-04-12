@@ -25,9 +25,9 @@ const FAQ_ITEMS: FaqItem[] = [
   /* 서비스 */
   {
     category: '서비스',
-    question: 'TeamMeet은 어떤 서비스인가요?',
+    question: 'MatchUp은 어떤 서비스인가요?',
     answer:
-      'TeamMeet은 AI 기반 멀티스포츠 소셜 매칭 플랫폼입니다. 실력, 위치, 매너 점수를 종합 분석하여 나에게 가장 적합한 운동 상대를 자동으로 찾아드립니다. 개인 매칭부터 팀 매칭까지, 축구/풋살/농구/배드민턴 등 11개 종목을 지원합니다.',
+      'MatchUp은 AI 기반 멀티스포츠 소셜 매칭 플랫폼입니다. 실력, 위치, 매너 점수를 종합 분석하여 나에게 가장 적합한 운동 상대를 자동으로 찾아드립니다. 개인 매칭부터 팀 매칭까지, 축구/풋살/농구/배드민턴 등 11개 종목을 지원합니다.',
   },
   {
     category: '서비스',
@@ -39,7 +39,7 @@ const FAQ_ITEMS: FaqItem[] = [
     category: '서비스',
     question: '앱 다운로드는 어디서 하나요?',
     answer:
-      'TeamMeet은 모바일 웹에서 바로 사용하실 수 있으며, iOS App Store와 Google Play Store에서도 앱을 다운로드하실 수 있습니다. 앱과 웹 모두 동일한 계정으로 이용 가능합니다.',
+      'MatchUp은 모바일 웹에서 바로 사용하실 수 있으며, iOS App Store와 Google Play Store에서도 앱을 다운로드하실 수 있습니다. 앱과 웹 모두 동일한 계정으로 이용 가능합니다.',
   },
   {
     category: '서비스',
@@ -53,7 +53,7 @@ const FAQ_ITEMS: FaqItem[] = [
     category: '매칭',
     question: 'AI 매칭은 어떻게 작동하나요?',
     answer:
-      'TeamMeet의 AI 매칭은 ELO 기반 실력 점수, 선호 포지션, 활동 지역, 가능 시간대, 매너 점수 등 다양한 요소를 종합 분석합니다. 경기를 할수록 데이터가 쌓여 매칭 정확도가 더욱 높아집니다. 목표는 치열하면서도 즐거운 경기를 만드는 것입니다.',
+      'MatchUp의 AI 매칭은 ELO 기반 실력 점수, 선호 포지션, 활동 지역, 가능 시간대, 매너 점수 등 다양한 요소를 종합 분석합니다. 경기를 할수록 데이터가 쌓여 매칭 정확도가 더욱 높아집니다. 목표는 치열하면서도 즐거운 경기를 만드는 것입니다.',
   },
   {
     category: '매칭',
@@ -135,7 +135,7 @@ const FAQ_ITEMS: FaqItem[] = [
     category: '계정',
     question: '소셜 로그인 연동은 어떻게 하나요?',
     answer:
-      '카카오, 네이버, 애플 계정으로 간편 로그인이 가능합니다. 마이페이지 > 설정 > 계정 연동에서 추가 소셜 계정을 연동하거나 해제할 수 있습니다. 여러 소셜 계정을 하나의 TeamMeet 계정에 연결할 수 있습니다.',
+      '카카오, 네이버, 애플 계정으로 간편 로그인이 가능합니다. 마이페이지 > 설정 > 계정 연동에서 추가 소셜 계정을 연동하거나 해제할 수 있습니다. 여러 소셜 계정을 하나의 MatchUp 계정에 연결할 수 있습니다.',
   },
 ];
 
@@ -223,7 +223,7 @@ export default function FaqPage() {
 
             <ScrollReveal delay={200}>
               <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[440px] mx-auto">
-                TeamMeet 이용에 대해 궁금한 점을
+                MatchUp 이용에 대해 궁금한 점을
                 <br className="hidden sm:block" />
                 빠르게 확인해보세요.
               </p>
@@ -244,7 +244,7 @@ export default function FaqPage() {
                   onClick={() => handleCategoryChange(category)}
                   className={`shrink-0 text-base font-semibold px-5 py-2.5 rounded-xl transition-[colors,transform,shadow] duration-200 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${
                     activeCategory === category
-                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                      ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
@@ -288,7 +288,7 @@ export default function FaqPage() {
         <div className="max-w-[600px] mx-auto px-5">
           <ScrollReveal>
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-8 sm:p-10 text-center border border-gray-100 dark:border-gray-700">
-              <div className="h-14 w-14 rounded-2xl bg-blue-500 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-blue-500/20">
+              <div className="h-14 w-14 rounded-2xl bg-blue-500 flex items-center justify-center mx-auto mb-5">
                 <Mail size={24} className="text-white" />
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight leading-tight">
@@ -301,7 +301,7 @@ export default function FaqPage() {
               </p>
               <a
                 href="mailto:support@teammeet.kr"
-                className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-7 py-3.5 rounded-xl text-md hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/20 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-7 py-3.5 rounded-xl text-md hover:bg-blue-600 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
               >
                 <Mail size={16} />
                 이메일 문의하기

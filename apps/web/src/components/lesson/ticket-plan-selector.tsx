@@ -1,46 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Sparkles, Zap, Infinity, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkles, Zap, Infinity, ShoppingCart, Ticket } from 'lucide-react';
 import { LessonTicketPlan, TicketType } from '@/types/api';
 import { formatAmount } from '@/lib/utils';
-
-// Mock plans for when API provides none
-const MOCK_PLANS: LessonTicketPlan[] = [
-  {
-    id: 'mock-single',
-    lessonId: '',
-    name: '일일 체험',
-    type: 'single',
-    price: 30000,
-    isActive: true,
-    sortOrder: 0,
-    description: '부담 없이 첫 수업을 경험해보세요',
-  },
-  {
-    id: 'mock-multi',
-    lessonId: '',
-    name: '정기수강',
-    type: 'multi',
-    price: 200000,
-    originalPrice: 240000,
-    totalSessions: 8,
-    isActive: true,
-    sortOrder: 1,
-    description: '꾸준히 실력을 키워보세요',
-  },
-  {
-    id: 'mock-unlimited',
-    lessonId: '',
-    name: '무제한 수강',
-    type: 'unlimited',
-    price: 150000,
-    validDays: 30,
-    isActive: true,
-    sortOrder: 2,
-    description: '한 달 동안 자유롭게 수강하세요',
-  },
-];
 
 const PLAN_META: Record<
   TicketType,
@@ -76,13 +39,36 @@ interface TicketPlanSelectorProps {
   plans?: LessonTicketPlan[];
   onSelect?: (plan: LessonTicketPlan) => void;
   onPurchase?: (plan: LessonTicketPlan) => void;
+  purchaseDisabled?: boolean;
+  purchaseDisabledLabel?: string;
 }
 
-export function TicketPlanSelector({ plans, onSelect, onPurchase }: TicketPlanSelectorProps) {
-  const activePlans = (plans && plans.length > 0 ? plans : MOCK_PLANS).filter(
-    (p) => p.isActive,
-  );
-  const [selectedId, setSelectedId] = useState<string>(activePlans[0]?.id ?? '');
+export function TicketPlanSelector({
+  plans,
+  onSelect,
+  onPurchase,
+  purchaseDisabled = false,
+  purchaseDisabledLabel,
+}: TicketPlanSelectorProps) {
+  const activePlans = (plans ?? []).filter((p) => p.isActive);
+  const [selectedId, setSelectedId] = useState<string>('');
+
+  useEffect(() => {
+    if (activePlans.length === 0) {
+      if (selectedId) {
+        setSelectedId('');
+      }
+      return;
+    }
+
+    const selectedPlan = activePlans.find((plan) => plan.id === selectedId);
+    if (selectedPlan) {
+      return;
+    }
+
+    setSelectedId(activePlans[0].id);
+    onSelect?.(activePlans[0]);
+  }, [activePlans, onSelect, selectedId]);
 
   const selectedPlan = activePlans.find((p) => p.id === selectedId);
 
@@ -95,6 +81,24 @@ export function TicketPlanSelector({ plans, onSelect, onPurchase }: TicketPlanSe
     if (selectedPlan) {
       onPurchase?.(selectedPlan);
     }
+  }
+
+  if (activePlans.length === 0) {
+    return (
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">
+            <Ticket size={18} aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">현재 판매 중인 수강권이 없어요</p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+              등록된 ticket plan이 없는 강좌라서 이 화면에서 가짜 구매 옵션을 대신 보여주지 않습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -117,10 +121,9 @@ export function TicketPlanSelector({ plans, onSelect, onPurchase }: TicketPlanSe
               onClick={() => handleSelect(plan)}
               className={[
                 'relative w-full text-left rounded-2xl p-4 transition-[border-color,background-color,box-shadow] duration-200',
-                'border-2',
                 isSelected
-                  ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-900/20'
-                  : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 hover:border-gray-200 dark:hover:border-gray-600',
+                  ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                  : 'border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/40 hover:border-gray-300',
               ].join(' ')}
               aria-pressed={isSelected}
               aria-label={`${meta.label(plan)} 수강권 선택`}
@@ -136,7 +139,7 @@ export function TicketPlanSelector({ plans, onSelect, onPurchase }: TicketPlanSe
                 {/* Radio indicator */}
                 <span
                   className={[
-                    'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                    'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
                     isSelected
                       ? 'border-blue-500 bg-blue-500'
                       : 'border-gray-300 dark:border-gray-500',
@@ -218,25 +221,27 @@ export function TicketPlanSelector({ plans, onSelect, onPurchase }: TicketPlanSe
       <button
         type="button"
         onClick={handlePurchase}
-        disabled={!selectedPlan}
+        disabled={!selectedPlan || purchaseDisabled}
         className={[
           'mt-4 w-full flex items-center justify-center gap-2',
           'rounded-2xl py-3 text-base font-bold transition-colors',
-          selectedPlan
+          selectedPlan && !purchaseDisabled
             ? 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
             : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed',
         ].join(' ')}
         aria-label={
           selectedPlan
-            ? `${PLAN_META[selectedPlan.type].label(selectedPlan)} 구매 — ${formatAmount(selectedPlan.price)}`
+            ? purchaseDisabled
+              ? purchaseDisabledLabel ?? '수강권 구매 불가'
+              : `${PLAN_META[selectedPlan.type].label(selectedPlan)} 구매 — ${formatAmount(selectedPlan.price)}`
             : '수강권 구매'
         }
       >
         <ShoppingCart size={18} aria-hidden="true" />
-        수강권 구매
-        {selectedPlan && (
+        {purchaseDisabled ? purchaseDisabledLabel ?? '수강권 구매 불가' : '수강권 구매'}
+        {selectedPlan && !purchaseDisabled ? (
           <span className="ml-1 opacity-80">· {formatAmount(selectedPlan.price)}</span>
-        )}
+        ) : null}
       </button>
 
       <p className="mt-2.5 text-center text-xs text-gray-400 dark:text-gray-500">

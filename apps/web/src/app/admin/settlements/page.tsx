@@ -185,7 +185,7 @@ export default function AdminSettlementsPage() {
                 <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                   {activeTab === 'pending' ? (
                     <th className="px-4 py-3 w-10">
-                      <button onClick={toggleAll} className={`flex h-4.5 w-4.5 items-center justify-center rounded border-2 transition-colors ${
+                      <button onClick={toggleAll} className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-colors ${
                         selectedRows.length === filtered.length && filtered.length > 0
                           ? 'bg-blue-500 border-blue-500'
                           : 'border-gray-300 dark:border-gray-600'
@@ -210,7 +210,7 @@ export default function AdminSettlementsPage() {
                   <tr key={settlement.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                     {activeTab === 'pending' ? (
                       <td className="px-4 py-3.5">
-                        <button onClick={() => toggleRow(settlement.id)} className={`flex h-4.5 w-4.5 items-center justify-center rounded border-2 transition-colors ${
+                        <button onClick={() => toggleRow(settlement.id)} className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-colors ${
                           selectedRows.includes(settlement.id)
                             ? 'bg-blue-500 border-blue-500'
                             : 'border-gray-300 dark:border-gray-600'

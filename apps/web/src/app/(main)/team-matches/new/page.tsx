@@ -109,7 +109,13 @@ export default function NewTeamMatchPage() {
 
   function handleSubmit() {
     const hostTeamId = selectedHostTeamId || (eligibleTeams.length > 0 ? eligibleTeams[0].id : undefined);
-    const payload: CreateTeamMatchInput & { hostTeamId?: string } = {
+    if (!hostTeamId) {
+      toast('error', '호스트 팀을 선택해주세요');
+      return;
+    }
+
+    const payload: CreateTeamMatchInput = {
+      hostTeamId,
       sportType: form.sportType,
       title: form.title,
       matchDate: form.matchDate,
@@ -132,7 +138,6 @@ export default function NewTeamMatchPage() {
       proPlayerCount: form.proPlayerCount,
       uniformColor: form.uniformColor || undefined,
       isFreeInvitation: form.isFreeInvitation,
-      ...(hostTeamId ? { hostTeamId } : {}),
     };
     createMutation.mutate(payload, {
       onSuccess: () => router.push('/team-matches'),
@@ -249,10 +254,10 @@ export default function NewTeamMatchPage() {
                   <button
                     key={opt.value}
                     onClick={() => update('sportType', opt.value)}
-                    className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-colors ${
+                    className={`rounded-xl px-4 py-4 text-md font-semibold text-center transition-colors ${
                       form.sportType === opt.value
-                        ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                        : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300'
+                        : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     {opt.label}
@@ -331,10 +336,10 @@ export default function NewTeamMatchPage() {
                   <button
                     key={q}
                     onClick={() => update('quarterCount', q)}
-                    className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
+                    className={`flex-1 rounded-xl py-3 text-base font-semibold transition-colors ${
                       form.quarterCount === q
-                        ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                        : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300'
+                        : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     {q}
@@ -380,13 +385,13 @@ export default function NewTeamMatchPage() {
                   <button
                     key={g.grade}
                     onClick={() => update('skillGrade', g.grade as SkillGrade)}
-                    className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-colors ${
+                    className={`shrink-0 rounded-xl px-4 py-2.5 text-center transition-colors ${
                       form.skillGrade === g.grade
-                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                        : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                        : 'border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
-                    <p className={`text-base font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
+                    <p className={`text-base font-bold ${form.skillGrade === g.grade ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
                       {g.label}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
@@ -419,10 +424,10 @@ export default function NewTeamMatchPage() {
                   <button
                     key={fmt}
                     onClick={() => update('gameFormat', fmt)}
-                    className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
+                    className={`flex-1 rounded-xl py-3 text-base font-semibold transition-colors ${
                       form.gameFormat === fmt
-                        ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                        : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300'
+                        : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     {fmt}
@@ -438,10 +443,10 @@ export default function NewTeamMatchPage() {
                 {MATCH_TYPES.map((mt) => (
                   <label
                     key={mt.value}
-                    className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-colors ${
+                    className={`flex items-center gap-3 w-full rounded-xl px-4 py-3.5 cursor-pointer transition-colors ${
                       form.matchType === mt.value
-                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                        : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                        : 'border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     <input
@@ -450,10 +455,10 @@ export default function NewTeamMatchPage() {
                       value={mt.value}
                       checked={form.matchType === mt.value}
                       onChange={() => update('matchType', mt.value as MatchType)}
-                      className="h-4 w-4 text-gray-900 dark:text-white border-gray-300 focus:ring-gray-500"
+                      className="h-4 w-4 text-blue-500 border-gray-300 focus:ring-blue-500"
                     />
                     <div>
-                      <p className={`text-base font-semibold ${form.matchType === mt.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
+                      <p className={`text-base font-semibold ${form.matchType === mt.value ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
                         {mt.label}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">{mt.desc}</p>
@@ -471,13 +476,13 @@ export default function NewTeamMatchPage() {
                   <button
                     key={opt.value}
                     onClick={() => update('matchStyle', opt.value)}
-                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
+                    className={`w-full rounded-xl px-4 py-3.5 text-left transition-colors ${
                       form.matchStyle === opt.value
-                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                        : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                        : 'border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
-                    <p className={`text-base font-semibold ${form.matchStyle === opt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-gray-300'}`}>
+                    <p className={`text-base font-semibold ${form.matchStyle === opt.value ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
                       {opt.label}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>

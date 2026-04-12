@@ -113,10 +113,10 @@ export default function OnboardingPage() {
                   <button
                     key={sport.key}
                     onClick={() => toggleSport(sport.key)}
-                    className={`relative flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition-[background-color,color,border-color,transform] duration-200 active:scale-[0.96] ${
+                    className={`relative flex flex-col items-center gap-2 rounded-2xl p-4 transition-[background-color,color,border-color,transform] duration-200 active:scale-[0.96] ${
                       isSelected
-                        ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-800'
-                        : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-200 dark:hover:border-gray-700'
+                        ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                        : 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                   >
                     {(() => {
@@ -155,7 +155,7 @@ export default function OnboardingPage() {
         {step === 'features' && (
           <div className="flex-1 flex flex-col pt-10">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-              TeamMeet은
+              MatchUp은
               <br />
               이런 걸 해줘요
             </h1>

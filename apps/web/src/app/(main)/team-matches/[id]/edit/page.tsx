@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, XCircle, AlertTriangle, Swords } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
 import { useTeamMatch } from '@/hooks/use-api';
@@ -188,12 +189,12 @@ export default function EditTeamMatchPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+      <MobileGlassHeader className="gap-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
-      </header>
+      </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -213,10 +214,10 @@ export default function EditTeamMatchPage() {
               <button
                 key={opt.value}
                 onClick={() => update('sportType', opt.value)}
-                className={`rounded-xl border-2 px-4 py-4 text-md font-semibold text-center transition-colors ${
+                className={`rounded-xl px-4 py-4 text-md font-semibold text-center transition-colors ${
                   form.sportType === opt.value
-                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                    ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300'
+                    : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 {opt.label}
@@ -292,10 +293,10 @@ export default function EditTeamMatchPage() {
               <button
                 key={q}
                 onClick={() => update('quarterCount', q)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
+                className={`flex-1 rounded-xl py-3 text-base font-semibold transition-colors ${
                   form.quarterCount === q
-                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                    ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300'
+                    : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 {q}
@@ -339,13 +340,13 @@ export default function EditTeamMatchPage() {
               <button
                 key={g.grade}
                 onClick={() => update('skillGrade', g.grade as SkillGrade)}
-                className={`shrink-0 rounded-xl border-2 px-4 py-2.5 text-center transition-colors ${
+                className={`shrink-0 rounded-xl px-4 py-2.5 text-center transition-colors ${
                   form.skillGrade === g.grade
-                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                    ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    : 'border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
-                <p className={`text-base font-bold ${form.skillGrade === g.grade ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
+                <p className={`text-base font-bold ${form.skillGrade === g.grade ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
                   {g.label}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5 whitespace-nowrap">{g.desc}</p>
@@ -378,10 +379,10 @@ export default function EditTeamMatchPage() {
               <button
                 key={fmt}
                 onClick={() => update('gameFormat', fmt)}
-                className={`flex-1 rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
+                className={`flex-1 rounded-xl py-3 text-base font-semibold transition-colors ${
                   form.gameFormat === fmt
-                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-200'
+                    ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300'
+                    : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 {fmt}
@@ -397,10 +398,10 @@ export default function EditTeamMatchPage() {
             {MATCH_TYPES.map((mt) => (
               <label
                 key={mt.value}
-                className={`flex items-center gap-3 w-full rounded-xl border-2 px-4 py-3.5 cursor-pointer transition-colors ${
+                className={`flex items-center gap-3 w-full rounded-xl px-4 py-3.5 cursor-pointer transition-colors ${
                   form.matchType === mt.value
-                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                    ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    : 'border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 <input
@@ -409,10 +410,10 @@ export default function EditTeamMatchPage() {
                   value={mt.value}
                   checked={form.matchType === mt.value}
                   onChange={() => update('matchType', mt.value as MatchType)}
-                  className="h-4 w-4 text-gray-900 dark:text-white border-gray-300 focus:ring-gray-500"
+                  className="h-4 w-4 text-blue-500 border-gray-300 focus:ring-blue-500"
                 />
                 <div>
-                  <p className={`text-base font-semibold ${form.matchType === mt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
+                  <p className={`text-base font-semibold ${form.matchType === mt.value ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
                     {mt.label}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">{mt.desc}</p>
@@ -430,13 +431,13 @@ export default function EditTeamMatchPage() {
               <button
                 key={opt.value}
                 onClick={() => update('matchStyle', opt.value)}
-                className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
+                className={`w-full rounded-xl px-4 py-3.5 text-left transition-colors ${
                   form.matchStyle === opt.value
-                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                    ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'
+                    : 'border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
-                <p className={`text-base font-semibold ${form.matchStyle === opt.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
+                <p className={`text-base font-semibold ${form.matchStyle === opt.value ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
                   {opt.label}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>

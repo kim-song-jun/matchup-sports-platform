@@ -1,71 +1,13 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
-import { useTranslations } from 'next-intl';
 import { useTeams, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SafeImage } from '@/components/ui/safe-image';
+import { TeamCard } from '@/components/teams/team-card';
 import { Users as UsersIcon } from 'lucide-react';
-import { sportLabel, sportCardAccent } from '@/lib/constants';
-import { getTeamImage, getTeamLogo } from '@/lib/sport-image';
+import { useTranslations } from 'next-intl';
 import type { SportTeam, MyTeam } from '@/types/api';
-
-const TeamCard = React.memo(function TeamCard({ team }: { team: MyTeam | SportTeam }) {
-  const t = useTranslations('teams');
-  const tl = useTranslations('levels');
-  const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
-  const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
-  const teamCoverImage = getTeamImage(team.sportType, team.coverImageUrl ?? null, team.id);
-  const fallbackTeamCoverImage = getTeamImage(team.sportType, undefined, team.id);
-
-  return (
-    <Link href={`/teams/${team.id}`}>
-      <div className="rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex h-24 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
-        {/* 이미지: 1:1 정사각형 고정 */}
-        <div className="relative w-24 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-          <SafeImage
-            src={teamCoverImage}
-            fallbackSrc={fallbackTeamCoverImage}
-            alt={team.name}
-            fill
-            className="object-cover"
-            sizes="96px"
-          />
-          <div className="absolute bottom-1.5 left-1.5 rounded-xl bg-white/92 p-0.5 shadow-[0_4px_12px_rgba(15,23,42,0.18)] backdrop-blur-sm">
-            <div className="relative h-7 w-7">
-              <SafeImage
-                src={teamLogo}
-                fallbackSrc={fallbackTeamLogo}
-                alt={`${team.name} logo`}
-                fill
-                className="rounded-lg object-cover"
-                sizes="28px"
-              />
-            </div>
-          </div>
-        </div>
-        {/* 텍스트 */}
-        <div className="flex-1 bg-white dark:bg-gray-900 px-3.5 py-3 min-w-0 flex flex-col justify-center">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</h3>
-            {team.isRecruiting && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5">{t('recruiting')}</span>}
-          </div>
-          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
-              {sportLabel[team.sportType] || team.sportType}
-            </span>
-            <span>{tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}</span>
-          </p>
-          {team.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{team.description}</p>}
-          {team.city && <p className="text-2xs text-gray-500 mt-0.5">{team.city} {team.district}</p>}
-        </div>
-      </div>
-    </Link>
-  );
-});
 
 export function TeamList() {
   const te = useTranslations('empty');

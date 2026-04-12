@@ -1,14 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Camera, Plus, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Plus, ShoppingBag } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
 import { getListingPreviewImages } from '@/lib/sport-image';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { FormField } from '@/components/ui/form-field';
+import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
+import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -27,9 +33,20 @@ const conditions = [
 
 export default function CreateListingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
+  const teamId = searchParams.get('teamId') ?? undefined;
+  const venueId = searchParams.get('venueId') ?? undefined;
+  const teamName = searchParams.get('teamName') ?? undefined;
+  const venueName = searchParams.get('venueName') ?? undefined;
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
+  const [uploadState, setUploadState] = useState<ImageUploadState>({
+    hasPendingUploads: false,
+    hasUploadErrors: false,
+    pendingCount: 0,
+  });
 
   const [form, setForm] = useState({
     title: '',
@@ -44,7 +61,20 @@ export default function CreateListingPage() {
   });
   const previewImages = getListingPreviewImages(form.sportType || 'marketplace-new', 3);
 
+  const guardImageUpload = () => {
+    if (uploadState.hasPendingUploads) {
+      toast('error', '이미지 업로드가 끝난 뒤 등록할 수 있어요');
+      return false;
+    }
+    if (uploadState.hasUploadErrors) {
+      toast('error', '실패한 이미지를 다시 시도하거나 제거해주세요');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (!guardImageUpload()) return;
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (!form.sportType) return toast('error', '종목을 선택해주세요');
     if (!form.condition) return toast('error', '상품 상태를 선택해주세요');
@@ -52,7 +82,12 @@ export default function CreateListingPage() {
 
     setIsSubmitting(true);
     try {
-      await api.post('/marketplace/listings', form);
+      await api.post('/marketplace/listings', {
+        ...form,
+        teamId,
+        venueId,
+        imageUrls: extractUploadUrls(imageAssets),
+      });
       toast('success', '매물이 등록되었어요!');
       router.push('/marketplace');
     } catch (err: unknown) {
@@ -98,49 +133,66 @@ export default function CreateListingPage() {
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-2xl">
+        {(teamId || venueId) && (
+          <div className="mb-5 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+            {teamId
+              ? `${teamName ?? '선택한 팀'} 허브에 귀속된 굿즈로 등록됩니다.`
+              : `${venueName ?? '선택한 장소'} 허브에 귀속된 굿즈로 등록됩니다.`}
+          </div>
+        )}
         {/* 사진 추가 영역 */}
         <div className="mb-6">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <p className="block text-sm font-semibold text-gray-700 mb-2">
             상품 이미지
-          </label>
-          <input type="file" id="file-upload" accept="image/*" multiple className="hidden" />
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-            <label htmlFor="file-upload" role="button" aria-label="사진 추가" className="flex h-20 w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:bg-gray-700 text-gray-500 hover:border-blue-300 hover:text-blue-400 transition-colors cursor-pointer">
-              <Camera size={20} />
-              <span className="text-xs font-medium">0/10</span>
-            </label>
-            {previewImages.map((image) => (
-              <div key={image} className="relative h-20 w-[80px] shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                <img
-                  src={image}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-full w-full object-cover opacity-60"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
-                  <Plus size={20} className="text-white/90" />
+          </p>
+          <ImageUpload
+            value={imageAssets}
+            onChange={setImageAssets}
+            onStateChange={setUploadState}
+            max={10}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            maxSizeMB={10}
+          />
+          {imageAssets.length === 0 && (
+            <div className="mt-2 flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+              {previewImages.map((image) => (
+                <div key={image} className="relative h-20 w-[80px] shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                  <img
+                    src={image}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-full w-full object-cover opacity-60"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-950/18">
+                    <Plus size={20} className="text-white/90" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다. 오른쪽 예시는 실제 노출 스타일 참고용입니다.</p>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray-500 mt-1.5">첫 번째 사진이 대표 이미지로 등록됩니다.</p>
+          {uploadState.hasPendingUploads && (
+            <p className="text-xs text-gray-500 mt-1.5">이미지 업로드가 끝난 뒤 매물을 등록할 수 있어요.</p>
+          )}
+          {uploadState.hasUploadErrors && (
+            <p className="text-xs text-red-500 mt-1.5">실패한 이미지를 다시 시도하거나 제거해주세요.</p>
+          )}
         </div>
 
         {/* 제목 */}
-        <Field label="제목" required id="mkt-title">
-          <input
+        <FormField label="제목" required htmlFor="mkt-title" className="mb-5">
+          <Input
             id="mkt-title"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             maxLength={100}
             placeholder="상품 제목을 입력해주세요"
-            className="input-field"
           />
-        </Field>
+        </FormField>
 
         {/* 종목 */}
-        <Field label="종목" required>
+        <FormField label="종목" required className="mb-5">
           <div className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
               <button
@@ -157,10 +209,10 @@ export default function CreateListingPage() {
               </button>
             ))}
           </div>
-        </Field>
+        </FormField>
 
         {/* 카테고리 */}
-        <Field label="카테고리" required>
+        <FormField label="카테고리" required className="mb-5">
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button
@@ -177,20 +229,20 @@ export default function CreateListingPage() {
               </button>
             ))}
           </div>
-        </Field>
+        </FormField>
 
         {/* 상품 상태 */}
-        <Field label="상품 상태" required>
+        <FormField label="상품 상태" required className="mb-5">
           <div className="space-y-2">
             {conditions.map((c) => (
               <button
                 key={c.value}
                 type="button"
                 onClick={() => setForm({ ...form, condition: c.value })}
-                className={`w-full text-left rounded-xl border-2 p-3.5 transition-colors ${
+                className={`w-full text-left rounded-xl border p-3.5 transition-colors ${
                   form.condition === c.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
-                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
                 }`}
               >
                 <p className={`text-base font-semibold ${form.condition === c.value ? 'text-white dark:text-gray-900' : 'text-gray-900'}`}>
@@ -200,18 +252,18 @@ export default function CreateListingPage() {
               </button>
             ))}
           </div>
-        </Field>
+        </FormField>
 
         {/* 거래 방식 */}
-        <Field label="거래 방식">
+        <FormField label="거래 방식" className="mb-5">
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setForm({ ...form, listingType: 'sell' })}
-              className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
+              className={`rounded-xl border py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'sell'
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                  : 'border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-200'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
               }`}
             >
               판매
@@ -219,127 +271,93 @@ export default function CreateListingPage() {
             <button
               type="button"
               onClick={() => setForm({ ...form, listingType: 'rent' })}
-              className={`rounded-xl border-2 py-3 text-base font-semibold transition-colors ${
+              className={`rounded-xl border py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'rent'
                   ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                  : 'border-gray-100 dark:border-gray-700 text-gray-500 hover:border-gray-200'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
               }`}
             >
               대여
             </button>
           </div>
-        </Field>
+        </FormField>
 
         {/* 가격 */}
-        <Field label="가격" required id="mkt-price">
+        <FormField label="가격" required htmlFor="mkt-price" className="mb-5">
           <div className="relative">
-            <input
+            <Input
               id="mkt-price"
               type="number"
+              inputMode="numeric"
               value={form.price || ''}
               onChange={(e) => setForm({ ...form, price: +e.target.value })}
               placeholder="0"
               min={0}
               step={1000}
-              className="input-field pr-10"
+              className="pr-10"
             />
             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500">원</span>
           </div>
-        </Field>
+        </FormField>
 
         {/* 대여 추가 정보 */}
         {form.listingType === 'rent' && (
           <div className="grid grid-cols-2 gap-3">
-            <Field label="일일 대여비" id="mkt-rental-price">
+            <FormField label="일일 대여비" htmlFor="mkt-rental-price">
               <div className="relative">
-                <input
+                <Input
                   id="mkt-rental-price"
                   type="number"
+                  inputMode="numeric"
                   value={form.rentalPricePerDay || ''}
                   onChange={(e) => setForm({ ...form, rentalPricePerDay: +e.target.value })}
                   placeholder="0"
-                  className="input-field pr-10"
+                  className="pr-10"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500">원</span>
               </div>
-            </Field>
-            <Field label="보증금" id="mkt-deposit">
+            </FormField>
+            <FormField label="보증금" htmlFor="mkt-deposit">
               <div className="relative">
-                <input
+                <Input
                   id="mkt-deposit"
                   type="number"
+                  inputMode="numeric"
                   value={form.rentalDeposit || ''}
                   onChange={(e) => setForm({ ...form, rentalDeposit: +e.target.value })}
                   placeholder="0"
-                  className="input-field pr-10"
+                  className="pr-10"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-gray-500">원</span>
               </div>
-            </Field>
+            </FormField>
           </div>
         )}
 
         {/* 설명 */}
-        <Field label="상세 설명" id="mkt-description">
-          <textarea
+        <FormField label="상세 설명" htmlFor="mkt-description" className="mb-5">
+          <Textarea
             id="mkt-description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             maxLength={1000}
             placeholder="구매시기, 브랜드/모델명, 사용감 등 자세하게 적어주세요"
             rows={5}
-            className="input-field resize-none"
+            className="min-h-[140px] resize-none"
           />
-        </Field>
+        </FormField>
 
         {/* 등록 버튼 */}
-        <button
+        <Button
           onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 mt-2 mb-8"
+          disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+          fullWidth
+          size="lg"
+          className="mb-8 mt-2"
         >
           {isSubmitting ? '등록 중...' : '매물 등록하기'}
-        </button>
+        </Button>
       </div>
-
-      <style jsx>{`
-        .input-field {
-          width: 100%;
-          border-radius: 12px;
-          border: 1px solid #E5E8EB;
-          background: #F9FAFB;
-          padding: 12px 14px;
-          font-size: 14px;
-          color: #191F28;
-          outline: none;
-          transition: all 0.2s;
-        }
-        .input-field:focus {
-          border-color: #3182F6;
-          background: white;
-          box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
-        }
-        :global(.dark) .input-field {
-          border-color: #374151;
-          background: #1F2937;
-          color: #F3F4F6;
-        }
-        :global(.dark) .input-field:focus {
-          border-color: #3182F6;
-          background: #111827;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-function Field({ label, required, children, id }: { label: string; required?: boolean; children: React.ReactNode; id?: string }) {
-  return (
-    <div className="mb-5">
-      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-1.5">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      {children}
     </div>
   );
 }

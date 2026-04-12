@@ -53,7 +53,7 @@ const PLANS = [
     ],
     cta: '프로 시작하기',
     ctaStyle:
-      'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/20 shadow-lg shadow-blue-500/10',
+      'bg-blue-500 text-white hover:bg-blue-600',
   },
   {
     id: 'team',
@@ -152,16 +152,16 @@ export default function PricingPage() {
               return (
                 <ScrollReveal key={plan.id} delay={idx * 120}>
                   <div
-                    className={`relative bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-8 border h-full flex flex-col transition-[colors,transform,shadow] duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                    className={`relative bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-8 border h-full flex flex-col transition-[colors,transform] duration-300 hover:-translate-y-0.5 ${
                       plan.recommended
-                        ? 'border-blue-500 shadow-xl shadow-blue-500/10 ring-1 ring-blue-500/20'
+                        ? 'border-blue-500 ring-2 ring-blue-500'
                         : 'border-gray-100 dark:border-gray-700'
                     }`}
                   >
                     {/* Recommended badge */}
                     {plan.recommended && (
                       <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                        <span className="inline-flex items-center gap-1.5 bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-blue-500/30">
+                        <span className="inline-flex items-center gap-1.5 bg-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full">
                           <Sparkles size={12} />
                           추천
                         </span>
@@ -253,7 +253,7 @@ export default function PricingPage() {
           </ScrollReveal>
 
           <ScrollReveal delay={100}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-10 border border-gray-100 dark:border-gray-700 shadow-lg shadow-gray-900/5 dark:shadow-black/20">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-10 border border-gray-100 dark:border-gray-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none">
               <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 mb-8">
                 <div className="text-center">
                   <div className="text-sm text-gray-500 font-medium mb-2">참가비 범위</div>
@@ -316,9 +316,9 @@ export default function PricingPage() {
             {FAQ_ITEMS.map((item, idx) => (
               <ScrollReveal key={item.q} delay={idx * 60}>
                 <div
-                  className={`bg-white dark:bg-gray-800 rounded-2xl border transition-[colors,shadow] duration-200 ${
+                  className={`bg-white dark:bg-gray-800 rounded-2xl border transition-colors duration-200 ${
                     openFaq === idx
-                      ? 'border-blue-200 dark:border-blue-800 shadow-lg shadow-blue-500/5'
+                      ? 'border-blue-200 dark:border-blue-800'
                       : 'border-gray-100 dark:border-gray-700'
                   }`}
                 >
@@ -373,7 +373,7 @@ export default function PricingPage() {
             </p>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.97] transition-[colors,transform,shadow] duration-200 shadow-lg shadow-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-blue-400 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
             >
               무료로 시작하기
               <ArrowRight size={18} strokeWidth={2.5} />

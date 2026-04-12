@@ -118,8 +118,8 @@ export function CheckoutModal({
                   </p>
                   <p className="text-xs text-gray-500">{method.description}</p>
                 </div>
-                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                  isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                  isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 dark:border-gray-500'
                 }`}>
                   {isSelected && <CheckCircle size={12} className="text-white" />}
                 </div>

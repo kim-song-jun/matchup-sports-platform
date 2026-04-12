@@ -1,16 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { Search, Plus, Star, MapPin } from 'lucide-react';
+import { Search, Plus, MapPin } from 'lucide-react';
+import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useVenues } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast';
-import { sportLabel } from '@/lib/constants';
-import { getVenueImageSet } from '@/lib/sport-image';
-import { SafeImage } from '@/components/ui/safe-image';
+import { VenueCard } from '@/components/venue/venue-card';
 import type { Venue } from '@/types/api';
 
 const sportFilters = [
@@ -60,16 +58,21 @@ export default function VenuesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">시설 찾기</h1>
-          <p className="text-sm text-gray-500 mt-0.5">내 주변 스포츠 시설을 찾아보세요</p>
-        </div>
-        <button onClick={() => toast('info', '시설 등록 요청이 접수되면 검토 후 추가됩니다. teammeet@support.com으로 시설 정보를 보내주세요.')}
-          className="flex items-center gap-1 rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <Plus size={12} /> 시설 등록 요청
-        </button>
-      </header>
+      <MobilePageTopZone
+        surface="plain"
+        eyebrow="시설 탐색"
+        title="시설 찾기"
+        subtitle="내 주변 스포츠 시설을 찾아보고, 운영 정보와 리뷰를 함께 확인하세요."
+        action={(
+          <button
+            onClick={() => toast('info', '시설 등록 요청이 접수되면 검토 후 추가됩니다. teammeet@support.com으로 시설 정보를 보내주세요.')}
+            className="inline-flex min-h-[44px] items-center gap-1 rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <Plus size={12} />
+            시설 등록 요청
+          </button>
+        )}
+      />
 
       <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
@@ -77,7 +80,7 @@ export default function VenuesPage() {
           <label htmlFor="venues-search" className="sr-only">시설 검색</label>
           <input id="venues-search" type="text" placeholder="시설명, 지역 검색" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 py-3 pl-10 pr-4 text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-gray-900 transition-colors" />
+            className="w-full rounded-xl border border-gray-100 bg-white py-3 pl-10 pr-4 text-base text-gray-900 outline-none transition-colors focus:border-blue-200 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-600" />
         </div>
       </div>
 
@@ -85,7 +88,7 @@ export default function VenuesPage() {
         {sportFilters.map((f) => (
           <button key={f.key} onClick={() => setActiveSport(f.key)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeSport === f.key ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+              activeSport === f.key ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'border border-gray-100 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}>
             {f.label}
           </button>
@@ -95,10 +98,10 @@ export default function VenuesPage() {
       <div className="px-5 @3xl:px-0 mb-4 flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
         {cities.map((c) => (
           <button key={c} onClick={() => setActiveCity(c === '전체' ? '' : c)}
-            className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
               (activeCity === '' && c === '전체') || activeCity === c
                 ? 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-900'
-                : 'text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}>
             {c}
           </button>
@@ -121,40 +124,9 @@ export default function VenuesPage() {
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-            {venues.map((venue: Venue) => {
-              const primarySport = venue.sportTypes?.[0] || 'soccer';
-              const venuePreviewImage = getVenueImageSet(primarySport, venue.imageUrls, venue.id, 1)[0];
-              return (
-                <Link key={venue.id} href={`/venues/${venue.id}`}>
-                  <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden flex hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-colors">
-                    {/* 이미지 */}
-                    <div className="relative w-28 shrink-0 bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                      <SafeImage src={venuePreviewImage} alt={venue.name} fill className="object-cover" sizes="112px" />
-                    </div>
-                    {/* 텍스트 */}
-                    <div className="flex-1 bg-white dark:bg-gray-800 p-3 min-w-0 flex flex-col justify-center">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
-                        {venue.rating > 0 && (
-                          <span className="shrink-0 flex items-center gap-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100">
-                            <Star size={10} fill="currentColor" className="text-amber-400" />
-                            {venue.rating.toFixed(1)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {venue.sportTypes?.map((s: string) => sportLabel[s] || s).join(' · ')}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1 truncate">{venue.address}</p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                        {venue.pricePerHour && <span>{new Intl.NumberFormat('ko-KR').format(venue.pricePerHour)}원/시간</span>}
-                        {venue.reviewCount > 0 && <><span className="text-gray-200">·</span><span>리뷰 {venue.reviewCount}</span></>}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            {venues.map((venue: Venue) => (
+              <VenueCard key={venue.id} venue={venue} />
+            ))}
           </div>
         )}
       </div>

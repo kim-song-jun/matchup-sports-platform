@@ -3,15 +3,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Search, SlidersHorizontal, Clock, Users, MapPin, Sparkles, X, List, Map, TrendingUp } from 'lucide-react';
+import { Search, SlidersHorizontal, Sparkles, X, List, Map, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
+import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
+import { buttonStyles } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SafeImage } from '@/components/ui/safe-image';
-import { sportLabel, sportCardAccent } from '@/lib/constants';
+import { Input } from '@/components/ui/input';
+import { MatchCard } from '@/components/match/match-card';
+import { sportLabel } from '@/lib/constants';
 import {
   buildMatchApiParams,
   buildMatchDiscoverySearchParams,
@@ -22,9 +26,7 @@ import {
   type MatchDiscoveryLevel,
   type MatchDiscoverySort,
 } from '@/lib/match-discovery';
-import { formatCurrency, formatMatchDate, getTimeBadge, friendlyLevel } from '@/lib/utils';
-import { getSportImage } from '@/lib/sport-image';
-import type { Match, RecommendationReason } from '@/types/api';
+import type { Match } from '@/types/api';
 
 const MatchesMapView = dynamic(
   () => import('@/components/map/matches-map-view').then((m) => ({ default: m.MatchesMapView })),
@@ -64,117 +66,6 @@ const SORT_FILTERS: Array<{ key: MatchDiscoverySort; translationKey: string }> =
   { key: 'deadline', translationKey: 'deadline' },
 ];
 
-const REASON_ICON_MAP: Record<string, React.ElementType> = {
-  level: TrendingUp,
-  distance: MapPin,
-  popularity: Users,
-  urgency: Clock,
-  new: Sparkles,
-};
-
-const MatchCard = React.memo(function MatchCard({ match }: { match: Match }) {
-  const filled = match.currentPlayers / match.maxPlayers;
-  const isFull = match.status === 'full' || filled >= 1;
-  const isAlmostFull = !isFull && filled >= 0.7;
-  const timeBadge = getTimeBadge(match.matchDate);
-  const accent = sportCardAccent[match.sportType];
-  const dotColor = accent?.dot || 'bg-gray-400';
-  const remaining = match.maxPlayers - match.currentPlayers;
-  const matchImage = getSportImage(match.sportType, match.imageUrl, match.id);
-  const fallbackMatchImage = getSportImage(match.sportType, undefined, match.id);
-
-  return (
-    <Link href={`/matches/${match.id}`} className="block">
-      <div className="group rounded-2xl border border-gray-100 bg-white overflow-hidden hover:border-gray-200 active:scale-[0.98] transition-[border-color,transform] duration-150 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700">
-        <div className="relative aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
-          <SafeImage
-            src={matchImage}
-            fallbackSrc={fallbackMatchImage}
-            alt={`${sportLabel[match.sportType]} 매치 - ${match.title}`}
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
-
-          <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} />
-            <span className="text-2xs font-semibold text-white/90">{sportLabel[match.sportType]}</span>
-            {timeBadge && (
-              <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-2xs font-bold leading-none text-white backdrop-blur-sm">
-                {timeBadge.text}
-              </span>
-            )}
-          </div>
-
-          <div className="absolute bottom-3 left-3.5">
-            <span className="text-sm font-bold text-white">{formatCurrency(match.fee)}</span>
-          </div>
-
-          <div className="absolute bottom-3 right-3">
-            {isFull ? (
-              <span className="rounded-md bg-white/15 px-2 py-1 text-2xs font-bold leading-none text-white/70 backdrop-blur-sm">
-                마감
-              </span>
-            ) : isAlmostFull ? (
-              <span className="rounded-md bg-amber-500/20 px-2 py-1 text-2xs font-bold leading-none text-amber-300 backdrop-blur-sm">
-                {remaining}자리 남음
-              </span>
-            ) : (
-              <span className="rounded-md bg-white/15 px-2 py-1 text-2xs font-semibold leading-none text-white/80 backdrop-blur-sm">
-                <Users size={10} className="mr-0.5 inline -mt-px" />
-                {match.currentPlayers}/{match.maxPlayers}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2 px-3.5 py-3.5">
-          <h3 className="truncate text-sm font-semibold leading-snug text-gray-900 dark:text-gray-100">
-            {match.title}
-          </h3>
-
-          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-            <Clock size={11} className="shrink-0 opacity-40" />
-            <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
-            {match.venue?.name && (
-              <>
-                <span className="shrink-0 opacity-30">·</span>
-                <span className="truncate">{match.venue.name}</span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-            <MapPin size={11} className="shrink-0 opacity-40" />
-            <span className="truncate">
-              {match.venue?.district ? `${match.venue.city} ${match.venue.district}` : match.venue?.city || '지역 미정'}
-            </span>
-            <span className="shrink-0 opacity-30">·</span>
-            <span className="shrink-0">{friendlyLevel(match.levelMin, match.levelMax)}</span>
-          </div>
-
-          {match.reasons && match.reasons.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-0.5">
-              {match.reasons.slice(0, 2).map((reason: RecommendationReason) => {
-                const ReasonIcon = REASON_ICON_MAP[reason.type];
-                return (
-                  <span
-                    key={reason.type}
-                    className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300 text-xs rounded-full px-2 py-1"
-                  >
-                    <ReasonIcon size={10} aria-hidden="true" />
-                    {reason.label}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-});
 
 export function MatchesPage() {
   const t = useTranslations('matches');
@@ -285,67 +176,71 @@ export function MatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)]">
-      <header className="px-5 pb-3 pt-4 @3xl:px-0">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('findMatch')}</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('subtitle')}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* List / Map view toggle */}
-            <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <button
-                type="button"
-                aria-label="리스트 뷰"
-                aria-pressed={viewMode === 'list'}
-                onClick={() => setViewMode('list')}
-                className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-              >
-                <List size={16} />
-              </button>
-              <button
-                type="button"
-                aria-label="지도 뷰"
-                aria-pressed={viewMode === 'map'}
-                onClick={() => setViewMode('map')}
-                className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
-                  viewMode === 'map'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Map size={16} />
-              </button>
-            </div>
+      <MobilePageTopZone
+        surface="plain"
+        eyebrow="AI 추천"
+        title={t('findMatch')}
+        subtitle={t('subtitle')}
+        action={(
+          <Link href="/matches/new" className={buttonStyles({ size: 'sm' })}>
+            <Plus size={14} strokeWidth={2.5} />
+            매치 만들기
+          </Link>
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            data-testid="match-clear-filters"
+            className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            {t('clearFilters')}
+          </button>
+          <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <button
               type="button"
-              onClick={handleClearFilters}
-              data-testid="match-clear-filters"
-              className="min-h-[44px] shrink-0 rounded-xl border border-gray-200 px-3 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-white"
+              aria-label="리스트 뷰"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+              className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
             >
-              {t('clearFilters')}
+              <List size={16} />
+            </button>
+            <button
+              type="button"
+              aria-label="지도 뷰"
+              aria-pressed={viewMode === 'map'}
+              onClick={() => setViewMode('map')}
+              className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
+                viewMode === 'map'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Map size={16} />
             </button>
           </div>
         </div>
-      </header>
+      </MobilePageTopZone>
 
       <div className="mb-3 px-5 @3xl:px-0">
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
             <label htmlFor="match-search-input" className="sr-only">매치 검색</label>
-            <input
+            <Input
               id="match-search-input"
               type="text"
               value={searchInput}
               placeholder={t('searchPlaceholder')}
               data-testid="match-search-input"
               onChange={(event) => setSearchInput(event.target.value)}
-              className="w-full rounded-xl bg-gray-50 py-3 pl-10 pr-11 text-base text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:bg-gray-800 dark:text-gray-100 dark:focus:bg-gray-900"
+              className="py-3 pl-10 pr-11 text-base shadow-sm"
             />
             {searchInput && (
               <button
@@ -367,7 +262,7 @@ export function MatchesPage() {
             className={`relative flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${
               showFilters
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-50 text-gray-500 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
+                : 'border border-gray-100 bg-white text-gray-500 shadow-sm active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
             }`}
           >
             <SlidersHorizontal size={16} />
@@ -412,8 +307,8 @@ export function MatchesPage() {
           onClick={() => updateFilters({ date: draftFilters.date === today ? '' : today })}
           className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.date === today
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           {t('today')}
@@ -425,8 +320,8 @@ export function MatchesPage() {
           onClick={() => updateFilters({ fee: draftFilters.fee === 'free' ? 'all' : 'free' })}
           className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.fee === 'free'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           {t('free')}
@@ -438,8 +333,8 @@ export function MatchesPage() {
           onClick={() => updateFilters({ level: draftFilters.level === 'beginner' ? 'all' : 'beginner' })}
           className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.level === 'beginner'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           {t('beginner')}
@@ -451,8 +346,8 @@ export function MatchesPage() {
           onClick={() => updateFilters({ available: !draftFilters.available })}
           className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.available
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           <Sparkles size={14} />
@@ -475,33 +370,33 @@ export function MatchesPage() {
 
       {showFilters && (
         <div className="mb-4 px-5 @3xl:px-0">
-          <div className="space-y-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800">
+          <Card variant="subtle" className="space-y-4">
             <div className="grid gap-4 @3xl:grid-cols-2">
               <div>
                 <label htmlFor="match-filter-date" className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t('date')}
                 </label>
-                <input
+                <Input
                   id="match-filter-date"
                   type="date"
                   value={draftFilters.date}
                   data-testid="match-date-input"
                   onChange={(event) => updateFilters({ date: event.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                  className="rounded-lg px-3 py-2 text-base dark:bg-gray-900"
                 />
               </div>
               <div>
                 <label htmlFor="match-filter-region" className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
                   {t('regionLabel')}
                 </label>
-                <input
+                <Input
                   id="match-filter-region"
                   type="text"
                   value={draftFilters.city}
                   data-testid="match-region-input"
                   placeholder={t('regionPlaceholder')}
                   onChange={(event) => updateFilters({ city: event.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 outline-none transition-colors focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                  className="rounded-lg px-3 py-2 text-base dark:bg-gray-900"
                 />
               </div>
             </div>
@@ -559,7 +454,7 @@ export function MatchesPage() {
                 })}
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -576,13 +471,13 @@ export function MatchesPage() {
         {isLoading ? (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3, 4].map((value) => (
-              <div key={value} className="rounded-2xl bg-gray-50 skeleton-shimmer dark:bg-gray-800">
+              <Card key={value} variant="subtle" padding="none" className="skeleton-shimmer">
                 <div className="aspect-[16/9]" />
                 <div className="space-y-2 p-3.5">
                   <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-700" />
                   <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-700" />
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         ) : error ? (

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, GraduationCap } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
@@ -160,12 +161,12 @@ export default function EditLessonPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+      <MobileGlassHeader className="gap-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">강좌 수정</h1>
-      </header>
+      </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -188,10 +189,10 @@ export default function EditLessonPage() {
                 <button
                   key={s.type}
                   onClick={() => update('sportType', s.type)}
-                  className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-colors ${
+                  className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                     selected
                       ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                      : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-200 text-gray-700 dark:text-gray-200'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 text-gray-700 dark:text-gray-200'
                   }`}
                 >
                   {Icon && <Icon size={28} />}
@@ -210,10 +211,10 @@ export default function EditLessonPage() {
               <button
                 key={t.value}
                 onClick={() => update('type', t.value)}
-                className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
+                className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
                   form.type === t.value
                     ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                    : 'border-gray-100 dark:border-gray-700 hover:border-gray-200'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
                 }`}
               >
                 <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>

@@ -3,65 +3,43 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, Clock, CheckCircle, BookOpen, Pencil, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, CheckCircle, BookOpen, Pencil, GraduationCap } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useAuthStore } from '@/stores/auth-store';
 import { MediaLightbox } from '@/components/ui/media-lightbox';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { useLesson } from '@/hooks/use-api';
-import { useToast } from '@/components/ui/toast';
-import { api } from '@/lib/api';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLesson, useMyLessonTickets } from '@/hooks/use-api';
 import { sportLabel, lessonTypeLabel, levelLabel } from '@/lib/constants';
+import { buildScheduledAt } from '@/lib/payment-ui';
 import { getSportDetailImageSet } from '@/lib/sport-image';
-import { formatFullDate, formatCurrency } from '@/lib/utils';
+import { formatAmount, formatFullDate, formatCurrency } from '@/lib/utils';
 import { TicketPlanSelector } from '@/components/lesson/ticket-plan-selector';
 import { LessonCalendar } from '@/components/lesson/lesson-calendar';
-import type { LessonTicketPlan, LessonSchedule } from '@/types/api';
+import { useToast } from '@/components/ui/toast';
+import type { LessonTicketPlan } from '@/types/api';
 const typeColor: Record<string, string> = {
   group_lesson: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', practice_match: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
   free_practice: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', clinic: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
 };
-
-const sampleCurriculum = [
-  { title: '오리엔테이션', desc: '기초 스트레칭 및 장비 점검', duration: '15분' },
-  { title: '기본기 훈련', desc: '핵심 동작 반복 훈련', duration: '30분' },
-  { title: '실전 연습', desc: '실전 상황 시뮬레이션', duration: '30분' },
-  { title: '피드백 & 정리', desc: '개인별 피드백 및 다음 목표 설정', duration: '15분' },
-];
 
 export default function LessonDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const lessonId = params.id as string;
   const [selectedTicketPlan, setSelectedTicketPlan] = useState<LessonTicketPlan | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
 
   const { data: lesson, isLoading } = useLesson(lessonId);
-
-  const enrollMutation = useMutation({
-    mutationFn: () => api.post(`/lessons/${lessonId}/enroll`) as Promise<unknown>,
-    onSuccess: () => {
-      toast('success', '수강 신청 완료! 강좌에서 만나요');
-      queryClient.invalidateQueries({ queryKey: ['lessons', lessonId] });
-    },
-    onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '수강 신청에 실패했어요. 잠시 후 다시 시도해주세요');
-    },
-  });
+  const { data: myTickets = [] } = useMyLessonTickets();
 
   const isHost = user?.id === lesson?.hostId;
-  const isEnrolled = !!(lesson?.participants?.some((p) => p.userId === user?.id));
   const isFull = !!(lesson && lesson.currentParticipants >= lesson.maxParticipants);
-  const selectedPrice = selectedTicketPlan?.price ?? lesson?.fee ?? 0;
-  const requiresPayment = selectedPrice > 0;
 
   if (isLoading) return <div role="status" aria-label="로딩 중" className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0"><div className="space-y-4 animate-pulse"><div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-2xl" /><div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-2xl" /></div></div>;
   if (!lesson) return (
@@ -77,6 +55,10 @@ export default function LessonDetailPage() {
 
   const SportIcon = SportIconMap[lesson.sportType];
   const filledPercent = (lesson.currentParticipants / lesson.maxParticipants) * 100;
+  const activeTicketPlans = lesson.ticketPlans?.filter((plan) => plan.isActive) ?? [];
+  const selectedPlan = selectedTicketPlan ?? activeTicketPlans[0] ?? null;
+  const selectedPrice = selectedPlan?.price ?? 0;
+  const ownedTicket = myTickets.find((ticket) => ticket.lessonId === lesson.id && ticket.status === 'active');
   const lessonImages = getSportDetailImageSet(
     lesson.sportType,
     [...(lesson.imageUrls ?? []), lesson.imageUrl],
@@ -100,12 +82,44 @@ export default function LessonDetailPage() {
     setShowMediaLightbox(true);
   }
 
+  function handleTicketCheckout(plan: LessonTicketPlan) {
+    if (!lesson) return;
+    if (isHost) {
+      toast('info', '본인이 등록한 강좌의 수강권은 구매할 수 없어요');
+      return;
+    }
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    if (ownedTicket) {
+      router.push(`/my/lesson-tickets?ticketId=${ownedTicket.id}`);
+      return;
+    }
+
+    const checkoutParams = new URLSearchParams({
+      source: 'lesson',
+      ticketPlanId: plan.id,
+      lessonId: lesson.id,
+      name: `${lesson.title} · ${plan.name}`,
+      amount: String(plan.price),
+      venue: lesson.venueName ?? '',
+    });
+
+    const scheduledAt = buildScheduledAt(lesson.lessonDate, lesson.startTime);
+    if (scheduledAt) {
+      checkoutParams.set('scheduledAt', scheduledAt);
+    }
+
+    router.push(`/payments/checkout?${checkoutParams.toString()}`);
+  }
+
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm z-10 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" /></button>
+      <MobileGlassHeader className="gap-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" /></button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{lesson.title}</h1>
-      </header>
+      </MobileGlassHeader>
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/lessons" className="hover:text-gray-600">강좌</Link><ChevronRight size={14} /><span className="text-gray-700 dark:text-gray-300">{lesson.title}</span>
       </div>
@@ -140,7 +154,7 @@ export default function LessonDetailPage() {
             )}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
             <div className="pointer-events-none absolute bottom-4 left-4">
-              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">{lessonTypeLabel[lesson.type]}</span>
+              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
 
@@ -164,8 +178,13 @@ export default function LessonDetailPage() {
                   <p className="text-lg font-bold text-gray-900 dark:text-white">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-sm text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
                   <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><Star size={12} className="text-amber-400" fill="currentColor" /> 4.8</span>
-                    <span>수강생 42명</span>
+                    {typeof lesson.host?.mannerScore === 'number' ? (
+                      <span className="flex items-center gap-1">
+                        <Star size={12} className="text-amber-400" fill="currentColor" />
+                        {lesson.host.mannerScore.toFixed(1)}
+                      </span>
+                    ) : null}
+                    <span>등록 인원 {lesson.currentParticipants}명</span>
                   </div>
                 </div>
               </div>
@@ -180,53 +199,31 @@ export default function LessonDetailPage() {
             <InfoCard icon={<CreditCard size={18} />} label="수강료" value={formatCurrency(lesson.fee)} />
           </div>
 
-          {/* 커리큘럼 */}
+          {/* 상세 안내 */}
           <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen size={18} className="text-gray-500" />
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">커리큘럼</h3>
-              <span className="text-xs text-gray-500 ml-auto">총 {sampleCurriculum.length}개 섹션</span>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">상세 안내</h3>
             </div>
-            {sampleCurriculum.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-3 py-3 border-b border-gray-50 dark:border-gray-700 last:border-0">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-bold mt-0.5">{idx + 1}</div>
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-gray-900 dark:text-white">{item.title}</p>
-                  <p className="text-sm text-gray-500 mt-0.5">{item.desc}</p>
-                </div>
-                <span className="text-xs text-gray-500 shrink-0 mt-0.5"><Clock size={12} className="inline mr-0.5" />{item.duration}</span>
-              </div>
-            ))}
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+              현재 이 강좌는 구조화된 커리큘럼 계약을 제공하지 않아요. 실제 설명, 일정, 수강권 정보만 기준으로 안내합니다.
+            </div>
           </div>
 
           {/* 수강권 선택 */}
-          <div className="mt-4">
+          <div id="ticket-plans" className="mt-4">
             <TicketPlanSelector
               plans={lesson.ticketPlans}
               onSelect={(plan) => setSelectedTicketPlan(plan)}
-              onPurchase={(plan) => {
-                setSelectedTicketPlan(plan);
-                if (plan.price > 0) {
-                  toast('info', '유료 수강권 결제는 아직 준비 중이에요');
-                } else {
-                  enrollMutation.mutate();
-                }
-              }}
+              onPurchase={handleTicketCheckout}
+              purchaseDisabled={isHost}
+              purchaseDisabledLabel="등록한 강좌는 구매할 수 없어요"
             />
           </div>
 
           {/* 수업 일정 캘린더 */}
           <div className="mt-4">
-            <LessonCalendar
-              schedules={lesson.upcomingSchedules as LessonSchedule[] | undefined}
-              onReserve={(scheduleId) => {
-                if (!isAuthenticated) {
-                  toast('info', '로그인 후 예약할 수 있어요');
-                  return;
-                }
-                toast('info', `수업 예약 기능을 준비 중이에요 (scheduleId: ${scheduleId})`);
-              }}
-            />
+            <LessonCalendar schedules={lesson.upcomingSchedules} />
           </div>
 
           {/* 이런 분께 추천 */}
@@ -275,7 +272,7 @@ export default function LessonDetailPage() {
         <div className="detail-sidebar px-5 @3xl:px-0 mt-4 @3xl:mt-0">
           <div className="sidebar-sticky space-y-3">
             <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <p className="text-2xl font-black text-gray-900 dark:text-white text-center mb-3">{formatCurrency(lesson.fee)}</p>
+              <p className="text-2xl font-black text-gray-900 dark:text-white text-center mb-3">{selectedPlan ? formatAmount(selectedPrice) : formatCurrency(lesson.fee)}</p>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-500">참가 현황</span>
                 <span className="text-sm font-semibold text-blue-500">{lesson.currentParticipants}/{lesson.maxParticipants}명</span>
@@ -284,21 +281,28 @@ export default function LessonDetailPage() {
                 <div className="h-full w-full rounded-full bg-blue-500 transition-transform duration-300 origin-left" style={{ transform: `scaleX(${filledPercent / 100})` }} />
               </div>
               {!isAuthenticated ? (
-                <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white active:bg-blue-600 hover:bg-blue-600 transition-colors">로그인 후 신청하기</Link>
-              ) : isEnrolled ? (
-                <div className="space-y-1.5">
-                  <button
-                    onClick={() => {
-                      toast('info', '수강 취소는 결제 내역에서 환불 신청해주세요');
-                    }}
-                    className="w-full rounded-xl bg-red-50 border border-red-200 py-3.5 text-md font-bold text-red-500 hover:bg-red-100 active:bg-red-200 transition-colors"
-                  >
-                    수강 취소
-                  </button>
-                  <Link href="/payments" className="block text-center text-xs text-gray-400 hover:text-blue-500 transition-colors py-0.5">
-                    결제 내역 →
-                  </Link>
-                </div>
+                <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white active:bg-blue-600 hover:bg-blue-600 transition-colors">로그인 후 수강권 선택하기</Link>
+              ) : isHost ? (
+                <Link
+                  href={`/lessons/${lessonId}/edit`}
+                  className="block w-full rounded-xl bg-gray-900 py-3.5 text-center text-md font-bold text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                >
+                  강좌 관리하기
+                </Link>
+              ) : ownedTicket ? (
+                <Link
+                  href={`/my/lesson-tickets?ticketId=${ownedTicket.id}`}
+                  className="block w-full rounded-xl bg-blue-50 py-3.5 text-center text-md font-bold text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-200 dark:hover:bg-blue-900/50"
+                >
+                  보유한 수강권 보기
+                </Link>
+              ) : activeTicketPlans.length === 0 ? (
+                <button
+                  disabled
+                  className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-bold text-gray-500 cursor-not-allowed"
+                >
+                  판매 중인 수강권 없음
+                </button>
               ) : isFull ? (
                 <button
                   disabled
@@ -308,26 +312,11 @@ export default function LessonDetailPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => {
-                    if (!requiresPayment) {
-                      enrollMutation.mutate();
-                    }
-                  }}
-                  disabled={enrollMutation.isPending || requiresPayment}
-                  className={`w-full rounded-xl py-3.5 text-md font-bold transition-colors disabled:opacity-50 ${
-                    requiresPayment
-                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700'
-                  }`}
+                  onClick={() => selectedPlan && handleTicketCheckout(selectedPlan)}
+                  disabled={!selectedPlan}
+                  className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white transition-colors hover:bg-blue-600 active:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"
                 >
-                  {enrollMutation.isPending ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      처리 중...
-                    </span>
-                  ) : (
-                    requiresPayment ? '유료 수강권 준비 중' : `수강 신청하기 ${lesson.fee > 0 ? `· ${formatCurrency(lesson.fee)}` : ''}`
-                  )}
+                  {selectedPlan ? `${selectedPlan.name} 결제하기 · ${formatAmount(selectedPrice)}` : '수강권을 먼저 선택하세요'}
                 </button>
               )}
 
@@ -367,14 +356,21 @@ export default function LessonDetailPage() {
               </div>
             </div>
 
-            {requiresPayment && !isHost && !isEnrolled && (
+            {ownedTicket && !isHost ? (
               <TrustSignalBanner
-                tone="warning"
-                label="결제 준비 중"
-                title="유료 강좌 결제는 아직 연결되지 않았어요"
-                description="강좌/수강권 구매는 결제와 좌석 확정이 아직 백엔드와 연결되지 않았습니다. 가짜 성공 없이 신청 버튼이 비활성화됩니다."
+                tone="success"
+                label="보유 중"
+                title="이미 이 강좌의 수강권을 보유하고 있어요"
+                description="결제 완료된 수강권은 내 수강권 화면에서 이용 상태와 유효기간을 계속 확인할 수 있어요."
               />
-            )}
+            ) : activeTicketPlans.length > 0 && !isHost ? (
+              <TrustSignalBanner
+                tone="info"
+                label="실구매 흐름"
+                title="선택한 수강권 기준으로 결제가 진행돼요"
+                description="이제는 mock plan 대신 lesson detail API가 내려준 실제 ticket plan만 구매할 수 있습니다. 결제 완료 후 내 수강권에서 확인할 수 있어요."
+              />
+            ) : null}
 
             {isHost && (
               <Link

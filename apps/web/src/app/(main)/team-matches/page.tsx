@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Search } from 'lucide-react';
+import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useTeamMatches, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ErrorState } from '@/components/ui/error-state';
-import { getGradeInfo } from '@/lib/skill-grades';
-import { sportLabel, sportCardAccent } from '@/lib/constants';
-import { formatCurrency, formatMatchDate } from '@/lib/utils';
+import { TeamMatchCard } from '@/components/match/team-match-card';
+import { sportLabel } from '@/lib/constants';
 import type { TeamMatch } from '@/types/api';
 
 const sportFilters = [
@@ -18,19 +18,6 @@ const sportFilters = [
   { key: 'futsal', label: '풋살' },
 ];
 
-const levelLabel: Record<string, string> = {
-  beginner: '입문',
-  lower: '하',
-  middle: '중',
-  upper: '상',
-  pro: '프로',
-};
-
-const matchStyleLabel: Record<string, string> = {
-  friendly: '친선',
-  competitive: '경쟁',
-  manner_focused: '매너 중시',
-};
 
 export default function TeamMatchesPage() {
   const [activeSport, setActiveSport] = useState('');
@@ -63,27 +50,33 @@ export default function TeamMatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
-      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 매칭</h1>
-        <Link
-          href="/team-matches/new"
-          className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          모집글 작성
-        </Link>
-      </header>
+      <MobilePageTopZone
+        eyebrow="밸런스 매칭"
+        title="팀 매칭"
+        subtitle="우리 팀과 비슷한 상대를 찾고, 호스트 모집글도 한 흐름 안에서 관리하세요."
+        action={(
+          <Link
+            href="/team-matches/new"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-2xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-600"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            모집글 작성
+          </Link>
+        )}
+      />
 
       {/* 필터 칩 */}
       <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((f) => (
           <button
             key={f.key}
+            type="button"
+            aria-pressed={activeSport === f.key}
             onClick={() => setActiveSport(f.key)}
             className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeSport === f.key
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >
             {f.label}
@@ -99,7 +92,7 @@ export default function TeamMatchesPage() {
           type="date"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="rounded-lg border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+          className="rounded-lg border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
         />
         {[
           { key: '', label: '전체' },
@@ -109,11 +102,13 @@ export default function TeamMatchesPage() {
         ].map((f) => (
           <button
             key={f.key}
+            type="button"
+            aria-pressed={levelFilter === f.key}
             onClick={() => setLevelFilter(f.key)}
             className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               levelFilter === f.key
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
             }`}
           >
             {f.label}
@@ -193,79 +188,3 @@ export default function TeamMatchesPage() {
   );
 }
 
-function TeamMatchCard({ match }: { match: TeamMatch }) {
-  const statusMap: Record<string, { label: string; className: string }> = {
-    recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-    matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
-    completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-    cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
-  };
-  const status = statusMap[match.status] ?? statusMap.recruiting;
-
-  return (
-    <Link href={`/team-matches/${match.id}`}>
-      <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 transition-colors active:scale-[0.98] hover:bg-gray-50 dark:hover:bg-gray-700 duration-200">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${status.className}`}>
-                {status.label}
-              </span>
-              <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
-                {sportLabel[match.sportType] ?? match.sportType}
-              </span>
-              {match.matchStyle && (
-                <>
-                  <span className="text-gray-200">·</span>
-                  <span className="text-xs text-gray-500">
-                    {matchStyleLabel[match.matchStyle] ?? match.matchStyle}
-                  </span>
-                </>
-              )}
-              {match.isFreeInvitation && (
-                <span className="text-xs font-semibold text-green-600 ml-1">
-                  무료초청
-                </span>
-              )}
-            </div>
-            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
-              {match.title}
-            </h3>
-          </div>
-        </div>
-
-        <p className="mt-2.5 text-sm text-gray-500 leading-relaxed">
-          {formatMatchDate(match.matchDate)} {match.startTime}
-          <span className="text-gray-300 mx-1">·</span>
-          {match.venueName}
-        </p>
-        <p className="mt-1 text-sm text-gray-500">
-          {match.quarterCount}쿼터
-          <span className="text-gray-300 mx-1">·</span>
-          {match.skillGrade ? getGradeInfo(match.skillGrade).label : (match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한없음')}
-          {match.gameFormat && (
-            <>
-              <span className="text-gray-300 mx-1">·</span>
-              {match.gameFormat}
-            </>
-          )}
-          <span className="text-gray-300 mx-1">·</span>
-          <span className="font-semibold text-gray-800 dark:text-gray-200">
-            {formatCurrency(match.opponentFee ?? match.totalFee)}
-          </span>
-        </p>
-
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            신청 {String(match.applicationCount ?? 0)}팀
-          </span>
-          {match.hostTeam && (
-            <span className="text-xs text-gray-500">
-              {match.hostTeam.name}
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}

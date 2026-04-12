@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
+import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
+import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -63,9 +65,23 @@ const initialForm: FormData = {
 export default function CreateLessonPage() {
   useRequireAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+  const teamId = searchParams.get('teamId') ?? undefined;
+  const venueId = searchParams.get('venueId') ?? undefined;
+  const teamName = searchParams.get('teamName') ?? undefined;
+  const venueNameFromQuery = searchParams.get('venueName') ?? undefined;
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<FormData>(initialForm);
+  const [form, setForm] = useState<FormData>(() => ({
+    ...initialForm,
+    venueName: venueNameFromQuery ?? initialForm.venueName,
+  }));
+  const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
+  const [uploadState, setUploadState] = useState<ImageUploadState>({
+    hasPendingUploads: false,
+    hasUploadErrors: false,
+    pendingCount: 0,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -82,10 +98,28 @@ export default function CreateLessonPage() {
     }
   }
 
+  function guardImageUpload(): boolean {
+    if (uploadState.hasPendingUploads) {
+      toast('error', '이미지 업로드가 끝난 뒤 계속할 수 있어요');
+      return false;
+    }
+    if (uploadState.hasUploadErrors) {
+      toast('error', '실패한 이미지를 다시 시도하거나 제거해주세요');
+      return false;
+    }
+    return true;
+  }
+
   const handleSubmit = async () => {
+    if (!guardImageUpload()) return;
     setIsSubmitting(true);
     try {
-      await api.post('/lessons', form);
+      await api.post('/lessons', {
+        ...form,
+        teamId,
+        venueId,
+        imageUrls: extractUploadUrls(imageAssets),
+      });
       toast('success', '강좌가 등록되었어요!');
       router.push('/lessons');
     } catch (err: unknown) {
@@ -129,6 +163,13 @@ export default function CreateLessonPage() {
       </div>
 
       <div className="px-5 @3xl:px-0">
+        {(teamId || venueId) && (
+          <div className="mb-5 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+            {teamId
+              ? `${teamName ?? '선택한 팀'} 허브에 귀속된 레슨으로 등록됩니다.`
+              : `${venueNameFromQuery ?? '선택한 장소'} 허브에 귀속된 레슨으로 등록됩니다.`}
+          </div>
+        )}
         {/* Step 0: Sport type + Lesson type */}
         {step === 0 && (
           <div className="space-y-6 animate-fade-in">
@@ -142,10 +183,10 @@ export default function CreateLessonPage() {
                     <button
                       key={s.type}
                       onClick={() => update('sportType', s.type)}
-                      className={`flex items-center gap-3 rounded-xl border-2 p-4 transition-colors ${
+                      className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                         selected
                           ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                          : 'border-gray-100 bg-white dark:bg-gray-800 dark:border-gray-700 hover:border-gray-200 text-gray-700 dark:text-gray-300'
+                          : 'border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300'
                       }`}
                     >
                       {Icon && <Icon size={28} />}
@@ -163,10 +204,10 @@ export default function CreateLessonPage() {
                   <button
                     key={t.value}
                     onClick={() => update('type', t.value)}
-                    className={`w-full rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${
+                    className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
                       form.type === t.value
                         ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
-                        : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 dark:bg-gray-800'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 dark:bg-gray-800'
                     }`}
                   >
                     <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-gray-100'}`}>
@@ -237,6 +278,31 @@ export default function CreateLessonPage() {
                 rows={3}
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
               />
+            </div>
+
+            <div>
+              <ImageUpload
+                value={imageAssets}
+                onChange={setImageAssets}
+                onStateChange={setUploadState}
+                max={5}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                maxSizeMB={10}
+                label="강좌 이미지 (선택)"
+              />
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                첫 번째 이미지가 강좌 대표 이미지로 사용돼요.
+              </p>
+              {uploadState.hasPendingUploads && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  이미지 업로드가 끝난 뒤 다음 단계로 진행할 수 있어요.
+                </p>
+              )}
+              {uploadState.hasUploadErrors && (
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                  실패한 이미지를 다시 시도하거나 제거해주세요.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -377,6 +443,7 @@ export default function CreateLessonPage() {
                 <SummaryRow label="날짜" value={form.lessonDate} />
                 <SummaryRow label="시간" value={`${form.startTime} ~ ${form.endTime}`} />
                 <SummaryRow label="인원" value={`최대 ${form.maxParticipants}명`} />
+                {imageAssets.length > 0 && <SummaryRow label="이미지" value={`${imageAssets.length}장`} />}
                 <SummaryRow
                   label="수강료"
                   value={form.fee === 0 ? '무료' : `${new Intl.NumberFormat('ko-KR').format(form.fee)}원`}
@@ -392,8 +459,15 @@ export default function CreateLessonPage() {
       <div className="px-5 @3xl:px-0 mt-6 mb-8">
         {step < STEPS.length - 1 ? (
           <button
-            onClick={() => canProceed() ? setStep(step + 1) : toast('error', '필수 항목을 입력해주세요')}
-            disabled={!canProceed()}
+            onClick={() => {
+              if (!canProceed()) {
+                toast('error', '필수 항목을 입력해주세요');
+                return;
+              }
+              if (!guardImageUpload()) return;
+              setStep(step + 1);
+            }}
+            disabled={!canProceed() || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             다음
@@ -402,7 +476,7 @@ export default function CreateLessonPage() {
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Check size={16} />

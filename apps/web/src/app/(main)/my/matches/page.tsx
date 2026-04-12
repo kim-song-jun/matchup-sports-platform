@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Clock, Users, Trophy } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, Trophy } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -26,7 +27,6 @@ function getDayLabel(dateStr: string) {
 type Tab = 'participated' | 'created';
 
 export default function MyMatchesPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   useRequireAuth();
   const {
@@ -57,13 +57,7 @@ export default function MyMatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      {/* Header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
-      </header>
+      <MobileGlassHeader title="매치 히스토리" showBack />
       <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 히스토리</h2>
         <p className="mt-1 text-sm text-gray-500">참가한 매치와 개설 매치를 확인하세요</p>
@@ -83,7 +77,7 @@ export default function MyMatchesPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 activeTab === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                  ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >

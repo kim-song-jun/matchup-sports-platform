@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, Plus, ChevronRight } from 'lucide-react';
+import { Check, Plus, ChevronRight } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
@@ -109,13 +110,7 @@ export default function CreateMatchPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      {/* Header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3">
-        <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft size={18} className="text-gray-600" />
-        </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 만들기</h1>
-      </header>
+      <MobileGlassHeader title="매치 만들기" showBack onBack={() => step > 0 ? setStep(step - 1) : router.back()} />
 
       <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치</Link>
@@ -146,7 +141,7 @@ export default function CreateMatchPage() {
                   data-testid={`match-sport-${type}`}
                   className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                     form.sportType === type
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                      ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                       : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >

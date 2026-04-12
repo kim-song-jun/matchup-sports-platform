@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="text-center" data-testid="admin-auth-wall">
           <ShieldCheck size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
           <p className="text-gray-500 dark:text-gray-400 text-base">관리자 권한이 필요합니다</p>
-          <Link href={isAuthenticated ? "/home" : "/login"} className="mt-3 inline-block text-blue-500 text-base font-medium hover:underline">
+          <Link href={isAuthenticated ? "/home" : "/login"} className="mt-3 inline-block text-blue-500 text-base font-medium hover:text-blue-600 transition-colors">
             {isAuthenticated ? '홈으로 이동' : '로그인'}
           </Link>
         </div>

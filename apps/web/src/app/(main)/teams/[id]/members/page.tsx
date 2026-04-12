@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Shield, User, MoreVertical, AlertTriangle, Crown, LogOut } from 'lucide-react';
+import { Shield, User, MoreVertical, AlertTriangle, Crown, LogOut } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
@@ -110,19 +111,12 @@ export default function TeamMembersPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            aria-label="뒤로 가기"
-            className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-          </button>
-          <h1 data-testid="team-members-heading" className="text-lg font-semibold text-gray-900 dark:text-white">{membersPageTitle}</h1>
-        </div>
-        {/* Invite button hidden — backend nickname-search not yet available */}
-      </header>
+      <MobileGlassHeader
+        title={membersPageTitle}
+        showBack
+        compact
+        testId="mobile-glass-header-team-members"
+      />
 
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>

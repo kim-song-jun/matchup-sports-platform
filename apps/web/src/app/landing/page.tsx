@@ -206,7 +206,7 @@ export default function LandingPage() {
               const Icon = f.icon;
               return (
                 <ScrollReveal key={f.title} delay={idx * 100}>
-                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full">
+                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 h-full">
                     <div className={`h-12 w-12 rounded-xl ${f.iconBg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
                       <Icon size={20} className="text-white" />
                     </div>
@@ -311,7 +311,7 @@ export default function LandingPage() {
               {SPORTS.map((sport) => {
                 const Icon = SportIconMap[sport.key];
                 return (
-                  <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:-translate-y-0.5 hover:border-blue-200 dark:hover:border-blue-800 transition-[colors,transform] duration-300 cursor-default">
+                  <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-blue-200 dark:hover:border-blue-800 transition-colors duration-300 cursor-default">
                     <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={20} className={sport.iconColor} />}
                     </div>
@@ -343,7 +343,7 @@ export default function LandingPage() {
               const SportIcon = SportIconMap[t.sport];
               return (
                 <ScrollReveal key={t.author} delay={idx * 120}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full flex flex-col">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 h-full flex flex-col">
                     <div className="flex gap-0.5 mb-4" role="img" aria-label={`${t.rating}점 만점`}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star key={i} size={14} className={i < t.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'} aria-hidden="true" />

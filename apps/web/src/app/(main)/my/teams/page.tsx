@@ -1,8 +1,8 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Users, MapPin, UserCog, Shield, Crown } from 'lucide-react';
+import { Users, MapPin, UserCog, Shield, Crown } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useMyTeams } from '@/hooks/use-api';
@@ -27,22 +27,33 @@ const teamRoleMeta = {
 } as const;
 
 export default function MyTeamsPage() {
-  const router = useRouter();
   useRequireAuth();
   const { data: teams = [], isLoading } = useMyTeams();
 
   if (isLoading) {
-    return <div className="px-5 pt-8 text-center text-gray-500 dark:text-gray-400">로딩 중...</div>;
+    return (
+      <div className="px-5 @3xl:px-0 mt-4 space-y-3 pt-[var(--safe-area-top)]">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-5 w-16 animate-pulse rounded-md bg-gray-100 dark:bg-gray-700" />
+              <div className="h-5 w-12 animate-pulse rounded-md bg-gray-100 dark:bg-gray-700" />
+            </div>
+            <div className="h-4 w-32 animate-pulse rounded-md bg-gray-100 dark:bg-gray-700 mb-2" />
+            <div className="h-4 w-48 animate-pulse rounded-md bg-gray-100 dark:bg-gray-700 mb-3" />
+            <div className="flex gap-2">
+              <div className="h-10 flex-1 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-700" />
+              <div className="h-10 flex-1 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-700" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀</h1>
-      </header>
+      <MobileGlassHeader title="내 팀" showBack />
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">소속 팀과 현재 역할을 확인하세요</p>
@@ -109,7 +120,7 @@ export default function MyTeamsPage() {
                   href={`/teams/${team.id}`}
                   data-testid={`my-team-detail-${team.id}`}
                   aria-label={`${team.name} 상세`}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-700 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
                 >
                   상세 보기
                 </Link>
@@ -117,7 +128,7 @@ export default function MyTeamsPage() {
                   href={`/teams/${team.id}/members`}
                   data-testid={`my-team-members-${team.id}`}
                   aria-label={`${team.name} ${team.role === 'member' ? '멤버 목록' : '멤버 관리'}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-700 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                 >
                   <UserCog size={14} aria-hidden="true" />
                   {team.role === 'member' ? '멤버 목록' : '멤버 관리'}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Swords } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Swords } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useMyTeamMatchApplications } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -16,23 +16,13 @@ const appStatusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function MyTeamMatchApplicationsPage() {
-  const router = useRouter();
   useRequireAuth();
 
   const { data: applications = [], isLoading } = useMyTeamMatchApplications();
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button
-          aria-label="뒤로 가기"
-          onClick={() => router.back()}
-          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
-        >
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀매칭 신청</h1>
-      </header>
+      <MobileGlassHeader title="내 팀매칭 신청" showBack />
 
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 mb-4">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀매칭 신청</h2>

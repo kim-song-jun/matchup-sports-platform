@@ -34,16 +34,16 @@ export default function MercenaryPage() {
         action={(
           <Link
             href="/mercenary/new"
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-600"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-600"
           >
-            <UserPlus size={16} strokeWidth={2.5} />
+            <UserPlus size={16} strokeWidth={2.5} aria-hidden="true" />
             용병 모집하기
           </Link>
         )}
       >
         <Link href="/my/mercenary" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-300">
           내 모집/신청
-          <ChevronRight size={14} />
+          <ChevronRight size={14} aria-hidden="true" />
         </Link>
       </MobilePageTopZone>
 
@@ -105,6 +105,7 @@ export default function MercenaryPage() {
           </div>
         </>
       )}
+      <div className="h-24" />
     </div>
   );
 }

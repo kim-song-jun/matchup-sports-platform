@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronRight, Users } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Users } from 'lucide-react';
 import Link from 'next/link';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useCreateTeamMatch, useMyTeams } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/error-state';
@@ -202,13 +203,7 @@ export default function NewTeamMatchPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
-      {/* Header */}
-      <header className="@3xl:hidden px-5 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">모집글 작성</h1>
-      </header>
+      <MobileGlassHeader title="모집글 작성" showBack onBack={() => (step > 0 ? setStep(step - 1) : router.back())} />
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>

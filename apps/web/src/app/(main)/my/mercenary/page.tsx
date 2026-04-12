@@ -112,7 +112,7 @@ export default function MyMercenaryPage() {
             onClick={() => setActiveTab('created')}
             className={`flex-1 min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === 'created'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
                 : 'text-gray-600 dark:text-gray-300'
             }`}
           >
@@ -124,7 +124,7 @@ export default function MyMercenaryPage() {
             onClick={() => setActiveTab('applied')}
             className={`flex-1 min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === 'applied'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
                 : 'text-gray-600 dark:text-gray-300'
             }`}
           >

@@ -327,16 +327,18 @@ export function HomePage() {
             {[1,2,3].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : filteredMatches.length === 0 ? (
-          <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 py-8 text-center">
-            <Calendar size={28} className="mx-auto text-gray-300 dark:text-gray-600" aria-hidden="true" />
-            <p className="mt-2 text-sm font-medium text-gray-500 dark:text-gray-400">{te('noMatches')}</p>
-            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{te('noMatchesDesc')}</p>
-            {activeSport !== 'all' && (
-              <button onClick={() => setActiveSport('all')} className="mt-3 text-sm font-medium text-blue-500 hover:text-blue-600 transition-colors">
-                {t('viewAllMatches')}
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={Calendar}
+            size="sm"
+            title={te('noMatches')}
+            description={te('noMatchesDesc')}
+            {...(activeSport !== 'all' && {
+              secondaryAction: {
+                label: t('viewAllMatches'),
+                onClick: () => setActiveSport('all'),
+              },
+            })}
+          />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {filteredMatches.slice(0, 6).map((m: Match, idx) => <MatchCard key={m.id} match={m} priority={idx === 0} />)}

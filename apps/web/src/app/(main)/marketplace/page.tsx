@@ -70,7 +70,7 @@ export default function MarketplacePage() {
             placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 text-base shadow-sm"
+            className="pl-10 text-base"
           />
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function MarketplacePage() {
           </div>
         )}
       </div>
-
+      <div className="h-24" />
     </div>
   );
 }

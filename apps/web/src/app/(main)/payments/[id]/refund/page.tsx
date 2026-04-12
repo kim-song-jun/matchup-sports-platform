@@ -11,6 +11,7 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
@@ -176,16 +177,7 @@ export default function RefundRequestPage() {
         </div>
       </Modal>
 
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button
-          aria-label="뒤로 가기"
-          onClick={() => router.back()}
-          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
-        >
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h1>
-      </header>
+      <MobileGlassHeader title={isMockMode ? '테스트 환불' : '환불 요청'} showBack compact />
 
       <div className="hidden @3xl:block mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-base text-gray-500 hover:text-gray-600 mb-2 transition-colors">

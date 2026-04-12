@@ -449,7 +449,7 @@ export default function MatchDetailPage() {
             </div>
             <div className="mb-4 flex items-center justify-between rounded-2xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
               <span className="text-sm text-gray-500">매치 상태</span>
-              <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass}`}>
+              <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-2xs font-medium ${statusBadgeClass}`}>
                 {statusLabel}
               </span>
             </div>

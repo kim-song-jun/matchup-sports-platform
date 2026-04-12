@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, XCircle, AlertTriangle, Swords } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -516,32 +517,30 @@ export default function EditTeamMatchPage() {
 
       <div className="h-24" />
       {/* Cancel confirmation modal */}
-      {showCancelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
-            <p className="text-base text-gray-500 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setShowCancelModal(false)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                돌아가기
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={isCancelling}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
-              >
-                {isCancelling ? '취소 중...' : '취소하기'}
-              </button>
-            </div>
+      <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)} size="sm">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mb-4">
+            <AlertTriangle size={24} className="text-red-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">모집글을 취소하시겠어요?</h3>
+          <p className="text-base text-gray-500 dark:text-gray-400 mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
+          <div className="mt-6 flex gap-3 w-full">
+            <button
+              onClick={() => setShowCancelModal(false)}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              돌아가기
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+            >
+              {isCancelling ? '취소 중...' : '취소하기'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

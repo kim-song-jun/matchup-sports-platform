@@ -120,7 +120,7 @@ export default function PricingPage() {
               return (
                 <ScrollReveal key={plan.id} delay={idx * 120}>
                   <div
-                    className={`relative bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-8 border h-full flex flex-col transition-[colors,transform] duration-300 hover:-translate-y-0.5 ${
+                    className={`relative bg-white dark:bg-gray-800 rounded-2xl p-7 lg:p-8 border h-full flex flex-col transition-colors duration-300 ${
                       plan.recommended
                         ? 'border-blue-500 ring-2 ring-blue-500'
                         : 'border-gray-100 dark:border-gray-700'

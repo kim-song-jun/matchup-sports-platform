@@ -335,7 +335,7 @@ export default function GuidePage() {
               const Icon = feature.icon;
               return (
                 <ScrollReveal key={feature.title} delay={idx * 100}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors duration-300 h-full">
                     <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
                       <Icon size={20} className="text-blue-600 dark:text-blue-400" />
                     </div>

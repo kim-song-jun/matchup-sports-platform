@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, ChevronRight, SearchX } from 'lucide-react';
+import { ChevronRight, SearchX } from 'lucide-react';
 import Link from 'next/link';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
@@ -198,12 +199,7 @@ export default function EditMatchPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft size={18} className="text-gray-600 dark:text-gray-300" />
-        </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 수정</h1>
-      </header>
+      <MobileGlassHeader title="매치 수정" showBack />
       <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={12} />

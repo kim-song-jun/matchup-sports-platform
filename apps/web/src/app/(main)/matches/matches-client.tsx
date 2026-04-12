@@ -193,11 +193,11 @@ export function MatchesPage() {
             type="button"
             onClick={handleClearFilters}
             data-testid="match-clear-filters"
-            className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             {t('clearFilters')}
           </button>
-          <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
             <button
               type="button"
               aria-label="리스트 뷰"
@@ -240,7 +240,7 @@ export function MatchesPage() {
               placeholder={t('searchPlaceholder')}
               data-testid="match-search-input"
               onChange={(event) => setSearchInput(event.target.value)}
-              className="py-3 pl-10 pr-11 text-base shadow-sm"
+              className="py-3 pl-10 pr-11 text-base"
             />
             {searchInput && (
               <button
@@ -262,7 +262,7 @@ export function MatchesPage() {
             className={`relative flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${
               showFilters
                 ? 'bg-blue-500 text-white'
-                : 'border border-gray-100 bg-white text-gray-500 shadow-sm active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
+                : 'border border-gray-100 bg-white text-gray-500 active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
             }`}
           >
             <SlidersHorizontal size={16} />
@@ -287,7 +287,7 @@ export function MatchesPage() {
               data-testid={testId}
               aria-pressed={isActive}
               onClick={() => updateFilters({ sport: isActive ? '' : filter.key })}
-              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'

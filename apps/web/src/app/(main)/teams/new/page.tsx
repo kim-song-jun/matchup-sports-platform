@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Globe, Video } from 'lucide-react';
+import { ChevronRight, Globe, Video } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
@@ -73,13 +74,7 @@ export default function CreateTeamPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      {/* Mobile header */}
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700" />
-        </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">팀 등록</h1>
-      </header>
+      <MobileGlassHeader title="팀 등록" showBack />
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">

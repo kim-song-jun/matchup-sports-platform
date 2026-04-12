@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ArrowLeft,
   CheckCircle,
   CreditCard,
   Calendar,
@@ -14,6 +13,7 @@ import {
   RotateCcw,
   ReceiptText,
 } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
@@ -31,7 +31,6 @@ import {
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
 export default function PaymentDetailPage() {
-  const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   const [copied, setCopied] = useState(false);
@@ -96,16 +95,7 @@ export default function PaymentDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-8">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button
-          aria-label="뒤로 가기"
-          onClick={() => router.back()}
-          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
-        >
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
-        </button>
-        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">결제 상세</h1>
-      </header>
+      <MobileGlassHeader title="결제 상세" showBack compact />
 
       <div className="hidden @3xl:block mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">

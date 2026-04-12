@@ -23,12 +23,12 @@ const statusLabel: Record<string, string> = {
   recruiting: '모집중', full: '마감', in_progress: '진행중', completed: '완료', cancelled: '취소',
 };
 
-const statusTextColor: Record<string, string> = {
-  recruiting: 'text-blue-500',
-  full: 'text-gray-400',
-  in_progress: 'text-blue-500',
-  completed: 'text-gray-400',
-  cancelled: 'text-red-500',
+const statusBadgeClass: Record<string, string> = {
+  recruiting: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+  full: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+  in_progress: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+  completed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+  cancelled: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
 };
 
 export default function AdminMatchesPage() {
@@ -108,7 +108,7 @@ export default function AdminMatchesPage() {
                   <span className="text-xs text-gray-400">
                     {sportLabel[m.sportType] || m.sportType}
                   </span>
-                  <span className={`text-xs font-medium ${statusTextColor[m.status] || 'text-gray-400'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${statusBadgeClass[m.status] || 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                     {statusLabel[m.status] || m.status}
                   </span>
                 </div>

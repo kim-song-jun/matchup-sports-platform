@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Trash2 } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { Modal } from '@/components/ui/modal';
 import { useDeleteTeam, useMyTeams, useTeam, useUpdateTeam } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
@@ -169,12 +171,7 @@ export default function EditTeamPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">팀 수정</h1>
-      </header>
+      <MobileGlassHeader title="팀 수정" showBack />
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href={`/teams/${teamId}`} className="hover:text-gray-700 transition-colors">팀 상세</Link>
@@ -274,25 +271,23 @@ export default function EditTeamPage() {
         </div>
       </div>
 
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
-          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6">
-            <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
-              <AlertTriangle size={20} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">팀을 삭제할까요?</h3>
-            <p className="mt-2 text-sm text-gray-500 text-center">삭제하면 되돌릴 수 없습니다.</p>
-            <div className="mt-5 flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
-                취소
-              </button>
-              <button onClick={() => void handleDelete()} disabled={deleteDisabled} className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-sm font-semibold text-white disabled:opacity-50">
-                {deleteTeam.isPending ? '삭제 중...' : '삭제'}
-              </button>
-            </div>
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="sm">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
+            <AlertTriangle size={20} className="text-red-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">팀을 삭제할까요?</h3>
+          <p className="mt-2 text-sm text-gray-500">삭제하면 되돌릴 수 없습니다.</p>
+          <div className="mt-5 flex w-full gap-3">
+            <button onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+              취소
+            </button>
+            <button onClick={() => void handleDelete()} disabled={deleteDisabled} className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-sm font-semibold text-white disabled:opacity-50">
+              {deleteTeam.isPending ? '삭제 중...' : '삭제'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
       <div className="h-24" />
     </div>
   );

@@ -159,7 +159,7 @@ export default function LessonDetailPage() {
             )}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
             <div className="pointer-events-none absolute bottom-4 left-4">
-              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
+              <span className="rounded-md px-3 py-1 text-2xs font-medium bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
 

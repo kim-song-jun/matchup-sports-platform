@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { ChevronRight, AlertTriangle, X } from 'lucide-react';
+import { ChevronRight, AlertTriangle } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 
 export default function AccountPage() {
   useRequireAuth();
@@ -147,125 +148,70 @@ export default function AccountPage() {
       </div>
 
       {/* 회원 탈퇴 확인 모달 */}
-      {showDeleteModal && (
-        <DeleteModal
-          deleteConfirmText={deleteConfirmText}
-          setDeleteConfirmText={setDeleteConfirmText}
-          onClose={() => setShowDeleteModal(false)}
-        />
-      )}
+      <DeleteModal
+        isOpen={showDeleteModal}
+        deleteConfirmText={deleteConfirmText}
+        setDeleteConfirmText={setDeleteConfirmText}
+        onClose={() => setShowDeleteModal(false)}
+      />
     </div>
   );
 }
 
 function DeleteModal({
+  isOpen,
   deleteConfirmText,
   setDeleteConfirmText,
   onClose,
 }: {
+  isOpen: boolean;
   deleteConfirmText: string;
   setDeleteConfirmText: (v: string) => void;
   onClose: () => void;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
-      if (e.key === 'Tab' && dialogRef.current) {
-        const focusable = Array.from(
-          dialogRef.current.querySelectorAll<HTMLElement>(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-          )
-        ).filter((el) => !el.hasAttribute('disabled'));
-        if (focusable.length === 0) { e.preventDefault(); return; }
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey) {
-          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-        } else {
-          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handler);
-    return () => {
-      document.removeEventListener('keydown', handler);
-      prev?.focus();
-    };
-  }, [onClose]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-modal-title"
-        tabIndex={-1}
-        className="relative w-full max-w-sm rounded-3xl bg-white dark:bg-gray-800 p-6 shadow-xl animate-fade-in outline-none"
-      >
-        <Button
-          aria-label="닫기"
-          onClick={onClose}
-          variant="ghost"
-          size="sm"
-          className="absolute top-4 right-4 p-2"
-        >
-          <X size={20} className="text-gray-500" />
-        </Button>
+    <Modal isOpen={isOpen} onClose={onClose} size="sm">
+      <div className="flex flex-col items-center text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/30 mb-4">
+          <AlertTriangle size={28} className="text-red-500" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
+        <p className="text-base text-gray-500 dark:text-gray-400 mb-6">
+          탈퇴하면 모든 매치 기록, 채팅 내역, 팀 정보가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.
+        </p>
 
-        <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/30 mb-4">
-            <AlertTriangle size={28} className="text-red-500" />
-          </div>
-          <h3 id="delete-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
-              <p className="text-base text-gray-500 dark:text-gray-400 mb-6">
-                탈퇴하면 모든 매치 기록, 채팅 내역, 팀 정보가 영구 삭제돼요. 이 작업은 되돌릴 수 없어요.
-              </p>
+        <div className="w-full mb-4">
+          <FormField
+            label={'확인을 위해 "탈퇴합니다"를 입력하세요'}
+            htmlFor="account-delete-confirm"
+            labelClassName="text-sm font-normal text-gray-500"
+          >
+            <Input
+              id="account-delete-confirm"
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="탈퇴합니다"
+              className="text-md focus:ring-red-500/10 focus:border-red-500"
+            />
+          </FormField>
+        </div>
 
-              <div className="w-full mb-4">
-                <FormField
-                  label={'확인을 위해 "탈퇴합니다"를 입력하세요'}
-                  htmlFor="account-delete-confirm"
-                  labelClassName="text-sm font-normal text-gray-500"
-                >
-                  <Input
-                    id="account-delete-confirm"
-                    type="text"
-                    value={deleteConfirmText}
-                    onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    placeholder="탈퇴합니다"
-                    className="text-md focus:ring-red-500/10 focus:border-red-500"
-                  />
-                </FormField>
-              </div>
-
-          <div className="flex gap-3 w-full">
-            <Button
-              onClick={onClose}
-              variant="subtle"
-              fullWidth
-            >
-              취소
-            </Button>
-            <Button
-              disabled={deleteConfirmText !== '탈퇴합니다'}
-              variant="danger"
-              fullWidth
-              className="disabled:opacity-40"
-            >
-              탈퇴하기
-            </Button>
-          </div>
+        <div className="flex gap-3 w-full">
+          <Button onClick={onClose} variant="subtle" fullWidth>
+            취소
+          </Button>
+          <Button
+            disabled={deleteConfirmText !== '탈퇴합니다'}
+            variant="danger"
+            fullWidth
+            className="disabled:opacity-40"
+          >
+            탈퇴하기
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

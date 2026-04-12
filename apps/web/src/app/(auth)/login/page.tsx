@@ -213,7 +213,7 @@ function LoginPageInner() {
 
           {/* 폼 */}
           <form onSubmit={handleEmailSubmit} className="space-y-3" noValidate>
-            <FormField label="이메일 주소" htmlFor="login-email" labelClassName="sr-only">
+            <FormField label="이메일 주소" htmlFor="login-email">
               <Input
                 id="login-email"
                 type="email"
@@ -223,7 +223,7 @@ function LoginPageInner() {
                 className="text-base"
               />
             </FormField>
-            <FormField label="비밀번호" htmlFor="login-password" labelClassName="sr-only">
+            <FormField label="비밀번호" htmlFor="login-password">
               <Input
                 id="login-password"
                 type="password"
@@ -234,7 +234,7 @@ function LoginPageInner() {
               />
             </FormField>
             {mode === 'register' && (
-              <FormField label="닉네임" htmlFor="login-nickname" labelClassName="sr-only">
+              <FormField label="닉네임" htmlFor="login-nickname">
                 <Input
                   id="login-nickname"
                   type="text"

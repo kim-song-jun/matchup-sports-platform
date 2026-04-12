@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Trash2, AlertTriangle, ChevronRight, SearchX } from 'lucide-react';
+import { Trash2, AlertTriangle, ChevronRight, SearchX } from 'lucide-react';
 import Link from 'next/link';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
@@ -166,12 +167,7 @@ export default function EditListingPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">매물 수정</h1>
-      </header>
+      <MobileGlassHeader title="매물 수정" showBack />
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/marketplace" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">장터</Link>
         <ChevronRight size={14} />

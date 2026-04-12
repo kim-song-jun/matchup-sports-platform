@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart } from 'lucide-react';
+import { Pencil, Trash2, AlertTriangle, Package, ChevronDown, Eye, Heart } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
@@ -31,7 +32,6 @@ const statusOptions = [
 ];
 
 export default function MyListingsPage() {
-  const router = useRouter();
   const { toast } = useToast();
   useRequireAuth();
   const { user } = useAuthStore();
@@ -87,12 +87,7 @@ export default function MyListingsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 장터 매물</h1>
-      </header>
+      <MobileGlassHeader title="내 장터 매물" showBack />
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 장터 매물</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">등록한 매물을 관리하세요</p>
@@ -184,21 +179,29 @@ export default function MyListingsPage() {
       </div>
       <div className="h-24" />
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5" onClick={() => setDeleteTarget(null)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="delete-listing-modal-title" className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 id="delete-listing-modal-title" className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-            <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">돌아가기</button>
-              <button onClick={() => handleDelete(deleteTarget)} className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors">삭제하기</button>
-            </div>
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} size="sm">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mb-4">
+            <AlertTriangle size={24} className="text-red-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
+          <p className="text-base text-gray-500 dark:text-gray-400 mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+          <div className="mt-6 flex gap-3 w-full">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              돌아가기
+            </button>
+            <button
+              onClick={() => deleteTarget && handleDelete(deleteTarget)}
+              className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
+            >
+              삭제하기
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

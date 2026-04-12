@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, GraduationCap } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Modal } from '@/components/ui/modal';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { Input } from '@/components/ui/input';
@@ -398,32 +399,30 @@ export default function EditLessonPage() {
       <div className="h-24" />
 
       {/* Delete confirmation modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
-          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white text-center">강좌를 삭제하시겠어요?</h3>
-            <p className="text-sm text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                돌아가기
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
-              >
-                {isDeleting ? '삭제 중...' : '삭제하기'}
-              </button>
-            </div>
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="sm">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mb-4">
+            <AlertTriangle size={24} className="text-red-500" />
+          </div>
+          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">강좌를 삭제하시겠어요?</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">삭제하면 되돌릴 수 없어요.</p>
+          <div className="mt-6 flex gap-3 w-full">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              돌아가기
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+            >
+              {isDeleting ? '삭제 중...' : '삭제하기'}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

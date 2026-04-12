@@ -175,7 +175,7 @@ export default function TeamDetailPage() {
               <SafeImage src={coverImage} fallbackSrc={fallbackCover} alt="" fill className="object-cover" sizes="(max-width: 768px) 100vw, 60vw" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               <div className="absolute -bottom-6 left-5">
-                <div className="rounded-[20px] bg-white/95 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.2)]">
+                <div className="rounded-[20px] bg-white/95 p-1.5 shadow-sm">
                   <div className="relative h-14 w-14">
                     <SafeImage src={logo} fallbackSrc={fallbackLogo} alt={`${currentTeam.name} logo`} fill className="rounded-[15px] object-cover" sizes="56px" />
                   </div>
@@ -185,7 +185,7 @@ export default function TeamDetailPage() {
             <div className="pt-8 px-5 pb-5">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{currentTeam.name}</h2>
-                {currentTeam.isRecruiting && <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-300">모집중</span>}
+                {currentTeam.isRecruiting && <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-2xs font-medium text-blue-600 dark:text-blue-300">모집중</span>}
               </div>
               <p className="text-sm text-gray-500">
                 {sportLabel[currentTeam.sportType] || currentTeam.sportType} · {currentTeam.memberCount}명

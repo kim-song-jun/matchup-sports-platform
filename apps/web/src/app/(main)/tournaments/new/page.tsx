@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useCreateTournament } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
@@ -60,12 +61,7 @@ export default function TournamentNewPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">대회 등록</h1>
-      </header>
+      <MobileGlassHeader title="대회 등록" showBack />
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/tournaments" className="hover:text-gray-600 transition-colors">대회</Link>

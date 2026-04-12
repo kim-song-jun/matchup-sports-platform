@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowLeft, ChevronRight, CreditCard } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { ChevronRight, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { usePayments } from '@/hooks/use-api';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -10,6 +9,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { formatAmount, formatFullDate } from '@/lib/utils';
 import { getPaymentMethodMeta, getPaymentSource, paymentStatusConfig } from '@/lib/payment-ui';
 import { Input } from '@/components/ui/input';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 
 const tabs = [
   { id: 'all', label: '전체' },
@@ -19,7 +19,6 @@ const tabs = [
 ];
 
 export default function PaymentsPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -51,16 +50,7 @@ export default function PaymentsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 dark:bg-gray-900">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 pt-4 pb-3">
-        <button
-          aria-label="뒤로 가기"
-          onClick={() => router.back()}
-          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
-        >
-          <ArrowLeft size={20} className="text-gray-700" />
-        </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 내역</h1>
-      </header>
+      <MobileGlassHeader title="결제 내역" showBack />
 
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 내역</h1>
@@ -97,7 +87,7 @@ export default function PaymentsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >

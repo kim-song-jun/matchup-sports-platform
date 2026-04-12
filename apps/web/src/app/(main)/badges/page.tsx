@@ -151,8 +151,8 @@ export default function BadgesPage() {
           icon: visual.icon,
           color: visual.color,
           bg: visual.bg,
-          earned: (ab as unknown as Record<string, unknown>).earned as boolean ?? local?.earned ?? false,
-          earnedAt: (ab as unknown as Record<string, unknown>).earnedAt as string | undefined ?? local?.earnedAt,
+          earned: ab.earned ?? local?.earned ?? false,
+          earnedAt: ab.earnedAt ?? local?.earnedAt,
           progress: local?.progress,
         };
       })
@@ -175,32 +175,8 @@ export default function BadgesPage() {
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">뱃지</h1>
       </header>
 
-      {/* Summary */}
-      <div className="px-5 @3xl:px-0 mt-4 mb-4">
-        <div className="rounded-xl bg-blue-500 p-5 text-white">
-          <p className="text-sm text-blue-100">획득한 뱃지</p>
-          <div className="flex items-end gap-1 mt-1">
-            <span className="text-4xl font-black leading-none">{earnedBadges.length}</span>
-            <span className="text-base text-blue-200 mb-0.5">/ {allBadges.length}</span>
-          </div>
-          <div className="mt-3 flex gap-1.5">
-            {earnedBadges.map((badge, idx) => {
-              const Icon = badge.icon;
-              return (
-                <div
-                  key={badge.id || `earned-${idx}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-gray-800"
-                >
-                  <Icon size={14} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
       {/* Tabs */}
-      <div className="px-5 @3xl:px-0 mb-4 flex gap-2" role="tablist">
+      <div className="px-5 @3xl:px-0 mt-4 mb-4 flex gap-2" role="tablist">
         <button
           role="tab"
           aria-selected={activeTab === 'my'}
@@ -223,7 +199,7 @@ export default function BadgesPage() {
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >
-          전체 뱃지 ({allBadges.length})
+          전체 뱃지 ({badges.length})
         </button>
       </div>
 
@@ -240,13 +216,13 @@ export default function BadgesPage() {
                 className={`rounded-2xl border p-4 transition-colors ${
                   badge.earned
                     ? 'border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800'
-                    : 'border-gray-100/60 bg-gray-50/50 dark:border-gray-700/60 dark:bg-gray-800/50'
+                    : 'border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
                 }`}
               >
                 <div className="flex items-start gap-3.5">
                   <div
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                      badge.earned ? 'bg-gray-100 text-gray-500' : 'bg-gray-100 text-gray-300'
+                      badge.earned ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' : 'bg-gray-100 text-gray-300 dark:bg-gray-700 dark:text-gray-500'
                     }`}
                   >
                     {badge.earned ? <Icon size={20} /> : <Lock size={18} />}
@@ -255,13 +231,13 @@ export default function BadgesPage() {
                     <div className="flex items-center gap-2">
                       <h3
                         className={`text-sm font-semibold ${
-                          badge.earned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
+                          badge.earned ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'
                         }`}
                       >
                         {badge.name}
                       </h3>
                       {badge.earned && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-semibold text-gray-500">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
                           획득
                         </span>
                       )}

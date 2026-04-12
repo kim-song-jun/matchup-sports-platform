@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ChevronRight, Star, Users } from 'lucide-react';
+import { Star, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { sportCardAccent, sportLabel, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate } from '@/lib/utils';
@@ -92,14 +92,10 @@ export function MercenaryCard({ post, className }: MercenaryCardProps) {
           <p className="mt-2 text-xs text-gray-500 truncate">{post.notes}</p>
         )}
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3">
           <span className="text-xs text-gray-500 flex items-center gap-1">
             <Users size={12} aria-hidden="true" />
             모집 {count}명 / 신청 {post.applicationCount ?? 0}명
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
-            상세 보기
-            <ChevronRight size={14} aria-hidden="true" />
           </span>
         </div>
       </Card>

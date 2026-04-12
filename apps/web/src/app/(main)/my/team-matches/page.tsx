@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Swords } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Swords } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
@@ -30,7 +31,6 @@ const appStatusConfig: Record<string, { label: string; style: string }> = {
 type TabKey = 'hosted' | 'applied';
 
 export default function MyTeamMatchesPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   useRequireAuth();
@@ -79,12 +79,7 @@ export default function MyTeamMatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h1>
-      </header>
+      <MobileGlassHeader title="내 팀 매칭" showBack />
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-4 px-5 @3xl:px-0 pt-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀 매칭</h2>
@@ -112,7 +107,7 @@ export default function MyTeamMatchesPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors ${
                 activeTab === tab.key
-                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                  ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
                   : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
             >

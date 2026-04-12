@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
-  ArrowLeft,
   CreditCard,
   Wallet,
   MapPin,
@@ -12,6 +11,7 @@ import {
   CheckCircle,
   Loader2,
 } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
@@ -124,16 +124,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
-        <button
-          aria-label="뒤로 가기"
-          onClick={() => router.back()}
-          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
-        >
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
-        </button>
-        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h1>
-      </header>
+      <MobileGlassHeader title={isMockMode ? '테스트 결제' : '결제하기'} showBack compact />
 
       <div className="hidden @3xl:block mb-6">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>

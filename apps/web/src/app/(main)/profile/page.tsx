@@ -86,7 +86,7 @@ export default function ProfilePage() {
           <Link
             href="/settings"
             aria-label={tc('settings')}
-            className="flex min-h-[44px] min-w-11 items-center justify-center rounded-xl border border-gray-200/80 bg-white/78 text-gray-700 shadow-sm transition-colors hover:bg-white dark:border-white/10 dark:bg-gray-800/82 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="flex min-h-[44px] min-w-11 items-center justify-center rounded-xl border border-gray-200/80 bg-white/78 text-gray-700 transition-colors hover:bg-white dark:border-white/10 dark:bg-gray-800/82 dark:text-gray-200 dark:hover:bg-gray-800"
           >
             <Settings size={16} />
           </Link>
@@ -105,7 +105,7 @@ export default function ProfilePage() {
             기록, 일정, 알림을 한 곳에서 정리하세요.
           </p>
         </div>
-        <Link href="/settings" className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+        <Link href="/settings" className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
           <Settings size={15} />
           {tc('settings')}
         </Link>
@@ -114,7 +114,7 @@ export default function ProfilePage() {
       <div className={`px-5 @3xl:px-0 ${mounted && isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
         <div>
         {mounted && isAuthenticated && user ? (
-          <div data-testid="profile-summary" className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div data-testid="profile-summary" className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-start gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-bold text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
                   {user.nickname?.charAt(0)}
@@ -202,7 +202,7 @@ export default function ProfilePage() {
       {/* 소통 바로가기 */}
       {mounted && isAuthenticated && (
         <div className="px-5 @3xl:px-0 pt-4 pb-2">
-          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
             <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700">
               <QuickAccessLink href="/chat" icon={MessageCircle} label={t('chatLabel')} count={chatUnread} />
               <QuickAccessLink href="/notifications" icon={Bell} label={t('notificationsLabel')} count={notifUnread} />
@@ -324,7 +324,7 @@ function UpcomingSchedule() {
 
   return (
     <div className="mt-4 @3xl:mt-0">
-      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
@@ -356,16 +356,13 @@ function UpcomingSchedule() {
         {view === 'calendar' ? (
           <MiniCalendar matches={calendarMatches} />
         ) : listMatches.length === 0 ? (
-          <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-6 text-center dark:border-gray-700 dark:bg-gray-900/40">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300">
-              <Calendar size={20} />
-            </div>
-            <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{te('noSchedule')}</p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{te('noScheduleDesc')}</p>
-            <Link href="/matches" className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:bg-gray-800 dark:hover:bg-gray-700">
-              {t('findMatch')}
-            </Link>
-          </div>
+          <EmptyState
+            icon={Calendar}
+            title={te('noSchedule')}
+            description={te('noScheduleDesc')}
+            action={{ label: t('findMatch'), href: '/matches' }}
+            size="sm"
+          />
         ) : (
           <div className="space-y-2">
             {listMatches.map((m: Match) => {
@@ -373,7 +370,7 @@ function UpcomingSchedule() {
               const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
               return (
                 <Link key={m.id} href={`/matches/${m.id}`}>
-                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-3 transition-[colors,transform] hover:bg-gray-50 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-900/30 dark:hover:bg-gray-700/60">
+                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3 transition-[colors,transform] hover:bg-gray-100 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-700">
                     <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-white text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                       <span className="text-xs font-semibold">{d.getMonth() + 1}월</span>
                       <span className="text-base font-black leading-none">{d.getDate()}</span>

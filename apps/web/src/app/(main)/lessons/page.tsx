@@ -65,7 +65,7 @@ export default function LessonsPage() {
         action={(
           <Link
             href="/lessons/new"
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-600"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-600"
           >
             <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
             {t('createLesson')}
@@ -95,7 +95,7 @@ export default function LessonsPage() {
           <button
             key={f.key}
             onClick={() => setActiveType(f.key)}
-            className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeType === f.key
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'border border-gray-100 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -138,6 +138,7 @@ export default function LessonsPage() {
           </div>
         )}
       </div>
+      <div className="h-24" />
     </div>
   );
 }

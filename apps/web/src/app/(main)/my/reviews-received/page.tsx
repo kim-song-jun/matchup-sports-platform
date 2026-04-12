@@ -1,8 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Star, User } from 'lucide-react';
+import { Star, User } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 
 const mockReviewsReceived = [
@@ -64,7 +63,6 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function ReviewsReceivedPage() {
-  const router = useRouter();
   useRequireAuth();
 
   const avgScore = mockReviewsReceived.reduce((sum, r) => sum + r.rating, 0) / mockReviewsReceived.length;
@@ -75,12 +73,7 @@ export default function ReviewsReceivedPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h1>
-      </header>
+      <MobileGlassHeader title="내가 받은 평가" showBack />
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내가 받은 평가</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">다른 사용자들이 남긴 평가를 확인하세요</p>

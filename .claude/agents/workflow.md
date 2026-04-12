@@ -83,6 +83,8 @@
 19. **Deploy-safe data sync must be idempotent** — 운영 배포는 destructive seed 대신 idempotent backfill
 20. **URL-synced filter UIs must merge against pending local state** — stale searchParams 재사용 금지
 21. **Live runtime contract must be verified on the real port** — DTO/query 변경은 `localhost:8111` 응답 재확인
+22. **Concurrent Playwright runners use isolated compose only** — shared `make dev` stack은 single active runner 계약 유지
+23. **Isolated web runtimes need per-stack `.next` storage** — host-shared `.next`는 Next dev artifact cross-talk를 만들어 `/landing` 500과 module-not-found를 유발
 
 ---
 
@@ -163,10 +165,13 @@ Builder 작업 재개
 ## Current Repo Runtime Notes
 
 - `make dev`, `make up`, `make dev-local` for local development
+- Playwright canonical runbook: `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+- `make dev-web` is the official web-only recovery path and must rerun `deps + web` together; do not use `docker compose restart web` as a substitute
 - Dev ports: web=3003, api=8111, Swagger=`http://localhost:8111/docs`
 - Prod ports: web=3000, api=8100
 - Production EC2: `ec2-user`, may have standalone `docker-compose`
-- Dev Docker: glibc Node image, `nocopy` bootstrap, `bcryptjs` override
+- Dev Docker: glibc Node image, `nocopy` bootstrap, `bcryptjs` override, stack-local `.next` for shared and isolated web runtimes
+- If `docker compose ps` shows `web` healthy but `localhost:3003` still 500s, check `lsof -nP -iTCP:3003 -sTCP:LISTEN` for a stale host-side `pnpm --filter web dev` or `next dev` shadow process before touching app code
 - Postgres/Redis: internal Docker network, `web` gated on API healthcheck
 - Nest validation: strict (`whitelist + forbidNonWhitelisted`)
 
@@ -181,6 +186,10 @@ Builder 작업 재개
 | Backend unit | `make test-api` or `pnpm --filter api test` |
 | Backend integration | `make test-integration` or `pnpm --filter api test:integration` |
 | E2E | `make test-e2e` or `pnpm exec playwright test --config=e2e/playwright.config.ts` |
+| Isolated E2E up | `make e2e-isolated-up RUN=<id>` |
+| Isolated E2E full suite | `make test-e2e-isolated RUN=<id>` |
+| Isolated E2E targeted spec | `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` |
+| Isolated E2E down | `make e2e-isolated-down RUN=<id>` |
 | Full build | `pnpm build` |
 | Full lint | `pnpm lint` |
 

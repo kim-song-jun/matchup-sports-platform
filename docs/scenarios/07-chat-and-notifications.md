@@ -1,5 +1,8 @@
 # Chat And Notification Scenarios
 
+> Status: Partial
+> `NOTI-001`은 검증됨이다. 채팅 realtime 송수신과 multi-tab unread/read, 알림 설정 영속화는 아직 follow-up 범위다.
+
 ## Scenario Checklist
 
 - [ ] CHAT-001 두 사용자 간 채팅 송수신
@@ -81,3 +84,4 @@
 - 2026-04-08: `e2e/tests/notification-center.spec.ts`로 `match_created` same-user multi-tab delivery, `player_joined` multi-tab read sync, `payment_confirmed` deep-link를 `Desktop Chrome 3/3`로 최종 검증했다.
 - 2026-04-08: 알림 센터는 explicit in-app navigation, socket connect-time backfill, focus/visibility backfill을 같이 둬서 hidden tab recovery까지 보장하도록 정리했다.
 - 2026-04-08: `global-setup`의 `teams` seed drift는 여전히 best-effort warning으로 남지만, notification suite 자체는 더 이상 그 이슈에 막히지 않는다.
+- 2026-04-11: `/settings/notifications`의 category persistence는 이 파일의 verified 범위가 아니다. 현재 페이지는 persistence unsupported 상태로 보고, server sync는 task 39에서 다룬다.

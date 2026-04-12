@@ -1,23 +1,42 @@
 import { spawnSync } from 'child_process';
 import * as path from 'path';
 import { TEST_PERSONAS } from './test-users';
+import {
+  E2E_DOCKER_COMPOSE_FILE,
+  E2E_DOCKER_POSTGRES_DB,
+  E2E_DOCKER_POSTGRES_SERVICE,
+  E2E_DOCKER_PROJECT_NAME,
+  E2E_DOCKER_POSTGRES_USER,
+} from './runtime';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const E2E_PERSONA_NICKNAMES = Object.values(TEST_PERSONAS).map((persona) => persona.nickname);
 
-const DOCKER_POSTGRES_ARGS = [
-  'compose',
-  'exec',
-  '-T',
-  'postgres',
-  'psql',
-  '-U',
-  'matchup_user',
-  '-d',
-  'matchup_dev',
-  '-v',
-  'ON_ERROR_STOP=1',
-] as const;
+function dockerComposeArgs(): string[] {
+  const args = ['compose', '-f', E2E_DOCKER_COMPOSE_FILE];
+  if (E2E_DOCKER_PROJECT_NAME) {
+    args.push('-p', E2E_DOCKER_PROJECT_NAME);
+  }
+  return args;
+}
+
+function dockerPostgresArgs(sql: string): string[] {
+  return [
+    ...dockerComposeArgs(),
+    'exec',
+    '-T',
+    E2E_DOCKER_POSTGRES_SERVICE,
+    'psql',
+    '-U',
+    E2E_DOCKER_POSTGRES_USER,
+    '-d',
+    E2E_DOCKER_POSTGRES_DB,
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-c',
+    sql,
+  ];
+}
 
 function escapeSqlLiteral(value: string): string {
   return value.replace(/'/g, "''");
@@ -28,7 +47,7 @@ function toSqlStringList(values: string[]): string {
 }
 
 function runPostgresCommand(sql: string): string {
-  const result = spawnSync('docker', [...DOCKER_POSTGRES_ARGS, '-c', sql], {
+  const result = spawnSync('docker', dockerPostgresArgs(sql), {
     cwd: REPO_ROOT,
     encoding: 'utf-8',
     timeout: 30_000,
@@ -40,6 +59,23 @@ function runPostgresCommand(sql: string): string {
   }
 
   return result.stdout?.trim() ?? '';
+}
+
+export function checkDockerPostgresReady(): { ok: boolean; detail?: string } {
+  const result = spawnSync('docker', dockerPostgresArgs('SELECT 1;'), {
+    cwd: REPO_ROOT,
+    encoding: 'utf-8',
+    timeout: 30_000,
+  });
+
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      detail: result.stderr?.trim() ?? 'docker compose postgres query failed',
+    };
+  }
+
+  return { ok: true };
 }
 
 export function softDeleteE2EUsers(): string {

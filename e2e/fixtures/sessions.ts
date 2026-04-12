@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { injectTokens, loginViaApi } from './auth';
-import { WEB_BASE } from './test-users';
+import { authStatePath } from './runtime';
+import { PersonaKey, TEST_PERSONAS, WEB_BASE } from './test-users';
 
 export interface AuthenticatedSession {
   context: BrowserContext;
@@ -29,6 +32,28 @@ export async function createAuthenticatedSession(
   await visitAndStabilize(page, path);
 
   return { context, page, nickname };
+}
+
+export async function createPersistedContext(
+  browser: Browser,
+  personaKey: PersonaKey,
+): Promise<BrowserContext> {
+  const storageState = authStatePath(personaKey);
+  if (fs.existsSync(storageState)) {
+    return browser.newContext({ storageState });
+  }
+
+  const tokens = await loginViaApi(TEST_PERSONAS[personaKey].nickname);
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await visitAndStabilize(page, '/');
+  await injectTokens(page, tokens);
+  fs.mkdirSync(path.dirname(storageState), { recursive: true });
+  await context.storageState({ path: storageState });
+  await page.close();
+
+  return context;
 }
 
 export async function openSiblingTab(session: AuthenticatedSession, path: string) {

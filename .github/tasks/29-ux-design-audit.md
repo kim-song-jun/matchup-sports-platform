@@ -1,5 +1,7 @@
 # Task 29 — UI/UX Design Audit: 개선 필요 항목 목록
 
+> Historical design audit. Canonical rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and this file remains reference only.
+
 > 작성일: 2026-04-10  
 > 작성자: UI/UX Pro Max 스킬 + 코드베이스 정적 분석  
 > 대상: `apps/web/src` 전체 (99 pages, 19 shared components)

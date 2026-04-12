@@ -11,8 +11,13 @@
 
 import { test, expect } from '@playwright/test';
 import { TEST_PERSONAS } from '../fixtures/test-users';
-import { setupAuthState, loginViaApi, injectTokens } from '../fixtures/auth';
-import { expectLoginRedirectOrLink } from '../fixtures/sessions';
+import { setupAuthState } from '../fixtures/auth';
+import {
+  closeSessions,
+  createAuthenticatedSession,
+  expectLoginRedirectOrLink,
+  type AuthenticatedSession,
+} from '../fixtures/sessions';
 
 const SINARO = TEST_PERSONAS.sinaro.nickname;
 const TEAM_OWNER = TEST_PERSONAS.teamOwner.nickname;
@@ -109,35 +114,21 @@ test.describe('Chat room — message send', () => {
 
 test.describe('Chat — two-context realtime simulation', () => {
   test('two users can see same chat room (structure test)', async ({ browser }) => {
-    // This test uses two separate browser contexts to simulate two users
-    const context1 = await browser.newContext();
-    const context2 = await browser.newContext();
-    const page1 = await context1.newPage();
-    const page2 = await context2.newPage();
+    let session1: AuthenticatedSession | null = null;
+    let session2: AuthenticatedSession | null = null;
 
     try {
-      // Setup auth for both users
-      const tokens1 = await loginViaApi(SINARO);
-      const tokens2 = await loginViaApi(TEAM_OWNER);
+      session1 = await createAuthenticatedSession(browser, SINARO, '/chat');
+      session2 = await createAuthenticatedSession(browser, TEAM_OWNER, '/chat');
 
-      await page1.goto('http://localhost:3003');
-      await injectTokens(page1, tokens1);
-      await page2.goto('http://localhost:3003');
-      await injectTokens(page2, tokens2);
-
-      // Both navigate to /chat
-      await page1.goto('http://localhost:3003/chat');
-      await page2.goto('http://localhost:3003/chat');
-
-      await page1.waitForLoadState('networkidle');
-      await page2.waitForLoadState('networkidle');
+      await session1.page.waitForLoadState('networkidle');
+      await session2.page.waitForLoadState('networkidle');
 
       // Both pages should render chat without crash
-      await expect(page1.locator('main:visible').first()).toBeVisible();
-      await expect(page2.locator('main:visible').first()).toBeVisible();
+      await expect(session1.page.locator('main:visible').first()).toBeVisible();
+      await expect(session2.page.locator('main:visible').first()).toBeVisible();
     } finally {
-      await context1.close();
-      await context2.close();
+      await closeSessions([session1, session2]);
     }
   });
 });

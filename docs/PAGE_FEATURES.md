@@ -1,7 +1,8 @@
 # MatchUp 페이지별 기능 명세서
 
-> 최종 업데이트: 2026-04-10
-> 전체 72개 페이지의 기능, 데이터 소스, 인터랙션 상세
+> 최종 업데이트: 2026-04-11
+> 현재 구현 surface 기준 명세. 검증 상태는 `docs/scenarios/index.md`를 source of truth로 사용한다.
+> `apps/web/src/app/**/page.tsx` 기준 현재 route snapshot은 91개다.
 
 ---
 
@@ -100,7 +101,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| **데이터** | `useMatch(id)` + mock 폴백 |
+| **데이터** | `useMatch(id)` |
 | **폼** | 생성과 동일한 필드, 기존 데이터 pre-fill |
 | **저장** | `PATCH /matches/{id}` → 상세 페이지 이동 |
 | **취소** | `router.back()` |
@@ -199,23 +200,26 @@
 | **필드** | 팀명, 종목, 설명, 지역(시/구), 실력등급(S~D), 선출선수 수, 유니폼 색상, 모집 여부, 연락처, SNS(인스타/유튜브/카카오톡), 쇼츠 URL |
 | **API** | `POST /teams` |
 
-### `/teams/[id]` — 팀 상세
+### `/teams/[id]` — 팀 허브
 
 | 항목 | 내용 |
 |------|------|
-| **데이터** | `useTeam(id)`, `useTeamBadges(id)` |
-| **신뢰 지표** | 정보 일치도(%), 매너 점수, 지각률(%), 노쇼율(%) |
-| **전적** | X전 X승 X무 X패 (승률 %) |
-| **뱃지** | BadgeDisplay 컴포넌트 |
-| **최근 경기** | 상대팀명, 스코어, 결과(승/무/패) |
+| **데이터** | `useTeam(id)`, `useTeamHub(id)` |
+| **섹션 구조** | `overview / goods / passes / events` segmented tabs |
+| **허브 카운트** | section별 goods/passes/events count |
+| **overview** | 팀 소개, 지역, 오너 정보, 기존 팀 identity |
+| **goods** | team affiliation이 붙은 장터 listing preview |
+| **passes** | team affiliation이 붙은 lesson/ticket preview |
+| **events** | team affiliation이 붙은 tournament preview |
 | **팀 참여 신청** | 인증 분기: 로그인 후 신청/바로 신청 |
-| **SNS 링크** | 인스타, 유튜브, 카카오톡 외부 링크 |
-| **공유** | Web Share API |
+| **관리 CTA** | capability가 있을 때만 수정 버튼 노출 |
+| **하위 플로우** | `/teams/[id]/matches`, `/teams/[id]/mercenary`, `/teams/[id]/members` 유지 |
 
 ### `/teams/[id]/edit` — 팀 수정
 
 | 항목 | 내용 |
 |------|------|
+| **데이터** | `useTeam(id)` prefill |
 | **저장** | `PATCH /teams/{id}` |
 | **삭제** | `DELETE /teams/{id}` (확인 모달) |
 
@@ -239,6 +243,7 @@
 | **데이터** | `useLessons(params)` |
 | **타입 필터** | 전체/그룹 레슨/연습 경기/자유 연습 |
 | **검색** | 제목, 코치명, 장소명 필터링 |
+| **소속 컨텍스트** | team/venue affiliation이 있으면 카드에서 publisher badge 노출 |
 | **강좌 등록** | → `/lessons/new` |
 
 ### `/lessons/new` — 강좌 등록
@@ -255,11 +260,12 @@
 | 항목 | 내용 |
 |------|------|
 | **데이터** | `useLesson(id)` |
-| **커버** | 종목 아이콘 + 유형 배지 (그라데이션 배경) |
-| **코치 소개** | 프로필 사진, 이름, 경력, 평점, 수강생 수 |
-| **커리큘럼** | 4개 섹션 (오리엔테이션/기본기/실전/피드백) |
+| **커버** | 업로드 이미지 우선 + 실사형 로컬 fallback cover/gallery |
+| **코치 소개** | 프로필 사진, 이름, 코치 소개 + sample stats 텍스트 |
+| **커리큘럼** | 현재는 sample curriculum 4개 섹션 |
 | **추천 대상** | "이런 분께 추천합니다" 4개 항목 |
-| **수강 신청** | 결제 모달 (수강료 있을 때) / 바로 신청 (무료) |
+| **수강 신청** | 무료는 즉시 신청, 유료 수강권은 `준비 중` 배너와 disabled CTA |
+| **일정 예약** | `LessonCalendar` 노출, 실제 예약 저장은 아직 준비 중 토스트 |
 | **캘린더 추가** | Google Calendar 연동 |
 | **2컬럼** | 왼쪽 정보 + 오른쪽 CTA (sticky sidebar) |
 
@@ -275,6 +281,7 @@
 | **검색** | 상품명, 종목 필터링 |
 | **카테고리** | 전체/풋살화/하키장비/농구화/라켓/유니폼/보호장비 |
 | **카드** | 썸네일, 제목, 지역, 가격(굵게), 상태 배지, 대여 배지, 조회수, 좋아요 수 |
+| **소속 컨텍스트** | team/venue affiliation이 있으면 허브 맥락 배지 노출 |
 | **글쓰기** | → `/marketplace/new` |
 
 ### `/marketplace/new` — 매물 등록
@@ -292,7 +299,7 @@
 | **데이터** | `useListing(id)` |
 | **좋아요** | 하트 토글 (빨간 fill) |
 | **공유** | Web Share API |
-| **구매하기** | → `/payments/checkout` |
+| **거래 계약** | 안전결제는 아직 미지원, 현재는 채팅 기반 거래만 지원 |
 | **채팅하기** | → `/chat` (판매자와 대화) |
 | **신고** | 토스트 "신고가 접수되었습니다" |
 | **판매자 정보** | 닉네임, 매너점수 |
@@ -318,18 +325,53 @@
 | **종목 필터** | 전체/풋살/농구/배드민턴/아이스하키 |
 | **지역 필터** | 전체/서울/경기/인천/부산/대구/대전/광주 |
 
-### `/venues/[id]` — 시설 상세
+### `/venues/[id]` — 시설 허브
 
 | 항목 | 내용 |
 |------|------|
-| **데이터** | `useVenue(id)` + mock 폴백 |
-| **지도** | MapPlaceholder (CSS 기반 + 네이버 지도 링크) |
-| **운영시간** | 평일/주말 시간 카드 |
-| **편의시설** | 태그 배지 (주차장, 샤워실, 라커 등) |
-| **리뷰** | 별점 + 리뷰 목록 |
-| **리뷰 작성** | ReviewForm (별점 4항목 + 빙질 + 코멘트 + 사진) |
-| **전화 문의** | `tel:` 링크 |
-| **예정 경기** | 이 구장에서 열리는 팀 매칭 목록 |
+| **데이터** | `useVenue(id)`, `useVenueHub(id)` + 로컬 이미지 fallback |
+| **섹션 구조** | `overview / goods / passes / events` tabs |
+| **overview** | 시설 소개, 운영시간, 편의시설, 기존 review/schedule count |
+| **goods** | venue affiliation이 붙은 listing preview |
+| **passes** | `venueId` 기반 lesson/ticket preview |
+| **events** | venue affiliation이 붙은 tournament preview |
+| **관리 CTA** | capability가 있을 때만 수정 버튼 노출 |
+
+### `/venues/[id]/edit` — 시설 수정
+
+| 항목 | 내용 |
+|------|------|
+| **데이터** | `useVenue(id)` prefill + `useVenueHub(id)` capability |
+| **권한 가드** | `canEditProfile`이 없으면 권한 없음 메시지 |
+| **저장** | `PATCH /venues/{id}` |
+
+---
+
+## 8-1. 대회
+
+### `/tournaments` — 대회 목록
+
+| 항목 | 내용 |
+|------|------|
+| **데이터** | `useTournaments()` |
+| **카드** | 제목, 일정, 상태, 참가비, team/venue affiliation context |
+| **등록** | → `/tournaments/new` |
+
+### `/tournaments/new` — 대회 등록
+
+| 항목 | 내용 |
+|------|------|
+| **필드** | 제목, 종목, 일정, 참가비, 설명 |
+| **허브 컨텍스트** | `teamId` 또는 `venueId` query가 있으면 연결 안내 배너 노출 |
+| **저장 계약** | `eventDate`를 실제 API의 `startDate/endDate`로 변환 |
+| **API** | `POST /tournaments` |
+
+### `/tournaments/[id]` — 대회 상세
+
+| 항목 | 내용 |
+|------|------|
+| **데이터** | `useTournament(id)` |
+| **정보** | 종목, 일정, venue/team affiliation, 참가비, 설명 |
 
 ---
 
@@ -362,8 +404,8 @@
 
 | 항목 | 내용 |
 |------|------|
-| **데이터** | `useMercenaryPosts()` + mock 폴백 |
-| **종목 필터** | 전체/축구/풋살 |
+| **데이터** | `useMercenaryPosts()` |
+| **종목 필터** | 전체 + 서비스 지원 종목 전체 |
 | **카드** | 팀명, 포지션, 레벨, 날짜, 장소, 비용(무료 태그), 매너점수 |
 | **신청** | `POST /mercenary/{id}/apply` + 토스트 |
 | **내 모집/신청** | → `/my/mercenary` 바로가기 |
@@ -375,6 +417,16 @@
 | **필드** | 팀 선택, 날짜, 시간, 장소, 포지션(GK/DF/MF/FW/ALL), 인원(1~5), 레벨, 비용, 비고 |
 | **API** | `POST /mercenary` |
 
+### `/mercenary/[id]` — 용병 모집 상세
+
+| 항목 | 내용 |
+|------|------|
+| **데이터** | `useMercenaryPost(id)` |
+| **정보 표시** | 팀명, 포지션, 레벨, 날짜, 장소, 비용, 모집 인원, 작성자 |
+| **비로그인 신청** | `/login?redirect=/mercenary/{id}` |
+| **로그인 신청** | `POST /mercenary/{id}/apply` |
+| **작성자 전용** | 수정(`/mercenary/[id]/edit`), 삭제(`DELETE /mercenary/{id}`) |
+
 ---
 
 ## 11. 뱃지
@@ -383,6 +435,7 @@
 
 | 항목 | 내용 |
 |------|------|
+| **데이터** | `useAllBadgeTypes()` + local visual config |
 | **8종 뱃지** | |
 | 1 | 매너 플레이어 — 매너 점수 4.5 이상 |
 | 2 | 시간 약속왕 — 지각률 0% |
@@ -393,7 +446,8 @@
 | 7 | 연승 행진 — 5연승 이상 |
 | 8 | 페어플레이 — 무분쟁 20경기 |
 | **탭** | 내 뱃지 / 전체 뱃지 |
-| **진행도** | 미달성 뱃지에 progress bar 표시 |
+| **신뢰 신호** | badge catalog는 API, earned/progress는 mixed/sample banner로 구분 |
+| **진행도** | 미달성 뱃지에 progress bar 표시 (현재 일부 로컬 추정값 포함) |
 
 ---
 
@@ -403,7 +457,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| **데이터** | `usePayments()` + mock 폴백 |
+| **데이터** | `usePayments()` real-data 우선, empty/error 분기 |
 | **필터** | 전체/매치/강좌/장터 탭 |
 | **기간** | 시작일 ~ 종료일 date range |
 | **카드** | 상태 배지(완료/환불/대기/실패), 결제수단 아이콘, 금액, 날짜 |
@@ -413,17 +467,17 @@
 
 | 항목 | 내용 |
 |------|------|
-| **주문 요약** | 상품명, 날짜, 장소, 금액 |
-| **쿠폰** | 코드 입력 + 적용 버튼 |
-| **가격 분석** | 원가, 할인, 최종 금액 |
+| **주문 요약** | route context가 있는 주문만 렌더 |
+| **지원 범위** | 현재 `source=match` + `participantId`가 있는 매치 참가 결제만 처리 |
 | **결제수단** | 신용카드/토스페이/네이버페이/카카오페이 라디오 |
 | **약관 동의** | 체크박스 필수 |
-| **결제하기** | 시뮬레이션 (2초) → 성공 토스트 |
+| **결제하기** | 지원된 context에서 `prepare -> confirm` 흐름, lesson/marketplace paid commerce는 미지원 |
 
 ### `/payments/[id]` — 결제 상세
 
 | 항목 | 내용 |
 |------|------|
+| **데이터** | owner-bound payment detail |
 | **상태 배너** | 완료(초록)/환불(빨강)/대기(주황) |
 | **상세** | 금액, 결제수단, 카드번호(마스킹), 영수증 번호, 타임라인 |
 | **환불** | 시간 기반: 24시간 전 전액, 1~24시간 50%, 1시간 이내 불가 |
@@ -432,6 +486,7 @@
 
 | 항목 | 내용 |
 |------|------|
+| **데이터** | route payment 기준 환불 요청 |
 | **환불 정책** | 시간 기반 자동 계산 (전액/50%/불가) |
 | **환불 사유** | 일정 변경/개인 사정/매치 취소/기타 |
 | **확인 모달** | 환불 금액 + 경고 → `POST /payments/{id}/refund` |
@@ -453,6 +508,7 @@
 
 | 항목 | 내용 |
 |------|------|
+| **데이터** | sample-labelled trust signal banner (real API pending) |
 | **평균 점수** | 큰 숫자 표시 |
 | **별점 분포** | 5점~1점 가로 바 차트 |
 | **리뷰 목록** | 평가자명, 별점, 코멘트, 매치명, 날짜 |
@@ -465,9 +521,10 @@
 
 | 항목 | 내용 |
 |------|------|
-| **목록** | 내가 호스트인 매치 |
+| **생성 탭** | 내가 호스트인 매치 실데이터 |
+| **참가 탭** | 전용 집계 API 정리 전까지 honest empty/follow-up banner 표시 |
 | **수정** | → `/matches/[id]/edit` |
-| **취소** | `PATCH /matches/{id}` status:cancelled (확인 모달) |
+| **취소** | `POST /matches/{id}/cancel` (확인 모달) |
 
 ### `/my/team-matches` — 내 팀 매칭 모집글
 
@@ -545,8 +602,11 @@
 
 | 항목 | 내용 |
 |------|------|
-| **마스터** | Push 알림, 이메일 알림 on/off |
-| **카테고리** | 매치, 채팅, 결제, 장터, 팀 매칭, 마케팅 (각 토글) |
+| **현재 상태** | `match/team/chat/payment` 4개 category는 서버 동기화, 브라우저 권한/DND는 device-local, email/marketing/master는 미지원 범위로 분리 |
+| **서버 동기화** | 매치, 팀, 채팅, 결제 토글을 `/notifications/preferences`로 조회/저장 |
+| **디바이스 로컬** | 브라우저 Push 권한 상태 표시, 방해금지 시간(DND) 토글 |
+| **미지원** | 이메일 알림, 마케팅 수신, 전체 마스터 토글은 서버 저장 계약이 없어 안내 섹션으로만 노출 |
+| **검증 메모** | `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web test` 통과. live protected-route browser smoke는 stale API process와 web restart instability 때문에 follow-up |
 
 ### `/settings/terms` — 이용약관
 ### `/settings/privacy` — 개인정보처리방침
@@ -577,11 +637,11 @@
 | `/admin/teams/[id]` | 상세 + 뱃지 관리 + 정지 |
 | `/admin/team-matches` | 팀 매칭 목록, 검색, 상태 |
 | `/admin/mercenary` | 용병 모집 목록, 삭제 |
-| `/admin/reviews` | 평가 데이터, 평균 통계 |
+| `/admin/reviews` | 현재 mock 기반 평가 데이터/평균 통계 |
 | `/admin/venues` | 시설 목록 |
 | `/admin/venues/new` | 시설 등록 폼 |
 | `/admin/venues/[id]` | 시설 수정/삭제 |
-| `/admin/payments` | 결제 목록, 상태 필터 |
+| `/admin/payments` | API 우선, 비어 있으면 mock fallback 잔존 |
 | `/admin/disputes` | 신고/분쟁 (대기/조사/해결/기각) |
 | `/admin/disputes/[id]` | 분쟁 상세 + 해결/기각/경고/정지 |
 | `/admin/statistics` | 통계 차트 (CSS 바 차트) |

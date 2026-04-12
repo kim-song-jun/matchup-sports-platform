@@ -11,5 +11,5 @@ export const TEST_PERSONAS = {
 
 export type PersonaKey = keyof typeof TEST_PERSONAS;
 
-export const API_BASE = 'http://localhost:8111';
-export const WEB_BASE = 'http://localhost:3003';
+export const API_BASE = process.env.E2E_API_BASE ?? 'http://localhost:8111';
+export const WEB_BASE = process.env.E2E_WEB_BASE ?? 'http://localhost:3003';

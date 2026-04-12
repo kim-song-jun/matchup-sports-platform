@@ -55,7 +55,7 @@ test.describe('Auth session matrix', () => {
       await adminSession.page.goto('/admin/dashboard', { waitUntil: 'domcontentloaded' });
       await adminSession.page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
       await expect(adminSession.page).toHaveURL(/\/admin\/dashboard/);
-      await expect(adminSession.page.getByText('TeamMeet Admin')).toBeVisible();
+      await expect(adminSession.page.getByText('MatchUp Admin')).toBeVisible();
     } finally {
       await closeSessions([regularSession, adminSession]);
     }

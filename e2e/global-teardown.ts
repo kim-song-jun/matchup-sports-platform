@@ -1,8 +1,6 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { softDeleteE2EUsers } from './fixtures/db-runtime';
-
-const AUTH_DIR = path.join(__dirname, '.auth');
+import { E2E_AUTH_DIR } from './fixtures/runtime';
 
 /**
  * Clean up E2E test artifacts.
@@ -12,11 +10,11 @@ const AUTH_DIR = path.join(__dirname, '.auth');
  */
 export default async function globalTeardown() {
   // Remove stored auth state files
-  if (fs.existsSync(AUTH_DIR)) {
-    const files = fs.readdirSync(AUTH_DIR).filter((f) => f.endsWith('.json'));
+  if (fs.existsSync(E2E_AUTH_DIR)) {
+    const files = fs.readdirSync(E2E_AUTH_DIR).filter((f) => f.endsWith('.json'));
     for (const file of files) {
       try {
-        fs.unlinkSync(path.join(AUTH_DIR, file));
+        fs.unlinkSync(`${E2E_AUTH_DIR}/${file}`);
       } catch {
         // ignore
       }

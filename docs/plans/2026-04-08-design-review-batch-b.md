@@ -1,5 +1,7 @@
 # 2026-04-08 Design Review — Batch B
 
+> Historical planning note. Canonical rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and current design remediation execution lives in `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`.
+
 ## Scope
 
 - `MainLayout`

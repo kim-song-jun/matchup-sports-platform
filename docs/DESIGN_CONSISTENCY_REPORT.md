@@ -1,5 +1,6 @@
 # MatchUp 디자인 통일성 검사 보고서
 
+> 이 문서는 audit snapshot이다. 규칙 정의는 `DESIGN.md`, 문서 내비게이션은 `docs/DESIGN_DOCUMENT_MAP.md`, 현재 디자인 개선 실행 계약은 `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`를 따른다.
 > 검사일: 2026-04-10 (원본: 2026-03-25)
 > 대상: 랜딩 제외 전체 사용자 페이지 (50+)
 
@@ -48,7 +49,9 @@
 | 헤더 패딩 pt-4 pb-3 | 대부분 통일 |
 | dark mode | 18/50+ 적용 (진행 중) |
 
-## 디자인 시스템 표준 (확정)
+## Audit 기준 요약
+
+> Canonical 규칙은 `DESIGN.md`를 따른다. 아래 내용은 2026-04-10 시점 감사에 사용한 요약 기준이다.
 
 ```
 타이포:
@@ -69,7 +72,7 @@
 색상:
   액센트: blue-500
   필터 active: bg-gray-900 text-white
-  카드 border: border-gray-100
+  카드 처리: subtle full border 또는 very light shadow
   배경: bg-gray-50 / bg-white
 ```
 

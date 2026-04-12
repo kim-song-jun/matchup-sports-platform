@@ -1,5 +1,7 @@
 # 2026-04-08 Design Remediation Priority
 
+> Historical planning note. Canonical rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and current design remediation execution lives in `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`.
+
 ## 목적
 
 2026-04-08 기준 Batch A~G 디자인 리뷰 결과를 구현 우선순위 기준으로 재정렬한다. 이 문서는 개별 배치 문서를 대체하지 않으며, 실제 수정 작업을 `.github/tasks/`로 쪼개기 전 상위 큐로 사용한다.

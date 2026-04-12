@@ -10,11 +10,59 @@
  */
 
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { API_BASE } from '../fixtures/test-users';
 import { TEST_PERSONAS } from '../fixtures/test-users';
-import { setupAuthState } from '../fixtures/auth';
+import { loginViaApi, setupAuthState } from '../fixtures/auth';
 
 const ADMIN = TEST_PERSONAS.admin.nickname;
 const SINARO = TEST_PERSONAS.sinaro.nickname;
+const ADMIN_API_BASE = `${API_BASE}/api/v1`;
+
+interface AdminHeaders {
+  Authorization: string;
+  'Content-Type': string;
+}
+
+function moderationNote(prefix: string) {
+  return `${prefix}-${Date.now()}`;
+}
+
+async function waitForAdminPage(page: Page, path: string) {
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+  await expect(page.locator('main')).toBeVisible();
+}
+
+async function createAdminHeaders(): Promise<AdminHeaders> {
+  const tokens = await loginViaApi(ADMIN);
+  return {
+    Authorization: `Bearer ${tokens.accessToken}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function adminApiRequest<T>(
+  path: string,
+  init: RequestInit & { headers?: Record<string, string> },
+): Promise<T> {
+  const response = await fetch(`${ADMIN_API_BASE}${path}`, init);
+  const text = await response.text();
+  let body: unknown;
+
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = text;
+  }
+
+  if (!response.ok) {
+    throw new Error(`${path} failed: ${response.status} ${JSON.stringify(body)}`);
+  }
+
+  const payload = body as { data?: T };
+  return (payload.data ?? body) as T;
+}
 
 test.describe('Admin dashboard — admin user', () => {
   test.beforeEach(async ({ page }) => {
@@ -101,6 +149,110 @@ test.describe('Admin dashboard — admin user', () => {
     await matchLink.click();
     await page.waitForURL(/\/admin\/matches/, { timeout: 5_000 });
     await expect(page).toHaveURL(/\/admin\/matches/);
+  });
+
+  test('ADMIN-001 payments page shows honest empty state when API returns no rows', async ({ page }) => {
+    await page.route('**/api/v1/admin/payments', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'success',
+          data: [],
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await waitForAdminPage(page, '/admin/payments');
+
+    await expect(page.getByRole('heading', { name: '결제 관리' })).toBeVisible();
+    await expect(page.getByText('아직 결제 내역이 없어요')).toBeVisible();
+    await expect(page.getByText('실제 결제가 생성되면 여기에 표시돼요')).toBeVisible();
+  });
+
+  test('ADMIN-001 reviews page shows honest error state when API fails', async ({ page }) => {
+    await page.route('**/api/v1/admin/reviews', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'error',
+          message: 'internal test failure',
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await waitForAdminPage(page, '/admin/reviews');
+
+    await expect(page.getByRole('heading', { name: '평가 관리' })).toBeVisible();
+    await expect(page.getByText('평가 목록을 불러오지 못했어요')).toBeVisible();
+    await expect(page.getByRole('button', { name: '다시 불러오기' })).toBeVisible();
+  });
+
+  test('ADMIN-001 moderation UI writes warn, suspend, reactivate without leaving admin shell', async ({ page }) => {
+    test.slow();
+
+    const targetNickname = `admin-moderation-ui-${Date.now()}`;
+    const targetTokens = await loginViaApi(targetNickname);
+    const targetId = String(targetTokens.user?.id ?? '');
+    if (!targetId) {
+      throw new Error('target user id missing from dev-login response');
+    }
+
+    const warnNote = moderationNote('ui-warn');
+    const suspendNote = moderationNote('ui-suspend');
+    const reactivateNote = moderationNote('ui-reactivate');
+    let needsCleanup = false;
+
+    const openActionModal = async (buttonName: RegExp | string) => {
+      await page.getByRole('button', { name: buttonName }).click();
+      await expect(page.getByRole('button', { name: '저장' })).toBeVisible();
+    };
+
+    const submitActionNote = async (note: string) => {
+      await page.locator('#admin-user-action-note').fill(note);
+      await page.getByRole('button', { name: '저장' }).click();
+    };
+
+    try {
+      await waitForAdminPage(page, `/admin/users/${targetId}`);
+      await expect(page).toHaveURL(new RegExp(`/admin/users/${targetId}$`));
+      await expect(page.getByText(targetNickname)).toBeVisible();
+
+      await openActionModal(/경고 기록/);
+      await submitActionNote(warnNote);
+      await expect(page.getByText(warnNote)).toBeVisible({ timeout: 10_000 });
+
+      await openActionModal(/계정 정지/);
+      await submitActionNote(suspendNote);
+      needsCleanup = true;
+      await expect(page.getByText(`정지 사유: ${suspendNote}`)).toBeVisible({ timeout: 10_000 });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+      await expect(page.getByText(`정지 사유: ${suspendNote}`)).toBeVisible();
+      await expect(page.getByText('정지').first()).toBeVisible();
+
+      await openActionModal(/계정 활성화/);
+      await submitActionNote(reactivateNote);
+      await expect(page.getByText(reactivateNote)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(`정지 사유: ${suspendNote}`)).toHaveCount(0);
+      await expect(page).toHaveURL(new RegExp(`/admin/users/${targetId}$`));
+      needsCleanup = false;
+    } finally {
+      if (needsCleanup) {
+        const headers = await createAdminHeaders();
+        await adminApiRequest(`/admin/users/${targetId}/status`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            status: 'active',
+            note: 'playwright-cleanup',
+          }),
+        }).catch(() => undefined);
+      }
+    }
   });
 });
 

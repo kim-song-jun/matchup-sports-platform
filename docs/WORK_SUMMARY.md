@@ -1,5 +1,7 @@
 # MatchUp 플랫폼 작업 요약
 
+> 이 문서는 작업 히스토리 요약이다. 현재 구현 surface와 검증 상태의 source of truth는 각각 `docs/IMPLEMENTATION_STATUS.md`, `docs/scenarios/index.md`다.
+
 ## 개요
 
 MatchUp 스포츠 매칭 플랫폼의 프론트엔드 디자인 시스템 전면 개선, 코드 품질 정비, 반응형 시스템 마이그레이션, 국제화(i18n) 인프라 구축, E2E 테스트 스위트 작성을 수행함.
@@ -36,6 +38,26 @@ MatchUp 스포츠 매칭 플랫폼의 프론트엔드 디자인 시스템 전면
 - **chat N+1 해소**: `chat.service.ts` `getUnreadCount()` — 참가방 순회 N+1 → `$queryRaw` 단일 집계 쿼리. 본인 발송 메시지 제외 로직 추가. `chat.service.spec.ts` 5개 케이스로 재작성
 - **nginx 보안/성능**: `/api/docs` 접근 내부 IP 제한, `client_max_body_size 55m`, `/uploads/` rate limit 10req/min, WebSocket `proxy_read_timeout 86400s`
 - **저장소 정리**: `.gitignore`에 `*.bak.*`, `__pycache__/`, `*.pyc` 패턴 추가. 백업 파일 3개 + pyc 2개 인덱스 제거
+
+### 2026-04-11 추가 업데이트
+
+- **team/venue hub rollout**: `/teams/[id]`, `/venues/[id]`를 `overview / goods / passes / events` 허브 landing으로 재구성하고, 팀/장소 소속 콘텐츠를 집계하는 `GET /teams/:id/hub`, `GET /venues/:id/hub` read model을 추가
+- **owner-scoped catalog affiliation**: `Lesson.teamId`, `MarketplaceListing.teamId/venueId`, `Venue.ownerId`를 도입해 팀/장소 귀속 데이터와 capability 기반 edit CTA를 연결
+- **tournament minimum domain**: `/tournaments`, `/tournaments/[id]`, `/tournaments/new`와 `GET/POST /tournaments`를 추가하고, 허브 `events` section과 연결
+- **hub validation**: `api db:generate`, `api tsc`, targeted backend unit, `api build`, `web tsc`, targeted hooks vitest, `/api/v1/health`, hub endpoint, route HTTP 200 smoke를 확인
+- **dev mock seed workflow**: `apps/api/prisma/mock-data-catalog.ts`, `apps/api/prisma/seed-mocks.ts`, `make db-seed-mocks`, `pnpm db:seed:mocks`를 추가해 canonical mock dataset을 non-destructive upsert 경로로 분리
+- **deploy checksum gate**: `SeedSyncState` 테이블과 `seed-mocks.ts --checksum-gate`를 추가해 deploy마다 checksum을 확인하고, `DEPLOY_SYNC_MOCK_DATA=false`가 아닌 한 필요한 경우에만 canonical mock dataset을 자동 sync하도록 연결
+- **deploy/runtime wiring**: `.github/workflows/deploy.yml`, `deploy/docker-compose.prod.yml`, `deploy/.env.prod.example`, `deploy/setup-ec2.sh`, `deploy/DEPLOY_GUIDE.md`를 같은 변경으로 맞춰 CI 배포와 수동 EC2 bootstrap이 동일한 mock sync 계약을 따르게 정리했고, `bootstrap-deploy-db.ts`로 빈 DB bootstrap fallback과 기존 DB `migrate deploy` 경로를 하나의 entrypoint로 통합
+- **canonical mock dataset 범위 확장**: mock users 12, venues 10, teams 10, matches 11, lessons 8, listings 10, mercenary posts 8, team matches 6, team badges 6으로 확대하고 soccer/baseball/volleyball/swimming/figure/short-track surface까지 커버
+- **public profile mock assets**: `apps/web/public/mock/profile/profile-01.svg` ~ `profile-12.svg`를 추가하고 mock users의 `profileImageUrl`이 로컬 public asset을 직접 참조하도록 맞춤
+- **seed 검증 결과**: checksum-gated deploy run 1회차는 state 저장 후 sync, 2회차는 `checksum unchanged` skip, `DEPLOY_SYNC_MOCK_DATA=false`는 disabled skip으로 동작했고, profile/team/match/lesson/listing/venue image field가 `/mock/*` 기반으로 유지되는 것을 DB query로 확인
+- **empty DB bootstrap 검증**: 신규 임시 Postgres에서 기존 migration chain 단독 replay가 실패하는 것을 재현한 뒤, `bootstrap-deploy-db.ts`가 orphaned migration history reset 후 `db push + migrate resolve + migrate deploy`까지 통과하도록 보완
+- **모바일 glass chrome system**: `globals.css`에 mobile glass token/class 세트를 추가하고, `BottomNav`, `(main) layout`, `landing-nav`, 홈 상단, 반복되는 detail sticky header를 공용 `MobileGlassHeader` 패턴으로 정리. 원칙은 `glass as frame, solid as content`로 고정
+- **디자인 규칙 명문화**: `.impeccable.md`, `AGENTS.md`에 mobile glass는 bottom nav / sticky header / overlay 같은 chrome layer에만 제한하고 dense content surface는 solid 유지한다는 규칙 추가
+- **프론트 검증 결과**: `pnpm --filter web test`, `pnpm --filter web lint` 통과. `tsc --noEmit`는 초기 실행에서는 통과했지만 ad hoc Next route-type regeneration 이후 task 범위 밖의 기존 타입 에러(`matches/new`, `team-matches/*`, `mercenary/page`, `uploads.ts`)가 surfaced 됐다. `pnpm --filter web build`는 기존 `@/components/ui/image-upload` module resolution 이슈로 실패했고, ad hoc Next dev browser smoke도 기존 React Client Manifest 오류로 막혀 non-task blocker로 기록
+- **문서 truth sync**: `docs/scenarios/index.md`, 개별 scenario 문서, `IMPLEMENTATION_STATUS`, `PAGE_FEATURES`의 상태 언어를 `구현됨 / 검증됨 / 부분 구현 / 미지원 / follow-up`으로 정리
+- **stale claim 재분류**: `MATCH-003 blocked`, `/mercenary/[id] 미존재`, `/settings/notifications`의 저장 완료처럼 현재 코드와 충돌하던 문구를 현재형 기준으로 수정
+- **backlog 추적성 보존**: outdated 항목은 삭제하지 않고 `stale / superseded / follow-up` 언어로 남겨 다음 구현 라운드의 single source를 복원
 
 ### 2026-04-08 추가 업데이트
 - `apps/web/src/lib/sport-image.ts`의 active fallback catalog를 전부 `/apps/web/public/mock/photoreal/` 기반 실사 사진으로 전환

@@ -77,9 +77,14 @@
 - [ ] 단계가 끊기지 않고 이어진다.
 - [ ] 이미 완료한 단계를 중복 제출할 수 없다.
 - [ ] 결과와 평가가 후속 화면에 반영된다.
+- [ ] `arrival`은 실제 참가 팀과 저장된 `arrivalChecks` 기준으로 hydrate된다.
+- [ ] GPS 반경 판정, 사진 업로드, 상대팀 지각/노쇼 판정은 미지원이면 fake control 대신 안내형 UI로 노출된다.
+- [ ] `score`는 실제 `quarterCount`와 확정된 두 참가 팀 기준으로 저장되고, `completed` 후에는 read-only 상태를 본다.
+- [ ] `evaluate`는 `completed` 경기에서만 제출 가능하고, 실제 참가 팀 기준으로 팀당 1회만 제출된다.
 
 ## Notes
 
 - 팀 매치는 권한, 실시간, 알림이 함께 얽혀 있어 핵심 회귀 세트로 다룬다.
 - 2026-04-07: `/teams/new`, `/my/teams`, `/team-matches`, `/team-matches/new` step 0 Desktop Chrome 스모크는 통과했다. 실제 신청/승인/거절/알림/경기 후 평가 흐름은 다음 자동화 묶음으로 남아 있다.
 - 2026-04-07: `e2e/tests/team-owner-flow.spec.ts` Desktop Chrome smoke는 통과했다. 현재 자동화 범위는 팀 생성/my teams/team-matches step-0 진입까지이며, 신청/승인/알림/평가 시나리오는 후속 범위다.
+- 2026-04-11: `TM-004` 운영 화면 계약은 실제 `team-match` detail 기반으로 정렬되었고, arrival 재제출도 backend에서 차단되도록 닫았다. 전용 Playwright spec(`e2e/tests/team-match-operations.spec.ts`)은 `/team-matches` warmup으로 조정했고, live API `health`/`dev-login`도 다시 통과했다. 다만 현재 host Next dev runtime에서 `/team-matches` 계열이 간헐적으로 `ERR_CONNECTION_RESET` 또는 generic `Internal Server Error`를 반환해 browser green은 아직 별도 런타임 정리 후 다시 확인해야 한다.

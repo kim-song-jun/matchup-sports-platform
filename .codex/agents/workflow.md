@@ -5,6 +5,7 @@
 - canonical agent docs: `.codex/agents/*.md`
 - compatibility prompt entry: `.claude/agents/prompts.md`
 - task docs: `.github/tasks/{NN}-{slug}.md`
+- Playwright runbook: `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
 
 ## Commands
 
@@ -67,6 +68,8 @@
 3. trust signal은 sample/estimated/verified를 명확히 구분할 것
 4. payment/refund/approval 등 거래 플로우는 실패를 성공처럼 시뮬레이션하지 않을 것
 5. live runtime contract가 바뀌면 실제 dev port에서 확인할 것
+6. concurrent local Playwright runner는 shared `make dev`가 아니라 isolated compose targets로만 검증할 것
+7. shared dev stack과 isolated web runtime 모두 stack-local `.next` volume을 유지해 Next dev artifact cross-talk를 막을 것
 
 ## Compatibility Rule
 

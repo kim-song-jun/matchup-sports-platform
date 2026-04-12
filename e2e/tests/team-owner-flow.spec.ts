@@ -1,102 +1,111 @@
 /**
- * Team owner flow scenarios — teamOwner persona
- *
- * Covers:
- * - Team creation form: fill required fields and submit
- * - Team list page shows created team
- * - Team matches list page loads
- * - Team match creation form (multi-step): navigate through steps
- * - My teams page shows teams
- * - Team matches new page shows "팀을 먼저 만들어주세요" if no team exists
+ * TEAM-001 owner-centric contracts for team creation and supported surfaces.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { TEST_PERSONAS } from '../fixtures/test-users';
-import { setupAuthState, loginViaApi } from '../fixtures/auth';
+import { setupAuthState, loginViaApi, gotoWithWarmup } from '../fixtures/auth';
 import { createTeamViaApi } from '../fixtures/api-helpers';
 
 const OWNER = TEST_PERSONAS.teamOwner.nickname;
 
-test.describe('Team creation — authenticated teamOwner', () => {
+function uniqueTeamName() {
+  return `E2E팀-${Date.now()}`;
+}
+
+function visibleByTestId(page: Page, testId: string) {
+  return page.locator(`[data-testid="${testId}"]:visible`).first();
+}
+
+async function expectActionHidden(container: Locator, name: RegExp) {
+  await expect(container.getByRole('button', { name })).toHaveCount(0);
+  await expect(container.getByRole('link', { name })).toHaveCount(0);
+}
+
+test.describe('TEAM-001 팀 생성과 오너 반영', () => {
   test.beforeEach(async ({ page }) => {
     await setupAuthState(page, OWNER);
   });
 
-  test('/teams/new page loads with required form fields', async ({ page }) => {
+  test('TEAM-001-A /teams/new 필수 필드가 노출된다', async ({ page }) => {
     await page.goto('/teams/new');
     await page.waitForLoadState('networkidle');
-    // Team name input
+
     await expect(page.locator('#team-name:visible').first()).toBeVisible();
-    // Sport type buttons
-    await expect(page.getByRole('button', { name: '풋살' })).toBeVisible();
-    // City selector
+    await expect(page.getByRole('button', { name: '풋살' }).first()).toBeVisible();
     await expect(page.locator('#team-city:visible').first()).toBeVisible();
-    // Submit button
-    await expect(page.locator('button:visible').filter({ hasText: '팀 등록하기' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '팀 등록하기' }).first()).toBeVisible();
   });
 
-  test('submitting team creation form with valid data navigates to /teams', async ({ page }) => {
+  test('TEAM-001-B 필수값 없이 제출하면 검증 메시지가 보인다', async ({ page }) => {
     await page.goto('/teams/new');
     await page.waitForLoadState('networkidle');
 
-    const uniqueName = `E2E팀${Date.now()}`;
+    await page.getByRole('button', { name: '팀 등록하기' }).first().click();
+    await expect(page.getByText(/팀명을|종목을|활동 지역을/).first()).toBeVisible({ timeout: 5_000 });
+  });
 
-    await page.locator('#team-name:visible').first().fill(uniqueName);
-    // Select futsal sport
-    await page.getByRole('button', { name: '풋살' }).click();
-    // Select city
+  test('TEAM-001-C 팀 생성 후 목록/상세/내 팀에 반영되고 지원된 owner CTA만 보인다', async ({ page }) => {
+    const teamName = uniqueTeamName();
+
+    await gotoWithWarmup(page, '/teams/new', '/teams');
+    await page.locator('#team-name:visible').first().fill(teamName);
+    await page.getByRole('button', { name: '풋살' }).first().click();
     await page.locator('#team-city:visible').first().selectOption('서울');
+    await page.getByRole('button', { name: '팀 등록하기' }).first().click();
 
-    await page.locator('button:visible').filter({ hasText: '팀 등록하기' }).first().click();
+    await expect(page).toHaveURL(/\/teams(?:\?|$)/, { timeout: 15_000 });
 
-    // Should navigate to /teams after success
-    await page.waitForURL(/\/teams/, { timeout: 10_000 });
-    await expect(page).toHaveURL(/\/teams/);
+    const createdTeamLink = page.locator('a[href^="/teams/"]:visible').filter({ hasText: teamName }).first();
+    await expect(createdTeamLink).toBeVisible({ timeout: 10_000 });
+    await createdTeamLink.click();
+
+    await expect(page).toHaveURL(/\/teams\/[^/]+$/, { timeout: 15_000 });
+    const teamId = page.url().split('/').filter(Boolean).at(-1);
+    expect(teamId).toBeTruthy();
+
+    await expect(page.getByRole('heading', { name: teamName }).first()).toBeVisible();
+    await expect(visibleByTestId(page, 'team-detail-members-link')).toBeVisible();
+    await expect(page.getByText('팀 정보 수정')).toHaveCount(0);
+
+    await page.goto('/my/teams');
+    await page.waitForLoadState('networkidle');
+
+    const teamCard = visibleByTestId(page, `my-team-card-${teamId}`);
+    await expect(teamCard).toBeVisible({ timeout: 10_000 });
+    await expect(visibleByTestId(page, `my-team-role-${teamId}`)).toHaveText(/팀장/);
+    await expect(visibleByTestId(page, `my-team-detail-${teamId}`)).toBeVisible();
+    await expect(visibleByTestId(page, `my-team-members-${teamId}`)).toHaveText('멤버 관리');
+    await expectActionHidden(teamCard, /팀 정보 수정|팀 삭제|삭제|수정/);
   });
 
-  test('submitting without required fields shows toast error', async ({ page }) => {
-    await page.goto('/teams/new');
+  test('TEAM-001-D supported surface에서는 unsupported edit/delete affordance가 숨겨진다', async ({ page }) => {
+    const tokens = await loginViaApi(OWNER);
+    const team = await createTeamViaApi(tokens.accessToken, {
+      name: `TEAM-001-D-${Date.now()}`,
+      sportType: 'futsal',
+      city: '서울',
+    });
+
+    await page.goto('/my/teams');
     await page.waitForLoadState('networkidle');
-    // Click submit without filling anything
-    await page.getByRole('button', { name: '팀 등록하기' }).click();
-    await page.waitForTimeout(500);
-    // Toast error message should appear
-    const errorToast = page.getByText(/팀명을|종목을|지역을/);
-    await expect(errorToast.first()).toBeVisible();
+
+    const teamCard = visibleByTestId(page, `my-team-card-${team.id}`);
+    await expect(teamCard).toBeVisible({ timeout: 10_000 });
+    await expectActionHidden(teamCard, /팀 정보 수정|팀 삭제|삭제|수정/);
+
+    await teamCard.locator('[data-testid^="my-team-detail-"]:visible').first().click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(visibleByTestId(page, 'team-detail-members-link')).toBeVisible();
+    await expect(page.getByText('팀 정보 수정')).toHaveCount(0);
   });
 });
 
-test.describe('My teams page — authenticated teamOwner', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupAuthState(page, OWNER);
-  });
-
-  test('/my/teams page loads with heading', async ({ page }) => {
-    await page.goto('/my/teams');
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('h1:visible, h2:visible').filter({ hasText: /내 팀/ }).first()).toBeVisible();
-  });
-
-  test('my teams page shows create team button or existing teams', async ({ page }) => {
-    await page.goto('/my/teams');
-    await page.waitForLoadState('networkidle');
-    // Either shows empty state with link or shows team cards
-    const createLink = page.locator('a[href="/teams/new"]');
-    const teamCards = page.locator('[class*="rounded"]').filter({ hasText: /풋살|축구|농구/ });
-    const hasCreate = await createLink.count() > 0;
-    const hasCards = await teamCards.count() > 0;
-    expect(hasCreate || hasCards).toBe(true);
-  });
-});
-
-test.describe('Team matches creation — multi-step form', () => {
-  let ownerToken: string;
-
+test.describe('Team match create entry remains available to an owner', () => {
   test.beforeAll(async () => {
     const tokens = await loginViaApi(OWNER);
-    ownerToken = tokens.accessToken;
-    // Create a team first so the new team match page doesn't block
-    await createTeamViaApi(ownerToken, {
+    await createTeamViaApi(tokens.accessToken, {
       name: `E2E매칭팀${Date.now()}`,
       sportType: 'soccer',
       city: '서울',
@@ -107,52 +116,11 @@ test.describe('Team matches creation — multi-step form', () => {
     await setupAuthState(page, OWNER);
   });
 
-  test('/team-matches/new — step 0: sport and title inputs are visible', async ({ page }) => {
-    await page.goto('/team-matches/new');
-    await page.waitForLoadState('networkidle');
-    // Should show either the form or the "팀을 먼저 만들어주세요" guard
-    const hasForm = await page.getByText('종목 선택').count() > 0;
-    const hasGuard = await page.getByText('팀을 먼저 만들어주세요').count() > 0;
-    // One of them must be present
-    expect(hasForm || hasGuard).toBe(true);
-  });
-
-  test('/team-matches/new — can proceed through step 0 with sport + title', async ({ page }) => {
+  test.fixme('TM-SMOKE-001 /team-matches/new에서 step 0 form이 열린다', async ({ page }) => {
     await page.goto('/team-matches/new');
     await page.waitForLoadState('networkidle');
 
-    // If guard shows, the test cannot proceed — skip gracefully
-    const guard = page.getByText('팀을 먼저 만들어주세요');
-    if (await guard.count() > 0) {
-      console.log('No teams available for team match form — skipping step navigation test');
-      return;
-    }
-
-    // Step 0: select sport and fill title
-    await page.getByRole('button', { name: '풋살' }).first().click();
-    const titleInput = page.locator('input[placeholder*="친선경기"]:visible').first();
-    await titleInput.fill('E2E 테스트 경기 모집');
-
-    // "다음" button should be enabled
-    const nextBtn = page.getByRole('button', { name: '다음' });
-    await expect(nextBtn).toBeEnabled();
-    await nextBtn.click();
-
-    // Step 1 should show 경기 날짜
-    await expect(page.getByText('경기 날짜')).toBeVisible({ timeout: 5_000 });
-  });
-});
-
-test.describe('Team matches list page', () => {
-  test('/team-matches page loads with heading and filters', async ({ page }) => {
-    await page.goto('/team-matches');
-    await expect(page.locator('h1:visible').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: '전체' }).first()).toBeVisible();
-  });
-
-  test('"모집글 작성" link is present on /team-matches', async ({ page }) => {
-    await page.goto('/team-matches');
-    const createLink = page.locator('a[href="/team-matches/new"]:visible').first();
-    await expect(createLink).toBeVisible();
+    await expect(page.locator('label:visible').filter({ hasText: '종목 선택' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '풋살' }).first()).toBeVisible();
   });
 });

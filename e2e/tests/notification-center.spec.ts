@@ -1,40 +1,22 @@
-import fs from 'fs';
-import path from 'path';
 import { test, expect, type Browser, type BrowserContext, Page } from '@playwright/test';
 import { confirmPaymentViaApi, createMatchViaApi, findVenueBySport, joinMatchViaApi, preparePaymentViaApi } from '../fixtures/api-helpers';
-import { gotoWithWarmup, injectTokens, loginViaApi } from '../fixtures/auth';
+import { gotoWithWarmup, loginViaApi } from '../fixtures/auth';
+import { createPersistedContext } from '../fixtures/sessions';
 import { TEST_PERSONAS } from '../fixtures/test-users';
 
 const HOST = TEST_PERSONAS.teamOwner.nickname;
 const JOINER = TEST_PERSONAS.sinaro.nickname;
 const NOTIFICATION_APPEAR_TIMEOUT = 30_000;
 const NOTIFICATION_NAVIGATION_TIMEOUT = 60_000;
-const AUTH_DIR = path.join(__dirname, '../.auth');
-
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function authStatePath(personaKey: keyof typeof TEST_PERSONAS) {
-  return path.join(AUTH_DIR, `${personaKey}.json`);
 }
 
 async function openAuthenticatedContext(
   browser: Browser,
   personaKey: keyof typeof TEST_PERSONAS,
 ) {
-  const storageState = authStatePath(personaKey);
-  if (fs.existsSync(storageState)) {
-    return browser.newContext({ storageState });
-  }
-
-  const tokens = await loginViaApi(TEST_PERSONAS[personaKey].nickname);
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('http://localhost:3003', { waitUntil: 'domcontentloaded' });
-  await injectTokens(page, tokens);
-  await page.close();
-  return context;
+  return createPersistedContext(browser, personaKey);
 }
 
 async function openAuthenticatedPage(context: BrowserContext, targetPath: string) {

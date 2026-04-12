@@ -1,0 +1,162 @@
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile.dev
+  working_dir: /app
+  volumes:
+    - type: bind
+      source: .
+      target: /app
+    - type: volume
+      source: root_node_modules
+      target: /app/node_modules
+      volume:
+        nocopy: true
+    - type: volume
+      source: api_node_modules
+      target: /app/apps/api/node_modules
+      volume:
+        nocopy: true
+    - type: volume
+      source: web_node_modules
+      target: /app/apps/web/node_modules
+      volume:
+        nocopy: true
+  environment:
+    TZ: Asia/Seoul
+
+services:
+  deps:
+    <<: *app-base
+    command: sh /app/deploy/bootstrap-dev-deps.sh
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${PLAYWRIGHT_POSTGRES_USER:-matchup_user}
+      POSTGRES_PASSWORD: ${PLAYWRIGHT_POSTGRES_PASSWORD:-matchup_password}
+      POSTGRES_DB: ${PLAYWRIGHT_POSTGRES_DB:-matchup_dev}
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PLAYWRIGHT_POSTGRES_USER:-matchup_user} -d ${PLAYWRIGHT_POSTGRES_DB:-matchup_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-init:
+    <<: *app-base
+    command: sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:push && pnpm db:seed"
+    environment:
+      TZ: Asia/Seoul
+      DATABASE_URL: postgresql://${PLAYWRIGHT_POSTGRES_USER:-matchup_user}:${PLAYWRIGHT_POSTGRES_PASSWORD:-matchup_password}@postgres:5432/${PLAYWRIGHT_POSTGRES_DB:-matchup_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-secret
+      AUTH_HASH_DRIVER: bcryptjs
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      deps:
+        condition: service_completed_successfully
+
+  api:
+    <<: *app-base
+    command: sh -c "cd /app/apps/api && pnpm db:generate && pnpm dev"
+    environment:
+      TZ: Asia/Seoul
+      DATABASE_URL: postgresql://${PLAYWRIGHT_POSTGRES_USER:-matchup_user}:${PLAYWRIGHT_POSTGRES_PASSWORD:-matchup_password}@postgres:5432/${PLAYWRIGHT_POSTGRES_DB:-matchup_dev}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-secret
+      API_PORT: 8111
+      AUTH_HASH_DRIVER: bcryptjs
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      REALTIME_ALLOWED_ORIGINS: http://localhost:${PLAYWRIGHT_WEB_PORT:-13003},http://localhost:3003,capacitor://localhost
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      deps:
+        condition: service_completed_successfully
+      db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8111/api/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "${PLAYWRIGHT_API_PORT:-18111}:8111"
+
+  web:
+    <<: *app-base
+    command: pnpm --filter web dev:e2e
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+      - type: volume
+        source: root_node_modules
+        target: /app/node_modules
+        volume:
+          nocopy: true
+      - type: volume
+        source: api_node_modules
+        target: /app/apps/api/node_modules
+        volume:
+          nocopy: true
+      - type: volume
+        source: web_node_modules
+        target: /app/apps/web/node_modules
+        volume:
+          nocopy: true
+      - type: volume
+        source: web_next_dir
+        target: /app/apps/web/.next
+        volume:
+          nocopy: true
+    environment:
+      TZ: Asia/Seoul
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: /api/v1
+      INTERNAL_API_ORIGIN: http://api:8111
+      NEXT_PUBLIC_WS_URL: http://localhost:${PLAYWRIGHT_API_PORT:-18111}
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      api:
+        condition: service_healthy
+      deps:
+        condition: service_completed_successfully
+    ports:
+      - "${PLAYWRIGHT_WEB_PORT:-13003}:3003"
+
+volumes:
+  postgres_data:
+  redis_data:
+  root_node_modules:
+  api_node_modules:
+  web_node_modules:
+  web_next_dir:

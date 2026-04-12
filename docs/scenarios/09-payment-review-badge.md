@@ -1,19 +1,22 @@
 # Payment Review Badge Scenarios
 
+> Status: Implemented, verification pending
+> 결제/환불/리뷰/배지 표면은 코드에 존재하지만, 이 문서 기준 scenario verification evidence는 아직 부족하다.
+
 ## Scenario Checklist
 
-- [ ] PAY-001 체크아웃 완료 후 주문 데이터 저장
-- [ ] PAY-002 환불 요청과 후속 상태 반영
-- [ ] REV-001 경기 후 리뷰 작성과 반영
-- [ ] BADGE-001 배지 / 진행도 갱신
+- [ ] PAY-001 체크아웃 완료 후 주문 데이터 저장 (`match` 결제 중심, dedicated Playwright pending)
+- [ ] PAY-002 환불 요청과 후속 상태 반영 (owner-bound detail/refund UI exists, cross-surface verification pending)
+- [ ] REV-001 경기 후 리뷰 작성과 반영 (pending review form exists, received reviews screen is still sample-labelled)
+- [ ] BADGE-001 배지 / 진행도 갱신 (badge catalog exists, earned/progress is mixed sample data)
 
 ## PAY-001 체크아웃 완료 후 주문 데이터 저장
 
 ### Target Domains
 
-- [ ] 개인 매치 참가 결제
-- [ ] 장터 주문
-- [ ] 레슨 구매
+- [x] 개인 매치 참가 결제
+- [ ] 장터 주문 (현재 미지원)
+- [ ] 레슨 구매 (현재 미지원)
 
 ### Steps
 
@@ -66,3 +69,8 @@
 ## Notes
 
 - 결제/환불은 외부 연동 범위 때문에 mock/stub 경계 정의가 필요하다.
+- 2026-04-11: checkout/refund/review/badge 화면은 “구현됨”과 “검증됨”을 분리해서 기록한다. 현재 상태는 implemented surface가 존재하지만 verified scenario는 아직 없음이다.
+- 2026-04-11: match payment detail/refund surface는 real-data + owner-bound contract로 정리됐고, context 없는 checkout 진입은 막혀 있다.
+- 2026-04-11: lesson/marketplace commerce는 fake success가 아니라 명시적 미지원 상태라서 `PAY-001`의 현재 인스코프는 match payment 중심이다.
+- 2026-04-11: `/my/reviews-received`와 `/badges`는 trust signal banner로 sample/mixed 상태를 명시한다. 실데이터 기반 리뷰/뱃지 progression verification은 follow-up이다.
+- 2026-04-11: Task 38에서 venue review form의 사진 업로드 UI가 real `/uploads` contract로 연결됐고, venue detail route에서 form open smoke는 통과했다. 다만 리뷰 저장 end-to-end verification은 아직 별도 시나리오로 닫히지 않았다.

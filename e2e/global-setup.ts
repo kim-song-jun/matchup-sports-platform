@@ -1,23 +1,29 @@
 import { chromium, FullConfig } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TEST_PERSONAS } from './fixtures/test-users';
+import { TEST_PERSONAS, WEB_BASE } from './fixtures/test-users';
 import { loginViaApi, injectTokens } from './fixtures/auth';
 import { healthCheck, createTeamViaApi, createMercenaryPostViaApi, addTeamMemberViaApi } from './fixtures/api-helpers';
 import { runE2EPreflight } from './fixtures/preflight';
 import { promoteAdminPersona, reactivateE2EUsers } from './fixtures/db-runtime';
+import { E2E_AUTH_DIR, E2E_DOCKER_PROJECT_NAME, E2E_SEED_DATA_PATH } from './fixtures/runtime';
 
-const AUTH_DIR = path.join(__dirname, '.auth');
-const STORAGE_BOOTSTRAP_URL = 'http://localhost:3003/matches';
-const STORAGE_BOOTSTRAP_TIMEOUT = 120_000;
+const STORAGE_BOOTSTRAP_PATH = process.env.E2E_STORAGE_BOOTSTRAP_PATH ?? '/matches';
+const STORAGE_BOOTSTRAP_URL = `${WEB_BASE}${STORAGE_BOOTSTRAP_PATH}`;
+const STORAGE_BOOTSTRAP_TIMEOUT = 60_000;
 
 export default async function globalSetup(_config: FullConfig) {
   const allowOffline = process.env.E2E_ALLOW_OFFLINE === '1';
+  const requireDockerPostgres = process.env.E2E_REQUIRE_DOCKER_POSTGRES === '1' || Boolean(E2E_DOCKER_PROJECT_NAME);
+  const requireAdminPromotion = process.env.E2E_REQUIRE_ADMIN_PROMOTION === '1';
 
   // Ensure auth storage directory exists
-  if (!fs.existsSync(AUTH_DIR)) {
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
+  if (!fs.existsSync(E2E_AUTH_DIR)) {
+    fs.mkdirSync(E2E_AUTH_DIR, { recursive: true });
   }
+
+  // 1. Run strict preflight by default.
+  await runE2EPreflight({ allowOffline, requireDockerPostgres });
 
   try {
     reactivateE2EUsers();
@@ -25,9 +31,6 @@ export default async function globalSetup(_config: FullConfig) {
   } catch (err) {
     console.warn(`[global-setup] Pre-run E2E account restore failed (continuing): ${err}`);
   }
-
-  // 1. Run strict preflight by default.
-  await runE2EPreflight({ allowOffline });
 
   if (!(await healthCheck()) && allowOffline) {
     console.warn('[global-setup] API is offline in allow-offline mode. Skipping persona setup/seed.');
@@ -54,7 +57,7 @@ export default async function globalSetup(_config: FullConfig) {
           timeout: STORAGE_BOOTSTRAP_TIMEOUT,
         });
         await injectTokens(page, t);
-        await context.storageState({ path: path.join(AUTH_DIR, `${key}.json`) });
+        await context.storageState({ path: path.join(E2E_AUTH_DIR, `${key}.json`) });
         await context.close();
       } catch (err) {
         failedPersonas.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
@@ -67,8 +70,17 @@ export default async function globalSetup(_config: FullConfig) {
 
     // 2b. Promote admin persona through the running postgres container.
     const adminPersona = TEST_PERSONAS.admin;
-    promoteAdminPersona(adminPersona.nickname);
-    console.log(`[global-setup] Promoted ${adminPersona.nickname} to admin role.`);
+    try {
+      promoteAdminPersona(adminPersona.nickname);
+      console.log(`[global-setup] Promoted ${adminPersona.nickname} to admin role.`);
+    } catch (err) {
+      const message = `[global-setup] Admin persona promotion failed. Admin specs require docker compose postgres access: ${err}`;
+      if (allowOffline || !requireAdminPromotion) {
+        console.warn(`${message} (continuing without hard failure)`);
+      } else {
+        throw new Error(message);
+      }
+    }
 
     // 3. Seed shared test data — best-effort (skip if API unavailable)
     try {
@@ -86,15 +98,14 @@ export default async function globalSetup(_config: FullConfig) {
         });
         // Persist team ID so tests can read it (simple JSON file)
         fs.writeFileSync(
-          path.join(AUTH_DIR, 'seed-data.json'),
+          E2E_SEED_DATA_PATH,
           JSON.stringify({ ownerTeamId: team.id }),
           'utf-8',
         );
         console.log(`[global-setup] Created seed team: ${team.id}`);
 
-        // Add teamManager and teamMember personas to the seed team so
-        // membership tests (team-manager-membership.spec.ts) have a real team
-        // with real members and do not fall back to placeholder-team-id.
+        // Add manager/member personas to the shared seed team for suites that
+        // still reuse global seed artifacts.
         const managerTokens = tokens['teamManager'];
         const memberTokens = tokens['teamMember'];
 
@@ -143,10 +154,10 @@ export default async function globalSetup(_config: FullConfig) {
             fee: 0,
           });
           const existing = JSON.parse(
-            fs.readFileSync(path.join(AUTH_DIR, 'seed-data.json'), 'utf-8'),
+            fs.readFileSync(E2E_SEED_DATA_PATH, 'utf-8'),
           );
           fs.writeFileSync(
-            path.join(AUTH_DIR, 'seed-data.json'),
+            E2E_SEED_DATA_PATH,
             JSON.stringify({ ...existing, mercenaryPostId: post.id, mercHostTeamId: mercHostTeam.id }),
             'utf-8',
           );
@@ -154,7 +165,7 @@ export default async function globalSetup(_config: FullConfig) {
         }
       }
     } catch (err) {
-      console.warn(`[global-setup] Seed data creation failed (tests may use fallback mock data): ${err}`);
+      console.warn(`[global-setup] Seed data creation failed (shared seed artifacts unavailable): ${err}`);
     }
   } finally {
     await browser.close();

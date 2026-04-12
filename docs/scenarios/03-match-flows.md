@@ -1,10 +1,13 @@
 # Match Flow Scenarios
 
+> Status: Verified with follow-up
+> `MATCH-001/002/003`는 문서상 검증됨이다. 남은 follow-up은 API/app restart persistence와 broader multi-browser expansion이다.
+
 ## Scenario Checklist
 
 - [x] MATCH-001 매치 생성 후 목록/상세/새로고침 반영
 - [x] MATCH-002 다른 사용자의 참가와 참가 인원 동기화
-- [ ] MATCH-003 수정 / 취소 / 종료 상태 반영 (`PATCH /matches/:id` 미구현)
+- [x] MATCH-003 수정 / 취소 / 종료 상태 반영
 
 ## MATCH-001 매치 생성 후 목록/상세/새로고침 반영
 
@@ -63,15 +66,16 @@
 
 ### Steps
 
-- [ ] 호스트가 본인 매치 수정 페이지로 진입한다.
-- [ ] 일정 또는 설명을 수정한다.
-- [ ] 마감/취소가 가능하면 수행한다.
-- [ ] 목록과 내 기록에서 변경 결과를 확인한다.
+- [x] 호스트가 본인 매치 상세에서 모집 마감 후 다시 모집중으로 되돌린다.
+- [x] 호스트가 수정 페이지로 진입해 제목, 설명, 모집 인원을 수정한다.
+- [x] 호스트가 취소 또는 완료 처리를 수행한다.
+- [x] 상세, 참가자 view, 내 기록에서 변경 결과를 확인한다.
 
 ### Expected
 
-- [ ] 수정값이 상세와 목록에 모두 반영된다.
-- [ ] 취소/마감 상태가 사용자에게 명확히 보인다.
+- [x] 수정값이 상세와 내 기록에 반영된다.
+- [x] 모집 마감/재오픈, 취소, 완료 상태가 사용자에게 명확히 보인다.
+- [x] 참가자 컨텍스트는 reload 후 동일 상태를 본다.
 
 ## Notes
 
@@ -81,4 +85,6 @@
 - 2026-04-08: 실제 실행에서 `/matches/new`가 UI 전용 필드(`customVenue`, `rules`)를 DTO 그대로 POST해 Nest `ValidationPipe(whitelist + forbidNonWhitelisted)`에 막히는 버그를 발견했고, submit payload를 DTO 기준으로 정리해 수정했다.
 - 2026-04-08: `customVenue` 직접 입력은 현재 백엔드 모델이 지원하지 않아 UI에서 등록된 시설 선택을 강제한다.
 - 2026-04-08: `/matches/new`, `/matches/[id]/edit`는 업로드된 파일이 없을 때도 실사형 예시 스트립을 보여주도록 바뀌었고, decorative 예시는 스크린리더에서 숨겨 UX 혼선을 줄였다.
-- 2026-04-08: `MATCH-003`은 프론트가 기대하는 수정/취소 흐름과 달리 backend `matches` 컨트롤러에 `PATCH /matches/:id`가 없어 구조적으로 blocked 상태다.
+- 2026-04-11: backend `PATCH /matches/:id`, `POST /matches/:id/cancel`, `POST /matches/:id/close`는 현재 코드에 존재하며, `e2e/tests/match-join-flow.spec.ts`에도 `MATCH-003` 케이스가 추가돼 있다.
+- 2026-04-11: Task 40 문서 정합성 기준으로 `MATCH-003 blocked` 주장은 제거한다. 현재 truth는 lifecycle scenario verified이며, 최신 런타임 재검증은 follow-up이다.
+- 2026-04-11: Task 38에서 `/matches/new`, `/matches/[id]/edit`는 mock-only affordance가 아니라 real upload UI + submit guard로 연결됐다. edit route smoke는 통과했지만 create-route upload completion smoke는 current dev runtime instability와 분리해 재검증이 필요하다.

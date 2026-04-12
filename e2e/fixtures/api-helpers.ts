@@ -1,5 +1,36 @@
 import { API_BASE } from './test-users';
 
+const API_RETRY_ATTEMPTS = 6;
+
+async function waitFor(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(input: string, init: RequestInit, label: string): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= API_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (response.ok) {
+        return response;
+      }
+
+      const text = await response.text();
+      throw new Error(`${label} failed: ${response.status} ${text}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === API_RETRY_ATTEMPTS) {
+        break;
+      }
+
+      await waitFor(attempt * 500);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+}
+
 /** Generic authenticated API call helper. */
 async function apiCall<T>(
   method: string,
@@ -7,33 +38,25 @@ async function apiCall<T>(
   token: string,
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+  const res = await fetchWithRetry(`${API_BASE}/api/v1${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API ${method} ${path} failed: ${res.status} ${text}`);
-  }
+  }, `API ${method} ${path}`);
   const json = await res.json() as Record<string, unknown>;
   return ((json.data ?? json) as unknown) as T;
 }
 
 async function publicApiCall<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+  const res = await fetchWithRetry(`${API_BASE}/api/v1${path}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
     },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API GET ${path} failed: ${res.status} ${text}`);
-  }
+  }, `API GET ${path}`);
   const json = await res.json() as Record<string, unknown>;
   return ((json.data ?? json) as unknown) as T;
 }
@@ -135,6 +158,7 @@ export async function createTeamMatchViaApi(
     startTime: string;
     endTime: string;
     venueName: string;
+    venueAddress?: string;
     totalFee: number;
     quarterCount?: number;
     hostTeamId?: string;
@@ -144,8 +168,28 @@ export async function createTeamMatchViaApi(
     quarterCount: 4,
     matchStyle: 'friendly',
     skillGrade: 'B',
+    venueAddress: 'E2E address',
     ...data,
   });
+}
+
+export async function applyTeamMatchViaApi(
+  token: string,
+  matchId: string,
+  data: {
+    applicantTeamId: string;
+    message?: string;
+  },
+): Promise<{ id: string; teamMatchId: string; applicantTeamId: string; status: string }> {
+  return apiCall('POST', `/team-matches/${matchId}/apply`, token, data);
+}
+
+export async function approveTeamMatchApplicationViaApi(
+  token: string,
+  matchId: string,
+  applicationId: string,
+): Promise<{ id: string; teamMatchId: string; applicantTeamId: string; status: string }> {
+  return apiCall('PATCH', `/team-matches/${matchId}/applications/${applicationId}/approve`, token);
 }
 
 export async function createMercenaryPostViaApi(
@@ -192,7 +236,7 @@ export async function createListingViaApi(
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/health`, { method: 'GET' });
+    const res = await fetchWithRetry(`${API_BASE}/api/v1/health`, { method: 'GET' }, 'API health check');
     return res.ok;
   } catch {
     return false;

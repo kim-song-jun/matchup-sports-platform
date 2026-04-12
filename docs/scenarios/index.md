@@ -7,6 +7,11 @@
 - `[ ]` 미실행
 - `[x]` 통과
 - 체크박스를 유지한 채 이슈가 있으면 옆에 짧게 메모를 남긴다.
+- `Implemented`: 코드 surface와 라우트/API는 존재하지만 최신 시나리오 검증 증거는 아직 정리되지 않음
+- `Verified`: 시나리오 문서 또는 자동화 결과에 현재 검증 증거가 있음
+- `Partial`: 같은 여정 안에 `Verified`와 `Implemented` 또는 미검증 항목이 함께 섞여 있음
+- `Unsupported`: 화면은 존재하지만 저장/거래/영속성 계약이 아직 연결되지 않아 통과로 취급하지 않음
+- `Follow-up`: 다음 task 또는 런타임 재검증이 필요함
 
 ## Canonical Documents
 
@@ -16,18 +21,25 @@
 
 ## Preflight
 
-- API는 Playwright가 자동 기동하지 않는다. 실행 전 백엔드가 먼저 떠 있어야 한다.
-- 권장 개발 스택:
-  - `make dev`
-  - 또는 API와 Web을 각각 실행
-- 기본 확인:
-  - Web: `http://localhost:3003`
-  - API: `http://localhost:8111/api/v1/health`
+- Shared stack path:
+  - Playwright가 API/Web를 자동 기동하지 않는다. `make dev`를 먼저 띄운다.
+  - shared dev stack은 single active Playwright runner only다.
+  - 기본 확인:
+    - Web: `http://localhost:3003`
+    - API: `http://localhost:8111/api/v1/health`
+    - Docker Postgres runtime: `docker compose exec -T postgres psql -U matchup_user -d matchup_dev -c 'SELECT 1;'`
+  - 현재 full Playwright bundle은 `make dev-local`을 공식 지원하지 않는다. 다만 non-admin shared attach/debug에서는 docker-postgres check를 best-effort로만 본다.
+- Isolated stack path:
+  - concurrent local runner가 필요하면 `make e2e-isolated-up RUN=<id>` / `make test-e2e-isolated RUN=<id>` / `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` / `make e2e-isolated-down RUN=<id>`를 사용한다.
+  - isolated helper가 run별 compose project, web/api port, auth dir, docker-postgres runtime을 직접 관리한다. shared `localhost:3003/8111` preflight를 재사용하지 않는다.
+  - 상세 절차, 병렬 실행 패턴, 트러블슈팅은 `docs/PLAYWRIGHT_E2E_RUNBOOK.md`를 기준 문서로 사용한다.
 - E2E preflight 정책:
-  - 기본: strict fail-fast (`global-setup`에서 API/Web/dev-login 실패 시 즉시 종료)
-  - 예외: 런타임 디버깅 목적일 때만 `E2E_ALLOW_OFFLINE=1`로 완화 실행
-  - 로컬 기본값은 `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter
+  - 기본: strict fail-fast (`global-setup`에서 API/Web/dev-login/docker-postgres 실패 시 즉시 종료)
+  - 예외: 런타임 디버깅 목적일 때만 `E2E_ALLOW_OFFLINE=1`로 완화 실행한다. 단, 이 모드는 full suite 보장용이 아니라 page/debug 용도다.
+  - 로컬 기본값은 `workers=1`, `fullyParallel=false`, `test timeout=120_000`, `navigationTimeout=120_000`, `line` reporter
   - 병렬도를 높일 때는 `PW_WORKERS`, `PLAYWRIGHT_REPORTER`를 명시적으로 override한다.
+  - shared attach 경로에서는 `global-setup`/`global-teardown`의 docker-postgres mutation을 best-effort로 본다. isolated run과 admin-required run은 docker-postgres access를 strict하게 요구한다.
+  - isolated compose에서 `/app/apps/web/.next`를 stack-local volume으로 분리하지 않으면 runner끼리 Next dev artifact를 덮어써 `Cannot find module './*.js'`, React Client Manifest mismatch, `/landing` 500이 발생한다.
 
 ## Auth Wall Contract
 
@@ -40,14 +52,15 @@
 
 - [x] [01-auth-and-session.md](./01-auth-and-session.md)
 - [ ] [02-home-and-discovery.md](./02-home-and-discovery.md)
-- [ ] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002` passed, `MATCH-003` blocked
-- [ ] [04-team-and-membership.md](./04-team-and-membership.md)
-- [ ] [05-team-match-flows.md](./05-team-match-flows.md)
-- [ ] [06-mercenary-flows.md](./06-mercenary-flows.md)
-- [ ] [07-chat-and-notifications.md](./07-chat-and-notifications.md)
-- [ ] [08-marketplace-and-lessons.md](./08-marketplace-and-lessons.md)
-- [ ] [09-payment-review-badge.md](./09-payment-review-badge.md)
-- [ ] [10-profile-settings-admin.md](./10-profile-settings-admin.md)
+- [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003` verified, restart-persistence follow-up remains
+- [x] [04-team-and-membership.md](./04-team-and-membership.md) - `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` verified
+- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - partial: `TM-004` operational spec exists, stale `submitResult` contract issue is cleared, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`
+- [ ] [06-mercenary-flows.md](./06-mercenary-flows.md) - partial: core create/apply/approve/status lifecycle is verified, but explicit reload/API-restart persistence and local Next `webServer` cold-boot instability follow-up remain
+- [ ] [07-chat-and-notifications.md](./07-chat-and-notifications.md) - partial: `NOTI-001` verified, chat realtime/unread scenarios pending
+- [ ] [08-marketplace-and-lessons.md](./08-marketplace-and-lessons.md) - partial: `MKT-003` / `LES-003` verified, lesson user-side purchase/ownership is implemented via Task 42, but live smoke is blocked by current dev runtime and host-side reflection remains follow-up
+- [ ] [09-payment-review-badge.md](./09-payment-review-badge.md) - implemented surfaces exist, verification pending
+- [ ] [10-profile-settings-admin.md](./10-profile-settings-admin.md) - partial: admin smoke spec exists, dashboard/users/payments/reviews honest-data runtime is verified, `SET-001` server sync is implemented but live protected-route smoke is blocked by current dev runtime instability
+- [ ] [11-team-and-venue-hubs.md](./11-team-and-venue-hubs.md) - partial: team/venue hub aggregate payload, flat-list affiliation context, tournaments surface, route/API smoke are verified; owner/admin interactive browser smoke remains follow-up
 
 ## Recommended Execution Order
 
@@ -82,14 +95,15 @@
 |---------------|--------------|--------|
 | `01-auth-and-session.md` | `e2e/tests/auth-session-matrix.spec.ts` | Verified (`Desktop Chrome 7/7`, `Mobile Chrome 7/7`) |
 | `02-home-and-discovery.md` | `e2e/tests/home.spec.ts`, `e2e/tests/match-discovery.spec.ts` | Home smoke passed (`Desktop Chrome`, `Mobile Chrome`), discovery deep-link/url persistence `Desktop Chrome 3/3`, `HOME-002` pending |
-| `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts` | `MATCH-001/002` verified (`Desktop Chrome 13/13`, `Mobile Chrome deep 2/2`), `MATCH-003` blocked |
-| `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` | Partial + `TEAM-003` visual fallback verified |
-| `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts` | Smoke verified |
-| `06-mercenary-flows.md` | `e2e/tests/mercenary-flow.spec.ts` | Partial |
-| `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts` | Chat smoke verified, notification center `Desktop Chrome 3/3` verified (`match_created`, `player_joined`, `payment_confirmed`) |
-| `08-marketplace-and-lessons.md` | `e2e/tests/marketplace-flow.spec.ts` | Partial + `MKT-003` / `LES-003` visual fallback verified |
-| `09-payment-review-badge.md` | TBD | Planned |
-| `10-profile-settings-admin.md` | `e2e/tests/admin-dashboard.spec.ts` | Partial |
+| `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts` | Verified: `MATCH-001/002/003` covered (`Desktop Chrome 13/13`, `Mobile Chrome deep 2/2`) with restart-persistence follow-up |
+| `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` | TDD pack verified: `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` passed. `TEAM-003` and `TEAM-004-B/TEAM-005-C` are planned. `TM-SMOKE-001` skip lives in the same spec file but belongs to `05-team-match-flows.md`. |
+| `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-match-operations.spec.ts` | Partial: step-0 smoke exists and `TM-004` operational spec now passes live API `health`/`dev-login`, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`, so full Desktop Chrome green is pending |
+| `06-mercenary-flows.md` | `e2e/tests/mercenary-flow.spec.ts` | Partial: create -> detail redirect, unauthenticated apply redirect, apply -> host accept -> applicant status flow verified in targeted automation, but explicit reload/API-restart persistence and local Next `webServer` cold-boot instability (`.next/routes-manifest.json` / `app-paths-manifest.json` ENOENT) remain |
+| `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts` | Partial: chat room smoke verified, notification center `Desktop Chrome 3/3` verified (`match_created`, `player_joined`, `payment_confirmed`) |
+| `08-marketplace-and-lessons.md` | `e2e/tests/marketplace-flow.spec.ts` | Partial: marketplace browse smoke exists, `MKT-003` / `LES-003` visual fallback verified, lesson user-side purchase/ownership contract is implemented in Task 42, but live browser smoke is blocked by current dev runtime and host-side reflection remains follow-up |
+| `09-payment-review-badge.md` | TBD | Implemented surfaces exist, but scenario verification is still pending |
+| `10-profile-settings-admin.md` | `e2e/tests/admin-dashboard.spec.ts` | Partial: admin dashboard smoke exists, dashboard/users/payments/reviews honest-data runtime verified on 2026-04-11, profile/onboarding verification pending, notification preference server sync implemented with unit coverage, but live protected-route smoke is blocked by current dev runtime instability |
+| `11-team-and-venue-hubs.md` | Manual API/runtime smoke + targeted unit/typecheck | Partial: `/teams/:id/hub`, `/venues/:id/hub`, `/tournaments`, `/teams/:id`, `/venues/:id`, `/venues/:id/edit` runtime smoke and targeted tests passed on 2026-04-11, but owner/admin interactive browser flow is still follow-up |
 
 ## Discussion
 
@@ -109,13 +123,18 @@
 | 2026-04-07 | Playwright 자동화는 `Auth -> Match -> Team Match -> Chat/Notification` 순서로 확장한다. |
 | 2026-04-07 | QA remediation 실행 순서는 `runtime source of truth -> Docker bootstrap -> API health -> E2E DB topology -> Playwright dependency -> selector stabilization`으로 고정한다. |
 | 2026-04-07 | 이번 QA remediation round는 `Conditional`로 진행하며, 기능 확장보다 `Runtime -> DB topology -> Playwright runtime -> Harness fail-fast -> Priority spec rerun` 순서를 우선한다. |
-| 2026-04-07 | 로컬 Next dev 기반 Playwright는 `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter를 기본으로 둔다. 6-worker 병렬은 dev compile saturation으로 false negative를 만들었다. |
+| 2026-04-07 | 당시 로컬 Next dev 기반 Playwright는 `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter로 직렬화해 false negative를 줄였다. 이 값은 2026-04-11 계약으로 superseded되었다. |
+| 2026-04-11 | 현재 로컬 기본 Playwright contract는 `workers=1`, `fullyParallel=false`, `navigationTimeout=120_000`, `line` reporter다. concurrent local runner는 shared `make dev`가 아니라 isolated compose 경로만 지원하며, isolated web은 stack-local `.next` volume을 유지해야 한다. |
 | 2026-04-08 | `matches` 생성/참가 deep flow는 우선 `reload-based persistence`까지 검증하고, 호스트 상세의 새로고침 없는 실시간 sync는 별도 follow-up으로 분리한다. |
-| 2026-04-08 | `MATCH-003`는 테스트 미작성보다 기능 공백에 가깝다. 프론트의 수정/취소 UI를 유지하려면 backend `PATCH /matches/:id` 또는 동등한 API가 먼저 필요하다. |
+| 2026-04-08 | `MATCH-003`는 당시 테스트 미작성보다 기능 공백에 가까웠다. 현재는 backend `PATCH /matches/:id`와 lifecycle spec이 존재하므로 blocked가 아니라 verified + follow-up 상태로 재분류한다. |
+| 2026-04-10 | Team/Membership 시나리오는 `TEAM-001/002`를 Given/When/Then + Case Matrix로 고정하고, Playwright 테스트명도 동일 시나리오 ID(`TEAM-001-A` 등)를 사용한다. |
 | 2026-04-08 | photoreal fallback QA는 사용자 노출 image slot 중 `mock/local fallback`이 발생하는 표면을 인스코프로 본다. 업로드 원본과 관리자 전용 이미지는 제외하되, 사용자-facing 생성/수정 폼의 빈 업로드 슬롯은 예외적으로 포함한다. |
 | 2026-04-08 | query-sync discovery 화면은 URL만 단일 source로 두더라도 빠른 입력/연속 토글이 있는 경우 pending local filter state를 같이 유지해야 한다. stale query snapshot 병합은 실제 필터 유실 버그를 만든다. |
 | 2026-04-08 | notification center v1은 설정 영속화보다 `producer wiring -> action center -> read sync -> deep link`를 우선한다. `/settings/notifications`는 device-local 명시를 유지하고 false affordance를 만들지 않는다. |
 | 2026-04-08 | notification card는 읽음 mutation과 라우팅을 같은 `Link` 기본 동작에 맡기지 않는다. in-app navigation이 필요한 카드 액션은 explicit handler와 connect-time backfill을 같이 둬서 websocket late-connect race를 막는다. |
+| 2026-04-10 | 현재 full Playwright harness는 Docker dev stack을 기준 런타임으로 본다. `global-setup`/`global-teardown`가 `docker compose exec postgres psql`로 E2E user restore와 admin promotion을 수행하므로, `make dev-local`은 full suite 지원 범위에 넣지 않는다. |
+| 2026-04-11 | Task 40 truth sync 기준으로 `MATCH-003 blocked`, `/mercenary/[id] 미존재`, `/settings/notifications device-local 저장 완료` 같은 stale 표현은 더 이상 현재 상태로 쓰지 않는다. 현재 기준은 `Implemented / Verified / Partial / Unsupported / Follow-up` 언어로 정리한다. |
+| 2026-04-11 | Task 39 기준으로 `/settings/notifications`는 `match/team/chat/payment` 4개만 서버 동기화하고, 브라우저 권한/DND는 device-local, email/marketing/master는 미지원으로 분리한다. |
 
 ### Findings Log
 
@@ -141,10 +160,20 @@
 | 2026-04-08 | Match discovery 2.0 v1 | Passed with scoped gaps | `/matches`가 URL 기반 필터 상태를 읽고 quick filter, 지역/레벨/정렬 패널을 유지하도록 바뀌었다. backend는 `q/city/district/freeOnly/availableOnly/beginnerFriendly/sort`를 지원하고, discovery helper unit `6/6`, backend match spec `252/252`, Playwright discovery subset `Desktop Chrome 3/3`를 통과했다. saved search와 recommendation reason badge는 이번 범위에서 제외했다. | saved search, personalized recommendation reason, distance/GPS filtering, multi-tab query-state matrix |
 | 2026-04-08 | Discovery live-contract rerun | Passed with runtime note | DTO/query 변경 후 `localhost:8111`이 stale contract를 계속 서빙할 수 있어 `curl`로 먼저 검증했고, dev compose `api` watch compile blocker를 우회해 transpile-only runtime에서 `e2e/tests/match-discovery.spec.ts` `Desktop Chrome 3/3`를 다시 확인했다. | dev compose `api` watch 정상화, `teams` seed/create runtime drift 정리 |
 | 2026-04-08 | Notification center v1 | Passed | `match_created`, `player_joined`, `payment_confirmed`, `payment_refunded` producer를 backend에 연결했고, `/notifications`를 API + websocket action center로 전환했다. `Desktop Chrome`에서 `notification-center.spec.ts` 전체 `3/3`를 통과했고, explicit in-app navigation, socket connect backfill, focus/visibility backfill, lighter `global-setup` bootstrap, fresh mutation token 패턴까지 고정했다. | chat-origin notification producer, `/settings/notifications` 영속화, unrelated `teams` seed drift 정리 |
+| 2026-04-10 | Team/Membership TDD pack | Passed with scoped skips | `04-team-and-membership.md`를 Given/When/Then + Case Matrix 형식으로 정리하고, `/teams/new` payload를 실제 저장 필드 기준으로 정렬했다. `/my/teams`, `/teams/[id]`의 unsupported edit/delete CTA를 제거했고, owner row action menu를 row-scoped outside-click 기준으로 고쳐 `TEAM-005-A` role-change persistence까지 복구했다. Docker dev stack 기준 Desktop Chrome에서 team bundle `10 passed / 1 skipped`를 확인했다. `04` 시나리오 범위로는 `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B`가 통과했다. | TEAM-003 media fallback automation, `TEAM-004-B`, `TEAM-005-C`, `TM-SMOKE-001 /team-matches/new` owner smoke, `make dev-local` 지원용 DB runtime abstraction |
+| 2026-04-11 | Scenario/doc truth sync | Updated | Task 40에서 시나리오 허브와 backlog 문구를 현재 코드 사실에 맞춰 재분류했다. `MATCH-003`는 blocked가 아니라 implemented + spec 존재 상태로, `/mercenary/[id]`는 existing route로, `/settings/notifications`는 persistence unsupported 상태로 정리했다. | Docker dev stack 정상화 후 `MATCH-003`와 settings notification follow-up을 런타임 기준으로 재검증 |
+| 2026-04-11 | Admin honest-data and audit persistence | Passed with follow-up | Task 37에서 admin audit를 Prisma persistence로 전환했고, `admin/payments`, `admin/reviews`, `admin/mercenary`, `admin/statistics`, `admin/teams/[id]`, `admin/venues/[id]`의 mock/sample fallback을 제거했다. `pnpm --filter api test -- admin`, `pnpm --filter api build`, `pnpm --filter web exec tsc --noEmit`가 통과했고, browser smoke로 `/admin/dashboard`, `/admin/users/:id`, `/admin/reviews`, `/admin/payments`를 열었다. live API smoke에서 `warn -> suspend -> reactivate`가 재조회에 그대로 남고 최종 상태를 `active`로 복구하는 것을 확인했고, Docker dev API restart smoke에서도 `warn -> suspend -> api restart -> detail refetch -> reactivate`가 그대로 유지되는 것을 검증했다. | payments/reviews/user moderation까지 포함한 Playwright spec 확장, admin disputes/settlements 시나리오 재검증 |
+| 2026-04-11 | Notification preference server sync | Passed with runtime follow-up | Task 39에서 `/settings/notifications`를 서버 동기화 category, device-local 항목, 미지원 범위로 재구성했고 `useNotificationPreferences()` freshness를 mount/focus refetch로 보강했다. `pnpm --filter api test -- notifications.service.spec.ts`, `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web test`는 통과했다. live protected-route browser smoke는 stale API process의 `dev-login` `500`과 이후 web restart의 `@swc/helpers` 누락이 연속으로 겹치며 마무리하지 못했다. | dev runtime 안정화 후 `/settings/notifications` reload / 재로그인 persistence smoke 재실행, multi-tab/rapid-toggle Playwright coverage 추가 |
+| 2026-04-11 | Upload UI rollout | Passed with runtime follow-up | Task 38에서 `ImageUpload` shared UI와 `/uploads` helper를 `matches`, `marketplace`, `lessons`, venue review form에 연결하고, match image update / marketplace edit-delete / upload delete hardening / prod uploads volume+rate-limit까지 닫았다. `image-upload` vitest `12/12`, web `tsc --noEmit`, api targeted unit `90/90`, prod compose config 검증이 통과했고 route smoke는 `matches edit`, `marketplace edit`, `venue review`를 열었다. create-route upload completion과 `lessons/new` live smoke는 current dev compose bootstrap instability(`deps` 137)와 unrelated API watch compile blockers가 겹쳐 follow-up으로 남겼다. | stabilized dev runtime에서 `matches new`, `marketplace new`, `lessons new` live upload smoke 재실행 및 product/env 분리 판정 |
+| 2026-04-11 | Lesson ticket purchase and ownership closure | Passed with runtime follow-up | Task 42에서 `lessons/[id]` fake enroll을 제거하고 real `ticketPlan -> checkout(source=lesson) -> confirm -> /my/lesson-tickets` 흐름으로 연결했다. backend는 active `ticketPlans`, `upcomingSchedules`, paid-only ticket ownership read model, host self-purchase guard를 반영했고, `pnpm --filter api test -- lessons.service.spec.ts`, `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web exec vitest run src/hooks/__tests__/use-api-lessons.test.tsx`가 통과했다. live browser smoke는 host `api`의 `RealtimeGateway` 초기화 오류와 host `web`의 upstream API 부재 500 때문에 마무리하지 못했다. | dev runtime 안정화 후 `/lessons/[id]`, `/payments/checkout?source=lesson...`, `/my/lesson-tickets` browser smoke 재실행, 강사 측 roster 반영은 Task 43에서 검증 |
+| 2026-04-11 | Team/Venue hub rollout | Passed with runtime follow-up | Task 48에서 team/venue detail을 허브 landing으로 재구성하고, owner-scoped goods/passes/events 집계 read model과 전역 flat list affiliation context를 추가했다. 최소 tournament domain(`list/detail/create`)과 venue edit real contract도 함께 연결했고, `api db:generate`, `api tsc`, targeted backend unit, `api build`, `web tsc`, targeted hooks vitest, `/api/v1/health`, `/teams/:id`, `/venues/:id`, `/tournaments` route smoke까지 확인했다. | owner/admin interactive browser smoke, seeded owner venue edit happy-path 검증 |
 
 ## Latest Run Summary
 
 - 실행 명령:
+  - `pnpm --filter api test -- teams.service.spec.ts`
+  - `pnpm --filter web exec tsc --noEmit`
+  - `pnpm exec playwright test e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
   - `pnpm --filter api test -- auth.service.spec.ts`
   - `pnpm --filter web test -- src/stores/__tests__/auth-store.test.ts`
   - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts e2e/tests/team-owner-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
@@ -153,11 +182,19 @@
   - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
   - `pnpm exec playwright test e2e/tests/match-join-flow.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line --grep 'Deep match flows'`
   - `pnpm --filter api test -- notifications.service.spec.ts matches.service.spec.ts payments.service.spec.ts`
+  - `pnpm --filter api test -- notifications.service.spec.ts`
+  - `pnpm --filter web test`
   - `pnpm --filter web test -- src/lib/__tests__/notification-center.test.ts`
   - `pnpm --filter web test -- src/hooks/__tests__/use-realtime.test.tsx`
   - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' -g 'payment-confirmed notification opens the payment detail route' --workers=1`
   - `pnpm exec playwright test e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1`
+  - targeted browser smoke on `/settings/notifications` (stale API process와 web restart instability로 completion blocked)
 - 결과:
+  - runtime matrix: Docker dev stack (`make dev`), `localhost:3003`, `localhost:8111`, `docker compose exec postgres ...`
+  - team service unit bundle: `491/491` passed
+  - web typecheck: passed
+  - team/membership Playwright bundle: `10 passed / 1 skipped`
+  - `04-team-and-membership` strict scope: `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` passed
   - backend auth unit: `242/242` passed
   - `auth-store` unit: `6/6` passed
   - `match-join-flow + team-owner-flow` diagnostic rerun: `20/20` passed with `--workers=1`
@@ -166,15 +203,20 @@
   - match flow desktop full file: `13/13` passed
   - match flow mobile deep: `2/2` passed
   - notification center backend/unit bundle: `253/253` passed
+  - notification preference backend unit bundle: `27 suites / 516 tests` passed
+  - web unit bundle: `29 files / 270 tests` passed
   - `notification-center` unit: `5/5` passed
   - `use-realtime` unit: `8/8` passed
   - notification center payment deep-link rerun: `Desktop Chrome 1/1` passed
   - notification center full-file rerun: `Desktop Chrome 3/3` passed
+  - `/settings/notifications` live protected-route browser smoke: stale API process의 `dev-login` `500` 이후 web restart에서 `@swc/helpers` 누락이 겹쳐 completion blocked
 - 재분류:
+  - 해결된 제품 문제: `/teams/new`가 실제 persistence contract에 없는 UI 필드를 전송하던 버그
+  - 해결된 UX 계약 문제: `/my/teams`, `/teams/[id]`의 unsupported edit/delete false affordance
   - 해결된 환경 블로커: API `:8111` health, host Playwright module resolution, E2E DB setup/teardown topology
   - 해결된 스펙 품질 문제: broad selector, auth wall 판정, bottom-nav contract, chat room response shape, hidden duplicate DOM 대응
   - 해결된 제품 문제: `/matches/new` create payload가 DTO에 없는 UI 필드를 전송하던 버그
-  - 남은 갭: `MATCH-003`, unrelated `global-setup` team seed/runtime drift, team-match approval/notification deep flows, persistence/realtime depth expansion, multi-browser 확대
+  - 남은 갭: `TEAM-003`, `TEAM-004-B`, `TEAM-005-C`, `TM-SMOKE-001`, mercenary flow automation, chat unread/realtime depth expansion, marketplace/lesson CRUD + commerce automation, payment/review/badge/admin Playwright coverage, `/settings/notifications` protected-route live smoke rerun after dev-login recovery, `make dev-local` 대응 DB runtime abstraction, multi-browser 확대
 
 ## How To Use
 

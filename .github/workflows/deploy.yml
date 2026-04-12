@@ -75,17 +75,17 @@ jobs:
       - name: Lint (all packages)
         run: pnpm lint
 
-      - name: Type-check api
-        run: cd apps/api && npx tsc --noEmit
+      - name: Type-check (parallel)
+        run: |
+          (cd apps/api && npx tsc --noEmit) &
+          (cd apps/web && npx tsc --noEmit) &
+          wait
 
-      - name: Type-check web
-        run: cd apps/web && npx tsc --noEmit
-
-      - name: Test api
-        run: pnpm --filter api test
-
-      - name: Test web
-        run: pnpm --filter web test
+      - name: Test (parallel)
+        run: |
+          pnpm --filter api test &
+          pnpm --filter web test &
+          wait
 
   # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
   deploy:
@@ -205,7 +205,10 @@ jobs:
           # Volumes are NOT touched (postgres/redis data must persist).
           echo "[cleanup] Disk usage before prune:"
           df -h / | tail -1
-          sudo docker image prune -a -f || true
+          # Use `docker image prune -f` (without -a) to remove only dangling images.
+          # `-a` would delete ALL unused images including cached base layers (node:22-alpine,
+          # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
+          sudo docker image prune -f || true
           sudo docker container prune -f || true
           sudo docker builder prune -a -f || true
           sudo docker network prune -f || true
@@ -242,14 +245,16 @@ jobs:
             sleep 2
           done
 
-          # ── Run database migrations before bringing up the new containers ──
-          # Explicit deploy step — migrations must succeed before the API
-          # starts. Failure aborts the deploy entirely (set -euo pipefail).
-          # Rollback: re-deploy a previous image tag or run
-          #   docker run --rm matchup-api npx prisma migrate resolve --rolled-back <migration>
-          echo "[INFO] Running database migrations..."
+          # ── Bootstrap or apply database migrations before new containers ──
+          # Empty databases cannot replay the current migration chain from
+          # scratch because the repo lacks an old baseline migration. In that
+          # case we bootstrap the current schema with prisma db push and mark
+          # the existing migrations as applied. Non-empty databases still use
+          # migrate deploy, and a non-empty DB without migration history fails
+          # closed instead of auto-resolving unknown drift.
+          echo "[INFO] Bootstrapping deploy database..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api npx prisma migrate deploy </dev/null
+            run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts </dev/null
 
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
@@ -294,10 +299,13 @@ jobs:
             sudo docker exec matchup_api npx prisma db seed
           fi
 
+          echo "[INFO] Checking deploy mock checksum and syncing canonical mock data..."
+          sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+
           echo "[INFO] Syncing DB-backed image data..."
-          # ts-node is a devDependency and not present in the production image.
-          # Failure is surfaced as a GitHub Actions warning so operators are
-          # notified; it does NOT abort the deploy (image sync is non-critical).
+          # Image sync remains a deploy-safe backfill step. Failure is surfaced
+          # as a GitHub Actions warning so operators are notified; it does not
+          # abort the deploy because remote/user-provided images still render.
           if ! sudo docker exec matchup_api npx ts-node prisma/seed-images.ts; then
             echo "::warning::seed-images sync failed — image data may be stale. Re-run manually: docker exec matchup_api npx ts-node prisma/seed-images.ts"
           fi
@@ -307,7 +315,8 @@ jobs:
 
           # ── Post-deploy cleanup ───────────────────────────────────────────
           # Reclaim space from the images and build cache replaced by this run.
-          sudo docker image prune -a -f || true
+          # Use `docker image prune -f` (without -a) to preserve cached base layers.
+          sudo docker image prune -f || true
           sudo docker builder prune -a -f || true
           echo "[cleanup] Final disk usage:"
           df -h / | tail -1

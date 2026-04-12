@@ -2,6 +2,41 @@ import { expect, Page } from '@playwright/test';
 import { API_BASE } from './test-users';
 
 const DEFAULT_WARMUP_PATH = '/matches';
+const AUTH_BOOTSTRAP_PATH = process.env.E2E_AUTH_BOOTSTRAP_PATH ?? DEFAULT_WARMUP_PATH;
+const AUTH_RETRY_ATTEMPTS = 6;
+
+async function waitFor(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(input: string, init: RequestInit, label: string): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= AUTH_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (response.ok) {
+        return response;
+      }
+
+      const text = await response.text();
+      throw new Error(`${label} failed: ${response.status} ${text}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === AUTH_RETRY_ATTEMPTS) {
+        break;
+      }
+
+      await waitFor(attempt * 500);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${label} failed`);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export interface TokenPair {
   accessToken: string;
@@ -11,14 +46,11 @@ export interface TokenPair {
 
 /** Call dev-login API directly (faster, no browser required). */
 export async function loginViaApi(nickname: string): Promise<TokenPair> {
-  const res = await fetch(`${API_BASE}/api/v1/auth/dev-login`, {
+  const res = await fetchWithRetry(`${API_BASE}/api/v1/auth/dev-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nickname }),
-  });
-  if (!res.ok) {
-    throw new Error(`dev-login failed for "${nickname}": ${res.status} ${await res.text()}`);
-  }
+  }, `dev-login for "${nickname}"`);
   const body = await res.json() as Record<string, unknown>;
   // API response wrapped in { status, data, timestamp }
   const data = (body.data ?? body) as Record<string, unknown>;
@@ -103,16 +135,18 @@ export async function gotoWithWarmup(
 }
 
 /**
- * Full auth setup: warm the dev server, inject tokens, then enter /home so the
- * app picks up the authenticated state.
+ * Full auth setup: warm the dev server on a lighter protected route so the app
+ * picks up the authenticated state before route-specific assertions run.
  */
 export async function setupAuthState(page: Page, nickname: string): Promise<void> {
   const tokens = await loginViaApi(nickname);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await injectTokens(page, tokens);
-  await gotoWithWarmup(page, '/home');
-  const authHeading = page.locator('h1:visible').filter({ hasText: nickname });
-  await expect(authHeading.first()).toBeVisible({ timeout: 10_000 });
+  await gotoWithWarmup(page, AUTH_BOOTSTRAP_PATH);
+  await expect(page).toHaveURL(new RegExp(`${escapeRegExp(AUTH_BOOTSTRAP_PATH)}(?:\\?|$)`), {
+    timeout: 20_000,
+  });
+  await page.locator('main:visible').first().waitFor({ state: 'visible', timeout: 10_000 });
 }
 
 /**

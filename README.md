@@ -169,8 +169,10 @@ sports-platform/
 │       │   ├── admin/              # 어드민 전용 API
 │       │   └── common/             # 필터, 인터셉터, 데코레이터
 │       └── prisma/
-│           ├── schema.prisma       # DB 스키마 (27개 모델)
-│           └── seed.ts             # 초기 데이터 시드
+│           ├── schema.prisma       # DB 스키마 (42개 모델)
+│           ├── seed.ts             # 초기 데이터 시드 (destructive full seed)
+│           ├── seed-mocks.ts       # idempotent dev mock sync
+│           └── mock-data-catalog.ts # canonical dev mock dataset
 │
 ├── e2e/                            # Playwright E2E 테스트
 ├── scripts/
@@ -251,15 +253,25 @@ make up
 # 2. DB 스키마 반영
 make db-push
 
-# 3. 초기 데이터 시드 (선택)
+# 3. 화면 검증용 canonical mock 데이터 동기화 (권장)
+make db-seed-mocks
+
+# 4. 초기 데이터 전체 재시드가 필요할 때만
 make db-seed
 
-# 4. 이미지 데이터만 안전하게 보강
+# 5. 이미지 데이터만 안전하게 보강
 make db-seed-images
 
-# 5. 로그와 함께 붙어서 실행하려면
+# 6. 로그와 함께 붙어서 실행하려면
 make dev
 ```
+
+`make db-seed-mocks` / `pnpm db:seed:mocks`는 기존 dev DB를 지우지 않고 canonical mock users / teams / matches / lessons / listings / mercenary posts / team matches를 upsert합니다. `make db-seed`는 baseline seed를 다시 넣는 destructive full seed이고, `make db-seed-images`는 비어 있는 이미지 slot만 보강합니다.
+
+Docker dev runtime notes:
+- `make dev-web`는 `deps + web`를 함께 다시 올리는 공식 복구 경로입니다. `docker compose restart web`만으로는 node_modules bootstrap과 `.next` reset이 보장되지 않습니다.
+- shared Docker dev stack은 `apps/web/.next`를 stack-local volume으로 격리합니다. host에서 `pnpm --filter web build`를 돌려도 container web의 dev artifact를 더 이상 직접 덮어쓰지 않습니다.
+- `docker compose ps`상 `web`가 정상인데 브라우저 `localhost:3003`만 500이면 host-side `pnpm --filter web dev` / `next dev`가 같은 포트를 점유했는지 `lsof -nP -iTCP:3003 -sTCP:LISTEN`로 먼저 확인합니다.
 
 | 서비스 | URL |
 |--------|-----|
@@ -285,13 +297,22 @@ pnpm lint            # 전체 린트 검사
 pnpm clean           # 빌드 캐시 및 .next 정리
 pnpm qa:manual:routes
 pnpm qa:manual:ui-gaps
+pnpm qa:visual:audit:manifest
+pnpm qa:visual:audit:capture
 pnpm docs:screenshots:overview
 pnpm docs:screenshots:app
 
 make db-push         # Prisma 스키마 → DB 즉시 반영 (dev)
+make db-bootstrap-deploy # deploy bootstrap 로직 검증 (empty DB fallback 포함)
 make db-migrate      # Prisma 마이그레이션 생성 및 적용
+make db-seed-mocks   # canonical mock 데이터만 idempotent sync
+make db-seed-mocks-deploy # deploy checksum gate와 동일한 조건으로 mock sync
 make db-seed         # 초기 데이터 시드 (destructive full seed)
 make db-seed-images  # 이미지 데이터만 안전하게 보강
+
+pnpm db:bootstrap:deploy # 루트에서 deploy DB bootstrap 실행
+pnpm db:seed:mocks   # 루트에서 api mock sync 실행
+pnpm db:seed:mocks:deploy # 루트에서 deploy checksum gate mock sync 실행
 ```
 
 ### 개별 앱
@@ -317,6 +338,7 @@ pnpm test:cov        # 커버리지 리포트 포함
 - 루트에는 앱 엔트리와 설정 파일만 둡니다. 일회성 QA 도구는 `scripts/qa/`, 문서 캡처 도구는 `scripts/docs/`에 둡니다.
 - 문서에서 참조하는 스크린샷은 `docs/screenshots/`를 canonical 경로로 사용합니다.
 - 디자인/기획용 버전 관리 레퍼런스 이미지는 `docs/reference/`에 둡니다.
+- 전수 시각 감사 raw artifact는 `output/playwright/visual-audit/` 아래에만 둡니다. 검토 후 canonical로 승격된 결과만 `docs/screenshots/`로 이동합니다.
 - 로컬 산출물과 캐시는 `playwright-report/`, `test-results/`, `.playwright-mcp/`, `.pnpm-store/`, `tmp/`, `ec2-info`처럼 git ignore 대상에만 둡니다.
 
 ---
@@ -413,7 +435,11 @@ pnpm test:cov        # 커버리지 리포트 포함
 
 ## Database
 
-Prisma + PostgreSQL 16 기반. 주요 모델 27개.
+Prisma + PostgreSQL 16 기반. 주요 모델 42개.
+
+- `make db-seed`: destructive full seed. 주요 테이블을 baseline sample data로 다시 채웁니다.
+- `make db-seed-mocks`: unrelated dev/E2E 데이터는 유지한 채 canonical mock dataset만 upsert합니다.
+- `make db-seed-images`: records를 지우지 않고 local `public/mock/` 기반 이미지 필드만 보강합니다.
 
 <details>
 <summary>전체 모델 목록 보기</summary>
@@ -465,15 +491,29 @@ cd apps/api && pnpm test
 # Backend 커버리지 리포트
 cd apps/api && pnpm test:cov
 
-# E2E 테스트 전체 실행 (Playwright)
-npx playwright test
+# E2E 테스트 전체 실행 (shared dev stack, single active runner only)
+make dev
+make test-e2e
 
 # 특정 스펙만 실행
 npx playwright test e2e/home.spec.ts
 
 # UI 모드로 실행 (디버깅용)
 npx playwright test --ui
+
+# Isolated Playwright runtime 기동
+make e2e-isolated-up RUN=NotifSmoke
+
+# Isolated runtime에 특정 스펙 실행
+make test-e2e-isolated-spec RUN=NotifSmoke SPEC=e2e/tests/notification-center.spec.ts PROJECT="Desktop Chrome"
+
+# Isolated runtime 정리
+make e2e-isolated-down RUN=NotifSmoke
 ```
+
+- shared `make dev` 흐름은 여전히 single active Playwright runner 계약이다.
+- 두 개 이상의 local runner가 필요하면 isolated targets만 사용한다. `RUN`은 lowercase compose project name으로 정규화되며, run별 web/api port, auth dir, stack-local `.next` volume이 분리된다.
+- 상세 실행 절차와 병렬 실행 예시는 [docs/PLAYWRIGHT_E2E_RUNBOOK.md](./docs/PLAYWRIGHT_E2E_RUNBOOK.md)를 기준으로 본다.
 
 **E2E 테스트 커버 영역**
 
@@ -509,8 +549,10 @@ docker-compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 ```
 
 - Nginx 리버스 프록시로 Frontend(3000) / Backend(8100) 라우팅
-- GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, compose 재기동, `prisma migrate deploy`와 `prisma/seed-images.ts`를 수행
+- GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, `prisma/bootstrap-deploy-db.ts`로 DB bootstrap/migration을 적용하고, checksum-gated `prisma/seed-mocks.ts --checksum-gate`, `prisma/seed-images.ts`를 수행
 - 프로덕션 배포는 `DB_PASSWORD`, `JWT_SECRET`만 필수이며, `TOSS_*`가 비어 있으면 결제 기능만 mock mode로 동작한다
+- `DEPLOY_SYNC_MOCK_DATA`는 기본 `true`이며, 정확히 `false`일 때만 deploy mock sync를 끈다
+- 신규/빈 운영 DB는 `bootstrap-deploy-db.ts`가 `db push + migrate resolve`로 현재 schema를 먼저 고정하고, 기존 운영 DB는 계속 `migrate deploy` 경로를 사용한다
 - 운영 EC2 SSH 계정 기준은 `ec2-user`다
 - SSL 종료는 Nginx 레이어에서 처리
 - EC2 초기 설정: `deploy/setup-ec2.sh` 참고

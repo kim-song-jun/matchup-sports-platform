@@ -1,186 +1,195 @@
 /**
- * Mercenary (용병) flow scenarios
+ * Mercenary lifecycle E2E
  *
  * Covers:
- * - /mercenary page loads with filter chips and list
- * - Sport filter chips filter the post list
- * - Apply button exists on post cards
- * - Unauthenticated apply redirects to /login
- * - /mercenary/new requires a team (shows guard or form)
- * - /my/mercenary page loads for authenticated user
- * - Authenticated apply triggers success or error toast (not redirect)
+ * - host creates a mercenary post via UI and lands on detail
+ * - the created post appears in list/team/my surfaces
+ * - unauthenticated viewers are redirected to login from detail apply CTA
+ * - applicant applies and sees pending state
+ * - host accepts from detail management UI
+ * - applicant sees accepted status in my applications
  */
 
-import { test, expect } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { createTeamViaApi } from '../fixtures/api-helpers';
+import { injectTokens, loginViaApi } from '../fixtures/auth';
 import { TEST_PERSONAS } from '../fixtures/test-users';
-import { setupAuthState, loginViaApi } from '../fixtures/auth';
-import { createTeamViaApi, createMercenaryPostViaApi } from '../fixtures/api-helpers';
 
-const MERCENARY_HOST = TEST_PERSONAS.mercenaryHost.nickname;
-const SINARO = TEST_PERSONAS.sinaro.nickname;
+const HOST_NICKNAME = TEST_PERSONAS.mercenaryHost.nickname;
+const APPLICANT_NICKNAME = TEST_PERSONAS.sinaro.nickname;
+const MATCH_DATE = '2026-12-15';
+const VENUE_NAME = `용병E2E구장-${Date.now()}`;
+const TEAM_NAME = `용병호스트E2E팀-${Date.now()}`;
 
-test.describe('Mercenary list page — public view', () => {
-  test('/mercenary page loads with heading', async ({ page }) => {
-    await page.goto('/mercenary');
-    await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('h1')).toContainText('용병');
-  });
+let hostTeamId = '';
+let createdPostId = '';
 
-  test('sport filter chips are visible and clickable', async ({ page }) => {
-    await page.goto('/mercenary');
-    const allChip = page.getByRole('button', { name: '전체' });
-    await expect(allChip).toBeVisible();
-    const soccerChip = page.getByRole('button', { name: '축구' });
-    await expect(soccerChip).toBeVisible();
-    await soccerChip.click();
-    await page.waitForTimeout(300);
-    // Should still show list or empty state
-    await expect(page.locator('main')).toBeVisible();
-  });
+async function waitFor(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  test('post cards show apply (신청) button', async ({ page }) => {
-    await page.goto('/mercenary');
-    await page.waitForTimeout(500);
-    const applyButtons = page.getByRole('button', { name: '신청' });
-    if (await applyButtons.count() > 0) {
-      await expect(applyButtons.first()).toBeVisible();
+async function withRetry<T>(label: string, action: () => Promise<T>, attempts = 6): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) {
+        break;
+      }
+
+      console.warn(`[mercenary-e2e] ${label} failed on attempt ${attempt}/${attempts}. Retrying...`);
+      await waitFor(attempt * 1_000);
     }
-  });
+  }
 
-  test('"용병 모집하기" link is present', async ({ page }) => {
-    await page.goto('/mercenary');
-    const link = page.locator('a[href="/mercenary/new"]');
-    await expect(link).toBeVisible();
-  });
+  throw lastError;
+}
 
-  test('unauthenticated apply redirects to /login', async ({ page }) => {
-    await page.goto('/mercenary');
-    await page.waitForTimeout(500);
-    const applyButtons = page.getByRole('button', { name: '신청' });
-    if (await applyButtons.count() === 0) {
-      // No posts visible — skip this assertion
+async function waitForTeamOption(page: Page, teamId: string) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await page.goto(`/mercenary/new?teamId=${teamId}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    const teamSelect = page.locator('#merc-team:visible').first();
+    await expect(teamSelect).toBeVisible();
+
+    const hasOption = await teamSelect.locator(`option[value="${teamId}"]`).count();
+    if (hasOption > 0) {
+      await teamSelect.selectOption(teamId);
       return;
     }
-    await applyButtons.first().click();
-    await page.waitForURL(/\/login/, { timeout: 5_000 });
-    await expect(page).toHaveURL(/\/login/);
-  });
-});
 
-test.describe('Mercenary new post — authenticated mercenaryHost', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupAuthState(page, MERCENARY_HOST);
-  });
+    await page.waitForTimeout(500 * (attempt + 1));
+  }
 
-  test('/mercenary/new shows team guard if no team, or shows form', async ({ page }) => {
-    await page.goto('/mercenary/new');
-    await page.waitForLoadState('networkidle');
-    const hasForm = await page.locator('#merc-team').count() > 0;
-    const hasGuard = await page.getByText('팀을 먼저 만들어주세요').count() > 0;
-    expect(hasForm || hasGuard).toBe(true);
-  });
+  throw new Error(`Mercenary create form never loaded team option ${teamId}`);
+}
 
-  test('/mercenary/new form has required fields when team exists', async ({ page }) => {
-    // Pre-create a team so the form is shown
-    const tokens = await loginViaApi(MERCENARY_HOST);
-    await createTeamViaApi(tokens.accessToken, {
-      name: `용병호스트팀${Date.now()}`,
+async function authenticatePage(page: Page, nickname: string) {
+  await withRetry(`authenticate ${nickname}`, async () => {
+    const tokens = await loginViaApi(nickname);
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await injectTokens(page, tokens);
+  });
+}
+
+test.describe.configure({ mode: 'serial' });
+
+test.describe('Mercenary lifecycle', () => {
+  test.beforeAll(async () => {
+    const hostTokens = await withRetry(`dev-login for ${HOST_NICKNAME}`, () => loginViaApi(HOST_NICKNAME));
+    const team = await withRetry('create mercenary host team', () => createTeamViaApi(hostTokens.accessToken, {
+      name: TEAM_NAME,
       sportType: 'soccer',
       city: '서울',
-    });
-
-    // Reload auth state (token already in localStorage from setupAuthState)
-    await setupAuthState(page, MERCENARY_HOST);
-    await page.goto('/mercenary/new');
-    await page.waitForLoadState('networkidle');
-
-    // Guard should not be shown
-    const guard = page.getByText('팀을 먼저 만들어주세요');
-    if (await guard.count() > 0) {
-      // Team creation may not have reflected — skip
-      console.log('[mercenary-flow] Team still not visible in API — skipping form test');
-      return;
-    }
-
-    await expect(page.locator('#merc-team')).toBeVisible();
-    await expect(page.locator('#merc-match-date')).toBeVisible();
-    await expect(page.locator('#merc-start-time')).toBeVisible();
-    await expect(page.locator('#merc-venue')).toBeVisible();
-  });
-});
-
-test.describe('Mercenary application — authenticated sinaro', () => {
-  let postId: string | null = null;
-
-  test.beforeAll(async () => {
-    try {
-      const hostTokens = await loginViaApi(MERCENARY_HOST);
-      const team = await createTeamViaApi(hostTokens.accessToken, {
-        name: `용병호스트E2E신규팀${Date.now()}`,
-        sportType: 'soccer',
-        city: '서울',
-      });
-      const post = await createMercenaryPostViaApi(hostTokens.accessToken, {
-        teamId: team.id,
-        matchDate: '2026-12-15',
-        startTime: '15:00',
-        venue: 'E2E테스트구장',
-        position: 'ALL',
-        count: 1,
-        fee: 0,
-      });
-      postId = post.id;
-    } catch (err) {
-      console.warn('[mercenary-flow] Could not create mercenary post:', err);
-    }
+      description: 'Mercenary lifecycle E2E team',
+    }));
+    hostTeamId = team.id;
   });
 
-  test.beforeEach(async ({ page }) => {
-    await setupAuthState(page, SINARO);
-  });
+  test('host creates a mercenary post and lands on detail', async ({ page }) => {
+    await authenticatePage(page, HOST_NICKNAME);
+    await waitForTeamOption(page, hostTeamId);
 
-  test('/mercenary page shows posts and allows authenticated apply', async ({ page }) => {
+    await page.locator('#merc-match-date:visible').first().fill(MATCH_DATE);
+    await page.locator('#merc-venue:visible').first().fill(VENUE_NAME);
+    await page.getByRole('button', { name: '포지션 무관' }).click();
+    await page.getByRole('button', { name: '고수' }).click();
+    await page.locator('#merc-fee:visible').first().fill('0');
+    await page.locator('#merc-notes:visible').first().fill('E2E mercenary lifecycle post');
+
+    await Promise.all([
+      page.waitForURL(/\/mercenary\/[^/?#]+$/, { timeout: 15_000 }),
+      page.getByRole('button', { name: '상세로 등록하기' }).click(),
+    ]);
+
+    createdPostId = page.url().split('/mercenary/')[1]?.split(/[?#]/)[0] ?? '';
+    expect(createdPostId).not.toBe('');
+
+    await expect(page.getByRole('heading', { level: 1, name: TEAM_NAME })).toBeVisible();
+    await expect(page.locator('p:visible').filter({ hasText: VENUE_NAME }).first()).toBeVisible();
+
     await page.goto('/mercenary');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await expect(page.getByText(TEAM_NAME).first()).toBeVisible();
 
-    const applyButtons = page.getByRole('button', { name: '신청' });
-    if (await applyButtons.count() === 0) {
-      // No posts — pass test as environment has no data
-      return;
-    }
-    await applyButtons.first().click();
-    await page.waitForTimeout(800);
-    // Should NOT redirect to login (user is authenticated)
-    await expect(page).not.toHaveURL(/\/login/);
-    // Should show success or error toast
-    const toast = page.locator('[class*="toast"], [role="status"]').filter({ hasText: /신청|실패/ });
-    if (await toast.count() > 0) {
-      await expect(toast.first()).toBeVisible();
-    }
-  });
-});
+    await page.goto(`/teams/${hostTeamId}/mercenary`);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await expect(page.getByText(VENUE_NAME).first()).toBeVisible();
 
-test.describe('My mercenary page — authenticated', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupAuthState(page, SINARO);
-  });
-
-  test('/my/mercenary page loads with heading', async ({ page }) => {
     await page.goto('/my/mercenary');
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('h1, h2').filter({ hasText: /내 용병/ }).first()).toBeVisible();
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await expect(page.getByText(TEAM_NAME).first()).toBeVisible();
   });
 
-  test('/my/mercenary page shows post list or empty state', async ({ page }) => {
-    await page.goto('/my/mercenary');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
+  test('public viewer is redirected to login from detail apply CTA', async ({ page }) => {
+    test.skip(!createdPostId, 'Mercenary post was not created');
 
-    const postCards = page.locator('[class*="rounded-xl"]').filter({ hasText: /모집중|마감|취소됨/ });
-    const emptyState = page.getByText(/용병 모집글이 없어요/);
-    const hasPosts = await postCards.count() > 0;
-    const hasEmpty = await emptyState.count() > 0;
-    expect(hasPosts || hasEmpty).toBe(true);
+    await page.goto(`/mercenary/${createdPostId}`);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    await Promise.all([
+      page.waitForURL(/\/login/, { timeout: 10_000 }),
+      page.locator('button:has-text("로그인 후 신청"):visible').first().click(),
+    ]);
+
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('applicant applies and sees pending state', async ({ page }) => {
+    test.skip(!createdPostId, 'Mercenary post was not created');
+
+    await authenticatePage(page, APPLICANT_NICKNAME);
+    await page.goto(`/mercenary/${createdPostId}`);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    await expect(page.locator('button:has-text("신청하기"):visible').first()).toBeVisible();
+    await page.locator('button:has-text("신청하기"):visible').first().click();
+
+    await expect(page.locator('h2:has-text("내 신청 상태"):visible').first()).toBeVisible();
+    await expect(page.locator('span:has-text("대기 중"):visible').first()).toBeVisible();
+    await expect(page.locator('button:has-text("신청 취소"):visible').first()).toBeVisible();
+
+    await page.reload();
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await expect(page.locator('button:has-text("신청 취소"):visible').first()).toBeVisible();
+    await expect(page.locator('button:has-text("신청하기"):visible')).toHaveCount(0);
+  });
+
+  test('host approves the applicant from detail page', async ({ page }) => {
+    test.skip(!createdPostId, 'Mercenary post was not created');
+
+    await authenticatePage(page, HOST_NICKNAME);
+    await page.goto(`/mercenary/${createdPostId}`);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    const applicantCard = page.locator('section').filter({ hasText: '지원 목록' }).locator('div.rounded-xl').filter({
+      hasText: APPLICANT_NICKNAME,
+    }).first();
+
+    await expect(applicantCard).toBeVisible();
+    await applicantCard.getByRole('button', { name: '승인' }).click();
+
+    await expect(applicantCard.locator('span:has-text("승인됨"):visible').first()).toBeVisible();
+    await expect(page.locator('text=모집 완료:visible').first()).toBeVisible();
+  });
+
+  test('applicant sees accepted status in my applications', async ({ page }) => {
+    test.skip(!createdPostId, 'Mercenary post was not created');
+
+    await authenticatePage(page, APPLICANT_NICKNAME);
+    await page.goto('/my/mercenary');
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+    await page.getByRole('tab', { name: '내 신청' }).click();
+    await expect(page.getByText(TEAM_NAME).first()).toBeVisible();
+    await expect(page.locator('span:has-text("승인됨"):visible').first()).toBeVisible();
+
+    await page.goto(`/mercenary/${createdPostId}`);
+    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await expect(page.locator('button:has-text("승인됨"):visible').first()).toBeVisible();
   });
 });

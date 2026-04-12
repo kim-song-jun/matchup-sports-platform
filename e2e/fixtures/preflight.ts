@@ -1,7 +1,10 @@
 import { API_BASE, TEST_PERSONAS, WEB_BASE } from './test-users';
+import { checkDockerPostgresReady } from './db-runtime';
+import { E2E_DOCKER_PROJECT_NAME } from './runtime';
 
 interface PreflightOptions {
   allowOffline: boolean;
+  requireDockerPostgres: boolean;
 }
 
 async function checkApiHealth(): Promise<boolean> {
@@ -42,15 +45,23 @@ export async function runE2EPreflight(options: PreflightOptions): Promise<void> 
     checkWebReachable(),
     checkDevLogin(),
   ]);
+  const dbRuntime = checkDockerPostgresReady();
 
   const [apiOk, webOk, devLoginOk] = checks;
   const failedChecks: string[] = [];
   if (!apiOk) failedChecks.push(`API health (${API_BASE}/api/v1/health)`);
   if (!webOk) failedChecks.push(`Web reachability (${WEB_BASE}/login)`);
   if (!devLoginOk) failedChecks.push('dev-login API');
+  if (options.requireDockerPostgres && !dbRuntime.ok) {
+    failedChecks.push(`docker compose postgres runtime (${dbRuntime.detail ?? 'not ready'})`);
+  }
 
   if (failedChecks.length === 0) {
-    console.log('[preflight] OK: API/Web/dev-login are ready.');
+    if (dbRuntime.ok) {
+      console.log('[preflight] OK: API/Web/dev-login/docker-postgres are ready.');
+    } else {
+      console.log('[preflight] OK: API/Web/dev-login are ready. Docker postgres checks are optional for this run.');
+    }
     return;
   }
 
@@ -60,5 +71,11 @@ export async function runE2EPreflight(options: PreflightOptions): Promise<void> 
     return;
   }
 
-  throw new Error(`${message}. Fix runtime or run with E2E_ALLOW_OFFLINE=1 for offline debug.`);
+  const dockerHint = options.requireDockerPostgres
+    ? ` The current Playwright harness expects a Docker compose postgres runtime${E2E_DOCKER_PROJECT_NAME ? ` for project "${E2E_DOCKER_PROJECT_NAME}"` : ''}.`
+    : '';
+
+  throw new Error(
+    `${message}.${dockerHint} Fix runtime or run with E2E_ALLOW_OFFLINE=1 for offline debug.`,
+  );
 }

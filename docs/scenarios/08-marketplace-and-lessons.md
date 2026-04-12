@@ -1,5 +1,8 @@
 # Marketplace And Lesson Scenarios
 
+> Status: Partial
+> visual fallback 검증은 완료됐고, lesson user-side purchase/ownership contract는 구현됐다. 다만 live browser smoke는 current dev runtime 때문에 재검증이 막혀 있고, 강사 측 반영은 별도 follow-up이다.
+
 ## Scenario Checklist
 
 - [ ] MKT-001 판매글 생성 후 목록/상세/내 목록 반영
@@ -66,6 +69,16 @@
 - [ ] 사용자 측 티켓 보유 상태가 반영된다.
 - [ ] 강사 측에서도 신규 이용자가 반영된다.
 
+### Current Status
+
+- `Implemented (user-side)`
+  - lesson detail은 실 ticket plan만 렌더하고 fake enroll을 제거했다.
+  - checkout은 `source=lesson`을 실제 처리하고, 결제 완료 후 `/my/lesson-tickets?ticketId=...`로 이동한다.
+  - `/my/lesson-tickets`는 paid-only ownership read model을 렌더하고 신규 티켓을 강조 표시한다.
+- `Follow-up`
+  - live browser smoke는 current dev runtime blocker로 미완료다.
+  - 강사 측 roster / attendance 반영은 `Task 43` 범위다.
+
 ## MKT-003 장터 fallback 이미지가 목록/상세/내 목록/등록 화면에서 일관됨
 
 ### Steps
@@ -97,3 +110,6 @@
 
 - 장터와 레슨은 CRUD+상태 반영 테스트 묶음으로 다룬다.
 - 2026-04-08: 장터와 레슨의 fallback 이미지는 목록/상세/내 목록/등록 화면까지 `/mock/photoreal/` 로컬 자산 기준으로 재검증했다.
+- 2026-04-11: lesson/marketplace 거래형 CTA는 일부 화면에서 명시적 미지원 상태를 유지한다. 따라서 visual verification과 commerce verification을 같은 완료 상태로 취급하지 않는다.
+- 2026-04-11: Task 38에서 `/marketplace/new`, `/marketplace/[id]/edit`, `/lessons/new`에 real upload UI와 submit guard가 연결됐다. `marketplace/[id]/edit` route smoke는 통과했고, create-route upload completion 및 `lessons/new` live smoke는 current dev runtime instability 때문에 follow-up으로 남긴다.
+- 2026-04-11: Task 42에서 lesson user-side purchase -> checkout -> owned ticket flow는 구현됐다. 다만 host `api`는 `RealtimeGateway` 초기화 오류로 기동 실패했고, host `web`는 API 부재 시 `/landing`부터 500을 반환해 live browser smoke를 닫지 못했다.

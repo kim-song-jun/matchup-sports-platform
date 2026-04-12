@@ -1,5 +1,7 @@
 # 2026-04-08 Design Page Inventory
 
+> Historical planning note. Canonical rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and current design remediation execution lives in `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`.
+
 ## 목적
 
 디자인팀(`design-main`, `ux-manager`, `ui-manager`) 평가 전에 현재 웹 앱의 실제 페이지 표면적을 route 기준으로 정리한다. 이 문서는 "무슨 페이지가 있는가", "각 페이지가 어떤 UI/기능 블록을 가지는가", "디자인 리뷰를 어떤 묶음으로 나눌 것인가"를 빠르게 파악하기 위한 인벤토리다.

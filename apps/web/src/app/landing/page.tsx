@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Target, Shield, Users, Zap, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check } from 'lucide-react';
+import { Target, Shield, Users, Zap, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check, Footprints } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { HeroScrollButton } from '@/components/landing/hero-scroll-button';
@@ -95,6 +95,10 @@ export default function LandingPage() {
                 </Link>
                 <HeroScrollButton targetId="features-section" />
               </div>
+              <p className="mt-5 text-sm text-gray-400 dark:text-gray-500">
+                평균 <span className="text-gray-600 dark:text-gray-300 font-semibold">3분 이내</span> 매칭 · 만족도{' '}
+                <span className="text-gray-600 dark:text-gray-300 font-semibold">4.8</span> / 5.0
+              </p>
             </ScrollReveal>
           </div>
         </div>
@@ -226,7 +230,7 @@ export default function LandingPage() {
           <ScrollReveal>
             <div className="text-center mb-12">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                이용 방법
+                <Footprints size={14} /> 이용 방법
               </span>
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 3단계로 시작하세요
@@ -319,6 +323,18 @@ export default function LandingPage() {
                   </div>
                 );
               })}
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal>
+            <div className="mt-10 text-center">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-500 hover:text-blue-600 transition-colors"
+              >
+                내 종목으로 매칭 시작하기
+                <ArrowRight size={15} strokeWidth={2.5} />
+              </Link>
             </div>
           </ScrollReveal>
         </div>

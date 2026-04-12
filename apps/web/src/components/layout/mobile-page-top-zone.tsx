@@ -32,7 +32,7 @@ export function MobilePageTopZone({
             surface === 'panel' && 'glass-mobile-panel rounded-3xl px-4 py-4',
           )}
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {eyebrow && (
                 <div
@@ -50,7 +50,7 @@ export function MobilePageTopZone({
                 {title}
               </h1>
               {subtitle && (
-                <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                   {subtitle}
                 </p>
               )}

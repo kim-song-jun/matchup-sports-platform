@@ -84,3 +84,19 @@ export function getTimeBadge(dateStr: string): { text: string; color: string } |
   if (diff <= 7) return { text: '이번 주', color: 'bg-gray-100 text-gray-500' };
   return null;
 }
+
+// ── Error utilities ──
+
+/** Extracts a user-facing error message from an Axios or unknown error.
+ *  Handles both string and string[] message shapes from class-validator responses. */
+export function extractErrorMessage(err: unknown, fallback = '오류가 발생했습니다.'): string {
+  const message = (err as { response?: { data?: { message?: string | string[] } } })
+    ?.response?.data?.message;
+  if (Array.isArray(message)) {
+    return message[0] ?? fallback;
+  }
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+  return fallback;
+}

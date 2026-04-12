@@ -4,23 +4,78 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, ChevronRight, MapPin, Share2, Star, Trophy } from 'lucide-react';
+import {
+  ArrowLeft,
+  Calendar,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  Clock,
+  DollarSign,
+  MapPin,
+  PenLine,
+  Phone,
+  Share2,
+  Star,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { MapPlaceholder } from '@/components/ui/map-placeholder';
+import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
 
 const MediaLightbox = dynamic(
   () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
   { ssr: false, loading: () => null }
 );
 import { SafeImage } from '@/components/ui/safe-image';
-import { useVenue, useVenueHub, useVenueSchedule } from '@/hooks/use-api';
+import { useVenue, useVenueHub, useVenueSchedule, useCreateVenueReview } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
 import { getListingImage, getSportImage, getVenueImageSet } from '@/lib/sport-image';
 import { formatMatchDate } from '@/lib/utils';
 import type { Lesson, MarketplaceListing, Tournament, VenueScheduleSlot } from '@/types/api';
+
+const dayLabels: Record<string, string> = {
+  mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일',
+  weekday: '평일', weekend: '주말',
+};
+
+const facilityTagColor = 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600';
+
+// Mock upcoming matches fallback — replace when venue-specific match API is available
+const mockUpcomingMatches = [
+  {
+    id: 'tm-101',
+    title: '서울 FC vs 강남 유나이티드',
+    matchDate: '2026-03-22',
+    startTime: '14:00',
+    homeTeam: '서울 FC',
+    awayTeam: '강남 유나이티드',
+    status: 'recruiting',
+  },
+  {
+    id: 'tm-102',
+    title: '성동 킥커스 vs TBD',
+    matchDate: '2026-03-23',
+    startTime: '10:00',
+    homeTeam: '성동 킥커스',
+    awayTeam: null,
+    status: 'recruiting',
+  },
+  {
+    id: 'tm-103',
+    title: '뚝섬 FC vs 왕십리 풋살',
+    matchDate: '2026-03-29',
+    startTime: '18:00',
+    homeTeam: '뚝섬 FC',
+    awayTeam: '왕십리 풋살',
+    status: 'matched',
+  },
+];
 
 type HubSection = 'overview' | 'goods' | 'passes' | 'events';
 
@@ -33,10 +88,12 @@ export default function VenueDetailPage() {
   const [activeSection, setActiveSection] = useState<HubSection>('overview');
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   const { data: venue, isLoading, isError, refetch } = useVenue(venueId);
   const { data: hubData } = useVenueHub(venueId);
   const { data: schedule = [] } = useVenueSchedule(venueId);
+  const createReviewMutation = useCreateVenueReview();
 
   if (isLoading) {
     return (
@@ -80,6 +137,36 @@ export default function VenueDetailPage() {
   }));
   const heroImage = venueImages[0] ?? fallbackImages[0];
 
+  const venueRating = venue.rating ?? 0;
+  const venueReviewCount = venue.reviewCount ?? 0;
+  const venueReviews = venue.reviews ?? venue.venueReviews ?? [];
+  const venueFacilities = venue.facilities ?? [];
+  const venuePhone = venue.phone || null;
+  const venuePricePerHour = venue.pricePerHour ?? null;
+  const operatingHours = venue.operatingHours as Record<string, { open: string; close: string; closed?: boolean }> | null;
+  const isIceRink = venueSport === 'ice_hockey' || venueSport === 'ice_skating';
+
+  async function handleReviewSubmit(data: ReviewData) {
+    try {
+      await createReviewMutation.mutateAsync({
+        id: venueId,
+        data: {
+          rating: data.overallRating,
+          facilityRating: data.facilityRating,
+          accessRating: data.accessRating,
+          costRating: data.costRating,
+          iceQuality: data.iceQualityRating,
+          comment: data.comment,
+          imageUrls: data.photos,
+        },
+      });
+      toast('success', '리뷰가 등록되었어요.');
+      setShowReviewForm(false);
+    } catch {
+      toast('error', '리뷰 등록에 실패했어요. 다시 시도해주세요.');
+    }
+  }
+
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <MobileGlassHeader className="justify-between">
@@ -108,13 +195,14 @@ export default function VenueDetailPage() {
       </MobileGlassHeader>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/venues" className="hover:text-gray-600 transition-colors">시설</Link>
+        <Link href="/venues" className="hover:text-gray-600 transition-colors">시설 찾기</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700">{venue.name}</span>
       </div>
 
-      <div className="@3xl:grid @3xl:grid-cols-[1fr_360px] @3xl:gap-8">
+      <div className="@3xl:grid @3xl:grid-cols-[1fr_380px] @3xl:gap-8">
         <div className="px-5 @3xl:px-0">
+          {/* Hero image */}
           <Card padding="none" className="overflow-hidden">
             <button type="button" onClick={() => setShowMediaLightbox(true)} className="relative h-[220px] w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
               <SafeImage src={heroImage} fallbackSrc={fallbackImages[0]} alt={venue.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 60vw" />
@@ -122,21 +210,23 @@ export default function VenueDetailPage() {
             <div className="p-5">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{venue.name}</h2>
-                {venue.reviewCount > 0 && (
+                {venueReviewCount > 0 && (
                   <span className="inline-flex items-center gap-1 text-sm text-amber-500">
-                    <Star size={12} fill="currentColor" />
-                    {venue.rating.toFixed(1)}
+                    <Star size={12} fill="currentColor" aria-hidden="true" />
+                    {venueRating.toFixed(1)}
+                    <span className="text-gray-400 dark:text-gray-500">({venueReviewCount})</span>
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {sportLabel[venueSport] || venue.type}
                 {(venue.city || venue.district) ? ` · ${[venue.city, venue.district].filter(Boolean).join(' ')}` : ''}
               </p>
-              {venue.description && <p className="mt-3 text-base text-gray-600">{venue.description}</p>}
+              {venue.description && <p className="mt-3 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{venue.description}</p>}
             </div>
           </Card>
 
+          {/* Hub section tabs */}
           <div className="mt-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             <HubSectionTab label="소개" active={activeSection === 'overview'} onClick={() => setActiveSection('overview')} />
             <HubSectionTab label={`굿즈 ${hubData?.sections.goodsCount ?? goods.length}`} active={activeSection === 'goods'} onClick={() => setActiveSection('goods')} />
@@ -146,13 +236,108 @@ export default function VenueDetailPage() {
 
           {activeSection === 'overview' && (
             <div className="space-y-4 mt-4">
+              {/* 지도 */}
+              <MapPlaceholder
+                lat={venue.lat ?? 37.5665}
+                lng={venue.lng ?? 126.978}
+                address={venue.address}
+                name={venue.name}
+                height={220}
+              />
+
+              {/* 기본 정보 — 주소, 운영시간, 요금, 전화번호 */}
               <Card>
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">기본 정보</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">{venue.address}</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {venue.pricePerHour ? `시간당 ${venue.pricePerHour.toLocaleString('ko-KR')}원` : '요금 정보 없음'}
-                </p>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">기본 정보</h3>
+                <div className="space-y-3">
+                  {/* 주소 */}
+                  <div className="flex items-start gap-3">
+                    <MapPin size={18} className="text-gray-500 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">주소</p>
+                      <p className="text-sm text-gray-900 dark:text-white mt-0.5">{venue.address}</p>
+                    </div>
+                  </div>
+
+                  {/* 운영 시간 */}
+                  <div className="flex items-start gap-3">
+                    <Clock size={18} className="text-gray-500 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">운영 시간</p>
+                      {operatingHours && Object.keys(operatingHours).length > 0 ? (
+                        <div className="space-y-1.5">
+                          {Object.entries(operatingHours).map(([day, hours]) => {
+                            const label = dayLabels[day] || day;
+                            const isClosed = hours.closed;
+                            return (
+                              <div
+                                key={day}
+                                className="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-700 px-3 py-2"
+                              >
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{label}</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                  {isClosed ? '휴무' : `${hours.open || '00:00'} ~ ${hours.close || '00:00'}`}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">운영 시간 정보 없음</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 이용 요금 */}
+                  <div className="flex items-start gap-3">
+                    <DollarSign size={18} className="text-gray-500 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">이용 요금</p>
+                      <p className="text-sm text-gray-900 dark:text-white mt-0.5">
+                        {venuePricePerHour
+                          ? `시간당 ${new Intl.NumberFormat('ko-KR').format(venuePricePerHour)}원`
+                          : '요금 정보 없음'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 전화번호 */}
+                  <div className="flex items-start gap-3">
+                    <Phone size={18} className="text-gray-500 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">전화번호</p>
+                      {venuePhone ? (
+                        <a href={`tel:${venuePhone}`} className="text-sm text-blue-500 mt-0.5 block">
+                          {venuePhone}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">전화번호 없음</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </Card>
+
+              {/* 시설 정보 */}
+              <Card>
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">시설 정보</h3>
+                {venueFacilities.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {venueFacilities.map((facility: string) => (
+                      <span
+                        key={facility}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${facilityTagColor}`}
+                      >
+                        <Check size={14} aria-hidden="true" />
+                        {facility}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={MapPin} title="등록된 시설 정보가 없어요" size="sm" />
+                )}
+              </Card>
+
+              {/* 향후 7일 예약 */}
               <Card>
                 <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
                 {schedule.length === 0 ? (
@@ -165,14 +350,74 @@ export default function VenueDetailPage() {
                   </div>
                 )}
               </Card>
+
+              {/* 리뷰 */}
               <Card>
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">리뷰</h3>
-                {venue.reviewCount === 0 ? (
-                  <EmptyState icon={Star} title="아직 리뷰가 없어요" size="sm" />
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">
+                    리뷰 ({venueReviewCount})
+                  </h3>
+                  {venueReviewCount > 0 && (
+                    <div className="flex items-center gap-1 text-sm">
+                      <Star size={12} className="text-amber-400" fill="currentColor" aria-hidden="true" />
+                      <span className="font-semibold text-gray-700 dark:text-gray-200">{venueRating.toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {venueReviews.length > 0 ? (
+                  <div className="space-y-4 mb-3">
+                    {venueReviews.slice(0, 5).map((review) => (
+                      <div key={review.id} className="border-b border-gray-50 dark:border-gray-700 pb-3 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-xs font-bold text-gray-500 dark:text-gray-300">
+                            {review.user?.nickname?.charAt(0) || '?'}
+                          </div>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{review.user?.nickname || '익명'}</span>
+                          <div className="flex items-center gap-0.5" aria-label={`별점 ${review.rating}점`}>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                size={12}
+                                className={i < (review.rating ?? 0) ? 'text-amber-400' : 'text-gray-200 dark:text-gray-600'}
+                                fill={i < (review.rating ?? 0) ? 'currentColor' : 'none'}
+                                aria-hidden="true"
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs text-gray-400 ml-auto">{review.createdAt}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{review.comment || ''}</p>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    평균 {venue.rating.toFixed(1)} / 5.0 · 총 {venue.reviewCount}개
-                  </p>
+                  <div className="mb-3">
+                    <EmptyState
+                      icon={Star}
+                      title="아직 리뷰가 없어요"
+                      description="이 시설을 이용한 후 리뷰를 남겨보세요"
+                      size="sm"
+                    />
+                  </div>
+                )}
+
+                {/* 리뷰 쓰기 */}
+                {!showReviewForm ? (
+                  <button
+                    onClick={() => setShowReviewForm(true)}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-transparent py-3.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <PenLine size={16} className="text-blue-500" aria-hidden="true" />
+                    리뷰 쓰기
+                  </button>
+                ) : (
+                  <ReviewForm
+                    venueId={venueId}
+                    venueType={isIceRink ? 'ice_rink' : 'field'}
+                    onSubmit={handleReviewSubmit}
+                    onCancel={() => setShowReviewForm(false)}
+                  />
                 )}
               </Card>
             </div>
@@ -183,18 +428,84 @@ export default function VenueDetailPage() {
           {activeSection === 'events' && <EventsSection events={events} />}
         </div>
 
+        {/* Right sidebar */}
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
             {canEdit && (
               <Card padding="sm">
-                <Link href={`/venues/${venueId}/edit`} className="block rounded-xl bg-blue-500 px-3 py-2.5 text-center text-sm font-semibold text-white">
+                <Link href={`/venues/${venueId}/edit`} className="block rounded-xl bg-blue-500 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-blue-600 transition-colors">
                   시설 페이지 수정
                 </Link>
               </Card>
             )}
+
+            {/* 이 구장 예정 경기 */}
+            <Card padding="sm">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Trophy size={16} className="text-blue-500" aria-hidden="true" />
+                이 구장 예정 경기
+              </h3>
+              {mockUpcomingMatches.length > 0 ? (
+                <div className="space-y-2">
+                  {mockUpcomingMatches.map((match) => {
+                    const statusLabel = match.status === 'matched' ? '매칭완료' : '모집중';
+                    const statusColor = match.status === 'matched' ? 'text-green-600 dark:text-green-400' : 'text-blue-500';
+                    return (
+                      <Link
+                        key={match.id}
+                        href={`/team-matches/${match.id}`}
+                        className="block rounded-xl bg-gray-50 dark:bg-gray-800 p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1">
+                            {match.title}
+                          </p>
+                          <span className={`shrink-0 text-2xs font-semibold ${statusColor}`}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          <Calendar size={12} className="shrink-0" aria-hidden="true" />
+                          <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <Users size={12} className="shrink-0" aria-hidden="true" />
+                          <span>{match.homeTeam}</span>
+                          <span className="text-gray-300 dark:text-gray-600">vs</span>
+                          <span>{match.awayTeam ?? '상대팀 모집중'}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={Calendar}
+                  title="예정된 경기가 없어요"
+                  description="이 시설에서 매치를 만들어보세요"
+                  size="sm"
+                />
+              )}
+              <Link
+                href="/team-matches/new"
+                className="block w-full text-center rounded-xl bg-blue-500 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-colors mt-3"
+              >
+                이 구장에서 경기 만들기
+              </Link>
+              {venuePhone && (
+                <a
+                  href={`tel:${venuePhone}`}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors mt-2"
+                >
+                  <Phone size={14} aria-hidden="true" />
+                  전화 문의
+                </a>
+              )}
+            </Card>
+
             {canManageCatalog && (
               <Card padding="sm">
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">허브 등록</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">허브 등록</h3>
                 <div className="space-y-1.5 text-sm">
                   <Link href={`/marketplace/new?venueId=${venueId}&venueName=${encodeURIComponent(venue.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
                     굿즈 등록
@@ -208,8 +519,9 @@ export default function VenueDetailPage() {
                 </div>
               </Card>
             )}
+
             <Card padding="sm">
-              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">허브 섹션</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">허브 섹션</h3>
               <div className="space-y-1.5 text-sm">
                 <button onClick={() => setActiveSection('goods')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">굿즈 {hubData?.sections.goodsCount ?? goods.length}</button>
                 <button onClick={() => setActiveSection('passes')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">수강권 {hubData?.sections.passesCount ?? passes.length}</button>
@@ -248,7 +560,7 @@ function HubSectionTab({ label, active, onClick }: { label: string; active: bool
 
 function ScheduleCard({ item }: { item: VenueScheduleSlot }) {
   return (
-    <Link href={`/matches/${item.id}`} className="block rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2.5">
+    <Link href={`/matches/${item.id}`} className="block rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
       <p className="text-xs text-gray-500 mt-1">{formatMatchDate(item.matchDate)} {item.startTime} - {item.endTime}</p>
     </Link>

@@ -1,3 +1,12 @@
+// Sport types — keep in sync with Prisma schema SportType enum
+export const SPORT_TYPES = [
+  'soccer', 'futsal', 'basketball', 'badminton',
+  'ice_hockey', 'figure_skating', 'short_track',
+  'swimming', 'tennis', 'baseball', 'volleyball',
+] as const;
+
+export type SportType = typeof SPORT_TYPES[number];
+
 // Sport labels — single source of truth
 export const sportLabel: Record<string, string> = {
   soccer: '축구',

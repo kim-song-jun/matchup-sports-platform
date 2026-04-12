@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { SportType } from '@/lib/constants';
 
 const timestamp = () => new Date().toISOString();
 
@@ -21,7 +22,7 @@ const mockUser = {
 const mockTeam1 = {
   id: 'team-1',
   name: '서울 FC',
-  sportType: 'SOCCER',
+  sportType: 'soccer' satisfies SportType,
   memberCount: 11,
   level: 3,
   isRecruiting: true,
@@ -36,7 +37,7 @@ const mockTeam1 = {
 const mockTeam2 = {
   id: 'team-2',
   name: '한강 농구단',
-  sportType: 'BASKETBALL',
+  sportType: 'basketball' satisfies SportType,
   memberCount: 5,
   level: 2,
   isRecruiting: false,
@@ -72,7 +73,7 @@ const mockMyTeamMemberships = [
 
 const mockMatch = {
   id: 'match-1',
-  sportType: 'SOCCER',
+  sportType: 'soccer' satisfies SportType,
   status: 'RECRUITING',
   scheduledAt: '2025-06-01T10:00:00.000Z',
   venueName: '서울 풋살장',
@@ -86,7 +87,7 @@ const mockTeamMatch = {
   id: 'tm-1',
   hostTeamId: 'team-1',
   hostTeam: mockTeam1,
-  sportType: 'soccer',
+  sportType: 'soccer' satisfies SportType,
   title: '주말 친선 경기 모집',
   description: '',
   matchDate: '2026-05-10',
@@ -118,7 +119,7 @@ const mockTeamMatch = {
 
 const mockMercenaryPost = {
   id: 'merc-1',
-  sportType: 'SOCCER',
+  sportType: 'soccer' satisfies SportType,
   status: 'OPEN',
   title: '풋살 용병 구합니다',
   description: '주말 풋살 용병 1명 구합니다',

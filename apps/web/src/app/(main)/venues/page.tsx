@@ -66,11 +66,12 @@ export default function VenuesPage() {
         subtitle="내 주변 스포츠 시설을 찾아보고, 운영 정보와 리뷰를 함께 확인하세요."
         action={(
           <button
+            type="button"
             onClick={() => toast('info', '시설 등록 요청이 접수되면 검토 후 추가됩니다. teammeet@support.com으로 시설 정보를 보내주세요.')}
-            className="inline-flex min-h-[44px] items-center gap-1 rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
+            aria-label="시설 등록 요청"
           >
-            <Plus size={12} />
-            시설 등록 요청
+            <Plus size={18} aria-hidden="true" />
           </button>
         )}
       />

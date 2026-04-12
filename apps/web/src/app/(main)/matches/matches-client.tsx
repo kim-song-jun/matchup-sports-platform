@@ -9,7 +9,6 @@ import dynamic from 'next/dynamic';
 import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
-import { buttonStyles } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -182,9 +181,12 @@ export function MatchesPage() {
         title={t('findMatch')}
         subtitle={t('subtitle')}
         action={(
-          <Link href="/matches/new" className={buttonStyles({ size: 'sm' })}>
-            <Plus size={14} strokeWidth={2.5} />
-            매치 만들기
+          <Link
+            href="/matches/new"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
+            aria-label="매치 만들기"
+          >
+            <Plus size={18} aria-hidden="true" />
           </Link>
         )}
       >

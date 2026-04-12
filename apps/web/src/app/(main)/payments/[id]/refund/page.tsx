@@ -20,7 +20,7 @@ import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useToast } from '@/components/ui/toast';
 import { usePayment, useRefundPayment } from '@/hooks/use-api';
 import { getPaymentMethodMeta, getPaymentSource, getRecordedPaymentMode, getRefundPolicy } from '@/lib/payment-ui';
-import { formatAmount, formatDateTime } from '@/lib/utils';
+import { formatAmount, formatDateTime, extractErrorMessage } from '@/lib/utils';
 
 const refundReasons = [
   { id: 'schedule', label: '일정 변경' },
@@ -99,8 +99,7 @@ export default function RefundRequestPage() {
       toast('success', isMockMode ? '환불 시뮬레이션이 완료되었어요' : '환불 요청이 접수되었어요');
       router.push(`/payments/${paymentId}`);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '환불 요청에 실패했어요.');
+      toast('error', extractErrorMessage(err, '환불 요청에 실패했어요.'));
     }
   };
 

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Plus, Package, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
-import { buttonStyles } from '@/components/ui/button';
 import { useListings } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
@@ -52,9 +51,12 @@ export default function MarketplacePage() {
         title={t('title')}
         subtitle="동호인끼리 믿고 거래할 수 있는 스포츠 장터예요."
         action={(
-          <Link href="/marketplace/new" className={buttonStyles({ size: 'sm' })}>
-            <Plus size={14} strokeWidth={2.5} />
-            {t('createListing')}
+          <Link
+            href="/marketplace/new"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
+            aria-label={t('createListing')}
+          >
+            <Plus size={18} aria-hidden="true" />
           </Link>
         )}
       />

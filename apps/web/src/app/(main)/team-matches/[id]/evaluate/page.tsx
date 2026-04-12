@@ -20,6 +20,7 @@ import {
   getOpponentTeam,
   getParticipantTeams,
 } from '@/lib/team-match-operations';
+import { extractErrorMessage } from '@/lib/utils';
 
 const evaluationItems = [
   { key: 'levelAccuracy', label: '수준 일치', desc: '모집글과 실제 경기 수준이 비슷했나요?' },
@@ -157,8 +158,7 @@ export default function TeamMatchEvaluatePage() {
           toast('success', '경기 평가가 저장되었어요');
         },
         onError: (error) => {
-          const apiError = error as { response?: { data?: { message?: string } } };
-          toast('error', apiError.response?.data?.message || '평가 제출에 실패했어요. 다시 시도해주세요');
+          toast('error', extractErrorMessage(error, '평가 제출에 실패했어요. 다시 시도해주세요'));
         },
       },
     );

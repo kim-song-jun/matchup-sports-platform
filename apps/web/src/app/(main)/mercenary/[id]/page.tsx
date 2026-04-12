@@ -19,7 +19,7 @@ import {
   useWithdrawMercenaryApplication,
 } from '@/hooks/use-api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
-import { formatFullDate, formatCurrency } from '@/lib/utils';
+import { formatFullDate, formatCurrency, extractErrorMessage } from '@/lib/utils';
 
 const positionLabel: Record<string, string> = {
   GK: '골키퍼',
@@ -35,18 +35,6 @@ const applicationStatusLabel: Record<string, string> = {
   rejected: '거절됨',
   withdrawn: '신청 취소',
 };
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string | string[] } } };
-  const message = maybe.response?.data?.message;
-  if (Array.isArray(message)) {
-    return message[0] ?? fallback;
-  }
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message;
-  }
-  return fallback;
-}
 
 function statusBadgeClass(status: string): string {
   if (status === 'accepted') return 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';

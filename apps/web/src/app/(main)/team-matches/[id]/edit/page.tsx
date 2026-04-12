@@ -14,7 +14,7 @@ import { FormField } from '@/components/ui/form-field';
 import { useTeamMatch } from '@/hooks/use-api';
 import { SKILL_GRADES, MATCH_TYPES } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
-import { formatAmount } from '@/lib/utils';
+import { formatAmount, extractErrorMessage } from '@/lib/utils';
 import { api } from '@/lib/api';
 
 const sportOptions = [
@@ -139,8 +139,7 @@ export default function EditTeamMatchPage() {
       toast('success', '모집글이 수정되었어요');
       router.push(`/team-matches/${id}`);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '모집글 수정에 실패했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '모집글 수정에 실패했어요. 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }
@@ -153,8 +152,7 @@ export default function EditTeamMatchPage() {
       toast('success', '모집글이 취소되었어요');
       router.push('/my/team-matches');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '취소하지 못했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '취소하지 못했어요. 다시 시도해주세요'));
     } finally {
       setIsCancelling(false);
       setShowCancelModal(false);

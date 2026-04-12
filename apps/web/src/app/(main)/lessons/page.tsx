@@ -65,10 +65,10 @@ export default function LessonsPage() {
         action={(
           <Link
             href="/lessons/new"
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-600"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
+            aria-label={t('createLesson')}
           >
-            <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
-            {t('createLesson')}
+            <Plus size={18} aria-hidden="true" />
           </Link>
         )}
       />

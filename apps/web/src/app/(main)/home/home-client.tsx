@@ -138,7 +138,7 @@ export function HomePage() {
 
       {/* 다가오는 일정 — 토스 스타일 컴팩트 리스트 */}
       {canRenderAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
-        <section className="mt-6 px-5 @3xl:px-0">
+        <section className="mt-10 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{t('upcomingSchedule')}</h2>
@@ -189,7 +189,7 @@ export function HomePage() {
 
       {/* 비로그인 가치 제안 — 토스 스타일 다크 패널 */}
       {!canRenderAuthenticated && (
-        <section className="mt-6 px-5 @3xl:px-0">
+        <section className="mt-10 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-900 dark:bg-gray-800 p-5">
             <p className="text-lg font-bold text-white tracking-tight">{t('aiMatchIntro')}</p>
             <p className="text-sm text-gray-400 mt-1.5 leading-relaxed">{t('valueProposition')}</p>
@@ -202,7 +202,7 @@ export function HomePage() {
 
       {/* 배너 (로그인 유저) — translateX 슬라이드 (배경 겹침 없음) */}
       {canRenderAuthenticated && (
-        <section className="mt-6 px-5 @3xl:px-0">
+        <section className="mt-10 px-5 @3xl:px-0">
           <div
             className="relative h-32 overflow-hidden rounded-2xl"
             onMouseEnter={() => setBannerPaused(true)}
@@ -281,8 +281,8 @@ export function HomePage() {
       )}
 
       {/* 빠른 탐색 칩 — 토스 스타일 pill row */}
-      <section className="px-5 @3xl:px-0 mt-8">
-        <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight mb-3">더 찾아보기</h2>
+      <section className="px-5 @3xl:px-0 mt-10">
+        <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">더 찾아보기</h2>
         <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
           {[
             { href: '/lessons', icon: GraduationCap, label: tn('lessons') },

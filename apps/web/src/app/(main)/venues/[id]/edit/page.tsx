@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import type { Venue } from '@/types/api';
+import { extractErrorMessage } from '@/lib/utils';
 
 type VenueEditState = Pick<Venue, 'name' | 'address' | 'description' | 'phone' | 'city' | 'district' | 'pricePerHour'>;
 
@@ -70,8 +71,7 @@ export default function VenueEditPage() {
       toast('success', '시설 정보를 저장했어요.');
       router.push(`/venues/${venueId}`);
     } catch (error) {
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', message || '시설 정보를 저장하지 못했어요.');
+      toast('error', extractErrorMessage(error, '시설 정보를 저장하지 못했어요.'));
     }
   }
 

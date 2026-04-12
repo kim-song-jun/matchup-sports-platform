@@ -13,7 +13,7 @@ import { FormField } from '@/components/ui/form-field';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
-import { formatCurrency, formatAmount } from '@/lib/utils';
+import { formatCurrency, formatAmount, extractErrorMessage } from '@/lib/utils';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -128,8 +128,7 @@ export default function CreateLessonPage() {
       toast('success', '강좌가 등록되었어요!');
       router.push('/lessons');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '강좌 등록에 실패했어요. 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '강좌 등록에 실패했어요. 다시 시도해주세요'));
     } finally {
       setIsSubmitting(false);
     }

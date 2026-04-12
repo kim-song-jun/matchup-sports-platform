@@ -25,7 +25,7 @@ import {
   getTeamMatchStatusMeta,
   isArrivalOpen,
 } from '@/lib/team-match-operations';
-import { formatDateDot } from '@/lib/utils';
+import { formatDateDot, extractErrorMessage } from '@/lib/utils';
 
 function formatCountdown(matchDate: string, startTime: string) {
   const startAt = new Date(`${matchDate}T${startTime}:00`);
@@ -156,8 +156,7 @@ export default function ArrivalCheckPage() {
           toast('success', `${selectedTeam.name} 도착 인증이 기록되었어요`);
         },
         onError: (error) => {
-          const apiError = error as { response?: { data?: { message?: string } } };
-          toast('error', apiError.response?.data?.message || '도착 인증에 실패했어요. 다시 시도해주세요');
+          toast('error', extractErrorMessage(error, '도착 인증에 실패했어요. 다시 시도해주세요'));
         },
       },
     );

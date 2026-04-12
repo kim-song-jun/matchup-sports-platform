@@ -21,6 +21,7 @@ import {
   toExistingUploadAsset,
   type UploadAsset,
 } from '@/lib/uploads';
+import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -152,8 +153,7 @@ export default function EditMatchPage() {
       toast('success', '매치 정보가 저장되었어요');
       router.push(`/matches/${matchId}`);
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요');
+      toast('error', extractErrorMessage(error, '수정에 실패했어요'));
     }
   };
 

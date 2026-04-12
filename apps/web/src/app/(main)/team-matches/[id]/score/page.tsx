@@ -24,6 +24,7 @@ import {
   isScoreEditable,
 } from '@/lib/team-match-operations';
 import { getTeamLogo } from '@/lib/sport-image';
+import { extractErrorMessage } from '@/lib/utils';
 
 function normalizeInput(value: string) {
   return value.replace(/[^0-9]/g, '');
@@ -144,8 +145,7 @@ export default function ScoreInputPage() {
           toast('success', '경기 결과가 저장되었어요');
         },
         onError: (error) => {
-          const apiError = error as { response?: { data?: { message?: string } } };
-          toast('error', apiError.response?.data?.message || '스코어 기록에 실패했어요. 다시 시도해주세요');
+          toast('error', extractErrorMessage(error, '스코어 기록에 실패했어요. 다시 시도해주세요'));
         },
       },
     );

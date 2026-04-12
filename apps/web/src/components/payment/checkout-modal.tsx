@@ -66,7 +66,7 @@ export function CheckoutModal({
       onSuccess(confirmed);
       onClose();
     } catch (err: unknown) {
-      const message = extractErrorMessage(err, '결제 처리 중 오류가 발생했습니다.');
+      const message = extractErrorMessage(err, '결제 처리 중 오류가 발생했어요. 다시 시도해주세요.');
       toast('error', message);
       onError(message);
     }

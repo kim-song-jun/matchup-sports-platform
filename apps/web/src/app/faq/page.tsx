@@ -30,7 +30,7 @@ export default function FaqPage() {
 
             <ScrollReveal delay={200}>
               <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[440px] mx-auto">
-                MatchUp 이용에 대해 궁금한 점을
+                TeamMeet 이용에 대해 궁금한 점을
                 <br className="hidden sm:block" />
                 빠르게 확인해보세요.
               </p>

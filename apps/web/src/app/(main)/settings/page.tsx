@@ -55,7 +55,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">앱 정보</p>
-              <p className="mt-0.5 text-xs text-gray-500">MatchUp v1.0.0</p>
+              <p className="mt-0.5 text-xs text-gray-500">TeamMeet v1.0.0</p>
             </div>
           </div>
         </SettingsSection>
@@ -64,7 +64,7 @@ export default function SettingsPage() {
         <LogoutButton />
 
         <div className="text-center">
-          <p className="text-xs text-gray-300">MatchUp v1.0.0</p>
+          <p className="text-xs text-gray-300">TeamMeet v1.0.0</p>
         </div>
         <div className="h-24" />
       </div>

@@ -106,7 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-5 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-900 dark:text-white">
             <ShieldCheck size={20} className="text-blue-500" />
-            <h1 className="text-lg font-bold">MatchUp Admin</h1>
+            <h1 className="text-lg font-bold">TeamMeet Admin</h1>
           </div>
           {/* Mobile close button */}
           <button

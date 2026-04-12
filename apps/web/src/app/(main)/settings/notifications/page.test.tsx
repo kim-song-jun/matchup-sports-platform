@@ -111,7 +111,7 @@ describe('NotificationsPage', () => {
 
     await user.click(screen.getByRole('switch', { name: '방해금지 시간 꺼짐' }));
 
-    expect(localStorage.getItem('matchup:notification-dnd-enabled')).toBe('true');
+    expect(localStorage.getItem('teameet:notification-dnd-enabled')).toBe('true');
     expect(mockToast).toHaveBeenCalledWith('success', '이 기기에서 방해금지 시간을 켰어요');
   });
 });

@@ -189,7 +189,7 @@ function LoginPageInner() {
 
       {/* 상단 — 브랜드 */}
       <div className="flex flex-col items-center justify-center px-6 pt-8 pb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
         <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
         </p>

@@ -62,7 +62,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-7 pb-5">
         <Link href="/home">
-          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
         </Link>
       </div>
 

@@ -34,7 +34,7 @@ interface ServerCategoryConfig {
   icon: LucideIcon;
 }
 
-const DEVICE_DND_STORAGE_KEY = 'matchup:notification-dnd-enabled';
+const DEVICE_DND_STORAGE_KEY = 'teameet:notification-dnd-enabled';
 const DND_START = '22:00';
 const DND_END = '08:00';
 
@@ -155,7 +155,7 @@ export default function NotificationsPage() {
                 서버와 동기화되는 범위
               </p>
               <p className="text-sm leading-6 text-blue-800/90 dark:text-blue-100/80">
-                아래 4개 카테고리는 MatchUp 계정에 저장되어 새로고침, 재로그인,
+                아래 4개 카테고리는 TeamMeet 계정에 저장되어 새로고침, 재로그인,
                 다른 탭 진입 후에도 같은 상태로 유지됩니다.
               </p>
             </div>

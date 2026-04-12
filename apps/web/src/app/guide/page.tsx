@@ -197,7 +197,7 @@ export default function GuidePage() {
               <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
                 가입부터 매칭, 경기, 평가까지.
                 <br className="hidden sm:block" />
-                MatchUp 서비스 이용의 모든 것을 안내합니다.
+                TeamMeet 서비스 이용의 모든 것을 안내합니다.
               </p>
             </ScrollReveal>
           </div>

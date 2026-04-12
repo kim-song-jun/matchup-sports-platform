@@ -52,7 +52,7 @@
 
 ```
 apps/
-  web/              → Next.js 15 프론트엔드 (App Router)
+  web/              → Next.js 16 프론트엔드 (App Router)
     src/
       app/          → 페이지 라우트
         (auth)/     → 로그인 등 인증 페이지
@@ -98,7 +98,7 @@ infra/
 ## 기술 스택
 
 ### 프론트엔드
-- **프레임워크**: Next.js 15 (App Router, React 19)
+- **프레임워크**: Next.js 16 (App Router, React 19.2)
 - **스타일링**: Tailwind CSS v4 + PostCSS
 - **UI 유틸**: clsx + class-variance-authority + tailwind-merge
 - **상태 관리**: Zustand 5

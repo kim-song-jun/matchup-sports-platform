@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
   // 프로덕션: standalone, Capacitor: export
   output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
   experimental: {
-    optimizePackageImports: ['lucide-react', 'next-intl', '@tanstack/react-query'],
+    optimizePackageImports: ['next-intl', '@tanstack/react-query'],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

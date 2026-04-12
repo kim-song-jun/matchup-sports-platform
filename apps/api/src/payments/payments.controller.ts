@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, UseGuards, Headers, RawBodyRequest, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query, UseGuards, Headers, RawBodyRequest, Req, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiHeader } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PaymentsService } from './payments.service';
@@ -59,8 +59,16 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '내 결제 내역' })
-  async getMyPayments(@CurrentUser('id') userId: string) {
-    return this.paymentsService.getByUserId(userId);
+  async getMyPayments(
+    @CurrentUser('id') userId: string,
+    @Query('cursor') cursor?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.paymentsService.getByUserId(
+      userId,
+      cursor,
+      take ? parseInt(take, 10) : undefined,
+    );
   }
 
   @Get(':id')

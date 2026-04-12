@@ -22,7 +22,8 @@ export default function PaymentsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const { data: payments = [], isLoading, isError, refetch } = usePayments();
+  const { data: paymentsData, isLoading, isError, refetch } = usePayments();
+  const payments = paymentsData?.items ?? [];
 
   const filteredPayments = useMemo(() => {
     return payments

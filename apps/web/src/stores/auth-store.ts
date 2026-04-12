@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { disconnectSocket } from '@/lib/realtime-client';
 
 interface SportProfile {
   id: string;
@@ -121,6 +122,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     if (typeof window !== 'undefined') {
+      disconnectSocket();
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       writeStoredUser(null);

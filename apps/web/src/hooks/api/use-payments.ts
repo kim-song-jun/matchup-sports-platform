@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import type {
   Payment,
+  PaginatedResponse,
   PreparedPayment,
   PreparePaymentInput,
   ConfirmPaymentInput,
@@ -16,11 +17,15 @@ import { queryKeys } from './query-keys';
 // ── Payments ──
 export function usePayments() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery<Payment[]>({
+  return useQuery<PaginatedResponse<Payment>>({
     queryKey: queryKeys.payments.all,
     queryFn: async () => {
       const res = await api.get('/payments/me');
-      return extractData<Payment[]>(res);
+      const data = extractData<PaginatedResponse<Payment> | Payment[]>(res);
+      if (Array.isArray(data)) {
+        return { items: data, nextCursor: null };
+      }
+      return data;
     },
     enabled: isAuthenticated,
   });

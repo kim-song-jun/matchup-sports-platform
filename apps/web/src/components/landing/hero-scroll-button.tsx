@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface HeroScrollButtonProps {

@@ -58,7 +58,8 @@ export default function MyMercenaryPage() {
   const [withdrawingPostId, setWithdrawingPostId] = useState<string | null>(null);
 
   const { data: apiData } = useMercenaryPosts();
-  const { data: myApplications = [] } = useMyMercenaryApplications();
+  const { data: myApplicationsData } = useMyMercenaryApplications();
+  const myApplications = myApplicationsData?.items ?? [];
   const deleteMutation = useDeleteMercenaryPost();
   const withdrawMutation = useWithdrawMercenaryApplication();
 

@@ -49,6 +49,8 @@ export function PricingFaq() {
               onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
               className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 rounded-2xl"
               aria-expanded={openFaq === idx}
+              aria-controls={`pricing-faq-${idx}-panel`}
+              id={`pricing-faq-${idx}`}
             >
               <span className="text-md font-semibold text-gray-900 dark:text-white">
                 {item.q}
@@ -61,6 +63,9 @@ export function PricingFaq() {
               />
             </button>
             <div
+              id={`pricing-faq-${idx}-panel`}
+              role="region"
+              aria-labelledby={`pricing-faq-${idx}`}
               className={`overflow-hidden transition-[max-height,opacity] duration-300 ${
                 openFaq === idx ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
               }`}

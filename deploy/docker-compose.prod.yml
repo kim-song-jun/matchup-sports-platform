@@ -5,8 +5,8 @@ services:
     restart: always
     command: >
       postgres
-      -c shared_buffers=256MB
-      -c effective_cache_size=512MB
+      -c shared_buffers=128MB
+      -c effective_cache_size=384MB
       -c max_connections=100
       -c work_mem=4MB
     environment:
@@ -34,8 +34,6 @@ services:
       --maxmemory 200mb
       --maxmemory-policy allkeys-lru
       --appendonly no
-    volumes:
-      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -80,7 +78,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8100:8100"
+      - "127.0.0.1:8100:8100"
     deploy:
       resources:
         limits:
@@ -112,7 +110,7 @@ services:
       retries: 12
       start_period: 20s
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     deploy:
       resources:
         limits:
@@ -137,5 +135,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
   uploads_data:

@@ -77,15 +77,17 @@ jobs:
 
       - name: Type-check (parallel)
         run: |
-          (cd apps/api && npx tsc --noEmit) &
-          (cd apps/web && npx tsc --noEmit) &
-          wait
+          (cd apps/api && npx tsc --noEmit) & pid1=$!
+          (cd apps/web && npx tsc --noEmit) & pid2=$!
+          wait $pid1 || exit 1
+          wait $pid2 || exit 1
 
       - name: Test (parallel)
         run: |
-          pnpm --filter api test &
-          pnpm --filter web test &
-          wait
+          pnpm --filter api test & pid1=$!
+          pnpm --filter web test & pid2=$!
+          wait $pid1 || exit 1
+          wait $pid2 || exit 1
 
   # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
   deploy:

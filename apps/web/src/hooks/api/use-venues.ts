@@ -88,6 +88,7 @@ export function useCreateVenueReview() {
     },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.venues.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.venues.list() });
     },
   });
 }

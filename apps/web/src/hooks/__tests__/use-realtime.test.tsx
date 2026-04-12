@@ -196,4 +196,14 @@ describe('useRealtime', () => {
     expect(offEvents).toContain('disconnect');
     expect(offEvents).toContain('connect_error');
   });
+
+  it('does not destroy the singleton socket on cleanup (prevents reconnection spam)', () => {
+    mockToken = 'valid-token';
+    const { unmount } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
+
+    mockDisconnect.mockClear();
+    unmount();
+
+    expect(mockDisconnect).not.toHaveBeenCalled();
+  });
 });

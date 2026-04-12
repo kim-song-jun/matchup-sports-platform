@@ -336,8 +336,8 @@ button:not(:disabled):active, a:active {
 
 .glass-mobile-nav,
 .floating-bottom-nav {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.35);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.08),
     0 1px 4px rgba(0, 0, 0, 0.04),
@@ -348,8 +348,8 @@ button:not(:disabled):active, a:active {
 
 .dark .glass-mobile-nav,
 .dark .floating-bottom-nav {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.4);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.3),
     0 1px 4px rgba(0, 0, 0, 0.15),

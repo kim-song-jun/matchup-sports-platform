@@ -9,7 +9,7 @@ const ChatRoomEmbed = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex-1 flex items-center justify-center">
-        <div className="animate-pulse text-gray-400">Loading...</div>
+        <div className="animate-pulse text-gray-400">채팅방을 불러오는 중...</div>
       </div>
     ),
   }

@@ -136,12 +136,15 @@ const FAQ_ITEMS: FaqItem[] = [
 
 /* ── Accordion Component ── */
 
-function AccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: boolean; onToggle: () => void }) {
+function AccordionItem({ item, isOpen, onToggle, id }: { item: FaqItem; isOpen: boolean; onToggle: () => void; id: string }) {
+  const panelId = `${id}-panel`;
   return (
     <div className="border-b border-gray-100 dark:border-gray-800">
       <button
         onClick={onToggle}
         aria-expanded={isOpen}
+        aria-controls={panelId}
+        id={id}
         className="w-full flex items-center justify-between gap-4 py-5 px-1 text-left group focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 rounded-lg"
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -160,6 +163,9 @@ function AccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: bool
         />
       </button>
       <div
+        id={panelId}
+        role="region"
+        aria-labelledby={id}
         className="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out"
         style={{
           gridTemplateRows: isOpen ? '1fr' : '0fr',
@@ -230,6 +236,7 @@ export function FaqContent() {
                     item={item}
                     isOpen={openIndex === idx}
                     onToggle={() => handleToggle(idx)}
+                    id={`faq-${activeCategory}-${idx}`}
                   />
                 ))
               ) : (

@@ -133,14 +133,16 @@ export class SchedulerService {
     const recentRows = await this.prisma.$queryRaw<
       Array<{ userId: string; id: string; arrivedAt: Date | null; rn: bigint }>
     >`
-      SELECT user_id AS "userId", id, arrived_at AS "arrivedAt", row_number() OVER (
-        PARTITION BY user_id ORDER BY joined_at DESC
-      ) AS rn
-      FROM match_participants mp
-      WHERE mp.status = 'confirmed'
-        AND EXISTS (
-          SELECT 1 FROM matches m WHERE m.id = mp.match_id AND m.status = 'completed'
-        )
+      SELECT "userId", id, "arrivedAt", rn FROM (
+        SELECT user_id AS "userId", id, arrived_at AS "arrivedAt", row_number() OVER (
+          PARTITION BY user_id ORDER BY joined_at DESC
+        ) AS rn
+        FROM match_participants mp
+        WHERE mp.status = 'confirmed'
+          AND EXISTS (
+            SELECT 1 FROM matches m WHERE m.id = mp.match_id AND m.status = 'completed'
+          )
+      ) ranked WHERE rn <= 10
     `;
 
     // Group by user; only keep users who have at least 10 recent participations

@@ -85,7 +85,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);
-      disconnectSocket();
+      // Don't destroy the singleton here — createRealtimeSocket handles token
+      // changes internally, and the socket should survive React re-renders,
+      // strict-mode double-effects, and HMR cycles.
     };
   }, [accessToken]);
 

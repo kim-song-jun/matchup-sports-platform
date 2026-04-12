@@ -17,8 +17,16 @@ export class VenuesController {
     @Query('city') city?: string,
     @Query('type') type?: string,
     @Query('sportType') sportType?: string,
+    @Query('cursor') cursor?: string,
+    @Query('take') take?: string,
   ) {
-    return this.venuesService.findAll({ city, type, sportType });
+    return this.venuesService.findAll({
+      city,
+      type,
+      sportType,
+      cursor,
+      take: take ? parseInt(take, 10) : undefined,
+    });
   }
 
   @Get(':id/hub')

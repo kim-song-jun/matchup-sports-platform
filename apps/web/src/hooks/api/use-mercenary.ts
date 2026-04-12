@@ -152,11 +152,15 @@ export interface MyMercenaryApplication {
 
 export function useMyMercenaryApplications() {
   const { isAuthenticated } = useAuthStore();
-  return useQuery<MyMercenaryApplication[]>({
+  return useQuery<PaginatedResponse<MyMercenaryApplication>>({
     queryKey: queryKeys.mercenary.myApplications(),
     queryFn: async () => {
       const res = await api.get('/mercenary/me/applications');
-      return extractData<MyMercenaryApplication[]>(res);
+      const data = extractData<PaginatedResponse<MyMercenaryApplication> | MyMercenaryApplication[]>(res);
+      if (Array.isArray(data)) {
+        return { items: data, nextCursor: null };
+      }
+      return data;
     },
     enabled: isAuthenticated,
   });

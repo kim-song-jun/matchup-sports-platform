@@ -5,6 +5,7 @@ import {
   AdminUserStatus,
   MercenaryPostStatus,
   PaymentStatus,
+  SportType,
 } from '@prisma/client';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -344,12 +345,12 @@ describe('AdminService', () => {
         {
           id: 'post-1',
           teamId: 'team-1',
-          sportType: 'futsal',
+          sportType: SportType.futsal,
           matchDate: new Date('2026-04-12T00:00:00Z'),
           position: 'GK',
           status: MercenaryPostStatus.open,
           createdAt: new Date('2026-04-11T04:00:00Z'),
-          team: { id: 'team-1', name: 'FC MatchUp', sportType: 'futsal' },
+          team: { id: 'team-1', name: 'FC MatchUp', sportType: SportType.futsal },
           author: { id: 'u1', nickname: 'owner' },
           _count: { applications: 3 },
         },

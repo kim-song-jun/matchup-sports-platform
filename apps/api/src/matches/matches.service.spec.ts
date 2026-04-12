@@ -8,6 +8,7 @@ import { MatchesService } from './matches.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MatchingEngineService } from './matching-engine.service';
+import { SportType } from '@prisma/client';
 
 describe('MatchesService', () => {
   let service: MatchesService;
@@ -75,7 +76,7 @@ describe('MatchesService', () => {
     const candidateMatch = {
       id: 'match-1',
       hostId: 'host-1',
-      sportType: 'futsal',
+      sportType: SportType.futsal,
       title: '주말 풋살',
       description: null,
       venueId: 'venue-1',
@@ -110,10 +111,10 @@ describe('MatchesService', () => {
         locationLng: 127.0,
         locationCity: '서울',
         locationDistrict: '강남구',
-        sportTypes: ['futsal'],
+        sportTypes: [SportType.futsal],
       });
       mockPrismaService.userSportProfile.findMany.mockResolvedValue([
-        { sportType: 'futsal', level: 3 },
+        { sportType: SportType.futsal, level: 3 },
       ]);
 
       const results = await service.getRecommended('user-1');
@@ -160,7 +161,7 @@ describe('MatchesService', () => {
         locationLng: null,
         locationCity: '서울',
         locationDistrict: '강남구',
-        sportTypes: ['futsal'],
+        sportTypes: [SportType.futsal],
       });
       mockPrismaService.userSportProfile.findMany.mockResolvedValue([]);
 
@@ -175,7 +176,7 @@ describe('MatchesService', () => {
       {
         id: 'match-1',
         title: '주말 풋살',
-        sportType: 'futsal',
+        sportType: SportType.futsal,
         status: 'recruiting',
         matchDate: new Date('2026-04-01'),
         venue: { id: 'v1', name: '서울 풋살장', city: '서울', district: '강남구' },
@@ -184,7 +185,7 @@ describe('MatchesService', () => {
       {
         id: 'match-2',
         title: '농구 한 판',
-        sportType: 'basketball',
+        sportType: SportType.basketball,
         status: 'recruiting',
         matchDate: new Date('2026-04-02'),
         venue: { id: 'v2', name: '부산 체육관', city: '부산', district: '해운대구' },
@@ -214,7 +215,7 @@ describe('MatchesService', () => {
       const manyMatches = Array.from({ length: 6 }, (_, i) => ({
         id: `match-${i}`,
         title: `매치 ${i}`,
-        sportType: 'futsal',
+        sportType: SportType.futsal,
         status: 'recruiting',
         matchDate: new Date('2026-04-01'),
         venue: { id: 'v1', name: '시설', city: '서울', district: '강남' },
@@ -231,12 +232,12 @@ describe('MatchesService', () => {
     it('should filter by sportType', async () => {
       mockPrismaService.match.findMany.mockResolvedValue([mockMatches[0]]);
 
-      await service.findAll({ sportType: 'futsal' });
+      await service.findAll({ sportType: SportType.futsal });
 
       expect(prisma.match.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            sportType: 'futsal',
+            sportType: SportType.futsal,
           }),
         }),
       );
@@ -356,7 +357,7 @@ describe('MatchesService', () => {
     const mockMatchDetail = {
       id: 'match-1',
       title: '주말 풋살',
-      sportType: 'futsal',
+      sportType: SportType.futsal,
       status: 'recruiting',
       venue: { id: 'v1', name: '서울 풋살장' },
       host: {
@@ -425,7 +426,7 @@ describe('MatchesService', () => {
   describe('create', () => {
     const createDto = {
       title: '주말 풋살',
-      sportType: 'futsal',
+      sportType: SportType.futsal,
       venueId: 'venue-1',
       matchDate: '2026-04-05',
       startTime: '18:00',
@@ -438,7 +439,7 @@ describe('MatchesService', () => {
       id: 'match-new',
       hostId: 'user-1',
       title: '주말 풋살',
-      sportType: 'futsal',
+      sportType: SportType.futsal,
       venueId: 'venue-1',
       matchDate: new Date('2026-04-05'),
       startTime: '18:00',
@@ -469,7 +470,7 @@ describe('MatchesService', () => {
           data: expect.objectContaining({
             hostId: 'user-1',
             title: '주말 풋살',
-            sportType: 'futsal',
+            sportType: SportType.futsal,
             venueId: 'venue-1',
             maxPlayers: 10,
             fee: 15000,
@@ -498,7 +499,7 @@ describe('MatchesService', () => {
         body: '"주말 풋살" 매치를 등록했어요.',
         data: {
           matchId: 'match-new',
-          sportType: 'futsal',
+          sportType: SportType.futsal,
         },
       });
     });
@@ -506,7 +507,7 @@ describe('MatchesService', () => {
     it('should use default values for optional fields', async () => {
       const minimalDto = {
         title: '농구 게임',
-        sportType: 'basketball',
+        sportType: SportType.basketball,
         venueId: 'venue-2',
         matchDate: '2026-04-06',
         startTime: '10:00',

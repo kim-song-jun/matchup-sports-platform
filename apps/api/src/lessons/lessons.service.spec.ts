@@ -73,7 +73,7 @@ describe('LessonsService', () => {
       {
         id: 'lesson-1',
         title: '풋살 기초 레슨',
-        sportType: 'FUTSAL',
+        sportType: SportType.futsal,
         type: 'group',
         status: 'open',
         lessonDate: new Date('2026-04-01'),
@@ -82,7 +82,7 @@ describe('LessonsService', () => {
       {
         id: 'lesson-2',
         title: '농구 슈팅 클리닉',
-        sportType: 'BASKETBALL',
+        sportType: SportType.basketball,
         type: 'clinic',
         status: 'open',
         lessonDate: new Date('2026-04-02'),
@@ -112,7 +112,7 @@ describe('LessonsService', () => {
       const manyLessons = Array.from({ length: 21 }, (_, i) => ({
         id: `lesson-${i}`,
         title: `레슨 ${i}`,
-        sportType: 'FUTSAL',
+        sportType: SportType.futsal,
         status: 'open',
         lessonDate: new Date(),
         host: { id: `u${i}`, nickname: `코치${i}`, profileImageUrl: null },
@@ -128,13 +128,13 @@ describe('LessonsService', () => {
     it('should filter by sportType', async () => {
       mockPrismaService.lesson.findMany.mockResolvedValue([mockLessons[0]]);
 
-      await service.findAll({ sportType: 'FUTSAL' });
+      await service.findAll({ sportType: SportType.futsal });
 
       expect(prisma.lesson.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             status: 'open',
-            sportType: 'FUTSAL',
+            sportType: SportType.futsal,
           }),
         }),
       );
@@ -158,13 +158,13 @@ describe('LessonsService', () => {
     it('should apply both sportType and type filters together', async () => {
       mockPrismaService.lesson.findMany.mockResolvedValue([]);
 
-      await service.findAll({ sportType: 'BASKETBALL', type: 'group' });
+      await service.findAll({ sportType: SportType.basketball, type: 'group' });
 
       expect(prisma.lesson.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
             status: 'open',
-            sportType: 'BASKETBALL',
+            sportType: SportType.basketball,
             type: 'group',
           },
         }),
@@ -190,7 +190,7 @@ describe('LessonsService', () => {
     const mockLessonDetail = {
       id: 'lesson-1',
       title: '풋살 기초 레슨',
-      sportType: 'FUTSAL',
+      sportType: SportType.futsal,
       type: 'group',
       status: 'open',
       lessonDate: new Date('2026-04-01'),
@@ -441,7 +441,7 @@ describe('LessonsService', () => {
           lesson: {
             id: 'lesson-1',
             hostId: 'host-1',
-            sportType: 'FUTSAL',
+            sportType: SportType.futsal,
             type: 'group_lesson',
             title: '풋살 기초 레슨',
             description: null,

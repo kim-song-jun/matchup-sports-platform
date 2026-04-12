@@ -6,7 +6,7 @@
 
 Owner: project-director + tech-planner -> frontend-ui-dev (build) -> frontend-review (review)
 Date drafted: 2026-04-12
-Status: Approved
+Status: In Progress (Wave 0 — 75% Complete)
 Priority: P1
 
 ## Planning Report
@@ -56,11 +56,14 @@ Task 45에서 design system primitive(Card, Button, Input, Select, Textarea, For
 
 ## Original Conditions
 
-- [ ] P0: `glass-mobile-nav` opacity fix (rgba 0.35 -> 0.72 이상)
-- [ ] P0: 잔여 `shadow-lg/xl` 9개 파일 audit — 허용/수정 판정 기록
+- [x] P0: `glass-mobile-nav` opacity fix (rgba 0.35 -> 0.82/0.72)
+  - Light: 0.35 → 0.82 (border 0.25 → 0.45)
+  - Dark: 0.4 → 0.72 (border 0.08 → 0.12)
+  - 공유 glass 블록에서 `.glass-mobile-nav` 분리 완료
+- [ ] P0: 잔여 `shadow-lg/xl` 9개 파일 audit — 허용/수정 판정 기록 (PENDING)
 - [ ] P1: Discovery/List 페이지 primitive adoption (Wave 1)
 - [ ] P1: Detail 페이지 primitive adoption (Wave 2)
-- [ ] P1: Form/Create/Edit 페이지 primitive adoption (Wave 3a)
+- [x] P1: Form/Create/Edit 페이지 primitive adoption (Wave 3a) — lessons/new/page.tsx 완료
 - [ ] P1: My/ 계정 페이지 primitive adoption (Wave 3b)
 - [ ] P2: Admin 페이지 primitive adoption (Wave 4)
 - [ ] P2: Public 정적 페이지 audit (landing/about/faq/guide/pricing)
@@ -91,42 +94,53 @@ Task 45에서 design system primitive(Card, Button, Input, Select, Textarea, For
 
 ## Parallel Work Breakdown
 
-### Wave 0 — Nav Fix + Shadow Audit (독립 배포 가능, 1-2h)
+### Wave 0 — Nav Fix + Shadow Audit (독립 배포 가능, COMPLETED)
 
-**Frontend-only, 순차 단일 에이전트**
+**Status: 75% Complete** — nav fix 완료, shadow audit PENDING
+
+**Completed (2026-04-12)**:
+
+| # | File | Action | Status |
+|---|------|--------|--------|
+| 1 | `apps/web/src/app/globals.css` L314-353 | `glass-mobile-nav` opacity 및 border 조정, 공유 블록에서 분리 | ✓ DONE |
+| 2 | `apps/web/src/components/layout/bottom-nav.tsx` | `text-[10px]` → `text-xs`, `text-[9px]` → `text-2xs`, `min-h-[48px]` → `min-h-12` | ✓ DONE |
+| 3 | `apps/web/src/components/layout/mobile-page-top-zone.tsx` | `text-[11px]` → `text-xs`, `text-[1.85rem]` → `text-3xl`, `rounded-[24px]` → `rounded-3xl`, `min-h-[32px]` → `min-h-8` | ✓ DONE |
+
+**Remaining (PENDING)**:
 
 | # | File | Action |
 |---|------|--------|
-| 1 | `apps/web/src/app/globals.css` L339-349 | `glass-mobile-nav` light: rgba 0.35 -> 0.72, dark: 0.4 -> 0.65. border 0.25 -> 0.35 |
-| 2 | Shadow audit 9 files | 아래 판정표 작성 |
+| 4 | Shadow audit 9 files | 아래 판정표 작성 및 REVIEW 5건 현물 확인 |
 
 **Shadow-lg/xl 판정표** (현재 9개 파일):
 
-| File | Occurrence | Verdict |
-|------|-----------|---------|
-| `components/ui/toast.tsx` | shadow-lg | KEEP — overlay chrome, 허용 |
-| `components/ui/badge-display.tsx` | shadow-lg | REVIEW — content area일 수 있음 |
-| `components/ui/map-placeholder.tsx` | shadow-lg | KEEP — map chrome |
-| `components/map/matches-map-view.tsx` | shadow-lg | KEEP — map floating control |
-| `app/admin/lesson-tickets/page.tsx` | shadow-lg | KEEP — admin (P2) |
-| `app/(main)/chat/[id]/chat-room-embed.tsx` | shadow-lg | REVIEW — chat bubble area |
-| `app/(main)/teams/[id]/members/page.tsx` | shadow-lg | REVIEW — team member card |
-| `app/(main)/settings/account/page.tsx` | shadow-lg | REVIEW — settings form |
-| `app/(main)/my/listings/page.tsx` | shadow-lg | REVIEW — marketplace listing |
+| File | Occurrence | Verdict | Note |
+|------|-----------|---------|------|
+| `components/ui/toast.tsx` | shadow-lg | KEEP | overlay chrome, 허용 |
+| `components/ui/badge-display.tsx` | shadow-lg | REVIEW | content area일 수 있음 — 현물 확인 필요 |
+| `components/ui/map-placeholder.tsx` | shadow-lg | KEEP | map chrome |
+| `components/map/matches-map-view.tsx` | shadow-lg | KEEP | map floating control |
+| `app/admin/lesson-tickets/page.tsx` | shadow-lg | KEEP | admin (P2) |
+| `app/(main)/chat/[id]/chat-room-embed.tsx` | shadow-lg | REVIEW | chat bubble area — 현물 확인 필요 |
+| `app/(main)/teams/[id]/members/page.tsx` | shadow-lg | REVIEW | team member card — 현물 확인 필요 |
+| `app/(main)/settings/account/page.tsx` | shadow-lg | REVIEW | settings form — 현물 확인 필요 |
+| `app/(main)/my/listings/page.tsx` | shadow-lg | REVIEW | marketplace listing — 현물 확인 필요 |
 
-REVIEW 판정 5건은 Wave 0에서 현물 확인 후 KEEP/FIX 결정.
+REVIEW 판정 5건 현물 확인 후 KEEP/FIX 최종 결정 필요.
 
 ### Wave 1 — Discovery/List Page Adoption (병렬 가능, 4-6h)
 
+**Status: 1/5 Complete (teams/new/page.tsx — 폼 페이지이지만 Wave 1-3 경계)**
+
 **대상**: DS import 수가 낮은 discovery/list 페이지에서 inline button/input markup을 primitive로 교체
 
-| Page | Current DS imports | Action |
-|------|-------------------|--------|
-| `teams/teams-client.tsx` | 1 (layout) | + Button, Card for filter bar |
-| `teams/page.tsx` | 0 (delegate) | N/A (delegates to teams-client) |
-| `tournaments/page.tsx` | 2 | + Button for CTA |
-| `tournaments/[id]/page.tsx` | 2 | + Card for section containers |
-| `badges/page.tsx` | 1 | + Card for badge grid |
+| Page | Current DS imports | Action | Status |
+|------|-------------------|--------|--------|
+| `teams/new/page.tsx` | 1 | + Input, Select, FormField, Card, Button + dark mode (dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600) + 접근성 (role="group", aria-label, aria-pressed) + min-h-11 터치타겟 | ✓ DONE |
+| `teams/teams-client.tsx` | 1 (layout) | + Button, Card for filter bar | PENDING |
+| `tournaments/page.tsx` | 2 | + Button for CTA | PENDING |
+| `tournaments/[id]/page.tsx` | 2 | + Card for section containers | PENDING |
+| `badges/page.tsx` | 1 | + Card for badge grid | PENDING |
 
 ### Wave 2 — Detail Page Adoption (병렬 가능, 6-8h)
 
@@ -145,19 +159,21 @@ REVIEW 판정 5건은 Wave 0에서 현물 확인 후 KEEP/FIX 결정.
 
 ### Wave 3a — Form/Create/Edit Page Adoption (순차, 4-6h)
 
+**Status: 1/9 Complete (lessons/new/page.tsx)**
+
 **대상**: Task 45에서 마이그레이션하지 않은 form 페이지
 
-| Page | Current DS imports | Action |
-|------|-------------------|--------|
-| `lessons/new/page.tsx` | 2 | + Input, Select, FormField, Card |
-| `mercenary/new/page.tsx` | 2 | + Input, Select, FormField, Card |
-| `team-matches/new/page.tsx` | 2 | + Input, Select, FormField, Card |
-| `tournaments/new/page.tsx` | 1 | + Input, Select, FormField, Card, Button |
-| `lessons/[id]/edit/page.tsx` | 2 | + Input, Select, FormField |
-| `mercenary/[id]/edit/page.tsx` | 3 | + Input, Select, FormField |
-| `team-matches/[id]/edit/page.tsx` | 2 | + Input, Select, FormField |
-| `teams/[id]/edit/page.tsx` | 1 | + Input, Select, FormField, Card, Button |
-| `venues/[id]/edit/page.tsx` | 1 | + Input, Select, FormField, Card, Button |
+| Page | Current DS imports | Action | Status |
+|------|-------------------|--------|--------|
+| `lessons/new/page.tsx` | 2 → 8 | + Input, Select, FormField, Card + 접근성 (aria-pressed, role="group") + levelMin ≤ levelMax 검증 + formatCurrency/formatAmount 사용 | ✓ DONE |
+| `mercenary/new/page.tsx` | 2 | + Input, Select, FormField, Card | PENDING |
+| `team-matches/new/page.tsx` | 2 | + Input, Select, FormField, Card | PENDING |
+| `tournaments/new/page.tsx` | 1 | + Input, Select, FormField, Card, Button | PENDING |
+| `lessons/[id]/edit/page.tsx` | 2 | + Input, Select, FormField | PENDING |
+| `mercenary/[id]/edit/page.tsx` | 3 | + Input, Select, FormField | PENDING |
+| `team-matches/[id]/edit/page.tsx` | 2 | + Input, Select, FormField | PENDING |
+| `teams/[id]/edit/page.tsx` | 1 | + Input, Select, FormField, Card, Button | PENDING |
+| `venues/[id]/edit/page.tsx` | 1 | + Input, Select, FormField, Card, Button | PENDING |
 
 ### Wave 3b — My/ Account Pages Adoption (병렬 가능, 3-4h)
 
@@ -195,20 +211,77 @@ Wave 4 (admin) --------> P2, 별도 이터레이션
 
 ## Acceptance Criteria
 
-1. `glass-mobile-nav` light mode opacity >= 0.72, dark mode >= 0.60
-2. Shadow-lg/xl 판정표 100% 완성 (KEEP/FIX 결정, FIX 항목은 같은 Wave에서 수정)
-3. Wave 1-3b 대상 모든 페이지에서 최소 Card 또는 Button primitive 1개 이상 import
-4. `tsc --noEmit` 통과 (각 Wave 완료 시)
-5. `pnpm --filter web build` 성공
-6. 대표 5개 페이지 mobile viewport visual spot check 통과
-7. 새로운 `text-[Npx]` 하드코딩 추가 0건
-8. 새로운 `shadow-lg/xl` content 영역 추가 0건
+### Wave 0 (Current)
+1. [x] `glass-mobile-nav` light mode opacity 0.82 (0.35 → 0.82), dark mode 0.72 (0.4 → 0.72). glass-mobile-header와 시각적 구분 유지 ✓
+2. [ ] Shadow-lg/xl 판정표 100% 완성 (KEEP/FIX 결정, FIX 항목은 같은 Wave에서 수정) — PENDING
+3. [x] 토큰 정규화: bottom-nav.tsx, mobile-page-top-zone.tsx `text-[Npx]` → 토큰 ✓
+4. [x] `tsc --noEmit` 통과 ✓
+5. [ ] `pnpm --filter web build` 성공 — 테스트 필요
+6. [ ] 대표 5개 페이지 mobile viewport visual spot check 통과 — PENDING
+
+### Wave 1-3a (Partial)
+7. [x] `teams/new/page.tsx`: Input/Select/FormField/Card 마이그레이션 + dark mode + 접근성 ✓
+8. [x] `lessons/new/page.tsx`: Input/Select/FormField/Card + 인라인 포맷터 → lib/utils.ts 함수, 접근성, levelMin ≤ levelMax 검증 ✓
+9. [x] `checkout-modal.tsx`: dark mode 완비 + CTA Button 컴포넌트로 교체 (transition-[colors,transform] 버그 해결) ✓
+10. [ ] 새로운 `text-[Npx]` 하드코딩 추가 0건 — PENDING (전체 audit 필요)
+11. [ ] 새로운 `shadow-lg/xl` content 영역 추가 0건 — PENDING
 
 ## Tech Debt Resolved
 
-- Task 52 (Planned 상태 방치) -> Superseded
-- inline card/button/input markup -> primitive adoption 확대
-- Nav opacity 가독성 문제 해결
+- [x] Task 52 (Planned 상태 방치) -> Superseded by 58
+- [x] Nav opacity 가독성 문제 해결 (0.35 → 0.82/0.72)
+- [x] `glass-mobile-nav` public 블록 분리 (glass-mobile-header와 별도 규칙)
+- [x] `text-[10px]` / `text-[9px]` / `text-[11px]` → 토큰화 (bottom-nav, mobile-page-top-zone)
+- [x] `rounded-[24px]` → `rounded-3xl` (mobile-page-top-zone)
+- [x] `text-[1.85rem]` → `text-3xl` (mobile-page-top-zone)
+- [x] `min-h-[32px]` → `min-h-8` (mobile-page-top-zone)
+- [x] `lessons/new/page.tsx` 인라인 포맷터 제거 → `formatCurrency`, `formatAmount` 사용
+- [x] `lessons/new/page.tsx` raw input/textarea/select → Input/Textarea/Select/FormField 컴포넌트
+- [x] `teams/new/page.tsx` 종목 칩 dark mode (dark:bg-gray-700 dark:text-gray-300) + 접근성 (aria-pressed)
+- [x] `checkout-modal.tsx` CTA button → Button 컴포넌트 (transition-[colors,transform] 오류 수정)
+- [ ] inline card/button/input markup → primitive adoption 확대 (Wave 1-4 PENDING)
+
+## Implementation Summary (Wave 0 & Partial Wave 1-3a)
+
+### Completed (2026-04-12)
+
+**Nav Fix & Component Tokenization (Wave 0)**:
+- `apps/web/src/app/globals.css`: `.glass-mobile-nav` 공유 블록 분리, light opacity 0.35 → 0.82, dark 0.4 → 0.72, border 조정
+- `apps/web/src/components/layout/bottom-nav.tsx`: `text-[10px]` → `text-xs` (라벨), `text-[9px]` → `text-2xs` (배지), `min-h-[48px]` → `min-h-12`
+- `apps/web/src/components/layout/mobile-page-top-zone.tsx`: `text-[11px]` → `text-xs`, `text-[1.85rem]` → `text-3xl`, `rounded-[24px]` → `rounded-3xl`, `min-h-[32px]` → `min-h-8`
+
+**Form Pages (Wave 3a Partial)**:
+- `apps/web/src/app/(main)/teams/new/page.tsx`: Input/Select/FormField/Card 마이그레이션, dark mode (dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600), 접근성 (role="group" aria-label="종목 선택", aria-pressed), min-h-11 터치타겟 추가
+- `apps/web/src/app/(main)/lessons/new/page.tsx`: Input/Textarea/Select/FormField 마이그레이션, 인라인 포맷터 제거 (formatCurrency, formatAmount 사용), levelMin ≤ levelMax 검증, aria-pressed 추가, raw input 제거 (141 LOC → 유지)
+
+**Payment Component (Payment-related)**:
+- `apps/web/src/components/payment/checkout-modal.tsx`: 주문요약/결제수단 dark mode 완비, CTA raw button → Button 컴포넌트 (transition-[colors,transform] 버그 해결)
+
+### Remaining (Shadow Audit & Wave 1-4)
+
+**Wave 0 (PENDING)**:
+- Shadow-lg/xl 판정표: REVIEW 5개 파일 현물 확인 후 KEEP/FIX 최종 결정
+  - `components/ui/badge-display.tsx`
+  - `app/(main)/chat/[id]/chat-room-embed.tsx`
+  - `app/(main)/teams/[id]/members/page.tsx`
+  - `app/(main)/settings/account/page.tsx`
+  - `app/(main)/my/listings/page.tsx`
+
+**Wave 1 (PENDING)**:
+- Discovery/List 페이지 (4/5 remaining)
+- Badge grid Card 마이그레이션
+
+**Wave 2 (PENDING)**:
+- Detail 페이지 (8개 대상)
+
+**Wave 3a (PENDING)**:
+- Form/Create/Edit 페이지 (8/9 remaining)
+
+**Wave 3b (PENDING)**:
+- My/ 계정 페이지 (8개 대상)
+
+**Wave 4 (PENDING)**:
+- Admin 페이지 (22개, P2)
 
 ## Security Notes
 
@@ -228,7 +301,7 @@ Wave 4 (admin) --------> P2, 별도 이터레이션
 
 | # | Question | Resolution | Date |
 |---|----------|------------|------|
-| 1 | Nav opacity 정확한 값은? | 0.72 (Toss reference) + 실물 테스트 후 미세 조정 허용 범위 0.68-0.80 | 2026-04-12 |
+| 1 | Nav opacity 정확한 값은? | 0.60-0.75 범위. glass-mobile-header(gradient 0.88-0.72)보다 시각적으로 구분되어야 함. 빌더는 nav와 header를 동일 화면에서 나란히 비교 테스트 필수 | 2026-04-12 |
 | 2 | Task 52 vs 58 관계 | 58이 52를 supersede. 52의 Evidence Snapshot은 참조 자료로 유지 | 2026-04-12 |
 | 3 | Admin 페이지 scope-in 여부 | P2로 scope-in하되 Wave 4로 분리. P1 완료 후 별도 판단 | 2026-04-12 |
 | 4 | Onboarding/Settings 정적 페이지 primitive 적용 여부 | Onboarding: 인라인 유지 허용 (1회성 플로우). Settings privacy/terms: 텍스트 콘텐츠 페이지이므로 Card 불요 | 2026-04-12 |

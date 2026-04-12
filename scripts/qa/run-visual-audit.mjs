@@ -573,7 +573,7 @@ function runPostgresCommand(sql) {
     'docker',
     [
       'compose', 'exec', '-T', 'postgres',
-      'psql', '-U', 'matchup', '-d', 'matchup',
+      'psql', '-U', 'matchup_user', '-d', 'matchup_dev',
       '-v', 'ON_ERROR_STOP=1',
       '-c', sql,
     ],
@@ -1901,6 +1901,9 @@ async function applyState(page, route, stateKey, viewportKey) {
     firstCard: [],
     firstInput: [],
     filterToggle: [],
+    tabTrigger: [],
+    dialogTrigger: [],
+    drawerTrigger: [],
   };
 
   if (stateKey === 'default') {
@@ -1950,7 +1953,10 @@ async function applyState(page, route, stateKey, viewportKey) {
   }
 
   if (stateKey === 'menu-open') {
-    const locator = await visibleLocator(page, selectors.menuOpen);
+    const menuSelectors = selectors.menuOpen.length > 0
+      ? selectors.menuOpen
+      : ['button[aria-label*="메뉴"]', 'button[aria-label*="menu"]', '[data-testid*="menu-toggle"]', 'button[aria-label*="Menu"]'];
+    const locator = await visibleLocator(page, menuSelectors);
     if (!locator) return { status: 'expected-na', note: 'no menu trigger found' };
     const beforeTriggerSnapshot = await captureLocatorSnapshot(locator);
     await locator.click();
@@ -1962,7 +1968,10 @@ async function applyState(page, route, stateKey, viewportKey) {
   }
 
   if (stateKey === 'filter-open') {
-    const locator = await visibleLocator(page, selectors.filterToggle);
+    const filterSelectors = selectors.filterToggle.length > 0
+      ? selectors.filterToggle
+      : ['[data-testid*="filter-toggle"]', 'button[aria-label*="필터"]', 'button[aria-pressed][aria-label]'];
+    const locator = await visibleLocator(page, filterSelectors);
     if (!locator) return { status: 'expected-na', note: 'no filter trigger found' };
     const beforeTriggerSnapshot = await captureLocatorSnapshot(locator);
     await locator.click();

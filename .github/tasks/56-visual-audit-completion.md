@@ -30,12 +30,12 @@ The runner's bootstrap logic (`--allow-bootstrap-writes`) tries to create downst
 ## Original Conditions
 
 - [x] P0: DB populated with sufficient data for all 8 batches
-- [x] P0: Visual audit personas have correct roles and team memberships (partial — teamOwner done, admin failed)
-- [ ] P0: Admin persona (`관리자E2E`) promoted to `admin` role (미완료 — 인프라 제약)
+- [x] P0: Visual audit personas have correct roles and team memberships (teamOwner + admin 완료)
+- [x] P0: Admin persona (`관리자E2E`) promoted to `admin` role (postgres credentials 수정으로 해결)
 - [x] P1: batch-5 (account/utility/my) captures successfully (60 captured, 1 blocked)
-- [ ] P1: batch-6 (admin) captures successfully (미완료 — localStorage SecurityError)
+- [x] P1: batch-6 (admin) captures successfully (46 captured, 0 blocked)
 - [x] P1: batch-7 (interactions) captures all interaction states (69 captured, 0 blocked)
-- [ ] P1: batch-8 (rerun) clears previously-blocked routes (미실행)
+- [x] P1: batch-8 (rerun) clears previously-blocked routes (32→1 blocked, /teams/[id]/edit ready selector minor)
 - [x] P2: Ready selectors verified post-data-population (matches/new, team-matches/new 수정 완료)
 - [x] P2: ERR_CONNECTION_RESET mitigation documented/implemented (2 viewport 전략 문서화 완료)
 
@@ -237,44 +237,74 @@ None. Visual audit uses live API (dev-login + real Prisma writes). No inline moc
 
 ### Code Changes Applied
 
-**`scripts/qa/visual-audit-config.mjs`**
-- `rg` 명령어를 `find apps/web/src/app -name 'page.tsx'`로 교체 (환경 의존 제거)
-- `/matches/new` 전용 ready selector handler 추가
-- `/team-matches/new` 전용 ready selector handler 추가
+1. **`scripts/qa/visual-audit-config.mjs`**: `rg` 명령어를 `find apps/web/src/app -name 'page.tsx'`로 교체 (환경 의존 제거), `/matches/new` 전용 ready selector handler 추가, `/team-matches/new` 전용 ready selector handler 추가, `/teams/[id]/edit` handler 추가, `ROUTE_STATES`에 `dialog-open` / `tab-switch` 추가, `interactionSelectorsForTemplate`에 per-route trigger 추가.
 
-**`scripts/qa/run-visual-audit.mjs`**
-- `runPostgresCommand`, `promotePersonaRole`, `ensureTeamsForPersona`, `runInfrastructureBootstrap` bootstrap 함수 추가
-- `--max-concurrent-contexts` 플래그 추가 (기본값 3)
-- `process.exit(1)` → `throw new Error(...)` 수정
-- `level: 'amateur'` → `level: 3` 수정 (Prisma enum 값 정합성)
-- `session.page` null guard 추가
+2. **`scripts/qa/run-visual-audit.mjs`**: `runPostgresCommand`, `promotePersonaRole`, `ensureTeamsForPersona`, `runInfrastructureBootstrap` bootstrap 함수 추가, `--max-concurrent-contexts` 플래그 추가 (기본값 3), postgres credentials `matchup_user` / `matchup_dev`로 수정, `level: 'amateur'` → `level: 3` 수정 (Prisma enum 정합성), `session.page` null guard 추가, `process.exit(1)` → `throw new Error(...)` 수정, `menu-open` / `filter-open` fallback 추가.
+
+3. **`scripts/qa/capture-component-catalog.mjs`**: 신규 생성 — MatchCard / TeamCard / MarketplaceCard / ProfileSummary / Badge / BottomNav 6개 컴포넌트 데스크탑 캡처.
+
+4. **`scripts/qa/capture-asset-inventory.mjs`**: 신규 생성 — `inventory.json` 생성 (brand 3, sport icons 11, mock images 114).
+
+5. **`apps/web/messages/ko.json`**: `feed.emptyTitle` / `feed.emptyDesc` 텍스트 수정 (인증 상태 분리).
+
+6. **`apps/web/messages/en.json`**: 동일 키 수정.
+
+7. **`apps/web/src/app/(main)/feed/page.tsx`**: 텍스트 수정 + hydration fix.
+
+8. **`apps/web/src/app/(main)/chat/page.tsx`**: hydration fix + FOUC fix.
+
+9. **`apps/web/src/app/(main)/settings/settings-client.tsx`**: hydration fix.
+
+10. **7개 파일 — TrustSignalBanner dev 어노테이션 제거**: 캡처 이미지에 노출되던 "실데이터" 디버그 박스 완전 제거.
+
+11. **data-testid 추가**: `match-card`, `team-card`, `lesson-card`, `marketplace-card`, `empty-state`, `badge-card`, `profile-summary`, `match-filter-bar` 8개 testid 삽입 (interaction selector 안정성 확보).
+
+12. **WCAG 접근성 수정**: `role="tab"` / `aria-selected` 추가 (`my/matches`, `payments`, `badges`), `aria-haspopup="dialog"` 추가 (`matches/[id]`, `team-matches/[id]`, `teams/[id]/members`).
 
 ### Capture Run Summary
 
-| 배치 | Run ID | Captured | Blocked | Expected N/A |
-|------|--------|----------|---------|--------------|
-| batch5 (account/utility/my) | v2-batch5-full | 60 | 1 | 27 |
-| batch6 (admin) | FAILED | 0 | — | — |
-| batch7 (interactions) | v2-batch7-interactions | 69 | 0 | 25 |
+| Run ID | 설명 | Captured | Blocked |
+|--------|------|----------|---------|
+| task50 batch1 | public + auth (9 viewport) | 138 | 0 |
+| task50 batch2 | discovery (9 viewport) | 94 | 3 |
+| task50 batch3 | detail (9 viewport) | 177 | 7 |
+| v2-batch4-rerun | batch4 재실행 | 70 | 1 |
+| v2-batch4-mobile-ext | mobile-sm / mobile-lg | 11 | 0 |
+| v2-batch5-full | account/utility/my (mobile-md / desktop-md) | 60 | 1 |
+| v2-batch5-tablet | tablet 3종 | 66 | 21 |
+| v2-batch5-desktop-ext | desktop-sm / desktop-lg | 20 | 0 |
+| v2-batch6-r2 | admin (mobile-md / desktop-md) | 46 | 0 |
+| v2-batch6-tablet | admin tablet 3종 | 19 | 1 |
+| v2-batch7-interactions | interaction states | 165 | 2 |
+| v2-interactions-discovery | discovery interaction 보완 | 2 | 0 |
+| v2-minor-fix-1 | teams/[id]/edit | 6 | 0 |
+| v2-minor-fix-2 | profile desktop | 3 | 0 |
+| Layer C component catalog | 6 컴포넌트 데스크탑 캡처 | 6 | 0 |
+| **합계** | | **883** | **36** |
 
-### batch6 실패 원인
+### QA 품질검사 결과: 6.5/10
 
-`page.evaluate: SecurityError: Failed to read the 'localStorage' property` — Playwright가 동적 라우트 resolve 중 `about:blank` 컨텍스트에서 localStorage 접근 시도. 현재 환경에서 docker compose postgres socket 방식 불일치로 admin role 승격도 불가. admin 14개 페이지 시각 audit 미완.
+- 실제 데이터 로딩: 정상 (Prisma seed-mocks 기반)
+- 레이아웃: 정상 (overflow, alignment 이상 없음)
+- Next.js "1 Issue" 배지: hydration fix 적용 완료 (items 7-9) — 재캡처 시 해소 예상
+- "N" 아바타 (개발환경 표시): Next.js devIndicators 아이콘, production에서 자동 제거
+- "실데이터" 디버그 박스: TrustSignalBanner 제거 완료 (item 10)
+- teams 간헐적 렌더링 깨짐: batch2-r4 시점 이슈, 이후 정상 확인
 
-### QA 발견 이슈
+### 이슈 현황
 
-**Bug 1 (P1) — `/feed` empty state 텍스트 버그**
+**Bug 1 (P1) — `/feed` empty state 텍스트 — 수정 완료**
 
-인증된 사용자에게도 "로그인하면 내 활동 피드를 볼 수 있어요" 텍스트가 노출됨. `apps/web/src/app/(main)/feed/page.tsx:157-160`에서 로그인 상태와 빈 데이터 조건이 미분리. `apps/web/messages/ko.json:252-253` 수정 필요. 별도 태스크 57에서 추적.
+인증된 사용자에게 "로그인하면 내 활동 피드를 볼 수 있어요" 텍스트가 노출되던 문제. `apps/web/messages/ko.json` + `apps/web/messages/en.json` + `apps/web/src/app/(main)/feed/page.tsx` 수정으로 해결 (items 5-7). 태스크 57 추적 불필요.
 
-**Bug 2 (P2) — `/profile` desktop-md navigation timeout**
+**Bug 2 (P2) — `/profile` desktop-md navigation timeout — 미해결**
 
-desktop-md viewport에서 120초 timeout 발생. mobile-md에서는 정상 동작 → desktop-only 렌더링 이슈 가능성. 별도 태스크 57에서 추적.
+desktop-md viewport에서 120초 timeout 발생. mobile-md에서는 정상 동작 → desktop-only 렌더링 이슈 가능성. 태스크 57에서 계속 추적.
 
-**Dev Env Issue (P3) — SSR hydration mismatch**
+**Dev Env Issue (P3) — SSR hydration mismatch — 부분 해결**
 
-`/chat`, `/settings`, `/my/teams`, `/feed`에서 React hydration mismatch 발생. 개발 환경 console에 "1 Issue" 뱃지 노출. production build에서는 다를 수 있음.
+`/chat`, `/settings`, `/feed`는 hydration fix 적용 완료 (items 7-9). `/my/teams`는 미처리. production build에서 영향 없을 가능성 있으나 재캡처로 최종 확인 필요.
 
-**Infra Issue (P3) — batch6 admin 캡처 미완료**
+**Infra Issue (P3) — batch6 admin 캡처 — v2-batch6-r2로 해결**
 
-localhost docker compose postgres 접근 방식 불일치로 admin role 승격 불가. admin 14개 페이지 시각 audit 미완. 다음 실행 시 docker compose 환경 정합성 확인 필요.
+docker compose postgres socket 방식 불일치로 인한 admin role 승격 실패는 postgres credentials 수정(`matchup_user` / `matchup_dev`)으로 해결. v2-batch6-r2에서 46 captured, 0 blocked 달성. admin 페이지 시각 audit 완료.

@@ -110,11 +110,11 @@ infra/
 - **테스트**: Vitest + jsdom + Testing Library
 
 ### 백엔드
-- **프레임워크**: NestJS 11 + TypeScript
+- **프레임워크**: NestJS 11.1 + TypeScript
 - **DB**: PostgreSQL 16 (Prisma 6 ORM)
 - **캐시**: Redis 7 (ioredis)
 - **인증**: JWT (passport-jwt) + OAuth (카카오/네이버/애플)
-- **API 문서**: Swagger (@nestjs/swagger)
+- **API 문서**: Swagger (@nestjs/swagger 11.2)
 - **실시간**: Socket.IO (@nestjs/websockets)
 - **유효성 검증**: class-validator + class-transformer
 - **테스트**: Jest 30 + ts-jest + Supertest
@@ -311,6 +311,11 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `@` alias → `src/` 디렉토리
 - API 프록시: `next.config.ts` rewrites → `localhost:8111`
 
+### 컴포넌트 개발 규칙 (React 19.2)
+- `React.forwardRef` 사용 금지 — `ref`를 Props 인터페이스에 직접 포함
+- 패턴: `interface FooProps { ref?: React.Ref<HTMLFooElement>; ... }`
+- 적용 대상: `components/ui/button.tsx`, `input.tsx`, `select.tsx`, `textarea.tsx` 및 신규 UI 컴포넌트 전체
+
 ### 상태 관리
 - 서버 상태: TanStack React Query (캐싱, 재요청)
 - 클라이언트 상태: Zustand stores (`stores/` 디렉토리)
@@ -353,6 +358,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **모션**: `globals.css`에 fade-in/slide-up/scale-in/badge-pulse, `prefers-reduced-motion` 대응
 - **내비게이션**: 모바일 하단 플로팅 pill 바, 활성 탭 blue-500 액센트
 - **레이아웃 재질**: 본문은 solid-first, glass는 navbar/header/overlay/button/panel chrome에서만 허용
+  - **CSS 클래스 관리**: `globals.css`의 glass 패턴:
+    - `.glass-mobile-header` (gradient: 0.88-0.72) — navbar/header 용
+    - `.glass-mobile-nav` / `.floating-bottom-nav` (solid: light 0.82 / dark 0.72) — 하단 모바일 nav 전용, header와 별도 관리
 - **스타일 절제**: shadow는 hairline-depth 중심, border는 subtle full-border 중심으로 사용
 
 ### 공유 UI 컴포넌트

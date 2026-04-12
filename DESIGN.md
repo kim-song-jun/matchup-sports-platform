@@ -6,7 +6,7 @@
 ## 0. Read This First
 
 - 디자인 규칙을 읽거나 바꿔야 한다면 항상 `DESIGN.md`부터 본다.
-- 현재 코드베이스 디자인 개선 작업을 실행하려면 `DESIGN.md` 다음에 `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`를 본다.
+- 현재 코드베이스 디자인 개선 작업을 실행하려면 `DESIGN.md` 다음에 `.github/tasks/58-design-system-audit.md`를 본다. (이전 Task 52는 58에 의해 superseded)
 - 과거 task, report, plan 문서는 evidence/history/reference일 뿐이고, 새로운 규칙 정의 문서가 아니다.
 - 문서 읽는 순서와 active/historical 구분은 `docs/DESIGN_DOCUMENT_MAP.md`를 따른다.
 
@@ -152,7 +152,174 @@
 - utility page가 showcase 화면처럼 보이지 않는가
 - Toss-like clean layout intent는 느껴지지만 MatchUp 고유 맥락은 유지되는가
 
-## 9. Document Roles
+## 9. Page Layout Recipes
+
+각 페이지 유형은 아래 구조를 따른다. 순서를 바꾸거나 단계를 빼지 않는다.
+
+**리스트 페이지** (matches, teams, lessons, marketplace, mercenary, venues)
+1. `MobilePageTopZone` — 페이지 제목 + 주요 CTA ("매치 만들기" 등)
+2. 필터바 — 검색 입력 + 필터 토글 (우측). 필터바는 스크롤 시 사라져도 된다
+3. 스포츠/퀵 필터 — 가로 스크롤 칩 (`flex gap-2 overflow-x-auto`). 활성 칩은 `bg-blue-500 text-white`
+4. 활성 필터 요약 — 파란 배지로 현재 필터 표시 (활성일 때만 노출)
+5. 결과 카운트 — `text-sm text-gray-500` 한 줄 (예: "12개 매치")
+6. 카드 그리드 — `flex flex-col gap-3` (모바일) / `grid grid-cols-2` (데스크톱)
+7. 하단 스페이서 — `h-24` (바텀 내비 겹침 방지)
+
+**디테일 페이지** (matches/[id], teams/[id], lessons/[id] 등)
+1. `MobileGlassHeader` — 뒤로 + 제목 + 공유
+2. 히어로 미디어 — 16:9 이미지 또는 갤러리
+3. 핵심 정보 — 제목, 종목 배지, 상태, 메타 정보
+4. 행동 영역 — CTA 버튼 (참가, 신청, 구매 등)
+5. 상세 섹션 — 설명, 참가자, 리뷰, 관련 항목
+6. 데스크톱: `grid grid-cols-[1fr_380px]` 2단 레이아웃. 우측은 `sticky top-1rem`
+
+**폼 페이지** (matches/new, teams/new 등)
+1. `MobileGlassHeader` — 뒤로 + 제목
+2. 단계 표시 — step indicator (multi-step인 경우)
+3. 입력 필드 — 섹션별 `space-y-4`, 섹션 간 `mt-8`
+4. 제출 버튼 — 폼 하단에 배치. 플로팅 금지
+5. 입력 필드: `min-h-[44px]`, 레이블은 필드 위에 (`<label htmlFor>`)
+
+**유틸리티 페이지** (profile, settings, notifications, badges)
+- hero 블록 금지. compact tool layout이 기본이다
+- 섹션 구분: 배경색 전환 또는 `border-t border-gray-100`
+- 메뉴형 리스트: 아이콘 + 제목 + 화살표, 행 높이 `min-h-[52px]`
+
+## 10. Card System
+
+카드는 4가지 변형만 존재한다. 새로운 카드 패턴을 만들지 않고 아래 중 선택한다.
+
+**배너 카드** — match card, lesson card
+- 16:9 이미지 + 그래디언트 오버레이 + 3줄 텍스트
+- 이미지 위: 종목 도트(좌상단), 시간 배지(우상단), 가격(좌하단), 참가 상태(우하단)
+- 텍스트: 제목(`text-sm font-semibold`) → 메타(`text-xs text-gray-500`) → 배지(선택)
+
+**가로 카드** — team card
+- 정사각형 썸네일(96px) 좌측 + 텍스트 우측, 전체 높이 `h-24`
+- 제목 + 종목 배지 + 멤버수 + 지역
+
+**썸네일 카드** — marketplace listing card
+- 100x100 썸네일 좌측 + 텍스트 우측
+- 제목(`text-md`) → 메타 → 가격(`text-lg font-bold`) → 타입/통계
+
+**메트릭 카드** — admin dashboard, profile 통계
+- 아이콘(우측) + 숫자(크게) + 레이블(작게)
+- 상세: 섹션 12 참조
+
+모든 카드 공통: `rounded-2xl`, `border border-gray-100`, hairline shadow, `active:scale-[0.98]`
+
+## 11. Metric Display (토스 핵심)
+
+숫자는 MatchUp에서 가장 중요한 정보다. 토스가 금액을 크게 보여주듯, 우리는 매치 수, 매너 점수, 참가 인원을 크게 보여준다.
+
+**규칙:**
+- 숫자: `text-3xl font-bold` (또는 맥락에 따라 `text-2xl`)
+- 레이블: `text-xs text-gray-500`
+- 배치: 항상 **숫자 위, 레이블 아래**. 가로 배치 금지
+- 단위: 숫자와 붙여서 표시 (예: "4.2점", "48회", "12명")
+- 변화량: `text-blue-500` (증가) / `text-red-500` (감소), 항상 화살표 또는 +/- 표시
+- 3자리 이상: 콤마 구분 (예: "1,234")
+- 금액: `formatCurrency()` 사용 (0원 → "무료")
+- 메트릭 그리드: 3열 균등 분할 (`grid grid-cols-3`), 각 셀 `text-center`
+
+## 12. Status & Sport Color
+
+**종목 컬러 사용 규칙:**
+- 종목 식별은 **도트(`h-2 w-2 rounded-full`) + 배지 텍스트** 조합으로만 표현한다
+- 카드 배경을 종목 컬러로 칠하지 않는다. tint는 선택적으로 매우 연하게만 허용 (`/40` opacity)
+- 종목 배지: `rounded-full px-2 py-0.5 text-2xs font-medium` + `sportCardAccent[type].badge`
+- 배지 색상 맵: `lib/constants.ts`의 `sportCardAccent`가 유일한 source of truth
+
+**상태 표시 규칙:**
+- 모집중/마감/완료/취소 같은 상태는 **배지**로 표현한다
+- 배지 패턴: `rounded-full px-2 py-0.5 text-2xs font-medium`
+- 의미 있는 상태에만 semantic 컬러 사용:
+  - 성공/완료: `bg-blue-50 text-blue-600`
+  - 경고/거의 마감: `bg-amber-50 text-amber-600`
+  - 실패/취소: `bg-red-50 text-red-500`
+  - 중립/대기: `bg-gray-100 text-gray-600`
+- 컬러만으로 상태를 전달하지 않는다. 반드시 텍스트를 병행한다
+
+## 13. State Patterns
+
+**빈 상태 (EmptyState):**
+- 반드시 `components/ui/empty-state.tsx` 사용. 인라인 빈 상태 금지
+- 필수 요소: 아이콘 + 제목 + 다음 행동 CTA
+- 아이콘: `bg-blue-50 rounded-full` 안에 Lucide 아이콘 (`text-blue-400`)
+- CTA는 사용자를 다음 논리적 단계로 안내해야 한다 (예: "매치 찾기", "팀 만들기")
+- 크기: `md`(기본, 독립 영역), `sm`(카드 내부, 부분 영역)
+
+**에러 상태 (ErrorState):**
+- 반드시 `components/ui/error-state.tsx` 사용
+- 재시도 버튼 필수 (`onRetry`)
+- 아이콘: `bg-red-50 rounded-full` + `AlertCircle`
+
+**로딩 상태:**
+- 스켈레톤: `animate-pulse bg-gray-100 rounded-xl` — 실제 콘텐츠 레이아웃과 동일한 형태
+- 스피너: 페이지 전환이나 액션 대기에서만 사용. 콘텐츠 영역에서 스피너 단독 사용 금지
+- 로딩 중에도 레이아웃(헤더, 바텀 내비)은 유지되어야 한다
+
+## 14. CTA Placement
+
+**리스트 페이지:** CTA는 `MobilePageTopZone`에만 배치. 페이지 본문에 추가 CTA 금지
+**디테일 페이지:** 모바일은 콘텐츠 아래 자연 배치, 데스크톱은 우측 `sticky` 사이드바
+**폼 페이지:** 제출 버튼은 폼 마지막에 배치. 플로팅/고정 CTA 금지
+**유틸리티 페이지:** CTA는 인라인 텍스트 링크 또는 메뉴 행으로만 표현
+
+**CTA 위계 (한 화면에서):**
+1. 주요 CTA: `bg-blue-500 text-white` — 화면당 **최대 1개**
+2. 보조 CTA: `border border-gray-200 bg-white text-gray-700` — 최대 1개
+3. 텍스트 링크: `text-blue-500 font-medium` — 필요한 만큼
+4. 3개 이상의 동급 CTA가 경쟁하면 위계가 무너진다. 반드시 1-2개로 줄인다
+
+**바텀 고정 CTA 금지 원칙:**
+- 바텀 내비게이션과 겹치는 고정 CTA를 만들지 않는다
+- 결제/확인처럼 반드시 필요한 경우만 예외로 허용하되, `safe-area-inset-bottom` 준수
+
+## 15. Information Density
+
+**카드 내 정보량:**
+- 배너 카드: 제목 1줄 + 메타 2줄 + 배지 최대 2개
+- 가로 카드: 제목 1줄 + 설명 1줄(line-clamp-1) + 메타 1줄
+- 제목이 넘치면 `truncate`. 2줄 이상 허용하지 않는다
+
+**말줄임 규칙:**
+- 제목: `truncate` (1줄)
+- 설명: `line-clamp-1` 또는 `line-clamp-2`
+- 3줄 이상의 텍스트가 카드 안에 있으면 정보 과밀이다
+
+**리스트 밀도:**
+- 카드 간격: `gap-3` (12px)
+- 한 화면(뷰포트 높이)에 3-5개 카드가 보여야 한다
+- 카드 하나가 전체 화면을 차지하면 정보 효율이 떨어진다
+
+**섹션 간 구분:**
+- 1순위: 여백 (`mt-10`)
+- 2순위: 배경색 전환 (`bg-white` ↔ `bg-gray-50`)
+- 3순위: 구분선 (`border-t border-gray-100`)
+- 세 가지를 동시에 사용하지 않는다. 하나만 선택한다
+
+## 16. Interaction Feedback
+
+**탭/클릭:**
+- 카드: `active:scale-[0.98]` + `transition duration-150`
+- 버튼: `hover:bg-{shade}` (데스크톱), `active:scale-[0.97]` (모바일)
+- 텍스트 링크: `hover:underline` 금지. `hover:text-blue-600`만 허용
+
+**포커스:**
+- 키보드 포커스: `focus-visible:ring-2 ring-blue-500 ring-offset-2`
+- 마우스 클릭 시 포커스 링 숨김 (`:focus-visible`만 사용, `:focus` 단독 사용 금지)
+
+**전환:**
+- `transition-all` 금지. 목적이 분명한 속성만: `transition-colors`, `transition-transform`, `transition-opacity`
+- 기본 duration: `duration-150`
+- 모달/시트 진입: `animate-slide-up` (모바일), `animate-scale-in` (데스크톱)
+
+**스크롤:**
+- 가로 스크롤 영역: 스크롤바 숨김 (`scrollbar-hide`)
+- 스냅: 선택적으로 `scroll-snap-x` 사용 가능 (칩 필터 등)
+
+## 17. Document Roles
 
 - `docs/DESIGN_DOCUMENT_MAP.md`: 읽는 순서와 active vs historical navigation hub
 - `DESIGN.md`: 규칙 정의

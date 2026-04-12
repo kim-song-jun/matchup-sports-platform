@@ -186,19 +186,27 @@ const ROUTE_STATES = {
   '/login': ['default', 'focus-first-input'],
   '/home': ['default', 'scrolled', 'hover-primary-cta', 'hover-card-first'],
   '/matches': ['default', 'scrolled', 'focus-first-input', 'filter-open', 'hover-card-first'],
+  '/matches/[id]': ['default', 'scrolled', 'dialog-open'],
   '/team-matches': ['default', 'scrolled', 'focus-first-input', 'hover-card-first'],
+  '/team-matches/[id]': ['default', 'scrolled', 'dialog-open'],
   '/teams': ['default', 'scrolled', 'hover-primary-cta', 'hover-card-first'],
+  '/teams/[id]/members': ['default', 'scrolled', 'dialog-open'],
   '/lessons': ['default', 'scrolled', 'focus-first-input', 'hover-card-first'],
   '/marketplace': ['default', 'scrolled', 'focus-first-input', 'hover-card-first'],
   '/mercenary': ['default', 'scrolled', 'hover-card-first'],
   '/venues': ['default', 'scrolled', 'focus-first-input', 'hover-card-first'],
   '/tournaments': ['default', 'scrolled', 'hover-primary-cta', 'hover-card-first'],
-  '/profile': ['default', 'scrolled', 'hover-primary-cta'],
+  '/profile': ['default', 'scrolled', 'hover-primary-cta', 'tab-switch'],
   '/settings': ['default', 'scrolled'],
   '/settings/notifications': ['default', 'scrolled'],
   '/notifications': ['default', 'scrolled'],
   '/chat': ['default', 'scrolled', 'hover-card-first'],
   '/reviews': ['default', 'scrolled'],
+  '/my/matches': ['default', 'scrolled', 'tab-switch'],
+  '/my/team-matches': ['default', 'scrolled', 'tab-switch'],
+  '/my/mercenary': ['default', 'scrolled', 'tab-switch'],
+  '/payments': ['default', 'scrolled', 'tab-switch'],
+  '/badges': ['default', 'scrolled', 'tab-switch'],
 };
 
 export function supportedStatesForTemplate(template) {
@@ -393,6 +401,16 @@ export function readyContractForTemplate(template) {
     );
   }
 
+  // /teams/[id]/edit has no <form> tag — inputs are in <section> wrappers.
+  // h1 is @3xl:hidden on desktop. #team-name input is always present.
+  if (template === '/teams/[id]/edit') {
+    return readyContract(
+      ['#team-name', 'input:not([type="hidden"])', 'button', 'h1'],
+      ['#team-name', 'button'],
+      { postReadyDelayMs: 800, selectorTimeoutMs: 45_000 },
+    );
+  }
+
   if (isCreateEditFormRoute(template)) {
     return readyContract(
       [
@@ -544,6 +562,26 @@ export function interactionSelectorsForTemplate(template) {
 
   if (template === '/chat') {
     selectors.firstCard.push('a[href^="/chat/"]');
+  }
+
+  // Explicit dialog trigger selectors by route — these are data-testid'd buttons that open Modals.
+  if (template === '/matches/[id]') {
+    selectors.dialogTrigger.push(
+      '[data-testid="match-host-close-button"]',
+      '[data-testid="match-host-cancel-button"]',
+      '[data-testid="match-arrive-button"]',
+    );
+  }
+
+  if (template === '/team-matches/[id]') {
+    selectors.dialogTrigger.push('[aria-haspopup="dialog"]');
+  }
+
+  if (template === '/teams/[id]/members') {
+    selectors.dialogTrigger.push(
+      '[data-testid="team-member-leave-self"]',
+      '[data-testid*="team-member-kick-"]',
+    );
   }
 
   selectors.tabTrigger.push('[role="tab"]');

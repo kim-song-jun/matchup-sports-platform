@@ -15,19 +15,19 @@ package.json 버전이 다음과 같이 업데이트됐습니다:
 ## Original Conditions (체크박스)
 
 ### Frontend (apps/web)
-- [ ] `React.forwardRef` 패턴 제거 → `ref` prop 직접 전달 (button, input, select, textarea)
-- [ ] `next.config.ts` — `experimental.optimizePackageImports` 처리 (Next.js 16 변경)
-- [ ] `useSearchParams()` Suspense 래핑 — login, kakao, naver 페이지
-- [ ] `next/image` onError 타입 검증 (safe-image.tsx)
-- [ ] `vitest run` 전체 통과
-- [ ] `tsc --noEmit` (web) 오류 0
+- [x] `React.forwardRef` 패턴 제거 → `ref` prop 직접 전달 (button, input, select, textarea)
+- [x] `next.config.ts` — `experimental.optimizePackageImports` 처리 (Next.js 16 변경)
+- [x] `useSearchParams()` Suspense 래핑 — login, kakao, naver 페이지
+- [x] `next/image` onError 타입 검증 (safe-image.tsx)
+- [x] `vitest run` 전체 통과
+- [x] `tsc --noEmit` (web) 오류 0
 
 ### Backend (apps/api)
-- [ ] `@nestjs/swagger` 11.2.7 — `@ApiProperty({ enum })` enumName 누락 파일 수정
-- [ ] `main.ts` swagger `addBearerAuth()` 타입 파라미터 명시
-- [ ] `realtime.gateway.ts` WebSocket 타입 시그니처 확인
-- [ ] `jest --selectProjects unit` 전체 통과
-- [ ] `tsc --noEmit` (api) 오류 0
+- [x] `@nestjs/swagger` 11.2.7 — `@ApiProperty({ enum })` enumName 누락 파일 수정
+- [x] `main.ts` swagger `addBearerAuth()` 타입 파라미터 명시
+- [x] `realtime.gateway.ts` WebSocket 타입 시그니처 확인
+- [x] `jest --selectProjects unit` 전체 통과
+- [x] `tsc --noEmit` (api) 오류 0
 
 ## Parallel Work Breakdown
 

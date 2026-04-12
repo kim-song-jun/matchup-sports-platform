@@ -13,15 +13,16 @@ else
   COMPOSE="sudo docker-compose"
 fi
 
-echo "[INFO] Stopping all containers..."
-${COMPOSE} -f docker-compose.prod.yml --env-file .env down --remove-orphans || true
+echo "[INFO] Stopping api, web, nginx containers..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env stop api web nginx 2>/dev/null || true
+${COMPOSE} -f docker-compose.prod.yml --env-file .env rm -f api web nginx 2>/dev/null || true
 
-echo "[INFO] Starting DB services first..."
+echo "[INFO] Ensuring postgres and redis are running..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis
 
 echo "[INFO] Waiting for postgres healthy..."
 for i in $(seq 1 30); do
-  if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T postgres pg_isready >/dev/null 2>&1; then
+  if sudo docker exec matchup_postgres pg_isready -U "${DB_USER:-matchup}" >/dev/null 2>&1; then
     echo "[INFO] postgres ready (attempt $i)"
     break
   fi
@@ -32,8 +33,11 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-echo "[INFO] Starting all services with force-recreate..."
-${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate
+echo "[INFO] Recreating api, web, nginx only (keeping postgres/redis running)..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps api
+echo "[INFO] Waiting for API to be ready before starting web..."
+sleep 5
+${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps web nginx
 
 echo "[INFO] Waiting for matchup_api health..."
 for i in $(seq 1 45); do

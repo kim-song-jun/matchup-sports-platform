@@ -74,7 +74,7 @@ Errors:
 
 1. 변경 범위를 `backend`, `frontend`, `infra`, `docs` 중 어디까지 포함하는지 먼저 고정한다.
 2. 비자명한 작업이면 `.github/tasks/`에서 기존 문서를 찾고, 없으면 해당 경로에 task/spec를 만든다.
-3. 관련된 가장 좁은 파일부터 읽는다. `README.md`, `CLAUDE.md`, `.impeccable.md`, `Makefile`, 실제 설정 파일을 우선한다.
+3. 관련된 가장 좁은 파일부터 읽는다. `README.md`, `CLAUDE.md`, `DESIGN.md`, `.impeccable.md`, `Makefile`, 실제 설정 파일을 우선한다.
 4. 가장 작은 정답을 구현하되, 범위 안의 tech debt와 mock/fixture drift는 같은 변경에서 함께 정리한다.
 5. 검증은 좁게 시작해서 넓게 확장한다. 단위 테스트 → 통합 테스트 → E2E → 빌드/린트 순서를 기본으로 본다.
 6. 새 규칙, gotcha, 워크플로 변경이 생기면 `AGENTS.md`와 `.claude/agents/*.md`를 같이 업데이트한다.
@@ -89,13 +89,25 @@ Errors:
 - Prisma Studio: `make db-studio` 후 `http://localhost:5555`
 - Dev compose의 Postgres/Redis는 내부 Docker 네트워크로만 접근한다. host direct connect를 전제하지 말고, 필요하면 `docker compose exec` 또는 앱/API 경유 흐름을 사용한다.
 - `deploy/Dockerfile.dev`는 native addon 호환성을 위해 glibc 기반 Node 이미지를 유지한다. dev compose의 `node_modules` 볼륨은 `nocopy` + 이미지 내 `/opt/deps` bootstrap service로 매 기동 시 동기화하고, `pg_isready`는 항상 실제 DB명까지 지정한다.
-- dev compose에서 `web`만 단독 restart 하지 않는다. `deps` bootstrap 없이 `web`만 다시 뜨면 `@parcel/watcher` optional binary가 빠져 Next dev가 기동 실패할 수 있으므로 `docker compose up -d deps web`로 같이 올린다.
-- dev web에서 route가 갑자기 500을 내면서 `.next/routes-manifest.json`, `.next/server/pages/_document.js`, `next-flight-client-entry-loader`, `next-flight-css-loader` ENOENT가 보이면 페이지 코드 회귀로 단정하지 않는다. 먼저 `docker compose up -d deps web`로 deps/bootstrap을 다시 맞추고 재컴파일 완료까지 기다린 뒤 route smoke를 다시 본다.
+- shared Docker dev stack의 `web`도 `/app/apps/web/.next`를 stack-local named volume으로 격리한다. host bind mount의 같은 `.next`를 `next build`, 다른 local runner, 다른 web runtime과 공유하면 `next-font-manifest.json` ENOENT와 React Client Manifest mismatch가 재발한다.
+- dev compose의 `deps` bootstrap을 `rsync` 단독 가정으로 바꾸면 오래된 dev 이미지에서 `service deps exit 127`로 전체 스택이 막힐 수 있다. `rsync` 전환 시에는 `cp` fallback을 함께 두거나 이미지를 먼저 재빌드한다.
+- dev compose에서 `web`만 단독 restart 하지 않는다. `deps` bootstrap 없이 `web`만 다시 뜨면 `@parcel/watcher` optional binary가 빠져 Next dev가 기동 실패할 수 있으므로 `docker compose up -d deps web` 또는 `make dev-web`로 같이 올린다.
+- dev web에서 route가 갑자기 500을 내면서 `.next/routes-manifest.json`, `.next/server/pages/_document.js`, `next-flight-client-entry-loader`, `next-flight-css-loader`, `next-font-manifest.json` ENOENT가 보이면 페이지 코드 회귀로 단정하지 않는다. 먼저 `docker compose up -d --build deps web` 또는 `make dev-web`로 deps/bootstrap과 isolated `.next`를 다시 맞추고 재컴파일 완료까지 기다린 뒤 route smoke를 다시 본다.
+- `make dev` 스택이 healthy인데 브라우저의 `localhost:3003`만 계속 500이면 Docker `web`만 보지 말고 host-side `pnpm --filter web dev` / `next dev` shadow process를 먼저 의심한다. `lsof -nP -iTCP:3003 -sTCP:LISTEN`로 확인해 stale host listener를 정리한 뒤 다시 본다.
+- dev web에서 `Could not find the module ".../next/dist/client/components/builtin/global-error.js#"` 같은 React Client Manifest mismatch가 나와도 동일한 App Router dev manifest drift 계열로 먼저 본다. `web` 재기동으로 상태를 리셋하고, root-level `apps/web/src/app/global-error.tsx`를 유지해 Next builtin global error 의존을 줄인다.
 - dev compose의 API는 `AUTH_HASH_DRIVER=bcryptjs`를 사용해 native `bcrypt`를 로드하지 않는다. production 기본값은 `bcrypt`를 유지한다.
 - `web` 서비스는 `api`의 단순 프로세스 시작이 아니라 `/api/v1/health` healthcheck 통과 이후에만 의존하도록 유지한다. cold start 시 프록시 초기 요청이 API readiness보다 앞서면 간헐적 5xx가 난다.
 - dev compose의 `api` watch가 unrelated TypeScript error에 막히면 `localhost:8111`은 테스트/tsc와 다른 stale contract를 계속 서빙할 수 있다. query/DTO 변경 후에는 unit test만 보지 말고 live `curl` 또는 브라우저 경로로 실제 `8111` 응답까지 확인한다.
-- 로컬 Playwright E2E는 Next dev on-demand compile 부하 때문에 기본값을 `workers=1`, `fullyParallel=false`, `navigationTimeout=60_000`, `line` reporter로 유지한다. 병렬도를 올릴 때는 `PW_WORKERS`와 `PLAYWRIGHT_REPORTER`를 명시적으로 override한다.
-- Next dev 기준 `/home`은 첫 컴파일 비용이 특히 무거워 60초를 넘길 수 있다. Playwright 세션 안정화나 수동 캡처 스크립트의 첫 진입점으로는 `/home`보다 `/login`, `/landing`, `/matches` 같은 더 가벼운 경로를 먼저 워밍업한 뒤 대상 페이지로 이동한다.
+- `apps/api`의 Docker dev runtime은 `pnpm exec ts-node --transpile-only src/main.ts` 기반 transpile-only 부팅을 사용한다. dirty worktree의 unrelated type error가 live `8111` contract를 막지 않게 하되, 타입 안정성은 `pnpm --filter api exec tsc --noEmit` 또는 관련 테스트로 별도 확인한다.
+- Prisma schema가 최근 변경되었는데 dev DB가 뒤처져 있으면 auth/dev-login, email login/register, JWT validate 같은 인증 경로가 공통으로 500을 낼 수 있다. `users.admin_status` 같은 누락 컬럼 에러가 보이면 authenticated UI/API smoke 전에 `make db-push`로 dev DB를 먼저 current schema에 맞춘다.
+- 로컬 Playwright E2E는 Next dev on-demand compile 부하 때문에 기본값을 `workers=1`, `fullyParallel=false`, `navigationTimeout=120_000`, `line` reporter로 유지한다. 병렬도를 올릴 때는 `PW_WORKERS`와 `PLAYWRIGHT_REPORTER`를 명시적으로 override한다.
+- `scripts/qa/run-visual-audit.mjs`의 bootstrap write는 기본 비활성이다. clean local DB에서 dynamic route fixture가 꼭 필요할 때만 `--allow-bootstrap-writes`를 명시하고, `localhost`가 아닌 API target에는 사용하지 않는다.
+- visual audit artifact는 같은 `run-id`를 재사용해 누적하지 않는다. `RUN`은 기본적으로 새 값으로 주고, broad capture는 `batch + viewport band` 단위로 쪼개서 실행한다. 예외는 `batch-8-rerun`으로, 이때만 기존 `capture-results.json`이 있는 같은 `run-id`를 다시 사용한다.
+- shared Next dev(`localhost:3003`) 기준 broad visual audit를 viewport band 여러 개로 병렬 실행하지 않는다. 장시간 capture에서 `net::ERR_CONNECTION_RESET`/`ERR_EMPTY_RESPONSE`가 반복되므로 `mobile -> tablet -> desktop` 순차 실행을 기본값으로 사용하고, blocker는 각 band 종료 후 `batch-8-rerun`이나 route-level targeted rerun으로 정리한다.
+- shared Docker dev stack(`make dev`, `localhost:3003/8111`) 기준 full Playwright는 single active runner only다. 두 개 이상의 local runner가 필요하면 `make e2e-isolated-up RUN=<id>` / `make test-e2e-isolated RUN=<id>` / `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` / `make e2e-isolated-down RUN=<id>` 경로만 사용한다. 상세 runbook은 `docs/PLAYWRIGHT_E2E_RUNBOOK.md`를 기준으로 본다.
+- Next dev 기준 `/home`은 첫 컴파일 비용이 특히 무거워 120초를 넘길 수 있다. Playwright 세션 안정화나 수동 캡처 스크립트의 첫 진입점으로는 `/home`보다 `/login`, `/landing`, `/matches` 같은 더 가벼운 경로를 먼저 워밍업한 뒤 대상 페이지로 이동한다.
+- Playwright가 자체 `webServer`로 Next dev를 cold start할 때 `apps/web/.next/routes-manifest.json` 또는 `app-paths-manifest.json` ENOENT가 간헐적으로 날 수 있다. 이 경우 제품 회귀로 단정하지 말고, 이미 떠 있는 docker `web`에 붙이거나 dev server를 충분히 prewarm한 뒤 재검증한다.
+- isolated Playwright compose에서도 `/app/apps/web/.next`는 반드시 stack-local volume이어야 한다. 서로 다른 runner가 host bind mount의 같은 `.next`를 공유하면 `Cannot find module './*.js'`, React Client Manifest mismatch, 반복적인 `/landing` 500이 발생한다.
 - notification/action-center UI에서 "읽음 처리 + in-app deep link"를 같은 `Link` 기본 동작에 맡기지 않는다. mutation이 같이 일어나는 카드 액션은 explicit navigation handler를 두고, websocket 연결 직후 한 번 backfill invalidate를 걸어 late-connect race를 막는다.
 - realtime unread/notification surface는 websocket event만 믿지 않는다. hidden tab 복귀와 late-connect를 고려해 focus/visibility 시점의 backfill refetch 경로를 함께 둔다.
 - Production compose 기준 포트는 `web=3000`, `api=8100`이다. dev/prod 포트를 혼동하지 않는다.
@@ -104,7 +116,10 @@ Errors:
 - 운영 env contract가 바뀌면 `.github/workflows/deploy.yml`, `deploy/docker-compose.prod.yml`, `deploy/.env.prod.example`, `deploy/setup-ec2.sh`를 같은 변경에서 sync한다. 특히 `TOSS_SECRET_KEY`처럼 mock mode가 가능한 optional env를 compose/bootstrap에서 required로 승격시키는 drift를 금지한다.
 - GitHub Actions가 운영 시크릿(`TOSS_SECRET_KEY` 등)을 소스 오브 트루스로 쓰면 deploy workflow는 protected EC2 `deploy/.env`를 preflight 전에 그 값으로 수렴시켜야 한다. secret이 비거나 제거됐는데 host에 stale 값이 남아 mock mode 계약이 깨지는 상태를 금지한다. 다만 Toss 결제 시크릿 부재만으로 앱 전체 deploy를 막아서는 안 된다.
 - Next production web의 `/api` rewrites와 `serverFetch`는 build-time `INTERNAL_API_ORIGIN`에 의존한다. 운영 API topology나 포트를 바꿀 때는 `apps/web/next.config.ts`, `deploy/Dockerfile.web`, workflow build args, prod compose env를 함께 맞춘다. 그렇지 않으면 `localhost:8111` 같은 dev fallback이 이미지에 bake될 수 있다.
-- 운영 자동화에 destructive full seed(`prisma db seed`, `make db-seed`)를 기본 경로로 연결하지 않는다. deploy-safe data backfill은 idempotent 전용 스크립트(`prisma/seed-images.ts`, `make db-seed-images`)로 분리한다.
+- 운영 자동화에 destructive full seed(`prisma db seed`, `make db-seed`)를 기본 경로로 연결하지 않는다. deploy-safe data backfill은 idempotent 전용 스크립트(`prisma/seed-mocks.ts --checksum-gate`, `prisma/seed-images.ts`)로 분리한다.
+- dev runtime에서 화면 확인용 canonical mock dataset이 필요하면 destructive full seed 대신 `prisma/seed-mocks.ts` / `make db-seed-mocks`를 사용한다. unrelated dev/E2E 레코드를 유지해야 하는 상태에서 `make db-seed`를 재실행하는 흐름은 금지한다.
+- production deploy는 `DEPLOY_SYNC_MOCK_DATA=false`가 아닌 한 checksum-gated mock sync를 기본으로 실행한다. mock catalog는 KST 날짜 anchor를 포함하므로, deploy-safe freshness가 필요할 때는 checksum skip만 믿지 말고 현재 anchor date까지 함께 본다.
+- production DB bootstrap은 `prisma/bootstrap-deploy-db.ts`를 single entry로 사용한다. 빈 DB면 `db push + migrate resolve`로 baseline을 고정하고, migration history가 없는 비어 있지 않은 DB는 drift 가능성이 크므로 자동 복구하지 않고 실패시킨다.
 - 이미 실행 중인 스택이 있으면 재시작보다 현재 상태를 활용한다.
 
 ## 2) Context Budget Rules
@@ -118,7 +133,8 @@ Errors:
 
 - 전역 기본 정책: `~/.codex/AGENTS.md`
 - 아키텍처/도메인/테스트 원칙: `CLAUDE.md`
-- 디자인 우선순위와 UX 원칙: `.impeccable.md`
+- 디자인 우선순위와 UX 원칙: `DESIGN.md` → `.impeccable.md`
+- 디자인 문서 탐색 허브: `docs/DESIGN_DOCUMENT_MAP.md` (navigation only, rule definition 금지)
 - 에이전트 역할/팀/파이프라인: `.claude/agents/prompts.md`, `.claude/agents/team-config.md`, `.claude/agents/workflow.md`
 - 실행/검증 명령: `README.md`, `Makefile`
 - 프로젝트 현황/기능 맵: `docs/PROJECT_OVERVIEW.md`, `docs/WORK_SUMMARY.md`
@@ -138,16 +154,25 @@ Errors:
   - 입력 검증은 DTO + `class-validator`
   - Nest `ValidationPipe`는 `whitelist + forbidNonWhitelisted`로 동작한다. 프론트 form state에 UI 전용 필드가 있으면 API submit 시 DTO 호환 payload로 정리해서 보내야 한다.
   - 목록은 cursor pagination을 기본값으로 본다.
+  - 프론트 통합용 API 문서는 Swagger만 단독 source of truth로 쓰지 않는다. `controller` + DTO + service status gate + integration test + `apps/web/src/hooks/use-api.ts` / `apps/web/src/types/api.ts`를 함께 교차검증하고, auth/permission/error/pagination/multipart/idempotency/mock-vs-real gotcha를 명시해야 한다.
+  - controller/DTO/service 계약이 바뀌면 `docs/api/domains/*.md`를 **같은 변경**에서 sync한다. `@docs` 호출 시 docs-writer가 이 sync를 검증한다. Canonical contract 문서 경로: `docs/api/` (README + global-contract + domains/*).
 - 권한 검증은 라우트 가드와 서비스 계층을 함께 본다. `JwtAuthGuard`, `AdminGuard`, `TeamMembershipService.assertRole(...)` 우회를 만들지 않는다.
 - 디자인 소스 우선순위:
+  - `DESIGN.md`
   - `.impeccable.md`
   - `apps/web/src/app/globals.css`의 `@theme`
   - 기존 공유 컴포넌트와 토큰 사용 패턴
+- shadow는 깊이감 보조 수단으로만 사용한다. content card에서 deep shadow, stacked shadow, glow shadow를 기본 스타일로 쓰지 않는다.
+- border는 subtle full-border 또는 borderless separation 중 하나만 선택한다. thick border, one-side accent border, border-heavy nested container는 금지한다.
+- 레이아웃은 Toss-like clean layout을 기준으로 `text-first`, `section-clear`, `action-obvious` 상태를 우선한다. utility page를 hero/card showcase처럼 만들지 않는다.
 - 모바일 glass language는 `chrome only` 원칙을 따른다. bottom nav, sticky header, overlay 같은 floating/mobile shell에는 glass를 쓸 수 있지만, dense content card와 거래형 본문 surface는 기본적으로 solid를 유지한다.
+- account / utility root page(`profile`, `settings`, `notifications`, `chat`, `reviews`)는 discovery-style intro를 쓰지 않는다. 이런 화면의 모바일 상단은 `MobileGlassHeader`, 본문은 compact solid card rhythm을 기본값으로 본다.
 - Mock/fixture source of truth:
   - `apps/api/test/fixtures/`
+  - `apps/api/prisma/mock-data-catalog.ts`
   - `apps/web/src/test/msw/`
   - `apps/web/public/mock/`
+  - `apps/web/public/mock/profile/`
   - `apps/web/public/mock/photoreal/ATTRIBUTION.md`
   - `e2e/fixtures/`
   - 필요 시 각 `*.spec.ts` / `*.test.tsx` 내부 inline mock
@@ -172,7 +197,9 @@ Errors:
 - 결제 연동이 optional/mock mode라면 checkout/detail/refund 전 구간에서 `테스트 결제/환불`과 `실제 청구/실환불 없음`을 명시해야 한다. legacy 실결제 기록은 `unavailable` 상태로 분리해 CTA를 차단하고, mock 흐름을 실거래처럼 보이게 만들면 안 된다.
 - admin/ops surface의 상세 링크와 후속 액션은 관리자 shell 안에서 맥락을 유지해야 한다. public surface로 이탈하는 관리 플로우는 금지한다.
 - 관리자 제재/정산/분쟁 처리처럼 운영 판단이 개입되는 액션은 local mock 완료나 단순 toast만으로 끝내면 안 된다. 처리 주체, 사유, 결과, 부분 실패를 추적 가능한 형태로 남겨야 한다.
+- venue 도메인은 현재 public browse/review + admin CRUD까지만 canonical contract로 본다. team과 달리 venue owner/operator membership 모델은 아직 없으므로, 팀 허브 패턴을 venue self-service에 재사용하려면 ownership/permission 모델을 먼저 설계해야 한다.
 - 루트에 ad hoc 스크립트나 개인 메모 파일을 두지 않는다. 수동 QA 도구는 `scripts/qa/`, 문서 캡처 도구는 `scripts/docs/`, 버전 관리할 시각 레퍼런스는 `docs/reference/`로 보낸다.
+- 전수 시각 감사의 raw screenshot/console/network 산출물은 `output/playwright/visual-audit/`를 표준 경로로 사용한다. `docs/screenshots/`에는 문서에서 직접 참조할 canonical 결과만 승격한다.
 - `ec2-info` 같은 호스트/운영자 로컬 메모는 git에 커밋하지 않고 ignore 상태로만 유지한다.
 - `packages/`는 실제 공유 워크스페이스가 다시 필요해질 때만 되살린다. 빈 placeholder 디렉터리는 유지하지 않는다.
 - task 문서는 `.github/tasks/`를 표준 경로로 사용한다. 기존 task 문서가 있으면 그 문서를 single source of truth로 갱신한다.
@@ -204,6 +231,10 @@ Errors:
   - `make test-api`
   - `make test-integration`
   - `make test-e2e`
+  - `make e2e-isolated-up RUN=<id>`
+  - `make test-e2e-isolated RUN=<id>`
+  - `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]`
+  - `make e2e-isolated-down RUN=<id>`
 - Cross-cutting checks:
   - `pnpm build`
   - `pnpm lint`

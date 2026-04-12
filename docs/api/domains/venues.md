@@ -35,7 +35,10 @@
 ### GET `/venues/:id/hub`
 
 - Optional auth endpoint
-- 로그인 여부에 따라 `capabilities` 해석이 달라진다.
+- 쿼리/헤더 파라미터 없이 JWT 존재 여부로 자동 분기 (`OptionalJwtAuthGuard`)
+- 컨트롤러가 `@CurrentUser('id') userId?` 와 `@CurrentUser('role') userRole?` 두 값을 서비스에 전달한다.
+- `userRole`은 `capabilities` 계산 시 admin 권한 여부를 판단하는 데 사용된다.
+- 로그인 여부 및 역할에 따라 `capabilities` 해석이 달라진다.
 - `data` 주요 필드:
   - `venue`
   - `sections` (`goodsCount`, `passesCount`, `eventsCount`, `scheduleCount`, `reviewCount`)
@@ -94,7 +97,7 @@
 
 - `POST /venues/:id/reviews`는 weakly typed body라서 프론트 payload 정제가 중요하다.
 - `PATCH /venues/:id`는 venue owner가 없거나 불일치하면 403.
-- `findHub`의 capability는 viewer role/userId에 의존하므로 비로그인에서 관리 CTA를 노출하면 안 된다.
+- `findHub`의 capability는 viewer `userId` + `userRole` 두 값에 의존하므로 비로그인에서 관리 CTA를 노출하면 안 된다.
 
 ## Error Example
 

@@ -1,7 +1,8 @@
 # MatchUp 구현 현황 문서
 
-> 최종 업데이트: 2026-04-10
+> 최종 업데이트: 2026-04-11
 > 기획서 대비 구현 상태 + 변경/추가 사항 정리
+> 이 문서는 구현 surface 기준 문서다. 검증 상태는 `docs/scenarios/index.md`를 source of truth로 사용한다.
 
 ---
 
@@ -9,13 +10,21 @@
 
 | 항목 | 수량 |
 |------|------|
-| 프론트엔드 페이지 | 68개 |
-| 백엔드 모듈 | 21개 |
+| 프론트엔드 페이지 | 95개 (`apps/web/src/app/**/page.tsx` snapshot) |
+| 백엔드 모듈 | 28개 |
 | API 엔드포인트 | 70+ |
-| API Hooks | 62개 |
-| DB 모델 (Prisma) | 16개 |
-| Git 커밋 | 173개 |
-| 총 코드 라인 | ~25,000줄 |
+| API Hooks | 125개 |
+| DB 모델 (Prisma) | 43개 |
+| Git 커밋 | 181개 |
+| 총 코드 라인 | 수시 변동으로 별도 집계하지 않음 |
+
+### 상태 언어
+
+- `구현됨`: route/API/UI surface가 현재 코드에 존재함
+- `검증됨`: scenario 또는 테스트 증거가 별도 문서에 기록됨
+- `부분 구현`: 화면은 있으나 저장/거래/운영 계약이 일부만 연결됨
+- `미지원`: 의도적으로 닫혀 있거나 아직 persistence가 연결되지 않음
+- `follow-up`: 다음 task나 최신 런타임 재검증이 필요함
 
 ---
 
@@ -143,6 +152,9 @@
 | ELO 레이팅 알고리즘 | ⚠️ | 공식/유틸 존재, 실제 경기 후 업데이트 미연동 |
 | 분쟁 검토 → 운영 조치 | ⚠️ | Admin UI 있으나 자동화 미구현 |
 | 결제/정산 | ⚠️ | UI 완성, 토스페이먼츠 실제 연동 미완 |
+| 리뷰/뱃지 실데이터 | ⚠️ | `/my/reviews-received`, `/badges`는 sample/mixed trust signal을 명시하지만 실데이터 연동은 아직 부족 |
+| 관리자 결제/평가 surface | ⚠️ | `admin/payments`, `admin/reviews`는 honest-data cleanup follow-up이 남아 있음 |
+| 알림 설정 영속화 | ⚠️ | `NotificationPreference` 기반 `match/team/chat/payment` 서버 동기화와 device-local/unsupported 분리는 구현됐지만, live protected-route browser smoke는 현재 dev runtime instability로 follow-up 상태 |
 | OAuth 소셜 로그인 | ⚠️ | API 구조 있으나 실제 카카오/네이버/애플 미연동 |
 | 푸시 알림 | ⚠️ | web-push VAPID 구현 완료, VAPID 키 생성 + 환경변수 설정 필요 |
 | 이미지 업로드 | ⚠️ | UI 있으나 S3 업로드 미연동 |
@@ -157,15 +169,17 @@
 | **개인 매치 시스템** | 팀 매칭과 별도로 개인 단위 매치 | /matches/* |
 | **강좌/레슨 시스템** | 그룹레슨, 연습경기, 자유연습, 클리닉 | /lessons/* |
 | **장터 (마켓플레이스)** | 중고 판매, 대여, 공동구매 | /marketplace/* |
-| **용병 모집 시스템** | 팀이 용병을 모집하고 개인이 신청 | /mercenary/* |
-| **뱃지 시스템** | 8종 뱃지 (매너, 시간약속, 심판영웅 등) | /badges |
+| **용병 모집 시스템** | 목록/작성/상세/신청 UI가 존재하고 lifecycle 검증은 follow-up | /mercenary/* |
+| **뱃지 시스템** | 8종 뱃지 카탈로그 + sample/mixed progress notice | /badges |
 | **다크/라이트 테마** | 시스템 연동 + 수동 전환 | /settings |
 | **시설 관리** | 시설 검색, 상세, 리뷰, 지도 | /venues/* |
+| **팀/장소 허브** | 팀/장소 상세를 goods/passes/events 집계형 허브로 재구성 | /teams/[id], /venues/[id] |
+| **대회 surface** | 전역 flat list + 상세 + 등록 + hub events 연결 | /tournaments/* |
 | **내 콘텐츠 관리** | 내가 만든 매치/팀/강좌/매물 수정/삭제 | /my/* |
 | **팀 멤버 관리** | 멤버 목록, 역할 변경, 추방, 초대 | /teams/[id]/members |
 | **쿼터별 스코어** | 경기 후 쿼터별 점수 입력 | /team-matches/[id]/score |
-| **결제 체크아웃** | 쿠폰, 결제수단, 가격 분석 | /payments/checkout |
-| **환불 요청** | 시간 기반 환불 정책 자동 계산 | /payments/[id]/refund |
+| **결제 체크아웃** | route context 기반 match 결제 중심, contextless entry 차단 | /payments/checkout |
+| **환불 요청** | owner-bound detail/refund + 시간 기반 정책 계산 | /payments/[id]/refund |
 | **Admin 분쟁 관리** | 신고 접수 → 조사 → 해결/기각 | /admin/disputes |
 | **Admin 통계** | 매치/매출/종목/시설 차트 | /admin/statistics |
 | **Admin 정산 관리** | 정산 대기/완료/환불 관리 | /admin/settlements |
@@ -175,9 +189,9 @@
 
 ---
 
-## 4. 전체 라우트 맵 (68개)
+## 4. 핵심 라우트 맵 (2026-04-11 snapshot)
 
-### 사용자 페이지 (50개)
+### 사용자 페이지 (대표 surface)
 
 ```
 인증
@@ -201,8 +215,8 @@
 팀/클럽
   /teams                          팀 목록 (검색/필터)
   /teams/new                      팀 등록
-  /teams/[id]                     팀 상세 (신뢰지표/전적/뱃지)
-  /teams/[id]/edit                팀 수정
+  /teams/[id]                     팀 허브 (overview/goods/passes/events + 기존 팀 정보)
+  /teams/[id]/edit                팀 수정/삭제
   /teams/[id]/members             멤버 관리 (역할/추방/초대)
 
 강좌
@@ -215,13 +229,21 @@
   /marketplace/[id]               매물 상세 (구매/좋아요/공유)
   /marketplace/[id]/edit          매물 수정 + 상태 변경
 
+대회
+  /tournaments                    대회 목록
+  /tournaments/new                대회 등록
+  /tournaments/[id]               대회 상세
+
 용병
   /mercenary                      용병 모집 목록
   /mercenary/new                  용병 모집 작성
+  /mercenary/[id]                 용병 모집 상세
+  /mercenary/[id]/edit            용병 모집 수정
 
 시설
   /venues                         시설 목록 (종목/지역 필터)
-  /venues/[id]                    시설 상세 (지도/리뷰/운영시간)
+  /venues/[id]                    시설 허브 (overview/goods/passes/events + schedule/review count)
+  /venues/[id]/edit               시설 수정
 
 채팅
   /chat                           채팅 목록 (데스크탑 2컬럼)
@@ -250,12 +272,12 @@
 설정
   /settings                       설정 (테마/로그아웃)
   /settings/account               개인정보 관리 (회원탈퇴)
-  /settings/notifications         알림 설정 (8개 토글)
+  /settings/notifications         알림 설정 (계정 동기화 4개 category + 로컬 브라우저 권한/DND + 미지원 범위 분리)
   /settings/terms                 이용약관
   /settings/privacy               개인정보 처리방침
 ```
 
-### Admin 페이지 (18개)
+### Admin 페이지 (대표 surface)
 
 ```
   /admin/dashboard                대시보드 (통계 카드)
@@ -279,7 +301,7 @@
 
 ---
 
-## 5. DB 스키마 (Prisma 모델 16개)
+## 5. DB 스키마 (Prisma 모델 43개)
 
 ```
 핵심 모델:
@@ -309,7 +331,7 @@
 
 ---
 
-## 6. 백엔드 API 모듈 (21개)
+## 6. 백엔드 API 모듈 (28개)
 
 ```
 Core:       auth, users, matches, prisma, config, health, realtime

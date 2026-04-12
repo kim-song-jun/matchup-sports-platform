@@ -1,6 +1,6 @@
 # MatchUp - AI 스포츠 매칭 플랫폼 프로젝트 현황
 
-> 최종 업데이트: 2026-04-10 | 스크린샷: v4 (Playwright 자동 캡처)
+> 최종 업데이트: 2026-04-12 | 스크린샷: v4 (Playwright 자동 캡처)
 
 ---
 
@@ -54,38 +54,15 @@ sports-platform/
 
 ## 3. 디자인 시스템
 
-### 브랜드
-- **성격**: 활발 · 스마트 · 친근
-- **톤 밸런스**: 친근함 70% + 전문성 30%
-- **레퍼런스**: 토스(Toss), 플랩(PLAB), 당근마켓, NRC
+Canonical source of truth: [`DESIGN.md`](../DESIGN.md)
 
-### 컬러 팔레트
-
-| 토큰 | 값 | 용도 |
-|------|-----|------|
-| `blue-500` | #3182F6 | 유일한 액센트 컬러 |
-| `blue-600` | #1B64DA | 호버/프레스 |
-| `gray-50` ~ `gray-900` | 10단계 | 배경/텍스트/보더 |
-| `success` | #34C759 | 성공 상태 |
-| `warning` | #FF9500 | 경고 상태 |
-| `error` | #FF3B30 | 에러 상태 |
-
-### 타이포그래피
-- **폰트**: Pretendard Variable (한국어 최적화)
-- **스케일**: 12 / 13 / 14 / 15 / 16 / 17 / 18 / 22 / 26 / 28 / 36 / 44 / 56 px
-- **행간**: heading leading-tight (1.15), body leading-relaxed (1.625)
-- **자간**: 전역 -0.02em, heading tracking-tight
-
-### 애니메이션
-- **easing**: `cubic-bezier(0.25, 1, 0.5, 1)` (ease-out-quart)
-- **duration**: 피드백 100-150ms, 상태 변경 200-300ms, 입장 400-600ms
-- **스크롤 reveal**: IntersectionObserver 기반 fade-up
-- **접근성**: `prefers-reduced-motion` 전역 존중
-
-### 다크모드
-- 라이트 기본 + 다크모드 지원
-- 시스템 설정 자동 감지
-- 사용자 수동 전환 (설정 페이지)
+- **문서 안내**: `docs/DESIGN_DOCUMENT_MAP.md`
+- **브랜드 성격**: 활발 · 스마트 · 친근
+- **기본 방향**: Toss-like clean layout, single blue accent, solid-first content
+- **금지 규칙**: 과한 shadow, 과한 border, content-wide glass
+- **glass 허용 범위**: navbar, sticky header, bottom nav, overlay, button/panel chrome
+- **토큰 기준**: `apps/web/src/app/globals.css` `@theme`
+- **접근성 기준**: WCAG 2.1 AA, `prefers-reduced-motion`, 컬러 단독 의미 전달 금지
 
 ---
 
@@ -240,7 +217,7 @@ S~D 등급 팀 매칭 모집글 리스트 + 종목/등급/날짜 필터.
 
 ---
 
-## 7. 데이터베이스 모델 (25개)
+## 7. 데이터베이스 모델 (43개)
 
 ### 핵심 모델
 | 모델 | 설명 |
@@ -273,10 +250,10 @@ S~D 등급 팀 매칭 모집글 리스트 + 종목/등급/날짜 필터.
 
 ## 8. API 구조
 
-### 백엔드 모듈 (20개)
+### 백엔드 모듈 (28개)
 Auth, Users, Matches, TeamMatches, Teams, Venues, Lessons, Reviews, Payments, Marketplace, Mercenary, Chat, Realtime, Notifications, Badges, Disputes, Settlements, Admin, Health, Prisma
 
-### 프론트엔드 API 훅 (86개)
+### 프론트엔드 API 훅 (125개)
 React Query 기반 쿼리/뮤테이션 훅. `queryKeys` 팩토리 패턴으로 캐시 관리.
 
 ### API 문서
@@ -286,7 +263,7 @@ Swagger: `http://localhost:8100/docs`
 
 ## 9. 프론트엔드 구조
 
-### 페이지 수: 78개
+### 페이지 수: 95개
 - 사용자 앱: 55개 (홈, 매치, 팀, 강좌, 장터, 시설, 채팅, 용병, 뱃지, 결제, 프로필, 설정 등)
 - 관리자: 18개 (대시보드, 사용자/매치/팀/시설/결제/분쟁/정산 관리)
 - 소개: 5개 (랜딩, 가이드, 요금, FAQ, 소개)
@@ -345,11 +322,13 @@ open http://localhost:8111/docs
 
 ## 12. 향후 개선 방향
 
+### 구현 완료
+- 실시간 채팅 (ChatService persist + broadcast 단일 경로, Prisma ChatRoom/ChatMessage/ChatParticipant 영속화, cursor 기반 페이지네이션)
+
 ### 기능
 - 실제 OAuth 연동 (카카오/네이버/애플)
 - 토스페이먼츠 실결제 연동
-- Socket.IO 실시간 채팅 구현
-- Push 알림 (FCM/APNs)
+- Push 알림 (web-push VAPID 코드 완성, VAPID 키 생성 + 환경변수 설정 필요)
 - Capacitor 네이티브 빌드
 
 ### 디자인

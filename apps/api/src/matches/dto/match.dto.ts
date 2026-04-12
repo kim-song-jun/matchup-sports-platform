@@ -5,15 +5,35 @@ import {
   IsIn,
   IsInt,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { SportType } from '@prisma/client';
+
+export class TeamConfigDto {
+  @ApiPropertyOptional({ description: 'Number of teams', minimum: 2, maximum: 4 })
+  @IsInt()
+  @Min(2)
+  @Max(4)
+  @IsOptional()
+  teamCount?: number;
+
+  @ApiPropertyOptional({ description: 'Players per team' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  playersPerTeam?: number;
+
+  @ApiPropertyOptional({ description: 'Auto balance teams' })
+  @IsBoolean()
+  @IsOptional()
+  autoBalance?: boolean;
+}
 
 export class CreateMatchDto {
   @ApiProperty({ description: '매치 제목' })
@@ -81,10 +101,11 @@ export class CreateMatchDto {
   @IsOptional()
   gender?: string;
 
-  @ApiPropertyOptional({ description: '팀 구성 설정' })
-  @IsObject()
+  @ValidateNested()
+  @Type(() => TeamConfigDto)
   @IsOptional()
-  teamConfig?: Record<string, unknown>;
+  @ApiPropertyOptional({ type: TeamConfigDto })
+  teamConfig?: TeamConfigDto;
 }
 
 export class MatchFilterDto {
@@ -245,10 +266,11 @@ export class UpdateMatchDto {
   @IsOptional()
   gender?: string;
 
-  @ApiPropertyOptional({ description: '팀 구성 설정' })
-  @IsObject()
+  @ValidateNested()
+  @Type(() => TeamConfigDto)
   @IsOptional()
-  teamConfig?: Record<string, unknown>;
+  @ApiPropertyOptional({ type: TeamConfigDto })
+  teamConfig?: TeamConfigDto;
 }
 
 export class CancelMatchDto {

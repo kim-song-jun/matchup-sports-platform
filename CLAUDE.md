@@ -297,6 +297,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **실시간(RealtimeGateway)**: JWT 핸드셰이크 인증, `emitToUser(userId, event, payload)` 헬퍼로 사용자 알림 전송
 - **WebPushService**: `VAPID_PUBLIC_KEY/PRIVATE_KEY/SUBJECT` 없을 시 `enabled=false`로 graceful disable. `sendToUser()` no-op + warn log. 알림 create 흐름은 푸시 실패와 무관하게 성공해야 함 (fire-and-forget). Firebase 미사용 — `web-push` 패키지 + VAPID로 EC2에서 직접 발송.
 - **ChatService**: 채팅 persist + broadcast 단일 경로 — REST `postMessage`와 WS `chat:message` 모두 `ChatService`를 통과. Gateway에서 직접 broadcast 금지. 참가자 검증(`assertParticipant`)은 REST + WS 양쪽에서 필수.
+- **중첩 DTO 패턴**: JSON 필드에 `Record<string, unknown>` 사용 금지. 전용 DTO 클래스 정의 후 `@ValidateNested() @Type(() => XxxDto)` 적용
+- **숫자 기본값**: `filter.limit || 20` 대신 `filter.limit ?? 20` — `||`는 0을 falsy로 처리하므로 nullish coalescing 사용
 
 ### API 컨벤션
 - 경로: `/api/v1/*` (NestJS globalPrefix)
@@ -330,7 +332,13 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useNotificationSocket()` — `notification:new` 이벤트 구독, 인앱 알림 상태 반영
 - `usePushRegistration()` — Web Push 구독 (`POST /notifications/push-subscribe`), VAPID 기반, `sw-push.js` 서비스 워커 + Capacitor 분기 처리
 
+### 에러 처리 규칙
+- **에러 메시지**: `catch (err)` 블록에서 직접 타입 단언 금지. `extractErrorMessage(err, 'fallback 메시지')` (`@/lib/utils`) 사용
+- **에러 메시지 어조**: fallback 메시지는 반드시 **해요체** (`~했어요`, `~해주세요`). 합니다체 금지
+- **SportType 타입**: `lib/constants.ts`의 `SportType` + `SPORT_TYPES` 사용. `@prisma/client` 직접 import 금지 (프론트엔드에서)
+
 ### 유틸 함수 (lib/utils.ts)
+- `extractErrorMessage(err, fallback)` — catch 블록 에러 메시지 추출 (타입 단언 대신 반드시 사용)
 - `formatCurrency(n)` — 금액 (0 → '무료', 그 외 'N원')
 - `formatAmount(n)` — 결제 금액 (항상 'N원', 0도 '0원')
 - `formatDate(dateStr)` / `formatMatchDate` — M/D (요일)

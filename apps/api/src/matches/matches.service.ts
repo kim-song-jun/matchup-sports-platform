@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, NotificationType, SportType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
+import { CancelMatchDto, CreateMatchDto, MatchFilterDto, TeamConfigDto, UpdateMatchDto } from './dto/match.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MatchingEngineService, RecommendationReason } from './matching-engine.service';
 
@@ -166,7 +166,7 @@ export class MatchesService {
   ) {}
 
   async findAll(filter: MatchFilterDto) {
-    const limit = filter.limit || 20;
+    const limit = filter.limit ?? 20;
     const where: Prisma.MatchWhereInput = {
       status: filter.availableOnly ? 'recruiting' : { in: ['recruiting', 'full'] },
     };
@@ -673,7 +673,7 @@ export class MatchesService {
     // TODO: AI 기반 팀 밸런싱 로직 구현
     // 현재는 단순 랜덤 배분
 
-    const teamCount = (match.teamConfig as { teamCount?: number })?.teamCount || 2;
+    const teamCount = (match.teamConfig as TeamConfigDto | null)?.teamCount ?? 2;
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
     const teamNames = ['A팀', 'B팀', 'C팀', 'D팀'];
 

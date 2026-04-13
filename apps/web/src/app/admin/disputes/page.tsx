@@ -16,10 +16,10 @@ const typeLabel: Record<string, string> = {
 };
 
 const typeColor: Record<string, string> = {
-  no_show: 'bg-red-50 text-red-600',
-  late: 'bg-amber-50 text-amber-600',
-  level_mismatch: 'bg-gray-100 text-gray-600',
-  misconduct: 'bg-red-50 text-red-500',
+  no_show: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  late: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+  level_mismatch: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  misconduct: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
 };
 
 const statusLabel: Record<string, string> = {
@@ -30,10 +30,10 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  investigating: 'bg-blue-50 text-blue-500',
-  resolved: 'bg-green-50 text-green-500',
-  dismissed: 'bg-gray-100 text-gray-500',
+  pending: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  investigating: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
+  resolved: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
+  dismissed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
 };
 
 const disputeFilters = [
@@ -87,13 +87,13 @@ export default function AdminDisputesPage() {
         </div>
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+            <span className="flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-2xs font-medium text-gray-600 dark:text-gray-300">
               <Clock size={14} />
               대기 {pendingCount}건
             </span>
           )}
           {investigatingCount > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+            <span className="flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-1.5 text-2xs font-medium text-blue-600 dark:text-blue-400">
               <AlertCircle size={14} />
               조사중 {investigatingCount}건
             </span>
@@ -143,12 +143,12 @@ export default function AdminDisputesPage() {
                     <td className="px-5 py-3.5 text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{dispute.reportedTeam?.name ?? '-'}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{dispute.match?.date ?? '-'}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${typeColor[dispute.type] || 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-2xs font-medium whitespace-nowrap ${typeColor[dispute.type] || 'bg-gray-100 text-gray-500'}`}>
                         {typeLabel[dispute.type] ?? dispute.type}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[dispute.status] || 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-2xs font-medium whitespace-nowrap ${statusColor[dispute.status] || 'bg-gray-100 text-gray-500'}`}>
                         {statusLabel[dispute.status] ?? dispute.status}
                       </span>
                     </td>

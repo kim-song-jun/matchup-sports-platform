@@ -76,7 +76,7 @@ export default function AdminStatisticsPage() {
 
       <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4 mb-6">
         <MetricCard label="전체 사용자" value={overview.userGrowth.totalUsers.toLocaleString()} icon={Users} iconColor="bg-blue-50 text-blue-500" sub={`이번 달 +${overview.userGrowth.thisMonth}`} />
-        <MetricCard label="활성 사용자" value={overview.userGrowth.activeUsers.toLocaleString()} icon={TrendingUp} iconColor="bg-green-50 text-green-500" sub={`성장률 ${overview.userGrowth.growthRate}%`} />
+        <MetricCard label="활성 사용자" value={overview.userGrowth.activeUsers.toLocaleString()} icon={TrendingUp} iconColor="bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400" sub={`성장률 ${overview.userGrowth.growthRate}%`} />
         <MetricCard label="총 매출" value={formatAmount(stats.totalRevenue)} icon={DollarSign} iconColor="bg-amber-50 text-amber-500" sub={`활성 팀 ${stats.activeTeams}`} />
         <MetricCard label="등록 팀" value={overview.userGrowth.teamCount.toLocaleString()} icon={Trophy} iconColor="bg-gray-100 text-gray-600" sub={`활성 상품 ${stats.activeListings}`} />
       </div>
@@ -87,17 +87,26 @@ export default function AdminStatisticsPage() {
             <BarChart3 size={16} className="text-blue-500" />
             <h2 className="text-md font-bold text-gray-900 dark:text-white">월별 매치 수</h2>
           </div>
-          <div className="flex items-end gap-3 h-[200px]">
+          <div
+            className="flex items-end gap-3 h-[200px]"
+            role="img"
+            aria-label="월별 매치 수 차트"
+          >
             {overview.matchTrend.map((item) => {
               const heightPercent = (item.count / maxMatchCount) * 100;
               return (
-                <div key={item.month} className="flex-1 flex flex-col items-center justify-end h-full">
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{item.count}</span>
+                <div
+                  key={item.month}
+                  className="flex-1 flex flex-col items-center justify-end h-full"
+                  aria-label={`${item.month}: ${item.count}건`}
+                >
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1" aria-hidden="true">{item.count}</span>
                   <div
                     className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-1"
                     style={{ height: `${heightPercent}%` }}
+                    aria-hidden="true"
                   />
-                  <span className="text-xs text-gray-400 mt-2">{item.month}</span>
+                  <span className="text-xs text-gray-400 mt-2" aria-hidden="true">{item.month}</span>
                 </div>
               );
             })}
@@ -109,19 +118,28 @@ export default function AdminStatisticsPage() {
             <DollarSign size={16} className="text-blue-500" />
             <h2 className="text-md font-bold text-gray-900 dark:text-white">월별 매출</h2>
           </div>
-          <div className="flex items-end gap-3 h-[200px]">
+          <div
+            className="flex items-end gap-3 h-[200px]"
+            role="img"
+            aria-label="월별 매출 차트"
+          >
             {overview.revenueTrend.map((item) => {
               const heightPercent = (item.revenue / maxRevenue) * 100;
               return (
-                <div key={item.month} className="flex-1 flex flex-col items-center justify-end h-full">
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <div
+                  key={item.month}
+                  className="flex-1 flex flex-col items-center justify-end h-full"
+                  aria-label={`${item.month}: ${formatCurrencyCompact(item.revenue)}`}
+                >
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1" aria-hidden="true">
                     {formatCurrencyCompact(item.revenue)}
                   </span>
                   <div
                     className="w-full rounded-t-lg bg-blue-500 transition-[height] duration-300 min-h-1"
                     style={{ height: `${heightPercent}%` }}
+                    aria-hidden="true"
                   />
-                  <span className="text-xs text-gray-400 mt-2">{item.month}</span>
+                  <span className="text-xs text-gray-400 mt-2" aria-hidden="true">{item.month}</span>
                 </div>
               );
             })}
@@ -143,16 +161,16 @@ export default function AdminStatisticsPage() {
               size="sm"
             />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" role="img" aria-label="종목별 매치 분포 차트">
               {overview.sportDistribution.map((item) => (
-                <div key={item.sport}>
-                  <div className="flex items-center justify-between mb-1">
+                <div key={item.sport} aria-label={`${sportLabel[item.sport] || item.sport}: ${item.count}건`}>
+                  <div className="flex items-center justify-between mb-1" aria-hidden="true">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {sportLabel[item.sport] || item.sport}
                     </span>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{item.count}건</span>
                   </div>
-                  <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                  <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden" aria-hidden="true">
                     <div
                       className="h-full rounded-full bg-blue-500 transition-[width] duration-300"
                       style={{ width: `${(item.count / maxSportCount) * 100}%` }}
@@ -229,9 +247,13 @@ function MetricCard({
           <Icon size={20} />
         </div>
       </div>
-      <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
-      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
-      {sub ? <p className="text-xs text-blue-500 font-medium mt-1">{sub}</p> : null}
+      <dl>
+        <dt className="text-sm text-gray-400 mt-0.5">{label}</dt>
+        <dd>
+          <span className="text-3xl font-bold text-gray-900 dark:text-white">{value}</span>
+          {sub ? <p className="text-xs text-blue-500 font-medium mt-1">{sub}</p> : null}
+        </dd>
+      </dl>
     </div>
   );
 }

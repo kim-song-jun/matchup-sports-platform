@@ -20,10 +20,10 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  open: 'bg-blue-50 text-blue-500',
-  filled: 'bg-green-50 text-green-600',
-  closed: 'bg-gray-100 text-gray-500',
-  cancelled: 'bg-red-50 text-red-500',
+  open: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
+  filled: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+  closed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+  cancelled: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
 };
 
 const mercenaryFilters = [
@@ -163,7 +163,7 @@ export default function AdminMercenaryPage() {
                       {post.applicationCount ?? 0}건
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[post.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-2xs font-medium whitespace-nowrap ${statusColor[post.status] ?? 'bg-gray-100 text-gray-500'}`}>
                         {statusLabel[post.status] ?? post.status}
                       </span>
                     </td>

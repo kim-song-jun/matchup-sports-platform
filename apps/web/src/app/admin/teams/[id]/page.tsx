@@ -74,10 +74,10 @@ export default function AdminTeamDetailPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-500">
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-2xs font-medium text-blue-500">
                     {sportLabel[team.sportType] || team.sportType}
                   </span>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-medium text-gray-600">
                     {team.isRecruiting ? '모집중' : '모집마감'}
                   </span>
                 </div>
@@ -127,7 +127,7 @@ export default function AdminTeamDetailPage() {
                           <span>{member.mannerScore.toFixed(1)}</span>
                         </div>
                       ) : null}
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleColor[member.role]}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${roleColor[member.role]}`}>
                         {roleLabel[member.role]}
                       </span>
                     </div>
@@ -157,7 +157,7 @@ export default function AdminTeamDetailPage() {
                           {new Date(match.matchDate).toLocaleDateString('ko-KR')} · {match.startTime} - {match.endTime}
                         </p>
                       </div>
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-medium text-gray-600">
                         {statusLabel[match.status] || match.status}
                       </span>
                     </div>

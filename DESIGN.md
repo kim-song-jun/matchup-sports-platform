@@ -1,6 +1,6 @@
-# MatchUp Design System
+# TeamMeet Design System
 
-이 문서는 MatchUp 프론트엔드의 **canonical design source of truth**다.
+이 문서는 TeamMeet 프론트엔드의 **canonical design source of truth**다.
 기존 디자인 관련 문서는 이 문서를 보완하거나 실행 결과를 기록할 수는 있지만, 시각 규칙을 새로 정의해서는 안 된다.
 
 ## 0. Read This First
@@ -23,7 +23,7 @@
 - 사용자 인상: 활발하지만 가볍지 않고, 친근하지만 싸보이지 않으며, 빠르게 읽히는 신뢰형 제품
 - 시각 방향: **Toss-like clean layout**를 기본값으로 삼되 그대로 복제하지 않는다
 - 기준 해석: 2026-04-04경 기준으로 관찰한 "정돈된 정보 구조, 절제된 장식, 또렷한 액션"을 reference intent로 본다
-- MatchUp의 차별점: 스포츠 에너지는 컬러 과잉이 아니라 copy, 정보 리듬, 이미지, CTA 확신으로 표현한다
+- TeamMeet의 차별점: 스포츠 에너지는 컬러 과잉이 아니라 copy, 정보 리듬, 이미지, CTA 확신으로 표현한다
 
 ### 2.1 "토스처럼"의 구체적 의미
 
@@ -150,7 +150,7 @@
 - 첫 3초에 레이아웃과 CTA가 장식보다 먼저 읽히는가
 - glass가 chrome에만 머물고 content로 번지지 않는가
 - utility page가 showcase 화면처럼 보이지 않는가
-- Toss-like clean layout intent는 느껴지지만 MatchUp 고유 맥락은 유지되는가
+- Toss-like clean layout intent는 느껴지지만 TeamMeet 고유 맥락은 유지되는가
 
 ## 9. Page Layout Recipes
 
@@ -208,9 +208,9 @@
 
 모든 카드 공통: `rounded-2xl`, `border border-gray-100`, hairline shadow, `active:scale-[0.98]`
 
-## 11. Information Hierarchy (MatchUp 핵심)
+## 11. Information Hierarchy (TeamMeet 핵심)
 
-MatchUp은 금융 앱이 아니다. 사용자가 첫 3초에 읽어야 할 것은 숫자가 아니라 **언제, 어디서, 자리 있는지**다.
+TeamMeet은 금융 앱이 아니다. 사용자가 첫 3초에 읽어야 할 것은 숫자가 아니라 **언제, 어디서, 자리 있는지**다.
 
 **카드에서의 정보 우선순위:**
 1. **시간** — "오늘 19:00", "내일 15:00" → 시간 배지(`text-2xs bg-gray-900/70 text-white`)로 눈에 띄게

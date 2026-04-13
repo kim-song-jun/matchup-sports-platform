@@ -34,9 +34,9 @@ const typeLabel: Record<string, { text: string; color: string }> = {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: '대기', color: 'bg-gray-100 text-gray-600' },
-  processed: { label: '완료', color: 'bg-green-50 text-green-500' },
-  refunded: { label: '환불', color: 'bg-red-50 text-red-500' },
-  failed: { label: '실패', color: 'bg-amber-50 text-amber-600' },
+  processed: { label: '완료', color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
+  refunded: { label: '환불', color: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
+  failed: { label: '실패', color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
 };
 
 export default function AdminSettlementsPage() {
@@ -135,8 +135,10 @@ export default function AdminSettlementsPage() {
                 <card.icon size={20} />
               </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{card.value}</p>
-            <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
+            <dl>
+              <dt className="text-sm text-gray-400 mt-0.5">{card.label}</dt>
+              <dd className="text-2xl font-bold text-gray-900 dark:text-white">{card.value}</dd>
+            </dl>
           </div>
         ))}
       </div>
@@ -229,7 +231,7 @@ export default function AdminSettlementsPage() {
                     <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{settlement.recipientName}</td>
                     <td className="px-5 py-3.5 text-right text-base font-semibold text-blue-500">{formatAmount(settlement.netAmount)}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusConfig[settlement.status]?.color ?? 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${statusConfig[settlement.status]?.color ?? 'bg-gray-100 text-gray-500'}`}>
                         {statusConfig[settlement.status]?.label ?? settlement.status}
                       </span>
                     </td>

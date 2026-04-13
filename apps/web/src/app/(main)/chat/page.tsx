@@ -148,7 +148,7 @@ export default function ChatListPage() {
       <div className="hidden @3xl:grid @3xl:grid-cols-[380px_1fr] @3xl:h-[calc(100dvh-5rem)] @3xl:-my-10 @3xl:-mx-8 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="border-r border-gray-100 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100 dark:border-gray-700">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
             <p className="text-sm text-gray-500 mt-0.5">{t('subtitle')}</p>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-3">

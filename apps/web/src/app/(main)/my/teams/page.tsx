@@ -55,7 +55,7 @@ export default function MyTeamsPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <MobileGlassHeader title="내 팀" showBack />
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">소속 팀과 현재 역할을 확인하세요</p>
       </div>
 
@@ -77,15 +77,15 @@ export default function MyTeamsPage() {
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[team.sportType]?.badge ?? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sportCardAccent[team.sportType]?.badge ?? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'}`}>
                       {sportLabel[team.sportType]}
                     </span>
-                    <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                    <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300">
                       {levelLabel[team.level]}
                     </span>
                     <span
                       data-testid={`my-team-role-${team.id}`}
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${teamRoleMeta[team.role].className}`}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${teamRoleMeta[team.role].className}`}
                     >
                       {(() => {
                         const RoleIcon = teamRoleMeta[team.role].icon;

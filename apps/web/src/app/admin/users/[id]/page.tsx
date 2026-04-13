@@ -172,10 +172,10 @@ export default function AdminUserDetailPage() {
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${
                     user.adminStatus === 'suspended'
-                      ? 'bg-red-50 text-red-600'
-                      : 'bg-green-50 text-green-600'
+                      ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                      : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
                   }`}>
                     {user.adminStatus === 'suspended' ? '정지' : '활성'}
                   </span>

@@ -25,8 +25,11 @@ import { formatAmount } from '@/lib/utils';
 
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
 const conditionColor: Record<string, string> = {
-  new: 'bg-gray-100 text-gray-600', like_new: 'bg-gray-100 text-gray-600',
-  good: 'bg-gray-100 text-gray-600', fair: 'bg-gray-100 text-gray-600', poor: 'bg-red-50 text-red-600',
+  new: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  like_new: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  good: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  fair: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  poor: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400',
 };
 
 export default function ListingDetailPage() {
@@ -116,7 +119,7 @@ export default function ListingDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <MobileGlassHeader className="justify-between">
+      <MobileGlassHeader compact className="justify-between">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" /></button>
         <div className="flex gap-1">
           <button
@@ -209,38 +212,38 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Title + price */}
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="mb-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${conditionColor[listing.condition]}`}>
                 {conditionLabel[listing.condition]}
               </span>
-              <span className="text-xs text-gray-500">{sportLabel[listing.sportType]}</span>
+              <span className="text-xs text-gray-400">{sportLabel[listing.sportType]}</span>
               {listing.listingType === 'rent' && (
                 <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600">대여</span>
               )}
             </div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{listing.title}</h1>
-            <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">{formatAmount(listing.price)}</p>
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-              <span className="flex items-center gap-1"><Eye size={14} />{listing.viewCount}</span>
-              <span className="flex items-center gap-1"><Heart size={14} />{listing.likeCount}</span>
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-snug">{listing.title}</h1>
+            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{formatAmount(listing.price)}</p>
+            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+              <span className="flex items-center gap-0.5"><Eye size={12} />{listing.viewCount}</span>
+              <span className="flex items-center gap-0.5"><Heart size={12} />{listing.likeCount}</span>
               {listing.locationDistrict && (
-                <span className="flex items-center gap-1"><MapPin size={14} />{listing.locationCity} {listing.locationDistrict}</span>
+                <span className="flex items-center gap-0.5"><MapPin size={12} />{listing.locationCity} {listing.locationDistrict}</span>
               )}
             </div>
           </div>
 
           {/* Description */}
-          <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2">상품 설명</h3>
-            <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
+          <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <h3 className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">상품 설명</h3>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
           </div>
 
           {/* Rental info */}
           {listing.listingType === 'rent' && (
-            <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <h3 className="text-md font-semibold text-blue-800 mb-2">대여 정보</h3>
-              <div className="space-y-2 text-base text-blue-700">
+            <div className="mt-4 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-950/20 p-4">
+              <h3 className="text-base font-bold text-blue-800 dark:text-blue-300 mb-2">대여 정보</h3>
+              <div className="space-y-2 text-sm text-blue-700 dark:text-blue-400">
                 <p>일일 대여비: {formatAmount(listing.rentalPricePerDay || 0)}</p>
                 <p>보증금: {formatAmount(listing.rentalDeposit || 0)}</p>
               </div>
@@ -253,26 +256,27 @@ export default function ListingDetailPage() {
           <div className="sidebar-sticky space-y-3">
           {/* Seller */}
           <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">판매자</h3>
+            <div className="flex items-center justify-between mb-2.5">
+              <h3 className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">판매자</h3>
+              <button
+                onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
+                className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <AlertTriangle size={11} aria-hidden="true" />
+                신고
+              </button>
+            </div>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-300 shrink-0">
                 {listing.seller?.nickname?.charAt(0)}
               </div>
-              <div className="flex-1">
-                <p className="text-md font-semibold text-gray-900 dark:text-white">{listing.seller?.nickname}</p>
-                <div className="flex items-center gap-1 text-sm text-amber-500 mt-0.5">
-                  <Star size={12} fill="currentColor" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{listing.seller?.nickname}</p>
+                <div className="flex items-center gap-1 text-xs text-amber-500 mt-0.5">
+                  <Star size={11} fill="currentColor" />
                   <span>{listing.seller?.mannerScore?.toFixed(1)}</span>
                 </div>
               </div>
-            </div>
-            <div className="mt-6 text-right">
-              <button
-                onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
-                className="text-xs text-gray-500 hover:text-red-500 transition-colors"
-              >
-                신고하기
-              </button>
             </div>
           </div>
 
@@ -313,10 +317,10 @@ export default function ListingDetailPage() {
                 </button>
                 {user?.id === listing?.sellerId && (
                   <div className="flex gap-2 mt-2">
-                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600">
+                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <Pencil size={14} /> 수정
                     </Link>
-                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-500">
+                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-red-200 dark:border-red-800 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
                       <Trash2 size={14} /> 삭제
                     </button>
                   </div>
@@ -330,15 +334,15 @@ export default function ListingDetailPage() {
 
       {/* 삭제 확인 모달 */}
       <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} size="sm">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-          <AlertTriangle size={24} className="text-red-500" />
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
         </div>
         <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-        <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없어요.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">삭제된 매물은 복구할 수 없어요.</p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => setShowDeleteConfirm(false)}
-            className="flex-1 rounded-xl bg-gray-100 py-3 text-base font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
+            className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             돌아가기
           </button>
@@ -357,7 +361,7 @@ export default function ListingDetailPage() {
                 },
               });
             }}
-            className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
+            className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-sm font-semibold text-white hover:bg-red-600 transition-colors"
           >
             삭제하기
           </button>

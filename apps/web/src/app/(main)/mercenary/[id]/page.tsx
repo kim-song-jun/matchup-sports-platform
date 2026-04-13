@@ -182,7 +182,7 @@ export default function MercenaryDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <MobileGlassHeader className="justify-between">
+      <MobileGlassHeader compact className="justify-between">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
@@ -355,7 +355,7 @@ export default function MercenaryDetailPage() {
       </div>
 
       {/* Spacer so scroll content clears the fixed CTA on mobile */}
-      <div className="h-32 @3xl:hidden" />
+      <div className="h-28 @3xl:hidden" />
 
       <div className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] @3xl:bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg @3xl:mx-0">
         {canEdit ? (

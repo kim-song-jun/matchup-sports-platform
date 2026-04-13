@@ -52,16 +52,16 @@ export function MercenaryCard({ post, className }: MercenaryCardProps) {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1 text-xs text-gray-500 flex-wrap">
-              <span className={`rounded-md px-1.5 py-0.5 font-medium ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                 {sportLabel[post.sportType] ?? post.sportType}
               </span>
-              <span className={`rounded-md px-1.5 py-0.5 font-medium ${statusStyle[post.status] ?? statusStyle.closed}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle[post.status] ?? statusStyle.closed}`}>
                 {statusLabel[post.status] ?? post.status}
               </span>
-              <span>{positionLabel[positionKey] ?? positionKey}</span>
+              <span className="text-xs text-gray-500">{positionLabel[positionKey] ?? positionKey}</span>
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
               {teamName}
             </h3>
           </div>

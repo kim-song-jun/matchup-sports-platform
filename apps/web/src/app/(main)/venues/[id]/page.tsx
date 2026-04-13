@@ -142,7 +142,7 @@ export default function VenueDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <MobileGlassHeader className="justify-between">
+      <MobileGlassHeader compact className="justify-between">
         <button aria-label="뒤로 가기" onClick={() => router.back()} className="glass-mobile-icon-button flex min-h-[44px] min-w-11 items-center justify-center rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>

@@ -8,6 +8,7 @@ import {
   Users, Shield, AlertCircle, Star,
   ChevronRight, MapPinCheck, ClipboardCheck, Pencil,
 } from 'lucide-react';
+import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
@@ -135,7 +136,7 @@ export default function TeamMatchDetailPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6 px-5 @3xl:px-0 pt-4">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
@@ -143,11 +144,23 @@ export default function TeamMatchDetailPage() {
         <span className="text-gray-700 dark:text-gray-300">상세</span>
       </div>
 
-      {/* Header */}
-      <header className="px-5 @3xl:px-0 @3xl:pt-0 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => router.back()} aria-label="뒤로 가기" className="@3xl:hidden flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-          <ArrowLeft size={20} />
+      {/* Mobile header */}
+      <MobileGlassHeader compact className="justify-between">
+        <button
+          onClick={() => router.back()}
+          aria-label="뒤로 가기"
+          className="glass-mobile-icon-button flex items-center justify-center min-h-[44px] min-w-11 rounded-xl"
+        >
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
+        <span className="text-base font-semibold text-gray-900 dark:text-white truncate flex-1 text-center px-2">{match.title}</span>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
+          {status.label}
+        </span>
+      </MobileGlassHeader>
+
+      {/* Desktop header */}
+      <header className="hidden @3xl:flex items-center gap-3 px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
           {status.label}

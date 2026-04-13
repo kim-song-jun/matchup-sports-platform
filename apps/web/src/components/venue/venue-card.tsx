@@ -39,7 +39,7 @@ export function VenueCard({ venue, className }: VenueCardProps) {
         {/* Text content */}
         <div className="flex-1 p-3 min-w-0 flex flex-col justify-center">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
+            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
             {venue.rating > 0 && (
               <span className="shrink-0 flex items-center gap-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100">
                 <Star size={10} fill="currentColor" className="text-amber-400" aria-hidden="true" />

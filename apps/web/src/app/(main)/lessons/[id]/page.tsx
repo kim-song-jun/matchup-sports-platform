@@ -128,7 +128,7 @@ export default function LessonDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader className="gap-3">
+      <MobileGlassHeader compact className="gap-3">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" /></button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{lesson.title}</h1>
       </MobileGlassHeader>
@@ -366,7 +366,7 @@ export default function LessonDetailPage() {
 
             {/* 등록자 — CTA와 같은 sticky 그룹 안에 */}
             <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">등록자</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">등록자</h3>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
                 <div>

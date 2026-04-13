@@ -56,31 +56,31 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
 
           <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} aria-hidden="true" />
-            <span className="text-2xs font-semibold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{sportLabel[match.sportType]}</span>
+            <span className="text-2xs font-medium text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{sportLabel[match.sportType]}</span>
             {timeBadge && (
-              <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+              <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 {timeBadge.text}
               </span>
             )}
           </div>
 
           <div className="absolute bottom-3 left-3.5">
-            <span className="text-[13px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{formatCurrency(match.fee)}</span>
+            <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{formatCurrency(match.fee)}</span>
           </div>
 
           <div className="absolute bottom-3 right-3">
             {isFull ? (
-              <span className="rounded-md bg-gray-900/70 px-2 py-0.5 text-2xs font-medium leading-none text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+              <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-medium leading-none text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 마감
               </span>
             ) : isAlmostFull ? (
-              <span className="rounded-md bg-blue-600/80 px-2 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+              <span className="rounded-md bg-blue-600/80 px-1.5 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 <Clock size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (
               <span
-                className="rounded-md bg-gray-900/70 px-2 py-0.5 text-2xs font-medium leading-none text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
+                className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-medium leading-none text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
                 aria-label={`참가 ${match.currentPlayers}명, 최대 ${match.maxPlayers}명`}
               >
                 <Users size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />

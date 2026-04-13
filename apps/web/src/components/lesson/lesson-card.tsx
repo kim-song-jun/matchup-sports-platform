@@ -66,7 +66,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           {/* Top-left: sport dot + name */}
           <div className="absolute top-3 left-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} aria-hidden="true" />
-            <span className="text-2xs font-semibold text-white/90 drop-shadow-sm">
+            <span className="text-2xs font-medium text-white/90 drop-shadow-sm">
               {sportLabel[lesson.sportType]}
             </span>
           </div>
@@ -80,7 +80,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
 
           {/* Bottom-left: price */}
           <div className="absolute bottom-3 left-3.5">
-            <span className="text-sm font-bold text-white drop-shadow-sm">
+            <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-sm">
               {formatCurrency(lesson.fee)}
             </span>
           </div>
@@ -88,16 +88,16 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           {/* Bottom-right: participant fill status */}
           <div className="absolute bottom-3 right-3">
             {isFull ? (
-              <span className="text-2xs font-medium text-white bg-gray-900/70 rounded-md px-2 py-0.5 leading-none">
+              <span className="text-2xs font-medium text-white bg-gray-900/70 rounded-md px-1.5 py-0.5 leading-none">
                 마감
               </span>
             ) : isAlmostFull ? (
-              <span className="text-2xs font-medium text-white bg-blue-600/80 rounded-md px-2 py-0.5 leading-none">
+              <span className="text-2xs font-medium text-white bg-blue-600/80 rounded-md px-1.5 py-0.5 leading-none">
                 <Clock size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (
-              <span className="text-2xs font-medium text-white bg-gray-900/60 rounded-md px-2 py-0.5 leading-none">
+              <span className="text-2xs font-medium text-white bg-gray-900/60 rounded-md px-1.5 py-0.5 leading-none">
                 <Users size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
                 {lesson.currentParticipants}/{lesson.maxParticipants}
               </span>

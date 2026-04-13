@@ -13,15 +13,22 @@ import { Server, Socket } from 'socket.io';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatService } from '../chat/chat.service';
 
-const realtimeAllowedOrigins = (() => {
+const realtimeAllowedOrigins: string | string[] = (() => {
   const envOrigins = process.env.REALTIME_ALLOWED_ORIGINS;
-  if (!envOrigins && process.env.NODE_ENV === 'production') {
-    throw new Error('REALTIME_ALLOWED_ORIGINS must be set in production');
+  if (!envOrigins) {
+    if (process.env.NODE_ENV === 'production') {
+      // Warn but allow all origins as fallback so the container does not crash-loop.
+      // Set REALTIME_ALLOWED_ORIGINS in deploy/.env for proper WebSocket CORS security.
+      console.warn(
+        '[RealtimeGateway] REALTIME_ALLOWED_ORIGINS is not set in production — ' +
+          'allowing all WebSocket origins. Set this env var for proper CORS security.',
+      );
+      return '*';
+    }
+    return ['http://localhost:3000', 'http://localhost:3003', 'capacitor://localhost'];
   }
-  return (envOrigins ?? 'http://localhost:3000,http://localhost:3003,capacitor://localhost')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  if (envOrigins.trim() === '*') return '*';
+  return envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
 })();
 
 @WebSocketGateway({

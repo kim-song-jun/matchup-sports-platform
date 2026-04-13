@@ -197,6 +197,18 @@ jobs:
           sync_env_from_github_secret "TOSS_SECRET_KEY" "${TOSS_SECRET_KEY_B64:-}"
           sync_env_from_github_secret "TOSS_WEBHOOK_SECRET" "${TOSS_WEBHOOK_SECRET_B64:-}"
 
+          # Auto-set REALTIME_ALLOWED_ORIGINS if not already configured
+          if ! grep -q '^REALTIME_ALLOWED_ORIGINS=.' deploy/.env 2>/dev/null; then
+            _DEPLOY_PUBLIC_IP=$(curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
+            if [ -n "$_DEPLOY_PUBLIC_IP" ]; then
+              tmp_env=$(mktemp)
+              awk 'index($0, "REALTIME_ALLOWED_ORIGINS=") != 1' deploy/.env > "$tmp_env"
+              printf 'REALTIME_ALLOWED_ORIGINS=http://%s,https://%s\n' "$_DEPLOY_PUBLIC_IP" "$_DEPLOY_PUBLIC_IP" >> "$tmp_env"
+              mv "$tmp_env" deploy/.env
+              echo "[INFO] Auto-set REALTIME_ALLOWED_ORIGINS for $_DEPLOY_PUBLIC_IP"
+            fi
+          fi
+
           set -a
           . deploy/.env
           set +a

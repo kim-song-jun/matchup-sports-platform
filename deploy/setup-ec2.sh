@@ -99,6 +99,15 @@ if [ "${TOSS_CLIENT_KEY+x}" = "x" ] || [ "${TOSS_SECRET_KEY+x}" = "x" ] || [ "${
   write_toss_env
 fi
 
+# Auto-set REALTIME_ALLOWED_ORIGINS if not already configured in deploy/.env
+if ! grep -q '^REALTIME_ALLOWED_ORIGINS=.' deploy/.env 2>/dev/null; then
+  _SETUP_PUBLIC_IP=$(curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
+  if [ -n "$_SETUP_PUBLIC_IP" ]; then
+    printf '\nREALTIME_ALLOWED_ORIGINS=http://%s,https://%s\n' "$_SETUP_PUBLIC_IP" "$_SETUP_PUBLIC_IP" >> deploy/.env
+    echo "✅ REALTIME_ALLOWED_ORIGINS 자동 설정 완료 ($_SETUP_PUBLIC_IP)"
+  fi
+fi
+
 # 7. Docker 빌드 + 실행
 echo "🏗️ Docker 빌드 중... (첫 빌드는 5-10분 소요)"
 cd "$APP_DIR"

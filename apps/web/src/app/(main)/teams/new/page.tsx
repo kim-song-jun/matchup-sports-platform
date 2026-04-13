@@ -7,7 +7,7 @@ import { ChevronRight, Globe, Video } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { api } from '@/lib/api';
+import { useCreateTeam } from '@/hooks/use-api';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { extractErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ export default function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
   useRequireAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createTeam = useCreateTeam();
 
   const [form, setForm] = useState({
     name: '',
@@ -40,7 +40,7 @@ export default function CreateTeamPage() {
     shortsUrl: '',
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!form.name) return toast('error', '팀명을 입력해주세요');
     if (!form.sportType) return toast('error', '종목을 선택해주세요');
     if (!form.city) return toast('error', '활동 지역을 선택해주세요');
@@ -60,16 +60,15 @@ export default function CreateTeamPage() {
       shortsUrl: form.shortsUrl || undefined,
     };
 
-    setIsSubmitting(true);
-    try {
-      await api.post('/teams', payload);
-      toast('success', '팀이 등록되었어요!');
-      router.push('/teams');
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
-    } finally {
-      setIsSubmitting(false);
-    }
+    createTeam.mutate(payload, {
+      onSuccess: () => {
+        toast('success', '팀이 등록되었어요!');
+        router.push('/teams');
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
+      },
+    });
   };
 
   return (
@@ -246,12 +245,12 @@ export default function CreateTeamPage() {
         {/* 등록 버튼 */}
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={createTeam.isPending}
           fullWidth
           size="lg"
           className="mb-6"
         >
-          {isSubmitting ? '등록 중...' : '팀 등록하기'}
+          {createTeam.isPending ? '등록 중...' : '팀 등록하기'}
         </Button>
       </div>
       <div className="h-24" />

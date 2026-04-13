@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { XCircle, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency, formatMatchDate } from '@/lib/utils';
@@ -9,11 +10,11 @@ import { getGradeInfo } from '@/lib/skill-grades';
 import type { TeamMatch } from '@/types/api';
 import { cn } from '@/lib/utils';
 
-const statusMap: Record<string, { label: string; className: string }> = {
+const statusMap: Record<string, { label: string; className: string; icon?: React.ElementType }> = {
   recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
   matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
   completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-  cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
+  cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
 };
 
 const matchStyleLabel: Record<string, string> = {
@@ -37,6 +38,7 @@ export interface TeamMatchCardProps {
 
 export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
   const status = statusMap[match.status] ?? statusMap.recruiting;
+  const StatusIcon = status.icon;
 
   return (
     <Link href={`/team-matches/${match.id}`}>
@@ -51,8 +53,9 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2">
+            <div className="mb-1 flex items-center gap-2 flex-wrap">
               <span className={`shrink-0 rounded-md px-2 py-0.5 text-2xs font-semibold ${status.className}`}>
+                {StatusIcon && <StatusIcon className="h-3 w-3 mr-0.5 inline -mt-px" aria-hidden="true" />}
                 {status.label}
               </span>
               <span
@@ -78,6 +81,7 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
               {match.title}
             </h3>
           </div>
+          <ChevronRight size={16} className="shrink-0 mt-0.5 text-gray-400 dark:text-gray-500" aria-hidden="true" />
         </div>
 
         <p className="mt-2.5 text-sm leading-relaxed text-gray-500">

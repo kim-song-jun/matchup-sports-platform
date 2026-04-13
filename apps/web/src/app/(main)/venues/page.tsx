@@ -37,6 +37,7 @@ export default function VenuesPage() {
   const [activeSport, setActiveSport] = useState('');
   const [activeCity, setActiveCity] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { toast } = useToast();
 
@@ -78,10 +79,12 @@ export default function VenuesPage() {
 
       <div className="px-5 @3xl:px-0 mb-3">
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+          <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${searchFocused ? 'text-blue-500' : 'text-gray-500'}`} size={16} aria-hidden="true" />
           <label htmlFor="venues-search" className="sr-only">시설 검색</label>
           <Input id="venues-search" type="text" placeholder="시설명, 지역 검색" value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             className="pl-10" />
         </div>
       </div>

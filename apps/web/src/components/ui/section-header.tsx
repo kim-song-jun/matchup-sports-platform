@@ -36,7 +36,7 @@ export function SectionHeader({
           ? (
             <Link
               href={href}
-              className="flex min-h-[44px] items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600"
+              className="flex min-h-[44px] items-center text-sm font-medium text-blue-500 dark:text-blue-300 transition-colors hover:text-blue-600 dark:hover:text-blue-200"
             >
               {moreLabel}
               <ChevronRight size={14} className="ml-0.5" />

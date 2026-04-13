@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MapPin } from 'lucide-react';
+import { MapPin, Heart, Eye } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -49,7 +49,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
 
         {/* Content */}
         <div className="flex flex-1 flex-col min-w-0 py-0.5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
 
           {/* meta: 지역 · 종목 · 상태 */}
           <div className="flex items-center gap-1.5 mt-1">
@@ -63,15 +63,22 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
           </div>
 
           {/* 가격 */}
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-1.5">{formatCurrency(item.price)}</p>
+          <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-1.5">{formatCurrency(item.price)}</p>
 
           {/* 하단: 타입 + 통계 */}
           <div className="flex items-center justify-between mt-auto pt-1">
             <span className="rounded-full px-2 py-0.5 text-2xs font-normal bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
               {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
             </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {t('likes', { count: item.likeCount })} · {t('views', { count: item.viewCount })}
+            <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span className="flex items-center gap-0.5">
+                <Heart size={11} aria-hidden="true" />
+                {t('likes', { count: item.likeCount })}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Eye size={11} aria-hidden="true" />
+                {t('views', { count: item.viewCount })}
+              </span>
             </span>
           </div>
 

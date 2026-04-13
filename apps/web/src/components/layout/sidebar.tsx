@@ -80,7 +80,7 @@ export function Sidebar() {
         {navSections.map((section, sIdx) => (
           <div key={sIdx} className={section.label ? 'mt-4' : sIdx > 0 ? 'mt-2 pt-2 border-t border-gray-100 dark:border-gray-800' : ''}>
             {section.label && (
-              <p className="px-3 mb-1 text-2xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              <p className="px-3 mb-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 {section.label}
               </p>
             )}

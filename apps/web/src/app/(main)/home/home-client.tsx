@@ -115,7 +115,13 @@ export function HomePage() {
       <header className="px-5 @3xl:px-0 pt-4 pb-2">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
-          {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'TeamMeet'}
+          {mounted && isAuthenticated ? (
+            user ? (
+              user.nickname ? `${user.nickname}님` : '안녕하세요'
+            ) : (
+              <span className="animate-pulse bg-gray-100 dark:bg-gray-700 rounded w-20 h-5 inline-block" />
+            )
+          ) : 'TeamMeet'}
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           {canRenderAuthenticated
@@ -144,7 +150,7 @@ export function HomePage() {
               <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{t('upcomingSchedule')}</h2>
               <Link href="/my/matches" className="text-sm text-blue-500 font-medium min-h-[44px] flex items-center">{t('viewAll')}</Link>
             </div>
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
               {upcoming.map((m: Match) => {
                 const d = new Date(m.matchDate);
                 return (
@@ -265,7 +271,7 @@ export function HomePage() {
                     key={i}
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
                     aria-label={`배너 ${i + 1}`}
-                    className="p-1"
+                    className="p-[10px]"
                   >
                     <span className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${
                       bannerIdx === i

@@ -43,7 +43,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
         interactive
         className="group overflow-hidden transition-[border-color,transform] duration-150 hover:border-gray-200 active:scale-[0.98] dark:hover:border-gray-700"
       >
-        <div className="relative aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <div className="relative aspect-[16/9] max-h-[180px] overflow-hidden bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={matchImage}
             fallbackSrc={fallbackMatchImage}
@@ -75,12 +75,16 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
               </span>
             ) : isAlmostFull ? (
               <span className="rounded-md bg-amber-600/80 px-2 py-1 text-2xs font-bold leading-none text-white">
+                <Clock size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (
-              <span className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-semibold leading-none text-white/80">
+              <span
+                className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-semibold leading-none text-white/80"
+                aria-label={`참가 ${match.currentPlayers}명, 최대 ${match.maxPlayers}명`}
+              >
                 <Users size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
-                {match.currentPlayers}/{match.maxPlayers}
+                {match.currentPlayers}/{match.maxPlayers}명
               </span>
             )}
           </div>

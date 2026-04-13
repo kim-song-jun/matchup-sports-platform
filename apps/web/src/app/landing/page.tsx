@@ -24,8 +24,8 @@ const SPORTS = [
 
 const SUB_FEATURES = [
   { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-blue-500' },
-  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-emerald-500' },
-  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-amber-500' },
+  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-blue-500' },
+  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-blue-500' },
 ];
 
 const STEPS = [
@@ -58,7 +58,7 @@ export default function LandingPage() {
       {/* ── Hero — 화이트 베이스, 텍스트 중심 ── */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
         <div className="max-w-[1100px] mx-auto px-5">
-          <div className="max-w-[680px] mx-auto text-center">
+          <div className="max-w-[680px] mx-auto text-center break-keep">
             {/* Badge */}
             <ScrollReveal delay={0}>
               <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
@@ -194,11 +194,11 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="space-y-2.5">
-                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>실력 매칭</span><span className="text-blue-400 font-semibold">94%</span></div><div className="h-1.5 rounded-full bg-white dark:bg-gray-800/5"><div className="h-full rounded-full bg-blue-500 w-[94%]" /></div></div>
-                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>매너 점수</span><span className="text-green-400 font-semibold">98%</span></div><div className="h-1.5 rounded-full bg-white dark:bg-gray-800/5"><div className="h-full rounded-full bg-green-500 w-[98%]" /></div></div>
-                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>거리</span><span className="text-amber-400 font-semibold">2.1km</span></div><div className="h-1.5 rounded-full bg-white dark:bg-gray-800/5"><div className="h-full rounded-full bg-amber-500 w-[85%]" /></div></div>
+                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>실력 매칭</span><span className="text-blue-400 font-semibold">94%</span></div><div className="h-1.5 rounded-full bg-gray-700"><div className="h-full rounded-full bg-blue-500 w-[94%]" /></div></div>
+                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>매너 점수</span><span className="text-blue-400 font-semibold">98%</span></div><div className="h-1.5 rounded-full bg-gray-700"><div className="h-full rounded-full bg-blue-500 w-[98%]" /></div></div>
+                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>거리</span><span className="text-blue-400 font-semibold">2.1km</span></div><div className="h-1.5 rounded-full bg-gray-700"><div className="h-full rounded-full bg-blue-500 w-[85%]" /></div></div>
                   </div>
-                  <div className="mt-4 text-center text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg py-2">매칭 적합도 96%</div>
+                  <div className="mt-4 text-center text-xs font-bold text-blue-300 bg-blue-500/10 rounded-lg py-2 pointer-events-none select-none" aria-hidden="true">매칭 적합도 96%</div>
                 </div>
               </div>
             </div>
@@ -388,7 +388,7 @@ export default function LandingPage() {
       {/* ── Final CTA ── */}
       <section className="relative overflow-hidden bg-gray-900 dark:bg-black">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.12),transparent_60%)]" />
-        <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center">
+        <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center break-keep">
           <ScrollReveal>
             <p className="text-base text-blue-400 font-semibold mb-4">가입은 3초, 첫 매칭은 무료</p>
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-6 tracking-tight leading-tight">

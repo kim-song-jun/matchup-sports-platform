@@ -169,7 +169,7 @@
   "marketplace": {
     "title": "Marketplace",
     "createListing": "List Item",
-    "searchPlaceholder": "Search items, sports",
+    "searchPlaceholder": "Search by item, brand, or sport",
     "categoryAll": "All",
     "categoryFutsalShoes": "Futsal Shoes",
     "categoryHockeyGear": "Hockey Gear",
@@ -182,8 +182,10 @@
     "conditionGood": "Good",
     "conditionFair": "Fair",
     "conditionPoor": "Poor",
+    "typeAll": "All",
     "typeRent": "Rent",
     "typeSell": "For Sale",
+    "typeGroupBuy": "Group Buy",
     "other": "Other",
     "locationUndecided": "Location TBD",
     "likes": "Likes {count}",
@@ -241,6 +243,7 @@
     "calendarView": "Calendar View",
     "findMatch": "Find Match",
     "findMatchLink": "Find a Match",
+    "viewAll": "View All",
     "matchCount": "{count} matches"
   },
   "notifications": {

@@ -9,14 +9,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { SportIconMap } from '@/components/icons/sport-icons';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import dynamic from 'next/dynamic';
 const EditProfileModal = dynamic(() => import('@/components/profile/edit-profile-modal').then(m => ({ default: m.EditProfileModal })), { ssr: false });
 import { useMyMatches, useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
 import type { SportProfile, Match } from '@/types/api';
 
-import { sportLabel, levelLabel } from '@/lib/constants';
+import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 
 type QuickAction = { href: string; label: string };
 type MenuItem = { label: string; icon: React.ElementType; href: string; quickAction?: QuickAction };
@@ -90,7 +89,6 @@ export default function ProfilePage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <MobileGlassHeader
         title={t('title')}
-        subtitle={t('subtitle')}
         actions={(
           <Link
             href="/settings"
@@ -131,7 +129,7 @@ export default function ProfilePage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
+                    <h2 className="truncate text-xl font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
                     {user.bio && <p className="mt-0.5 text-sm text-gray-500">{user.bio}</p>}
                     <div className="mt-1 flex items-center gap-2">
                       <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400">
@@ -152,22 +150,22 @@ export default function ProfilePage() {
             {user.sportProfiles && user.sportProfiles.length > 0 && (
               <div className="mt-4 space-y-2">
                 {user.sportProfiles.map((sp: SportProfile) => {
-                  const SportIcon = SportIconMap[sp.sportType];
+                  const accent = sportCardAccent[sp.sportType] ?? sportCardAccent['soccer'];
                   return (
                     <div key={sp.id} className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-700/60">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          {SportIcon && <SportIcon size={15} className="shrink-0 text-gray-500" />}
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${accent.dot}`} aria-hidden="true" />
                           <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{sportLabel[sp.sportType]}</span>
-                          <span className="rounded-md bg-white px-1.5 py-0.5 text-2xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
                             {levelLabel[sp.level]}
                           </span>
                         </div>
-                        <span className="shrink-0 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        <span className="shrink-0 tabular-nums text-xs text-gray-400 dark:text-gray-500">
                           ELO {sp.eloRating}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-1 text-2xs text-gray-400 dark:text-gray-500">
                         {t('matchRecord', { matchCount: sp.matchCount, winCount: sp.winCount })}
                       </p>
                     </div>
@@ -178,17 +176,17 @@ export default function ProfilePage() {
 
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/40">
               <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-700">
-                <div className="px-3 py-3 text-center">
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                  <p className="mt-1 text-xs text-gray-500">{t('totalMatches')}</p>
+                <div className="flex-1 px-3 py-3 text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
+                  <p className="mt-1 text-2xs font-medium text-gray-400">{t('totalMatches')}</p>
                 </div>
-                <div className="px-3 py-3 text-center">
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                  <p className="mt-1 text-xs text-gray-500">{t('mannerScore')}</p>
+                <div className="flex-1 px-3 py-3 text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
+                  <p className="mt-1 text-2xs font-medium text-gray-400">{t('mannerScore')}</p>
                 </div>
-                <div className="px-3 py-3 text-center">
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
-                  <p className="mt-1 text-xs text-gray-500">{t('sports')}</p>
+                <div className="flex-1 px-3 py-3 text-center">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
+                  <p className="mt-1 text-2xs font-medium text-gray-400">{t('sports')}</p>
                 </div>
               </div>
             </div>
@@ -343,32 +341,31 @@ function UpcomingSchedule() {
   return (
     <div className="mt-4 @3xl:mt-0">
       <div className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{t('upcomingScheduleDesc')}</p>
-          </div>
-          <div className="flex items-center gap-1" role="tablist">
-            <button
-              role="tab"
-              aria-selected={view === 'list'}
-              onClick={() => setView('list')}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              aria-label={t('listView')}
-            >
-              <List size={16} />
-            </button>
-            <button
-              role="tab"
-              aria-selected={view === 'calendar'}
-              onClick={() => setView('calendar')}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-              aria-label={t('calendarView')}
-            >
-              <CalendarDays size={16} />
-            </button>
-            <Link href="/matches" className="ml-2 text-sm font-semibold text-blue-500">{t('findMatchLink')}</Link>
-          </div>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
+          <Link href="/my/matches" className="whitespace-nowrap text-sm font-semibold text-blue-500">
+            {t('viewAll')} &gt;
+          </Link>
+        </div>
+        <div className="mb-3 flex items-center gap-1" role="tablist">
+          <button
+            role="tab"
+            aria-selected={view === 'list'}
+            onClick={() => setView('list')}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+            aria-label={t('listView')}
+          >
+            <List size={15} />
+          </button>
+          <button
+            role="tab"
+            aria-selected={view === 'calendar'}
+            onClick={() => setView('calendar')}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+            aria-label={t('calendarView')}
+          >
+            <CalendarDays size={15} />
+          </button>
         </div>
 
         {view === 'calendar' ? (
@@ -379,6 +376,7 @@ function UpcomingSchedule() {
             title={te('noSchedule')}
             description={te('noScheduleDesc')}
             action={{ label: t('findMatch'), href: '/matches' }}
+            actionVariant="solid"
             size="sm"
           />
         ) : (

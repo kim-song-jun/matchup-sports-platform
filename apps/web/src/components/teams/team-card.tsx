@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { MapPin } from 'lucide-react';
+import { MapPin, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -31,57 +31,57 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
         padding="none"
         interactive
         className={cn(
-          'flex h-24 overflow-hidden transition-[transform] duration-150 active:scale-[0.98]',
+          'flex overflow-hidden transition-[transform] duration-150 active:scale-[0.98]',
           className,
         )}
       >
-        {/* Square cover image */}
-        <div className="relative w-24 shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
+        {/* Cover image — 80×80 rounded */}
+        <div className="relative m-3 h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={teamCoverImage}
             fallbackSrc={fallbackTeamCoverImage}
             alt={team.name}
             fill
             className="object-cover"
-            sizes="96px"
+            sizes="80px"
           />
-          <div className="absolute bottom-1.5 left-1.5 rounded-xl bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.08)] dark:bg-gray-800">
-            <div className="relative h-7 w-7">
+          <div className="absolute bottom-1 left-1 rounded-lg bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-gray-800">
+            <div className="relative h-6 w-6">
               <SafeImage
                 src={teamLogo}
                 fallbackSrc={fallbackTeamLogo}
                 alt={`${team.name} logo`}
                 fill
-                className="rounded-lg object-cover"
-                sizes="28px"
+                className="rounded-md object-cover"
+                sizes="24px"
               />
             </div>
           </div>
         </div>
 
         {/* Text content */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center bg-white px-3.5 py-3 dark:bg-gray-800">
+        <div className="flex min-w-0 flex-1 flex-col justify-center bg-white py-3 pr-3.5 dark:bg-gray-800">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{team.name}</h3>
+            <h3 className="truncate text-base font-bold text-gray-900 dark:text-gray-100">{team.name}</h3>
             {team.isRecruiting && (
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+              <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                 {t('recruiting')}
               </span>
             )}
           </div>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
             <span
-              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}
+              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}
             >
               {sportLabel[team.sportType] || team.sportType}
             </span>
-            <span>{tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}</span>
-          </p>
-          {team.description && (
-            <p className="mt-1 line-clamp-1 text-xs text-gray-500">{team.description}</p>
-          )}
+            <span className="flex items-center gap-0.5 text-xs text-gray-500">
+              <Users size={10} aria-hidden="true" />
+              {tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}
+            </span>
+          </div>
           {team.city && (
-            <p className="mt-0.5 flex items-center gap-0.5 text-2xs text-gray-500">
+            <p className="mt-1 flex items-center gap-0.5 text-xs text-gray-400 dark:text-gray-500">
               <MapPin size={10} className="shrink-0" aria-hidden="true" />
               {team.city} {team.district}
             </p>

@@ -47,6 +47,7 @@ export default function MatchDetailPage() {
   const [pendingParticipantId, setPendingParticipantId] = useState<string | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -325,15 +326,22 @@ export default function MatchDetailPage() {
                 aria-label={`${match.title} 대표 이미지 보기`}
                 className="relative h-[220px] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
               >
-                <SafeImage
-                  src={heroImage}
-                  fallbackSrc={heroFallbackImage}
-                  alt={match.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 60vw"
-                  priority
-                />
+                {heroImageFailed ? (
+                  <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-700">
+                    {SportIcon && <SportIcon size={48} className="text-gray-400 dark:text-gray-500" aria-hidden="true" />}
+                  </div>
+                ) : (
+                  <SafeImage
+                    src={heroImage}
+                    fallbackSrc={heroFallbackImage}
+                    alt={match.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 60vw"
+                    priority
+                    onError={() => setHeroImageFailed(true)}
+                  />
+                )}
               </button>
               {matchImages.length > 1 && (
                 <div className="mt-2 grid grid-cols-3 gap-2">
@@ -360,70 +368,73 @@ export default function MatchDetailPage() {
             </div>
           )}
 
-          {/* Title card */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 @3xl:p-6">
-            <div className="flex items-start gap-3">
-              {SportIcon && (
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
-                  <SportIcon size={24} />
-                </div>
-              )}
-              <div>
-                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}>{sportLabel[match.sportType]}</span>
-                <h2 data-testid="match-detail-title" className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
-                  {match.title}
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  호스트: {match.host?.nickname}
-                  <Star size={12} className="inline ml-1 text-amber-400" fill="currentColor" />
-                  <span className="ml-0.5">{match.host?.mannerScore?.toFixed(1)}</span>
-                </p>
-              </div>
-            </div>
-
-            {match.description && (
-              <p className="mt-4 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{match.description}</p>
-            )}
-          </div>
-
-          {/* Info grid */}
-          <div className="mt-4 grid grid-cols-2 gap-3 @3xl:gap-5">
-            <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
-            <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
-            <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={capacitySubLabel} highlight={isAlmostFull && isRecruitingOpen} />
-            <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatAmount(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
-          </div>
-
-          {/* Venue card */}
-          {match.venue && (
-            <div className="mt-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">시설 정보</h3>
-              <div className="flex items-center gap-3">
-                {venuePreviewImage && (
-                  <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                    <SafeImage
-                      src={venuePreviewImage}
-                      fallbackSrc={fallbackVenuePreviewImage}
-                      alt={match.venue.name}
-                      fill
-                      className="object-cover"
-                      sizes="64px"
-                    />
+          {/* Match info panel — single outer border, internal dividers replace per-card borders */}
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            {/* Title section */}
+            <div className="p-5 @3xl:p-6">
+              <div className="flex items-start gap-3">
+                {SportIcon && (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                    <SportIcon size={24} />
                   </div>
                 )}
                 <div>
-                  <p className="text-base font-medium text-gray-800 dark:text-gray-200">{match.venue.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{match.venue.address}</p>
-                  {(match.venue.rating ?? 0) > 0 && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Star size={12} className="text-amber-400" fill="currentColor" />
-                      <span className="text-xs text-gray-600 dark:text-gray-300">{(match.venue.rating ?? 0).toFixed(1)}</span>
-                    </div>
-                  )}
+                  <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-2xs font-normal`}>{sportLabel[match.sportType]}</span>
+                  <h2 data-testid="match-detail-title" className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
+                    {match.title}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    호스트: {match.host?.nickname}
+                    <Star size={12} className="inline ml-1 text-amber-400" fill="currentColor" aria-hidden="true" />
+                    <span className="ml-0.5">{match.host?.mannerScore?.toFixed(1)}</span>
+                  </p>
                 </div>
               </div>
+
+              {match.description && (
+                <p className="mt-4 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{match.description}</p>
+              )}
             </div>
-          )}
+
+            {/* Info grid */}
+            <div className="border-t border-gray-100 dark:border-gray-700 p-4 @3xl:p-6 grid grid-cols-2 gap-3 @3xl:gap-5">
+              <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
+              <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
+              <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={capacitySubLabel} highlight={isAlmostFull && isRecruitingOpen} />
+              <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatAmount(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
+            </div>
+
+            {/* Venue section */}
+            {match.venue && (
+              <div className="border-t border-gray-100 dark:border-gray-700 p-4 @3xl:p-6">
+                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">시설 정보</h3>
+                <div className="flex items-center gap-3">
+                  {venuePreviewImage && (
+                    <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                      <SafeImage
+                        src={venuePreviewImage}
+                        fallbackSrc={fallbackVenuePreviewImage}
+                        alt={match.venue.name}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-base font-medium text-gray-800 dark:text-gray-200">{match.venue.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{match.venue.address}</p>
+                    {(match.venue.rating ?? 0) > 0 && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star size={12} className="text-amber-400" fill="currentColor" aria-hidden="true" />
+                        <span className="text-xs text-gray-600 dark:text-gray-300">{(match.venue.rating ?? 0).toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right sidebar: participants + action */}
@@ -433,8 +444,8 @@ export default function MatchDetailPage() {
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-500">참가 현황</span>
-              <span data-testid="match-participant-count" className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
+              <span className="text-xs font-medium text-gray-400">참가 현황</span>
+              <span data-testid="match-participant-count" className={`text-base font-bold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
                 {match.currentPlayers}/{match.maxPlayers}명
               </span>
             </div>
@@ -442,7 +453,7 @@ export default function MatchDetailPage() {
               <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
             <div className="mb-4 flex items-center justify-between rounded-2xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
-              <span className="text-sm text-gray-500">매치 상태</span>
+              <span className="text-xs font-medium text-gray-400">매치 상태</span>
               <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-2xs font-medium ${statusBadgeClass}`}>
                 {statusLabel}
               </span>
@@ -581,16 +592,19 @@ export default function MatchDetailPage() {
                 onClick={() => joinMutation.mutate({ openCheckout: match.fee > 0 })}
                 disabled={joinMutation.isPending}
                 data-testid="match-join-button"
-                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-semibold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
               >
                 {joinMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     처리 중...
                   </span>
-                ) : (
-                  `${match.fee > 0 ? '참가 후 결제하기' : '참가하기'} · ${formatAmount(match.fee)}`
-                )}
+                ) : match.fee > 0 ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    참가 후 결제하기
+                    <span className="opacity-75 text-sm font-medium">· {formatAmount(match.fee)}</span>
+                  </span>
+                ) : '참가하기'}
               </button>
             )}
 
@@ -607,29 +621,29 @@ export default function MatchDetailPage() {
                 const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(match.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(match.venue?.name || '')}&details=${encodeURIComponent(match.description || '')}`;
                 window.open(url, '_blank');
               }}
-              className="w-full mt-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
+              className="w-full mt-2 rounded-xl border border-gray-100 dark:border-gray-700 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-center gap-1.5"
             >
-              <Calendar size={14} />
+              <Calendar size={13} aria-hidden="true" />
               캘린더에 추가
             </button>
           </div>
 
           {/* Participants */}
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
-            <div className="space-y-2.5">
+            <div className="divide-y divide-gray-50 dark:divide-gray-700/60">
               {match.participants?.map((p: MatchParticipant) => (
-                <div key={p.id} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
+                <div key={p.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
                     {p.user?.nickname?.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate flex items-center gap-1.5">
                       {p.user?.nickname}
                       {p.userId === match.hostId && (
-                        <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
+                        <span className="rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-medium text-blue-500 dark:text-blue-400">호스트</span>
                       )}
                     </p>
                   </div>
@@ -637,8 +651,10 @@ export default function MatchDetailPage() {
                     {p.arrivedAt && (
                       <CheckCircle2 size={14} className="text-green-500" aria-label="도착 완료" />
                     )}
-                    <span className={`text-2xs font-medium rounded-full px-2 py-0.5 ${
-                      p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
+                    <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${
+                      p.status === 'confirmed'
+                        ? 'bg-blue-500 text-white'
+                        : 'border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500'
                     }`}>
                       {p.status === 'confirmed' ? '확정' : '대기'}
                     </span>
@@ -879,7 +895,7 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
+    <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
         <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>

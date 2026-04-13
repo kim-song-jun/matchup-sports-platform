@@ -43,7 +43,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
         interactive
         className="group overflow-hidden transition-[border-color,transform] duration-150 hover:border-gray-200 active:scale-[0.98] dark:hover:border-gray-700"
       >
-        <div className="relative aspect-[16/9] max-h-[180px] overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <div className="relative aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={matchImage}
             fallbackSrc={fallbackMatchImage}
@@ -52,35 +52,35 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 768px) 100vw, 50vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
 
           <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} aria-hidden="true" />
-            <span className="text-2xs font-semibold text-white/90">{sportLabel[match.sportType]}</span>
+            <span className="text-2xs font-semibold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{sportLabel[match.sportType]}</span>
             {timeBadge && (
-              <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-bold leading-none text-white">
+              <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 {timeBadge.text}
               </span>
             )}
           </div>
 
           <div className="absolute bottom-3 left-3.5">
-            <span className="text-sm font-bold text-white">{formatCurrency(match.fee)}</span>
+            <span className="text-[13px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{formatCurrency(match.fee)}</span>
           </div>
 
           <div className="absolute bottom-3 right-3">
             {isFull ? (
-              <span className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-bold leading-none text-white/70">
+              <span className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-bold leading-none text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 마감
               </span>
             ) : isAlmostFull ? (
-              <span className="rounded-md bg-amber-600/80 px-2 py-1 text-2xs font-bold leading-none text-white">
+              <span className="rounded-md bg-amber-600/80 px-2 py-1 text-2xs font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 <Clock size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (
               <span
-                className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-semibold leading-none text-white/80"
+                className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-semibold leading-none text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
                 aria-label={`참가 ${match.currentPlayers}명, 최대 ${match.maxPlayers}명`}
               >
                 <Users size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
@@ -90,8 +90,8 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
           </div>
         </div>
 
-        <div className="space-y-2 px-3.5 py-3.5">
-          <h3 className="truncate text-sm font-semibold leading-snug text-gray-900 dark:text-gray-100">
+        <div className="space-y-2 px-3.5 py-3">
+          <h3 className="truncate text-[15px] font-semibold leading-snug text-gray-900 dark:text-gray-100">
             {match.title}
           </h3>
 

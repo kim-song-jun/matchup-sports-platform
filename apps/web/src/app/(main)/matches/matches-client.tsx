@@ -190,15 +190,7 @@ export function MatchesPage() {
           </Link>
         )}
       >
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            data-testid="match-clear-filters"
-            className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            {t('clearFilters')}
-          </button>
+        <div className="flex items-center justify-end gap-2">
           <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
             <button
               type="button"
@@ -230,10 +222,10 @@ export function MatchesPage() {
         </div>
       </MobilePageTopZone>
 
-      <div className="mb-3 px-5 @3xl:px-0" data-testid="match-filter-bar">
+      <div className="mb-2 px-5 @3xl:px-0" data-testid="match-filter-bar">
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
             <label htmlFor="match-search-input" className="sr-only">매치 검색</label>
             <Input
               id="match-search-input"
@@ -242,16 +234,16 @@ export function MatchesPage() {
               placeholder={t('searchPlaceholder')}
               data-testid="match-search-input"
               onChange={(event) => setSearchInput(event.target.value)}
-              className="py-3 pl-10 pr-11 text-base"
+              className="h-9 rounded-lg py-0 pl-9 pr-10 text-sm"
             />
             {searchInput && (
               <button
                 type="button"
                 aria-label={t('clearSearch')}
                 onClick={() => setSearchInput('')}
-                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
-                <X size={14} />
+                <X size={13} />
               </button>
             )}
           </div>
@@ -261,15 +253,15 @@ export function MatchesPage() {
             aria-pressed={showFilters}
             data-testid="match-filter-toggle"
             onClick={() => setShowFilters((prev) => !prev)}
-            className={`relative flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${
+            className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
               showFilters
                 ? 'bg-blue-500 text-white'
-                : 'border border-gray-100 bg-white text-gray-500 active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
+                : 'border border-gray-200 bg-white text-gray-500 active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
             }`}
           >
-            <SlidersHorizontal size={16} />
+            <SlidersHorizontal size={15} />
             {activeFilterCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-1 text-2xs font-bold text-white dark:bg-white dark:text-gray-900">
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-900 px-0.5 text-2xs font-bold text-white dark:bg-white dark:text-gray-900">
                 {activeFilterCount}
               </span>
             )}
@@ -277,7 +269,7 @@ export function MatchesPage() {
         </div>
       </div>
 
-      <div className="mb-3 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide @3xl:px-0">
+      <div className="mb-2 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide @3xl:px-0">
         {SPORT_FILTERS.map((filter) => {
           const isActive = draftFilters.sport === filter.key;
           const testId = filter.key ? `match-sport-${filter.key}` : 'match-sport-all';
@@ -289,10 +281,10 @@ export function MatchesPage() {
               data-testid={testId}
               aria-pressed={isActive}
               onClick={() => updateFilters({ sport: isActive ? '' : filter.key })}
-              className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}
             >
               {filter.key ? ts(filter.translationKey) : ts('all')}
@@ -307,10 +299,10 @@ export function MatchesPage() {
           data-testid="match-quick-today"
           aria-pressed={draftFilters.date === today}
           onClick={() => updateFilters({ date: draftFilters.date === today ? '' : today })}
-          className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.date === today
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
+              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
           }`}
         >
           {t('today')}
@@ -320,10 +312,10 @@ export function MatchesPage() {
           data-testid="match-quick-free"
           aria-pressed={draftFilters.fee === 'free'}
           onClick={() => updateFilters({ fee: draftFilters.fee === 'free' ? 'all' : 'free' })}
-          className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.fee === 'free'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
+              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
           }`}
         >
           {t('free')}
@@ -333,10 +325,10 @@ export function MatchesPage() {
           data-testid="match-quick-beginner"
           aria-pressed={draftFilters.level === 'beginner'}
           onClick={() => updateFilters({ level: draftFilters.level === 'beginner' ? 'all' : 'beginner' })}
-          className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.level === 'beginner'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
+              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
           }`}
         >
           {t('beginner')}
@@ -346,15 +338,26 @@ export function MatchesPage() {
           data-testid="match-quick-available"
           aria-pressed={draftFilters.available}
           onClick={() => updateFilters({ available: !draftFilters.available })}
-          className={`inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`inline-flex shrink-0 min-h-[36px] items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.available
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
+              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
           }`}
         >
-          <Sparkles size={14} />
+          <Sparkles size={13} aria-hidden="true" />
           {t('availableOnly')}
         </button>
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            data-testid="match-clear-filters"
+            onClick={handleClearFilters}
+            className="inline-flex shrink-0 min-h-[36px] items-center gap-1 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
+          >
+            <X size={13} aria-hidden="true" />
+            {t('clearFilters')}
+          </button>
+        )}
       </div>
 
       {activeSummary.length > 0 && (

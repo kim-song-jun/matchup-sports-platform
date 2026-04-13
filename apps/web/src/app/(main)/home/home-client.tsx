@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { Plus, ArrowRight, Calendar, Swords, GraduationCap, UserPlus, MapPin } from 'lucide-react';
+import {
+  Plus, ArrowRight, Calendar, Swords, GraduationCap, UserPlus, MapPin,
+  Search, Users, ShoppingBag, ChevronRight,
+} from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -51,6 +54,33 @@ const banners = [
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
+// Quick action grid items — always visible, answers "what does this app do?"
+const quickActions = [
+  {
+    href: '/matches',
+    icon: Search,
+    label: '매치 찾기',
+    desc: '오늘 바로 참가하세요',
+  },
+  {
+    href: '/team-matches',
+    icon: Users,
+    label: '팀 매칭',
+    desc: '상대팀을 AI로 추천',
+  },
+  {
+    href: '/mercenary',
+    icon: UserPlus,
+    label: '용병 모집',
+    desc: '빈 자리 채우기',
+  },
+  {
+    href: '/marketplace',
+    icon: ShoppingBag,
+    label: '장터',
+    desc: '장비 사고팔기',
+  },
+];
 
 export function HomePage() {
   const user = useAuthStore((s) => s.user);
@@ -82,12 +112,18 @@ export function HomePage() {
     activeSport === 'all' ? allMatches : allMatches.filter((m: Match) => m.sportType === activeSport),
   [allMatches, activeSport]);
 
+  // Upcoming schedule: next 3 days, max 3 items
   const upcoming = useMemo(() =>
     allMatches.filter((m: Match) => {
       const diff = Math.ceil((new Date(m.matchDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       return diff >= 0 && diff <= 3;
-    }).slice(0, 4),
+    }).slice(0, 3),
   [allMatches]);
+
+  // AI recommended matches: first 3 from allMatches (separate from filtered list).
+  // These are always the top 3 regardless of sport filter. ZONE 2 list offsets by 3
+  // when unfiltered so the same cards don't appear twice in a row.
+  const recommendedMatches = useMemo(() => allMatches.slice(0, 3), [allMatches]);
 
   const handleSportClick = useCallback((type: string) => {
     setActiveSport(prev => prev === type ? 'all' : type);
@@ -108,10 +144,16 @@ export function HomePage() {
     return () => clearInterval(t);
   }, [bannerPaused, prefersReducedMotion]);
 
+  // Today's date string for hero
+  const todayLabel = useMemo(() => {
+    const d = new Date();
+    return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
+  }, []);
+
   return (
     <div className="pt-[var(--safe-area-top)]">
 
-      {/* ═══ ZONE 1: 헤더 (토스 스타일 — 큰 인사, 부제, CTA) ═══ */}
+      {/* ═══ ZONE 1: 헤더 — 큰 인사, 날짜, CTA ═══ */}
       <header className="px-5 @3xl:px-0 pt-4 pb-2">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
@@ -123,37 +165,81 @@ export function HomePage() {
             )
           ) : 'TeamMeet'}
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {canRenderAuthenticated
-            ? upcoming.length > 0 ? `${t('upcomingSchedule')} ${t('upcomingCount', { count: upcoming.length })}` : t('findMatchToday')
-            : t('findPartner')}
-        </p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">{todayLabel}</p>
         <div className="mt-3">
           {canRenderAuthenticated ? (
-            <Link href="/matches/new" className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
-              <Plus size={16} strokeWidth={2.5} className="mr-1" aria-hidden="true" />
+            <Link
+              href="/matches/new"
+              className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-600"
+            >
+              <Plus size={16} strokeWidth={2.5} aria-hidden="true" />
               {t('createMatch')}
+              <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
             </Link>
           ) : (
-            <Link href="/login" className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
+            <Link
+              href="/login"
+              className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-600"
+            >
               {tc('login')}
+              <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
             </Link>
           )}
         </div>
       </header>
 
-      {/* 다가오는 일정 — 토스 스타일 컴팩트 리스트 */}
+      {/* ═══ 빠른 액션 그리드 — 서비스 핵심 기능 2×2 ═══ */}
+      <section className="mt-8 px-5 @3xl:px-0">
+        <div className="grid grid-cols-2 gap-3">
+          {quickActions.map(({ href, icon: Icon, label, desc }) => (
+            <Link key={href} href={href}>
+              <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/80 active:scale-[0.97] transition-[colors,transform] h-full">
+                <div className="inline-flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30 p-2.5 text-blue-500 dark:text-blue-400">
+                  <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                </div>
+                <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white tracking-tight">{label}</p>
+                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══ 다가오는 일정 — 로그인 유저 전용, 최대 3개 ═══ */}
       {canRenderAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
-        <section className="mt-10 px-5 @3xl:px-0">
+        <section className="mt-8 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{t('upcomingSchedule')}</h2>
               <Link href="/my/matches" className="text-sm text-blue-500 font-medium min-h-[44px] flex items-center">{t('viewAll')}</Link>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-700">
-              {upcoming.map((m: Match) => {
+              {upcoming.map((m: Match, idx) => {
                 const d = new Date(m.matchDate);
-                return (
+                const accent = sportCardAccent[m.sportType];
+                const isFirst = idx === 0;
+                return isFirst ? (
+                  // 첫 번째(가장 가까운) 일정 — 하이라이트 카드
+                  <Link key={m.id} href={`/matches/${m.id}`}>
+                    <div className="flex items-center gap-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 px-3 py-3 mb-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 active:scale-[0.98] transition-colors">
+                      <div className="flex flex-col items-center justify-center w-10 shrink-0">
+                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{d.getMonth()+1}/{d.getDate()}</span>
+                        <span className="text-2xs text-blue-400 dark:text-blue-500">{weekdays[d.getDay()]}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{m.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {accent && <span className={`h-2 w-2 rounded-full ${accent.dot}`} aria-hidden="true" />}
+                        <span className={`text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-amber-500' : 'text-blue-500'}`}>
+                          {m.currentPlayers}/{m.maxPlayers}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ) : (
+                  // 나머지 일정 — 컴팩트 리스트
                   <Link key={m.id} href={`/matches/${m.id}`}>
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
@@ -164,9 +250,12 @@ export function HomePage() {
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{m.title}</p>
                         <p className="text-xs text-gray-500">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
                       </div>
-                      <span className={`shrink-0 text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-amber-500' : 'text-gray-500'}`}>
-                        {m.currentPlayers}/{m.maxPlayers}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {accent && <span className={`h-2 w-2 rounded-full ${accent.dot}`} aria-hidden="true" />}
+                        <span className={`text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-amber-500' : 'text-gray-500'}`}>
+                          {m.currentPlayers}/{m.maxPlayers}
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 );
@@ -184,6 +273,7 @@ export function HomePage() {
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{tm.title}</p>
                         <p className="text-xs text-gray-500">{tm.startTime} · {t('teamMatch')}</p>
                       </div>
+                      <span className="h-2 w-2 rounded-full bg-blue-400 shrink-0" aria-hidden="true" />
                     </div>
                   </Link>
                 );
@@ -195,7 +285,7 @@ export function HomePage() {
 
       {/* 비로그인 가치 제안 — 토스 스타일 다크 패널 */}
       {!canRenderAuthenticated && (
-        <section className="mt-10 px-5 @3xl:px-0">
+        <section className="mt-8 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-900 dark:bg-gray-800 p-5">
             <p className="text-lg font-bold text-white tracking-tight">{t('aiMatchIntro')}</p>
             <p className="text-sm text-gray-400 mt-1.5 leading-relaxed">{t('valueProposition')}</p>
@@ -206,9 +296,26 @@ export function HomePage() {
         </section>
       )}
 
-      {/* 배너 (로그인 유저) — translateX 슬라이드 (배경 겹침 없음) */}
+      {/* ═══ AI 추천 매치 — 가로 스크롤 프리뷰 ═══ */}
+      {recommendedMatches.length > 0 && (
+        <section className="mt-8 px-5 @3xl:px-0">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">AI 추천 매치</h2>
+            <Link href="/matches" className="text-sm text-blue-500 font-medium min-h-[44px] flex items-center gap-0.5">
+              더보기 <ChevronRight size={14} aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-5 px-5 @3xl:mx-0 @3xl:px-0">
+            {recommendedMatches.map((m: Match, idx) => (
+              <RecommendedMatchCard key={m.id} match={m} priority={idx === 0} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 배너 (로그인 유저) — translateX 슬라이드 */}
       {canRenderAuthenticated && (
-        <section className="mt-10 px-5 @3xl:px-0">
+        <section className="mt-8 px-5 @3xl:px-0">
           <div
             className="relative h-32 overflow-hidden rounded-2xl"
             onMouseEnter={() => setBannerPaused(true)}
@@ -216,7 +323,7 @@ export function HomePage() {
             onFocus={() => setBannerPaused(true)}
             onBlur={() => setBannerPaused(false)}
           >
-            {/* 슬라이드 레일 — translateX로 배너 전환, 배경 겹침 없음 */}
+            {/* 슬라이드 레일 */}
             <div
               className="flex h-full transition-transform duration-500 ease-in-out"
               style={{
@@ -236,10 +343,8 @@ export function HomePage() {
                     aria-hidden={bannerIdx !== i}
                   >
                     <div className={`relative h-full ${banner.bg} px-5 py-5 flex items-center justify-between overflow-hidden`}>
-                      {/* 장식 원 — 배경에 입체감 부여 */}
-                      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
-                      <div className="absolute -right-2 top-10 w-14 h-14 rounded-full bg-white/5 pointer-events-none" />
-
+                      <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" aria-hidden="true" />
+                      <div className="absolute -right-2 top-10 w-14 h-14 rounded-full bg-white/5 pointer-events-none" aria-hidden="true" />
                       <div className="min-w-0 flex-1 relative z-10">
                         <p className={`text-base font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
                           {banner.title}
@@ -251,8 +356,6 @@ export function HomePage() {
                           {banner.cta} <ArrowRight size={12} aria-hidden="true" />
                         </div>
                       </div>
-
-                      {/* 이모지 — Apple/Android 렌더러가 3D 스타일로 표시 */}
                       <div className="shrink-0 ml-4 relative z-10 text-5xl leading-none select-none" aria-hidden="true">
                         {banner.emoji}
                       </div>
@@ -262,7 +365,7 @@ export function HomePage() {
               })}
             </div>
 
-            {/* 인디케이터 — 현재 배너 밝기에 따라 색상 분기 */}
+            {/* 인디케이터 */}
             <div className="absolute bottom-3 right-4 flex gap-1.5 z-20">
               {banners.map((_, i) => {
                 const activeDark = banners[bannerIdx].dark;
@@ -286,26 +389,7 @@ export function HomePage() {
         </section>
       )}
 
-      {/* 빠른 탐색 칩 — 토스 스타일 pill row */}
-      <section className="px-5 @3xl:px-0 mt-10">
-        <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">더 찾아보기</h2>
-        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
-          {[
-            { href: '/lessons', icon: GraduationCap, label: tn('lessons') },
-            { href: '/team-matches', icon: Swords, label: tn('teamMatching') },
-            { href: '/mercenary', icon: UserPlus, label: tn('mercenary') },
-            { href: '/venues', icon: MapPin, label: tn('venues') },
-          ].map(({ href, icon: Icon, label }) => (
-            <Link key={href} href={href}
-              className="flex shrink-0 items-center min-h-[44px] gap-2 rounded-xl border border-gray-100 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-              <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
-              {label}
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ═══ ZONE 2: 매치 탐색 (핵심 기능) ═══ */}
+      {/* ═══ ZONE 2: 매치 탐색 — 종목 필터 + 리스트 ═══ */}
       <section className="mt-10 px-5 @3xl:px-0">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
@@ -347,14 +431,14 @@ export function HomePage() {
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-            {filteredMatches.slice(0, 6).map((m: Match, idx) => <MatchCard key={m.id} match={m} priority={idx === 0} />)}
+            {(activeSport === 'all' ? filteredMatches.slice(3, 9) : filteredMatches.slice(0, 6)).map((m: Match, idx) => <MatchCard key={m.id} match={m} priority={idx === 0} />)}
           </div>
         )}
       </section>
 
-      {/* ═══ ZONE 3: 탐색 섹션 (팀 · 강좌 · 장터) — 토스 스타일 배경 구분 ═══ */}
+      {/* ═══ ZONE 3: 팀 · 강좌 · 장터 — 배경 구분 ═══ */}
       <div className="mt-10 bg-gray-50 dark:bg-gray-900/50 py-8">
-        {/* 팀 — 컴팩트 리스트 카드 */}
+        {/* 팀 */}
         {teams.length > 0 && (
           <section className="px-5 @3xl:px-0">
             <SectionHeader title={t('activeTeams')} href="/teams" showMore={teams.length > 3} moreLabel={t('viewMore')} />
@@ -385,36 +469,33 @@ export function HomePage() {
           </section>
         )}
 
-        {/* 강좌 — 컴팩트 리스트 카드 */}
+        {/* 강좌 */}
         {lessons.length > 0 && (
           <section className="mt-8 px-5 @3xl:px-0">
             <SectionHeader title={t('recommendedLessons')} href="/lessons" showMore={lessons.length > 3} moreLabel={t('viewMore')} />
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
-              {lessons.map((l: Lesson) => {
-                const accent = sportCardAccent[l.sportType];
-                return (
-                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{l.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">{sportLabel[l.sportType]}</p>
-                      <div className="flex items-center justify-between mt-3">
-                        {l.coachName && (
-                          <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-2xs font-bold text-gray-500">{l.coachName.charAt(0)}</span>
-                            {l.coachName} {t('coach')}
-                          </p>
-                        )}
-                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(l.fee)}</span>
-                      </div>
+              {lessons.map((l: Lesson) => (
+                <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
+                  <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{l.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">{sportLabel[l.sportType]}</p>
+                    <div className="flex items-center justify-between mt-3">
+                      {l.coachName && (
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-2xs font-bold text-gray-500">{l.coachName.charAt(0)}</span>
+                          {l.coachName} {t('coach')}
+                        </p>
+                      )}
+                      <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(l.fee)}</span>
                     </div>
-                  </Link>
-                );
-              })}
+                  </div>
+                </Link>
+              ))}
             </div>
           </section>
         )}
 
-        {/* 장터 — 이미지 그리드 (상품은 이미지가 핵심) */}
+        {/* 장터 */}
         {listings.length > 0 && (
           <section className="mt-8 px-5 @3xl:px-0">
             <SectionHeader title={t('latestMarketplace')} href="/marketplace" showMore={listings.length > 3} moreLabel={t('viewMore')} />
@@ -449,6 +530,8 @@ export function HomePage() {
     </div>
   );
 }
+
+// MatchCard — ZONE 2 리스트용 (이미지 + 정보 가로 배치)
 const MatchCard = React.memo(function MatchCard({ match, priority = false }: { match: Match; priority?: boolean }) {
   const filled = match.currentPlayers / match.maxPlayers;
   const isAlmostFull = filled >= 0.7;
@@ -479,7 +562,7 @@ const MatchCard = React.memo(function MatchCard({ match, priority = false }: { m
             <span className="absolute top-1.5 left-1.5 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
         </div>
-        {/* 정보 — 3줄: 제목 / 종목·날짜 / 인원·가격 */}
+        {/* 정보 */}
         <div className="flex-1 px-3.5 py-3 min-w-0 flex flex-col justify-center">
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate tracking-tight">
             {match.title}
@@ -500,6 +583,62 @@ const MatchCard = React.memo(function MatchCard({ match, priority = false }: { m
                 <span className="text-xs text-gray-500 dark:text-gray-400">{levelLabel[match.levelMin]}~{levelLabel[match.levelMax]}</span>
               </>
             )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+});
+
+// RecommendedMatchCard — AI 추천 섹션용 가로 스크롤 컴팩트 카드
+const RecommendedMatchCard = React.memo(function RecommendedMatchCard({ match, priority = false }: { match: Match; priority?: boolean }) {
+  const filled = match.currentPlayers / match.maxPlayers;
+  const isAlmostFull = filled >= 0.7;
+  const accent = sportCardAccent[match.sportType];
+  const timeBadge = getTimeBadge(match.matchDate);
+  const matchImage = getSportDetailImageSet(
+    match.sportType,
+    [match.imageUrl, ...(match.venue?.imageUrls ?? [])],
+    match.id,
+    1,
+  )[0];
+  const fallbackMatchImage = getSportDetailImageSet(match.sportType, undefined, match.id, 1)[0];
+
+  return (
+    <Link href={`/matches/${match.id}`} className="shrink-0 w-[260px]">
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.97] transition-[colors,transform]">
+        {/* 썸네일 이미지 */}
+        <div className="relative h-[120px] bg-gray-100 dark:bg-gray-700 overflow-hidden">
+          <SafeImage
+            src={matchImage}
+            fallbackSrc={fallbackMatchImage}
+            alt={match.title}
+            fill
+            className="object-cover"
+            sizes="260px"
+            priority={priority}
+          />
+          {timeBadge && (
+            <span className="absolute top-2 left-2 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
+          )}
+          {accent && (
+            <span className={`absolute top-2 right-2 text-xs font-semibold rounded-full px-2 py-0.5 ${accent.badge}`}>
+              {sportLabel[match.sportType]}
+            </span>
+          )}
+        </div>
+        {/* 정보 */}
+        <div className="px-3 pt-2.5 pb-3">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{match.title}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+            {formatMatchDate(match.matchDate)} {match.startTime}
+            {match.venue?.name && ` · ${match.venue.name}`}
+          </p>
+          <div className="flex items-center justify-between mt-2">
+            <span className={`text-xs font-medium ${isAlmostFull ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`}>
+              {match.currentPlayers}/{match.maxPlayers}명
+            </span>
+            <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(match.fee)}</span>
           </div>
         </div>
       </div>

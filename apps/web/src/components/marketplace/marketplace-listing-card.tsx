@@ -68,7 +68,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
           {/* 하단: 타입 + 통계 */}
           <div className="flex items-center justify-between mt-auto pt-1">
             <span className="rounded-full px-2 py-0.5 text-2xs font-normal bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-              {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
+              {item.listingType === 'rent' ? t('typeRent') : item.listingType === 'group_buy' ? t('typeGroupBuy') : t('typeSell')}
             </span>
             <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <span className="flex items-center gap-0.5">

@@ -169,7 +169,7 @@
   "marketplace": {
     "title": "장터",
     "createListing": "상품 등록하기",
-    "searchPlaceholder": "상품명, 종목 검색",
+    "searchPlaceholder": "상품명, 브랜드, 종목으로 검색",
     "categoryAll": "전체",
     "categoryFutsalShoes": "풋살화",
     "categoryHockeyGear": "하키장비",
@@ -182,8 +182,10 @@
     "conditionGood": "양호",
     "conditionFair": "사용감",
     "conditionPoor": "하자",
+    "typeAll": "전체",
     "typeRent": "대여",
     "typeSell": "판매",
+    "typeGroupBuy": "공동구매",
     "other": "기타",
     "locationUndecided": "지역 미정",
     "likes": "관심 {count}",
@@ -241,6 +243,7 @@
     "calendarView": "캘린더 보기",
     "findMatch": "매치 찾기",
     "findMatchLink": "매칭 찾기",
+    "viewAll": "전체 보기",
     "matchCount": "{count}매치"
   },
   "notifications": {

@@ -14,8 +14,10 @@ import {
   Instagram,
   MapPin,
   MessageCircle,
+  MessageSquare,
   Package,
   Share2,
+  ShoppingBag,
   Star,
   Ticket,
   Trophy,
@@ -535,9 +537,9 @@ export default function TeamDetailPage() {
                   </>
                 ) : isAuthenticated ? (
                   <>
-                    <div className="text-center mb-3">
-                      <span className="inline-block text-2xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-full px-2 py-0.5 mb-1">팀원 모집중</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">아래 버튼으로 가입 신청해보세요</p>
+                    <div className="rounded-2xl bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 p-4 mb-3 text-center">
+                      <span className="inline-block bg-blue-500 text-white rounded-full px-3 py-1 text-sm font-medium mb-2">팀원 모집중</span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">아래 버튼으로 가입 신청해보세요</p>
                     </div>
                     <Button
                       onClick={async () => {
@@ -549,7 +551,9 @@ export default function TeamDetailPage() {
                         }
                       }}
                       fullWidth
+                      className="justify-center gap-2"
                     >
+                      <UserPlus size={16} aria-hidden="true" />
                       팀 가입 신청
                     </Button>
                   </>
@@ -560,7 +564,7 @@ export default function TeamDetailPage() {
                 )}
 
                 <Button onClick={handleContact} variant="subtle" fullWidth className="justify-center gap-2">
-                  <MessageCircle size={17} aria-hidden="true" />
+                  <MessageSquare size={16} aria-hidden="true" />
                   연락하기
                 </Button>
               </Card>
@@ -569,8 +573,8 @@ export default function TeamDetailPage() {
             {/* 용병 모집 중 카드 */}
             <Card padding="sm">
               <Link href={`/mercenary?teamId=${teamId}`} className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700">
-                  <UserPlus size={18} className="text-gray-500 dark:text-gray-400" aria-hidden="true" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30">
+                  <Users size={18} className="text-blue-500 dark:text-blue-400" aria-hidden="true" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">용병 모집</p>
@@ -585,7 +589,7 @@ export default function TeamDetailPage() {
               <Card padding="sm">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2.5">운영자</h3>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-base font-bold text-gray-500 dark:text-gray-300">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-base font-bold text-blue-600 dark:text-blue-400">
                     {currentTeam.owner.nickname?.charAt(0) ?? '?'}
                   </div>
                   <div className="flex-1">
@@ -601,19 +605,25 @@ export default function TeamDetailPage() {
               </Card>
             )}
 
-            {/* 허브 섹션 빠른 이동 */}
+            {/* 팀 활동 빠른 이동 */}
             <Card padding="sm">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">허브 섹션</h3>
-              <div className="space-y-1.5 text-sm">
-                <button onClick={() => setActiveSection('goods')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
-                  굿즈 {hubData?.sections.goodsCount ?? hubGoods.length}
-                </button>
-                <button onClick={() => setActiveSection('passes')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
-                  수강권 {hubData?.sections.passesCount ?? hubPasses.length}
-                </button>
-                <button onClick={() => setActiveSection('events')} className="w-full rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left text-gray-700 dark:text-gray-200">
-                  대회 {hubData?.sections.eventsCount ?? hubEvents.length}
-                </button>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">팀 활동</h3>
+              <div className="space-y-1.5">
+                {[
+                  { key: 'goods' as const, icon: <ShoppingBag size={14} aria-hidden="true" />, label: '굿즈', count: hubData?.sections.goodsCount ?? hubGoods.length },
+                  { key: 'passes' as const, icon: <Ticket size={14} aria-hidden="true" />, label: '수강권', count: hubData?.sections.passesCount ?? hubPasses.length },
+                  { key: 'events' as const, icon: <Trophy size={14} aria-hidden="true" />, label: '대회', count: hubData?.sections.eventsCount ?? hubEvents.length },
+                ].map(({ key, icon, label, count }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveSection(key)}
+                    className="flex w-full items-center gap-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-left"
+                  >
+                    <span className={`shrink-0 ${count === 0 ? 'text-gray-300 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400'}`}>{icon}</span>
+                    <span className={`flex-1 text-sm ${count === 0 ? 'text-gray-300 dark:text-gray-600' : 'text-gray-700 dark:text-gray-200'}`}>{label}</span>
+                    <span className={`text-xs font-medium ${count === 0 ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400 dark:text-gray-500'}`}>{count}</span>
+                  </button>
+                ))}
               </div>
             </Card>
           </div>

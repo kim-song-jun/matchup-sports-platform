@@ -11,11 +11,10 @@ import { useToast } from '@/components/ui/toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FormField } from '@/components/ui/form-field';
-import { useTeamMatch } from '@/hooks/use-api';
+import { useTeamMatch, useUpdateTeamMatch, useCancelTeamMatch } from '@/hooks/use-api';
 import { SKILL_GRADES, MATCH_TYPES } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 import { formatAmount, extractErrorMessage } from '@/lib/utils';
-import { api } from '@/lib/api';
 
 const sportOptions = [
   { value: 'soccer', label: '축구' },
@@ -63,6 +62,8 @@ export default function EditTeamMatchPage() {
   const id = params.id as string;
 
   const { data: match, isLoading } = useTeamMatch(id);
+  const updateTeamMatch = useUpdateTeamMatch();
+  const cancelTeamMatch = useCancelTeamMatch();
 
   const [form, setForm] = useState<FormData>({
     title: '',
@@ -87,9 +88,7 @@ export default function EditTeamMatchPage() {
     hasReferee: false,
     notes: '',
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (match) {
@@ -123,40 +122,38 @@ export default function EditTeamMatchPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.title || !form.sportType || !form.matchDate || !form.startTime || !form.endTime || !form.venueName || !form.totalFee) {
       toast('error', '필수 항목을 입력해주세요');
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        ...form,
-        totalFee: Number(form.totalFee),
-        opponentFee: form.opponentFee ? Number(form.opponentFee) : 0,
-      };
-      await api.patch(`/team-matches/${id}`, payload);
-      toast('success', '모집글이 수정되었어요');
-      router.push(`/team-matches/${id}`);
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '모집글 수정에 실패했어요. 다시 시도해주세요'));
-    } finally {
-      setIsSubmitting(false);
-    }
+    const payload = {
+      ...form,
+      totalFee: Number(form.totalFee),
+      opponentFee: form.opponentFee ? Number(form.opponentFee) : 0,
+    };
+    updateTeamMatch.mutate({ id, data: payload as unknown as Record<string, unknown> }, {
+      onSuccess: () => {
+        toast('success', '모집글이 수정되었어요');
+        router.push(`/team-matches/${id}`);
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '모집글 수정에 실패했어요. 다시 시도해주세요'));
+      },
+    });
   };
 
-  const handleCancel = async () => {
-    setIsCancelling(true);
-    try {
-      await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
-      toast('success', '모집글이 취소되었어요');
-      router.push('/my/team-matches');
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '취소하지 못했어요. 다시 시도해주세요'));
-    } finally {
-      setIsCancelling(false);
-      setShowCancelModal(false);
-    }
+  const handleCancel = () => {
+    cancelTeamMatch.mutate(id, {
+      onSuccess: () => {
+        toast('success', '모집글이 취소되었어요');
+        router.push('/my/team-matches');
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '취소하지 못했어요. 다시 시도해주세요'));
+        setShowCancelModal(false);
+      },
+    });
   };
 
   if (isLoading) {
@@ -504,11 +501,11 @@ export default function EditTeamMatchPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSubmitting}
+            disabled={updateTeamMatch.isPending}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
-            {isSubmitting ? '저장 중...' : '수정 완료'}
+            {updateTeamMatch.isPending ? '저장 중...' : '수정 완료'}
           </button>
         </div>
       </div>
@@ -531,10 +528,10 @@ export default function EditTeamMatchPage() {
             </button>
             <button
               onClick={handleCancel}
-              disabled={isCancelling}
+              disabled={cancelTeamMatch.isPending}
               className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
             >
-              {isCancelling ? '취소 중...' : '취소하기'}
+              {cancelTeamMatch.isPending ? '취소 중...' : '취소하기'}
             </button>
           </div>
         </div>

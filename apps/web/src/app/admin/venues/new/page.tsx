@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, X, Plus, Loader2 } from 'lucide-react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { queryKeys } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +32,7 @@ const venueTypes = [
 export default function AdminVenueNewPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState({
     name: '',
@@ -64,6 +66,7 @@ export default function AdminVenueNewPage() {
       await api.post('/admin/venues', payload);
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.venues });
       toast('success', '시설이 등록되었어요');
       router.push('/admin/venues');
     },

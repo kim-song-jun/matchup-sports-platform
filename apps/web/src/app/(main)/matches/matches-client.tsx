@@ -189,38 +189,7 @@ export function MatchesPage() {
             <Plus size={18} aria-hidden="true" />
           </Link>
         )}
-      >
-        <div className="flex items-center justify-end gap-2">
-          <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
-            <button
-              type="button"
-              aria-label="리스트 뷰"
-              aria-pressed={viewMode === 'list'}
-              onClick={() => setViewMode('list')}
-              className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-500 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
-            >
-              <List size={16} />
-            </button>
-            <button
-              type="button"
-              aria-label="지도 뷰"
-              aria-pressed={viewMode === 'map'}
-              onClick={() => setViewMode('map')}
-              className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
-                viewMode === 'map'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-500 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Map size={16} />
-            </button>
-          </div>
-        </div>
-      </MobilePageTopZone>
+      />
 
       <div className="mb-2 px-5 @3xl:px-0" data-testid="match-filter-bar">
         <div className="relative flex items-center gap-2">
@@ -246,6 +215,34 @@ export function MatchesPage() {
                 <X size={13} />
               </button>
             )}
+          </div>
+          <div className="flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              aria-label="리스트 뷰"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+              className={`flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              <List size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label="지도 뷰"
+              aria-pressed={viewMode === 'map'}
+              onClick={() => setViewMode('map')}
+              className={`flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors ${
+                viewMode === 'map'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Map size={16} aria-hidden="true" />
+            </button>
           </div>
           <button
             type="button"
@@ -284,7 +281,7 @@ export function MatchesPage() {
               className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}
             >
               {filter.key ? ts(filter.translationKey) : ts('all')}

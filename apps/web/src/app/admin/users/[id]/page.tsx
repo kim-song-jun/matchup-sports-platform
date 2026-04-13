@@ -5,13 +5,14 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Star, Trophy, MapPin, AlertTriangle, Ban, User, Shield, RefreshCw } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { useAdminUser } from '@/hooks/use-api';
+import { useAdminUser, queryKeys } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
 import { extractErrorMessage } from '@/lib/utils';
@@ -23,6 +24,7 @@ export default function AdminUserDetailPage() {
   const userId = params.id as string;
   const { toast } = useToast();
   const { data: user, isLoading, isError, refetch } = useAdminUser(userId);
+  const queryClient = useQueryClient();
   const [actionType, setActionType] = useState<ModerationAction>(null);
   const [actionNote, setActionNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +56,7 @@ export default function AdminUserDetailPage() {
 
       setActionType(null);
       setActionNote('');
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
       await refetch();
     } catch (err: unknown) {
       toast('error', extractErrorMessage(err, '관리 액션을 적용하지 못했어요.'));

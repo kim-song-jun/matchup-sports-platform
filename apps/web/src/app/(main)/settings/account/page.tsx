@@ -6,7 +6,7 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { ChevronRight, AlertTriangle } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
-import { api } from '@/lib/api';
+import { useUpdateProfile } from '@/hooks/use-api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -17,6 +17,7 @@ export default function AccountPage() {
   useRequireAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const updateProfile = useUpdateProfile();
   const [nickname, setNickname] = useState('축구왕김선수');
   const [email, setEmail] = useState('player@example.com');
   const [phone, setPhone] = useState('010-1234-5678');
@@ -117,14 +118,11 @@ export default function AccountPage() {
 
         {/* 저장 버튼 */}
         <Button
-          onClick={async () => {
-            try {
-              await api.patch('/users/me', { nickname, email, phone });
-              toast('success', '변경사항이 저장되었어요');
-            } catch {
-              toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요');
-            }
-          }}
+          onClick={() => updateProfile.mutate({ nickname, email, phone }, {
+            onSuccess: () => toast('success', '변경사항이 저장되었어요'),
+            onError: () => toast('error', '저장하지 못했어요. 네트워크 연결을 확인해주세요'),
+          })}
+          disabled={updateProfile.isPending}
           size="lg"
           fullWidth
         >

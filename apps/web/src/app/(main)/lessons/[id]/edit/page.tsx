@@ -13,9 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import { useLesson } from '@/hooks/use-api';
+import { useLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/use-api';
 import { formatAmount, extractErrorMessage } from '@/lib/utils';
-import { api } from '@/lib/api';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -57,6 +56,8 @@ export default function EditLessonPage() {
   const lessonId = params.id as string;
 
   const { data: lesson, isLoading } = useLesson(lessonId);
+  const updateLesson = useUpdateLesson();
+  const deleteLesson = useDeleteLesson();
 
   const [form, setForm] = useState<FormData>({
     sportType: '',
@@ -74,9 +75,7 @@ export default function EditLessonPage() {
     levelMin: 1,
     levelMax: 5,
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (lesson) {
@@ -103,35 +102,33 @@ export default function EditLessonPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.title || !form.coachName || !form.venueName || !form.lessonDate || !form.startTime || !form.endTime) {
       toast('error', '필수 항목을 입력해주세요');
       return;
     }
-    setIsSubmitting(true);
-    try {
-      await api.patch(`/lessons/${lessonId}`, form);
-      toast('success', '강좌 정보가 저장되었어요');
-      router.push(`/lessons/${lessonId}`);
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요'));
-    } finally {
-      setIsSubmitting(false);
-    }
+    updateLesson.mutate({ id: lessonId, data: form as unknown as Record<string, unknown> }, {
+      onSuccess: () => {
+        toast('success', '강좌 정보가 저장되었어요');
+        router.push(`/lessons/${lessonId}`);
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요'));
+      },
+    });
   };
 
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    try {
-      await api.delete(`/lessons/${lessonId}`);
-      toast('success', '강좌가 삭제되었어요');
-      router.push('/my/lessons');
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '강좌 삭제에 실패했어요. 다시 시도해주세요'));
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteModal(false);
-    }
+  const handleDelete = () => {
+    deleteLesson.mutate(lessonId, {
+      onSuccess: () => {
+        toast('success', '강좌가 삭제되었어요');
+        router.push('/my/lessons');
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '강좌 삭제에 실패했어요. 다시 시도해주세요'));
+        setShowDeleteModal(false);
+      },
+    });
   };
 
   if (isLoading) {
@@ -385,11 +382,11 @@ export default function EditLessonPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSubmitting}
+            disabled={updateLesson.isPending}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
-            {isSubmitting ? '저장 중...' : '수정 완료'}
+            {updateLesson.isPending ? '저장 중...' : '수정 완료'}
           </button>
         </div>
       </div>
@@ -413,10 +410,10 @@ export default function EditLessonPage() {
             </button>
             <button
               onClick={handleDelete}
-              disabled={isDeleting}
+              disabled={deleteLesson.isPending}
               className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
             >
-              {isDeleting ? '삭제 중...' : '삭제하기'}
+              {deleteLesson.isPending ? '삭제 중...' : '삭제하기'}
             </button>
           </div>
         </div>

@@ -10,9 +10,8 @@ import {
   Save,
   Trash2,
 } from 'lucide-react';
-import { api } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/utils';
-import { useDeleteAdminVenue, useAdminVenue } from '@/hooks/use-api';
+import { useUpdateAdminVenue, useDeleteAdminVenue, useAdminVenue } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -109,6 +108,7 @@ export default function AdminVenueEditPage() {
   const venueId = params.id as string;
   const { toast } = useToast();
   const { data: venue, isLoading, isError, refetch } = useAdminVenue(venueId);
+  const updateVenue = useUpdateAdminVenue();
   const deleteVenue = useDeleteAdminVenue();
 
   const [form, setForm] = useState<VenueFormState>(createEmptyForm);
@@ -154,10 +154,11 @@ export default function AdminVenueEditPage() {
     setSaved(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setSaving(true);
-    try {
-      await api.patch(`/admin/venues/${venueId}`, {
+    updateVenue.mutate({
+      id: venueId,
+      data: {
         name: form.name,
         type: form.type || undefined,
         sportTypes: form.sportTypes,
@@ -176,15 +177,18 @@ export default function AdminVenueEditPage() {
             weekend: { open: form.weekendOpen, close: form.weekendClose },
           } : {}),
         },
-      });
-      setSaved(true);
-      toast('success', '시설 정보가 저장되었어요');
-      await refetch();
-    } catch (error) {
-      toast('error', extractErrorMessage(error, '저장하지 못했어요. 다시 시도해주세요'));
-    } finally {
-      setSaving(false);
-    }
+      },
+    }, {
+      onSuccess: () => {
+        setSaved(true);
+        toast('success', '시설 정보가 저장되었어요');
+        void refetch();
+      },
+      onError: (error) => {
+        toast('error', extractErrorMessage(error, '저장하지 못했어요. 다시 시도해주세요'));
+      },
+      onSettled: () => setSaving(false),
+    });
   };
 
   const handleDelete = async () => {
@@ -372,7 +376,7 @@ export default function AdminVenueEditPage() {
         <div className="flex items-center justify-end gap-3">
           {saved ? <span className="text-sm text-green-600 dark:text-green-400">저장됨</span> : null}
           <button
-            onClick={() => void handleSave()}
+            onClick={handleSave}
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60 transition-colors"
           >

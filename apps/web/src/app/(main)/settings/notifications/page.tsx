@@ -144,7 +144,7 @@ export default function NotificationsPage() {
         </span>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] mt-4 space-y-4 pb-8">
+      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] mt-4 space-y-5 pb-8">
         <section className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
@@ -244,7 +244,7 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-4 space-y-2 dark:border-gray-700 dark:bg-gray-900/50">
+        <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-2 dark:border-gray-700 dark:bg-gray-900/50">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
               준비 중인 기능

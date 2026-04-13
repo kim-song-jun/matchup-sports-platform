@@ -292,42 +292,40 @@ export default function ListingDetailPage() {
           </div>
 
           {/* CTA */}
-          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            {!isAuthenticated ? (
-              <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
-                로그인 후 구매하기
-              </Link>
-            ) : (
-              <div className="space-y-2">
-                <button
-                  onClick={() => router.push('/payments/checkout')}
-                  className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors"
-                >
-                  {listing.listingType === 'rent' ? '대여 신청하기' : '구매하기'}
-                </button>
-                <button
-                  onClick={() => {
-                    toast('success', '판매자와 채팅을 시작했어요');
-                    router.push('/chat');
-                  }}
-                  className="w-full rounded-xl border border-gray-200 py-3.5 text-md font-semibold text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-                >
-                  <MessageCircle size={18} />
-                  채팅하기
-                </button>
-                {user?.id === listing?.sellerId && (
-                  <div className="flex gap-2 mt-2">
-                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <Pencil size={14} /> 수정
-                    </Link>
-                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-red-200 dark:border-red-800 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
-                      <Trash2 size={14} /> 삭제
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {!isAuthenticated ? (
+            <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
+              로그인 후 구매하기
+            </Link>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={() => router.push('/payments/checkout')}
+                className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors"
+              >
+                {listing.listingType === 'rent' ? '대여 신청하기' : '구매하기'}
+              </button>
+              <button
+                onClick={() => {
+                  toast('success', '판매자와 채팅을 시작했어요');
+                  router.push('/chat');
+                }}
+                className="w-full rounded-xl border border-gray-200 py-3.5 text-md font-semibold text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+              >
+                <MessageCircle size={18} />
+                채팅하기
+              </button>
+              {user?.id === listing?.sellerId && (
+                <div className="flex gap-2 mt-2">
+                  <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <Pencil size={14} /> 수정
+                  </Link>
+                  <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-red-200 dark:border-red-800 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
+                    <Trash2 size={14} /> 삭제
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           </div>
         </div>
       </div>

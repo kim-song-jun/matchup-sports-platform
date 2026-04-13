@@ -388,7 +388,7 @@ export default function LessonDetailPage() {
             {isHost && (
               <Link
                 href={`/lessons/${lessonId}/edit`}
-                className="flex items-center justify-center gap-2 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 dark:border-gray-600 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
               >
                 <Pencil size={16} />
                 강좌 수정

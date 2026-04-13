@@ -36,7 +36,7 @@ const MediaLightbox = dynamic(
 import { SafeImage } from '@/components/ui/safe-image';
 import { useVenue, useVenueHub, useVenueSchedule, useCreateVenueReview } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getListingImage, getSportImage, getVenueImageSet } from '@/lib/sport-image';
 import { formatMatchDate } from '@/lib/utils';
 import type { Lesson, MarketplaceListing, Tournament, VenueScheduleSlot } from '@/types/api';
@@ -46,7 +46,12 @@ const dayLabels: Record<string, string> = {
   weekday: '평일', weekend: '주말',
 };
 
-const facilityTagColor = 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600';
+// V-3: facility 태그는 시설 종목 tint 컬러를 사용. 동적으로 결정하기 위해 함수로 제공
+function getFacilityTagColor(sportType: string): string {
+  const accent = sportCardAccent[sportType];
+  if (!accent) return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600';
+  return `${accent.badge} border border-transparent`;
+}
 
 
 type HubSection = 'overview' | 'goods' | 'passes' | 'events';
@@ -177,7 +182,7 @@ export default function VenueDetailPage() {
         <div className="px-5 @3xl:px-0">
           {/* Hero image */}
           <Card padding="none" className="overflow-hidden">
-            <button type="button" onClick={() => setShowMediaLightbox(true)} aria-label="이미지 전체 보기" className="relative h-[220px] w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
+            <button type="button" onClick={() => setShowMediaLightbox(true)} aria-label="이미지 전체 보기" className="relative h-[240px] w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
               {heroImageFailed ? (
                 <VenueHeroFallback sportType={venueSport} />
               ) : (
@@ -193,8 +198,8 @@ export default function VenueDetailPage() {
               )}
             </button>
             <div className="p-5">
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{venue.name}</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{venue.name}</h2>
                 {venueReviewCount > 0 && (
                   <span
                     className="inline-flex items-center gap-1 text-sm text-amber-500"
@@ -235,7 +240,7 @@ export default function VenueDetailPage() {
 
               {/* 기본 정보 — 주소, 운영시간, 요금, 전화번호 */}
               <Card>
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">기본 정보</h3>
+                <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white mb-3">기본 정보</h3>
                 <div className="space-y-3">
                   {/* 주소 */}
                   <div className="flex items-start gap-3">
@@ -307,13 +312,13 @@ export default function VenueDetailPage() {
 
               {/* 시설 정보 */}
               <Card>
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">시설 정보</h3>
+                <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white mb-3">시설 정보</h3>
                 {venueFacilities.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {venueFacilities.map((facility: string) => (
                       <span
                         key={facility}
-                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${facilityTagColor}`}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${getFacilityTagColor(venueSport)}`}
                       >
                         <Check size={14} aria-hidden="true" />
                         {facility}
@@ -327,7 +332,7 @@ export default function VenueDetailPage() {
 
               {/* 향후 7일 예약 */}
               <Card>
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
+                <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
                 {schedule.length === 0 ? (
                   <EmptyState icon={CalendarDays} title="예약이 없어요" size="sm" />
                 ) : (
@@ -342,7 +347,7 @@ export default function VenueDetailPage() {
               {/* 리뷰 */}
               <Card>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">
+                  <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white">
                     리뷰 ({venueReviewCount})
                   </h3>
                   {venueReviewCount > 0 && (

@@ -72,8 +72,8 @@ export default function SettingsPage() {
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-4">
-      <h3 className="mb-1.5 px-1 text-xs font-medium tracking-wide text-gray-400">{title}</h3>
+    <div className="mb-5">
+      <h3 className="mb-1.5 px-1 text-base font-semibold tracking-wide text-gray-400">{title}</h3>
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white divide-y divide-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:divide-gray-700">
         {children}
       </div>

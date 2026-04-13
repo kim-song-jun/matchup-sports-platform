@@ -28,7 +28,6 @@ const banners = [
     subtitle: 'AI가 우리 팀 실력에 맞는 상대를 추천해드려요',
     cta: '매칭 보기',
     href: '/team-matches',
-    emoji: '🏆',
     bg: 'bg-gradient-to-br from-blue-400 to-blue-600',
     dark: true,
   },
@@ -37,7 +36,6 @@ const banners = [
     subtitle: '지금 가입하면 첫 참가비 0원으로 즐길 수 있어요',
     cta: '지금 시작',
     href: '/matches',
-    emoji: '🎉',
     bg: 'bg-gradient-to-br from-gray-700 to-gray-900',
     dark: true,
   },
@@ -46,7 +44,6 @@ const banners = [
     subtitle: '팀 빈 자리를 용병으로 채워 완벽한 라인업을',
     cta: '용병 찾기',
     href: '/mercenary',
-    emoji: '💪',
     bg: 'bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-800 dark:to-gray-700',
     dark: false,
   },
@@ -156,7 +153,7 @@ export function HomePage() {
       {/* ═══ ZONE 1: 헤더 — 큰 인사, 날짜, CTA ═══ */}
       <header className="px-5 @3xl:px-0 pt-4 pb-2">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
+        <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight mt-0.5">
           {mounted && isAuthenticated ? (
             user ? (
               user.nickname ? `${user.nickname}님` : '안녕하세요'
@@ -189,25 +186,33 @@ export function HomePage() {
       </header>
 
       {/* ═══ 빠른 액션 그리드 — 서비스 핵심 기능 2×2 ═══ */}
-      <section className="mt-8 px-5 @3xl:px-0">
-        <div className="grid grid-cols-2 gap-3">
-          {quickActions.map(({ href, icon: Icon, label, desc }) => (
-            <Link key={href} href={href}>
-              <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/80 active:scale-[0.97] transition-[colors,transform] h-full">
-                <div className="inline-flex items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/30 p-2.5 text-blue-500 dark:text-blue-400">
-                  <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+      <section className="mt-10 px-5 @3xl:px-0">
+        <div className="grid grid-cols-2 gap-3.5">
+          {quickActions.map(({ href, icon: Icon, label, desc }, idx) => {
+            const iconStyles = [
+              'bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400',
+              'bg-violet-50 dark:bg-violet-900/30 text-violet-500 dark:text-violet-400',
+              'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+              'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+            ];
+            return (
+              <Link key={href} href={href}>
+                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 hover:bg-gray-50 dark:hover:bg-gray-700/80 active:scale-[0.97] transition-[colors,transform] h-full">
+                  <div className={`inline-flex items-center justify-center rounded-xl p-3 ${iconStyles[idx]}`}>
+                    <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white tracking-tight">{label}</p>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{desc}</p>
                 </div>
-                <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white tracking-tight">{label}</p>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{desc}</p>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
       {/* ═══ 다가오는 일정 — 로그인 유저 전용, 최대 3개 ═══ */}
       {canRenderAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
-        <section className="mt-8 px-5 @3xl:px-0">
+        <section className="mt-10 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{t('upcomingSchedule')}</h2>
@@ -356,9 +361,7 @@ export function HomePage() {
                           {banner.cta} <ArrowRight size={12} aria-hidden="true" />
                         </div>
                       </div>
-                      <div className="shrink-0 ml-4 relative z-10 text-5xl leading-none select-none" aria-hidden="true">
-                        {banner.emoji}
-                      </div>
+                      <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/20 to-transparent rounded-r-2xl pointer-events-none" aria-hidden="true" />
                     </div>
                   </Link>
                 );
@@ -405,7 +408,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mt-4 px-5 @3xl:px-0">
+      <section className="mt-5 px-5 @3xl:px-0">
         <SectionHeader
           title={activeSport === 'all' ? t('recommendedMatches') : `${sportLabel[activeSport]} ${tc('matches')}`}
           count={filteredMatches.length}
@@ -449,8 +452,8 @@ export function HomePage() {
                 const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
                 const region = team.district || team.city;
                 return (
-                  <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full flex flex-col">
+                  <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[220px] @3xl:w-auto">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full flex flex-col">
                       {/* 상단: 로고 + 팀명 + 모집중 */}
                       <div className="flex items-start gap-2.5">
                         <div className={`relative h-10 w-10 rounded-xl ${accent?.tint || 'bg-gray-100 dark:bg-gray-700'} shrink-0 overflow-hidden`}>

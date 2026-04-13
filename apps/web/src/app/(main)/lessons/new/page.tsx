@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { api } from '@/lib/api';
+import { useCreateLesson } from '@/hooks/use-api';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
 import { formatCurrency, formatAmount, extractErrorMessage } from '@/lib/utils';
 
@@ -72,6 +72,7 @@ export default function CreateLessonPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const createLesson = useCreateLesson();
   const teamId = searchParams.get('teamId') ?? undefined;
   const venueId = searchParams.get('venueId') ?? undefined;
   const teamName = searchParams.get('teamName') ?? undefined;
@@ -87,7 +88,6 @@ export default function CreateLessonPage() {
     hasUploadErrors: false,
     pendingCount: 0,
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -115,23 +115,22 @@ export default function CreateLessonPage() {
     return true;
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!guardImageUpload()) return;
-    setIsSubmitting(true);
-    try {
-      await api.post('/lessons', {
-        ...form,
-        teamId,
-        venueId,
-        imageUrls: extractUploadUrls(imageAssets),
-      });
-      toast('success', '강좌가 등록되었어요!');
-      router.push('/lessons');
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '강좌 등록에 실패했어요. 다시 시도해주세요'));
-    } finally {
-      setIsSubmitting(false);
-    }
+    createLesson.mutate({
+      ...form,
+      teamId,
+      venueId,
+      imageUrls: extractUploadUrls(imageAssets),
+    }, {
+      onSuccess: () => {
+        toast('success', '강좌가 등록되었어요!');
+        router.push('/lessons');
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '강좌 등록에 실패했어요. 다시 시도해주세요'));
+      },
+    });
   };
 
   const selectedSport = sports.find((s) => s.type === form.sportType);
@@ -444,11 +443,11 @@ export default function CreateLessonPage() {
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+            disabled={createLesson.isPending || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Check size={16} />
-            {isSubmitting ? '등록 중...' : '강좌 등록하기'}
+            {createLesson.isPending ? '등록 중...' : '강좌 등록하기'}
           </button>
         )}
       </div>

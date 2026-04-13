@@ -11,7 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportImageSet } from '@/lib/sport-image';
-import { api } from '@/lib/api';
+import { useCreateMatch } from '@/hooks/use-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,8 +28,8 @@ export default function CreateMatchPage() {
   useRequireAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const createMatch = useCreateMatch();
   const [step, setStep] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
   const [uploadState, setUploadState] = useState<ImageUploadState>({
     hasPendingUploads: false,
@@ -74,38 +74,36 @@ export default function CreateMatchPage() {
     return true;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!guardImageUpload()) return;
-
-    setIsSubmitting(true);
-    try {
-      if (!form.venueId) {
-        toast('error', '현재는 등록된 시설만 선택할 수 있어요');
-        return;
-      }
-
-      await api.post('/matches', {
-        title: form.title,
-        description: form.description,
-        sportType: form.sportType,
-        venueId: form.venueId,
-        matchDate: form.matchDate,
-        startTime: form.startTime,
-        endTime: form.endTime,
-        maxPlayers: form.maxPlayers,
-        fee: form.fee,
-        levelMin: form.levelMin,
-        levelMax: form.levelMax,
-        gender: form.gender,
-        ...(imageAssets.length > 0 ? { imageUrl: firstUploadUrl(imageAssets) } : {}),
-      });
-      toast('success', '매치가 만들어졌어요!');
-      router.push('/matches?created=true');
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '생성에 실패했어요. 잠시 후 다시 시도해주세요'));
-    } finally {
-      setIsSubmitting(false);
+    if (!form.venueId) {
+      toast('error', '현재는 등록된 시설만 선택할 수 있어요');
+      return;
     }
+
+    createMatch.mutate({
+      title: form.title,
+      description: form.description,
+      sportType: form.sportType,
+      venueId: form.venueId,
+      matchDate: form.matchDate,
+      startTime: form.startTime,
+      endTime: form.endTime,
+      maxPlayers: form.maxPlayers,
+      fee: form.fee,
+      levelMin: form.levelMin,
+      levelMax: form.levelMax,
+      gender: form.gender,
+      ...(imageAssets.length > 0 ? { imageUrl: firstUploadUrl(imageAssets) } : {}),
+    }, {
+      onSuccess: () => {
+        toast('success', '매치가 만들어졌어요!');
+        router.push('/matches?created=true');
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '생성에 실패했어요. 잠시 후 다시 시도해주세요'));
+      },
+    });
   };
 
   return (
@@ -388,12 +386,12 @@ export default function CreateMatchPage() {
               {form.rules && <ConfirmRow label="규칙" value={form.rules} />}
               {imageAssets.length > 0 && <ConfirmRow label="이미지" value={`${imageAssets.length}장`} />}
             </Card>
-            <Button onClick={handleSubmit} disabled={isSubmitting || uploadState.hasUploadErrors} aria-busy={isSubmitting}
+            <Button onClick={handleSubmit} disabled={createMatch.isPending || uploadState.hasUploadErrors} aria-busy={createMatch.isPending}
               data-testid="match-create-submit"
               fullWidth
               size="lg"
               className="gap-1.5">
-              {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
+              {createMatch.isPending ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
             </Button>
           </div>
         )}

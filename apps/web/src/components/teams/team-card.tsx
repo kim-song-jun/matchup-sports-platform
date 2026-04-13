@@ -31,21 +31,21 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
         padding="none"
         interactive
         className={cn(
-          'flex overflow-hidden transition-[transform] duration-150 active:scale-[0.98]',
+          'flex gap-4 overflow-hidden transition-[transform] duration-150 active:scale-[0.98]',
           className,
         )}
       >
-        {/* Cover image — 80×80 rounded */}
-        <div className="relative m-3 h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
+        {/* Cover image — 88×120 rectangular */}
+        <div className="relative m-3 h-[88px] w-[120px] shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={teamCoverImage}
             fallbackSrc={fallbackTeamCoverImage}
             alt={team.name}
             fill
             className="object-cover"
-            sizes="80px"
+            sizes="120px"
           />
-          <div className="absolute bottom-1 left-1 rounded-lg bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-gray-800">
+          <div className="absolute bottom-1 left-1 rounded-xl bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-gray-800">
             <div className="relative h-6 w-6">
               <SafeImage
                 src={teamLogo}
@@ -60,32 +60,42 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
         </div>
 
         {/* Text content */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center bg-white py-3 pr-3.5 dark:bg-gray-800">
+        <div className="flex min-w-0 flex-1 flex-col bg-white py-3 pr-3.5 dark:bg-gray-800">
+          {/* 팀명 + 모집중 */}
           <div className="flex items-center justify-between gap-2">
-            <h3 className="truncate text-base font-bold text-gray-900 dark:text-gray-100">{team.name}</h3>
+            <h3 className="truncate text-md font-bold text-gray-900 dark:text-gray-100">{team.name}</h3>
             {team.isRecruiting && (
-              <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
                 {t('recruiting')}
               </span>
             )}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-            <span
-              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}
-            >
+
+          {/* 종목 배지 + 지역 */}
+          <div className="mt-1 flex items-center gap-1.5 min-w-0">
+            <span className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-1.5 py-0.5 text-2xs font-medium shrink-0`}>
               {sportLabel[team.sportType] || team.sportType}
             </span>
-            <span className="flex items-center gap-0.5 text-xs text-gray-500">
-              <Users size={10} aria-hidden="true" />
-              {tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}
-            </span>
+            {(team.city || team.district) && (
+              <span className="flex items-center gap-0.5 text-2xs text-gray-400 dark:text-gray-500 min-w-0">
+                <MapPin size={9} className="shrink-0" aria-hidden="true" />
+                <span className="truncate">{team.district || team.city}</span>
+              </span>
+            )}
           </div>
-          {team.city && (
-            <p className="mt-1 flex items-center gap-0.5 text-xs text-gray-400 dark:text-gray-500">
-              <MapPin size={10} className="shrink-0" aria-hidden="true" />
-              {team.city} {team.district}
-            </p>
-          )}
+
+          {/* 한줄 소개 */}
+          <p className="mt-1.5 text-2xs text-gray-500 dark:text-gray-400 line-clamp-1 leading-relaxed">
+            {team.description || '소개가 없는 팀이에요.'}
+          </p>
+
+          {/* 인원수 + 레벨 */}
+          <div className="mt-auto pt-1.5 flex items-center gap-1 text-2xs text-gray-400 dark:text-gray-500">
+            <Users size={9} className="shrink-0" aria-hidden="true" />
+            <span className="font-medium text-gray-700 dark:text-gray-300">{t('memberCount', { count: team.memberCount })}</span>
+            <span aria-hidden="true">·</span>
+            <span>{tl(String(team.level) as Parameters<typeof tl>[0])}</span>
+          </div>
         </div>
       </Card>
     </Link>

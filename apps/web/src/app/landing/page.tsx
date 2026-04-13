@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Target, Shield, Users, Zap, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check, Footprints } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
+import { sportCardAccent } from '@/lib/constants';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { HeroScrollButton } from '@/components/landing/hero-scroll-button';
 import { LandingNav } from '@/components/landing/landing-nav';
@@ -56,12 +57,19 @@ export default function LandingPage() {
       <LandingNav />
 
       {/* ── Hero — 화이트 베이스, 텍스트 중심 ── */}
-      <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
+      <section className="relative pt-36 pb-24 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
+        {/* Radial gradient decoration — subtle blue glow centered behind the hero text */}
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse_at_50%_0%,rgba(49,130,246,0.08),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(49,130,246,0.12),transparent_70%)]" />
+        </div>
         <div className="max-w-[1100px] mx-auto px-5">
           <div className="max-w-[680px] mx-auto text-center break-keep">
             {/* Badge */}
             <ScrollReveal delay={0}>
-              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
+              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold tracking-wide px-4 py-2 rounded-full mb-8">
                 <Sparkles size={14} />
                 11개 종목 · 2,400+ 매칭 완료
               </div>
@@ -112,7 +120,7 @@ export default function LandingPage() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
               {STATS.map((stat) => (
                 <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
-                  <span className="text-2xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
+                  <span className="text-3xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
                   <div className="text-xs text-gray-500 mt-2 font-medium">{stat.label}</div>
                 </div>
               ))}
@@ -135,8 +143,8 @@ export default function LandingPage() {
                   { icon: SearchX, text: '매번 상대 찾기가 힘든 주말', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
                   { icon: UserX, text: '약속했는데 노쇼 당한 경험', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
                 ] as const).map((pain) => (
-                  <div key={pain.text} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center">
-                    <div className={`h-12 w-12 rounded-xl ${pain.bg} flex items-center justify-center mx-auto mb-4`}>
+                  <div key={pain.text} className={`${pain.bg} rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center`}>
+                    <div className={`h-12 w-12 rounded-xl bg-white/60 dark:bg-white/10 flex items-center justify-center mx-auto mb-4`}>
                       <pain.icon size={20} className={pain.color} />
                     </div>
                     <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed font-medium">{pain.text}</p>
@@ -172,7 +180,7 @@ export default function LandingPage() {
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs font-semibold px-3 py-1 rounded-full mb-4">
                   <Target size={14} /> 핵심 기능
                 </div>
-                <h3 className="text-2xl lg:text-2xl font-bold mb-3">AI 매칭</h3>
+                <h3 className="text-2xl lg:text-3xl font-bold mb-3">AI 매칭</h3>
                 <p className="text-md text-gray-400 leading-relaxed max-w-[400px]">
                   실력, 위치, 시간, 매너 점수를 종합 분석해 나와 가장 잘 맞는 상대를 자동으로 찾아드려요. 경기할수록 AI가 더 정확해집니다.
                 </p>
@@ -210,7 +218,7 @@ export default function LandingPage() {
               const Icon = f.icon;
               return (
                 <ScrollReveal key={f.title} delay={idx * 100}>
-                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 h-full">
+                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-[colors,shadow] duration-300 h-full">
                     <div className={`h-12 w-12 rounded-xl ${f.iconBg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
                       <Icon size={20} className="text-white" />
                     </div>
@@ -298,7 +306,7 @@ export default function LandingPage() {
               {SPORTS.map((sport) => {
                 const Icon = SportIconMap[sport.key];
                 return (
-                  <div key={sport.key} className="shrink-0 w-[88px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform duration-200">
+                  <div key={sport.key} className="shrink-0 w-[96px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform duration-200">
                     <div className={`w-12 h-12 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={24} className={sport.iconColor} />}
                     </div>
@@ -357,6 +365,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {TESTIMONIALS.map((t, idx) => {
               const SportIcon = SportIconMap[t.sport];
+              const accent = sportCardAccent[t.sport];
               return (
                 <ScrollReveal key={t.author} delay={idx * 120}>
                   <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 h-full flex flex-col">
@@ -369,8 +378,16 @@ export default function LandingPage() {
                       &ldquo;{t.quote}&rdquo;
                     </p>
                     <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
-                      <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center shrink-0">
-                        {SportIcon ? <SportIcon size={18} className="text-gray-500 dark:text-gray-400" /> : <span className="text-sm font-bold text-gray-500">{t.author.charAt(0)}</span>}
+                      {/* Avatar: initial circle + sport badge overlay */}
+                      <div className="relative shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-sm font-bold text-gray-600 dark:text-gray-300">{t.author.charAt(0)}</span>
+                        </div>
+                        {SportIcon && (
+                          <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ${accent?.badge ?? 'bg-gray-50 text-gray-500'} flex items-center justify-center ring-2 ring-white dark:ring-gray-800`}>
+                            <SportIcon size={11} aria-hidden="true" />
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-white text-base">{t.author}</p>

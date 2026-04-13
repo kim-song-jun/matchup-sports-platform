@@ -77,6 +77,33 @@ export function usePurchaseLessonTicket() {
   });
 }
 
+export function useUpdateLesson() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+      const res = await api.patch(`/lessons/${id}`, data);
+      return extractData<Lesson>(res);
+    },
+    onSuccess: (_, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.detail(id) });
+    },
+  });
+}
+
+export function useDeleteLesson() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/lessons/${id}`);
+      return { id };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lessons.all });
+    },
+  });
+}
+
 export function useConfirmLessonTicketPayment() {
   const queryClient = useQueryClient();
 

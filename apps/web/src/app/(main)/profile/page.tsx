@@ -121,15 +121,15 @@ export default function ProfilePage() {
       <div className={`px-5 @3xl:px-0 ${mounted && isAuthenticated ? '@3xl:grid @3xl:grid-cols-[1fr_340px] @3xl:gap-8' : 'max-w-[600px] mx-auto'}`}>
         <div>
         {mounted && isAuthenticated && user ? (
-          <div data-testid="profile-summary" className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div data-testid="profile-summary" className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-lg font-bold text-blue-600 dark:bg-blue-900/20 dark:text-blue-300">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-lg font-bold text-white">
                   {user.nickname?.charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="truncate text-xl font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
+                    <h2 className="truncate text-2xl font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
                     {user.bio && <p className="mt-0.5 text-sm text-gray-500">{user.bio}</p>}
                     <div className="mt-1 flex items-center gap-2">
                       <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400">
@@ -152,7 +152,7 @@ export default function ProfilePage() {
                 {user.sportProfiles.map((sp: SportProfile) => {
                   const accent = sportCardAccent[sp.sportType] ?? sportCardAccent['soccer'];
                   return (
-                    <div key={sp.id} className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-700/60">
+                    <div key={sp.id} className="rounded-xl border border-gray-100 bg-white px-3 py-2.5 dark:border-gray-700 dark:bg-gray-700">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
                           <span className={`h-2 w-2 shrink-0 rounded-full ${accent.dot}`} aria-hidden="true" />
@@ -177,15 +177,15 @@ export default function ProfilePage() {
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/40">
               <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-700">
                 <div className="flex-1 px-3 py-3 text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
+                  <p className="text-3xl font-black text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
                   <p className="mt-1 text-2xs font-medium text-gray-400">{t('totalMatches')}</p>
                 </div>
                 <div className="flex-1 px-3 py-3 text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
+                  <p className="text-3xl font-black text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
                   <p className="mt-1 text-2xs font-medium text-gray-400">{t('mannerScore')}</p>
                 </div>
                 <div className="flex-1 px-3 py-3 text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
+                  <p className="text-3xl font-black text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
                   <p className="mt-1 text-2xs font-medium text-gray-400">{t('sports')}</p>
                 </div>
               </div>

@@ -388,7 +388,7 @@ export default function TeamMatchDetailPage() {
           <div className="mt-4 @3xl:mt-0 detail-sidebar">
             <div className="sidebar-sticky space-y-3">
             {/* CTA 버튼 영역 */}
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-3">
+            <div className="space-y-2">
               {isRecruiting && !isHost && (
                 <button
                   onClick={() => {
@@ -439,7 +439,7 @@ export default function TeamMatchDetailPage() {
                 <>
                   <Link
                     href={`/team-matches/${id}/edit`}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 py-3.5 text-base font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-3.5 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <Pencil size={16} />
                     모집글 수정

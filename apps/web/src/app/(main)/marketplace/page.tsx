@@ -87,7 +87,7 @@ export default function MarketplacePage() {
       />
 
       {/* 검색 바 */}
-      <div className="px-5 @3xl:px-0 mb-2">
+      <div className="px-5 @3xl:px-0 pt-2 mb-3">
         <div className="relative">
           <Search
             className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${searchFocused ? 'text-blue-500' : 'text-gray-500'}`}
@@ -109,7 +109,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* 카테고리 칩 */}
-      <div className="px-5 @3xl:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-3 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {categoryFilterKeys.map((cat) => (
           <button
             key={cat.labelKey}
@@ -119,7 +119,7 @@ export default function MarketplacePage() {
             className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeCategoryKey === cat.labelKey
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
-                : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >
             {t(cat.labelKey)}
@@ -128,7 +128,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* 거래 유형 필터 */}
-      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-5 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {listingTypeFilters.map((filter) => (
           <button
             key={filter.key}
@@ -145,6 +145,16 @@ export default function MarketplacePage() {
           </button>
         ))}
       </div>
+
+      {/* 활성 매물 수 요약 */}
+      {!isLoading && !error && listings.length > 0 && (
+        <div className="px-5 @3xl:px-0 mb-3">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 dark:bg-blue-400" aria-hidden="true" />
+            매물 {listings.length}건
+          </span>
+        </div>
+      )}
 
       {/* 리스트 */}
       <div className="px-5 @3xl:px-0">

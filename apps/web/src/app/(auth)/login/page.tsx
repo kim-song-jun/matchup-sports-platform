@@ -72,7 +72,7 @@ function SocialLoginButtons() {
       <div className="space-y-2.5">
         <a
           href="/api/v1/auth/kakao"
-          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] transition-colors"
+          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] hover:opacity-90 transition-[opacity,transform]"
           style={{ backgroundColor: '#FEE500', color: '#191919' }}
           aria-label="카카오 계정으로 로그인"
         >
@@ -81,7 +81,7 @@ function SocialLoginButtons() {
         </a>
         <a
           href="/api/v1/auth/naver"
-          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] transition-colors"
+          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] hover:opacity-90 transition-[opacity,transform]"
           style={{ backgroundColor: '#03C75A', color: '#ffffff' }}
           aria-label="네이버 계정으로 로그인"
         >
@@ -90,7 +90,7 @@ function SocialLoginButtons() {
         </a>
         <a
           href="/api/v1/auth/apple"
-          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] transition-colors"
+          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] hover:opacity-90 transition-[opacity,transform]"
           style={{ backgroundColor: '#000000', color: '#ffffff' }}
           aria-label="애플 계정으로 로그인"
         >
@@ -159,7 +159,7 @@ function LoginPageInner() {
     <div className="relative flex min-h-dvh flex-col bg-white dark:bg-gray-900" data-testid="login-page">
       {/* Subtle sport-energy gradient decoration — blue tint fades out below the brand area */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-blue-50/60 to-transparent dark:from-blue-950/30 dark:to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-blue-50/80 to-transparent dark:from-blue-950/30 dark:to-transparent"
         aria-hidden="true"
       />
       {/* 상단 — 뒤로가기 */}
@@ -177,9 +177,9 @@ function LoginPageInner() {
       </div>
 
       {/* 상단 — 브랜드 */}
-      <div className="relative flex flex-col items-center justify-center px-6 pt-8 pb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
-        <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
+      <div className="relative flex flex-col items-center justify-center px-6 pt-10 pb-10">
+        <h1 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
+        <p className="mt-2 text-base text-gray-400 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
         </p>
       </div>
@@ -192,7 +192,7 @@ function LoginPageInner() {
             {(['login', 'register'] as const).map(tab => (
               <button key={tab} onClick={() => setMode(tab)}
                 data-testid={tab === 'login' ? 'auth-tab-login' : 'auth-tab-register'}
-                className={`flex-1 py-2.5 text-base font-medium border-b-2 transition-colors ${
+                className={`flex-1 py-2.5 text-base font-semibold border-b-2 transition-colors ${
                   mode === tab ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}>
                 {tab === 'login' ? '로그인' : '회원가입'}
@@ -201,7 +201,7 @@ function LoginPageInner() {
           </div>
 
           {/* 폼 */}
-          <form onSubmit={handleEmailSubmit} className="space-y-3" noValidate>
+          <form onSubmit={handleEmailSubmit} className="space-y-4" noValidate>
             <FormField label="이메일 주소" htmlFor="login-email">
               <Input
                 id="login-email"

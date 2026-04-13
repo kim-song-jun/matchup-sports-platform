@@ -7,7 +7,7 @@ import { ChevronRight, Plus, ShoppingBag } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
-import { api } from '@/lib/api';
+import { useCreateListing } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { getListingPreviewImages } from '@/lib/sport-image';
 import { Button } from '@/components/ui/button';
@@ -38,11 +38,11 @@ export default function CreateListingPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
+  const createListing = useCreateListing();
   const teamId = searchParams.get('teamId') ?? undefined;
   const venueId = searchParams.get('venueId') ?? undefined;
   const teamName = searchParams.get('teamName') ?? undefined;
   const venueName = searchParams.get('venueName') ?? undefined;
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
   const [uploadState, setUploadState] = useState<ImageUploadState>({
     hasPendingUploads: false,
@@ -75,28 +75,27 @@ export default function CreateListingPage() {
     return true;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!guardImageUpload()) return;
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (!form.sportType) return toast('error', '종목을 선택해주세요');
     if (!form.condition) return toast('error', '상품 상태를 선택해주세요');
     if (form.price <= 0) return toast('error', '가격을 입력해주세요');
 
-    setIsSubmitting(true);
-    try {
-      await api.post('/marketplace/listings', {
-        ...form,
-        teamId,
-        venueId,
-        imageUrls: extractUploadUrls(imageAssets),
-      });
-      toast('success', '매물이 등록되었어요!');
-      router.push('/marketplace');
-    } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
-    } finally {
-      setIsSubmitting(false);
-    }
+    createListing.mutate({
+      ...form,
+      teamId,
+      venueId,
+      imageUrls: extractUploadUrls(imageAssets),
+    }, {
+      onSuccess: () => {
+        toast('success', '매물이 등록되었어요!');
+        router.push('/marketplace');
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
+      },
+    });
   };
 
   if (!isAuthenticated) {
@@ -345,12 +344,12 @@ export default function CreateListingPage() {
         {/* 등록 버튼 */}
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+          disabled={createListing.isPending || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
           fullWidth
           size="lg"
           className="mb-8 mt-10"
         >
-          {isSubmitting ? '등록 중...' : '매물 등록하기'}
+          {createListing.isPending ? '등록 중...' : '매물 등록하기'}
         </Button>
       </div>
       <div className="h-24" />

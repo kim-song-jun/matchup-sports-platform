@@ -11,8 +11,7 @@ import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Textarea } from '@/components/ui/textarea';
-import { useListing } from '@/hooks/use-api';
-import { api } from '@/lib/api';
+import { useListing, useUpdateListing, useDeleteListing } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { extractUploadUrls, toExistingUploadAsset, type UploadAsset } from '@/lib/uploads';
 
@@ -68,6 +67,8 @@ export default function EditListingPage() {
   const { toast } = useToast();
   const listingId = params.id as string;
   const { data: listing, isLoading } = useListing(listingId);
+  const updateListing = useUpdateListing();
+  const deleteListing = useDeleteListing();
   const hydratedListingIdRef = useRef<string | null>(null);
 
   const [form, setForm] = useState<ListingFormState>(initialForm);
@@ -77,7 +78,6 @@ export default function EditListingPage() {
     hasUploadErrors: false,
     pendingCount: 0,
   });
-  const [isSaving, setIsSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
@@ -110,34 +110,35 @@ export default function EditListingPage() {
     return true;
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!guardImageUpload()) return;
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (form.price <= 0) return toast('error', '가격을 입력해주세요');
 
-    setIsSaving(true);
-    try {
-      await api.patch(`/marketplace/listings/${listingId}`, {
-        ...form,
-        imageUrls: extractUploadUrls(imageAssets),
-      });
-      toast('success', '매물 정보가 저장되었어요');
-      router.push(`/marketplace/${listingId}`);
-    } catch {
-      toast('error', '수정에 실패했어요. 잠시 후 다시 시도해주세요');
-    } finally {
-      setIsSaving(false);
-    }
+    updateListing.mutate({
+      id: listingId,
+      data: { ...form, imageUrls: extractUploadUrls(imageAssets) },
+    }, {
+      onSuccess: () => {
+        toast('success', '매물 정보가 저장되었어요');
+        router.push(`/marketplace/${listingId}`);
+      },
+      onError: () => {
+        toast('error', '수정에 실패했어요. 잠시 후 다시 시도해주세요');
+      },
+    });
   };
 
-  const handleDelete = async () => {
-    try {
-      await api.delete(`/marketplace/listings/${listingId}`);
-      toast('success', '매물이 삭제되었어요');
-      router.push('/my/listings');
-    } catch {
-      toast('error', '삭제하지 못했어요. 다시 시도해주세요');
-    }
+  const handleDelete = () => {
+    deleteListing.mutate(listingId, {
+      onSuccess: () => {
+        toast('success', '매물이 삭제되었어요');
+        router.push('/my/listings');
+      },
+      onError: () => {
+        toast('error', '삭제하지 못했어요. 다시 시도해주세요');
+      },
+    });
   };
 
   if (isLoading) {
@@ -315,10 +316,10 @@ export default function EditListingPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+            disabled={updateListing.isPending || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
             className="flex-1 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
-            {isSaving ? '저장 중...' : '저장'}
+            {updateListing.isPending ? '저장 중...' : '저장'}
           </button>
         </div>
       </div>

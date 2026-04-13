@@ -27,7 +27,7 @@ export default function CreateTeamPage() {
 
   const [form, setForm] = useState({
     name: '',
-    sportType: '',
+    sportTypes: [] as string[],
     description: '',
     city: '',
     district: '',
@@ -38,14 +38,23 @@ export default function CreateTeamPage() {
     shortsUrl: '',
   });
 
+  const toggleSport = (type: string) => {
+    setForm(prev => ({
+      ...prev,
+      sportTypes: prev.sportTypes.includes(type)
+        ? prev.sportTypes.filter(t => t !== type)
+        : [...prev.sportTypes, type],
+    }));
+  };
+
   const handleSubmit = async () => {
     if (!form.name) return toast('error', '팀명을 입력해주세요');
-    if (!form.sportType) return toast('error', '종목을 선택해주세요');
+    if (form.sportTypes.length === 0) return toast('error', '종목을 1개 이상 선택해주세요');
     if (!form.city) return toast('error', '활동 지역을 선택해주세요');
 
     const payload = {
       name: form.name,
-      sportType: form.sportType,
+      sportTypes: form.sportTypes,
       description: form.description || undefined,
       city: form.city,
       district: form.district || undefined,
@@ -100,24 +109,32 @@ export default function CreateTeamPage() {
           />
         </FormField>
 
-        {/* 종목 */}
-        <FormField label="종목" required className="mb-5">
+        {/* 종목 (복수 선택) */}
+        <FormField label="종목 (복수 선택 가능)" required className="mb-5">
           <div className="flex flex-wrap gap-2">
-            {sportTypes.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setForm({ ...form, sportType: type })}
-                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                  form.sportType === type
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {sportLabel[type] || type}
-              </button>
-            ))}
+            {sportTypes.map((type) => {
+              const selected = form.sportTypes.includes(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggleSport(type)}
+                  className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+                    selected
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {sportLabel[type] || type}
+                </button>
+              );
+            })}
           </div>
+          {form.sportTypes.length > 0 && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {form.sportTypes.length}개 종목 선택됨
+            </p>
+          )}
         </FormField>
 
         {/* 팀 소개 */}

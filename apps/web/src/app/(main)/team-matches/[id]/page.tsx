@@ -198,7 +198,7 @@ export default function TeamMatchDetailPage() {
                     <MapPin size={16} />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">구장</p>
+                    <p className="text-sm text-gray-500">장소</p>
                     <p className="text-base font-medium text-gray-900 dark:text-white">{match.venueName}</p>
                     {match.venueAddress && (
                       <p className="text-xs text-gray-500">{match.venueAddress}</p>

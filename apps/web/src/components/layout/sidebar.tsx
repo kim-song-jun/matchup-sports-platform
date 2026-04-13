@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell, UserPlus, MapPin } from 'lucide-react';
+import { Home, Search, GraduationCap, ShoppingBag, User, LogOut, Plus, ShieldCheck, Users, Swords, MessageCircle, Bell, UserPlus, MapPin, Trophy, Award } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { LocaleSwitcher } from '@/components/ui/locale-switcher';
@@ -39,6 +39,7 @@ export function Sidebar() {
         { href: '/marketplace', icon: ShoppingBag, label: t('marketplace') },
         { href: '/teams', icon: Users, label: t('teams') },
         { href: '/mercenary', icon: UserPlus, label: t('mercenary') },
+        { href: '/tournaments', icon: Trophy, label: t('tournaments') },
         { href: '/venues', icon: MapPin, label: t('venues') },
       ],
     },
@@ -49,6 +50,12 @@ export function Sidebar() {
         { href: '/notifications', icon: Bell, label: t('notifications') },
       ],
     }] : []),
+    {
+      label: t('activity'),
+      items: [
+        { href: '/badges', icon: Award, label: t('badges') },
+      ],
+    },
     {
       label: null,
       items: [

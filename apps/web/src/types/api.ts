@@ -305,6 +305,7 @@ export interface MyTeam {
   id: string;
   name: string;
   sportType: string;
+  sportTypes: string[];
   description: string | null;
   city: string | null;
   district: string | null;
@@ -324,6 +325,7 @@ export interface SportTeam {
   ownerId?: string;
   name: string;
   sportType: string;
+  sportTypes: string[];
   description: string | null;
   city: string | null;
   district: string | null;

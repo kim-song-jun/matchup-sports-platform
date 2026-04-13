@@ -17,6 +17,7 @@ function createTeam(id: string, name: string): SportTeam {
     id,
     name,
     sportType: 'futsal',
+    sportTypes: ['futsal'],
     description: null,
     city: '서울',
     district: null,

@@ -35,7 +35,7 @@ export class MercenaryService {
         ...(filter.teamId ? { teamId: filter.teamId } : {}),
       },
       include: {
-        team: { select: { id: true, name: true, sportType: true } },
+        team: { select: { id: true, name: true, sportTypes: true } },
         author: { select: { id: true, nickname: true } },
         _count: {
           select: {
@@ -65,7 +65,7 @@ export class MercenaryService {
     const post = await this.prisma.mercenaryPost.findUnique({
       where: { id },
       include: {
-        team: { select: { id: true, name: true, sportType: true } },
+        team: { select: { id: true, name: true, sportTypes: true } },
         author: { select: { id: true, nickname: true } },
         applications: {
           include: {
@@ -149,7 +149,7 @@ export class MercenaryService {
         notes: dto.notes ?? null,
       },
       include: {
-        team: { select: { id: true, name: true, sportType: true } },
+        team: { select: { id: true, name: true, sportTypes: true } },
         author: { select: { id: true, nickname: true } },
       },
     });
@@ -183,7 +183,7 @@ export class MercenaryService {
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
       include: {
-        team: { select: { id: true, name: true, sportType: true } },
+        team: { select: { id: true, name: true, sportTypes: true } },
         author: { select: { id: true, nickname: true } },
       },
     });
@@ -390,7 +390,7 @@ export class MercenaryService {
       include: {
         post: {
           include: {
-            team: { select: { id: true, name: true, sportType: true } },
+            team: { select: { id: true, name: true, sportTypes: true } },
           },
         },
       },
@@ -411,12 +411,12 @@ export class MercenaryService {
   private async assertTeamSportType(teamId: string, sportType: SportType) {
     const team = await this.prisma.sportTeam.findUnique({
       where: { id: teamId },
-      select: { sportType: true },
+      select: { sportTypes: true },
     });
     if (!team) {
       throw new NotFoundException('팀을 찾을 수 없습니다.');
     }
-    if (team.sportType !== sportType) {
+    if (!team.sportTypes.includes(sportType)) {
       throw new BadRequestException('팀 종목과 모집글 종목은 일치해야 합니다.');
     }
   }

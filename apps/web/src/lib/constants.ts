@@ -52,6 +52,26 @@ export const sportCardAccent: Record<string, { tint: string; badge: string; dot:
   volleyball:     { tint: 'bg-indigo-50/40 dark:bg-indigo-900/10', badge: 'bg-indigo-50 text-indigo-500 dark:bg-indigo-900/30 dark:text-indigo-400', dot: 'bg-indigo-400' },
 };
 
+// Venue labels — sport-specific venue name
+export const venueLabel: Record<string, string> = {
+  soccer: '구장',
+  futsal: '풋살장',
+  basketball: '체육관',
+  badminton: '배드민턴장',
+  ice_hockey: '링크장',
+  figure_skating: '링크장',
+  short_track: '링크장',
+  swimming: '수영장',
+  tennis: '테니스장',
+  baseball: '야구장',
+  volleyball: '체육관',
+};
+
+export function getVenueLabel(sportType?: string | null): string {
+  if (!sportType) return '장소';
+  return venueLabel[sportType] ?? '장소';
+}
+
 // Match status
 export const matchStatusLabel: Record<string, string> = {
   recruiting: '모집중',

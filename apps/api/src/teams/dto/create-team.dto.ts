@@ -10,6 +10,8 @@ import {
   IsNotEmpty,
   IsBoolean,
   IsUrl,
+  ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SportType } from '@prisma/client';
@@ -21,9 +23,12 @@ export class CreateTeamDto {
   @MaxLength(100)
   name!: string;
 
-  @ApiProperty({ enum: SportType, enumName: 'SportType', description: '종목' })
-  @IsEnum(SportType)
-  sportType!: SportType;
+  @ApiProperty({ enum: SportType, enumName: 'SportType', isArray: true, description: '종목 목록 (최소 1개, 최대 11개)' })
+  @IsArray()
+  @IsEnum(SportType, { each: true })
+  @ArrayMinSize(1)
+  @ArrayMaxSize(11)
+  sportTypes!: SportType[];
 
   @ApiPropertyOptional({ description: '팀 소개' })
   @IsString()

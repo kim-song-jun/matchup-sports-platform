@@ -305,10 +305,10 @@ export default function EditTeamMatchPage() {
           </div>
         </section>
 
-        {/* 구장 */}
+        {/* 장소 */}
         <section className="mb-5">
           <label htmlFor="team-match-edit-venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
-            구장명 <span className="text-red-400">*</span>
+            장소명 <span className="text-red-400">*</span>
           </label>
           <input
             id="team-match-edit-venue-name"
@@ -321,7 +321,7 @@ export default function EditTeamMatchPage() {
         </section>
 
         <section className="mb-5">
-          <label htmlFor="team-match-edit-venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">구장 주소 (선택)</label>
+          <label htmlFor="team-match-edit-venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">장소 주소 (선택)</label>
           <input
             id="team-match-edit-venue-address"
             type="text"

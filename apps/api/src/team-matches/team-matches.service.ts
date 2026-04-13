@@ -43,7 +43,7 @@ export class TeamMatchesService {
       where,
       include: {
         hostTeam: {
-          select: { id: true, name: true, sportType: true, city: true, district: true, level: true, memberCount: true },
+          select: { id: true, name: true, sportTypes: true, city: true, district: true, level: true, memberCount: true },
         },
         _count: { select: { applications: true } },
       },
@@ -65,7 +65,7 @@ export class TeamMatchesService {
           select: {
             id: true,
             name: true,
-            sportType: true,
+            sportTypes: true,
             city: true,
             district: true,
             level: true,
@@ -82,7 +82,7 @@ export class TeamMatchesService {
               select: {
                 id: true,
                 name: true,
-                sportType: true,
+                sportTypes: true,
                 description: true,
                 city: true,
                 district: true,

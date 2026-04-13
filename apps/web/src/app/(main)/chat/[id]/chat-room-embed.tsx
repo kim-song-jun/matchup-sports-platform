@@ -47,7 +47,7 @@ function groupMessagesByDate(messages: ChatMessage[]): { date: string; label: st
 const QUICK_ACTIONS = [
   { label: '입금 완료', message: '입금 완료했습니다! 확인 부탁드립니다.' },
   { label: '유니폼 색상 조율', message: '유니폼 색상 조율하려고 합니다. 어떤 색으로 준비하시나요?' },
-  { label: '위치 공유', message: '구장 위치 공유드립니다. 안전하게 오세요!' },
+  { label: '위치 공유', message: '장소 위치 공유드립니다. 안전하게 오세요!' },
 ];
 
 interface ChatRoomEmbedProps {

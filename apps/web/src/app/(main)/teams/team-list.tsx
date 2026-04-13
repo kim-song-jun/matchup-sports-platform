@@ -1,13 +1,21 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { useTeams, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TeamCard } from '@/components/teams/team-card';
-import { Users as UsersIcon } from 'lucide-react';
+import { Search, Users as UsersIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { sportLabel } from '@/lib/constants';
 import type { SportTeam, MyTeam } from '@/types/api';
+
+const sportFilters = [
+  { key: '', label: '전체' },
+  ...Object.entries(sportLabel).map(([key, label]) => ({ key, label })),
+];
 
 export function TeamList() {
   const te = useTranslations('empty');
@@ -15,15 +23,36 @@ export function TeamList() {
   const { data, isLoading, error, refetch } = useTeams();
   const { data: myTeams } = useMyTeams();
 
+  const [activeSport, setActiveSport] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
+
   const allTeams = data?.items ?? [];
   const myTeamList: MyTeam[] = myTeams ?? [];
   const myTeamIds = new Set(myTeamList.map((t) => t.id));
-  const otherTeams = isAuthenticated ? allTeams.filter((t: SportTeam) => !myTeamIds.has(t.id)) : allTeams;
+
+  const filteredTeams = useMemo(() => {
+    let result = isAuthenticated ? allTeams.filter((t: SportTeam) => !myTeamIds.has(t.id)) : allTeams;
+    if (activeSport) {
+      result = result.filter((t: SportTeam) => {
+        const types = t.sportTypes ?? [t.sportType];
+        return types.includes(activeSport);
+      });
+    }
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter((t: SportTeam) =>
+        t.name.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [allTeams, isAuthenticated, myTeamIds, activeSport, debouncedSearch]);
 
   if (isLoading) {
     return (
       <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
-        {[1, 2].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
+        {[1, 2, 3].map(i => <div key={i} className="h-24 rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
       </div>
     );
   }
@@ -33,10 +62,41 @@ export function TeamList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="팀 이름으로 검색"
+          className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
+        />
+      </div>
+
+      {/* Sport filter chips */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        {sportFilters.map((filter) => (
+          <button
+            key={filter.key}
+            type="button"
+            onClick={() => setActiveSport(filter.key)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeSport === filter.key
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      {/* My teams */}
       {isAuthenticated && (
         <div>
-          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀</h2>
+          <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">내 팀</h2>
           {myTeamList.length === 0 ? (
             <EmptyState
               icon={UsersIcon}
@@ -55,19 +115,26 @@ export function TeamList() {
         </div>
       )}
 
+      {/* Other teams */}
       <div>
         {isAuthenticated && (
-          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀</h2>
+          <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">다른 팀</h2>
         )}
-        {otherTeams.length === 0 && !isLoading ? (
+        {!isLoading && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{filteredTeams.length}개 팀</p>
+        )}
+        {filteredTeams.length === 0 ? (
           <EmptyState
             icon={UsersIcon}
-            title={te('noTeams')}
-            description={te('noTeamsDesc')}
+            title={debouncedSearch || activeSport ? '조건에 맞는 팀이 없어요' : te('noTeams')}
+            description={debouncedSearch || activeSport ? '다른 조건으로 검색해보세요' : te('noTeamsDesc')}
+            {...(activeSport && {
+              secondaryAction: { label: '전체 보기', onClick: () => { setActiveSport(''); setSearchInput(''); } },
+            })}
           />
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
-            {otherTeams.map((team: SportTeam) => (
+            {filteredTeams.map((team: SportTeam) => (
               <TeamCard key={team.id} team={team} />
             ))}
           </div>

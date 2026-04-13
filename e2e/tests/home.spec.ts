@@ -107,8 +107,8 @@ test.describe('Navigation - Mobile', () => {
     await gotoWithWarmup(page, '/home');
     const nav = page.getByTestId('bottom-nav');
     // Profile tab should have badge overlay for unread
-    const profileTab = page.getByTestId('bottom-nav-profile');
-    await expect(profileTab).toBeVisible();
+    const moreTab = page.getByTestId('bottom-nav-more');
+    await expect(moreTab).toBeVisible();
   });
 
   test('navigate between tabs', async ({ page }) => {

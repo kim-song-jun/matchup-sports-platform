@@ -144,20 +144,21 @@ export async function syncImageData(prisma: PrismaClient) {
   const teams = await prisma.sportTeam.findMany({
     select: {
       id: true,
-      sportType: true,
+      sportTypes: true,
       coverImageUrl: true,
       photos: true,
     },
   });
 
   for (const team of teams) {
+    const primarySportType = team.sportTypes[0];
     const nextCoverImageUrl = mergeManagedSingle(
       team.coverImageUrl,
-      getTeamCoverSeedImage(team.sportType, team.id),
+      getTeamCoverSeedImage(primarySportType, team.id),
     );
     const nextPhotos = mergeManagedGallery(
       team.photos,
-      getTeamPhotoSeedImages(team.sportType, team.id, 3),
+      getTeamPhotoSeedImages(primarySportType, team.id, 3),
       3,
     );
 

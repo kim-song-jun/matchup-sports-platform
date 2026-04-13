@@ -69,7 +69,8 @@ export function useMyTeams() {
       return raw.map((m): MyTeam => ({
         id: m.team.id,
         name: m.team.name,
-        sportType: m.team.sportType,
+        sportType: m.team.sportTypes?.[0] ?? m.team.sportType,
+        sportTypes: m.team.sportTypes ?? [m.team.sportType],
         description: m.team.description,
         city: m.team.city,
         district: m.team.district,

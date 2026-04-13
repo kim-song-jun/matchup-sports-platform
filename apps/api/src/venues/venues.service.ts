@@ -122,7 +122,7 @@ export class VenuesService {
             select: { id: true, nickname: true, profileImageUrl: true },
           },
           team: {
-            select: { id: true, name: true, sportType: true, logoUrl: true },
+            select: { id: true, name: true, sportTypes: true, logoUrl: true },
           },
           venue: {
             select: { id: true, name: true, city: true, district: true, address: true },

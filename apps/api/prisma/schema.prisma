@@ -760,10 +760,10 @@ model LessonAttendance {
 // ─── 팀/클럽 홍보 ───────────────────────────────────────
 
 model SportTeam {
-  id            String    @id @default(uuid())
-  ownerId       String    @map("owner_id")
+  id            String      @id @default(uuid())
+  ownerId       String      @map("owner_id")
   name          String
-  sportType     SportType @map("sport_type")
+  sportTypes    SportType[] @map("sport_types")
   description   String?
   logoUrl       String?   @map("logo_url")
   coverImageUrl String?   @map("cover_image_url")
@@ -796,7 +796,6 @@ model SportTeam {
   mercenaryPosts      MercenaryPost[]
   invitations         TeamInvitation[]
 
-  @@index([sportType])
   @@index([city, isRecruiting])
   @@map("sport_teams")
 }

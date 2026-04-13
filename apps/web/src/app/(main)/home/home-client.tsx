@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
-import { Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users, GraduationCap, UserPlus, MapPin } from 'lucide-react';
+import { Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users, GraduationCap, UserPlus, MapPin, Trophy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -224,6 +224,7 @@ export function HomePage() {
             { href: '/team-matches', icon: Swords, label: tn('teamMatching') },
             { href: '/mercenary', icon: UserPlus, label: tn('mercenary') },
             { href: '/venues', icon: MapPin, label: tn('venues') },
+            { href: '/tournaments', icon: Trophy, label: tn('tournaments') },
           ].map(({ href, icon: Icon, label }) => (
             <Link key={href} href={href}
               className="flex shrink-0 items-center min-h-[44px] gap-2 rounded-xl border border-gray-100 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
@@ -308,6 +309,10 @@ export function HomePage() {
             </div>
           </section>
         )}
+
+        {/* TODO: Tournament section — awaiting useTournaments hook (frontend-data-dev).
+            Pattern: hooks/api/use-tournaments.ts, endpoint GET /tournaments,
+            type Tournament from types/api.ts, query keys already defined in query-keys.ts. */}
 
         {/* 강좌 — 컴팩트 리스트 카드 */}
         {lessons.length > 0 && (

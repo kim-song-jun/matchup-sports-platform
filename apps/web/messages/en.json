@@ -41,7 +41,11 @@
     "communication": "Social",
     "findMatch": "Find Match",
     "createMatch": "Create Match",
-    "venues": "Venues"
+    "venues": "Venues",
+    "more": "More",
+    "tournaments": "Tournaments",
+    "badges": "Badges",
+    "activity": "Activity"
   },
   "sports": {
     "all": "All",
@@ -92,7 +96,8 @@
     "recruiting": "Recruiting",
     "viewAllMatches": "View All",
     "coach": "Coach",
-    "rent": "Rent"
+    "rent": "Rent",
+    "upcomingTournaments": "Upcoming Tournaments"
   },
   "matches": {
     "findMatch": "Find Match",

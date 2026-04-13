@@ -94,7 +94,7 @@ describe('TeamsService', () => {
       {
         id: 'team-1',
         name: 'FC 서울',
-        sportType: SportType.futsal,
+        sportTypes: [SportType.futsal],
         city: '서울',
         isRecruiting: true,
         createdAt: new Date('2026-03-01'),
@@ -103,7 +103,7 @@ describe('TeamsService', () => {
       {
         id: 'team-2',
         name: '판교 농구단',
-        sportType: SportType.basketball,
+        sportTypes: [SportType.basketball],
         city: '성남',
         isRecruiting: false,
         createdAt: new Date('2026-03-02'),
@@ -132,7 +132,7 @@ describe('TeamsService', () => {
       const manyTeams = Array.from({ length: 21 }, (_, i) => ({
         id: `team-${i}`,
         name: `팀 ${i}`,
-        sportType: SportType.futsal,
+        sportTypes: [SportType.futsal],
         createdAt: new Date(),
         owner: { id: `u${i}`, nickname: `유저${i}`, profileImageUrl: null },
       }));
@@ -151,7 +151,7 @@ describe('TeamsService', () => {
 
       expect(prisma.sportTeam.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ sportType: SportType.futsal }),
+          where: expect.objectContaining({ sportTypes: { has: SportType.futsal } }),
         }),
       );
     });
@@ -199,7 +199,7 @@ describe('TeamsService', () => {
     const mockTeamDetail = {
       id: 'team-1',
       name: 'FC 서울',
-      sportType: SportType.futsal,
+      sportTypes: [SportType.futsal],
       city: '서울',
       district: '강남구',
       owner: {
@@ -246,7 +246,7 @@ describe('TeamsService', () => {
   describe('create', () => {
     const createData = {
       name: 'FC 새팀',
-      sportType: SportType.futsal,
+      sportTypes: [SportType.futsal],
       description: '즐겁게 운동해요',
       city: '서울',
       district: '강남구',
@@ -277,7 +277,7 @@ describe('TeamsService', () => {
         data: expect.objectContaining({
           ownerId: 'user-1',
           name: 'FC 새팀',
-          sportType: SportType.futsal,
+          sportTypes: [SportType.futsal],
           description: '즐겁게 운동해요',
           city: '서울',
           district: '강남구',
@@ -304,7 +304,7 @@ describe('TeamsService', () => {
     it('should use default values for optional fields', async () => {
       const minimalData = {
         name: '최소 팀',
-        sportType: SportType.basketball,
+        sportTypes: [SportType.basketball],
       };
 
       mockTx.sportTeam.create.mockResolvedValue({
@@ -332,7 +332,7 @@ describe('TeamsService', () => {
     const mockTeam = {
       id: 'team-1',
       name: 'FC 서울',
-      sportType: SportType.futsal,
+      sportTypes: [SportType.futsal],
       owner: { id: 'owner-1', nickname: '팀장', profileImageUrl: null, mannerScore: 4.5 },
     };
     const mockInvitee = { id: 'invitee-1', nickname: '초대받은유저' };
@@ -654,7 +654,7 @@ describe('TeamsService', () => {
           teamId: 'team-1',
           inviteeId: 'user-1',
           status: InvitationStatus.pending,
-          team: { id: 'team-1', name: 'FC 서울', logoUrl: null, sportType: SportType.futsal },
+          team: { id: 'team-1', name: 'FC 서울', logoUrl: null, sportTypes: [SportType.futsal] },
           inviter: { id: 'manager-1', nickname: '매니저', profileImageUrl: null },
         },
       ];

@@ -14,7 +14,7 @@ import type { CreateTeamMatchInput } from '@/types/api';
 import { formatCurrency } from '@/lib/utils';
 import { sportLabel } from '@/lib/constants';
 
-const STEPS = ['종목', '구장/일시', '경기조건', '비용/규정', '확인'];
+const STEPS = ['종목', '장소/일시', '경기조건', '비용/규정', '확인'];
 
 const sportOptions = Object.entries(sportLabel).map(([value, label]) => ({ value, label }));
 
@@ -280,7 +280,7 @@ export default function NewTeamMatchPage() {
           </div>
         )}
 
-        {/* Step 1: 구장/일시 */}
+        {/* Step 1: 장소/일시 */}
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <div>
@@ -349,7 +349,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장명</label>
+              <label htmlFor="venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">장소명</label>
               <input
                 id="venue-name"
                 type="text"
@@ -361,7 +361,7 @@ export default function NewTeamMatchPage() {
             </div>
 
             <div>
-              <label htmlFor="venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장 주소 (선택)</label>
+              <label htmlFor="venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">장소 주소 (선택)</label>
               <input
                 id="venue-address"
                 type="text"
@@ -587,7 +587,7 @@ export default function NewTeamMatchPage() {
                 <SummaryRow label="날짜" value={form.matchDate} />
                 <SummaryRow label="시간" value={`${form.startTime} ~ ${form.endTime}`} />
                 <SummaryRow label="쿼터" value={`${form.quarterCount}쿼터`} />
-                <SummaryRow label="구장" value={form.venueName} />
+                <SummaryRow label="장소" value={form.venueName} />
                 {form.venueAddress && <SummaryRow label="주소" value={form.venueAddress} />}
                 <SummaryRow label="총 비용" value={formatCurrency(Number(form.totalFee))} />
                 {form.isFreeInvitation ? (

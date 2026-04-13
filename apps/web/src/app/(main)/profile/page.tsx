@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity, Info, HelpCircle, FileText, Shield } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity, Info, HelpCircle, FileText, Shield, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
@@ -58,6 +58,7 @@ export default function ProfilePage() {
         { label: t('myLessons'), icon: BookOpen, href: '/my/lessons' },
         { label: '내 수강권', icon: Ticket, href: '/my/lesson-tickets' },
         { label: t('myListings'), icon: ShoppingBag, href: '/my/listings' },
+        { label: '장소 찾기', icon: MapPin, href: '/venues' },
       ],
     },
     {

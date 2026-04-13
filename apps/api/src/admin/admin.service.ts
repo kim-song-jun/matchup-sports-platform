@@ -609,7 +609,7 @@ export class AdminService {
     const posts = await this.prisma.mercenaryPost.findMany({
       where,
       include: {
-        team: { select: { id: true, name: true, sportType: true } },
+        team: { select: { id: true, name: true, sportTypes: true } },
         author: { select: { id: true, nickname: true } },
         _count: { select: { applications: true } },
       },
@@ -681,7 +681,7 @@ export class AdminService {
         data: {
           ownerId: data.ownerId,
           name: data.name,
-          sportType: data.sportType,
+          sportTypes: data.sportTypes,
           description: data.description,
           logoUrl: data.logoUrl,
           coverImageUrl: data.coverImageUrl,

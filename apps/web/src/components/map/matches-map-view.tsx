@@ -86,7 +86,7 @@ export function MatchesMapView({ matches }: MatchesMapViewProps) {
       <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 h-[400px] dark:border-gray-700 dark:bg-gray-800">
         <MapPin size={24} className="text-gray-400" aria-hidden="true" />
         <p className="text-sm text-gray-500 dark:text-gray-400">지도에 표시할 매치가 없어요</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">구장 위치 정보가 있는 매치만 지도에 나타납니다</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">장소 위치 정보가 있는 매치만 지도에 나타납니다</p>
       </div>
     );
   }

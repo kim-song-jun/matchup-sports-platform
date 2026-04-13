@@ -1022,7 +1022,7 @@ async function main() {
     {
       ownerId: users[2].id,
       name: '잠실 아이스베어스',
-      sportType: 'ice_hockey' as const,
+      sportTypes: ['ice_hockey' as const],
       description: '송파구 기반 아이스하키 동호회. 주 1회 정기전.',
       city: '서울',
       district: '송파구',
@@ -1035,7 +1035,7 @@ async function main() {
     {
       ownerId: users[0].id,
       name: 'FC 마포',
-      sportType: 'futsal' as const,
+      sportTypes: ['futsal' as const],
       description: '마포구 직장인 풋살 동호회. 매주 토요일 저녁.',
       city: '서울',
       district: '마포구',
@@ -1048,7 +1048,7 @@ async function main() {
     {
       ownerId: users[1].id,
       name: '강남 슬래머즈',
-      sportType: 'basketball' as const,
+      sportTypes: ['basketball' as const],
       description: '강남 농구 동호회. 주 2회 정기 모임.',
       city: '서울',
       district: '강남구',
@@ -1061,7 +1061,7 @@ async function main() {
     {
       ownerId: users[3].id,
       name: '셔틀콕 파이터즈',
-      sportType: 'badminton' as const,
+      sportTypes: ['badminton' as const],
       description: '서초/강남 배드민턴 동호회. 매주 수/토 모임.',
       city: '서울',
       district: '서초구',
@@ -1179,7 +1179,7 @@ async function main() {
     prisma.teamMatch.create({
       data: {
         hostTeamId: existingTeams[0].id,
-        sportType: existingTeams[0].sportType,
+        sportType: existingTeams[0].sportTypes[0],
         title: '잠실 아이스베어스 vs 도전팀 모집',
         description: '친선전입니다. 레벨 3~5 팀 모집합니다.',
         matchDate: nextSat,
@@ -1212,7 +1212,7 @@ async function main() {
     prisma.teamMatch.create({
       data: {
         hostTeamId: existingTeams[1].id,
-        sportType: existingTeams[1].sportType,
+        sportType: existingTeams[1].sportTypes[0],
         title: 'FC 마포 주말 풋살 대전',
         description: '매너 위주 풋살 경기. 초보 팀도 환영!',
         matchDate: nextSun,
@@ -1245,7 +1245,7 @@ async function main() {
     prisma.teamMatch.create({
       data: {
         hostTeamId: existingTeams[0].id,
-        sportType: existingTeams[0].sportType,
+        sportType: existingTeams[0].sportTypes[0],
         title: '아이스베어스 정기전 상대 모집',
         description: '실전형 경기. 레벨 4 이상 팀 우대.',
         matchDate: dayAfter,
@@ -1271,7 +1271,7 @@ async function main() {
     prisma.teamMatch.create({
       data: {
         hostTeamId: existingTeams.length > 2 ? existingTeams[2].id : existingTeams[0].id,
-        sportType: existingTeams.length > 2 ? existingTeams[2].sportType : 'basketball',
+        sportType: existingTeams.length > 2 ? existingTeams[2].sportTypes[0] : 'basketball',
         title: '강남 슬래머즈 친선 농구 매치',
         description: '5:5 농구 친선전. 매너 경기 우선. 초중급 팀 환영!',
         matchDate: nextNextSat,
@@ -1298,7 +1298,7 @@ async function main() {
     prisma.teamMatch.create({
       data: {
         hostTeamId: existingTeams[1].id,
-        sportType: existingTeams[1].sportType,
+        sportType: existingTeams[1].sportTypes[0],
         title: 'FC 마포 실전 풋살 리그전',
         description: '실전 풋살 리그 3라운드. 경쟁전 원하는 팀!',
         matchDate: nextNextSun,
@@ -1325,7 +1325,7 @@ async function main() {
     prisma.teamMatch.create({
       data: {
         hostTeamId: existingTeams.length > 3 ? existingTeams[3].id : existingTeams[0].id,
-        sportType: existingTeams.length > 3 ? existingTeams[3].sportType : 'badminton',
+        sportType: existingTeams.length > 3 ? existingTeams[3].sportTypes[0] : 'badminton',
         title: '셔틀콕 파이터즈 단체전',
         description: '배드민턴 5인 단체전. 복식 2경기 + 단식 1경기.',
         matchDate: in5Days,

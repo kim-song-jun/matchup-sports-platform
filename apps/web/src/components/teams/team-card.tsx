@@ -68,14 +68,22 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
               </span>
             )}
           </div>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <span
-              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}
-            >
-              {sportLabel[team.sportType] || team.sportType}
-            </span>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {(team.sportTypes ?? [team.sportType]).slice(0, 2).map((st) => (
+              <span
+                key={st}
+                className={`${sportCardAccent[st]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}
+              >
+                {sportLabel[st] || st}
+              </span>
+            ))}
+            {(team.sportTypes?.length ?? 1) > 2 && (
+              <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400 shrink-0">
+                +{(team.sportTypes?.length ?? 1) - 2}
+              </span>
+            )}
             <span>{tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}</span>
-          </p>
+          </div>
           {team.description && (
             <p className="mt-1 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{team.description}</p>
           )}

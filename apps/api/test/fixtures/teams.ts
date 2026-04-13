@@ -18,7 +18,7 @@ export async function createTeamWithOwner(
   ownerId: string,
   overrides: Partial<{
     name: string;
-    sportType: SportType;
+    sportTypes: SportType[];
     city: string;
     district: string;
     level: number;
@@ -30,7 +30,7 @@ export async function createTeamWithOwner(
       data: {
         ownerId,
         name: overrides.name ?? `Test Team ${Date.now()}`,
-        sportType: overrides.sportType ?? SportType.futsal,
+        sportTypes: overrides.sportTypes ?? [SportType.futsal],
         city: overrides.city ?? '서울',
         district: overrides.district ?? '마포구',
         memberCount: 1,

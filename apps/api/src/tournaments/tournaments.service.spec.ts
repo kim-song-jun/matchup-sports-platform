@@ -144,7 +144,7 @@ describe('TournamentsService', () => {
       venueId: null,
       venue: null,
       organizer: { id: 'manager-1', nickname: 'manager', profileImageUrl: null },
-      team: { id: 'team-1', name: '드림팀', sportType: 'futsal', logoUrl: null },
+      team: { id: 'team-1', name: '드림팀', sportTypes: ['futsal'], logoUrl: null },
     });
 
     const result = await service.create('manager-1', 'user', {

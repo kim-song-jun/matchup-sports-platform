@@ -41,7 +41,11 @@
     "communication": "소통",
     "findMatch": "매치 찾기",
     "createMatch": "매치 만들기",
-    "venues": "구장"
+    "venues": "구장",
+    "more": "더보기",
+    "tournaments": "대회",
+    "badges": "뱃지",
+    "activity": "활동"
   },
   "sports": {
     "all": "전체",
@@ -92,7 +96,8 @@
     "recruiting": "모집중",
     "viewAllMatches": "전체 보기",
     "coach": "코치",
-    "rent": "대여"
+    "rent": "대여",
+    "upcomingTournaments": "다가오는 대회"
   },
   "matches": {
     "findMatch": "매치 찾기",

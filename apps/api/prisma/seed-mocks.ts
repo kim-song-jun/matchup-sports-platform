@@ -315,7 +315,7 @@ async function main() {
           data: {
             ownerId,
             name: team.name,
-            sportType: team.sportType,
+            sportTypes: Array.isArray(team.sportType) ? team.sportType : [team.sportType],
             description: team.description,
             coverImageUrl: null,
             photos: [],
@@ -333,7 +333,7 @@ async function main() {
           where: { id },
           data: {
             ownerId,
-            sportType: team.sportType,
+            sportTypes: Array.isArray(team.sportType) ? team.sportType : [team.sportType],
             description: team.description,
             city: team.city,
             district: team.district,

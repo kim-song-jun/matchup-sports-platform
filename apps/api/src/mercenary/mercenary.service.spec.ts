@@ -92,7 +92,7 @@ describe('MercenaryService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
-    prismaMock.sportTeam.findUnique.mockResolvedValue({ sportType: 'FUTSAL' });
+    prismaMock.sportTeam.findUnique.mockResolvedValue({ sportTypes: ['FUTSAL'] });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -286,7 +286,7 @@ describe('MercenaryService', () => {
 
     it('throws BadRequestException when team sport type does not match post sport type', async () => {
       teamMembershipMock.assertRole.mockResolvedValue({ role: 'manager' });
-      prismaMock.sportTeam.findUnique.mockResolvedValue({ sportType: 'SOCCER' });
+      prismaMock.sportTeam.findUnique.mockResolvedValue({ sportTypes: ['SOCCER'] });
 
       await expect(service.create('user-1', dto)).rejects.toThrow(BadRequestException);
       expect(prismaMock.mercenaryPost.create).not.toHaveBeenCalled();
@@ -299,7 +299,7 @@ describe('MercenaryService', () => {
   describe('update', () => {
     it('throws BadRequestException when requested sport type does not match team sport type', async () => {
       prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ teamId: 'team-1' }));
-      prismaMock.sportTeam.findUnique.mockResolvedValue({ sportType: 'SOCCER' });
+      prismaMock.sportTeam.findUnique.mockResolvedValue({ sportTypes: ['SOCCER'] });
 
       await expect(
         service.update('post-1', 'user-1', { sportType: 'FUTSAL' as SportType }),

@@ -350,7 +350,7 @@ describe('AdminService', () => {
           position: 'GK',
           status: MercenaryPostStatus.open,
           createdAt: new Date('2026-04-11T04:00:00Z'),
-          team: { id: 'team-1', name: 'FC MatchUp', sportType: SportType.futsal },
+          team: { id: 'team-1', name: 'FC MatchUp', sportTypes: [SportType.futsal] },
           author: { id: 'u1', nickname: 'owner' },
           _count: { applications: 3 },
         },

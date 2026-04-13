@@ -253,7 +253,7 @@ export default function MatchDetailPage() {
             Math.sin(dLng / 2) ** 2;
         const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         if (distance > 200) {
-          toast('error', '구장에서 너무 멀어요. 200m 이내에서만 인증할 수 있어요.');
+          toast('error', '장소에서 너무 멀어요. 200m 이내에서만 인증할 수 있어요.');
           setIsArriving(false);
           return;
         }
@@ -762,7 +762,7 @@ export default function MatchDetailPage() {
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            구장에 도착했나요? 사진을 찍어 도착을 인증해주세요.
+            장소에 도착했나요? 사진을 찍어 도착을 인증해주세요.
           </p>
           <div>
             <label htmlFor="arrival-photo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

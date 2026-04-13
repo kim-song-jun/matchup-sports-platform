@@ -74,7 +74,7 @@ describe('TeamMatchesService', () => {
         sportType: 'FUTSAL',
         status: 'recruiting',
         matchDate: new Date('2026-04-01'),
-        hostTeam: { id: 't1', name: 'FC 서울', sportType: 'FUTSAL', city: '서울', district: '강남구', level: 3, memberCount: 10 },
+        hostTeam: { id: 't1', name: 'FC 서울', sportTypes: ['FUTSAL'], city: '서울', district: '강남구', level: 3, memberCount: 10 },
         _count: { applications: 2 },
       },
       {
@@ -83,7 +83,7 @@ describe('TeamMatchesService', () => {
         sportType: 'BASKETBALL',
         status: 'recruiting',
         matchDate: new Date('2026-04-02'),
-        hostTeam: { id: 't2', name: '판교 농구단', sportType: 'BASKETBALL', city: '성남', district: '분당구', level: 4, memberCount: 8 },
+        hostTeam: { id: 't2', name: '판교 농구단', sportTypes: ['BASKETBALL'], city: '성남', district: '분당구', level: 4, memberCount: 8 },
         _count: { applications: 0 },
       },
     ];
@@ -113,7 +113,7 @@ describe('TeamMatchesService', () => {
         sportType: 'FUTSAL',
         status: 'recruiting',
         matchDate: new Date(),
-        hostTeam: { id: `t${i}`, name: `팀${i}`, sportType: 'FUTSAL', city: '서울', district: '강남', level: 3, memberCount: 10 },
+        hostTeam: { id: `t${i}`, name: `팀${i}`, sportTypes: ['FUTSAL'], city: '서울', district: '강남', level: 3, memberCount: 10 },
         _count: { applications: 0 },
       }));
       mockPrismaService.teamMatch.findMany.mockResolvedValue(manyMatches);
@@ -188,7 +188,7 @@ describe('TeamMatchesService', () => {
       const applicantMatch = {
         ...mockTeamMatches[1],
         id: 'tm-3',
-        hostTeam: { id: 't9', name: '상대팀', sportType: 'FUTSAL', city: '서울', district: '종로구', level: 3, memberCount: 10 },
+        hostTeam: { id: 't9', name: '상대팀', sportTypes: ['FUTSAL'], city: '서울', district: '종로구', level: 3, memberCount: 10 },
       };
       mockPrismaService.teamMatch.findMany.mockResolvedValue([applicantMatch]);
 
@@ -278,7 +278,7 @@ describe('TeamMatchesService', () => {
       hostTeam: {
         id: 't1',
         name: 'FC 서울',
-        sportType: 'FUTSAL',
+        sportTypes: ['FUTSAL'],
         city: '서울',
         district: '강남구',
         level: 3,
@@ -294,7 +294,7 @@ describe('TeamMatchesService', () => {
           applicantTeam: {
             id: 't2',
             name: '판교 FC',
-            sportType: 'FUTSAL',
+            sportTypes: ['FUTSAL'],
             description: null,
             city: '성남',
             district: '분당구',

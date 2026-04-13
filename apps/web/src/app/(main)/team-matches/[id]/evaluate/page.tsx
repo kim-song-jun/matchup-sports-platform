@@ -21,7 +21,7 @@ import {
 
 const evaluationItems = [
   { key: 'levelAccuracy', label: '수준 일치', desc: '모집글과 실제 경기 수준이 비슷했나요?' },
-  { key: 'infoAccuracy', label: '정보 일치', desc: '구장, 인원, 안내 정보가 실제와 맞았나요?' },
+  { key: 'infoAccuracy', label: '정보 일치', desc: '장소, 인원, 안내 정보가 실제와 맞았나요?' },
   { key: 'mannerRating', label: '매너', desc: '상대 팀이 경기 내내 매너 있게 참여했나요?' },
   { key: 'punctuality', label: '시간 약속', desc: '약속한 시간에 맞춰 참여했나요?' },
   { key: 'paymentClarity', label: '비용 정산', desc: '비용 정산이 명확하고 깔끔했나요?' },

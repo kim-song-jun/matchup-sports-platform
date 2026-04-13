@@ -38,7 +38,7 @@ export class TeamsService {
   async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string; limit?: number }) {
     const limit = Math.min(Math.max(1, filter.limit ?? 20), 100);
     const where: Prisma.SportTeamWhereInput = {};
-    if (filter.sportType) where.sportType = filter.sportType as SportType;
+    if (filter.sportType) where.sportTypes = { has: filter.sportType as SportType };
     if (filter.city) where.city = filter.city;
     if (filter.recruiting === 'true') where.isRecruiting = true;
     if (filter.ownerId) where.ownerId = filter.ownerId;
@@ -89,7 +89,7 @@ export class TeamsService {
         data: {
           ownerId,
           name: data.name,
-          sportType: data.sportType,
+          sportTypes: data.sportTypes,
           description: data.description,
           logoUrl: data.logoUrl,
           coverImageUrl: data.coverImageUrl,
@@ -128,7 +128,7 @@ export class TeamsService {
       where: { id: teamId },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.sportType !== undefined ? { sportType: data.sportType } : {}),
+        ...(data.sportTypes !== undefined ? { sportTypes: data.sportTypes } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.logoUrl !== undefined ? { logoUrl: data.logoUrl } : {}),
         ...(data.coverImageUrl !== undefined ? { coverImageUrl: data.coverImageUrl } : {}),
@@ -429,7 +429,7 @@ export class TeamsService {
         expiresAt: { gt: new Date() },
       },
       include: {
-        team: { select: { id: true, name: true, logoUrl: true, sportType: true } },
+        team: { select: { id: true, name: true, logoUrl: true, sportTypes: true } },
         inviter: { select: { id: true, nickname: true, profileImageUrl: true } },
       },
       orderBy: { createdAt: 'desc' },

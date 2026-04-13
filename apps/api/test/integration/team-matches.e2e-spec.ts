@@ -38,7 +38,7 @@ describe('TeamMatches (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         name,
-        sportType: 'futsal',
+        sportTypes: ['futsal'],
         city: '서울',
         district: '마포구',
         level: 3,

@@ -38,12 +38,13 @@ export class TeamsController {
     @Query('recruiting') recruiting?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
+    @Query('search') search?: string,
   ) {
     const parsed = limit ? parseInt(limit, 10) : undefined;
     const safeLimit = parsed !== undefined
       ? Math.min(Math.max(1, Number.isNaN(parsed) ? 20 : parsed), 100)
       : undefined;
-    return this.teamsService.findAll({ sportType, city, recruiting, cursor, limit: safeLimit });
+    return this.teamsService.findAll({ sportType, city, recruiting, cursor, limit: safeLimit, search });
   }
 
   @Get('me')

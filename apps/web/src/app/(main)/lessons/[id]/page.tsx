@@ -170,6 +170,12 @@ export default function LessonDetailPage() {
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>
+            {lesson.team && (
+              <Link href={`/teams/${lesson.team.id}`} className="inline-flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium mt-1">
+                <Users size={14} aria-hidden="true" />
+                {lesson.team.name}
+              </Link>
+            )}
             {lesson.description && <p className="mt-3 text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{lesson.description}</p>}
           </div>
 

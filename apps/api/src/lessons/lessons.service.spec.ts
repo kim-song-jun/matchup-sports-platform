@@ -202,6 +202,7 @@ describe('LessonsService', () => {
         profileImageUrl: 'https://example.com/img.jpg',
         mannerScore: 4.8,
       },
+      team: { id: 'team-1', name: 'FC 서울' },
       ticketPlans: [
         {
           id: 'plan-1',
@@ -268,6 +269,7 @@ describe('LessonsService', () => {
                 mannerScore: true,
               },
             },
+            team: { select: { id: true, name: true } },
             ticketPlans: {
               where: { isActive: true },
               orderBy: { sortOrder: 'asc' },

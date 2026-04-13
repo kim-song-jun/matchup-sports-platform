@@ -69,6 +69,7 @@ export class LessonsService {
             mannerScore: true,
           },
         },
+        team: { select: { id: true, name: true } },
         ticketPlans: {
           where: { isActive: true },
           orderBy: { sortOrder: 'asc' },

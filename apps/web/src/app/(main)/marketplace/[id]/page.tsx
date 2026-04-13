@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Heart, Eye, MapPin, Star, MessageCircle, ChevronRight, Share2, ShieldCheck, Pencil, Trash2, AlertTriangle, ShoppingBag, Users } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import dynamic from 'next/dynamic';
@@ -215,6 +215,12 @@ export default function ListingDetailPage() {
               )}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{listing.title}</h1>
+            {listing.team && (
+              <Link href={`/teams/${listing.team.id}`} className="inline-flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium mt-1">
+                <Users size={14} aria-hidden="true" />
+                {listing.team.name}
+              </Link>
+            )}
             <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">{formatAmount(listing.price)}</p>
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
               <span className="flex items-center gap-1"><Eye size={14} />{listing.viewCount}</span>

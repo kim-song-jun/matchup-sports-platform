@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
+import { useMatches, useTeams, useLessons, useListings, useTeamMatches, useTournaments } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { Plus, Clock, ArrowRight, Calendar, Swords, Gift, Users, GraduationCap, UserPlus, MapPin, Trophy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,7 +12,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { sportLabel, sportCardAccent, levelLabel } from '@/lib/constants';
 import { formatCurrency, formatMatchDate, getTimeBadge } from '@/lib/utils';
 import { getSportDetailImageSet, getTeamLogo, getListingImage } from '@/lib/sport-image';
-import type { Match, SportTeam, Lesson, MarketplaceListing, TeamMatch } from '@/types/api';
+import type { Match, SportTeam, Lesson, MarketplaceListing, TeamMatch, Tournament } from '@/types/api';
 
 const sportFilters = [
   'all', 'soccer', 'futsal', 'basketball', 'badminton',
@@ -44,12 +44,14 @@ export function HomePage() {
   const { data: lessonData } = useLessons({ limit: '4' });
   const { data: listingData } = useListings({ limit: '4' });
   const { data: teamMatchData } = useTeamMatches({ limit: '3' });
+  const { data: tournamentData } = useTournaments({ limit: '3' });
 
   const allMatches = matchData?.items ?? [];
   const teams = teamData?.items ?? [];
   const lessons = lessonData?.items ?? [];
   const listings = listingData?.items ?? [];
   const teamMatches = teamMatchData?.items ?? [];
+  const tournaments = tournamentData?.items ?? [];
 
   const [activeSport, setActiveSport] = useState<string>('all');
   const [bannerIdx, setBannerIdx] = useState(0);
@@ -290,7 +292,7 @@ export function HomePage() {
                 const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors h-full">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
                       <div className="flex items-center gap-2.5">
                         <div className={`relative h-9 w-9 rounded-xl ${accent?.tint || 'bg-gray-100'} shrink-0 overflow-hidden`}>
                           <SafeImage src={teamLogo} fallbackSrc={fallbackTeamLogo} alt={`${team.name} logo`} fill className="rounded-[10px] object-cover" sizes="36px" />
@@ -310,9 +312,39 @@ export function HomePage() {
           </section>
         )}
 
-        {/* TODO: Tournament section — awaiting useTournaments hook (frontend-data-dev).
-            Pattern: hooks/api/use-tournaments.ts, endpoint GET /tournaments,
-            type Tournament from types/api.ts, query keys already defined in query-keys.ts. */}
+        {/* 대회 — 컴팩트 스크롤 카드 */}
+        {tournaments.length > 0 && (
+          <section className="mt-8 px-5 @3xl:px-0">
+            <SectionHeader title={t('upcomingTournaments')} href="/tournaments" showMore={tournaments.length > 3} moreLabel={t('viewMore')} />
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
+              {tournaments.map((tournament: Tournament) => {
+                const accent = sportCardAccent[tournament.sportType];
+                return (
+                  <Link key={tournament.id} href={`/tournaments/${tournament.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Trophy size={14} className="text-amber-500" aria-hidden="true" />
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
+                          {sportLabel[tournament.sportType]}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{tournament.title}</p>
+                      {tournament.eventDate && (
+                        <p className="text-xs text-gray-500 mt-1">{formatMatchDate(tournament.eventDate)}</p>
+                      )}
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-500">{formatCurrency(tournament.entryFee ?? 0)}</span>
+                        {tournament.status === 'recruiting' && (
+                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('recruiting')}</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* 강좌 — 컴팩트 리스트 카드 */}
         {lessons.length > 0 && (
@@ -323,7 +355,7 @@ export function HomePage() {
                 const accent = sportCardAccent[l.sportType];
                 return (
                   <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors h-full">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{l.title}</p>
                       <p className="text-xs text-gray-500 mt-1">{sportLabel[l.sportType]}</p>
                       <div className="flex items-center justify-between mt-3">
@@ -353,7 +385,7 @@ export function HomePage() {
                 const fallbackListingImage = getListingImage(undefined, item.id);
                 return (
                   <Link key={item.id} href={`/marketplace/${item.id}`}>
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <div className="relative aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <SafeImage src={listingImage} fallbackSrc={fallbackListingImage} alt={item.title} fill className="object-cover" sizes="(max-width: 768px) 50vw, 33vw" />
                       </div>

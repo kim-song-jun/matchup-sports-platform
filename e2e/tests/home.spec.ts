@@ -91,8 +91,8 @@ test.describe('Navigation - Mobile', () => {
     await gotoWithWarmup(page, '/home');
     const nav = page.getByTestId('bottom-nav');
     await expect(nav).toBeVisible();
-    // 5 tabs
-    const tabs = nav.locator('a');
+    // 4 Link (a) + 1 button ("More") = 5 interactive items
+    const tabs = nav.locator('a, button');
     expect(await tabs.count()).toBe(5);
   });
 

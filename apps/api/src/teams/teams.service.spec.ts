@@ -117,7 +117,7 @@ describe('TeamsService', () => {
       const result = await service.findAll({});
 
       expect(result).toEqual({
-        items: mockTeams,
+        items: mockTeams.map((t) => ({ ...t, sportType: t.sportTypes[0] })),
         nextCursor: null,
       });
       expect(prisma.sportTeam.findMany).toHaveBeenCalledWith(
@@ -215,7 +215,7 @@ describe('TeamsService', () => {
 
       const result = await service.findById('team-1');
 
-      expect(result).toEqual(mockTeamDetail);
+      expect(result).toEqual({ ...mockTeamDetail, sportType: mockTeamDetail.sportTypes[0] });
       expect(prisma.sportTeam.findUnique).toHaveBeenCalledWith({
         where: { id: 'team-1' },
         include: {
@@ -272,7 +272,7 @@ describe('TeamsService', () => {
     it('should create a team and auto-create owner membership inside a transaction', async () => {
       const result = await service.create('user-1', createData);
 
-      expect(result).toEqual(createdTeam);
+      expect(result).toEqual({ ...createdTeam, sportType: createdTeam.sportTypes[0] });
       expect(mockTx.sportTeam.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           ownerId: 'user-1',
@@ -662,7 +662,12 @@ describe('TeamsService', () => {
 
       const result = await service.getMyInvitations('user-1');
 
-      expect(result).toEqual(mockInvitations);
+      expect(result).toEqual(
+        mockInvitations.map((inv) => ({
+          ...inv,
+          team: { ...inv.team, sportType: inv.team.sportTypes[0] },
+        })),
+      );
       expect(mockPrismaService.teamInvitation.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -678,17 +683,18 @@ describe('TeamsService', () => {
     beforeEach(() => {
       mockPrismaService.sportTeam.findUnique.mockResolvedValue({
         id: 'team-1',
+        sportTypes: [SportType.futsal],
         owner: { id: 'owner-1', nickname: 'owner', profileImageUrl: null, mannerScore: 4.5 },
       });
     });
 
     it('updates team data when manager+ role is verified', async () => {
       mockMembershipService.assertRole.mockResolvedValue({ role: TeamRole.manager });
-      mockPrismaService.sportTeam.update.mockResolvedValue({ id: 'team-1', name: 'new-name' });
+      mockPrismaService.sportTeam.update.mockResolvedValue({ id: 'team-1', name: 'new-name', sportTypes: [SportType.futsal] });
 
       const result = await service.update('team-1', 'manager-1', { name: 'new-name' });
 
-      expect(result).toEqual({ id: 'team-1', name: 'new-name' });
+      expect(result).toEqual({ id: 'team-1', name: 'new-name', sportTypes: [SportType.futsal], sportType: SportType.futsal });
       expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
       expect(mockPrismaService.sportTeam.update).toHaveBeenCalledWith(
         expect.objectContaining({

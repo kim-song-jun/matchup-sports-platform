@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, ChevronRight, MapPin, Trophy } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronRight, MapPin, Trophy, Users } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -72,7 +72,12 @@ export default function TournamentDetailPage() {
           )}
           {(data.team || data.venue) && (
             <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-              {data.team && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1">팀: {data.team.name}</span>}
+              {data.team && (
+                <Link href={`/teams/${data.team.id}`} className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
+                  <Users size={12} aria-hidden="true" />
+                  {data.team.name}
+                </Link>
+              )}
               {data.venue && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1">장소: {data.venue.name}</span>}
             </div>
           )}

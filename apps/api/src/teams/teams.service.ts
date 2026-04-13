@@ -23,8 +23,16 @@ export class TeamsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * Adds a backward-compatible `sportType` field (primary sport) alongside the
+   * canonical `sportTypes` array so frontend clients can transition gradually.
+   */
+  private withBackwardCompat<T extends { sportTypes: SportType[] }>(team: T): T & { sportType: SportType } {
+    return { ...team, sportType: team.sportTypes[0] };
+  }
+
   async findByOwner(ownerId: string) {
-    return this.prisma.sportTeam.findMany({
+    const teams = await this.prisma.sportTeam.findMany({
       where: { ownerId },
       include: {
         owner: {
@@ -33,15 +41,18 @@ export class TeamsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return teams.map((t) => this.withBackwardCompat(t));
   }
 
-  async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string; limit?: number }) {
+  async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string; limit?: number; search?: string }) {
     const limit = Math.min(Math.max(1, filter.limit ?? 20), 100);
     const where: Prisma.SportTeamWhereInput = {};
     if (filter.sportType) where.sportTypes = { has: filter.sportType as SportType };
     if (filter.city) where.city = filter.city;
     if (filter.recruiting === 'true') where.isRecruiting = true;
     if (filter.ownerId) where.ownerId = filter.ownerId;
+    const trimmedSearch = filter.search?.slice(0, 100);
+    if (trimmedSearch) where.name = { contains: trimmedSearch, mode: 'insensitive' as const };
 
     const items = await this.prisma.sportTeam.findMany({
       where,
@@ -58,7 +69,7 @@ export class TeamsService {
     const hasNext = items.length > limit;
     const result = hasNext ? items.slice(0, limit) : items;
     return {
-      items: result,
+      items: result.map((t) => this.withBackwardCompat(t)),
       nextCursor: hasNext ? result[result.length - 1].id : null,
     };
   }
@@ -80,7 +91,7 @@ export class TeamsService {
     if (!team) {
       throw new NotFoundException('팀을 찾을 수 없습니다.');
     }
-    return team;
+    return this.withBackwardCompat(team);
   }
 
   async create(ownerId: string, data: CreateTeamDto) {
@@ -116,7 +127,7 @@ export class TeamsService {
         },
       });
 
-      return team;
+      return this.withBackwardCompat(team);
     });
   }
 
@@ -124,7 +135,7 @@ export class TeamsService {
     await this.membershipService.assertRole(teamId, userId, TeamRole.manager);
     await this.findById(teamId);
 
-    return this.prisma.sportTeam.update({
+    const updated = await this.prisma.sportTeam.update({
       where: { id: teamId },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
@@ -155,6 +166,7 @@ export class TeamsService {
         },
       },
     });
+    return this.withBackwardCompat(updated);
   }
 
   async remove(teamId: string, userId: string) {
@@ -422,7 +434,7 @@ export class TeamsService {
    * Returns all pending invitations sent to the current user.
    */
   async getMyInvitations(userId: string) {
-    return this.prisma.teamInvitation.findMany({
+    const invitations = await this.prisma.teamInvitation.findMany({
       where: {
         inviteeId: userId,
         status: InvitationStatus.pending,
@@ -434,6 +446,10 @@ export class TeamsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return invitations.map((inv) => ({
+      ...inv,
+      team: this.withBackwardCompat(inv.team),
+    }));
   }
 
   /**

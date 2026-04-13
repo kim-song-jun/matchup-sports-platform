@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, MessageCircle, Share2, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, ChevronRight, MessageCircle, Plus, Share2, Trophy, Users } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -202,6 +202,32 @@ export default function TeamDetailPage() {
             <HubSectionTab label={`대회 ${hubData?.sections.eventsCount ?? hubEvents.length}`} active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
           </div>
 
+          {canManageCatalog && (
+            <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-hide pb-1 @3xl:hidden">
+              <Link
+                href={`/marketplace/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 min-h-[44px]"
+              >
+                <Plus size={14} aria-hidden="true" />
+                굿즈 등록
+              </Link>
+              <Link
+                href={`/lessons/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 min-h-[44px]"
+              >
+                <Plus size={14} aria-hidden="true" />
+                수강권 등록
+              </Link>
+              <Link
+                href={`/tournaments/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 min-h-[44px]"
+              >
+                <Plus size={14} aria-hidden="true" />
+                대회 등록
+              </Link>
+            </div>
+          )}
+
           {activeSection === 'overview' && (
             <div className="space-y-4 mt-4">
               <Card>
@@ -254,13 +280,13 @@ export default function TeamDetailPage() {
               <Card padding="sm">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">허브 등록</h3>
                 <div className="space-y-1.5 text-sm">
-                  <Link href={`/marketplace/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={`/marketplace/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2.5 min-h-[44px] flex items-center text-gray-700 dark:text-gray-200">
                     굿즈 등록
                   </Link>
-                  <Link href={`/lessons/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={`/lessons/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2.5 min-h-[44px] flex items-center text-gray-700 dark:text-gray-200">
                     수강권 등록
                   </Link>
-                  <Link href={`/tournaments/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={`/tournaments/new?teamId=${teamId}&teamName=${encodeURIComponent(currentTeam.name)}`} className="block rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2.5 min-h-[44px] flex items-center text-gray-700 dark:text-gray-200">
                     대회 등록
                   </Link>
                 </div>

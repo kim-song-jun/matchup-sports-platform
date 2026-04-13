@@ -7,6 +7,18 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // ── Cleanup (order matters for FK constraints) ──
+  await prisma.notification.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.chatMessage.deleteMany();
+  await prisma.chatRoomParticipant.deleteMany();
+  await prisma.chatRoom.deleteMany();
+  await prisma.settlementRecord.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.lessonAttendance.deleteMany();
+  await prisma.lessonTicket.deleteMany();
+  await prisma.lessonTicketPlan.deleteMany();
+  await prisma.marketplaceOrder.deleteMany();
+  await prisma.teamInvitation.deleteMany();
   await prisma.mercenaryApplication.deleteMany();
   await prisma.mercenaryPost.deleteMany();
   await prisma.teamMembership.deleteMany();
@@ -16,6 +28,7 @@ async function main() {
   await prisma.teamMatch.deleteMany();
   await prisma.matchParticipant.deleteMany();
   await prisma.match.deleteMany();
+  await prisma.tournament.deleteMany();
   await prisma.marketplaceListing.deleteMany();
   await prisma.lesson.deleteMany();
   await prisma.sportTeam.deleteMany();
@@ -1169,6 +1182,75 @@ async function main() {
     mercenarySeedData.map((data) => prisma.mercenaryPost.create({ data })),
   );
   console.log(`  ✅ ${mercenarySeedData.length} mercenary posts seeded`);
+
+  // ── Tournaments ──
+  const tournamentSeedData = [
+    {
+      organizerId: createdTeams[0].ownerId,
+      teamId: createdTeams[0].id,
+      sportType: 'ice_hockey' as const,
+      title: '2026 잠실 아이스하키 동호인 대회',
+      description: '서울 동호인 팀 대상 아이스하키 토너먼트입니다. 레벨 3 이상 참가 가능.',
+      startDate: nextSat,
+      endDate: nextNextSat,
+      entryFee: 50000,
+      maxParticipants: 8,
+      status: 'recruiting' as const,
+    },
+    {
+      organizerId: createdTeams[1].ownerId,
+      teamId: createdTeams[1].id,
+      sportType: 'futsal' as const,
+      title: 'FC 마포 풋살 리그 2026',
+      description: '마포구 직장인 풋살 리그. 5인제 경기 진행.',
+      startDate: nextSun,
+      endDate: nextNextSun,
+      entryFee: 30000,
+      maxParticipants: 12,
+      status: 'recruiting' as const,
+    },
+    {
+      organizerId: createdTeams[2].ownerId,
+      teamId: createdTeams[2].id,
+      sportType: 'basketball' as const,
+      title: '강남 슬래머즈 3x3 농구 대회',
+      description: '강남 지역 3x3 농구 오픈 토너먼트. 누구나 참가 환영.',
+      startDate: nextNextSat,
+      endDate: nextNextSun,
+      entryFee: 20000,
+      maxParticipants: 16,
+      status: 'recruiting' as const,
+    },
+    {
+      organizerId: createdTeams[3].ownerId,
+      teamId: createdTeams[3].id,
+      sportType: 'badminton' as const,
+      title: '셔틀콕 파이터즈 배드민턴 오픈',
+      description: '서초/강남 배드민턴 오픈 대회. 복식 위주 진행.',
+      startDate: in3Days,
+      endDate: nextSat,
+      entryFee: 15000,
+      maxParticipants: 32,
+      status: 'recruiting' as const,
+    },
+    {
+      organizerId: users[4].id,
+      venueId: venues[0].id,
+      sportType: 'futsal' as const,
+      title: '마포 풋살파크 주말 오픈 토너먼트',
+      description: '마포 풋살파크 주최 오픈 대회. 팀 미소속 개인 참가도 환영.',
+      startDate: nextSat,
+      endDate: nextSat,
+      entryFee: 25000,
+      maxParticipants: 10,
+      status: 'recruiting' as const,
+    },
+  ];
+
+  await Promise.all(
+    tournamentSeedData.map((data) => prisma.tournament.create({ data })),
+  );
+  console.log(`  ✅ ${tournamentSeedData.length} tournaments seeded`);
 
   await syncImageData(prisma);
 

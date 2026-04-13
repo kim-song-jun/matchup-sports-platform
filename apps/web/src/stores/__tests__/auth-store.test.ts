@@ -23,12 +23,8 @@ describe('AuthStore', () => {
       nickname: '테스트유저',
       email: 'test@test.com',
       profileImageUrl: null,
-      gender: null,
-      bio: null,
       mannerScore: 4.5,
       totalMatches: 10,
-      locationCity: null,
-      locationDistrict: null,
     };
 
     useAuthStore.getState().login('access-token', 'refresh-token', mockUser);
@@ -43,7 +39,7 @@ describe('AuthStore', () => {
   });
 
   it('logout clears user state', () => {
-    const mockUser = { id: 'u1', nickname: '유저', email: 'a@b.com', profileImageUrl: null, gender: null, bio: null, mannerScore: 3.0, totalMatches: 0, locationCity: null, locationDistrict: null };
+    const mockUser = { id: 'u1', nickname: '유저', email: 'a@b.com', profileImageUrl: null, mannerScore: 3.0, totalMatches: 0 };
     useAuthStore.getState().login('t1', 't2', mockUser);
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
 
@@ -58,7 +54,7 @@ describe('AuthStore', () => {
   });
 
   it('setUser updates user and auth status', () => {
-    const mockUser = { id: 'u2', nickname: '새유저', email: null, profileImageUrl: null, gender: null, bio: null, mannerScore: 3.0, totalMatches: 5, locationCity: null, locationDistrict: null };
+    const mockUser = { id: 'u2', nickname: '새유저', email: null, profileImageUrl: null, mannerScore: 3.0, totalMatches: 5 };
 
     useAuthStore.getState().setUser(mockUser);
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
@@ -74,12 +70,8 @@ describe('AuthStore', () => {
       nickname: '동기화유저',
       email: 'sync@test.com',
       profileImageUrl: null,
-      gender: null,
-      bio: null,
       mannerScore: 4.2,
       totalMatches: 12,
-      locationCity: null,
-      locationDistrict: null,
     };
 
     localStorage.setItem('authUser', JSON.stringify(mockUser));
@@ -92,7 +84,7 @@ describe('AuthStore', () => {
   });
 
   it('syncs logout from another tab via storage event', () => {
-    const mockUser = { id: 'u1', nickname: '유저', email: 'a@b.com', profileImageUrl: null, gender: null, bio: null, mannerScore: 3.0, totalMatches: 0, locationCity: null, locationDistrict: null };
+    const mockUser = { id: 'u1', nickname: '유저', email: 'a@b.com', profileImageUrl: null, mannerScore: 3.0, totalMatches: 0 };
     useAuthStore.getState().login('t1', 't2', mockUser);
 
     window.dispatchEvent(new StorageEvent('storage', { key: 'accessToken', newValue: null }));

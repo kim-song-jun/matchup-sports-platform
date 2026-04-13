@@ -36,7 +36,7 @@ export function TeamList() {
     <div className="space-y-6">
       {isAuthenticated && (
         <div>
-          <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">내 팀</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀</h2>
           {myTeamList.length === 0 ? (
             <EmptyState
               icon={UsersIcon}
@@ -57,7 +57,7 @@ export function TeamList() {
 
       <div>
         {isAuthenticated && (
-          <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">다른 팀</h2>
+          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀</h2>
         )}
         {otherTeams.length === 0 && !isLoading ? (
           <EmptyState

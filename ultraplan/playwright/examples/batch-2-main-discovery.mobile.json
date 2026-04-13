@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "va-b2-mobile-20260412",
+  "laneId": "A",
+  "batchId": "batch-2-main-discovery",
+  "bandId": "mobile",
+  "viewportIds": ["mobile-sm", "mobile-md", "mobile-lg"],
+  "mode": "capture",
+  "routeSelection": {
+    "type": "batch",
+    "batchId": "batch-2-main-discovery"
+  },
+  "cases": [
+    { "caseId": "b2-mobile-default", "state": "default", "priority": 1 },
+    { "caseId": "b2-mobile-scrolled", "state": "scrolled", "priority": 2 },
+    { "caseId": "b2-mobile-focus-first-input", "state": "focus-first-input", "priority": 3 },
+    { "caseId": "b2-mobile-filter-open", "state": "filter-open", "priority": 4 },
+    { "caseId": "b2-mobile-hover-card-first", "state": "hover-card-first", "priority": 5 }
+  ]
+}

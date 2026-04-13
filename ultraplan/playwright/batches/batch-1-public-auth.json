@@ -1,0 +1,17 @@
+{
+  "id": "batch-1-public-auth",
+  "lane": "A",
+  "priority": 2,
+  "stateProfile": "public",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "menu-open", "hover-primary-cta"],
+  "rerunStates": ["default", "scrolled"],
+  "runNaming": {
+    "manifest": "va-b1-<band>-<yyyymmdd>",
+    "capture": "va-b1-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b1-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

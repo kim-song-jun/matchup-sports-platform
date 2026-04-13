@@ -138,20 +138,6 @@ export function useAdminVenue(id: string) {
   });
 }
 
-export function useUpdateAdminVenue() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
-      const res = await api.patch(`/admin/venues/${id}`, data);
-      return extractData<Venue>(res);
-    },
-    onSuccess: (_, { id }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.venues });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.venue(id) });
-    },
-  });
-}
-
 export function useDeleteAdminVenue() {
   const queryClient = useQueryClient();
 

@@ -1,0 +1,146 @@
+{
+  "schemaVersion": "1.0.0",
+  "repo": "MatchUp",
+  "canonicalOutputRoot": "output/playwright/visual-audit",
+  "captureMode": "full-page",
+  "executionPolicy": {
+    "parallelism": "isolated-runner-only",
+    "sharedStackBroadCapture": false,
+    "laneBandOrder": ["mobile", "tablet", "desktop"],
+    "recaptureAfterFix": true,
+    "minimumPostFixState": "default"
+  },
+  "viewportBands": [
+    { "id": "mobile", "order": 1, "viewports": ["mobile-sm", "mobile-md", "mobile-lg"] },
+    { "id": "tablet", "order": 2, "viewports": ["tablet-sm", "tablet-md", "tablet-lg"] },
+    { "id": "desktop", "order": 3, "viewports": ["desktop-sm", "desktop-md", "desktop-lg"] }
+  ],
+  "stateProfiles": {
+    "always": ["default"],
+    "public": ["default", "scrolled", "menu-open", "hover-primary-cta"],
+    "discovery": ["default", "scrolled", "focus-first-input", "filter-open", "hover-card-first"],
+    "detail": ["default", "scrolled", "dialog-open", "drawer-open"],
+    "forms": ["default", "scrolled", "focus-first-input", "dialog-open"],
+    "account": ["default", "scrolled", "tab-switch"],
+    "admin": ["default", "scrolled", "filter-open", "dialog-open"],
+    "interactions": ["default", "scrolled", "focus-first-input", "filter-open", "hover-card-first", "hover-primary-cta", "menu-open", "dialog-open", "drawer-open", "tab-switch"]
+  },
+  "runNaming": {
+    "laneRuntime": "ultra-<lane>-<band>",
+    "visualRun": "va-<batch>-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-<batch>-<band>-<reason>",
+    "batch8Rerun": "same-run-id-only"
+  },
+  "lanes": [
+    {
+      "id": "A",
+      "name": "ultra-a",
+      "priority": "highest",
+      "batches": ["batch-2-main-discovery", "batch-1-public-auth"],
+      "notes": "High-impact discovery and public/auth coverage."
+    },
+    {
+      "id": "B",
+      "name": "ultra-b",
+      "priority": "highest",
+      "batches": ["batch-3-detail-pages", "batch-4-create-edit-forms"],
+      "notes": "Detail and form coverage for trust and conversion."
+    },
+    {
+      "id": "C",
+      "name": "ultra-c",
+      "priority": "medium",
+      "batches": ["batch-5-account-utility", "batch-6-admin"],
+      "notes": "Account and admin coverage."
+    },
+    {
+      "id": "D",
+      "name": "ultra-d",
+      "priority": "on-demand",
+      "batches": ["batch-7-interactions", "batch-8-rerun"],
+      "notes": "Interaction sweep and rerun-only cleanup."
+    }
+  ],
+  "batches": [
+    {
+      "id": "batch-1-public-auth",
+      "lane": "A",
+      "priority": 2,
+      "category": "public-auth",
+      "stateProfile": "public",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "post-fix-default-plus-related-states",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-2-main-discovery",
+      "lane": "A",
+      "priority": 1,
+      "category": "discovery",
+      "stateProfile": "discovery",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "post-fix-default-plus-related-states",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-3-detail-pages",
+      "lane": "B",
+      "priority": 1,
+      "category": "detail",
+      "stateProfile": "detail",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "post-fix-default-plus-related-states",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-4-create-edit-forms",
+      "lane": "B",
+      "priority": 1,
+      "category": "forms",
+      "stateProfile": "forms",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "post-fix-default-plus-related-states",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-5-account-utility",
+      "lane": "C",
+      "priority": 2,
+      "category": "account",
+      "stateProfile": "account",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "post-fix-default-plus-related-states",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-6-admin",
+      "lane": "C",
+      "priority": 3,
+      "category": "admin",
+      "stateProfile": "admin",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "post-fix-default-plus-related-states",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-7-interactions",
+      "lane": "D",
+      "priority": 2,
+      "category": "interactions",
+      "stateProfile": "interactions",
+      "bandPolicy": "all-9",
+      "rerunPolicy": "targeted-state-sweep",
+      "routeSelection": { "type": "batch" }
+    },
+    {
+      "id": "batch-8-rerun",
+      "lane": "D",
+      "priority": 99,
+      "category": "rerun",
+      "stateProfile": "targeted",
+      "bandPolicy": "same-run-id-only",
+      "rerunPolicy": "same-run-id-only",
+      "routeSelection": { "type": "rerun" }
+    }
+  ]
+}

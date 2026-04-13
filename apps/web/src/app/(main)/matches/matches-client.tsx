@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { useMatches } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
+import { buttonStyles } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -181,20 +182,56 @@ export function MatchesPage() {
         title={t('findMatch')}
         subtitle={t('subtitle')}
         action={(
-          <Link
-            href="/matches/new"
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
-            aria-label="매치 만들기"
-          >
-            <Plus size={18} aria-hidden="true" />
+          <Link href="/matches/new" className={buttonStyles({ size: 'sm' })}>
+            <Plus size={14} strokeWidth={2.5} />
+            매치 만들기
           </Link>
         )}
-      />
+      >
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            data-testid="match-clear-filters"
+            className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            {t('clearFilters')}
+          </button>
+          <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <button
+              type="button"
+              aria-label="리스트 뷰"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+              className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              <List size={16} />
+            </button>
+            <button
+              type="button"
+              aria-label="지도 뷰"
+              aria-pressed={viewMode === 'map'}
+              onClick={() => setViewMode('map')}
+              className={`min-h-[44px] min-w-11 flex items-center justify-center transition-colors ${
+                viewMode === 'map'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Map size={16} />
+            </button>
+          </div>
+        </div>
+      </MobilePageTopZone>
 
-      <div className="mb-2 px-5 @3xl:px-0" data-testid="match-filter-bar">
+      <div className="mb-3 px-5 @3xl:px-0">
         <div className="relative flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
             <label htmlFor="match-search-input" className="sr-only">매치 검색</label>
             <Input
               id="match-search-input"
@@ -203,46 +240,18 @@ export function MatchesPage() {
               placeholder={t('searchPlaceholder')}
               data-testid="match-search-input"
               onChange={(event) => setSearchInput(event.target.value)}
-              className="h-11 rounded-lg py-0 pl-9 pr-10 text-sm"
+              className="py-3 pl-10 pr-11 text-base shadow-sm"
             />
             {searchInput && (
               <button
                 type="button"
                 aria-label={t('clearSearch')}
                 onClick={() => setSearchInput('')}
-                className="absolute right-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
-                <X size={13} />
+                <X size={14} />
               </button>
             )}
-          </div>
-          <div className="flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              aria-label="리스트 뷰"
-              aria-pressed={viewMode === 'list'}
-              onClick={() => setViewMode('list')}
-              className={`flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
-            >
-              <List size={16} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label="지도 뷰"
-              aria-pressed={viewMode === 'map'}
-              onClick={() => setViewMode('map')}
-              className={`flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors ${
-                viewMode === 'map'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Map size={16} aria-hidden="true" />
-            </button>
           </div>
           <button
             type="button"
@@ -250,15 +259,15 @@ export function MatchesPage() {
             aria-pressed={showFilters}
             data-testid="match-filter-toggle"
             onClick={() => setShowFilters((prev) => !prev)}
-            className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors ${
+            className={`relative flex h-[46px] w-[46px] items-center justify-center rounded-xl transition-colors ${
               showFilters
                 ? 'bg-blue-500 text-white'
-                : 'border border-gray-200 bg-white text-gray-500 active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
+                : 'border border-gray-100 bg-white text-gray-500 shadow-sm active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
             }`}
           >
-            <SlidersHorizontal size={15} />
+            <SlidersHorizontal size={16} />
             {activeFilterCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gray-900 px-0.5 text-2xs font-bold text-white dark:bg-white dark:text-gray-900">
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-1 text-2xs font-bold text-white dark:bg-white dark:text-gray-900">
                 {activeFilterCount}
               </span>
             )}
@@ -266,7 +275,7 @@ export function MatchesPage() {
         </div>
       </div>
 
-      <div className="mb-2 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide @3xl:px-0">
+      <div className="mb-3 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide @3xl:px-0">
         {SPORT_FILTERS.map((filter) => {
           const isActive = draftFilters.sport === filter.key;
           const testId = filter.key ? `match-sport-${filter.key}` : 'match-sport-all';
@@ -278,10 +287,10 @@ export function MatchesPage() {
               data-testid={testId}
               aria-pressed={isActive}
               onClick={() => updateFilters({ sport: isActive ? '' : filter.key })}
-              className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
-                  : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}
             >
               {filter.key ? ts(filter.translationKey) : ts('all')}
@@ -296,10 +305,10 @@ export function MatchesPage() {
           data-testid="match-quick-today"
           aria-pressed={draftFilters.date === today}
           onClick={() => updateFilters({ date: draftFilters.date === today ? '' : today })}
-          className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.date === today
-              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
-              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           {t('today')}
@@ -309,10 +318,10 @@ export function MatchesPage() {
           data-testid="match-quick-free"
           aria-pressed={draftFilters.fee === 'free'}
           onClick={() => updateFilters({ fee: draftFilters.fee === 'free' ? 'all' : 'free' })}
-          className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.fee === 'free'
-              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
-              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           {t('free')}
@@ -322,10 +331,10 @@ export function MatchesPage() {
           data-testid="match-quick-beginner"
           aria-pressed={draftFilters.level === 'beginner'}
           onClick={() => updateFilters({ level: draftFilters.level === 'beginner' ? 'all' : 'beginner' })}
-          className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.level === 'beginner'
-              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
-              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
           {t('beginner')}
@@ -335,26 +344,15 @@ export function MatchesPage() {
           data-testid="match-quick-available"
           aria-pressed={draftFilters.available}
           onClick={() => updateFilters({ available: !draftFilters.available })}
-          className={`inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.available
-              ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
-              : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
-          <Sparkles size={13} aria-hidden="true" />
+          <Sparkles size={14} />
           {t('availableOnly')}
         </button>
-        {activeFilterCount > 0 && (
-          <button
-            type="button"
-            data-testid="match-clear-filters"
-            onClick={handleClearFilters}
-            className="inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
-          >
-            <X size={13} aria-hidden="true" />
-            {t('clearFilters')}
-          </button>
-        )}
       </div>
 
       {activeSummary.length > 0 && (
@@ -417,7 +415,7 @@ export function MatchesPage() {
                       aria-pressed={isActive}
                       data-testid={`match-level-${filter.key}`}
                       onClick={() => updateFilters({ level: filter.key })}
-                      className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                      className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-blue-500 text-white'
                           : 'border border-gray-200 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300'
@@ -444,7 +442,7 @@ export function MatchesPage() {
                       aria-pressed={isActive}
                       data-testid={`match-sort-${filter.key}`}
                       onClick={() => updateFilters({ sort: filter.key })}
-                      className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                      className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-blue-500 text-white'
                           : 'border border-gray-200 bg-white text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300'
@@ -471,7 +469,7 @@ export function MatchesPage() {
 
       <div className="px-5 @3xl:px-0">
         {isLoading ? (
-          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 @3xl:gap-4">
+          <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3, 4].map((value) => (
               <Card key={value} variant="subtle" padding="none" className="skeleton-shimmer">
                 <div className="aspect-[16/9]" />
@@ -501,7 +499,6 @@ export function MatchesPage() {
           </div>
         )}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

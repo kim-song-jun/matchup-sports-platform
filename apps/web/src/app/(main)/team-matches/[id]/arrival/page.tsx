@@ -15,7 +15,6 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { useMyTeams, useTeamMatch, useTeamMatchArrival } from '@/hooks/use-api';
 import {
@@ -25,7 +24,7 @@ import {
   getTeamMatchStatusMeta,
   isArrivalOpen,
 } from '@/lib/team-match-operations';
-import { formatDateDot, extractErrorMessage } from '@/lib/utils';
+import { formatDateDot } from '@/lib/utils';
 
 function formatCountdown(matchDate: string, startTime: string) {
   const startAt = new Date(`${matchDate}T${startTime}:00`);
@@ -156,7 +155,8 @@ export default function ArrivalCheckPage() {
           toast('success', `${selectedTeam.name} 도착 인증이 기록되었어요`);
         },
         onError: (error) => {
-          toast('error', extractErrorMessage(error, '도착 인증에 실패했어요. 다시 시도해주세요'));
+          const apiError = error as { response?: { data?: { message?: string } } };
+          toast('error', apiError.response?.data?.message || '도착 인증에 실패했어요. 다시 시도해주세요');
         },
       },
     );
@@ -208,7 +208,7 @@ export default function ArrivalCheckPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm text-blue-500 font-semibold">TEAM MATCH</p>
-              <h2 className="mt-1 text-base font-bold text-gray-900 dark:text-white">{match.title}</h2>
+              <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{match.title}</h2>
             </div>
             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta?.className ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
               {statusMeta?.label ?? match.status}
@@ -250,7 +250,7 @@ export default function ArrivalCheckPage() {
           </div>
         ) : (
           <>
-            <div className="rounded-xl bg-gray-900 px-5 py-5 text-center">
+            <div className="rounded-2xl bg-gray-900 px-5 py-5 text-center">
               <p className="text-xs text-gray-400">경기 시작까지</p>
               <p className="mt-1 text-3xl font-bold tracking-wide text-white">{countdown}</p>
             </div>
@@ -260,16 +260,16 @@ export default function ArrivalCheckPage() {
                 <label htmlFor="arrival-team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   인증할 팀 선택
                 </label>
-                <Select
+                <select
                   id="arrival-team-select"
                   value={selectedTeamId}
                   onChange={(event) => setSelectedTeamId(event.target.value)}
-                  className="mt-2"
+                  className="mt-2 w-full min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 transition-colors"
                 >
                   {myParticipantTeams.map((team) => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
-                </Select>
+                </select>
               </div>
             )}
 
@@ -306,12 +306,12 @@ export default function ArrivalCheckPage() {
               ) : (
                 <>
                   <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    현장에 도착했다면 현재 참여 팀 기준으로 도착 시각을 저장해요.
+                    현장에 도착했다면 현재 참여 팀 기준으로 도착 시각을 저장합니다.
                   </p>
                   <button
                     onClick={handleCheckIn}
                     disabled={!selectedTeam || arrivalMutation.isPending}
-                    className="mt-4 w-full min-h-[48px] rounded-2xl bg-blue-500 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                    className="mt-4 w-full min-h-[52px] rounded-2xl bg-blue-500 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                   >
                     {arrivalMutation.isPending ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                     {selectedTeam ? `${selectedTeam.name} 도착 기록하기` : '도착 기록하기'}
@@ -364,7 +364,7 @@ export default function ArrivalCheckPage() {
             <div>
               <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">현재 지원 범위</p>
               <p className="mt-1 text-sm text-blue-800/90 dark:text-blue-200/80">
-                이번 단계에서는 도착 시각만 서버에 저장해요. GPS 반경 판정, 현장 사진 업로드, 상대 팀 지각/노쇼 판정은 아직 연결되지 않아 이 화면에서 제공하지 않아요.
+                이번 단계에서는 도착 시각만 서버에 저장합니다. GPS 반경 판정, 현장 사진 업로드, 상대 팀 지각/노쇼 판정은 아직 연결되지 않아 이 화면에서 제공하지 않습니다.
               </p>
             </div>
           </div>

@@ -1,0 +1,17 @@
+{
+  "id": "batch-3-detail-pages",
+  "lane": "B",
+  "priority": 1,
+  "stateProfile": "detail",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "dialog-open", "drawer-open"],
+  "rerunStates": ["default", "scrolled", "dialog-open"],
+  "runNaming": {
+    "manifest": "va-b3-<band>-<yyyymmdd>",
+    "capture": "va-b3-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b3-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

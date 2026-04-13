@@ -10,7 +10,6 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
-import { Input } from '@/components/ui/input';
 import {
   ChatBubble, DateSeparator, SystemMessage,
   formatDateLabel, getDateKey,
@@ -290,7 +289,7 @@ export default function ChatRoomEmbed({
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <span className="text-base font-bold text-gray-900 dark:text-white truncate block">
+            <span className="text-lg font-bold text-gray-900 dark:text-white truncate block">
               {room?.name ?? '채팅방'}
             </span>
           </div>
@@ -440,7 +439,7 @@ export default function ChatRoomEmbed({
       {/* Quick Actions */}
       <div className="shrink-0 px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">빠른 메시지</span>
+          <span className="shrink-0 text-2xs font-semibold text-gray-400 dark:text-gray-500">빠른 메시지</span>
           {QUICK_ACTIONS.map((action) => (
             <button
               key={action.label}
@@ -472,7 +471,7 @@ export default function ChatRoomEmbed({
             <Smile size={18} />
           </button>
           <label htmlFor="chat-message-input" className="sr-only">메시지 입력</label>
-          <Input
+          <input
             ref={inputRef}
             id="chat-message-input"
             type="text"
@@ -481,7 +480,7 @@ export default function ChatRoomEmbed({
             onKeyDown={handleKeyDown}
             placeholder="메시지를 입력하세요"
             maxLength={2000}
-            className="flex-1"
+            className="flex-1 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-3.5 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
           />
           <button
             aria-label="메시지 보내기"

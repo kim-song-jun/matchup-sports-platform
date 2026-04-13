@@ -1,28 +1,56 @@
 import { create } from 'zustand';
 import { disconnectSocket } from '@/lib/realtime-client';
-import type { UserProfile } from '@/types/api';
+
+interface SportProfile {
+  id: string;
+  sportType: string;
+  level: number;
+  eloRating: number;
+  preferredPositions: string[];
+  matchCount: number;
+  winCount: number;
+  mvpCount: number;
+}
+
+interface User {
+  id: string;
+  nickname: string;
+  email: string | null;
+  profileImageUrl: string | null;
+  mannerScore: number;
+  totalMatches: number;
+  bio?: string | null;
+  gender?: string | null;
+  locationCity?: string | null;
+  locationDistrict?: string | null;
+  sportProfiles?: SportProfile[];
+  createdAt?: string;
+  lastLoginAt?: string;
+  city?: string | null;
+  district?: string | null;
+  teamCount?: number;
+  oauthProvider?: string;
+  role?: string;
+  [key: string]: unknown;
+}
 
 interface AuthState {
-  user: UserProfile | null;
+  user: User | null;
   isAuthenticated: boolean;
   accessToken: string | null;
-  setUser: (user: UserProfile | null) => void;
-  login: (accessToken: string, refreshToken: string, user: UserProfile) => void;
+  setUser: (user: User | null) => void;
+  login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => void;
 }
 
 const AUTH_USER_STORAGE_KEY = 'authUser';
-const EMPTY_AUTH_USER: UserProfile = {
+const EMPTY_AUTH_USER: User = {
   id: '',
   nickname: '',
   email: null,
   profileImageUrl: null,
-  gender: null,
-  bio: null,
   mannerScore: 0,
   totalMatches: 0,
-  locationCity: null,
-  locationDistrict: null,
 };
 
 function setAuthCookie(hasToken: boolean) {
@@ -39,21 +67,21 @@ function readStoredToken() {
   return localStorage.getItem('accessToken');
 }
 
-function readStoredUser(): UserProfile | null {
+function readStoredUser(): User | null {
   if (typeof window === 'undefined') return null;
 
   const raw = localStorage.getItem(AUTH_USER_STORAGE_KEY);
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as UserProfile;
+    return JSON.parse(raw) as User;
   } catch {
     localStorage.removeItem(AUTH_USER_STORAGE_KEY);
     return null;
   }
 }
 
-function writeStoredUser(user: UserProfile | null) {
+function writeStoredUser(user: User | null) {
   if (typeof window === 'undefined') return;
 
   if (user) {
@@ -78,7 +106,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => ({
       user,
       isAuthenticated: !!user,
-      accessToken: user ? state.accessToken : null,
+      accessToken: user ? state.accessToken : state.accessToken,
     }));
   },
 

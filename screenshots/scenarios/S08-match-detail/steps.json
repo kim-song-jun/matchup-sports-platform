@@ -1,0 +1,22 @@
+{
+  "scenario": "S08",
+  "name": "Match Detail",
+  "startedAt": "2026-04-13T18:35:00+09:00",
+  "completedAt": "2026-04-13T18:55:00+09:00",
+  "matrixCombinations": 12,
+  "steps": [
+    { "step": 1, "action": "navigate", "target": "/matches/:id", "description": "Match detail initial load", "screenshot": "01-detail-initial.png" },
+    { "step": 2, "action": "observe", "target": "gallery", "description": "Main image + thumbnails", "screenshot": "02-gallery.png" },
+    { "step": 3, "action": "click", "target": "thumbnail", "description": "Thumbnail click → lightbox", "screenshot": "03-lightbox.png" },
+    { "step": 4, "action": "observe", "target": "match info", "description": "Host, date, venue, capacity, fee", "screenshot": "04-match-info.png" },
+    { "step": 5, "action": "observe", "target": "venue info", "description": "Venue card with rating", "screenshot": "05-venue-info.png" },
+    { "step": 6, "action": "observe", "target": "progress bar", "description": "Participation progress 4/12", "screenshot": "06-progress.png" },
+    { "step": 7, "action": "click", "target": "join CTA", "description": "참가 후 결제하기 click → joined state", "screenshot": "07-join-click.png" },
+    { "step": 8, "action": "observe", "target": "joined state", "description": "결제 마무리하기 + 취소 버튼", "screenshot": "08-joined-state.png" },
+    { "step": 9, "action": "click", "target": "cancel join", "description": "참가 신청 취소 → restored", "screenshot": "09-cancel-join.png" },
+    { "step": 10, "action": "observe", "target": "participants", "description": "Participant list with status badges", "screenshot": "10-participants.png" },
+    { "step": 11, "action": "click", "target": "share button", "description": "Share button click", "screenshot": "11-share.png" },
+    { "step": 12, "action": "click", "target": "calendar button", "description": "캘린더에 추가 click", "screenshot": "12-calendar.png" },
+    { "step": 13, "action": "click", "target": "back arrow", "description": "Back navigation", "screenshot": "13-back.png" }
+  ]
+}

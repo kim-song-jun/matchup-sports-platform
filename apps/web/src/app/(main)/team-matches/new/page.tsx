@@ -2,12 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, ChevronRight, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Users } from 'lucide-react';
 import Link from 'next/link';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useCreateTeamMatch, useMyTeams } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { SKILL_GRADES, MATCH_TYPES, getGradeInfo } from '@/lib/skill-grades';
@@ -15,10 +13,6 @@ import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 import type { CreateTeamMatchInput } from '@/types/api';
 import { formatCurrency } from '@/lib/utils';
 import { sportLabel } from '@/lib/constants';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
 
 const STEPS = ['종목', '구장/일시', '경기조건', '비용/규정', '확인'];
 
@@ -174,7 +168,7 @@ export default function NewTeamMatchPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 mx-auto mb-4">
             <Users size={28} className="text-gray-400" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">팀을 먼저 만들어주세요</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">팀을 먼저 만들어주세요</h2>
           <p className="text-sm text-gray-500 mt-2">팀 매칭 모집글을 작성하려면 소속 팀이 필요해요</p>
           <Link href="/teams/new" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
             팀 만들기
@@ -187,19 +181,30 @@ export default function NewTeamMatchPage() {
   if (myTeams !== undefined && eligibleTeams.length === 0) {
     return (
       <div className="pt-[var(--safe-area-top)] @3xl:pt-0 px-5 @3xl:px-0">
-        <EmptyState
-          icon={Users}
-          title="권한이 없어요"
-          description="모집글을 작성하려면 팀의 owner 또는 manager여야 해요"
-          action={{ label: '새 팀 만들기', href: '/teams/new' }}
-        />
+        <div className="max-w-[500px] mx-auto mt-20 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 mx-auto mb-4">
+            <Users size={28} className="text-gray-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">권한이 없어요</h2>
+          <p className="text-sm text-gray-500 mt-2">매니저 이상 권한을 가진 팀이 없어요</p>
+          <p className="text-xs text-gray-400 mt-1">모집글을 작성하려면 팀의 owner 또는 manager여야 해요</p>
+          <Link href="/teams/new" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
+            새 팀 만들기
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
-      <MobileGlassHeader title="모집글 작성" showBack onBack={() => (step > 0 ? setStep(step - 1) : router.back())} />
+      {/* Header */}
+      <header className="@3xl:hidden px-5 pt-4 pb-3 flex items-center gap-3">
+        <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">모집글 작성</h1>
+      </header>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
@@ -224,17 +229,17 @@ export default function NewTeamMatchPage() {
 
       {eligibleTeams.length > 1 && (
         <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mb-5">
-          <FormField label="호스트 팀 선택" htmlFor="host-team-select">
-            <Select
-              id="host-team-select"
-              value={selectedHostTeamId}
-              onChange={(e) => setSelectedHostTeamId(e.target.value)}
-            >
-              {eligibleTeams.map((team) => (
-                <option key={team.id} value={team.id}>{team.name} ({team.role === 'owner' ? '오너' : '매니저'})</option>
-              ))}
-            </Select>
-          </FormField>
+          <label htmlFor="host-team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">호스트 팀 선택</label>
+          <select
+            id="host-team-select"
+            value={selectedHostTeamId}
+            onChange={(e) => setSelectedHostTeamId(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors min-h-[44px]"
+          >
+            {eligibleTeams.map((team) => (
+              <option key={team.id} value={team.id}>{team.name} ({team.role === 'owner' ? '오너' : '매니저'})</option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -243,7 +248,7 @@ export default function NewTeamMatchPage() {
         {step === 0 && (
           <div className="space-y-5 animate-fade-in">
             <div>
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">종목 선택</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">종목 선택</label>
               <div className="grid grid-cols-2 gap-2">
                 {sportOptions.map((opt) => (
                   <button
@@ -261,61 +266,71 @@ export default function NewTeamMatchPage() {
               </div>
             </div>
 
-            <FormField label="모집글 제목" htmlFor="match-title">
-              <Input
+            <div>
+              <label htmlFor="match-title" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">모집글 제목</label>
+              <input
                 id="match-title"
                 type="text"
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
                 placeholder="예: 일요일 오전 친선경기 모집합니다"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+            </div>
           </div>
         )}
 
         {/* Step 1: 구장/일시 */}
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
-            <FormField label="경기 날짜" htmlFor="match-date">
-              <Input
+            <div>
+              <label htmlFor="match-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">경기 날짜</label>
+              <input
                 id="match-date"
                 type="date"
                 value={form.matchDate}
                 onChange={(e) => update('matchDate', e.target.value)}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="시작 시간" htmlFor="match-start-time">
-                <Input
+              <div>
+                <label htmlFor="match-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">시작 시간</label>
+                <input
                   id="match-start-time"
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
                 />
-              </FormField>
-              <FormField label="종료 시간" htmlFor="match-end-time">
-                <Input
+              </div>
+              <div>
+                <label htmlFor="match-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">종료 시간</label>
+                <input
                   id="match-end-time"
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
                 />
-              </FormField>
+              </div>
             </div>
 
-            <FormField label="총 경기 시간 (분, 선택)" htmlFor="match-total-minutes">
-              <Input
+            <div>
+              <label htmlFor="match-total-minutes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 경기 시간 (분, 선택)</label>
+              <input
                 id="match-total-minutes"
                 type="number"
                 value={form.totalMinutes}
                 onChange={(e) => update('totalMinutes', e.target.value)}
                 placeholder="예: 120"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+            </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">쿼터 수</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">쿼터 수</label>
               <div className="flex gap-2">
                 {quarterOptions.map((q) => (
                   <button
@@ -333,25 +348,29 @@ export default function NewTeamMatchPage() {
               </div>
             </div>
 
-            <FormField label="구장명" htmlFor="venue-name">
-              <Input
+            <div>
+              <label htmlFor="venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장명</label>
+              <input
                 id="venue-name"
                 type="text"
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+            </div>
 
-            <FormField label="구장 주소 (선택)" htmlFor="venue-address">
-              <Input
+            <div>
+              <label htmlFor="venue-address" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">구장 주소 (선택)</label>
+              <input
                 id="venue-address"
                 type="text"
                 value={form.venueAddress}
                 onChange={(e) => update('venueAddress', e.target.value)}
                 placeholder="예: 서울시 마포구 상암동 481-6"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+            </div>
           </div>
         )}
 
@@ -360,7 +379,7 @@ export default function NewTeamMatchPage() {
           <div className="space-y-5 animate-fade-in">
             {/* 실력등급 S~D */}
             <div>
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">실력등급</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">실력등급</label>
               <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {SKILL_GRADES.map((g) => (
                   <button
@@ -382,8 +401,9 @@ export default function NewTeamMatchPage() {
             </div>
 
             {/* 선출선수(명) */}
-            <FormField label="선출선수 (명)" htmlFor="pro-player-count" hint="팀 내 축구/풋살 선출 출신 선수 수 (0~10명)">
-              <Input
+            <div>
+              <label htmlFor="pro-player-count" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">선출선수 (명)</label>
+              <input
                 id="pro-player-count"
                 type="number"
                 min={0}
@@ -391,12 +411,14 @@ export default function NewTeamMatchPage() {
                 value={form.proPlayerCount}
                 onChange={(e) => update('proPlayerCount', Math.min(10, Math.max(0, Number(e.target.value))))}
                 placeholder="0"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+              <p className="text-xs text-gray-500 mt-1">팀 내 축구/풋살 선출 출신 선수 수 (0~10명)</p>
+            </div>
 
             {/* 경기방식 */}
             <div>
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">경기방식</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">경기방식</label>
               <div className="flex gap-2">
                 {gameFormatOptions.map((fmt) => (
                   <button
@@ -416,7 +438,7 @@ export default function NewTeamMatchPage() {
 
             {/* 매치 유형 */}
             <div>
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">매치 유형</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">매치 유형</label>
               <div className="space-y-2">
                 {MATCH_TYPES.map((mt) => (
                   <label
@@ -448,7 +470,7 @@ export default function NewTeamMatchPage() {
 
             {/* 경기 스타일 */}
             <div>
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">경기 스타일</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">경기 스타일</label>
               <div className="space-y-2">
                 {matchStyleOptions.map((opt) => (
                   <button
@@ -470,15 +492,17 @@ export default function NewTeamMatchPage() {
             </div>
 
             {/* 유니폼 색상 */}
-            <FormField label="유니폼 색상" htmlFor="uniform-color">
-              <Input
+            <div>
+              <label htmlFor="uniform-color" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">유니폼 색상</label>
+              <input
                 id="uniform-color"
                 type="text"
                 value={form.uniformColor}
                 onChange={(e) => update('uniformColor', e.target.value)}
                 placeholder="예: 빨강 상의 + 검정 하의"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
-            </FormField>
+            </div>
 
             {/* 토글 필드들 */}
             <div className="space-y-3">
@@ -507,50 +531,55 @@ export default function NewTeamMatchPage() {
         {/* Step 3: 비용/규정 */}
         {step === 3 && (
           <div className="space-y-5 animate-fade-in">
-            <FormField label="총 비용 (원)" htmlFor="total-fee">
-              <Input
+            <div>
+              <label htmlFor="total-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">총 비용 (원)</label>
+              <input
                 id="total-fee"
                 type="number"
                 value={form.totalFee}
                 onChange={(e) => update('totalFee', e.target.value)}
                 placeholder="예: 200000"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
               {form.totalFee && (
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(Number(form.totalFee))}</p>
               )}
-            </FormField>
+            </div>
 
-            <FormField label="상대팀 부담금 (원, 선택)" htmlFor="opponent-fee">
-              <Input
+            <div>
+              <label htmlFor="opponent-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">상대팀 부담금 (원, 선택)</label>
+              <input
                 id="opponent-fee"
                 type="number"
                 value={form.opponentFee}
                 onChange={(e) => update('opponentFee', e.target.value)}
                 placeholder="비워두면 총 비용의 절반"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
               />
               {form.opponentFee && (
                 <p className="text-xs text-gray-500 mt-1">{formatCurrency(Number(form.opponentFee))}</p>
               )}
-            </FormField>
+            </div>
 
-            <FormField label="추가 안내 (선택)" htmlFor="match-notes">
-              <Textarea
+            <div>
+              <label htmlFor="match-notes" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">추가 안내 (선택)</label>
+              <textarea
                 id="match-notes"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}
                 placeholder="유니폼 색상, 주차 안내, 기타 규정 등"
                 rows={4}
-                className="resize-none"
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-800 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors resize-none"
               />
-            </FormField>
+            </div>
           </div>
         )}
 
         {/* Step 4: 확인 */}
         {step === 4 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">모집글 요약</h3>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">모집글 요약</h3>
 
               <div className="space-y-3">
                 <SummaryRow label="제목" value={form.title} />
@@ -582,7 +611,7 @@ export default function NewTeamMatchPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8 pb-4">
+      <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8">
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => setStep(step + 1)}
@@ -603,7 +632,6 @@ export default function NewTeamMatchPage() {
           </button>
         )}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

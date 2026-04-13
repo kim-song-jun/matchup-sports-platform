@@ -1,0 +1,8 @@
+{
+  "id": "C",
+  "name": "ultra-c",
+  "batchOrder": ["batch-5-account-utility", "batch-6-admin"],
+  "priority": "medium",
+  "runnerLabel": "ultra-c-<band>",
+  "description": "Account and admin capture lane."
+}

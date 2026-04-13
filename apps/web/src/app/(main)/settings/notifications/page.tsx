@@ -34,7 +34,7 @@ interface ServerCategoryConfig {
   icon: LucideIcon;
 }
 
-const DEVICE_DND_STORAGE_KEY = 'teameet:notification-dnd-enabled';
+const DEVICE_DND_STORAGE_KEY = 'matchup:notification-dnd-enabled';
 const DND_START = '22:00';
 const DND_END = '08:00';
 
@@ -42,25 +42,25 @@ const SERVER_CATEGORIES: ServerCategoryConfig[] = [
   {
     key: 'matchEnabled',
     label: '매치 알림',
-    desc: '새 매치, 참가 확인, 경기 상태 변경을 계정 전체에서 동기화해요.',
+    desc: '새 매치, 참가 확인, 경기 상태 변경을 계정 전체에서 동기화합니다.',
     icon: Trophy,
   },
   {
     key: 'teamEnabled',
     label: '팀 알림',
-    desc: '팀 가입, 신청 승인/거절, 운영 공지를 계정 전체에서 동기화해요.',
+    desc: '팀 가입, 신청 승인/거절, 운영 공지를 계정 전체에서 동기화합니다.',
     icon: Users,
   },
   {
     key: 'chatEnabled',
     label: '채팅 알림',
-    desc: '새 메시지와 단체 채팅방 업데이트를 계정 전체에서 동기화해요.',
+    desc: '새 메시지와 단체 채팅방 업데이트를 계정 전체에서 동기화합니다.',
     icon: MessageCircle,
   },
   {
     key: 'paymentEnabled',
     label: '결제 알림',
-    desc: '결제 완료, 환불, 주문 상태 변경을 계정 전체에서 동기화해요.',
+    desc: '결제 완료, 환불, 주문 상태 변경을 계정 전체에서 동기화합니다.',
     icon: CreditCard,
   },
 ];
@@ -77,6 +77,10 @@ export default function NotificationsPage() {
     useState<BrowserPermissionState>('unsupported');
   const [savingKey, setSavingKey] = useState<ServerPreferenceKey | null>(null);
 
+  if (!isAuthenticated) {
+    return null;
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -88,10 +92,6 @@ export default function NotificationsPage() {
       'Notification' in window ? window.Notification.permission : 'unsupported',
     );
   }, []);
-
-  if (!isAuthenticated) {
-    return null;
-  }
 
   const handleServerToggle = (key: ServerPreferenceKey, nextValue: boolean) => {
     setSavingKey(key);
@@ -144,10 +144,10 @@ export default function NotificationsPage() {
         </span>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] mt-4 space-y-5 pb-8">
-        <section className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
+      <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] py-6 space-y-5">
+        <section className="rounded-[24px] border border-blue-100 bg-blue-50/80 dark:border-blue-900/60 dark:bg-blue-950/30 p-5">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
               <BellRing size={18} />
             </div>
             <div className="space-y-1">
@@ -155,17 +155,17 @@ export default function NotificationsPage() {
                 서버와 동기화되는 범위
               </p>
               <p className="text-sm leading-6 text-blue-800/90 dark:text-blue-100/80">
-                아래 4개 카테고리는 TeamMeet 계정에 저장되어 새로고침, 재로그인,
+                아래 4개 카테고리는 MatchUp 계정에 저장되어 새로고침, 재로그인,
                 다른 탭 진입 후에도 같은 상태로 유지됩니다.
               </p>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4 dark:border-gray-700 dark:bg-gray-800">
+        <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
           <SectionHeading
             title="계정 전체에 저장되는 알림"
-            description="로그인 상태, 기기, 브라우저가 달라져도 아래 설정이 유지됩니다."
+            description="서버에 저장되는 category preference입니다."
           />
 
           {preferencesQuery.isLoading ? (
@@ -200,43 +200,24 @@ export default function NotificationsPage() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4 dark:border-gray-700 dark:bg-gray-800">
+        <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
           <SectionHeading
             title="이 기기에서만 적용되는 항목"
             description="브라우저 권한과 방해금지 시간은 디바이스별로 따로 관리됩니다."
           />
 
           <div className="divide-y divide-gray-50 dark:divide-gray-700">
-            {browserPermission === 'denied' ? (
-              <div className="flex items-start gap-3 py-4 first:pt-0 last:pb-0">
-                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 shrink-0">
-                  <Smartphone size={18} className="text-orange-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-md font-medium text-gray-900 dark:text-gray-50">브라우저 Push 권한</p>
-                    <span className="rounded-md bg-orange-100 px-1.5 py-0.5 text-2xs font-medium text-orange-600 dark:bg-orange-900/40 dark:text-orange-300">
-                      차단됨
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    브라우저 설정에서 알림을 허용해주세요. 차단 상태에서는 Push 알림을 받을 수 없어요.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <StatusRow
-                icon={Smartphone}
-                label="브라우저 Push 권한"
-                desc={browserPermissionDescription(browserPermission)}
-                value={browserPermissionLabel(browserPermission)}
-              />
-            )}
+            <StatusRow
+              icon={Smartphone}
+              label="브라우저 Push 권한"
+              desc={browserPermissionDescription(browserPermission)}
+              value={browserPermissionLabel(browserPermission)}
+            />
             <div className="py-4 first:pt-0 last:pb-0">
               <ToggleRow
                 icon={Moon}
                 label="방해금지 시간"
-                desc={`${DND_START} ~ ${DND_END} 사이에는 이 기기에서만 Push 알림을 무음 처리해요.`}
+                desc={`${DND_START} ~ ${DND_END} 사이에는 이 기기에서만 Push 알림을 무음 처리합니다.`}
                 enabled={dndEnabled}
                 onToggle={handleDndToggle}
               />
@@ -244,20 +225,16 @@ export default function NotificationsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 space-y-2 dark:border-gray-700 dark:bg-gray-900/50">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-              준비 중인 기능
-            </h3>
-            <span className="rounded-md bg-gray-200 px-1.5 py-0.5 text-2xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-              준비 중
-            </span>
-          </div>
+        <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/50 p-5 space-y-2">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+            현재 지원하지 않는 범위
+          </h3>
           <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-            이메일 알림, 마케팅 수신 동의, 전체 알림 일괄 끄기는 곧 지원될 예정이에요.
+            이메일 알림, 마케팅 수신, 전체 마스터 토글은 아직 서버 저장 계약이
+            없습니다. 이번 라운드에서는 계정 동기화가 가능한 category 설정만
+            노출합니다.
           </p>
         </section>
-        <div className="h-24" />
       </div>
     </div>
   );
@@ -272,10 +249,10 @@ function SectionHeading({
 }) {
   return (
     <div className="space-y-1">
-      <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">
+      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         {title}
       </h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
     </div>
   );
 }
@@ -317,7 +294,7 @@ function StatusRow({
         <p className="text-md font-medium text-gray-900 dark:text-gray-50">{label}</p>
         <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
       </div>
-      <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-2xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+      <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
         {value}
       </span>
     </div>
@@ -448,12 +425,12 @@ function browserPermissionLabel(permission: BrowserPermissionState): string {
 function browserPermissionDescription(permission: BrowserPermissionState): string {
   switch (permission) {
     case 'granted':
-      return '이 브라우저에서 Push 표시 권한이 허용되어 있어요.';
+      return '이 브라우저에서 Push 표시 권한이 허용되어 있습니다.';
     case 'denied':
-      return '브라우저 설정에서 Push 차단을 해제해야 알림을 받을 수 있어요.';
+      return '브라우저 설정에서 Push 차단을 해제해야 알림을 받을 수 있습니다.';
     case 'default':
-      return '아직 브라우저 권한이 결정되지 않았어요.';
+      return '아직 브라우저 권한이 결정되지 않았습니다.';
     default:
-      return '현재 브라우저는 Push 권한 상태를 제공하지 않아요.';
+      return '현재 브라우저는 Push 권한 상태를 제공하지 않습니다.';
   }
 }

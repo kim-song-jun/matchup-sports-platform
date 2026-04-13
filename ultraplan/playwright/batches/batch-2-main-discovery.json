@@ -1,0 +1,17 @@
+{
+  "id": "batch-2-main-discovery",
+  "lane": "A",
+  "priority": 1,
+  "stateProfile": "discovery",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "focus-first-input", "filter-open", "hover-card-first"],
+  "rerunStates": ["default", "scrolled", "filter-open"],
+  "runNaming": {
+    "manifest": "va-b2-<band>-<yyyymmdd>",
+    "capture": "va-b2-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b2-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

@@ -6,15 +6,10 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, GraduationCap } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Modal } from '@/components/ui/modal';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
-import { useLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/use-api';
-import { formatAmount, extractErrorMessage } from '@/lib/utils';
+import { useLesson } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -56,8 +51,6 @@ export default function EditLessonPage() {
   const lessonId = params.id as string;
 
   const { data: lesson, isLoading } = useLesson(lessonId);
-  const updateLesson = useUpdateLesson();
-  const deleteLesson = useDeleteLesson();
 
   const [form, setForm] = useState<FormData>({
     sportType: '',
@@ -75,7 +68,9 @@ export default function EditLessonPage() {
     levelMin: 1,
     levelMax: 5,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (lesson) {
@@ -102,33 +97,37 @@ export default function EditLessonPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title || !form.coachName || !form.venueName || !form.lessonDate || !form.startTime || !form.endTime) {
       toast('error', '필수 항목을 입력해주세요');
       return;
     }
-    updateLesson.mutate({ id: lessonId, data: form as unknown as Record<string, unknown> }, {
-      onSuccess: () => {
-        toast('success', '강좌 정보가 저장되었어요');
-        router.push(`/lessons/${lessonId}`);
-      },
-      onError: (err) => {
-        toast('error', extractErrorMessage(err, '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요'));
-      },
-    });
+    setIsSubmitting(true);
+    try {
+      await api.patch(`/lessons/${lessonId}`, form);
+      toast('success', '강좌 정보가 저장되었어요');
+      router.push(`/lessons/${lessonId}`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '강좌 수정에 실패했어요. 잠시 후 다시 시도해주세요');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = () => {
-    deleteLesson.mutate(lessonId, {
-      onSuccess: () => {
-        toast('success', '강좌가 삭제되었어요');
-        router.push('/my/lessons');
-      },
-      onError: (err) => {
-        toast('error', extractErrorMessage(err, '강좌 삭제에 실패했어요. 다시 시도해주세요'));
-        setShowDeleteModal(false);
-      },
-    });
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await api.delete(`/lessons/${lessonId}`);
+      toast('success', '강좌가 삭제되었어요');
+      router.push('/my/lessons');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '강좌 삭제에 실패했어요. 다시 시도해주세요');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   if (isLoading) {
@@ -156,6 +155,9 @@ export default function EditLessonPage() {
     );
   }
 
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
+  const selectClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
+
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
@@ -163,7 +165,7 @@ export default function EditLessonPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-base font-bold tracking-tight text-gray-900 dark:text-white truncate flex-1">강좌 수정</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">강좌 수정</h1>
       </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
@@ -189,7 +191,7 @@ export default function EditLessonPage() {
                   onClick={() => update('sportType', s.type)}
                   className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                     selected
-                      ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                      ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 text-gray-700 dark:text-gray-200'
                   }`}
                 >
@@ -211,11 +213,11 @@ export default function EditLessonPage() {
                 onClick={() => update('type', t.value)}
                 className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
                   form.type === t.value
-                    ? 'border-blue-500 bg-blue-500 dark:border-blue-500 dark:bg-blue-500'
+                    ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
                 }`}
               >
-                <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-white' : 'text-gray-900 dark:text-white'}`}>
+                <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-white'}`}>
                   {t.label}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
@@ -225,154 +227,189 @@ export default function EditLessonPage() {
         </section>
 
         {/* 강좌 제목 */}
-        <FormField label="강좌 제목" required htmlFor="lesson-edit-title" className="mb-5">
-          <Input
+        <section className="mb-5">
+          <label htmlFor="lesson-edit-title" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+            강좌 제목 <span className="text-red-400">*</span>
+          </label>
+          <input
             id="lesson-edit-title"
             type="text"
             value={form.title}
             onChange={(e) => update('title', e.target.value)}
             placeholder="예: 초보자를 위한 풋살 기초 레슨"
+            className={inputClass}
           />
-        </FormField>
+        </section>
 
         {/* 강좌 설명 */}
-        <FormField label="강좌 설명" htmlFor="lesson-edit-description" className="mb-5">
-          <Textarea
+        <section className="mb-5">
+          <label htmlFor="lesson-edit-description" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">강좌 설명</label>
+          <textarea
             id="lesson-edit-description"
             value={form.description}
             onChange={(e) => update('description', e.target.value)}
             placeholder="강좌에 대한 자세한 설명을 입력해주세요"
             rows={4}
-            className="resize-none"
+            className={`${inputClass} resize-none`}
           />
-        </FormField>
+        </section>
 
         {/* 코치명 */}
-        <FormField label="코치명" required htmlFor="lesson-edit-coach-name" className="mb-5">
-          <Input
+        <section className="mb-5">
+          <label htmlFor="lesson-edit-coach-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+            코치명 <span className="text-red-400">*</span>
+          </label>
+          <input
             id="lesson-edit-coach-name"
             type="text"
             value={form.coachName}
             onChange={(e) => update('coachName', e.target.value)}
             placeholder="예: 김코치"
+            className={inputClass}
           />
-        </FormField>
+        </section>
 
         {/* 코치 소개 */}
-        <FormField label="코치 소개" htmlFor="lesson-edit-coach-bio" className="mb-5">
-          <Textarea
+        <section className="mb-5">
+          <label htmlFor="lesson-edit-coach-bio" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">코치 소개</label>
+          <textarea
             id="lesson-edit-coach-bio"
             value={form.coachBio}
             onChange={(e) => update('coachBio', e.target.value)}
             placeholder="코치 경력 및 자격증 등을 입력해주세요"
             rows={3}
-            className="resize-none"
+            className={`${inputClass} resize-none`}
           />
-        </FormField>
+        </section>
 
         {/* 장소명 */}
-        <FormField label="장소명" required htmlFor="lesson-edit-venue-name" className="mb-5">
-          <Input
+        <section className="mb-5">
+          <label htmlFor="lesson-edit-venue-name" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+            장소명 <span className="text-red-400">*</span>
+          </label>
+          <input
             id="lesson-edit-venue-name"
             type="text"
             value={form.venueName}
             onChange={(e) => update('venueName', e.target.value)}
             placeholder="예: 난지천 풋살장"
+            className={inputClass}
           />
-        </FormField>
+        </section>
 
         {/* 날짜 */}
-        <FormField label="날짜" required htmlFor="lesson-edit-date" className="mb-5">
-          <Input
+        <section className="mb-5">
+          <label htmlFor="lesson-edit-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+            날짜 <span className="text-red-400">*</span>
+          </label>
+          <input
             id="lesson-edit-date"
             type="date"
             value={form.lessonDate}
             onChange={(e) => update('lessonDate', e.target.value)}
+            className={inputClass}
           />
-        </FormField>
+        </section>
 
         {/* 시간 */}
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="시작 시간" required htmlFor="lesson-edit-start-time">
-              <Input
+            <div>
+              <label htmlFor="lesson-edit-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+                시작 시간 <span className="text-red-400">*</span>
+              </label>
+              <input
                 id="lesson-edit-start-time"
                 type="time"
                 value={form.startTime}
                 onChange={(e) => update('startTime', e.target.value)}
+                className={inputClass}
               />
-            </FormField>
-            <FormField label="종료 시간" required htmlFor="lesson-edit-end-time">
-              <Input
+            </div>
+            <div>
+              <label htmlFor="lesson-edit-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
+                종료 시간 <span className="text-red-400">*</span>
+              </label>
+              <input
                 id="lesson-edit-end-time"
                 type="time"
                 value={form.endTime}
                 onChange={(e) => update('endTime', e.target.value)}
+                className={inputClass}
               />
-            </FormField>
+            </div>
           </div>
         </section>
 
         {/* 인원 / 수강료 */}
         <section className="mb-5">
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="최대 인원" htmlFor="lesson-edit-max-participants">
-              <Input
+            <div>
+              <label htmlFor="lesson-edit-max-participants" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 인원</label>
+              <input
                 id="lesson-edit-max-participants"
                 type="number"
                 value={form.maxParticipants}
                 onChange={(e) => update('maxParticipants', +e.target.value)}
                 min={1}
                 max={50}
+                className={inputClass}
               />
-            </FormField>
-            <FormField
-              label="수강료 (원)"
-              htmlFor="lesson-edit-fee"
-              hint={form.fee > 0 ? formatAmount(form.fee) : undefined}
-            >
-              <Input
+            </div>
+            <div>
+              <label htmlFor="lesson-edit-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">수강료 (원)</label>
+              <input
                 id="lesson-edit-fee"
                 type="number"
                 value={form.fee}
                 onChange={(e) => update('fee', +e.target.value)}
                 min={0}
                 step={1000}
+                className={inputClass}
               />
-            </FormField>
+              {form.fee > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {new Intl.NumberFormat('ko-KR').format(form.fee)}원
+                </p>
+              )}
+            </div>
           </div>
         </section>
 
         {/* 레벨 */}
         <section className="mb-6">
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="최소 레벨" htmlFor="lesson-edit-level-min">
-              <Select
+            <div>
+              <label htmlFor="lesson-edit-level-min" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최소 레벨</label>
+              <select
                 id="lesson-edit-level-min"
                 value={form.levelMin}
                 onChange={(e) => update('levelMin', +e.target.value)}
+                className={selectClass}
               >
                 {[1, 2, 3, 4, 5].map((l) => (
                   <option key={l} value={l}>{levelLabel[l]}</option>
                 ))}
-              </Select>
-            </FormField>
-            <FormField label="최대 레벨" htmlFor="lesson-edit-level-max">
-              <Select
+              </select>
+            </div>
+            <div>
+              <label htmlFor="lesson-edit-level-max" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">최대 레벨</label>
+              <select
                 id="lesson-edit-level-max"
                 value={form.levelMax}
                 onChange={(e) => update('levelMax', +e.target.value)}
+                className={selectClass}
               >
                 {[1, 2, 3, 4, 5].map((l) => (
                   <option key={l} value={l}>{levelLabel[l]}</option>
                 ))}
-              </Select>
-            </FormField>
+              </select>
+            </div>
           </div>
         </section>
 
         {/* Action buttons */}
-        <div className="flex gap-3 mb-8 mt-10">
+        <div className="flex gap-3 mb-8">
           <button
             onClick={() => setShowDeleteModal(true)}
             className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 transition-colors"
@@ -382,42 +419,42 @@ export default function EditLessonPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={updateLesson.isPending}
+            disabled={isSubmitting}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
-            {updateLesson.isPending ? '저장 중...' : '수정 완료'}
+            {isSubmitting ? '저장 중...' : '수정 완료'}
           </button>
         </div>
       </div>
 
-      <div className="h-24" />
-
       {/* Delete confirmation modal */}
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="sm">
-        <div className="flex flex-col items-center text-center">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mb-4">
-            <AlertTriangle size={24} className="text-red-500" />
-          </div>
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">강좌를 삭제하시겠어요?</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">삭제하면 되돌릴 수 없어요.</p>
-          <div className="mt-6 flex gap-3 w-full">
-            <button
-              onClick={() => setShowDeleteModal(false)}
-              className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              돌아가기
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={deleteLesson.isPending}
-              className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
-            >
-              {deleteLesson.isPending ? '삭제 중...' : '삭제하기'}
-            </button>
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6 animate-fade-in">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+              <AlertTriangle size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">강좌를 삭제하시겠어요?</h3>
+            <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                돌아가기
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? '삭제 중...' : '삭제하기'}
+              </button>
+            </div>
           </div>
         </div>
-      </Modal>
+      )}
     </div>
   );
 }

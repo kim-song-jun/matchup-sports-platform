@@ -8,19 +8,18 @@ interface EmptyStateProps {
   title: string;
   description?: string;
   action?: { label: string; href: string };
-  actionVariant?: 'outline' | 'solid';
   secondaryAction?: { label: string; onClick: () => void };
   size?: 'sm' | 'md';
 }
 
-export function EmptyState({ icon: Icon, title, description, action, actionVariant = 'outline', secondaryAction, size = 'md' }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, secondaryAction, size = 'md' }: EmptyStateProps) {
   const isSm = size === 'sm';
   const isAuthWall = action?.href === '/login';
 
   return (
     <div
       className={`flex flex-col items-center justify-center text-center ${isSm ? 'p-8' : 'p-12'}`}
-      data-testid={isAuthWall ? 'auth-wall' : 'empty-state'}
+      data-testid={isAuthWall ? 'auth-wall' : undefined}
     >
       <div className={`flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/30 ${isSm ? 'h-12 w-12' : 'h-20 w-20'}`}>
         <Icon size={isSm ? 24 : 40} className="text-blue-400 dark:text-blue-300 animate-gentle-bounce" />
@@ -37,11 +36,7 @@ export function EmptyState({ icon: Icon, title, description, action, actionVaria
         <Link
           href={action.href}
           data-testid={isAuthWall ? 'auth-wall-login-link' : undefined}
-          className={
-            actionVariant === 'solid'
-              ? 'mt-5 inline-flex items-center rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600 dark:hover:bg-blue-400'
-              : 'mt-5 inline-flex items-center rounded-xl border border-blue-200 dark:border-blue-800 px-4 py-2 text-base font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors'
-          }
+          className="mt-5 inline-flex items-center rounded-xl border border-blue-200 dark:border-blue-800 px-4 py-2 text-base font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
         >
           {action.label}
         </Link>

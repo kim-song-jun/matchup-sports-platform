@@ -11,8 +11,6 @@ import { formatAmount, formatDateCompact } from '@/lib/utils';
 import { ticketTypeLabel } from '@/lib/constants';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import type { TicketStatus, TicketType } from '@/types/api';
 
 // ── Mock data ────────────────────────────────────────────────────────────────
@@ -283,11 +281,12 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
                 <label htmlFor="new-expiry" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
                   새 만료일
                 </label>
-                <Input
+                <input
                   id="new-expiry"
                   type="date"
                   value={newExpiry}
                   onChange={(e) => setNewExpiry(e.target.value)}
+                  className="w-full min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
                 />
               </div>
               {newExpiry && (
@@ -340,13 +339,13 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
                 <label htmlFor="status-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
                   변경 사유 <span className="text-gray-400 font-normal">(선택)</span>
                 </label>
-                <Textarea
+                <textarea
                   id="status-reason"
                   value={statusReason}
                   onChange={(e) => setStatusReason(e.target.value)}
                   placeholder="관리자 메모용 변경 사유를 입력하세요"
                   rows={3}
-                  className="resize-none"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none transition-colors"
                 />
               </div>
             </div>
@@ -359,26 +358,28 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
                 <label htmlFor="adj-total" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
                   전체 횟수
                 </label>
-                <Input
+                <input
                   id="adj-total"
                   type="number"
                   min={1}
                   max={999}
                   value={adjTotal}
                   onChange={(e) => setAdjTotal(Math.max(1, Number(e.target.value)))}
+                  className="w-full min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
                 />
               </div>
               <div>
                 <label htmlFor="adj-used" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">
                   사용 횟수
                 </label>
-                <Input
+                <input
                   id="adj-used"
                   type="number"
                   min={0}
                   max={adjTotal}
                   value={adjUsed}
                   onChange={(e) => setAdjUsed(Math.min(adjTotal, Math.max(0, Number(e.target.value))))}
+                  className="w-full min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
                 />
               </div>
               <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 space-y-1">
@@ -832,14 +833,12 @@ export default function AdminLessonTicketsPage() {
         {/* Search */}
         <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
-          <label htmlFor="lesson-tickets-search" className="sr-only">수강권 검색</label>
-          <Input
-            id="lesson-tickets-search"
+          <input
             type="text"
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="구매자 또는 강좌명 검색"
-            className="pl-10"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 pl-10 pr-4 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors"
           />
         </div>
 

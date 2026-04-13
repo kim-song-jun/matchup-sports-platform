@@ -24,7 +24,7 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
   const fallbackTeamCoverImage = getTeamImage(team.sportType, undefined, team.id);
 
   return (
-    <Link href={`/teams/${team.id}`} data-testid="team-card">
+    <Link href={`/teams/${team.id}`}>
       <Card
         variant="default"
         padding="none"
@@ -34,7 +34,7 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
           className,
         )}
       >
-        {/* Square cover image — flush to card edge */}
+        {/* Square cover image */}
         <div className="relative w-24 shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={teamCoverImage}
@@ -68,19 +68,19 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
               </span>
             )}
           </div>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
             <span
-              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}
+              className={`${sportCardAccent[team.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}
             >
               {sportLabel[team.sportType] || team.sportType}
             </span>
             <span>{tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}</span>
           </p>
           {team.description && (
-            <p className="mt-1 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{team.description}</p>
+            <p className="mt-1 line-clamp-1 text-xs text-gray-500">{team.description}</p>
           )}
-          {(team.city || team.district) && (
-            <p className="mt-0.5 text-2xs text-gray-400 dark:text-gray-500">{team.district || team.city}</p>
+          {team.city && (
+            <p className="mt-0.5 text-2xs text-gray-500">{team.city} {team.district}</p>
           )}
         </div>
       </Card>

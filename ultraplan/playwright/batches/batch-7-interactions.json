@@ -1,0 +1,17 @@
+{
+  "id": "batch-7-interactions",
+  "lane": "D",
+  "priority": 2,
+  "stateProfile": "interactions",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "focus-first-input", "filter-open", "hover-card-first", "hover-primary-cta", "menu-open", "dialog-open", "drawer-open", "tab-switch"],
+  "rerunStates": ["default", "scrolled", "focus-first-input", "filter-open"],
+  "runNaming": {
+    "manifest": "va-b7-<band>-<yyyymmdd>",
+    "capture": "va-b7-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b7-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

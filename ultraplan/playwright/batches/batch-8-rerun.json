@@ -1,0 +1,17 @@
+{
+  "id": "batch-8-rerun",
+  "lane": "D",
+  "priority": 99,
+  "stateProfile": "targeted",
+  "bandPolicy": "same-run-id-only",
+  "defaultStates": ["default"],
+  "rerunStates": ["default"],
+  "runNaming": {
+    "manifest": "same-run-id-only",
+    "capture": "same-run-id-only",
+    "rerun": "same-run-id-only"
+  },
+  "routeSelection": {
+    "type": "rerun"
+  }
+}

@@ -235,7 +235,6 @@ export interface MarketplaceListing {
   likeCount: number;
   rentalPricePerDay?: number;
   rentalDeposit?: number;
-  createdAt?: string;
   team?: { id: string; name: string };
   venue?: { id: string; name: string };
   seller?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore: number };
@@ -283,11 +282,6 @@ export interface UserProfile {
   createdAt?: string;
   lastLoginAt?: string;
   provider?: string;
-  phone?: string | null;
-  /** OAuth provider identifier returned by auth endpoints (e.g. 'kakao', 'naver') */
-  oauthProvider?: string;
-  /** User role for admin gate checks (e.g. 'admin', 'user') */
-  role?: string;
   winCount?: number;
   sportTypes?: string[];
   sportProfiles?: SportProfile[];

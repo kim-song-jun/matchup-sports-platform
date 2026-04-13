@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, Plus, ShoppingBag } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, ChevronRight, Plus, ShoppingBag } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
-import { useCreateListing } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
 import { getListingPreviewImages } from '@/lib/sport-image';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { FormField } from '@/components/ui/form-field';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
-import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -38,11 +36,11 @@ export default function CreateListingPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { isAuthenticated } = useAuthStore();
-  const createListing = useCreateListing();
   const teamId = searchParams.get('teamId') ?? undefined;
   const venueId = searchParams.get('venueId') ?? undefined;
   const teamName = searchParams.get('teamName') ?? undefined;
   const venueName = searchParams.get('venueName') ?? undefined;
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
   const [uploadState, setUploadState] = useState<ImageUploadState>({
     hasPendingUploads: false,
@@ -75,27 +73,29 @@ export default function CreateListingPage() {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!guardImageUpload()) return;
     if (!form.title) return toast('error', '제목을 입력해주세요');
     if (!form.sportType) return toast('error', '종목을 선택해주세요');
     if (!form.condition) return toast('error', '상품 상태를 선택해주세요');
     if (form.price <= 0) return toast('error', '가격을 입력해주세요');
 
-    createListing.mutate({
-      ...form,
-      teamId,
-      venueId,
-      imageUrls: extractUploadUrls(imageAssets),
-    }, {
-      onSuccess: () => {
-        toast('success', '매물이 등록되었어요!');
-        router.push('/marketplace');
-      },
-      onError: (err) => {
-        toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
-      },
-    });
+    setIsSubmitting(true);
+    try {
+      await api.post('/marketplace/listings', {
+        ...form,
+        teamId,
+        venueId,
+        imageUrls: extractUploadUrls(imageAssets),
+      });
+      toast('success', '매물이 등록되었어요!');
+      router.push('/marketplace');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '등록에 실패했어요. 잠시 후 다시 시도해주세요');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -105,7 +105,7 @@ export default function CreateListingPage() {
           <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
           </div>
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">매물을 등록해보세요</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매물을 등록해보세요</h2>
           <p className="text-base text-gray-500 mt-2">로그인하면 장비를 등록하고 거래할 수 있어요</p>
           <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기
@@ -117,7 +117,13 @@ export default function CreateListingPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader title="매물 등록" showBack />
+      {/* Mobile header */}
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
+          <ArrowLeft size={20} className="text-gray-700" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매물 등록</h1>
+      </header>
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -135,7 +141,7 @@ export default function CreateListingPage() {
           </div>
         )}
         {/* 사진 추가 영역 */}
-        <div className="mb-6 mt-4">
+        <div className="mb-6">
           <p className="block text-sm font-semibold text-gray-700 mb-2">
             상품 이미지
           </p>
@@ -193,7 +199,7 @@ export default function CreateListingPage() {
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 dark:bg-gray-700 text-gray-600 hover:bg-gray-100'
@@ -213,7 +219,7 @@ export default function CreateListingPage() {
                 key={cat}
                 type="button"
                 onClick={() => setForm({ ...form, category: cat })}
-                className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.category === cat
                     ? 'bg-blue-500 text-white'
                     : 'bg-white dark:bg-gray-800 text-gray-600 border border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -235,7 +241,7 @@ export default function CreateListingPage() {
                 onClick={() => setForm({ ...form, condition: c.value })}
                 className={`w-full text-left rounded-xl border p-3.5 transition-colors ${
                   form.condition === c.value
-                    ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                    ? 'border-gray-900 bg-gray-900 text-white dark:border-white dark:bg-white dark:text-gray-900'
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -256,7 +262,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'sell' })}
               className={`rounded-xl border py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'sell'
-                  ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
               }`}
             >
@@ -267,7 +273,7 @@ export default function CreateListingPage() {
               onClick={() => setForm({ ...form, listingType: 'rent' })}
               className={`rounded-xl border py-3 text-base font-semibold transition-colors ${
                 form.listingType === 'rent'
-                  ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                  ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                   : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'
               }`}
             >
@@ -344,15 +350,14 @@ export default function CreateListingPage() {
         {/* 등록 버튼 */}
         <Button
           onClick={handleSubmit}
-          disabled={createListing.isPending || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+          disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
           fullWidth
           size="lg"
-          className="mb-8 mt-10"
+          className="mb-8 mt-2"
         >
-          {createListing.isPending ? '등록 중...' : '매물 등록하기'}
+          {isSubmitting ? '등록 중...' : '매물 등록하기'}
         </Button>
       </div>
-      <div className="h-24" />
     </div>
   );
 }

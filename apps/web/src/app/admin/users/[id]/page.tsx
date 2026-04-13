@@ -5,17 +5,14 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Star, Trophy, MapPin, AlertTriangle, Ban, User, Shield, RefreshCw } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
-import { Textarea } from '@/components/ui/textarea';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { useAdminUser, queryKeys } from '@/hooks/use-api';
+import { useAdminUser } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
-import { extractErrorMessage } from '@/lib/utils';
 
 type ModerationAction = 'warn' | 'suspend' | 'reactivate' | null;
 
@@ -24,7 +21,6 @@ export default function AdminUserDetailPage() {
   const userId = params.id as string;
   const { toast } = useToast();
   const { data: user, isLoading, isError, refetch } = useAdminUser(userId);
-  const queryClient = useQueryClient();
   const [actionType, setActionType] = useState<ModerationAction>(null);
   const [actionNote, setActionNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,10 +52,10 @@ export default function AdminUserDetailPage() {
 
       setActionType(null);
       setActionNote('');
-      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
       await refetch();
     } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '관리 액션을 적용하지 못했어요.'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '관리 액션을 적용하지 못했어요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -128,13 +124,13 @@ export default function AdminUserDetailPage() {
             <p className="text-xs font-medium text-red-500">계정 정지 사유는 필수입니다.</p>
           ) : null}
           <label htmlFor="admin-user-action-note" className="sr-only">운영 메모</label>
-          <Textarea
+          <textarea
             id="admin-user-action-note"
             value={actionNote}
             onChange={(e) => setActionNote(e.target.value)}
             rows={4}
             placeholder="운영 메모를 입력하세요"
-            className="resize-none"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
           />
           <div className="flex gap-3">
             <button
@@ -175,10 +171,10 @@ export default function AdminUserDetailPage() {
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
-                  <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                     user.adminStatus === 'suspended'
-                      ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                      : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                      ? 'bg-red-50 text-red-600'
+                      : 'bg-green-50 text-green-600'
                   }`}>
                     {user.adminStatus === 'suspended' ? '정지' : '활성'}
                   </span>

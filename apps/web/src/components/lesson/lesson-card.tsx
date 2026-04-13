@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Clock, MapPin, Users } from 'lucide-react';
+import { Clock, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
 import { sportLabel, sportCardAccent, lessonTypeLabel, ticketTypeLabel } from '@/lib/constants';
@@ -43,7 +43,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
   const nextTime = lesson.upcomingSchedules?.[0]?.startTime ?? lesson.startTime;
 
   return (
-    <Link href={`/lessons/${lesson.id}`} className="block" data-testid="lesson-card">
+    <Link href={`/lessons/${lesson.id}`} className="block">
       <Card
         variant="default"
         padding="none"
@@ -55,32 +55,32 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           <SafeImage
             src={lessonImage}
             fallbackSrc={fallbackLessonImage}
-            alt={`${sportLabel[lesson.sportType] ?? lesson.sportType} 강좌 - ${lesson.title}`}
+            alt=""
             fill
             className="object-cover group-hover:scale-[1.02] transition-transform duration-300"
             sizes="(max-width: 768px) 100vw, 50vw"
           />
           {/* Gradient overlay for readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
 
           {/* Top-left: sport dot + name */}
           <div className="absolute top-3 left-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} aria-hidden="true" />
-            <span className="text-2xs font-medium text-white/90 drop-shadow-sm">
+            <span className="text-2xs font-semibold text-white/90 drop-shadow-sm">
               {sportLabel[lesson.sportType]}
             </span>
           </div>
 
           {/* Top-right: lesson type badge */}
           <div className="absolute top-3 right-3">
-            <span className="text-2xs font-medium text-white bg-gray-900/60 rounded-md px-1.5 py-0.5 leading-none">
+            <span className="text-2xs font-bold text-white bg-gray-900/60 rounded-md px-1.5 py-0.5 leading-none">
               {lessonTypeLabel[lesson.type] || lesson.type}
             </span>
           </div>
 
           {/* Bottom-left: price */}
           <div className="absolute bottom-3 left-3.5">
-            <span className="rounded-md bg-gray-900/70 px-2 py-1 text-sm font-bold leading-none text-white drop-shadow-sm">
+            <span className="text-sm font-bold text-white drop-shadow-sm">
               {formatCurrency(lesson.fee)}
             </span>
           </div>
@@ -88,16 +88,15 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           {/* Bottom-right: participant fill status */}
           <div className="absolute bottom-3 right-3">
             {isFull ? (
-              <span className="text-2xs font-medium text-white bg-gray-900/70 rounded-md px-1.5 py-0.5 leading-none">
+              <span className="text-2xs font-bold text-white bg-gray-900/70 rounded-md px-2 py-1 leading-none">
                 마감
               </span>
             ) : isAlmostFull ? (
-              <span className="text-2xs font-medium text-white bg-blue-600/80 rounded-md px-1.5 py-0.5 leading-none">
-                <Clock size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
+              <span className="text-2xs font-bold text-amber-100 bg-amber-600/80 rounded-md px-2 py-1 leading-none">
                 {remaining}자리 남음
               </span>
             ) : (
-              <span className="text-2xs font-medium text-white bg-gray-900/60 rounded-md px-1.5 py-0.5 leading-none">
+              <span className="text-2xs font-semibold text-white bg-gray-900/60 rounded-md px-2 py-1 leading-none">
                 <Users size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
                 {lesson.currentParticipants}/{lesson.maxParticipants}
               </span>
@@ -119,7 +118,6 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
             {lesson.venueName && (
               <>
                 <span className="opacity-30 shrink-0" aria-hidden="true">·</span>
-                <MapPin size={11} className="shrink-0 opacity-40" aria-hidden="true" />
                 <span className="truncate">{lesson.venueName}</span>
               </>
             )}
@@ -147,9 +145,8 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
                 </span>
               )}
               {lesson.venue && (
-                <span className="flex items-center gap-0.5 rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5">
-                  <MapPin size={10} className="shrink-0" aria-hidden="true" />
-                  {lesson.venue.name}
+                <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5">
+                  장소: {lesson.venue.name}
                 </span>
               )}
             </div>

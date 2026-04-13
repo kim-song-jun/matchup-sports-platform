@@ -11,7 +11,6 @@ import {
   Trophy,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
 import { useMyTeams, useSubmitTeamMatchResult, useTeamMatch } from '@/hooks/use-api';
 import {
@@ -24,7 +23,6 @@ import {
   isScoreEditable,
 } from '@/lib/team-match-operations';
 import { getTeamLogo } from '@/lib/sport-image';
-import { extractErrorMessage } from '@/lib/utils';
 
 function normalizeInput(value: string) {
   return value.replace(/[^0-9]/g, '');
@@ -145,7 +143,8 @@ export default function ScoreInputPage() {
           toast('success', '경기 결과가 저장되었어요');
         },
         onError: (error) => {
-          toast('error', extractErrorMessage(error, '스코어 기록에 실패했어요. 다시 시도해주세요'));
+          const apiError = error as { response?: { data?: { message?: string } } };
+          toast('error', apiError.response?.data?.message || '스코어 기록에 실패했어요. 다시 시도해주세요');
         },
       },
     );
@@ -196,7 +195,7 @@ export default function ScoreInputPage() {
       </header>
 
       <div className="px-5 @3xl:px-0 @3xl:max-w-2xl @3xl:mx-auto">
-        <div className="rounded-xl bg-gray-900 p-5 mb-4">
+        <div className="rounded-2xl bg-gray-900 p-5 mb-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 text-center">
               <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-white/10">
@@ -266,7 +265,7 @@ export default function ScoreInputPage() {
                       <label htmlFor={`home-${key}`} className="mb-1 block text-center text-xs text-gray-500 dark:text-gray-400">
                         {hostTeam.name}
                       </label>
-                      <Input
+                      <input
                         id={`home-${key}`}
                         type="text"
                         inputMode="numeric"
@@ -274,7 +273,7 @@ export default function ScoreInputPage() {
                         onChange={(event) => updateScore('home', key, event.target.value)}
                         placeholder="0"
                         disabled={isCompleted || submitResultMutation.isPending}
-                        className="text-center text-xl font-bold py-3"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 py-3 text-center text-xl font-bold text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 transition-colors"
                       />
                     </div>
 
@@ -284,7 +283,7 @@ export default function ScoreInputPage() {
                       <label htmlFor={`away-${key}`} className="mb-1 block text-center text-xs text-gray-500 dark:text-gray-400">
                         {guestTeam.name}
                       </label>
-                      <Input
+                      <input
                         id={`away-${key}`}
                         type="text"
                         inputMode="numeric"
@@ -292,7 +291,7 @@ export default function ScoreInputPage() {
                         onChange={(event) => updateScore('away', key, event.target.value)}
                         placeholder="0"
                         disabled={isCompleted || submitResultMutation.isPending}
-                        className="text-center text-xl font-bold py-3"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/50 py-3 text-center text-xl font-bold text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 transition-colors"
                       />
                     </div>
                   </div>
@@ -345,7 +344,7 @@ export default function ScoreInputPage() {
             {isCompleted ? (
               <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-5 mb-8 text-center dark:border-green-900/50 dark:bg-green-950/20">
                 <CheckCircle2 size={30} className="mx-auto text-green-600 dark:text-green-300" />
-                <p className="mt-2 text-base font-bold text-green-800 dark:text-green-200">저장된 경기 결과입니다</p>
+                <p className="mt-2 text-lg font-bold text-green-800 dark:text-green-200">저장된 경기 결과입니다</p>
                 <p className="mt-1 text-sm text-green-700 dark:text-green-200/80">
                   새로고침 후에도 동일한 스코어가 유지됩니다.
                 </p>
@@ -371,7 +370,7 @@ export default function ScoreInputPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={!allFilled || submitResultMutation.isPending}
-                  className="w-full min-h-[48px] rounded-2xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                  className="w-full min-h-[52px] rounded-2xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
                 >
                   {submitResultMutation.isPending ? '저장 중...' : '경기 결과 저장'}
                 </button>

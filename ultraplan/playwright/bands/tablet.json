@@ -1,0 +1,8 @@
+{
+  "id": "tablet",
+  "order": 2,
+  "runSuffix": "tablet",
+  "viewports": ["tablet-sm", "tablet-md", "tablet-lg"],
+  "recommendedExecution": "sequential",
+  "description": "Tablet band with the three canonical tablet viewport ids."
+}

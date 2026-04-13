@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="text-center" data-testid="admin-auth-wall">
           <ShieldCheck size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
           <p className="text-gray-500 dark:text-gray-400 text-base">관리자 권한이 필요합니다</p>
-          <Link href={isAuthenticated ? "/home" : "/login"} className="mt-3 inline-block text-blue-500 text-base font-medium hover:text-blue-600 transition-colors">
+          <Link href={isAuthenticated ? "/home" : "/login"} className="mt-3 inline-block text-blue-500 text-base font-medium hover:underline">
             {isAuthenticated ? '홈으로 이동' : '로그인'}
           </Link>
         </div>
@@ -106,7 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-5 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-900 dark:text-white">
             <ShieldCheck size={20} className="text-blue-500" />
-            <h1 className="text-lg font-bold">TeamMeet Admin</h1>
+            <h1 className="text-lg font-bold">MatchUp Admin</h1>
           </div>
           {/* Mobile close button */}
           <button

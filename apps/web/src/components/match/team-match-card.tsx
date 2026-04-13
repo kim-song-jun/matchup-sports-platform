@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { XCircle, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatCurrency, formatMatchDate } from '@/lib/utils';
@@ -10,11 +9,11 @@ import { getGradeInfo } from '@/lib/skill-grades';
 import type { TeamMatch } from '@/types/api';
 import { cn } from '@/lib/utils';
 
-const statusMap: Record<string, { label: string; className: string; icon?: React.ElementType }> = {
+const statusMap: Record<string, { label: string; className: string }> = {
   recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
   matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
   completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-  cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
+  cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
 };
 
 const matchStyleLabel: Record<string, string> = {
@@ -38,7 +37,6 @@ export interface TeamMatchCardProps {
 
 export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
   const status = statusMap[match.status] ?? statusMap.recruiting;
-  const StatusIcon = status.icon;
 
   return (
     <Link href={`/team-matches/${match.id}`}>
@@ -53,19 +51,18 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center gap-2 flex-wrap">
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
-                {StatusIcon && <StatusIcon className="h-3 w-3 mr-0.5 inline -mt-px" aria-hidden="true" />}
+            <div className="mb-1 flex items-center gap-2">
+              <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${status.className}`}>
                 {status.label}
               </span>
               <span
-                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}
+                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}
               >
                 {sportLabel[match.sportType] ?? match.sportType}
               </span>
               {match.matchStyle && (
                 <>
-                  <span className="text-gray-200 dark:text-gray-700" aria-hidden="true">·</span>
+                  <span className="text-gray-200" aria-hidden="true">·</span>
                   <span className="text-xs text-gray-500">
                     {matchStyleLabel[match.matchStyle] ?? match.matchStyle}
                   </span>
@@ -81,17 +78,16 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
               {match.title}
             </h3>
           </div>
-          <ChevronRight size={16} className="shrink-0 mt-0.5 text-gray-400 dark:text-gray-500" aria-hidden="true" />
         </div>
 
         <p className="mt-2.5 text-sm leading-relaxed text-gray-500">
           {formatMatchDate(match.matchDate)} {match.startTime}
-          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
           {match.venueName}
         </p>
         <p className="mt-1 text-sm text-gray-500">
           {match.quarterCount}쿼터
-          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
           {match.skillGrade
             ? getGradeInfo(match.skillGrade).label
             : match.requiredLevel
@@ -99,11 +95,11 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
               : '제한없음'}
           {match.gameFormat && (
             <>
-              <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+              <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
               {match.gameFormat}
             </>
           )}
-          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
           <span className="font-semibold text-gray-800 dark:text-gray-200">
             {formatCurrency(match.opponentFee ?? match.totalFee)}
           </span>

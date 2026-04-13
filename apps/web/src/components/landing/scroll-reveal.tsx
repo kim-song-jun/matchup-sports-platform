@@ -18,9 +18,7 @@ const TRANSFORMS: Record<string, string> = {
 
 export function ScrollReveal({ children, className = '', delay = 0, direction = 'up' }: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
-  // Start visible so SSR and no-JS clients always see content.
-  // After mount, reset to false then let IntersectionObserver trigger the reveal.
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -31,7 +29,6 @@ export function ScrollReveal({ children, className = '', delay = 0, direction = 
       return;
     }
 
-    // Reset to hidden only after the observer is attached, preventing a flash.
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -43,7 +40,6 @@ export function ScrollReveal({ children, className = '', delay = 0, direction = 
     );
 
     observer.observe(el);
-    setVisible(false);
     return () => observer.disconnect();
   }, []);
 

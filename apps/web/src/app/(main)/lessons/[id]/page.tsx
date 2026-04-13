@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, MapPin, Users, Star, CreditCard, ChevronRight, User, CheckCircle, BookOpen, Pencil, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, CreditCard, ChevronRight, User, CheckCircle, BookOpen, Pencil, GraduationCap } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -29,13 +29,6 @@ const typeColor: Record<string, string> = {
   group_lesson: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', practice_match: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
   free_practice: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300', clinic: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
 };
-
-const sampleCurriculum = [
-  { title: '오리엔테이션', desc: '기초 스트레칭 및 장비 점검', duration: '15분' },
-  { title: '기본기 훈련', desc: '핵심 동작 반복 훈련', duration: '30분' },
-  { title: '실전 연습', desc: '실전 상황 시뮬레이션', duration: '30분' },
-  { title: '피드백 & 정리', desc: '개인별 피드백 및 다음 목표 설정', duration: '15분' },
-];
 
 export default function LessonDetailPage() {
   const params = useParams();
@@ -128,7 +121,7 @@ export default function LessonDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader compact className="gap-3">
+      <MobileGlassHeader className="gap-3">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" /></button>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">{lesson.title}</h1>
       </MobileGlassHeader>
@@ -166,28 +159,28 @@ export default function LessonDetailPage() {
             )}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
             <div className="pointer-events-none absolute bottom-4 left-4">
-              <span className="rounded-md px-1.5 py-0.5 text-2xs font-medium bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
+              <span className="rounded-md px-3 py-1 text-xs font-semibold bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
 
           {/* 타이틀 */}
-          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-normal ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
-            <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>
             {lesson.description && <p className="mt-3 text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{lesson.description}</p>}
           </div>
 
           {/* 코치 */}
           {lesson.coachName && (
-            <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">코치 소개</h3>
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">코치 소개</h3>
               <div className="flex items-start gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"><User size={28} /></div>
                 <div>
-                  <p className="text-base font-bold text-gray-900 dark:text-white">{lesson.coachName}</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-sm text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
                   <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
                     {typeof lesson.host?.mannerScore === 'number' ? (
@@ -211,23 +204,15 @@ export default function LessonDetailPage() {
             <InfoCard icon={<CreditCard size={18} />} label="수강료" value={formatCurrency(lesson.fee)} />
           </div>
 
-          {/* 커리큘럼 */}
-          <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+          {/* 상세 안내 */}
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen size={18} className="text-gray-500" />
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">커리큘럼</h3>
-              <span className="text-xs text-gray-500 ml-auto">총 {sampleCurriculum.length}개 섹션</span>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">상세 안내</h3>
             </div>
-            {sampleCurriculum.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-3 py-3 border-b border-gray-50 dark:border-gray-700 last:border-0">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-bold mt-0.5">{idx + 1}</div>
-                <div className="flex-1">
-                  <p className="text-base font-semibold text-gray-900 dark:text-white">{item.title}</p>
-                  <p className="text-sm text-gray-500 mt-0.5">{item.desc}</p>
-                </div>
-                <span className="text-xs text-gray-500 shrink-0 mt-0.5"><Clock size={12} className="inline mr-0.5" />{item.duration}</span>
-              </div>
-            ))}
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+              현재 이 강좌는 구조화된 커리큘럼 계약을 제공하지 않아요. 실제 설명, 일정, 수강권 정보만 기준으로 안내합니다.
+            </div>
           </div>
 
           {/* 수강권 선택 */}
@@ -247,8 +232,8 @@ export default function LessonDetailPage() {
           </div>
 
           {/* 이런 분께 추천 */}
-          <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">이런 분께 추천합니다</h3>
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">이런 분께 추천합니다</h3>
             {[
               `${sportLabel[lesson.sportType]}을(를) 처음 시작하시는 분`,
               '체계적으로 기초를 배우고 싶은 분',
@@ -262,8 +247,8 @@ export default function LessonDetailPage() {
           </div>
 
           {/* 강좌 사진 */}
-          <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
+          <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
               {galleryImages.map((image, index) => (
                 <button
@@ -291,7 +276,7 @@ export default function LessonDetailPage() {
         {/* Right CTA — sidebar-sticky로 전체 오른쪽 컬럼이 sticky */}
         <div className="detail-sidebar px-5 @3xl:px-0 mt-4 @3xl:mt-0">
           <div className="sidebar-sticky space-y-3">
-            <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
               <p className="text-2xl font-black text-gray-900 dark:text-white text-center mb-3">{selectedPlan ? formatAmount(selectedPrice) : formatCurrency(lesson.fee)}</p>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-500">참가 현황</span>
@@ -365,8 +350,8 @@ export default function LessonDetailPage() {
             </div>
 
             {/* 등록자 — CTA와 같은 sticky 그룹 안에 */}
-            <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">등록자</h3>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">등록자</h3>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">{lesson.host?.nickname?.charAt(0) || '?'}</div>
                 <div>
@@ -383,12 +368,19 @@ export default function LessonDetailPage() {
                 title="이미 이 강좌의 수강권을 보유하고 있어요"
                 description="결제 완료된 수강권은 내 수강권 화면에서 이용 상태와 유효기간을 계속 확인할 수 있어요."
               />
+            ) : activeTicketPlans.length > 0 && !isHost ? (
+              <TrustSignalBanner
+                tone="info"
+                label="실구매 흐름"
+                title="선택한 수강권 기준으로 결제가 진행돼요"
+                description="이제는 mock plan 대신 lesson detail API가 내려준 실제 ticket plan만 구매할 수 있습니다. 결제 완료 후 내 수강권에서 확인할 수 있어요."
+              />
             ) : null}
 
             {isHost && (
               <Link
                 href={`/lessons/${lessonId}/edit`}
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-gray-200 dark:border-gray-600 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+                className="flex items-center justify-center gap-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <Pencil size={16} />
                 강좌 수정
@@ -397,8 +389,6 @@ export default function LessonDetailPage() {
           </div>
         </div>
       </div>
-
-      <div className="h-24" />
 
       <MediaLightbox
         isOpen={showMediaLightbox}
@@ -413,7 +403,7 @@ export default function LessonDetailPage() {
 
 function InfoCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
       <div className="flex items-center gap-2 mb-1.5"><span className="text-gray-400 dark:text-gray-500">{icon}</span><span className="text-xs text-gray-500 dark:text-gray-400">{label}</span></div>
       <p className="text-md font-semibold text-gray-900 dark:text-white">{value}</p>
       {sub && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{sub}</p>}

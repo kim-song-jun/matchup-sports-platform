@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Swords } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, AlertTriangle, Eye, Plus, Swords } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
@@ -31,6 +30,7 @@ const appStatusConfig: Record<string, { label: string; style: string }> = {
 type TabKey = 'hosted' | 'applied';
 
 export default function MyTeamMatchesPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   useRequireAuth();
@@ -79,11 +79,16 @@ export default function MyTeamMatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader title="내 팀 매칭" showBack />
-      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-4 px-5 @3xl:px-0 pt-4">
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h1>
+      </header>
+      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀 매칭</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">팀 매칭 모집 및 신청 현황을 관리하세요</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h2>
+          <p className="text-base text-gray-500 dark:text-gray-400 mt-1">팀 매칭 모집 및 신청 현황을 관리하세요</p>
         </div>
         {activeTab === 'hosted' && (
           <Link
@@ -97,18 +102,18 @@ export default function MyTeamMatchesPage() {
       </div>
 
       {/* Tab navigation */}
-      <div className="px-5 @3xl:px-0 pt-4 pb-1">
-        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700" role="tablist">
+      <div className="px-5 @3xl:px-0 pt-3 pb-1">
+        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               role="tab"
               aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors ${
+              className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
                 activeTab === tab.key
-                  ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
               {tab.label}
@@ -120,7 +125,7 @@ export default function MyTeamMatchesPage() {
       {/* Tab: 내가 만든 매치 */}
       {activeTab === 'hosted' && (
         <>
-          <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
+          <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
             {postsLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
@@ -139,17 +144,17 @@ export default function MyTeamMatchesPage() {
               return (
                 <div key={post.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
                       {sportLabel[post.sportType]}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.style}`}>
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
                       {st.text}
                     </span>
                     <span className="text-xs text-gray-500 ml-auto">{post.teamName}</span>
                   </div>
 
                   <Link href={`/team-matches/${post.id}`}>
-                    <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{post.title}</h3>
+                    <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{post.title}</h3>
                   </Link>
 
                   <div className="mt-2 space-y-1.5">
@@ -197,13 +202,12 @@ export default function MyTeamMatchesPage() {
               );
             })}
           </div>
-          <div className="h-24" />
         </>
       )}
 
       {/* Tab: 내가 신청한 매치 */}
       {activeTab === 'applied' && (
-        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
+        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
           {appsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -225,7 +229,7 @@ export default function MyTeamMatchesPage() {
                 <Link key={app.id} href={`/team-matches/${tm.id}`} className="block">
                   <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 dark:hover:border-gray-600 transition-colors active:scale-[0.995]">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConf.style}`}>
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusConf.style}`}>
                         {statusConf.label}
                       </span>
                       {tm.hostTeam && (
@@ -257,7 +261,6 @@ export default function MyTeamMatchesPage() {
               );
             })
           )}
-          <div className="h-24" />
         </div>
       )}
 
@@ -276,7 +279,7 @@ export default function MyTeamMatchesPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500 dark:text-red-400" aria-hidden="true" />
         </div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
         <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
         <div className="mt-6 flex gap-3">
           <button

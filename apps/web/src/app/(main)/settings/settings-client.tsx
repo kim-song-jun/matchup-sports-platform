@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Moon, Sun, Monitor, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
@@ -10,8 +9,8 @@ export function SettingsBackButton() {
   const router = useRouter();
 
   return (
-    <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-      <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+    <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+      <ArrowLeft size={20} className="text-gray-700" />
     </button>
   );
 }
@@ -33,7 +32,7 @@ export function ThemePicker() {
             onClick={() => setTheme(opt.value)}
             className={`flex flex-col items-center gap-1 rounded-xl border py-3 transition-colors ${
               theme === opt.value
-                ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                ? 'border-blue-500 bg-blue-500 text-white shadow-sm shadow-blue-500/20 dark:border-blue-500 dark:bg-blue-500 dark:text-white'
                 : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600'
             }`}
           >
@@ -49,13 +48,8 @@ export function ThemePicker() {
 export function LogoutButton() {
   const router = useRouter();
   const { isAuthenticated, logout } = useAuthStore();
-  // Defer auth check to after hydration so SSR and initial client render both produce null
-  const [clientAuth, setClientAuth] = useState(false);
-  useEffect(() => {
-    setClientAuth(isAuthenticated);
-  }, [isAuthenticated]);
 
-  if (!clientAuth) return null;
+  if (!isAuthenticated) return null;
 
   return (
     <div className="mb-6">

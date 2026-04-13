@@ -1,0 +1,9 @@
+{
+  "shotDir": "screenshots/2026-04-13/",
+  "reportsDir": "screenshots/reports/",
+  "lastReviewedFile": "00000",
+  "lastReviewedAt": null,
+  "batchSize": 30,
+  "batches": [],
+  "policy": "report-only — NO code changes"
+}

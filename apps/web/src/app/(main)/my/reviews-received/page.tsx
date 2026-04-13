@@ -1,8 +1,10 @@
 'use client';
 
-import { Star, User } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Star, User } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 
 const mockReviewsReceived = [
   {
@@ -63,6 +65,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function ReviewsReceivedPage() {
+  const router = useRouter();
   useRequireAuth();
 
   const avgScore = mockReviewsReceived.reduce((sum, r) => sum + r.rating, 0) / mockReviewsReceived.length;
@@ -73,15 +76,29 @@ export default function ReviewsReceivedPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader title="내가 받은 평가" showBack />
-      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내가 받은 평가</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">다른 사용자들이 남긴 평가를 확인하세요</p>
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h1>
+      </header>
+      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 받은 평가</h2>
+        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">다른 사용자들이 남긴 평가를 확인하세요</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 mt-4 pb-8">
+      <div className="px-5 @3xl:px-0 pb-8">
+        <div className="mb-4">
+          <TrustSignalBanner
+            tone="warning"
+            label="샘플 데이터"
+            title="받은 평가는 아직 실데이터와 연결되지 않았어요"
+            description="현재 이 화면의 리뷰 목록과 통계는 UI 검증용 샘플입니다. 실제 리뷰 API가 연결되기 전까지 신뢰 지표로 사용하면 안 됩니다."
+          />
+        </div>
+
         {/* Summary */}
-        <div className="mb-4 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
           <div className="flex items-center gap-6">
             <div className="text-center">
               <p className="text-4xl font-black text-gray-900 dark:text-white">{avgScore.toFixed(1)}</p>
@@ -108,27 +125,26 @@ export default function ReviewsReceivedPage() {
         {/* Review List */}
         <div className="space-y-3">
           {mockReviewsReceived.map((review) => (
-            <div key={review.id} className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div key={review.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 shrink-0">
                   <User size={18} className="text-gray-500 dark:text-gray-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{review.reviewerName}</span>
+                    <span className="text-base font-semibold text-gray-900 dark:text-white">{review.reviewerName}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{review.date}</span>
                   </div>
                   <div className="mt-0.5">
                     <StarRating rating={review.rating} />
                   </div>
-                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{review.comment}</p>
-                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{review.matchTitle}</p>
+                  <p className="text-base text-gray-700 dark:text-gray-300 mt-2">{review.comment}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{review.matchTitle}</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
-        <div className="h-24" />
       </div>
     </div>
   );

@@ -1,0 +1,8 @@
+{
+  "id": "D",
+  "name": "ultra-d",
+  "batchOrder": ["batch-7-interactions", "batch-8-rerun"],
+  "priority": "on-demand",
+  "runnerLabel": "ultra-d-<band>",
+  "description": "Interaction sweep and rerun-only lane."
+}

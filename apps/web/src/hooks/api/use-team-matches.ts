@@ -65,34 +65,6 @@ export function useCreateTeamMatch() {
   });
 }
 
-export function useUpdateTeamMatch() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
-      const res = await api.patch(`/team-matches/${id}`, data);
-      return extractData<TeamMatch>(res);
-    },
-    onSuccess: (_, { id }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
-    },
-  });
-}
-
-export function useCancelTeamMatch() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
-      return extractData<TeamMatch>(res);
-    },
-    onSuccess: (_, id) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
-    },
-  });
-}
-
 export function useApplyTeamMatch() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -1,0 +1,20 @@
+{
+  "scenario": "S05",
+  "name": "OAuth Callback Pages",
+  "startedAt": "2026-04-13T17:15:00+09:00",
+  "completedAt": "2026-04-13T17:30:00+09:00",
+  "matrixCombinations": 12,
+  "steps": [
+    { "step": 1, "action": "navigate", "target": "/callback/kakao?code=testcode", "description": "Kakao loading state (spinner)", "screenshot": "01-kakao-loading.png" },
+    { "step": 2, "action": "navigate", "target": "/callback/kakao", "description": "Kakao error state (no code)", "screenshot": "02-kakao-error.png" },
+    { "step": 3, "action": "hover+click", "target": "로그인 페이지로 button", "description": "Kakao error button interaction", "screenshot": "03-kakao-error-btn.png" },
+    { "step": 4, "action": "navigate", "target": "/callback/kakao?code=badcode", "description": "Kakao API error state", "screenshot": "04-kakao-api-error.png" },
+    { "step": 5, "action": "navigate", "target": "/callback/kakao?code=validcode", "description": "Kakao success redirect to home", "screenshot": "05-kakao-success.png" },
+    { "step": 6, "action": "navigate", "target": "/callback/naver?code=testcode&state=xxx", "description": "Naver loading state", "screenshot": "06-naver-loading.png" },
+    { "step": 7, "action": "navigate", "target": "/callback/naver", "description": "Naver error state (no code)", "screenshot": "07-naver-error.png" },
+    { "step": 8, "action": "navigate", "target": "/callback/naver?code=test&state=mismatch", "description": "Naver CSRF state mismatch", "screenshot": "08-naver-csrf-error.png" },
+    { "step": 9, "action": "navigate", "target": "/callback/naver?code=badcode&state=valid", "description": "Naver API error", "screenshot": "09-naver-api-error.png" },
+    { "step": 10, "action": "navigate", "target": "/callback/naver?code=valid&state=valid", "description": "Naver success redirect", "screenshot": "10-naver-success.png" },
+    { "step": 11, "action": "observe", "target": "Suspense fallback", "description": "Callback Suspense fallback", "screenshot": "11-callback-suspense.png" }
+  ]
+}

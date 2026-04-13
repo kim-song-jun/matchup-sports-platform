@@ -87,7 +87,7 @@ export function TicketPlanSelector({
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-start gap-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">
             <Ticket size={18} aria-hidden="true" />
           </div>
           <div>
@@ -103,7 +103,7 @@ export function TicketPlanSelector({
 
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">수강권 선택</h3>
+      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">수강권 선택</h3>
 
       <div className="space-y-3">
         {activePlans.map((plan) => {
@@ -130,7 +130,7 @@ export function TicketPlanSelector({
             >
               {/* Popular badge */}
               {meta.popular && (
-                <span className="absolute -top-2.5 left-4 rounded-full bg-blue-500 px-2.5 py-0.5 text-2xs font-bold text-white shadow-sm">
+                <span className="absolute -top-2.5 left-4 rounded-full bg-blue-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
                   가장 인기
                 </span>
               )}
@@ -175,7 +175,7 @@ export function TicketPlanSelector({
                     </span>
 
                     {discountPct !== null && (
-                      <span className="rounded-full bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 text-2xs font-bold text-red-500 dark:text-red-400">
+                      <span className="rounded-full bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 text-xs font-bold text-red-500 dark:text-red-400">
                         {discountPct}% 할인
                       </span>
                     )}

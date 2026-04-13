@@ -1,10 +1,11 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Clock, MapPin, Users, ListChecks, GraduationCap } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, Calendar, Clock, MapPin, Users, ListChecks, GraduationCap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useLessons, useMe } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
@@ -24,6 +25,7 @@ function daysUntil(dateStr: string) {
 }
 
 export default function MyLessonsPage() {
+  const router = useRouter();
   useRequireAuth();
   const { user, isAuthenticated } = useAuthStore();
   const {
@@ -60,13 +62,25 @@ export default function MyLessonsPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader title="내가 등록한 강좌" showBack />
-      <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내가 등록한 강좌</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">등록한 강좌를 관리하세요</p>
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h1>
+      </header>
+      <div className="hidden @3xl:block mb-6 px-5 @3xl:px-0 pt-4">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내가 등록한 강좌</h2>
+        <p className="text-base text-gray-500 dark:text-gray-400 mt-1">등록한 강좌를 관리하세요</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 mt-4 space-y-3 pb-8 stagger-children">
+      <div className="px-5 @3xl:px-0 space-y-4 pb-8 stagger-children">
+        <TrustSignalBanner
+          tone="warning"
+          label="제한된 보기"
+          title="현재는 공개 중인 내 강좌만 표시돼요"
+          description="취소되었거나 마감된 강좌는 이 화면에 포함되지 않습니다. 수정·취소 같은 관리 기능도 아직 실데이터와 연결되지 않았어요."
+        />
+
         {isLoading || isOwnerPending ? (
           Array.from({ length: 2 }).map((_, index) => (
             <div
@@ -134,7 +148,7 @@ export default function MyLessonsPage() {
                 </div>
 
                 <Link href={`/lessons/${lesson.id}`}>
-                  <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{lesson.title}</h3>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{lesson.title}</h3>
                 </Link>
 
                 {/* Info rows */}
@@ -182,7 +196,7 @@ export default function MyLessonsPage() {
 
               {/* Curriculum section */}
               {lesson.curriculum && lesson.curriculum.length > 0 && (
-                <div className="bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
+                <div className="border-t border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 px-5 py-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <ListChecks size={12} className="text-gray-500" />
                     <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">커리큘럼 요약</span>
@@ -200,7 +214,7 @@ export default function MyLessonsPage() {
                 </div>
               )}
 
-              <div className="mt-3 px-5 py-3">
+              <div className="border-t border-gray-50 dark:border-gray-800 px-5 py-3">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   상세 페이지에서 공개 정보만 확인할 수 있어요.
                 </p>
@@ -209,7 +223,6 @@ export default function MyLessonsPage() {
           );
         })}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

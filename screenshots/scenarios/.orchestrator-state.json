@@ -1,0 +1,16 @@
+{
+  "currentScenario": null,
+  "round": 0,
+  "processedScenarios": [
+    { "scenario": "S01-landing-navigation",   "result": "SKIPPED_EMPTY", "detectedAt": "2026-04-13T15:45:00+09:00" },
+    { "scenario": "S02-auth-login-register",  "result": "SKIPPED_EMPTY", "detectedAt": "2026-04-13T16:15:00+09:00" },
+    { "scenario": "S03-onboarding",           "result": "SKIPPED_EMPTY", "detectedAt": "2026-04-13T16:20:00+09:00" },
+    { "scenario": "S04-info-pages",           "result": "SKIPPED_EMPTY", "detectedAt": "2026-04-13T17:10:00+09:00" },
+    { "scenario": "S05-oauth-callbacks",      "result": "SKIPPED_EMPTY", "detectedAt": "2026-04-13T17:15:00+09:00" }
+  ],
+  "inProgress": null,
+  "lastPollAt": "2026-04-13T17:15:00+09:00",
+  "status": "waiting",
+  "monitorTaskId": "bklbaortd",
+  "note": "S01-S05 all SKIPPED_EMPTY. Capture Agent creating flag+steps.json skeleton but not running Chrome MCP captures yet."
+}

@@ -10,15 +10,11 @@ export default function MainLayout({
   return (
     <div id="main-content" tabIndex={-1} className="min-h-dvh bg-gray-50 dark:bg-gray-900 outline-none">
       {/* Desktop: sidebar + content */}
-      <div className="hidden lg:flex lg:flex-col">
+      <div className="hidden lg:block">
         <Sidebar />
-        {/* pl matches sidebar width (w-[240px]) exactly */}
-        <main className="pl-[240px] min-h-dvh flex flex-col">
-          <div className="@container flex-1 max-w-[960px] mx-auto w-full px-8 py-10">
+        <main className="pl-[260px] min-h-dvh">
+          <div className="@container max-w-[960px] mx-auto px-8 py-10">
             {children}
-          </div>
-          <div className="pl-0 max-w-[960px] mx-auto w-full">
-            <Footer />
           </div>
         </main>
       </div>

@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import dynamic from 'next/dynamic';
 import { Modal } from '@/components/ui/modal';
 import { SafeImage } from '@/components/ui/safe-image';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 
 const MediaLightbox = dynamic(
   () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
@@ -18,18 +19,14 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useListing, useDeleteListing } from '@/hooks/use-api';
-import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
 import { getListingImageSet } from '@/lib/sport-image';
 import { formatAmount } from '@/lib/utils';
 
 const conditionLabel: Record<string, string> = { new: '새 상품', like_new: '거의 새 것', good: '양호', fair: '사용감', poor: '하자' };
 const conditionColor: Record<string, string> = {
-  new: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  like_new: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  good: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  fair: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-  poor: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400',
+  new: 'bg-gray-100 text-gray-600', like_new: 'bg-gray-100 text-gray-600',
+  good: 'bg-gray-100 text-gray-600', fair: 'bg-gray-100 text-gray-600', poor: 'bg-red-50 text-red-600',
 };
 
 export default function ListingDetailPage() {
@@ -119,7 +116,7 @@ export default function ListingDetailPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       {/* Mobile header */}
-      <MobileGlassHeader compact className="justify-between">
+      <MobileGlassHeader className="justify-between">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"><ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" /></button>
         <div className="flex gap-1">
           <button
@@ -137,12 +134,7 @@ export default function ListingDetailPage() {
             <Share2 size={18} className="text-gray-500" />
           </button>
           <button
-            onClick={async () => {
-              setLiked(!liked);
-              try {
-                await api.post(`/marketplace/listings/${listingId}/like`);
-              } catch { /* silent fail for now */ }
-            }}
+            onClick={() => setLiked(!liked)}
             aria-label={liked ? '좋아요 취소' : '좋아요'}
             className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl"
           >
@@ -212,38 +204,38 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Title + price */}
-          <div className="mb-3">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${conditionColor[listing.condition]}`}>
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`rounded-full px-2 py-0.5 text-xs font-normal ${conditionColor[listing.condition]}`}>
                 {conditionLabel[listing.condition]}
               </span>
-              <span className="text-xs text-gray-400">{sportLabel[listing.sportType]}</span>
+              <span className="text-xs text-gray-500">{sportLabel[listing.sportType]}</span>
               {listing.listingType === 'rent' && (
-                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600">대여</span>
+                <span className="rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 text-blue-600">대여</span>
               )}
             </div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-snug">{listing.title}</h1>
-            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{formatAmount(listing.price)}</p>
-            <div className="flex items-center gap-3 mt-1.5 text-sm text-gray-400 dark:text-gray-500">
-              <span className="flex items-center gap-0.5"><Eye size={12} />{listing.viewCount}</span>
-              <span className="flex items-center gap-0.5"><Heart size={12} />{listing.likeCount}</span>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{listing.title}</h1>
+            <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">{formatAmount(listing.price)}</p>
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+              <span className="flex items-center gap-1"><Eye size={14} />{listing.viewCount}</span>
+              <span className="flex items-center gap-1"><Heart size={14} />{listing.likeCount}</span>
               {listing.locationDistrict && (
-                <span className="flex items-center gap-0.5"><MapPin size={12} />{listing.locationCity} {listing.locationDistrict}</span>
+                <span className="flex items-center gap-1"><MapPin size={14} />{listing.locationCity} {listing.locationDistrict}</span>
               )}
             </div>
           </div>
 
           {/* Description */}
-          <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">상품 설명</h3>
-            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 mb-4">
+            <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-2">상품 설명</h3>
+            <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
           </div>
 
           {/* Rental info */}
           {listing.listingType === 'rent' && (
-            <div className="mt-4 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-950/20 p-4">
-              <h3 className="text-base font-bold text-blue-800 dark:text-blue-300 mb-2">대여 정보</h3>
-              <div className="space-y-2 text-sm text-blue-700 dark:text-blue-400">
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-5 mb-4">
+              <h3 className="text-md font-semibold text-blue-800 mb-2">대여 정보</h3>
+              <div className="space-y-2 text-base text-blue-700">
                 <p>일일 대여비: {formatAmount(listing.rentalPricePerDay || 0)}</p>
                 <p>보증금: {formatAmount(listing.rentalDeposit || 0)}</p>
               </div>
@@ -255,92 +247,95 @@ export default function ListingDetailPage() {
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
           {/* Seller */}
-          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <div className="flex items-center justify-between mb-2.5">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">판매자</h3>
-              <button
-                onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
-                className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-red-500 transition-colors"
-              >
-                <AlertTriangle size={11} aria-hidden="true" />
-                신고
-              </button>
-            </div>
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">판매자</h3>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-300 shrink-0">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">
                 {listing.seller?.nickname?.charAt(0)}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{listing.seller?.nickname}</p>
-                <div className="flex items-center gap-1 text-xs text-amber-500 mt-0.5">
-                  <Star size={11} fill="currentColor" />
+              <div className="flex-1">
+                <p className="text-md font-semibold text-gray-900 dark:text-white">{listing.seller?.nickname}</p>
+                <div className="flex items-center gap-1 text-sm text-amber-500 mt-0.5">
+                  <Star size={12} fill="currentColor" />
                   <span>{listing.seller?.mannerScore?.toFixed(1)}</span>
                 </div>
               </div>
             </div>
+            <div className="mt-3 pt-3 border-t border-gray-50 text-right">
+              <button
+                onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
+                className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+              >
+                신고하기
+              </button>
+            </div>
           </div>
 
           {/* Safety notice */}
-          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 p-4">
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-700 p-4">
             <div className="flex items-start gap-2">
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">안전거래 안내</p>
-                <p className="text-xs text-gray-500 mt-0.5">실제 안전결제는 아직 준비 중이며, 현재는 채팅 기반 거래만 지원해요.</p>
+                <p className="text-xs text-gray-500 mt-0.5">실제 안전결제는 아직 준비 중이며, 현재는 채팅 기반 거래만 지원합니다.</p>
               </div>
             </div>
           </div>
 
           {/* CTA */}
-          {!isAuthenticated ? (
-            <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
-              로그인 후 구매하기
-            </Link>
-          ) : (
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/payments/checkout')}
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors"
-              >
-                {listing.listingType === 'rent' ? '대여 신청하기' : '구매하기'}
-              </button>
-              <button
-                onClick={() => {
-                  toast('success', '판매자와 채팅을 시작했어요');
-                  router.push('/chat');
-                }}
-                className="w-full rounded-xl border border-gray-200 py-3.5 text-md font-semibold text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-              >
-                <MessageCircle size={18} />
-                채팅하기
-              </button>
-              {user?.id === listing?.sellerId && (
-                <div className="flex gap-2 mt-2">
-                  <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <Pencil size={14} /> 수정
-                  </Link>
-                  <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-xl border border-red-200 dark:border-red-800 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
-                    <Trash2 size={14} /> 삭제
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            {!isAuthenticated ? (
+              <Link href="/login" className="block w-full text-center rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors">
+                로그인 후 구매하기
+              </Link>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    toast('success', '판매자와 채팅을 시작했어요');
+                    router.push('/chat');
+                  }}
+                  className="w-full rounded-xl border border-gray-200 py-3.5 text-md font-semibold text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  <MessageCircle size={18} />
+                  채팅하기
+                </button>
+                {user?.id !== listing?.sellerId && (
+                  <TrustSignalBanner
+                    tone="warning"
+                    label="결제 준비 중"
+                    title={listing.listingType === 'rent' ? '대여 결제는 아직 열리지 않았어요' : '장터 구매 결제는 아직 열리지 않았어요'}
+                    description="현재는 판매자와 채팅으로 거래 조건을 확인하는 단계까지만 지원합니다. 결제 페이지로 보내는 가짜 흐름은 제거되었습니다."
+                  />
+                )}
+                {user?.id === listing?.sellerId && (
+                  <div className="flex gap-2 mt-2">
+                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600">
+                      <Pencil size={14} /> 수정
+                    </Link>
+                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-500">
+                      <Trash2 size={14} /> 삭제
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           </div>
         </div>
       </div>
 
       {/* 삭제 확인 모달 */}
       <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} size="sm">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 mx-auto mb-4">
-          <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500" />
         </div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">삭제된 매물은 복구할 수 없어요.</p>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
+        <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => setShowDeleteConfirm(false)}
-            className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="flex-1 rounded-xl bg-gray-100 py-3 text-base font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
           >
             돌아가기
           </button>
@@ -359,14 +354,12 @@ export default function ListingDetailPage() {
                 },
               });
             }}
-            className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-sm font-semibold text-white hover:bg-red-600 transition-colors"
+            className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
           >
             삭제하기
           </button>
         </div>
       </Modal>
-
-      <div className="h-24" />
 
       <MediaLightbox
         isOpen={showMediaLightbox}

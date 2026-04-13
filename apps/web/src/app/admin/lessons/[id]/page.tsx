@@ -8,7 +8,6 @@ import { api } from '@/lib/api';
 import { ChevronRight, Calendar, MapPin, Users, CreditCard, User, GraduationCap, AlertCircle, CheckCircle, Ticket } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { Select } from '@/components/ui/select';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useLesson } from '@/hooks/use-api';
 import type { LessonParticipant } from '@/types/api';
@@ -60,8 +59,8 @@ const typeColor: Record<string, string> = {
 };
 const statusLabel: Record<string, string> = { open: '진행중', closed: '마감', completed: '완료', cancelled: '취소' };
 const statusColor: Record<string, string> = {
-  open: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400', closed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
-  completed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400', cancelled: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
+  open: 'bg-blue-50 text-blue-500', closed: 'bg-gray-100 text-gray-500',
+  completed: 'bg-green-50 text-green-500', cancelled: 'bg-red-50 text-red-500',
 };
 const statusOptions = ['open', 'closed', 'completed', 'cancelled'];
 
@@ -150,7 +149,7 @@ export default function AdminLessonDetailPage() {
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">{lesson.title}</h2>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-2xs font-medium ${statusColor[lesson.status] || 'bg-gray-100 dark:bg-gray-700'}`}>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusColor[lesson.status] || 'bg-gray-100 dark:bg-gray-700'}`}>
                 {statusLabel[lesson.status] || lesson.status}
               </span>
             </div>
@@ -246,7 +245,7 @@ export default function AdminLessonDetailPage() {
             <div className="flex items-center gap-2 mb-4">
               <Ticket size={18} className="text-gray-400" aria-hidden="true" />
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">발급 수강권</h3>
-              <span className="ml-auto rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">
+              <span className="ml-auto rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-gray-400">
                 {LESSON_MOCK_TICKETS.length}건
               </span>
             </div>
@@ -335,16 +334,17 @@ export default function AdminLessonDetailPage() {
             {/* Status change */}
             <div className="mb-4">
               <label htmlFor="admin-lesson-status" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">상태 변경</label>
-              <Select
+              <select
                 id="admin-lesson-status"
                 value={lesson.status}
                 onChange={(e) => statusMutation.mutate(e.target.value)}
                 disabled={statusChanging}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors disabled:opacity-50"
               >
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{statusLabel[s]}</option>
                 ))}
-              </Select>
+              </select>
               {statusMutation.isSuccess && (
                 <p className="flex items-center gap-1 text-xs text-green-500 mt-1.5">
                   <CheckCircle size={12} className="text-green-500" />

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
+  ArrowLeft,
   CheckCircle,
   CreditCard,
   Calendar,
@@ -13,7 +14,6 @@ import {
   RotateCcw,
   ReceiptText,
 } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
@@ -31,6 +31,7 @@ import {
 import { formatAmount, formatDateTime } from '@/lib/utils';
 
 export default function PaymentDetailPage() {
+  const router = useRouter();
   const params = useParams();
   const id = params.id as string;
   const [copied, setCopied] = useState(false);
@@ -95,7 +96,16 @@ export default function PaymentDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-8">
-      <MobileGlassHeader title="결제 상세" showBack compact />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+        >
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">결제 상세</h1>
+      </header>
 
       <div className="hidden @3xl:block mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
@@ -103,7 +113,7 @@ export default function PaymentDetailPage() {
           <ChevronRight size={14} />
           <span className="text-gray-700 dark:text-gray-300">상세</span>
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">결제 상세</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">결제 상세</h2>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
@@ -126,8 +136,8 @@ export default function PaymentDetailPage() {
           />
         ) : null}
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 금액</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-base text-gray-500">결제 금액</span>
@@ -142,8 +152,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 수단</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800/50">
               <method.icon size={20} className="text-gray-500" />
@@ -155,11 +165,11 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">연결된 일정</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">연결된 일정</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${source.color}`}>
+              <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${source.color}`}>
                 {source.label}
               </span>
               <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{source.title}</p>
@@ -190,8 +200,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">영수증 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">영수증 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">주문번호</span>
@@ -207,8 +217,8 @@ export default function PaymentDetailPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 타임라인</h3>
           <div className="relative pl-6">
             <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-gray-100 dark:bg-gray-700" />
             {timelineSteps.map((step, index) => (
@@ -226,8 +236,8 @@ export default function PaymentDetailPage() {
         </div>
 
         {payment.status === 'completed' && source.kind === 'match' ? (
-          <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">환불 규정</h3>
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 mb-4">
               <p className={`text-sm font-semibold ${refundPolicy.color}`}>{refundPolicy.label}</p>
               <p className="text-sm text-gray-500 mt-1">{refundPolicy.description}</p>
@@ -236,7 +246,7 @@ export default function PaymentDetailPage() {
             {refundPolicy.percentage > 0 ? (
               paymentMode.state === 'unavailable' ? (
                 <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  현재 환경에서는 legacy 실결제 환불을 처리할 수 없어요. 운영 결제 연동이 복구된 뒤 다시 시도해주세요.
+                  현재 환경에서는 legacy 실결제 환불을 처리할 수 없습니다. 운영 결제 연동이 복구된 뒤 다시 시도해주세요.
                 </div>
               ) : (
                 <Link
@@ -250,14 +260,13 @@ export default function PaymentDetailPage() {
             ) : (
               <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
                 {paymentMode.state === 'mock'
-                  ? '현재 정책상 이 테스트 결제는 환불 상태를 변경할 수 없어요.'
-                  : '현재 정책상 이 결제는 환불할 수 없어요.'}
+                  ? '현재 정책상 이 테스트 결제는 환불 상태를 변경할 수 없습니다.'
+                  : '현재 정책상 이 결제는 환불할 수 없습니다.'}
               </div>
             )}
           </div>
         ) : null}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

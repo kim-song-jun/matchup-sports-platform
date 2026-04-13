@@ -1,0 +1,20 @@
+{
+  "scenario": "S09",
+  "name": "Create Match (4-step wizard)",
+  "startedAt": "2026-04-13T19:00:00+09:00",
+  "completedAt": "2026-04-13T19:20:00+09:00",
+  "matrixCombinations": 12,
+  "note": "Step 3-4 could not be reached via preview_fill due to React state sync limitation",
+  "steps": [
+    { "step": 1, "action": "navigate", "target": "/matches/new", "description": "Step 1 sport selection (11 buttons)", "screenshot": "01-step1-sport.png" },
+    { "step": 2, "action": "click", "target": "풋살 button", "description": "Select futsal → auto advance to Step 2", "screenshot": "02-step1-futsal-selected.png" },
+    { "step": 3, "action": "observe", "target": "Step 2 form", "description": "Step 2 match info top (title, desc, image upload)", "screenshot": "03-step2-info-top.png" },
+    { "step": 4, "action": "scroll", "target": "Step 2 form", "description": "Step 2 match info bottom (capacity, fee, level, gender, rules)", "screenshot": "04-step2-info-bottom.png" },
+    { "step": 5, "action": "fill", "target": "title input", "description": "Fill match title", "screenshot": "05-step2-title-filled.png" },
+    { "step": 6, "action": "click", "target": "다음 button", "description": "Step 2 → Step 3 transition", "screenshot": "06-step3-venue-time.png", "blocked": true, "reason": "React state sync issue with preview_fill" },
+    { "step": 7, "action": "fill", "target": "venue/date/time", "description": "Step 3 venue and schedule", "screenshot": "07-step3-filled.png", "blocked": true },
+    { "step": 8, "action": "click", "target": "다음 button", "description": "Step 3 → Step 4 review", "screenshot": "08-step4-review.png", "blocked": true },
+    { "step": 9, "action": "click", "target": "매치 만들기 button", "description": "Final submit", "screenshot": "09-step4-submit.png", "blocked": true },
+    { "step": 10, "action": "click", "target": "뒤로가기", "description": "Back navigation preserves data", "screenshot": "10-back-preserved.png" }
+  ]
+}

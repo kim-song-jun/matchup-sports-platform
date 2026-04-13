@@ -5,7 +5,6 @@ import { useState, useEffect, useRef } from 'react';
 import { ToastProvider } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
-import type { ApiResponse, UserProfile } from '@/types/api';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 import { RealtimeProvider, useChatUnreadSync, useNotificationSync } from '@/hooks/use-realtime';
 
@@ -23,9 +22,10 @@ function AuthHydrator() {
     if (!token) return;
 
     api
-      .get<ApiResponse<UserProfile>>('/auth/me')
+      .get('/auth/me')
       .then((res) => {
-        setUser(res.data);
+        const data = res.data?.data ?? res.data;
+        setUser(data);
       })
       .catch(() => {
         logout();

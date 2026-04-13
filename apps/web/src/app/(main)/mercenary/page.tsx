@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Search, UserPlus } from 'lucide-react';
+import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useMercenaryPosts } from '@/hooks/use-api';
@@ -24,27 +25,27 @@ export default function MercenaryPage() {
     : allPosts;
 
   return (
-    <div className="pt-[var(--safe-area-top)]">
-      <header className="px-5 @3xl:px-0 pt-4 pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">용병 모집</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">팀 빈자리를 빠르게 채워보세요</p>
-          </div>
+    <div className="pt-[var(--safe-area-top)] animate-fade-in">
+      <MobilePageTopZone
+        surface="plain"
+        eyebrow="팀 빈자리 채우기"
+        title="용병 모집"
+        subtitle="급하게 필요한 포지션을 빠르게 채우고, 내 모집/신청도 한 흐름 안에서 관리하세요."
+        action={(
           <Link
             href="/mercenary/new"
-            className="flex items-center gap-1.5 min-h-[44px] rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-600"
-            aria-label="용병 모집하기"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-600"
           >
-            <UserPlus size={14} strokeWidth={2.5} aria-hidden="true" />
-            모집하기
+            <UserPlus size={16} strokeWidth={2.5} />
+            용병 모집하기
           </Link>
-        </div>
-        <Link href="/my/mercenary" className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-blue-500 dark:text-blue-300 min-h-[44px]">
+        )}
+      >
+        <Link href="/my/mercenary" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-300">
           내 모집/신청
-          <ChevronRight size={14} aria-hidden="true" />
+          <ChevronRight size={14} />
         </Link>
-      </header>
+      </MobilePageTopZone>
 
       <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {sportFilters.map((filter) => (
@@ -52,7 +53,7 @@ export default function MercenaryPage() {
             key={filter.key}
             type="button"
             onClick={() => setActiveSport(filter.key)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeSport === filter.key
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 active:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -83,7 +84,7 @@ export default function MercenaryPage() {
       ) : (
         <>
           <div className="px-5 @3xl:px-0 mb-3">
-            <p className="text-sm text-gray-500 dark:text-gray-400">{filtered.length}개의 모집글</p>
+            <p className="text-sm text-gray-500">{filtered.length}개의 모집글</p>
           </div>
 
           <div className="px-5 @3xl:px-0">
@@ -104,7 +105,6 @@ export default function MercenaryPage() {
           </div>
         </>
       )}
-      <div className="h-24" />
     </div>
   );
 }

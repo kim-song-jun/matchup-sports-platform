@@ -62,7 +62,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-7 pb-5">
         <Link href="/home">
-          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
         </Link>
       </div>
 
@@ -80,7 +80,7 @@ export function Sidebar() {
         {navSections.map((section, sIdx) => (
           <div key={sIdx} className={section.label ? 'mt-4' : sIdx > 0 ? 'mt-2 pt-2 border-t border-gray-100 dark:border-gray-800' : ''}>
             {section.label && (
-              <p className="px-3 mb-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+              <p className="px-3 mb-1 text-2xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 {section.label}
               </p>
             )}
@@ -89,10 +89,10 @@ export function Sidebar() {
                 const isActive = pathname.startsWith(href);
                 return (
                   <Link key={href} href={href}
-                    className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
+                    className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold'
-                        : 'font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
+                        ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
                     }`}>
                     <Icon size={16} strokeWidth={isActive ? 2 : 1.5} />
                     <span className="flex-1">{label}</span>

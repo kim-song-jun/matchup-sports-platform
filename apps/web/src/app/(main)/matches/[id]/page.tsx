@@ -9,7 +9,6 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { Modal } from '@/components/ui/modal';
-import { Textarea } from '@/components/ui/textarea';
 import { useMatch, useUpdateMatch, useCancelMatch, useCloseMatch, useArriveMatch, queryKeys } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
@@ -18,7 +17,7 @@ import type { ApiResponse, MatchParticipant, Payment, Upload } from '@/types/api
 import { api } from '@/lib/api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportDetailImageSet, getVenueImageSet } from '@/lib/sport-image';
-import { formatFullDate, formatAmount, extractErrorMessage } from '@/lib/utils';
+import { formatFullDate, formatAmount } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const MediaLightbox = dynamic(
@@ -47,15 +46,14 @@ export default function MatchDetailPage() {
   const [pendingParticipantId, setPendingParticipantId] = useState<string | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
-  const [heroImageFailed, setHeroImageFailed] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
   const joinMutation = useMutation<MatchParticipant, unknown, { openCheckout: boolean }>({
     mutationFn: async () => {
-      const res = await api.post<ApiResponse<MatchParticipant>>(`/matches/${matchId}/join`);
-      return res.data;
+      const res = await api.post(`/matches/${matchId}/join`);
+      return (res as unknown as ApiResponse<MatchParticipant>).data;
     },
     onSuccess: (participant, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.matches.all });
@@ -64,14 +62,15 @@ export default function MatchDetailPage() {
       if (variables.openCheckout && participant.paymentStatus === 'pending') {
         setPendingParticipantId(participant.id);
         setShowCheckout(true);
-        toast('info', '참가 신청이 생성되었어요. 결제를 완료하면 확정돼요.');
+        toast('info', '참가 신청이 생성되었어요. 결제를 완료하면 확정됩니다.');
         return;
       }
 
       toast('success', '참가 완료! 경기에서 만나요');
     },
     onError: (err: unknown) => {
-      toast('error', extractErrorMessage(err, '참가에 실패했어요. 잠시 후 다시 시도해주세요'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '참가에 실패했어요. 잠시 후 다시 시도해주세요');
     },
   });
 
@@ -82,7 +81,8 @@ export default function MatchDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
     },
     onError: (err: unknown) => {
-      toast('error', extractErrorMessage(err, '탈퇴에 실패했어요. 다시 시도해주세요'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '탈퇴에 실패했어요. 다시 시도해주세요');
     },
   });
 
@@ -193,7 +193,8 @@ export default function MatchDetailPage() {
       await updateMatchMutation.mutateAsync({ id: matchId, data: { status } });
       toast('success', successMessage);
     } catch (error) {
-      toast('error', extractErrorMessage(error, '상태 변경에 실패했어요'));
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '상태 변경에 실패했어요');
     }
   }
 
@@ -203,7 +204,8 @@ export default function MatchDetailPage() {
       toast('success', '모집을 마감했어요');
       setShowCloseModal(false);
     } catch (error) {
-      toast('error', extractErrorMessage(error, '상태 변경에 실패했어요'));
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '상태 변경에 실패했어요');
     }
   }
 
@@ -214,7 +216,8 @@ export default function MatchDetailPage() {
       setShowCancelModal(false);
       setCancelReason('');
     } catch (error) {
-      toast('error', extractErrorMessage(error, '취소에 실패했어요'));
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '취소에 실패했어요');
     }
   }
 
@@ -259,10 +262,10 @@ export default function MatchDetailPage() {
       // Upload photo
       const formData = new FormData();
       formData.append('files', arrivalPhoto);
-      const uploadRes = await api.post<ApiResponse<Upload[]>>('/uploads', formData, {
+      const uploadRes = await api.post('/uploads', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const uploads = uploadRes.data;
+      const uploads = (uploadRes as unknown as ApiResponse<Upload[]>).data;
       const photoUrl = uploads[0]?.path;
       if (!photoUrl) {
         toast('error', '사진 업로드에 실패했어요. 다시 시도해주세요.');
@@ -276,7 +279,8 @@ export default function MatchDetailPage() {
       setArrivalPhoto(null);
       setArrivalPhotoPreview(null);
     } catch (err) {
-      toast('error', extractErrorMessage(err, '도착 인증에 실패했어요.'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '도착 인증에 실패했어요.');
     } finally {
       setIsArriving(false);
     }
@@ -324,24 +328,17 @@ export default function MatchDetailPage() {
                 type="button"
                 onClick={() => openMediaAt(0)}
                 aria-label={`${match.title} 대표 이미지 보기`}
-                className="relative h-[220px] w-full overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
+                className="relative h-[220px] w-full overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
               >
-                {heroImageFailed ? (
-                  <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-700">
-                    {SportIcon && <SportIcon size={48} className="text-gray-400 dark:text-gray-500" aria-hidden="true" />}
-                  </div>
-                ) : (
-                  <SafeImage
-                    src={heroImage}
-                    fallbackSrc={heroFallbackImage}
-                    alt={match.title}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 60vw"
-                    priority
-                    onError={() => setHeroImageFailed(true)}
-                  />
-                )}
+                <SafeImage
+                  src={heroImage}
+                  fallbackSrc={heroFallbackImage}
+                  alt={match.title}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  priority
+                />
               </button>
               {matchImages.length > 1 && (
                 <div className="mt-2 grid grid-cols-3 gap-2">
@@ -351,7 +348,7 @@ export default function MatchDetailPage() {
                       type="button"
                       onClick={() => openMediaAt(mediaImageIndex.get(image) ?? index + 1)}
                       aria-label={`${match.title} 이미지 ${index + 2} 보기`}
-                      className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800"
+                      className="relative aspect-[4/3] overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800"
                     >
                       <SafeImage
                         src={image}
@@ -368,93 +365,90 @@ export default function MatchDetailPage() {
             </div>
           )}
 
-          {/* Match info panel — single outer border, internal dividers replace per-card borders */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-            {/* Title section */}
-            <div className="p-5 @3xl:p-6">
-              <div className="flex items-start gap-3">
-                {SportIcon && (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
-                    <SportIcon size={24} />
+          {/* Title card */}
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 @3xl:p-6">
+            <div className="flex items-start gap-3">
+              {SportIcon && (
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                  <SportIcon size={24} />
+                </div>
+              )}
+              <div>
+                <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>{sportLabel[match.sportType]}</span>
+                <h2 data-testid="match-detail-title" className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
+                  {match.title}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  호스트: {match.host?.nickname}
+                  <Star size={12} className="inline ml-1 text-amber-400" fill="currentColor" />
+                  <span className="ml-0.5">{match.host?.mannerScore?.toFixed(1)}</span>
+                </p>
+              </div>
+            </div>
+
+            {match.description && (
+              <p className="mt-4 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{match.description}</p>
+            )}
+          </div>
+
+          {/* Info grid */}
+          <div className="mt-4 grid grid-cols-2 gap-3 @3xl:gap-5">
+            <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
+            <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
+            <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={capacitySubLabel} highlight={isAlmostFull && isRecruitingOpen} />
+            <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatAmount(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
+          </div>
+
+          {/* Venue card */}
+          {match.venue && (
+            <div className="mt-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">시설 정보</h3>
+              <div className="flex items-center gap-3">
+                {venuePreviewImage && (
+                  <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
+                    <SafeImage
+                      src={venuePreviewImage}
+                      fallbackSrc={fallbackVenuePreviewImage}
+                      alt={match.venue.name}
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
                   </div>
                 )}
                 <div>
-                  <span className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}>{sportLabel[match.sportType]}</span>
-                  <h2 data-testid="match-detail-title" className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 leading-tight">
-                    {match.title}
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    호스트: {match.host?.nickname}
-                    <Star size={12} className="inline ml-1 text-amber-400" fill="currentColor" aria-hidden="true" />
-                    <span className="ml-0.5">{match.host?.mannerScore?.toFixed(1)}</span>
-                  </p>
-                </div>
-              </div>
-
-              {match.description && (
-                <p className="mt-4 text-base text-gray-600 dark:text-gray-300 leading-relaxed">{match.description}</p>
-              )}
-            </div>
-
-            {/* Info grid */}
-            <div className="border-t border-gray-100 dark:border-gray-700 p-4 @3xl:p-6 grid grid-cols-2 gap-3 @3xl:gap-5">
-              <InfoCard icon={<Calendar size={18} />} label="일시" value={`${formatFullDate(match.matchDate)}`} sub={`${match.startTime} ~ ${match.endTime}`} />
-              <InfoCard icon={<MapPin size={18} />} label="장소" value={match.venue?.name || '미정'} sub={match.venue?.address?.slice(0, 20)} />
-              <InfoCard icon={<Users size={18} />} label="인원" value={`${match.currentPlayers} / ${match.maxPlayers}명`} sub={capacitySubLabel} highlight={isAlmostFull && isRecruitingOpen} />
-              <InfoCard icon={<CreditCard size={18} />} label="참가비" value={formatAmount(match.fee)} sub={`${levelLabel[match.levelMin]}~${levelLabel[match.levelMax]}`} />
-            </div>
-
-            {/* Venue section */}
-            {match.venue && (
-              <div className="border-t border-gray-100 dark:border-gray-700 p-4 @3xl:p-6">
-                <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">시설 정보</h3>
-                <div className="flex items-center gap-3">
-                  {venuePreviewImage && (
-                    <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700">
-                      <SafeImage
-                        src={venuePreviewImage}
-                        fallbackSrc={fallbackVenuePreviewImage}
-                        alt={match.venue.name}
-                        fill
-                        className="object-cover"
-                        sizes="64px"
-                      />
+                  <p className="text-base font-medium text-gray-800 dark:text-gray-200">{match.venue.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{match.venue.address}</p>
+                  {(match.venue.rating ?? 0) > 0 && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Star size={12} className="text-amber-400" fill="currentColor" />
+                      <span className="text-xs text-gray-600 dark:text-gray-300">{(match.venue.rating ?? 0).toFixed(1)}</span>
                     </div>
                   )}
-                  <div>
-                    <p className="text-base font-medium text-gray-800 dark:text-gray-200">{match.venue.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{match.venue.address}</p>
-                    {(match.venue.rating ?? 0) > 0 && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <Star size={12} className="text-amber-400" fill="currentColor" aria-hidden="true" />
-                        <span className="text-xs text-gray-600 dark:text-gray-300">{(match.venue.rating ?? 0).toFixed(1)}</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Right sidebar: participants + action */}
         <div className="px-5 @3xl:px-0 mt-4 @3xl:mt-0 detail-sidebar">
           <div className="sidebar-sticky space-y-3">
-          {/* Action button — hidden on mobile (replaced by sticky CTA) */}
-          <div className="hidden @3xl:block rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+          {/* Action button */}
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-400">참가 현황</span>
-              <span data-testid="match-participant-count" className={`text-base font-bold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
+              <span className="text-sm text-gray-500">참가 현황</span>
+              <span data-testid="match-participant-count" className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
                 {match.currentPlayers}/{match.maxPlayers}명
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
               <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
-            <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
-              <span className="text-xs font-medium text-gray-400">매치 상태</span>
-              <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass}`}>
+            <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+              <span className="text-sm text-gray-500">매치 상태</span>
+              <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass}`}>
                 {statusLabel}
               </span>
             </div>
@@ -473,7 +467,7 @@ export default function MatchDetailPage() {
                     <Link
                       href={`/matches/${matchId}/edit`}
                       data-testid="match-host-edit-button"
-                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       <Pencil size={14} />
                       매치 수정
@@ -482,9 +476,8 @@ export default function MatchDetailPage() {
                       <button
                         onClick={() => setShowCloseModal(true)}
                         disabled={updateMatchMutation.isPending}
-                        aria-haspopup="dialog"
                         data-testid="match-host-close-button"
-                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60 min-h-[44px]"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
                       >
                         모집 마감
                       </button>
@@ -494,7 +487,7 @@ export default function MatchDetailPage() {
                         onClick={() => handleHostStatusChange('recruiting', '재모집을 시작했어요')}
                         disabled={updateMatchMutation.isPending}
                         data-testid="match-host-reopen-button"
-                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60 min-h-[44px]"
+                        className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
                       >
                         재모집 시작
                       </button>
@@ -503,16 +496,15 @@ export default function MatchDetailPage() {
                       onClick={() => handleHostStatusChange('completed', '매치를 완료 처리했어요')}
                       disabled={updateMatchMutation.isPending}
                       data-testid="match-host-complete-button"
-                      className="w-full rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors disabled:opacity-60 min-h-[44px]"
+                      className="w-full rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-60"
                     >
                       매치 완료
                     </button>
                     <button
                       onClick={() => setShowCancelModal(true)}
                       disabled={updateMatchMutation.isPending}
-                      aria-haspopup="dialog"
                       data-testid="match-host-cancel-button"
-                      className="w-full rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60 min-h-[44px]"
+                      className="w-full rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-60"
                     >
                       매치 취소
                     </button>
@@ -539,7 +531,7 @@ export default function MatchDetailPage() {
                       setPendingParticipantId(currentParticipant?.id ?? null);
                       setShowCheckout(true);
                     }}
-                    className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+                    className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
                   >
                     결제 마무리하기 · {formatAmount(match.fee)}
                   </button>
@@ -555,9 +547,8 @@ export default function MatchDetailPage() {
                   ) : (
                     <button
                       onClick={() => setShowArrivalModal(true)}
-                      aria-haspopup="dialog"
                       data-testid="match-arrive-button"
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600 transition-colors min-h-[44px]"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-500 py-3 text-sm font-semibold text-white hover:bg-green-600 transition-colors min-h-[44px]"
                     >
                       <Camera size={16} aria-hidden="true" />
                       도착 인증
@@ -585,26 +576,23 @@ export default function MatchDetailPage() {
               </button>
             ) : isFull ? (
               <button disabled className="w-full rounded-xl bg-gray-100 py-3.5 text-md font-semibold text-gray-500 cursor-not-allowed">
-                마감되었어요
+                마감되었습니다
               </button>
             ) : (
               <button
                 onClick={() => joinMutation.mutate({ openCheckout: match.fee > 0 })}
                 disabled={joinMutation.isPending}
                 data-testid="match-join-button"
-                className="w-full rounded-xl bg-blue-500 py-3.5 text-base font-semibold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
+                className="w-full rounded-xl bg-blue-500 py-4 text-lg font-bold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
               >
                 {joinMutation.isPending ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     처리 중...
                   </span>
-                ) : match.fee > 0 ? (
-                  <span className="flex items-center justify-center gap-1.5">
-                    참가 후 결제하기
-                    <span className="opacity-75 text-sm font-medium">· {formatAmount(match.fee)}</span>
-                  </span>
-                ) : '참가하기'}
+                ) : (
+                  `${match.fee > 0 ? '참가 후 결제하기' : '참가하기'} · ${formatAmount(match.fee)}`
+                )}
               </button>
             )}
 
@@ -621,29 +609,29 @@ export default function MatchDetailPage() {
                 const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(match.title)}&dates=${fmt(startDate)}/${fmt(endDate)}&location=${encodeURIComponent(match.venue?.name || '')}&details=${encodeURIComponent(match.description || '')}`;
                 window.open(url, '_blank');
               }}
-              className="w-full mt-2 rounded-xl border border-gray-100 dark:border-gray-700 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-center gap-1.5"
+              className="w-full mt-2 rounded-xl border border-gray-200 dark:border-gray-600 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
             >
-              <Calendar size={13} aria-hidden="true" />
+              <Calendar size={14} />
               캘린더에 추가
             </button>
           </div>
 
           {/* Participants */}
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">
+          <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
-            <div className="divide-y divide-gray-50 dark:divide-gray-700/60">
+            <div className="space-y-2.5">
               {match.participants?.map((p: MatchParticipant) => (
-                <div key={p.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
+                <div key={p.id} className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
                     {p.user?.nickname?.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate flex items-center gap-1.5">
+                    <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
                       {p.user?.nickname}
                       {p.userId === match.hostId && (
-                        <span className="rounded-full bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 text-xs font-medium text-blue-500 dark:text-blue-400">호스트</span>
+                        <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
                       )}
                     </p>
                   </div>
@@ -651,10 +639,8 @@ export default function MatchDetailPage() {
                     {p.arrivedAt && (
                       <CheckCircle2 size={14} className="text-green-500" aria-label="도착 완료" />
                     )}
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      p.status === 'confirmed'
-                        ? 'bg-blue-500 text-white'
-                        : 'border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500'
+                    <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
+                      p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {p.status === 'confirmed' ? '확정' : '대기'}
                     </span>
@@ -667,61 +653,6 @@ export default function MatchDetailPage() {
         </div>
       </div>
 
-
-      {/* Spacer so scroll content clears the sticky CTA on mobile */}
-      <div className="h-28 @3xl:hidden" />
-
-      {/* Mobile sticky CTA — primary action only, desktop uses sidebar */}
-      <div className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] @3xl:hidden left-0 right-0 z-20 bg-white/95 dark:bg-gray-900/95 border-t border-gray-100 dark:border-gray-800 px-5 py-3 backdrop-blur-sm">
-        {!isAuthenticated ? (
-          <Link
-            href="/login"
-            className="flex w-full items-center justify-center min-h-[44px] rounded-xl bg-blue-500 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
-          >
-            로그인 후 참가하기
-          </Link>
-        ) : isHost ? null : match.status === 'cancelled' ? (
-          <button disabled className="w-full min-h-[44px] rounded-xl bg-gray-100 py-3 text-md font-semibold text-gray-500 cursor-not-allowed">
-            취소된 매치예요
-          </button>
-        ) : match.status === 'completed' ? (
-          <button disabled className="w-full min-h-[44px] rounded-xl bg-gray-100 py-3 text-md font-semibold text-gray-500 cursor-not-allowed">
-            종료된 매치예요
-          </button>
-        ) : isParticipant ? (
-          <div className="flex items-center justify-center gap-2 min-h-[44px] rounded-xl bg-blue-50 dark:bg-blue-950/30 py-3 text-sm font-semibold text-blue-600 dark:text-blue-400">
-            <CheckCircle2 size={16} aria-hidden="true" />
-            참가 중
-          </div>
-        ) : !isRecruitingOpen ? (
-          <button disabled className="w-full min-h-[44px] rounded-xl bg-gray-100 py-3 text-md font-semibold text-gray-500 cursor-not-allowed">
-            모집이 마감되었어요
-          </button>
-        ) : isFull ? (
-          <button disabled className="w-full min-h-[44px] rounded-xl bg-gray-100 py-3 text-md font-semibold text-gray-500 cursor-not-allowed">
-            마감되었어요
-          </button>
-        ) : (
-          <button
-            onClick={() => joinMutation.mutate({ openCheckout: match.fee > 0 })}
-            disabled={joinMutation.isPending}
-            data-testid="match-join-sticky-button"
-            className="w-full min-h-[44px] rounded-xl bg-blue-500 py-3 text-base font-semibold text-white hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[colors,transform] duration-200 disabled:opacity-50"
-          >
-            {joinMutation.isPending ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                처리 중...
-              </span>
-            ) : match.fee > 0 ? (
-              <span className="flex items-center justify-center gap-1.5">
-                참가 후 결제하기
-                <span className="opacity-75 text-sm font-medium">· {formatAmount(match.fee)}</span>
-              </span>
-            ) : '참가하기'}
-          </button>
-        )}
-      </div>
 
       {/* 모집 마감 확인 모달 */}
       <Modal
@@ -783,13 +714,13 @@ export default function MatchDetailPage() {
             <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               취소 사유 <span className="text-gray-400 font-normal">(선택)</span>
             </label>
-            <Textarea
+            <textarea
               id="cancel-reason"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="참가자들에게 전달할 취소 사유를 입력해주세요"
               rows={3}
-              className="resize-none"
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none transition-colors resize-none"
             />
           </div>
           <div className="flex gap-3">
@@ -896,7 +827,7 @@ export default function MatchDetailPage() {
               onClick={handleArrivalConfirm}
               disabled={isArriving || !arrivalPhoto}
               data-testid="match-arrive-confirm-button"
-              className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-50 min-h-[44px]"
+              className="flex-1 rounded-xl bg-green-500 py-3 text-base font-semibold text-white hover:bg-green-600 transition-colors disabled:opacity-50 min-h-[44px]"
             >
               {isArriving ? (
                 <span className="flex items-center justify-center gap-2">
@@ -937,7 +868,6 @@ export default function MatchDetailPage() {
           }}
         />
       )}
-      <div className="h-24" />
     </div>
   );
 }
@@ -950,7 +880,7 @@ function InfoCard({ icon, label, value, sub, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3.5">
+    <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5">
       <div className="flex items-center gap-2 mb-1.5">
         <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>

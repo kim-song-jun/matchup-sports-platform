@@ -25,7 +25,7 @@ export function SectionHeader({
   return (
     <div className={cn('mb-3 flex items-center justify-between', className)}>
       <div className="flex items-baseline gap-2">
-        <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">{title}</h2>
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h2>
         {count !== undefined && count > 0 ? (
           <span className="text-xs text-gray-500 dark:text-gray-400">{count}</span>
         ) : null}
@@ -36,7 +36,7 @@ export function SectionHeader({
           ? (
             <Link
               href={href}
-              className="flex min-h-[44px] items-center text-sm font-medium text-blue-500 dark:text-blue-300 transition-colors hover:text-blue-600 dark:hover:text-blue-200"
+              className="flex min-h-[44px] items-center text-sm font-medium text-blue-500 transition-colors hover:text-blue-600"
             >
               {moreLabel}
               <ChevronRight size={14} className="ml-0.5" />

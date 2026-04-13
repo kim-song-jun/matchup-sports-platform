@@ -9,7 +9,6 @@ import { useLessons } from '@/hooks/use-api';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { LessonCard } from '@/components/lesson/lesson-card';
 import type { Lesson } from '@/types/api';
 
@@ -65,10 +64,10 @@ export default function LessonsPage() {
         action={(
           <Link
             href="/lessons/new"
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
-            aria-label={t('createLesson')}
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-600"
           >
-            <Plus size={18} aria-hidden="true" />
+            <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
+            {t('createLesson')}
           </Link>
         )}
       />
@@ -78,13 +77,13 @@ export default function LessonsPage() {
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={16} aria-hidden="true" />
           <label htmlFor="lessons-search" className="sr-only">강좌 검색</label>
-          <Input
+          <input
             id="lessons-search"
             type="text"
             placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="w-full rounded-xl border border-gray-100 bg-white py-3 pl-10 pr-4 text-base text-gray-900 shadow-sm outline-none transition-colors focus:border-blue-200 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-600"
           />
         </div>
       </div>
@@ -95,7 +94,7 @@ export default function LessonsPage() {
           <button
             key={f.key}
             onClick={() => setActiveType(f.key)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeType === f.key
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'border border-gray-100 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -138,7 +137,6 @@ export default function LessonsPage() {
           </div>
         )}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

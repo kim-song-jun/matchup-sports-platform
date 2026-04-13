@@ -6,14 +6,9 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useToast } from '@/components/ui/toast';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { useCreateLesson } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
-import { formatCurrency, formatAmount, extractErrorMessage } from '@/lib/utils';
 
 const sports = [
   { type: 'futsal', label: '풋살' },
@@ -72,7 +67,6 @@ export default function CreateLessonPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const createLesson = useCreateLesson();
   const teamId = searchParams.get('teamId') ?? undefined;
   const venueId = searchParams.get('venueId') ?? undefined;
   const teamName = searchParams.get('teamName') ?? undefined;
@@ -88,6 +82,7 @@ export default function CreateLessonPage() {
     hasUploadErrors: false,
     pendingCount: 0,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function update<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -97,7 +92,7 @@ export default function CreateLessonPage() {
     switch (step) {
       case 0: return !!form.sportType && !!form.type;
       case 1: return !!form.title && !!form.coachName;
-      case 2: return !!form.venueName && !!form.lessonDate && !!form.startTime && !!form.endTime && form.levelMin <= form.levelMax;
+      case 2: return !!form.venueName && !!form.lessonDate && !!form.startTime && !!form.endTime;
       case 3: return true;
       default: return false;
     }
@@ -115,22 +110,24 @@ export default function CreateLessonPage() {
     return true;
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!guardImageUpload()) return;
-    createLesson.mutate({
-      ...form,
-      teamId,
-      venueId,
-      imageUrls: extractUploadUrls(imageAssets),
-    }, {
-      onSuccess: () => {
-        toast('success', '강좌가 등록되었어요!');
-        router.push('/lessons');
-      },
-      onError: (err) => {
-        toast('error', extractErrorMessage(err, '강좌 등록에 실패했어요. 다시 시도해주세요'));
-      },
-    });
+    setIsSubmitting(true);
+    try {
+      await api.post('/lessons', {
+        ...form,
+        teamId,
+        venueId,
+        imageUrls: extractUploadUrls(imageAssets),
+      });
+      toast('success', '강좌가 등록되었어요!');
+      router.push('/lessons');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '강좌 등록에 실패했어요. 다시 시도해주세요');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const selectedSport = sports.find((s) => s.type === form.sportType);
@@ -143,11 +140,11 @@ export default function CreateLessonPage() {
         <button
           onClick={() => (step > 0 ? setStep(step - 1) : router.back())}
           aria-label="뒤로 가기"
-          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="flex items-center justify-center min-h-11 min-w-11 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">강좌 등록</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">강좌 등록</h1>
       </header>
 
       {/* Progress */}
@@ -155,7 +152,7 @@ export default function CreateLessonPage() {
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`} />
+              <div className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? 'bg-blue-500' : 'bg-gray-100'}`} />
             </div>
           ))}
         </div>
@@ -186,10 +183,9 @@ export default function CreateLessonPage() {
                     <button
                       key={s.type}
                       onClick={() => update('sportType', s.type)}
-                      aria-pressed={form.sportType === s.type}
                       className={`flex items-center gap-3 rounded-xl border p-4 transition-colors ${
                         selected
-                          ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                          ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                           : 'border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300'
                       }`}
                     >
@@ -208,14 +204,13 @@ export default function CreateLessonPage() {
                   <button
                     key={t.value}
                     onClick={() => update('type', t.value)}
-                    aria-pressed={form.type === t.value}
                     className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors ${
                       form.type === t.value
-                        ? 'border-blue-500 bg-blue-500 dark:border-blue-500 dark:bg-blue-500'
+                        ? 'border-gray-900 bg-gray-900 dark:border-white dark:bg-white'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 dark:bg-gray-800'
                     }`}
                   >
-                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-white' : 'text-gray-900 dark:text-gray-100'}`}>
+                    <p className={`text-base font-semibold ${form.type === t.value ? 'text-white dark:text-gray-900' : 'text-gray-900 dark:text-gray-100'}`}>
                       {t.label}
                     </p>
                     <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
@@ -229,51 +224,61 @@ export default function CreateLessonPage() {
         {/* Step 1: Title, description, coach */}
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
-            <FormField label="강좌 제목" htmlFor="lesson-title" required>
-              <Input
+            <div>
+              <label htmlFor="lesson-title" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                강좌 제목 <span className="text-red-400">*</span>
+              </label>
+              <input
                 id="lesson-title"
                 type="text"
                 value={form.title}
                 onChange={(e) => update('title', e.target.value)}
                 maxLength={100}
                 placeholder="예: 초보자를 위한 풋살 기초 레슨"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </FormField>
+            </div>
 
-            <FormField label="강좌 설명" htmlFor="lesson-description">
-              <Textarea
+            <div>
+              <label htmlFor="lesson-description" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">강좌 설명</label>
+              <textarea
                 id="lesson-description"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
                 maxLength={1000}
                 placeholder="강좌에 대한 자세한 설명을 입력해주세요"
                 rows={4}
-                className="resize-none"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
               />
-            </FormField>
+            </div>
 
-            <FormField label="코치명" htmlFor="lesson-coach-name" required>
-              <Input
+            <div>
+              <label htmlFor="lesson-coach-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                코치명 <span className="text-red-400">*</span>
+              </label>
+              <input
                 id="lesson-coach-name"
                 type="text"
                 value={form.coachName}
                 onChange={(e) => update('coachName', e.target.value)}
                 maxLength={50}
                 placeholder="예: 김코치"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </FormField>
+            </div>
 
-            <FormField label="코치 소개" htmlFor="lesson-coach-bio">
-              <Textarea
+            <div>
+              <label htmlFor="lesson-coach-bio" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">코치 소개</label>
+              <textarea
                 id="lesson-coach-bio"
                 value={form.coachBio}
                 onChange={(e) => update('coachBio', e.target.value)}
                 maxLength={500}
                 placeholder="코치 경력 및 자격증 등을 입력해주세요"
                 rows={3}
-                className="resize-none"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors resize-none"
               />
-            </FormField>
+            </div>
 
             <div>
               <ImageUpload
@@ -305,94 +310,119 @@ export default function CreateLessonPage() {
         {/* Step 2: Venue, date/time, details */}
         {step === 2 && (
           <div className="space-y-5 animate-fade-in">
-            <FormField label="장소명" htmlFor="lesson-venue" required>
-              <Input
+            <div>
+              <label htmlFor="lesson-venue" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                장소명 <span className="text-red-400">*</span>
+              </label>
+              <input
                 id="lesson-venue"
                 type="text"
                 value={form.venueName}
                 onChange={(e) => update('venueName', e.target.value)}
                 placeholder="예: 난지천 풋살장"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </FormField>
+            </div>
 
-            <FormField label="날짜" htmlFor="lesson-date" required>
-              <Input
+            <div>
+              <label htmlFor="lesson-date" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                날짜 <span className="text-red-400">*</span>
+              </label>
+              <input
                 id="lesson-date"
                 type="date"
                 value={form.lessonDate}
                 onChange={(e) => update('lessonDate', e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
               />
-            </FormField>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="시작 시간" htmlFor="lesson-start-time" required>
-                <Input
+              <div>
+                <label htmlFor="lesson-start-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  시작 시간 <span className="text-red-400">*</span>
+                </label>
+                <input
                   id="lesson-start-time"
                   type="time"
                   value={form.startTime}
                   onChange={(e) => update('startTime', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </FormField>
-              <FormField label="종료 시간" htmlFor="lesson-end-time" required>
-                <Input
+              </div>
+              <div>
+                <label htmlFor="lesson-end-time" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  종료 시간 <span className="text-red-400">*</span>
+                </label>
+                <input
                   id="lesson-end-time"
                   type="time"
                   value={form.endTime}
                   onChange={(e) => update('endTime', e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </FormField>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="최대 인원" htmlFor="lesson-max-participants">
-                <Input
+              <div>
+                <label htmlFor="lesson-max-participants" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최대 인원</label>
+                <input
                   id="lesson-max-participants"
                   type="number"
                   value={form.maxParticipants}
                   onChange={(e) => update('maxParticipants', +e.target.value)}
                   min={1}
                   max={50}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </FormField>
-              <FormField
-                label="수강료 (원)"
-                htmlFor="lesson-fee"
-                hint={form.fee > 0 ? formatAmount(form.fee) : undefined}
-              >
-                <Input
+              </div>
+              <div>
+                <label htmlFor="lesson-fee" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">수강료 (원)</label>
+                <input
                   id="lesson-fee"
                   type="number"
                   value={form.fee}
                   onChange={(e) => update('fee', +e.target.value)}
                   min={0}
                   step={1000}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 />
-              </FormField>
+                {form.fee > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Intl.NumberFormat('ko-KR').format(form.fee)}원
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="최소 레벨" htmlFor="lesson-level-min">
-                <Select
+              <div>
+                <label htmlFor="lesson-level-min" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최소 레벨</label>
+                <select
                   id="lesson-level-min"
                   value={form.levelMin}
                   onChange={(e) => update('levelMin', +e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
                   ))}
-                </Select>
-              </FormField>
-              <FormField label="최대 레벨" htmlFor="lesson-level-max">
-                <Select
+                </select>
+              </div>
+              <div>
+                <label htmlFor="lesson-level-max" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">최대 레벨</label>
+                <select
                   id="lesson-level-max"
                   value={form.levelMax}
                   onChange={(e) => update('levelMax', +e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white transition-colors"
                 >
                   {[1, 2, 3, 4, 5].map((l) => (
                     <option key={l} value={l}>{levelLabel[l]}</option>
                   ))}
-                </Select>
-              </FormField>
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -400,8 +430,8 @@ export default function CreateLessonPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">강좌 정보 확인</h3>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 정보 확인</h3>
               <div className="space-y-3">
                 <SummaryRow label="종목" value={selectedSport?.label || ''} />
                 <SummaryRow label="유형" value={selectedType?.label || ''} />
@@ -414,7 +444,10 @@ export default function CreateLessonPage() {
                 <SummaryRow label="시간" value={`${form.startTime} ~ ${form.endTime}`} />
                 <SummaryRow label="인원" value={`최대 ${form.maxParticipants}명`} />
                 {imageAssets.length > 0 && <SummaryRow label="이미지" value={`${imageAssets.length}장`} />}
-                <SummaryRow label="수강료" value={formatCurrency(form.fee)} />
+                <SummaryRow
+                  label="수강료"
+                  value={form.fee === 0 ? '무료' : `${new Intl.NumberFormat('ko-KR').format(form.fee)}원`}
+                />
                 <SummaryRow label="레벨" value={`${levelLabel[form.levelMin]} ~ ${levelLabel[form.levelMax]}`} />
               </div>
             </div>
@@ -443,15 +476,14 @@ export default function CreateLessonPage() {
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={createLesson.isPending || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
+            disabled={isSubmitting || uploadState.hasPendingUploads || uploadState.hasUploadErrors}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Check size={16} />
-            {createLesson.isPending ? '등록 중...' : '강좌 등록하기'}
+            {isSubmitting ? '등록 중...' : '강좌 등록하기'}
           </button>
         )}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

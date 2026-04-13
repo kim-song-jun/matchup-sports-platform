@@ -121,13 +121,13 @@ export default function NotificationsPage() {
         subtitle={unreadCount > 0 ? t('unreadCount', { count: unreadCount }) : '중요한 업데이트와 알림을 모아봤어요.'}
         showBack
         actions={mounted && isAuthenticated && unreadCount > 0 ? (
-          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="glass-mobile-icon-button flex min-h-[44px] items-center justify-center rounded-xl px-3.5 text-xs font-semibold text-gray-600 dark:text-gray-300" disabled={markAllRead.isPending}>
+          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="glass-mobile-icon-button flex min-h-[44px] items-center justify-center rounded-2xl px-3.5 text-xs font-semibold text-gray-600 dark:text-gray-300" disabled={markAllRead.isPending}>
             {t('markAllRead')}
           </button>
         ) : undefined}
       />
 
-      <div className="px-5 @3xl:px-0 mt-4">
+      <div className="px-5 @3xl:px-0">
         {!mounted || !isAuthenticated ? (
           <EmptyState
             icon={Bell}
@@ -136,9 +136,9 @@ export default function NotificationsPage() {
             action={{ label: tc('login'), href: '/login' }}
           />
         ) : isLoading ? (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="rounded-2xl border border-gray-100 dark:border-gray-800 p-4 animate-pulse">
+              <div key={index} className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 animate-pulse">
                 <div className="flex items-start gap-3">
                   <div className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-gray-800" />
                   <div className="flex-1 space-y-2">
@@ -157,7 +157,7 @@ export default function NotificationsPage() {
             description={te('noNotificationsDesc')}
           />
         ) : (
-          <div className="space-y-3 stagger-children">
+          <div className="space-y-2 stagger-children">
             {notifications.map((n) => {
               const visualType = notificationVisualType(n);
               const TypeIcon = typeConfig[visualType]?.icon || Bell;
@@ -185,7 +185,6 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      <div className="h-24" />
     </div>
   );
 }
@@ -210,7 +209,7 @@ function NotificationCard({
   onOpen: () => void;
 }) {
   const cardInner = (
-    <div className={`w-full rounded-2xl p-4 text-left transition-colors active:scale-[0.98] ${notification.isRead ? 'border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' : 'border border-blue-100 dark:border-blue-900/40 bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-50/90'}`}>
+    <div className={`w-full rounded-xl p-4 text-left transition-colors active:scale-[0.98] ${notification.isRead ? 'hover:bg-gray-50 dark:hover:bg-gray-800' : 'bg-blue-50/70 dark:bg-blue-900/20 hover:bg-blue-50/90'}`}>
       <div className="flex items-start gap-3">
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${typeConfig[visualType]?.bg || 'bg-gray-100'} ${typeConfig[visualType]?.darkBg || 'dark:bg-gray-800'} ${typeConfig[visualType]?.text || 'text-gray-500'}`}>
           <TypeIcon size={18} />
@@ -220,7 +219,7 @@ function NotificationCard({
             <span className="text-xs text-gray-400 dark:text-gray-500">{formatTimeAgo(notification.createdAt)}</span>
             {!notification.isRead && <span data-testid="notification-unread-dot" className="flex h-2.5 w-2.5 rounded-full bg-blue-500" />}
           </div>
-          <p className={`text-sm mt-0.5 ${notification.isRead ? 'text-gray-600 dark:text-gray-500' : 'font-semibold text-gray-900 dark:text-gray-100'}`}>
+          <p className={`text-base mt-0.5 ${notification.isRead ? 'text-gray-600 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100 font-bold'}`}>
             {notification.title}
           </p>
           <p className="text-xs text-gray-500 mt-0.5">{notification.body}</p>
@@ -241,7 +240,7 @@ function NotificationCard({
         href={target}
         onClick={onNavigate}
         data-testid={`notification-card-${notification.id}`}
-        className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
       >
         {cardInner}
       </Link>
@@ -253,7 +252,7 @@ function NotificationCard({
       type="button"
       onClick={onOpen}
       data-testid={`notification-card-${notification.id}`}
-      className="w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      className="w-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
     >
       {cardInner}
     </button>

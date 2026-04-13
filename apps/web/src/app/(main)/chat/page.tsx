@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Lock, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -37,19 +37,19 @@ function ChatRoomItem({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
+      className={`rounded-xl border p-4 transition-[colors,transform] active:scale-[0.98] ${
         isActive
           ? 'bg-gray-50 border-gray-100 dark:border-gray-700'
           : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl text-md font-bold shrink-0 bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300">
           {(room.name ?? '?').charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate" title={room.name ?? undefined}>
+            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">
               {room.name}
             </h3>
             {room.lastMessageAt && (
@@ -59,7 +59,7 @@ function ChatRoomItem({
             )}
           </div>
           <div className="flex items-center justify-between mt-1.5">
-            <p className="text-sm text-gray-500 truncate flex-1 mr-2" title={room.lastMessage ?? undefined}>
+            <p className="text-sm text-gray-500 truncate flex-1 mr-2">
               {room.lastMessage ?? '대화를 시작해보세요'}
             </p>
             {(room.unreadCount ?? 0) > 0 && (
@@ -82,24 +82,20 @@ export default function ChatListPage() {
   const { data: chatRooms = [], isLoading, isError, refetch } = useChatRooms();
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  // Defer auth check to after hydration so SSR and initial client render match
-  const [clientAuth, setClientAuth] = useState(false);
-  useEffect(() => {
-    setClientAuth(isAuthenticated);
-  }, [isAuthenticated]);
-
   const selectedRoom = chatRooms.find((r) => r.id === selectedRoomId);
 
-  if (!clientAuth) {
+  if (!isAuthenticated) {
     return (
-      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in dark:bg-gray-900">
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
         <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
-        <EmptyState
-          icon={Lock}
-          title="로그인이 필요해요"
-          description="채팅을 시작하려면 로그인해주세요"
-          action={{ label: '로그인하기', href: '/login?redirect=/chat' }}
-        />
+        <div className="px-5 @3xl:px-0">
+          <EmptyState
+            icon={MessageCircle}
+            title={te('noChat')}
+            description={te('noChatDesc')}
+            action={{ label: tc('login'), href: '/login' }}
+          />
+        </div>
       </div>
     );
   }
@@ -114,9 +110,9 @@ export default function ChatListPage() {
   );
 
   const loadingState = (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="h-[72px] animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-700" />
+        <div key={i} className="h-[72px] animate-pulse rounded-xl bg-gray-100 dark:bg-gray-700" />
       ))}
     </div>
   );
@@ -136,7 +132,7 @@ export default function ChatListPage() {
       }
 
       return (
-        <Link key={room.id} href={`/chat/${room.id}`} className="block">
+        <Link key={room.id} href={`/chat/${room.id}`}>
           <ChatRoomItem room={room} />
         </Link>
       );
@@ -148,7 +144,7 @@ export default function ChatListPage() {
       <div className="hidden @3xl:grid @3xl:grid-cols-[380px_1fr] @3xl:h-[calc(100dvh-5rem)] @3xl:-my-10 @3xl:-mx-8 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="border-r border-gray-100 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800">
           <div className="shrink-0 px-5 pt-5 pb-3 border-b border-gray-100 dark:border-gray-700">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
             <p className="text-sm text-gray-500 mt-0.5">{t('subtitle')}</p>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-3">
@@ -182,19 +178,16 @@ export default function ChatListPage() {
       </div>
 
       {/* MOBILE: Full-width list */}
-      <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900 flex flex-col min-h-[calc(100dvh-56px-80px)]">
+      <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
         <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
-        <div className="flex-1 flex flex-col px-5 mt-4">
+        <div className="px-5">
           {isLoading ? loadingState : isError ? (
             <ErrorState onRetry={refetch} message="채팅방을 불러오지 못했어요" />
           ) : chatRooms.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              {emptyState}
-            </div>
+            emptyState
           ) : (
-            <div className="space-y-3">{roomList(false)}</div>
+            <div className="space-y-2">{roomList(false)}</div>
           )}
-          <div className="h-24" />
         </div>
       </div>
     </>

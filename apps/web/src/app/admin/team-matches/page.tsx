@@ -18,11 +18,11 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  recruiting: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
-  approved: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  matched: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  completed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
-  cancelled: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
+  recruiting: 'bg-blue-50 text-blue-500',
+  approved: 'bg-green-50 text-green-600',
+  matched: 'bg-green-50 text-green-600',
+  completed: 'bg-gray-100 text-gray-500',
+  cancelled: 'bg-red-50 text-red-500',
 };
 
 const teamMatchFilters = [
@@ -129,7 +129,7 @@ export default function AdminTeamMatchesPage() {
                     <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{sportLabel[tm.sportType] || tm.sportType}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{tm.matchDate}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2 py-0.5 text-2xs font-medium whitespace-nowrap ${statusColor[tm.status] || 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[tm.status] || 'bg-gray-100 text-gray-500'}`}>
                         {statusLabel[tm.status] || tm.status}
                       </span>
                     </td>

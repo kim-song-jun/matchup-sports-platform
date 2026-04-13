@@ -8,7 +8,6 @@ import { api } from '@/lib/api';
 import { ArrowLeft, ChevronRight, Calendar, MapPin, Users, CreditCard, Star, Trophy, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/components/ui/toast';
-import { Select } from '@/components/ui/select';
 import { SportIconMap } from '@/components/icons/sport-icons';
 import { useMatch } from '@/hooks/use-api';
 import type { MatchParticipant } from '@/types/api';
@@ -19,11 +18,11 @@ const statusLabel: Record<string, string> = {
   recruiting: '모집중', full: '마감', in_progress: '진행중', completed: '완료', cancelled: '취소',
 };
 const statusColor: Record<string, string> = {
-  recruiting: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
-  full: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
-  in_progress: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
-  completed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
-  cancelled: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
+  recruiting: 'bg-blue-50 text-blue-500',
+  full: 'bg-gray-100 text-gray-500',
+  in_progress: 'bg-blue-50 text-blue-500',
+  completed: 'bg-gray-100 text-gray-500',
+  cancelled: 'bg-red-50 text-red-500',
 };
 const statusOptions = ['recruiting', 'full', 'in_progress', 'completed', 'cancelled'];
 
@@ -31,10 +30,10 @@ const paymentStatusLabel: Record<string, string> = {
   completed: '결제완료', pending: '대기', refunded: '환불', failed: '실패',
 };
 const paymentStatusColor: Record<string, string> = {
-  completed: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  pending: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
-  refunded: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
-  failed: 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500',
+  completed: 'bg-green-50 text-green-500',
+  pending: 'bg-gray-100 text-gray-500',
+  refunded: 'bg-red-50 text-red-500',
+  failed: 'bg-gray-100 text-gray-400',
 };
 
 export default function AdminMatchDetailPage() {
@@ -118,7 +117,7 @@ export default function AdminMatchDetailPage() {
                   <span className="text-sm text-gray-400">{sportLabel[match.sportType]} · ID: {match.id?.slice(0, 8)}</span>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-2xs font-medium ${statusColor[match.status] || 'bg-gray-100 dark:bg-gray-700'}`}>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusColor[match.status] || 'bg-gray-100 dark:bg-gray-700'}`}>
                 {statusLabel[match.status] || match.status}
               </span>
             </div>
@@ -202,7 +201,7 @@ export default function AdminMatchDetailPage() {
                         <p className="text-xs text-gray-400">{p.joinedAt ? new Date(p.joinedAt).toLocaleDateString('ko-KR') : ''}</p>
                       </div>
                     </div>
-                    <span className={`rounded-full px-2 py-0.5 text-2xs font-medium ${
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                       paymentStatusColor[p.paymentStatus] || 'bg-gray-100 dark:bg-gray-700 text-gray-400'
                     }`}>
                       {paymentStatusLabel[p.paymentStatus] || p.paymentStatus || '확인중'}
@@ -229,16 +228,17 @@ export default function AdminMatchDetailPage() {
             {/* Status change */}
             <div className="mb-4">
               <label htmlFor="admin-match-status" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">상태 변경</label>
-              <Select
+              <select
                 id="admin-match-status"
                 value={match.status}
                 onChange={(e) => statusMutation.mutate(e.target.value)}
                 disabled={statusChanging}
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 transition-colors disabled:opacity-50"
               >
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{statusLabel[s]}</option>
                 ))}
-              </Select>
+              </select>
               {statusMutation.isSuccess && (
                 <p className="flex items-center gap-1 text-xs text-green-500 mt-1.5">
                   <CheckCircle size={12} />

@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Shield, User, MoreVertical, AlertTriangle, Crown, LogOut } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, Shield, User, MoreVertical, AlertTriangle, Crown, LogOut } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
@@ -111,16 +110,23 @@ export default function TeamMembersPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader
-        title={membersPageTitle}
-        showBack
-        compact
-        testId="mobile-glass-header-team-members"
-      />
+      <header className="@3xl:hidden flex items-center justify-between px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            aria-label="뒤로 가기"
+            className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+          </button>
+          <h1 data-testid="team-members-heading" className="text-lg font-semibold text-gray-900 dark:text-white">{membersPageTitle}</h1>
+        </div>
+        {/* Invite button hidden — backend nickname-search not yet available */}
+      </header>
 
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
-          <h2 data-testid="team-members-heading" className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{membersPageTitle}</h2>
+          <h2 data-testid="team-members-heading" className="text-2xl font-bold text-gray-900 dark:text-white">{membersPageTitle}</h2>
           <p className="text-base text-gray-500 mt-1">
             {isLoading ? '불러오는 중...' : `팀 멤버 ${members.length}명`}
           </p>
@@ -256,7 +262,6 @@ export default function TeamMembersPage() {
                   <button
                     onClick={() => setShowLeaveModal(true)}
                     aria-label={`${member.user?.nickname ?? '내 계정'} 팀 탈퇴`}
-                    aria-haspopup="dialog"
                     data-testid="team-member-leave-self"
                     className="flex items-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors min-h-[44px]"
                   >
@@ -331,7 +336,6 @@ export default function TeamMembersPage() {
           targetUser={transferTarget}
         />
       )}
-      <div className="h-24" />
     </div>
   );
 }

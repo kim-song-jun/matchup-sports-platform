@@ -1,0 +1,22 @@
+{
+  "scenario": "S07",
+  "name": "Match Discovery",
+  "startedAt": "2026-04-13T18:15:00+09:00",
+  "completedAt": "2026-04-13T18:35:00+09:00",
+  "matrixCombinations": 12,
+  "steps": [
+    { "step": 1, "action": "navigate", "target": "/matches", "description": "Initial load with all filters", "screenshot": "01-matches-initial.png" },
+    { "step": 2, "action": "type", "target": "search input", "description": "Search '풋살' debounce", "screenshot": "02-search-futsal.png" },
+    { "step": 3, "action": "click", "target": "축구 chip", "description": "Filter by soccer", "screenshot": "03-filter-soccer.png" },
+    { "step": 4, "action": "click", "target": "오늘 quick filter", "description": "Quick filter today — expanded panel", "screenshot": "04-filter-today-expanded.png" },
+    { "step": 5, "action": "scroll", "target": "expanded panel", "description": "Date/region/level/sort options", "screenshot": "05-expanded-filters.png" },
+    { "step": 6, "action": "click", "target": "필터 초기화", "description": "Reset all filters", "screenshot": "06-filter-reset.png" },
+    { "step": 7, "action": "click", "target": "map toggle", "description": "Switch to map view", "screenshot": "07-map-view.png" },
+    { "step": 8, "action": "click", "target": "list toggle", "description": "Switch back to list", "screenshot": "08-list-view.png" },
+    { "step": 9, "action": "click", "target": "무료 quick filter", "description": "Free matches filter", "screenshot": "09-filter-free.png" },
+    { "step": 10, "action": "click", "target": "초보 가능", "description": "Beginner friendly filter", "screenshot": "10-filter-beginner.png" },
+    { "step": 11, "action": "click", "target": "자리 있음", "description": "Open spots filter", "screenshot": "11-filter-open.png" },
+    { "step": 12, "action": "click", "target": "+ button", "description": "Create match FAB → /matches/new", "screenshot": "12-create-fab.png" },
+    { "step": 13, "action": "click", "target": "match card", "description": "Click match → detail page", "screenshot": "13-match-card-click.png" }
+  ]
+}

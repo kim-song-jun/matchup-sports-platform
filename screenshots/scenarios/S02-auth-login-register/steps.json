@@ -1,0 +1,32 @@
+{
+  "scenario": "S02",
+  "name": "Login / Register Page",
+  "startedAt": "2026-04-13T15:50:00+09:00",
+  "completedAt": "2026-04-13T16:15:00+09:00",
+  "matrixCombinations": 12,
+  "steps": [
+    { "step": 1, "action": "navigate", "target": "/login", "description": "Initial page load (login mode)", "screenshot": "01-login-initial.png" },
+    { "step": 2, "action": "observe", "target": "back link", "description": "Back link default state", "screenshot": "02-back-link-default.png" },
+    { "step": 3, "action": "hover", "target": "back link", "description": "Back link hover", "screenshot": "03-back-link-hover.png" },
+    { "step": 4, "action": "observe", "target": "login tab", "description": "Login tab active state", "screenshot": "04-login-tab-active.png" },
+    { "step": 5, "action": "observe", "target": "register tab", "description": "Register tab inactive", "screenshot": "05-register-tab-inactive.png" },
+    { "step": 6, "action": "hover", "target": "register tab", "description": "Register tab hover", "screenshot": "06-register-tab-hover.png" },
+    { "step": 7, "action": "click", "target": "register tab", "description": "Switch to register mode", "screenshot": "07-register-mode.png" },
+    { "step": 8, "action": "click", "target": "login tab", "description": "Switch back to login", "screenshot": "08-login-mode-again.png" },
+    { "step": 9, "action": "observe", "target": "#login-email", "description": "Email input empty default", "screenshot": "09-email-empty.png" },
+    { "step": 10, "action": "focus", "target": "#login-email", "description": "Email input focus ring", "screenshot": "10-email-focus.png" },
+    { "step": 11, "action": "type", "target": "#login-email", "description": "Type valid email", "screenshot": "11-email-valid.png" },
+    { "step": 12, "action": "blur", "target": "#login-email", "description": "Email blur after valid", "screenshot": "12-email-blur-valid.png" },
+    { "step": 13, "action": "focus", "target": "#login-password", "description": "Password focus", "screenshot": "13-password-focus.png" },
+    { "step": 14, "action": "type", "target": "#login-password", "description": "Type short password", "screenshot": "14-password-short.png" },
+    { "step": 15, "action": "click", "target": "submit", "description": "Submit short password toast", "screenshot": "15-password-short-toast.png" },
+    { "step": 16, "action": "click", "target": "submit", "description": "Submit empty fields toast", "screenshot": "16-empty-submit-toast.png" },
+    { "step": 17, "action": "observe", "target": "submit button", "description": "Submit button default state", "screenshot": "17-submit-default.png" },
+    { "step": 18, "action": "hover", "target": "submit button", "description": "Submit button hover", "screenshot": "18-submit-hover.png" },
+    { "step": 19, "action": "focus", "target": "submit button", "description": "Submit button focus", "screenshot": "19-submit-focus.png" },
+    { "step": 20, "action": "observe", "target": "browse link", "description": "Browse without login link", "screenshot": "20-browse-link.png" },
+    { "step": 21, "action": "hover", "target": "browse link", "description": "Browse link hover", "screenshot": "21-browse-link-hover.png" },
+    { "step": 22, "action": "observe", "target": "dev login panel", "description": "Dev login panel", "screenshot": "22-dev-login-panel.png" },
+    { "step": 23, "action": "click", "target": "persona chip", "description": "Dev login persona click", "screenshot": "23-dev-login-persona.png" }
+  ]
+}

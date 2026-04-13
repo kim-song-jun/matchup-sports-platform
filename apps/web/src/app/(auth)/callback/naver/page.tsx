@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, Suspense } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 import type { ApiResponse, UserProfile } from '@/types/api';
-import { Button } from '@/components/ui/button';
 
 type OAuthResult = {
   accessToken: string;
@@ -13,7 +12,7 @@ type OAuthResult = {
   user: UserProfile;
 };
 
-function NaverCallbackPageInner() {
+export default function NaverCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuthStore();
@@ -45,10 +44,10 @@ function NaverCallbackPageInner() {
     }
 
     api
-      .post<ApiResponse<OAuthResult>>('/auth/naver', { code, state })
+      .post('/auth/naver', { code, state })
       .then((res) => {
-        const { accessToken, refreshToken, user } = res.data;
-        login(accessToken, refreshToken, user);
+        const { accessToken, refreshToken, user } = (res as unknown as ApiResponse<OAuthResult>).data;
+        login(accessToken, refreshToken, user as never);
         router.replace('/home');
       })
       .catch(() => {
@@ -60,9 +59,12 @@ function NaverCallbackPageInner() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white dark:bg-gray-900 px-6">
         <p className="text-base text-gray-700 dark:text-gray-300 text-center">{errorMessage}</p>
-        <Button variant="primary" onClick={() => router.replace('/login')}>
+        <button
+          onClick={() => router.replace('/login')}
+          className="min-h-[44px] rounded-xl bg-blue-500 px-6 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors"
+        >
           로그인 페이지로
-        </Button>
+        </button>
       </div>
     );
   }
@@ -77,13 +79,5 @@ function NaverCallbackPageInner() {
       />
       <p className="text-sm text-gray-500 dark:text-gray-400">로그인 중...</p>
     </div>
-  );
-}
-
-export default function NaverCallbackPage() {
-  return (
-    <Suspense fallback={<div className="min-h-dvh bg-white dark:bg-gray-900" />}>
-      <NaverCallbackPageInner />
-    </Suspense>
   );
 }

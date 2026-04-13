@@ -11,16 +11,14 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
-import { Textarea } from '@/components/ui/textarea';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useToast } from '@/components/ui/toast';
 import { usePayment, useRefundPayment } from '@/hooks/use-api';
 import { getPaymentMethodMeta, getPaymentSource, getRecordedPaymentMode, getRefundPolicy } from '@/lib/payment-ui';
-import { formatAmount, formatDateTime, extractErrorMessage } from '@/lib/utils';
+import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const refundReasons = [
   { id: 'schedule', label: '일정 변경' },
@@ -99,7 +97,8 @@ export default function RefundRequestPage() {
       toast('success', isMockMode ? '환불 시뮬레이션이 완료되었어요' : '환불 요청이 접수되었어요');
       router.push(`/payments/${paymentId}`);
     } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '환불 요청에 실패했어요.'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '환불 요청에 실패했어요.');
     }
   };
 
@@ -176,13 +175,22 @@ export default function RefundRequestPage() {
         </div>
       </Modal>
 
-      <MobileGlassHeader title={isMockMode ? '테스트 환불' : '환불 요청'} showBack compact />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+        >
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h1>
+      </header>
 
       <div className="hidden @3xl:block mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-base text-gray-500 hover:text-gray-600 mb-2 transition-colors">
           <ArrowLeft size={16} /> 결제 상세
         </button>
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isMockMode ? '테스트 환불' : '환불 요청'}</h2>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
@@ -195,8 +203,8 @@ export default function RefundRequestPage() {
           />
         ) : null}
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 정보</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">상품명</span>
@@ -231,8 +239,8 @@ export default function RefundRequestPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">환불 규정</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 규정</h3>
           <div className="space-y-2">
             {[
               { key: 'full', label: '경기 24시간 전', result: '전액 환불', active: refundPolicy.percentage === 100 },
@@ -257,7 +265,7 @@ export default function RefundRequestPage() {
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${refundPolicy.bgColor} border-transparent`}>
+        <div className={`rounded-2xl border p-5 ${refundPolicy.bgColor} border-transparent`}>
           <div className="flex items-center gap-3 mb-3">
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-800/80 ${refundPolicy.color}`}>
               <RotateCcw size={20} />
@@ -270,8 +278,8 @@ export default function RefundRequestPage() {
           <p className="text-xs text-gray-500">{refundPolicy.description}</p>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">환불 사유</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">환불 사유</h3>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {refundReasons.map((reason) => (
               <button
@@ -279,7 +287,7 @@ export default function RefundRequestPage() {
                 onClick={() => setSelectedReason(reason.id)}
                 className={`rounded-xl py-3 px-4 text-base font-medium transition-colors ${
                   selectedReason === reason.id
-                    ? 'ring-2 ring-blue-500 dark:ring-blue-500 border border-blue-500 bg-blue-500 text-white dark:bg-blue-500 dark:text-white dark:border-blue-500'
+                    ? 'ring-2 ring-gray-900 dark:ring-white border border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'
                 }`}
               >
@@ -288,20 +296,18 @@ export default function RefundRequestPage() {
             ))}
           </div>
           <label htmlFor="refund-additional-reason" className="sr-only">추가 사유</label>
-          <Textarea
+          <textarea
             id="refund-additional-reason"
             value={additionalReason}
             onChange={(e) => setAdditionalReason(e.target.value)}
             placeholder="추가 사유를 입력해 주세요 (선택)"
             rows={3}
-            className="resize-none"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
       </div>
 
-      <div className="h-24" />
-
-      <div className="fixed bottom-[calc(80px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
+      <div className="fixed bottom-[calc(60px+var(--safe-area-bottom))] @3xl:bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg mx-auto @3xl:mx-0">
         <div className="flex items-center justify-between mb-3 @3xl:hidden">
           <span className="text-sm text-gray-500">{isMockMode ? '테스트 환불 예상 금액' : '환불 예상 금액'}</span>
           <span className={`text-xl font-bold ${refundPolicy.color}`}>{formatAmount(refundAmount)}</span>

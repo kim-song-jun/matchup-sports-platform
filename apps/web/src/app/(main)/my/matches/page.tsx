@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { MapPin, Calendar, Clock, Users, Trophy } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, MapPin, Calendar, Clock, Users, Trophy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
 import { useMyMatches } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { formatCurrency } from '@/lib/utils';
@@ -27,6 +27,7 @@ function getDayLabel(dateStr: string) {
 type Tab = 'participated' | 'created';
 
 export default function MyMatchesPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   useRequireAuth();
   const {
@@ -57,27 +58,31 @@ export default function MyMatchesPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader title="매치 히스토리" showBack />
+      {/* Header */}
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h1>
+      </header>
       <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">매치 히스토리</h2>
-        <p className="mt-1 text-sm text-gray-500">참가한 매치와 개설 매치를 확인하세요</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">매치 히스토리</h2>
+        <p className="text-base text-gray-500 mt-1">참가 기록과 개설 기능 연결 상태를 확인하세요</p>
       </div>
 
       {/* Tabs */}
-      <div className="px-5 @3xl:px-0 pt-4 pb-1">
-        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700" role="tablist">
+      <div className="px-5 @3xl:px-0 pt-3 pb-1">
+        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1">
           {([
             { key: 'participated' as Tab, label: '참가 매치' },
             { key: 'created' as Tab, label: '내가 만든 매치' },
           ]).map((tab) => (
             <button
               key={tab.key}
-              role="tab"
-              aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              className={`flex-1 min-h-[44px] rounded-lg py-2.5 text-base font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 activeTab === tab.key
-                  ? 'bg-white text-gray-900 dark:bg-gray-800 dark:text-white'
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'
               }`}
             >
@@ -90,7 +95,16 @@ export default function MyMatchesPage() {
 
       {/* ── Tab: 참가 매치 ── */}
       {activeTab === 'participated' && (
-        <div className="px-5 @3xl:px-0 pb-8 space-y-3 mt-4">
+        <div className="px-5 @3xl:px-0 pb-8 space-y-3 mt-3">
+          <div className="mt-3 mb-4">
+            <TrustSignalBanner
+              tone="success"
+              label="실데이터"
+              title="현재는 내가 참가한 매치만 정확하게 보여드려요"
+              description="이 탭은 참가 이력 API 기준으로 동작합니다. 호스트 여부와 무관하게 내가 참여한 매치만 표시됩니다."
+            />
+          </div>
+
           <div className="space-y-3 stagger-children">
             {isLoading ? (
               Array.from({ length: 3 }).map((_, index) => (
@@ -134,10 +148,10 @@ export default function MyMatchesPage() {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500">
+                        <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">
                           {sportLabel[match.sportType]}
                         </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.style}`}>
+                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
                           {st.text}
                         </span>
                       </div>
@@ -145,7 +159,7 @@ export default function MyMatchesPage() {
                     </div>
 
                     <Link href={`/matches/${match.id}`}>
-                      <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{match.title}</h3>
+                      <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{match.title}</h3>
                     </Link>
 
                     <div className="mt-2 space-y-1.5">
@@ -171,20 +185,25 @@ export default function MyMatchesPage() {
               })
             )}
           </div>
-          <div className="h-24" />
         </div>
       )}
 
       {/* ── Tab: 내가 만든 매치 ── */}
       {activeTab === 'created' && (
-        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-4">
+        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
+          <TrustSignalBanner
+            tone="warning"
+            label="연결 예정"
+            title="내가 만든 매치 관리는 아직 실데이터와 연결되지 않았어요"
+            description="현재 API는 참가한 매치 기준으로만 이력을 제공합니다. 내가 개설한 매치 전용 목록과 관리 액션은 준비 중입니다."
+          />
+
           <EmptyState
             icon={Calendar}
             title="개설한 매치 목록은 곧 제공돼요"
             description="지금은 매치를 새로 만들 수 있지만, 개설 목록과 수정·취소 관리는 전용 API가 준비된 뒤 연결됩니다"
             action={{ label: '매치 만들기', href: '/matches/new' }}
           />
-          <div className="h-24" />
         </div>
       )}
     </div>

@@ -6,13 +6,11 @@ import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Save, Trash2, AlertTriangle, UserPlus } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useDeleteMercenaryPost, useMercenaryPost, useUpdateMercenaryPost } from '@/hooks/use-api';
 import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
-import { formatCurrency, extractErrorMessage } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import type { UpdateMercenaryPostInput } from '@/types/api';
 
 const positionOptions = [
@@ -39,6 +37,18 @@ interface FormData {
   level: number;
   fee: number;
   notes: string;
+}
+
+function extractErrorMessage(error: unknown, fallback: string): string {
+  const maybe = error as { response?: { data?: { message?: string | string[] } } };
+  const message = maybe.response?.data?.message;
+  if (Array.isArray(message)) {
+    return message[0] ?? fallback;
+  }
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+  return fallback;
 }
 
 function toDateInputValue(value: string): string {
@@ -156,6 +166,7 @@ export default function EditMercenaryPage() {
     );
   }
 
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
   const accent = sportCardAccent[post.sportType];
 
   return (
@@ -180,7 +191,7 @@ export default function EditMercenaryPage() {
               <p className="text-sm font-semibold text-gray-900 dark:text-white">{post.team?.name ?? '소속 팀'}</p>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">종목은 팀 정보 기준으로 고정됩니다.</p>
             </div>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${accent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${accent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
               {sportLabel[post.sportType] ?? post.sportType}
             </span>
           </div>
@@ -190,7 +201,7 @@ export default function EditMercenaryPage() {
           <label className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             팀명
           </label>
-          <div className="ds-input w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 cursor-not-allowed opacity-60">
+          <div className={`${inputClass} cursor-not-allowed opacity-80`}>
             {post.team?.name ?? '—'}
           </div>
         </section>
@@ -199,11 +210,12 @@ export default function EditMercenaryPage() {
           <label htmlFor="mercenary-edit-match-date" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             경기 날짜 <span className="text-red-400">*</span>
           </label>
-          <Input
+          <input
             id="mercenary-edit-match-date"
             type="date"
             value={form.matchDate}
             onChange={(e) => update('matchDate', e.target.value)}
+            className={inputClass}
           />
         </section>
 
@@ -211,12 +223,13 @@ export default function EditMercenaryPage() {
           <label htmlFor="mercenary-edit-venue" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">
             장소 <span className="text-red-400">*</span>
           </label>
-          <Input
+          <input
             id="mercenary-edit-venue"
             type="text"
             value={form.venue}
             onChange={(e) => update('venue', e.target.value)}
             placeholder="예: 강남 풋살파크"
+            className={inputClass}
           />
         </section>
 
@@ -229,7 +242,7 @@ export default function EditMercenaryPage() {
                 onClick={() => update('position', option.value)}
                 className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
                   form.position === option.value
-                    ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
@@ -243,24 +256,26 @@ export default function EditMercenaryPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="mercenary-edit-count" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">모집 인원</label>
-              <Input
+              <input
                 id="mercenary-edit-count"
                 type="number"
                 value={form.count}
                 onChange={(e) => update('count', Math.max(1, Number(e.target.value) || 1))}
                 min={1}
                 max={10}
+                className={inputClass}
               />
             </div>
             <div>
               <label htmlFor="mercenary-edit-fee" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">참가비 (원)</label>
-              <Input
+              <input
                 id="mercenary-edit-fee"
                 type="number"
                 value={form.fee}
                 onChange={(e) => update('fee', Math.max(0, Number(e.target.value) || 0))}
                 min={0}
                 step={1000}
+                className={inputClass}
               />
               <p className="text-xs text-gray-500 mt-1">{formatCurrency(form.fee)}</p>
             </div>
@@ -276,7 +291,7 @@ export default function EditMercenaryPage() {
                 onClick={() => update('level', option.value)}
                 className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
                   form.level === option.value
-                    ? 'border-blue-500 bg-blue-500 text-white dark:border-blue-500 dark:bg-blue-500 dark:text-white'
+                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
@@ -288,13 +303,13 @@ export default function EditMercenaryPage() {
 
         <section className="mb-6">
           <label htmlFor="mercenary-edit-notes" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5 block">비고</label>
-          <Textarea
+          <textarea
             id="mercenary-edit-notes"
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             placeholder="추가 안내사항을 입력해주세요"
             rows={4}
-            className="resize-none"
+            className={`${inputClass} resize-none`}
           />
         </section>
 
@@ -321,7 +336,7 @@ export default function EditMercenaryPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500" />
         </div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
         <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
         <div className="mt-6 flex gap-3">
           <button

@@ -43,7 +43,6 @@ export default function MarketplacePage() {
   const [activeCategoryKey, setActiveCategoryKey] = useState('categoryAll');
   const [activeListingType, setActiveListingType] = useState<ListingTypeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { data, isLoading, error, refetch } = useListings();
   const allListings = data?.items ?? [];
@@ -87,13 +86,9 @@ export default function MarketplacePage() {
       />
 
       {/* 검색 바 */}
-      <div className="px-5 @3xl:px-0 pt-2 mb-3">
+      <div className="px-5 @3xl:px-0 mb-2">
         <div className="relative">
-          <Search
-            className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${searchFocused ? 'text-blue-500' : 'text-gray-500'}`}
-            size={18}
-            aria-hidden="true"
-          />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
           <label htmlFor="marketplace-search" className="sr-only">장터 검색</label>
           <Input
             id="marketplace-search"
@@ -101,60 +96,48 @@ export default function MarketplacePage() {
             placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            className="pl-10 text-base"
+            className="pl-10 text-base shadow-sm"
           />
         </div>
       </div>
 
+      {/* 거래 유형 칩 */}
+      <div className="px-5 @3xl:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        {listingTypeFilters.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            aria-pressed={activeListingType === f.key}
+            onClick={() => setActiveListingType(f.key)}
+            className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+              activeListingType === f.key
+                ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
+                : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t(f.labelKey)}
+          </button>
+        ))}
+      </div>
+
       {/* 카테고리 칩 */}
-      <div className="px-5 @3xl:px-0 mb-3 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {categoryFilterKeys.map((cat) => (
           <button
             key={cat.labelKey}
             type="button"
             aria-pressed={activeCategoryKey === cat.labelKey}
             onClick={() => setActiveCategoryKey(cat.labelKey)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeCategoryKey === cat.labelKey
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
-                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >
             {t(cat.labelKey)}
           </button>
         ))}
       </div>
-
-      {/* 거래 유형 필터 */}
-      <div className="px-5 @3xl:px-0 mb-5 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {listingTypeFilters.map((filter) => (
-          <button
-            key={filter.key}
-            type="button"
-            aria-pressed={activeListingType === filter.key}
-            onClick={() => setActiveListingType(filter.key)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-              activeListingType === filter.key
-                ? 'bg-blue-50 border border-blue-500 text-blue-600 dark:bg-blue-900/30 dark:border-blue-400 dark:text-blue-400'
-                : 'border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
-            }`}
-          >
-            {t(filter.labelKey)}
-          </button>
-        ))}
-      </div>
-
-      {/* 활성 매물 수 요약 */}
-      {!isLoading && !error && listings.length > 0 && (
-        <div className="px-5 @3xl:px-0 mb-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 dark:bg-blue-400" aria-hidden="true" />
-            매물 {listings.length}건
-          </span>
-        </div>
-      )}
 
       {/* 리스트 */}
       <div className="px-5 @3xl:px-0">
@@ -180,7 +163,7 @@ export default function MarketplacePage() {
           </div>
         )}
       </div>
-      <div className="h-24" />
+
     </div>
   );
 }

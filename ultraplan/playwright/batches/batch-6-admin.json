@@ -1,0 +1,17 @@
+{
+  "id": "batch-6-admin",
+  "lane": "C",
+  "priority": 3,
+  "stateProfile": "admin",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "filter-open", "dialog-open"],
+  "rerunStates": ["default", "scrolled", "filter-open"],
+  "runNaming": {
+    "manifest": "va-b6-<band>-<yyyymmdd>",
+    "capture": "va-b6-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b6-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

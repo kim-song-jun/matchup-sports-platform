@@ -40,9 +40,9 @@ export function LandingNav() {
         <div className="max-w-[1100px] mx-auto px-5 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
-              <span className="text-white font-black text-sm">T</span>
+              <span className="text-white font-black text-sm">M</span>
             </div>
-            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">TeamMeet</span>
+            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">MatchUp</span>
           </Link>
 
           {/* Desktop links */}

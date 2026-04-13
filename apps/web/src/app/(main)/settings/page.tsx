@@ -11,11 +11,11 @@ export default function SettingsPage() {
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">
           환경
         </p>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">설정</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">계정과 화면 환경을 가볍게 정리하세요.</p>
       </div>
 
-      <div className="max-w-2xl px-5 @3xl:px-0 mt-4">
+      <div className="max-w-2xl px-5 @3xl:px-0">
         {/* 계정 */}
         <SettingsSection title="계정">
           <SettingsLink icon={User} label="프로필 수정" desc="닉네임, 프로필 사진 변경" href="/profile" />
@@ -55,7 +55,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">앱 정보</p>
-              <p className="mt-0.5 text-xs text-gray-500">TeamMeet v1.0.0</p>
+              <p className="mt-0.5 text-xs text-gray-500">MatchUp v1.0.0</p>
             </div>
           </div>
         </SettingsSection>
@@ -63,7 +63,9 @@ export default function SettingsPage() {
         {/* 로그아웃 */}
         <LogoutButton />
 
-        <div className="h-24" />
+        <div className="text-center">
+          <p className="text-xs text-gray-300">MatchUp v1.0.0</p>
+        </div>
       </div>
 
     </div>
@@ -72,8 +74,8 @@ export default function SettingsPage() {
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-5">
-      <h3 className="mb-1.5 px-1 text-base font-semibold tracking-wide text-gray-400">{title}</h3>
+    <div className="mb-4">
+      <h3 className="mb-1.5 px-1 text-2xs font-semibold uppercase tracking-[0.12em] text-gray-400">{title}</h3>
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white divide-y divide-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:divide-gray-700">
         {children}
       </div>
@@ -83,7 +85,7 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 
 function SettingsLink({ icon: Icon, label, desc, href }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; desc?: string; href: string }) {
   return (
-    <Link href={href} className="flex min-h-[44px] items-center gap-3 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
+    <Link href={href} className="flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 dark:bg-gray-700">
         <Icon size={17} />
       </div>

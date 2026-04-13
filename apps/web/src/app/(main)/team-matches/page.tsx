@@ -8,7 +8,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useTeamMatches, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ErrorState } from '@/components/ui/error-state';
-import { Input } from '@/components/ui/input';
 import { TeamMatchCard } from '@/components/match/team-match-card';
 import { sportLabel } from '@/lib/constants';
 import type { TeamMatch } from '@/types/api';
@@ -58,10 +57,10 @@ export default function TeamMatchesPage() {
         action={(
           <Link
             href="/team-matches/new"
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500 text-white transition-colors hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500"
-            aria-label="모집글 작성"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-2xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-600"
           >
-            <Plus size={18} aria-hidden="true" />
+            <Plus size={16} strokeWidth={2.5} />
+            모집글 작성
           </Link>
         )}
       />
@@ -74,7 +73,7 @@ export default function TeamMatchesPage() {
             type="button"
             aria-pressed={activeSport === f.key}
             onClick={() => setActiveSport(f.key)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeSport === f.key
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -88,12 +87,12 @@ export default function TeamMatchesPage() {
       {/* 필터 행 */}
       <div className="px-5 @3xl:px-0 mb-4 flex flex-wrap items-center gap-2">
         <label htmlFor="team-match-date-filter" className="sr-only">경기 날짜 필터</label>
-        <Input
+        <input
           id="team-match-date-filter"
           type="date"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="w-auto"
+          className="rounded-lg border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
         />
         {[
           { key: '', label: '전체' },
@@ -106,7 +105,7 @@ export default function TeamMatchesPage() {
             type="button"
             aria-pressed={levelFilter === f.key}
             onClick={() => setLevelFilter(f.key)}
-            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               levelFilter === f.key
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -144,7 +143,7 @@ export default function TeamMatchesPage() {
           <div className="space-y-6">
             {isAuthenticated && myHostTeamIds.size > 0 && (
               <div>
-                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
                 {myTeamMatches.length === 0 ? (
                   <EmptyState
                     icon={Search}
@@ -164,7 +163,7 @@ export default function TeamMatchesPage() {
             )}
             <div>
               {isAuthenticated && myHostTeamIds.size > 0 && (
-                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
               )}
               {otherMatches.length === 0 && isAuthenticated && myHostTeamIds.size > 0 ? (
                 <EmptyState
@@ -184,7 +183,7 @@ export default function TeamMatchesPage() {
           </div>
         )}
       </div>
-      <div className="h-24" />
+
     </div>
   );
 }

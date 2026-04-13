@@ -10,8 +10,6 @@ import {
   Star,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { useMyTeams, useSubmitTeamMatchEvaluation, useTeamMatch } from '@/hooks/use-api';
 import {
@@ -20,7 +18,6 @@ import {
   getOpponentTeam,
   getParticipantTeams,
 } from '@/lib/team-match-operations';
-import { extractErrorMessage } from '@/lib/utils';
 
 const evaluationItems = [
   { key: 'levelAccuracy', label: '수준 일치', desc: '모집글과 실제 경기 수준이 비슷했나요?' },
@@ -158,7 +155,8 @@ export default function TeamMatchEvaluatePage() {
           toast('success', '경기 평가가 저장되었어요');
         },
         onError: (error) => {
-          toast('error', extractErrorMessage(error, '평가 제출에 실패했어요. 다시 시도해주세요'));
+          const apiError = error as { response?: { data?: { message?: string } } };
+          toast('error', apiError.response?.data?.message || '평가 제출에 실패했어요. 다시 시도해주세요');
         },
       },
     );
@@ -208,7 +206,7 @@ export default function TeamMatchEvaluatePage() {
       <div className="px-5 @3xl:px-0 @3xl:max-w-2xl @3xl:mx-auto">
         <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 mb-4">
           <p className="text-sm font-semibold text-blue-500">POST MATCH</p>
-          <h2 className="mt-1 text-base font-bold text-gray-900 dark:text-white">{match.title}</h2>
+          <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{match.title}</h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             {participantTeams.map((team) => team.name).join(' vs ')}
           </p>
@@ -226,23 +224,23 @@ export default function TeamMatchEvaluatePage() {
                 <label htmlFor="evaluation-team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   평가를 남길 팀 선택
                 </label>
-                <Select
+                <select
                   id="evaluation-team-select"
                   value={selectedTeamId}
                   onChange={(event) => setSelectedTeamId(event.target.value)}
-                  className="mt-2"
+                  className="mt-2 w-full min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 transition-colors"
                 >
                   {myParticipantTeams.map((team) => (
                     <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
-                </Select>
+                </select>
               </div>
             )}
 
             {submittedEvaluation ? (
               <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-5 mb-6 dark:border-green-900/50 dark:bg-green-950/20">
                 <CheckCircle2 size={30} className="text-green-600 dark:text-green-300" />
-                <p className="mt-3 text-base font-bold text-green-800 dark:text-green-200">이미 평가를 제출했습니다</p>
+                <p className="mt-3 text-lg font-bold text-green-800 dark:text-green-200">이미 평가를 제출했습니다</p>
                 <p className="mt-1 text-sm text-green-700 dark:text-green-200/80">
                   {opponentTeam?.name}에 대한 평가가 저장되어 중복 제출이 차단됩니다.
                 </p>
@@ -291,7 +289,7 @@ export default function TeamMatchEvaluatePage() {
                 </div>
 
                 {allRated && (
-                  <div className="mt-4 rounded-xl bg-gray-900 p-5 text-center">
+                  <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-center">
                     <p className="text-sm text-gray-400">종합 평점</p>
                     <div className="mt-1 flex items-center justify-center gap-2">
                       <Star size={24} className="text-amber-400" fill="currentColor" />
@@ -304,13 +302,13 @@ export default function TeamMatchEvaluatePage() {
                   <label htmlFor="team-match-eval-comment" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                     한줄 코멘트 (선택)
                   </label>
-                  <Textarea
+                  <textarea
                     id="team-match-eval-comment"
                     value={comment}
                     onChange={(event) => setComment(event.target.value)}
                     placeholder="상대 팀과 경기하며 느낀 점을 남겨주세요"
                     rows={3}
-                    className="resize-none"
+                    className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-500/20 transition-colors resize-none"
                   />
                 </div>
 
@@ -318,7 +316,7 @@ export default function TeamMatchEvaluatePage() {
                   <button
                     onClick={handleSubmit}
                     disabled={!allRated || submitEvaluationMutation.isPending || !opponentTeam}
-                    className="w-full min-h-[48px] rounded-2xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                    className="w-full min-h-[52px] rounded-2xl bg-blue-500 py-3.5 text-base font-bold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
                   >
                     <Send size={16} />
                     {submitEvaluationMutation.isPending ? '제출 중...' : '평가 제출하기'}

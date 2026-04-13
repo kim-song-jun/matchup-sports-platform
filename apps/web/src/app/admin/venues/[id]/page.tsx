@@ -10,15 +10,11 @@ import {
   Save,
   Trash2,
 } from 'lucide-react';
-import { extractErrorMessage } from '@/lib/utils';
-import { useUpdateAdminVenue, useDeleteAdminVenue, useAdminVenue } from '@/hooks/use-api';
+import { api } from '@/lib/api';
+import { useDeleteAdminVenue, useAdminVenue } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
 
 const sportOptions = [
   { value: 'soccer', label: '축구' },
@@ -108,7 +104,6 @@ export default function AdminVenueEditPage() {
   const venueId = params.id as string;
   const { toast } = useToast();
   const { data: venue, isLoading, isError, refetch } = useAdminVenue(venueId);
-  const updateVenue = useUpdateAdminVenue();
   const deleteVenue = useDeleteAdminVenue();
 
   const [form, setForm] = useState<VenueFormState>(createEmptyForm);
@@ -154,11 +149,10 @@ export default function AdminVenueEditPage() {
     setSaved(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
-    updateVenue.mutate({
-      id: venueId,
-      data: {
+    try {
+      await api.patch(`/admin/venues/${venueId}`, {
         name: form.name,
         type: form.type || undefined,
         sportTypes: form.sportTypes,
@@ -177,18 +171,16 @@ export default function AdminVenueEditPage() {
             weekend: { open: form.weekendOpen, close: form.weekendClose },
           } : {}),
         },
-      },
-    }, {
-      onSuccess: () => {
-        setSaved(true);
-        toast('success', '시설 정보가 저장되었어요');
-        void refetch();
-      },
-      onError: (error) => {
-        toast('error', extractErrorMessage(error, '저장하지 못했어요. 다시 시도해주세요'));
-      },
-      onSettled: () => setSaving(false),
-    });
+      });
+      setSaved(true);
+      toast('success', '시설 정보가 저장되었어요');
+      await refetch();
+    } catch (error) {
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr.response?.data?.message || '저장하지 못했어요. 다시 시도해주세요');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -197,9 +189,13 @@ export default function AdminVenueEditPage() {
       toast('success', '시설이 삭제되었어요');
       router.push('/admin/venues');
     } catch (error) {
-      toast('error', extractErrorMessage(error, '삭제하지 못했어요. 다시 시도해주세요'));
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr.response?.data?.message || '삭제하지 못했어요. 다시 시도해주세요');
     }
   };
+
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-colors';
+  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
 
   if (isLoading) {
     return (
@@ -257,21 +253,23 @@ export default function AdminVenueEditPage() {
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h2 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h2>
 
-          <FormField label="시설명" htmlFor="venue-name">
-            <Input id="venue-name" type="text" value={form.name} onChange={(event) => updateField('name', event.target.value)} />
-          </FormField>
+          <div>
+            <label htmlFor="venue-name" className={labelClass}>시설명</label>
+            <input id="venue-name" type="text" value={form.name} onChange={(event) => updateField('name', event.target.value)} className={inputClass} />
+          </div>
 
-          <FormField label="시설 유형" htmlFor="venue-type">
-            <Select id="venue-type" value={form.type} onChange={(event) => updateField('type', event.target.value)}>
+          <div>
+            <label htmlFor="venue-type" className={labelClass}>시설 유형</label>
+            <select id="venue-type" value={form.type} onChange={(event) => updateField('type', event.target.value)} className={inputClass}>
               <option value="">유형 선택</option>
               {venueTypes.map((type) => (
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
-            </Select>
-          </FormField>
+            </select>
+          </div>
 
           <div>
-            <p className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">가능 종목</p>
+            <label className={labelClass}>가능 종목</label>
             <div className="flex flex-wrap gap-2">
               {sportOptions.map((sport) => {
                 const selected = form.sportTypes.includes(sport.value);
@@ -280,7 +278,7 @@ export default function AdminVenueEditPage() {
                     key={sport.value}
                     type="button"
                     onClick={() => toggleSport(sport.value)}
-                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       selected
                         ? 'bg-gray-900 dark:bg-gray-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -293,34 +291,40 @@ export default function AdminVenueEditPage() {
             </div>
           </div>
 
-          <FormField label="주소" htmlFor="venue-address">
-            <Input id="venue-address" type="text" value={form.address} onChange={(event) => updateField('address', event.target.value)} />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="도시" htmlFor="venue-city">
-              <Input id="venue-city" type="text" value={form.city} onChange={(event) => updateField('city', event.target.value)} />
-            </FormField>
-            <FormField label="구/군" htmlFor="venue-district">
-              <Input id="venue-district" type="text" value={form.district} onChange={(event) => updateField('district', event.target.value)} />
-            </FormField>
+          <div>
+            <label htmlFor="venue-address" className={labelClass}>주소</label>
+            <input id="venue-address" type="text" value={form.address} onChange={(event) => updateField('address', event.target.value)} className={inputClass} />
           </div>
 
-          <FormField label="연락처" htmlFor="venue-phone">
-            <Input id="venue-phone" type="text" value={form.phone} onChange={(event) => updateField('phone', event.target.value)} />
-          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="venue-city" className={labelClass}>도시</label>
+              <input id="venue-city" type="text" value={form.city} onChange={(event) => updateField('city', event.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="venue-district" className={labelClass}>구/군</label>
+              <input id="venue-district" type="text" value={form.district} onChange={(event) => updateField('district', event.target.value)} className={inputClass} />
+            </div>
+          </div>
 
-          <FormField label="설명" htmlFor="venue-description">
-            <Textarea id="venue-description" rows={4} value={form.description} onChange={(event) => updateField('description', event.target.value)} className="resize-none" />
-          </FormField>
+          <div>
+            <label htmlFor="venue-phone" className={labelClass}>연락처</label>
+            <input id="venue-phone" type="text" value={form.phone} onChange={(event) => updateField('phone', event.target.value)} className={inputClass} />
+          </div>
+
+          <div>
+            <label htmlFor="venue-description" className={labelClass}>설명</label>
+            <textarea id="venue-description" rows={4} value={form.description} onChange={(event) => updateField('description', event.target.value)} className={`${inputClass} resize-none`} />
+          </div>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h2 className="text-md font-bold text-gray-900 dark:text-white">부대시설 / 운영정보</h2>
 
-          <FormField label="부대시설" htmlFor="facility-input">
+          <div>
+            <label htmlFor="facility-input" className={labelClass}>부대시설</label>
             <div className="flex gap-2">
-              <Input
+              <input
                 id="facility-input"
                 type="text"
                 value={facilityInput}
@@ -332,6 +336,7 @@ export default function AdminVenueEditPage() {
                   }
                 }}
                 placeholder="예: 샤워실"
+                className={inputClass}
               />
               <button type="button" onClick={addFacility} className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white">
                 추가
@@ -351,32 +356,37 @@ export default function AdminVenueEditPage() {
                 ))}
               </div>
             ) : null}
-          </FormField>
+          </div>
 
-          <FormField label="시간당 대여료" htmlFor="venue-price">
-            <Input id="venue-price" type="number" min="0" value={form.pricePerHour} onChange={(event) => updateField('pricePerHour', event.target.value)} />
-          </FormField>
+          <div>
+            <label htmlFor="venue-price" className={labelClass}>시간당 대여료</label>
+            <input id="venue-price" type="number" min="0" value={form.pricePerHour} onChange={(event) => updateField('pricePerHour', event.target.value)} className={inputClass} />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="평일 오픈" htmlFor="weekday-open">
-              <Input id="weekday-open" type="time" value={form.weekdayOpen} onChange={(event) => updateField('weekdayOpen', event.target.value)} />
-            </FormField>
-            <FormField label="평일 마감" htmlFor="weekday-close">
-              <Input id="weekday-close" type="time" value={form.weekdayClose} onChange={(event) => updateField('weekdayClose', event.target.value)} />
-            </FormField>
-            <FormField label="주말 오픈" htmlFor="weekend-open">
-              <Input id="weekend-open" type="time" value={form.weekendOpen} onChange={(event) => updateField('weekendOpen', event.target.value)} />
-            </FormField>
-            <FormField label="주말 마감" htmlFor="weekend-close">
-              <Input id="weekend-close" type="time" value={form.weekendClose} onChange={(event) => updateField('weekendClose', event.target.value)} />
-            </FormField>
+            <div>
+              <label htmlFor="weekday-open" className={labelClass}>평일 오픈</label>
+              <input id="weekday-open" type="time" value={form.weekdayOpen} onChange={(event) => updateField('weekdayOpen', event.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="weekday-close" className={labelClass}>평일 마감</label>
+              <input id="weekday-close" type="time" value={form.weekdayClose} onChange={(event) => updateField('weekdayClose', event.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="weekend-open" className={labelClass}>주말 오픈</label>
+              <input id="weekend-open" type="time" value={form.weekendOpen} onChange={(event) => updateField('weekendOpen', event.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="weekend-close" className={labelClass}>주말 마감</label>
+              <input id="weekend-close" type="time" value={form.weekendClose} onChange={(event) => updateField('weekendClose', event.target.value)} className={inputClass} />
+            </div>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-3">
           {saved ? <span className="text-sm text-green-600 dark:text-green-400">저장됨</span> : null}
           <button
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60 transition-colors"
           >

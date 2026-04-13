@@ -3,17 +3,11 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { useCreateTournament } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { sportLabel } from '@/lib/constants';
-import { extractErrorMessage } from '@/lib/utils';
 import type { CreateTournamentInput } from '@/types/api';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
 
 const sportOptions = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis'];
 
@@ -55,13 +49,22 @@ export default function TournamentNewPage() {
       toast('success', '대회를 등록했어요.');
       router.push(`/tournaments/${created.id}`);
     } catch (error) {
-      toast('error', extractErrorMessage(error, '대회 등록에 실패했어요.'));
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast('error', message || '대회 등록에 실패했어요.');
     }
   }
 
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20';
+  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
+
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <MobileGlassHeader title="대회 등록" showBack />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">대회 등록</h1>
+      </header>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/tournaments" className="hover:text-gray-600 transition-colors">대회</Link>
@@ -78,27 +81,32 @@ export default function TournamentNewPage() {
                 : `${venueName ?? '선택한 장소'} 허브에 연결됩니다.`}
             </div>
           )}
-          <FormField label="대회명" htmlFor="tournament-title">
-            <Input id="tournament-title" value={form.title} onChange={(event) => updateField('title', event.target.value)} />
-          </FormField>
-          <FormField label="종목" htmlFor="tournament-sport">
-            <Select id="tournament-sport" value={form.sportType} onChange={(event) => updateField('sportType', event.target.value)}>
+          <div>
+            <label htmlFor="tournament-title" className={labelClass}>대회명</label>
+            <input id="tournament-title" className={inputClass} value={form.title} onChange={(event) => updateField('title', event.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="tournament-sport" className={labelClass}>종목</label>
+            <select id="tournament-sport" className={inputClass} value={form.sportType} onChange={(event) => updateField('sportType', event.target.value)}>
               {sportOptions.map((sportType) => (
                 <option key={sportType} value={sportType}>{sportLabel[sportType] || sportType}</option>
               ))}
-            </Select>
-          </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="일정" htmlFor="tournament-date">
-              <Input id="tournament-date" type="date" value={form.eventDate} onChange={(event) => updateField('eventDate', event.target.value)} />
-            </FormField>
-            <FormField label="참가비" htmlFor="tournament-fee">
-              <Input id="tournament-fee" type="number" value={form.entryFee ?? ''} onChange={(event) => updateField('entryFee', event.target.value ? Number(event.target.value) : undefined)} />
-            </FormField>
+            </select>
           </div>
-          <FormField label="설명" htmlFor="tournament-description">
-            <Textarea id="tournament-description" className="min-h-[110px]" value={form.description ?? ''} onChange={(event) => updateField('description', event.target.value)} />
-          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="tournament-date" className={labelClass}>일정</label>
+              <input id="tournament-date" type="date" className={inputClass} value={form.eventDate} onChange={(event) => updateField('eventDate', event.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="tournament-fee" className={labelClass}>참가비</label>
+              <input id="tournament-fee" type="number" className={inputClass} value={form.entryFee ?? ''} onChange={(event) => updateField('entryFee', event.target.value ? Number(event.target.value) : undefined)} />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="tournament-description" className={labelClass}>설명</label>
+            <textarea id="tournament-description" className={`${inputClass} min-h-[110px]`} value={form.description ?? ''} onChange={(event) => updateField('description', event.target.value)} />
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

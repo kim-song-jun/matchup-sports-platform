@@ -72,19 +72,6 @@ export function useMe() {
   });
 }
 
-export function useUpdateProfile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
-      const res = await api.patch('/users/me', data);
-      return extractData<UserProfile>(res);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
-    },
-  });
-}
-
 // ── User profile (public) ──
 export function useUserProfile(id: string) {
   return useQuery<UserProfile>({

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "va-b3-desktop-20260412",
+  "laneId": "B",
+  "batchId": "batch-3-detail-pages",
+  "bandId": "desktop",
+  "viewportIds": ["desktop-sm", "desktop-md", "desktop-lg"],
+  "mode": "capture",
+  "routeSelection": {
+    "type": "batch",
+    "batchId": "batch-3-detail-pages"
+  },
+  "cases": [
+    { "caseId": "b3-desktop-default", "state": "default", "priority": 1 },
+    { "caseId": "b3-desktop-scrolled", "state": "scrolled", "priority": 2 },
+    { "caseId": "b3-desktop-dialog-open", "state": "dialog-open", "priority": 3 },
+    { "caseId": "b3-desktop-drawer-open", "state": "drawer-open", "priority": 4 }
+  ]
+}

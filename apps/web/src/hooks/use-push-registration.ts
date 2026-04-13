@@ -83,8 +83,9 @@ export function usePushRegistration(): void {
       try {
         const swReg = await navigator.serviceWorker.register('/sw-push.js');
 
-        const vapidRes = await api.get<{ data?: { key?: string }; key?: string }>('/notifications/vapid-public-key');
-        const vapidKey = vapidRes?.data?.key ?? vapidRes?.key;
+        const vapidRes = await api.get<unknown>('/notifications/vapid-public-key');
+        const responseData = vapidRes.data as { data?: { key?: string }; key?: string };
+        const vapidKey = responseData?.data?.key ?? responseData?.key;
         if (!vapidKey || cancelled) return;
 
         const permission = await Notification.requestPermission();

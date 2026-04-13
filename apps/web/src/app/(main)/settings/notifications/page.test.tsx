@@ -66,9 +66,9 @@ describe('NotificationsPage', () => {
 
     expect(screen.getByText('계정 전체에 저장되는 알림')).toBeInTheDocument();
     expect(screen.getByText('이 기기에서만 적용되는 항목')).toBeInTheDocument();
-    expect(screen.getByText('준비 중인 기능')).toBeInTheDocument();
+    expect(screen.getByText('현재 지원하지 않는 범위')).toBeInTheDocument();
     expect(
-      screen.getByText(/이메일 알림, 마케팅 수신 동의, 전체 알림 일괄 끄기는 곧 지원될 예정이에요/),
+      screen.getByText(/이메일 알림, 마케팅 수신, 전체 마스터 토글은 아직 서버 저장 계약이 없습니다/),
     ).toBeInTheDocument();
   });
 
@@ -111,7 +111,7 @@ describe('NotificationsPage', () => {
 
     await user.click(screen.getByRole('switch', { name: '방해금지 시간 꺼짐' }));
 
-    expect(localStorage.getItem('teameet:notification-dnd-enabled')).toBe('true');
+    expect(localStorage.getItem('matchup:notification-dnd-enabled')).toBe('true');
     expect(mockToast).toHaveBeenCalledWith('success', '이 기기에서 방해금지 시간을 켰어요');
   });
 });

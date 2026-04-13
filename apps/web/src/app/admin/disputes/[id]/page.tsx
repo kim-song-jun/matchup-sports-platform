@@ -17,9 +17,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { Textarea } from '@/components/ui/textarea';
 import { useAdminDispute, useUpdateDisputeStatus } from '@/hooks/use-api';
-import { extractErrorMessage } from '@/lib/utils';
 
 const typeLabel: Record<string, string> = {
   no_show: '노쇼',
@@ -29,10 +27,10 @@ const typeLabel: Record<string, string> = {
 };
 
 const typeColor: Record<string, string> = {
-  no_show: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-  late: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-  level_mismatch: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-  misconduct: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400',
+  no_show: 'bg-red-50 text-red-600',
+  late: 'bg-amber-50 text-amber-600',
+  level_mismatch: 'bg-gray-100 text-gray-600',
+  misconduct: 'bg-red-50 text-red-500',
 };
 
 const statusLabel: Record<string, string> = {
@@ -43,10 +41,10 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-  investigating: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
-  resolved: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400',
-  dismissed: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400',
+  pending: 'bg-gray-100 text-gray-600',
+  investigating: 'bg-blue-50 text-blue-500',
+  resolved: 'bg-green-50 text-green-500',
+  dismissed: 'bg-gray-100 text-gray-500',
 };
 
 type ActionMode = 'investigating' | 'resolved' | 'dismissed' | null;
@@ -77,7 +75,8 @@ export default function AdminDisputeDetailPage() {
       setAdminNote('');
       await refetch();
     } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '분쟁 상태를 업데이트하지 못했어요.'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '분쟁 상태를 업데이트하지 못했어요.');
     }
   };
 
@@ -117,13 +116,13 @@ export default function AdminDisputeDetailPage() {
                 : '기각 사유를 남기면 감사 로그에 기록됩니다.'}
           </p>
           <label htmlFor="admin-dispute-note" className="sr-only">운영 메모</label>
-          <Textarea
+          <textarea
             id="admin-dispute-note"
             value={adminNote}
             onChange={(e) => setAdminNote(e.target.value)}
             rows={4}
             placeholder="운영 메모를 입력하세요"
-            className="resize-none"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
           />
           <div className="flex gap-3">
             <button
@@ -156,10 +155,10 @@ export default function AdminDisputeDetailPage() {
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`rounded-full px-2.5 py-0.5 text-2xs font-medium ${typeColor[dispute.type] || 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${typeColor[dispute.type] || 'bg-gray-100 text-gray-600'}`}>
                     {typeLabel[dispute.type] || dispute.type}
                   </span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-2xs font-medium ${statusColor[dispute.status] || 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor[dispute.status] || 'bg-gray-100 text-gray-600'}`}>
                     {statusLabel[dispute.status] || dispute.status}
                   </span>
                 </div>

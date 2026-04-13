@@ -2,15 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronRight, SearchX } from 'lucide-react';
+import { ArrowLeft, ChevronRight, SearchX } from 'lucide-react';
 import Link from 'next/link';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
 import { useMatch, useUpdateMatch, useVenues } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { sportLabel, levelLabel } from '@/lib/constants';
@@ -21,7 +17,6 @@ import {
   toExistingUploadAsset,
   type UploadAsset,
 } from '@/lib/uploads';
-import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -153,7 +148,8 @@ export default function EditMatchPage() {
       toast('success', '매치 정보가 저장되었어요');
       router.push(`/matches/${matchId}`);
     } catch (error) {
-      toast('error', extractErrorMessage(error, '수정에 실패했어요'));
+      const axiosErr = error as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요');
     }
   };
 
@@ -199,7 +195,12 @@ export default function EditMatchPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <MobileGlassHeader title="매치 수정" showBack />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <ArrowLeft size={18} className="text-gray-600 dark:text-gray-300" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 수정</h1>
+      </header>
       <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치 찾기</Link>
         <ChevronRight size={12} />
@@ -214,8 +215,8 @@ export default function EditMatchPage() {
           <div className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
               <button key={type} onClick={() => setForm({ ...form, sportType: type })}
-                className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  form.sportType === type ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
+                className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  form.sportType === type ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                 }`}>
                 {sportLabel[type] || type}
               </button>
@@ -225,12 +226,14 @@ export default function EditMatchPage() {
 
         {/* Title */}
         <FormSection label="제목" id="edit-title">
-          <Input id="edit-title" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <input id="edit-title" type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
         </FormSection>
 
         {/* Description */}
         <FormSection label="설명" id="edit-description">
-          <Textarea id="edit-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="resize-none" />
+          <textarea id="edit-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3}
+            className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors resize-none" />
         </FormSection>
 
         {/* Images */}
@@ -285,7 +288,7 @@ export default function EditMatchPage() {
               {venues.map((v) => (
                 <button key={v.id} onClick={() => setForm({ ...form, venueId: v.id })}
                   className={`w-full text-left rounded-xl p-3 transition-colors ${
-                    form.venueId === v.id ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}>
                   <p className={`text-sm font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
                   <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'opacity-60' : 'text-gray-500'}`}>{v.address}</p>
@@ -300,11 +303,14 @@ export default function EditMatchPage() {
         {/* Date & Time */}
         <FormSection label="일시" id="edit-matchDate">
           <div className="grid grid-cols-3 gap-3">
-            <Input id="edit-matchDate" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} />
+            <input id="edit-matchDate" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             <label htmlFor="edit-startTime" className="sr-only">시작 시간</label>
-            <Input id="edit-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+            <input id="edit-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             <label htmlFor="edit-endTime" className="sr-only">종료 시간</label>
-            <Input id="edit-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+            <input id="edit-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
           </div>
         </FormSection>
 
@@ -313,11 +319,13 @@ export default function EditMatchPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="edit-maxPlayers" className="block text-xs text-gray-500 mb-1">최대 인원</label>
-              <Input id="edit-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: parseInt(e.target.value) || 0 })} />
+              <input id="edit-maxPlayers" type="number" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: parseInt(e.target.value) || 0 })}
+                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             </div>
             <div>
               <label htmlFor="edit-fee" className="block text-xs text-gray-500 mb-1">참가비 (원)</label>
-              <Input id="edit-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: parseInt(e.target.value) || 0 })} />
+              <input id="edit-fee" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: parseInt(e.target.value) || 0 })}
+                className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors" />
             </div>
           </div>
         </FormSection>
@@ -325,13 +333,15 @@ export default function EditMatchPage() {
         {/* Level Range */}
         <FormSection label="레벨 범위" id="edit-levelMin">
           <div className="grid grid-cols-2 gap-3">
-            <Select id="edit-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: parseInt(e.target.value) })}>
+            <select id="edit-levelMin" value={form.levelMin} onChange={(e) => setForm({ ...form, levelMin: parseInt(e.target.value) })}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
-            </Select>
+            </select>
             <label htmlFor="edit-levelMax" className="sr-only">최대 레벨</label>
-            <Select id="edit-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: parseInt(e.target.value) })}>
+            <select id="edit-levelMax" value={form.levelMax} onChange={(e) => setForm({ ...form, levelMax: parseInt(e.target.value) })}
+              className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none transition-colors">
               {[1,2,3,4,5].map(l => <option key={l} value={l}>{levelLabel[l]}</option>)}
-            </Select>
+            </select>
           </div>
         </FormSection>
 
@@ -340,8 +350,8 @@ export default function EditMatchPage() {
           <div className="flex gap-2">
             {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
               <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
-                className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  form.gender === g.value ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
+                className={`min-h-[44px] rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                 }`}>
                 {g.label}
               </button>
@@ -361,7 +371,6 @@ export default function EditMatchPage() {
           </button>
         </div>
       </div>
-      <div className="h-24" />
     </div>
   );
 }
@@ -370,9 +379,9 @@ function FormSection({ label, id, children }: { label: string; id?: string; chil
   return (
     <div className="mb-5">
       {id ? (
-        <label htmlFor={id} className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</label>
+        <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</label>
       ) : (
-        <p className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{label}</p>
+        <p className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</p>
       )}
       {children}
     </div>

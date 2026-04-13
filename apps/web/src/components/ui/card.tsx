@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const cardVariantClasses = {
-  default: 'rounded-2xl border border-gray-100 bg-white shadow-[var(--shadow-card-rest)] dark:border-gray-700 dark:bg-gray-800',
+  default: 'rounded-2xl border border-gray-100 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-gray-700 dark:bg-gray-800',
   surface:
     'rounded-2xl border border-gray-200 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:border-gray-700 dark:bg-gray-800',
   subtle: 'rounded-2xl border border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/60',
@@ -34,7 +34,7 @@ export function cardStyles({
     cardVariantClasses[variant],
     cardPaddingClasses[padding],
     interactive &&
-      'cursor-pointer transition-[border-color,transform,box-shadow] duration-150 hover:bg-gray-50 hover:shadow-[var(--shadow-card-hover)] active:scale-[0.98] dark:hover:bg-gray-700',
+      'transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-700',
   );
 }
 

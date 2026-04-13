@@ -5,6 +5,8 @@ import { ArrowLeft, Star, Clock, Shield, CheckCircle, Sparkles, Trophy, Flame, H
 import { useRouter } from 'next/navigation';
 import { useAllBadgeTypes } from '@/hooks/use-api';
 import { formatDateCompact } from '@/lib/utils';
+import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
+
 interface BadgeInfo {
   id: string;
   type: string;
@@ -136,6 +138,7 @@ export default function BadgesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const { data: apiBadges } = useAllBadgeTypes();
+  const hasLiveCatalog = Boolean(apiBadges?.length);
 
   // API 뱃지가 있으면 로컬 UI 메타데이터와 병합, 없으면 목업 폴백
   const badges: BadgeInfo[] = apiBadges
@@ -151,8 +154,8 @@ export default function BadgesPage() {
           icon: visual.icon,
           color: visual.color,
           bg: visual.bg,
-          earned: ab.earned ?? local?.earned ?? false,
-          earnedAt: ab.earnedAt ?? local?.earnedAt,
+          earned: (ab as unknown as Record<string, unknown>).earned as boolean ?? local?.earned ?? false,
+          earnedAt: (ab as unknown as Record<string, unknown>).earnedAt as string | undefined ?? local?.earnedAt,
           progress: local?.progress,
         };
       })
@@ -164,42 +167,72 @@ export default function BadgesPage() {
   return (
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
-      <header className="flex items-center gap-3 px-5 py-3 @3xl:px-0 @3xl:pt-4 @3xl:pb-3">
+      <header className="px-5 @3xl:px-0 pt-4 pb-3 flex items-center gap-3">
         <button
           aria-label="뒤로 가기"
           onClick={() => router.back()}
-          className="flex min-h-[44px] min-w-11 items-center justify-center rounded-xl p-2 text-gray-500 transition-[colors,transform] hover:bg-gray-50 active:scale-[0.98] dark:hover:bg-gray-800 @3xl:hidden"
+          className="rounded-lg p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] @3xl:hidden min-w-11 min-h-[44px] flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">뱃지</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">뱃지</h1>
       </header>
 
+      {/* Summary */}
+      <div className="px-5 @3xl:px-0 mb-4">
+        <div className="mb-4">
+          <TrustSignalBanner
+            tone={hasLiveCatalog ? 'info' : 'warning'}
+            label={hasLiveCatalog ? '혼합 데이터' : '샘플 데이터'}
+            title={hasLiveCatalog ? '뱃지 카탈로그만 실데이터로 연결되어 있어요' : '현재 뱃지 화면은 샘플 기반입니다'}
+            description={hasLiveCatalog
+              ? '뱃지 종류는 API에서 불러오지만, 획득 여부와 진행률 일부는 로컬 추정값을 사용합니다.'
+              : '획득 여부와 진행률, 발급 일시는 UI 검증용 샘플이므로 실제 신뢰 지표로 사용하면 안 됩니다.'}
+          />
+        </div>
+        <div className="rounded-xl bg-blue-500 p-5 text-white">
+          <p className="text-sm text-blue-100">획득한 뱃지</p>
+          <div className="flex items-end gap-1 mt-1">
+            <span className="text-4xl font-black leading-none">{earnedBadges.length}</span>
+            <span className="text-base text-blue-200 mb-0.5">/ {allBadges.length}</span>
+          </div>
+          <div className="mt-3 flex gap-1.5">
+            {earnedBadges.map((badge, idx) => {
+              const Icon = badge.icon;
+              return (
+                <div
+                  key={badge.id || `earned-${idx}`}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-gray-800"
+                >
+                  <Icon size={14} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Tabs */}
-      <div className="px-5 @3xl:px-0 mt-4 mb-4 flex gap-2" role="tablist">
+      <div className="px-5 @3xl:px-0 mb-4 flex gap-2">
         <button
-          role="tab"
-          aria-selected={activeTab === 'my'}
           onClick={() => setActiveTab('my')}
-          className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
             activeTab === 'my'
-              ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
+              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >
           내 뱃지 ({earnedBadges.length})
         </button>
         <button
-          role="tab"
-          aria-selected={activeTab === 'all'}
           onClick={() => setActiveTab('all')}
-          className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
             activeTab === 'all'
-              ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
+              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
               : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
           }`}
         >
-          전체 뱃지 ({badges.length})
+          전체 뱃지 ({allBadges.length})
         </button>
       </div>
 
@@ -212,17 +245,16 @@ export default function BadgesPage() {
             return (
               <div
                 key={badge.id || `badge-${idx}`}
-                data-testid="badge-card"
-                className={`rounded-2xl border p-4 transition-colors ${
+                className={`rounded-xl border p-4 transition-colors ${
                   badge.earned
-                    ? 'border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800'
-                    : 'border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
+                    ? 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
+                    : 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-100/60 dark:border-gray-700/60'
                 }`}
               >
                 <div className="flex items-start gap-3.5">
                   <div
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                      badge.earned ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' : 'bg-gray-100 text-gray-300 dark:bg-gray-700 dark:text-gray-500'
+                      badge.earned ? 'bg-gray-100 text-gray-500' : 'bg-gray-100 text-gray-300'
                     }`}
                   >
                     {badge.earned ? <Icon size={20} /> : <Lock size={18} />}
@@ -230,14 +262,14 @@ export default function BadgesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3
-                        className={`text-sm font-semibold ${
-                          badge.earned ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'
+                        className={`text-md font-semibold ${
+                          badge.earned ? 'text-gray-900 dark:text-white' : 'text-gray-500'
                         }`}
                       >
                         {badge.name}
                       </h3>
                       {badge.earned && (
-                        <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-semibold text-gray-500">
                           획득
                         </span>
                       )}
@@ -269,7 +301,6 @@ export default function BadgesPage() {
         </div>
       </div>
 
-      <div className="h-24" />
     </div>
   );
 }

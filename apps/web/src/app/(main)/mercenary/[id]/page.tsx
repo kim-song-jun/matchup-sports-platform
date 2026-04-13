@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Users, Pencil, Trash2, AlertTriangle, UserCheck, UserPlus, ChevronRight } from 'lucide-react';
+import { ArrowLeft, MapPin, Users, Pencil, Trash2, AlertTriangle, UserCheck, ChevronRight } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -19,7 +19,7 @@ import {
   useWithdrawMercenaryApplication,
 } from '@/hooks/use-api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
-import { formatFullDate, formatCurrency, extractErrorMessage } from '@/lib/utils';
+import { formatFullDate, formatCurrency } from '@/lib/utils';
 
 const positionLabel: Record<string, string> = {
   GK: '골키퍼',
@@ -35,6 +35,18 @@ const applicationStatusLabel: Record<string, string> = {
   rejected: '거절됨',
   withdrawn: '신청 취소',
 };
+
+function extractErrorMessage(error: unknown, fallback: string): string {
+  const maybe = error as { response?: { data?: { message?: string | string[] } } };
+  const message = maybe.response?.data?.message;
+  if (Array.isArray(message)) {
+    return message[0] ?? fallback;
+  }
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return message;
+  }
+  return fallback;
+}
 
 function statusBadgeClass(status: string): string {
   if (status === 'accepted') return 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
@@ -182,7 +194,7 @@ export default function MercenaryDetailPage() {
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <MobileGlassHeader compact className="justify-between">
+      <MobileGlassHeader className="justify-between">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
@@ -203,7 +215,7 @@ export default function MercenaryDetailPage() {
 
         <div className="flex items-center gap-2 mt-4 mb-2">
           <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${accent?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${accent?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}
           >
             {sportLabel[post.sportType] ?? post.sportType}
           </span>
@@ -219,7 +231,7 @@ export default function MercenaryDetailPage() {
           </span>
         </div>
 
-        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
           {post.team?.name ?? '—'}
         </h1>
 
@@ -271,7 +283,7 @@ export default function MercenaryDetailPage() {
 
         {(post.notes || post.description) && (
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">모집 내용</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">모집 내용</h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
               {post.notes ?? post.description}
             </p>
@@ -280,7 +292,7 @@ export default function MercenaryDetailPage() {
 
         {post.author && (
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">작성자</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">작성자</h2>
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-300">
                 {post.author.nickname.charAt(0)}
@@ -294,9 +306,9 @@ export default function MercenaryDetailPage() {
 
         {canManageApplications && (
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">지원 목록</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">지원 목록</h2>
             {applications.length === 0 ? (
-              <EmptyState icon={UserPlus} title="아직 지원자가 없어요" size="sm" />
+              <p className="text-sm text-gray-500 dark:text-gray-400">아직 지원자가 없어요.</p>
             ) : (
               <div className="space-y-3">
                 {applications.map((application) => {
@@ -308,7 +320,7 @@ export default function MercenaryDetailPage() {
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
                           {application.user?.nickname ?? '지원자'}
                         </p>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(application.status)}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(application.status)}`}>
                           {applicationStatusLabel[application.status] ?? application.status}
                         </span>
                       </div>
@@ -345,8 +357,8 @@ export default function MercenaryDetailPage() {
 
         {myApplicationStatus && !canManageApplications && (
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
-            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">내 신청 상태</h2>
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(myApplicationStatus)}`}>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">내 신청 상태</h2>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(myApplicationStatus)}`}>
               {applicationStatusLabel[myApplicationStatus] ?? myApplicationStatus}
             </span>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">호스트의 승인/거절 결과가 여기에 반영됩니다.</p>
@@ -354,10 +366,7 @@ export default function MercenaryDetailPage() {
         )}
       </div>
 
-      {/* Spacer so scroll content clears the fixed CTA on mobile */}
-      <div className="h-28 @3xl:hidden" />
-
-      <div className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] @3xl:bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg @3xl:mx-0">
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {canEdit ? (
           <div className="flex gap-3">
             <Link
@@ -409,7 +418,7 @@ export default function MercenaryDetailPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
         </div>
-        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">
           모집글을 삭제하시겠어요?
         </h3>
         <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">

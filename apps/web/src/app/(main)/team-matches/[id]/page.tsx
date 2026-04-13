@@ -8,11 +8,8 @@ import {
   Users, Shield, AlertCircle, Star,
   ChevronRight, MapPinCheck, ClipboardCheck, Pencil,
 } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
-import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { ApplicationsSection } from '@/components/team-matches/applications-section';
 import {
   useTeamMatch, useTeamMatchRefereeSchedule,
@@ -136,7 +133,7 @@ export default function TeamMatchDetailPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6 px-5 @3xl:px-0 pt-4">
         <Link href="/team-matches" className="hover:text-gray-600 transition-colors">팀 매칭</Link>
@@ -144,25 +141,13 @@ export default function TeamMatchDetailPage() {
         <span className="text-gray-700 dark:text-gray-300">상세</span>
       </div>
 
-      {/* Mobile header */}
-      <MobileGlassHeader compact className="justify-between">
-        <button
-          onClick={() => router.back()}
-          aria-label="뒤로 가기"
-          className="glass-mobile-icon-button flex items-center justify-center min-h-[44px] min-w-11 rounded-xl"
-        >
-          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+      {/* Header */}
+      <header className="px-5 @3xl:px-0 @3xl:pt-0 pt-4 pb-3 flex items-center gap-3">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="@3xl:hidden flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <ArrowLeft size={20} />
         </button>
-        <span className="text-base font-semibold text-gray-900 dark:text-white truncate flex-1 text-center px-2">{match.title}</span>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
-          {status.label}
-        </span>
-      </MobileGlassHeader>
-
-      {/* Desktop header */}
-      <header className="hidden @3xl:flex items-center gap-3 px-5 @3xl:px-0 pt-4 pb-3">
         <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate flex-1">{match.title}</h1>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-normal ${status.className}`}>
           {status.label}
         </span>
       </header>
@@ -172,8 +157,8 @@ export default function TeamMatchDetailPage() {
           {/* 왼쪽: 경기 정보 */}
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 정보</h2>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">경기 정보</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
@@ -239,21 +224,21 @@ export default function TeamMatchDetailPage() {
             </div>
 
             {/* 경기 조건 */}
-            <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 조건</h2>
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">경기 조건</h2>
 
               {/* 실력등급 배지 + 무료초청 태그 */}
               <div className="flex flex-wrap items-center gap-2 mb-4">
                 {match.skillGrade && (() => {
                   const grade = getGradeInfo(match.skillGrade);
                   return (
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${grade.color}`}>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-normal ${grade.color}`}>
                       {grade.label}등급
                     </span>
                   );
                 })()}
                 {match.isFreeInvitation && (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-50 text-green-600">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal bg-green-50 text-green-600">
                     무료초청
                   </span>
                 )}
@@ -317,8 +302,8 @@ export default function TeamMatchDetailPage() {
 
             {/* 심판 배정 표 */}
             {!match.hasReferee && refereeRows.length > 0 && (
-              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Shield size={16} className="text-blue-500" />
                   심판 배정표
                 </h2>
@@ -345,8 +330,8 @@ export default function TeamMatchDetailPage() {
 
             {/* 호스트 팀 카드 */}
             {match.hostTeam && (
-              <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">호스트 팀</h2>
+              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">호스트 팀</h2>
                 <Link
                   href={`/teams/${match.hostTeam.id}`}
                   aria-label="호스트 팀 상세 보기"
@@ -388,7 +373,7 @@ export default function TeamMatchDetailPage() {
           <div className="mt-4 @3xl:mt-0 detail-sidebar">
             <div className="sidebar-sticky space-y-3">
             {/* CTA 버튼 영역 */}
-            <div className="space-y-2">
+            <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-3">
               {isRecruiting && !isHost && (
                 <button
                   onClick={() => {
@@ -398,7 +383,6 @@ export default function TeamMatchDetailPage() {
                     }
                     setShowApplyModal(true);
                   }}
-                  aria-haspopup="dialog"
                   className="w-full rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
                 >
                   <span className="flex items-center justify-center gap-2">경기 신청하기</span>
@@ -428,7 +412,7 @@ export default function TeamMatchDetailPage() {
               {canOpenEvaluate && (
                 <Link
                   href={`/team-matches/${id}/evaluate`}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-semibold text-white hover:bg-blue-600 transition-colors"
                 >
                   <ClipboardCheck size={18} />
                   경기 평가하기
@@ -439,7 +423,7 @@ export default function TeamMatchDetailPage() {
                 <>
                   <Link
                     href={`/team-matches/${id}/edit`}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 py-3.5 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-700 py-3.5 text-base font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     <Pencil size={16} />
                     모집글 수정
@@ -459,7 +443,6 @@ export default function TeamMatchDetailPage() {
       </div>
 
 
-      <div className="h-24" />
       {/* 신청 모달 */}
       <Modal isOpen={showApplyModal} onClose={() => setShowApplyModal(false)} title="경기 신청">
         <label className="flex items-start gap-3 rounded-xl bg-gray-50 dark:bg-gray-700 p-4 mb-4 cursor-pointer">
@@ -484,15 +467,16 @@ export default function TeamMatchDetailPage() {
         ) : applicableTeams.length > 1 ? (
           <div className="mb-4">
             <label htmlFor="team-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">신청 팀 선택</label>
-            <Select
+            <select
               id="team-select"
               value={selectedTeamId || applicableTeams[0].id}
               onChange={(e) => setSelectedTeamId(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors min-h-[44px]"
             >
               {applicableTeams.map((team) => (
                 <option key={team.id} value={team.id}>{team.name}</option>
               ))}
-            </Select>
+            </select>
           </div>
         ) : (
           <div className="mb-4 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
@@ -502,13 +486,13 @@ export default function TeamMatchDetailPage() {
 
         <div className="mb-4">
           <label htmlFor="apply-message" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">메시지 (선택)</label>
-          <Textarea
+          <textarea
             id="apply-message"
             value={applyMessage}
             onChange={(e) => setApplyMessage(e.target.value)}
             placeholder="호스트에게 전달할 메시지를 작성하세요"
             rows={3}
-            className="resize-none"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
           />
         </div>
 
@@ -522,7 +506,7 @@ export default function TeamMatchDetailPage() {
           <button
             onClick={handleApply}
             disabled={!confirmed || applyMutation.isPending || applicableTeams.length === 0}
-            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {applyMutation.isPending ? (
                 <span className="flex items-center justify-center gap-2">

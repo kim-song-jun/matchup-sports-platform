@@ -31,7 +31,7 @@ export function LessonCalendar({ schedules, onReserve }: LessonCalendarProps) {
   if (activeSessions.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-        <h3 className="mb-4 text-base font-bold text-gray-900 dark:text-white">수업 일정</h3>
+        <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">수업 일정</h3>
         <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
           등록된 수업 일정이 아직 없어요. 예시 달력을 대신 보여주지 않고, 실제 일정이 생기면 이 영역에 표시됩니다.
         </div>
@@ -112,7 +112,7 @@ export function LessonCalendar({ schedules, onReserve }: LessonCalendarProps) {
 
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">수업 일정</h3>
+      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">수업 일정</h3>
 
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-3">

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
-import { extractErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
@@ -20,7 +19,7 @@ function sanitizeRedirect(raw: string | null): string {
   return raw;
 }
 
-// Kakao chat-bubble icon (white path on yellow background)
+// Kakao icon per brand guideline
 function KakaoIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -34,7 +33,7 @@ function KakaoIcon() {
   );
 }
 
-// Naver "N" wordmark (white on green background)
+// Naver icon per brand guideline
 function NaverIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -46,22 +45,45 @@ function NaverIcon() {
   );
 }
 
-// Apple logo (white on black background)
-function AppleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M13.3 3c-.2 1.1.3 2.2 1 3-.7.1-1.9-.5-2.6-1.5-.6-.9-.8-2-.2-3 .7.1 1.6.7 1.8 1.5ZM16 13.6c-.4.9-1 1.8-1.8 2.4-.6.5-1.2.9-1.9.9-.6 0-1-.2-1.5-.4-.5-.2-1-.4-1.7-.4-.7 0-1.2.2-1.7.4-.5.2-.9.4-1.5.4-.8 0-1.4-.4-2-.9C4 14.7 3 12.9 3 11c0-2.6 1.7-4 3.3-4 .7 0 1.3.2 1.8.4.4.2.7.3 1 .3.2 0 .6-.1 1-.3.6-.2 1.3-.5 2.1-.4.9.1 1.7.4 2.3 1.1-.8.5-1.4 1.3-1.3 2.3.1 1.1.8 2 1.8 2.2Z"
-        fill="white"
-      />
-    </svg>
-  );
+// Builds the Kakao OAuth authorize URL
+function buildKakaoAuthUrl(): string | null {
+  const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+  const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+  if (!clientId || !redirectUri) return null;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+  });
+  return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 
-// Social login buttons always render — OAuth flow is initiated server-side via /api/v1/auth/{provider}.
-// Brand colors are used as-is per DESIGN.md exception: "소셜 로그인은 각 서비스 브랜드 컬러를 그대로 사용."
-// Hardcoded hex values (#FEE500, #03C75A, #000000) are intentional brand exceptions, not token violations.
+// Builds the Naver OAuth authorize URL
+function buildNaverAuthUrl(): string | null {
+  const clientId = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID;
+  const redirectUri = process.env.NEXT_PUBLIC_NAVER_REDIRECT_URI;
+  if (!clientId || !redirectUri) return null;
+  // state is required by Naver OAuth spec; use a random value stored in sessionStorage for CSRF protection
+  const state = Math.random().toString(36).slice(2);
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('naverOAuthState', state);
+  }
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    state,
+  });
+  return `https://nid.naver.com/oauth2.0/authorize?${params.toString()}`;
+}
+
 function SocialLoginButtons() {
+  const kakaoUrl = buildKakaoAuthUrl();
+  const naverUrl = buildNaverAuthUrl();
+
+  // Both providers disabled — render nothing
+  if (!kakaoUrl && !naverUrl) return null;
+
   return (
     <div className="mt-6">
       <div className="flex items-center gap-3 mb-4">
@@ -69,40 +91,33 @@ function SocialLoginButtons() {
         <span className="text-xs text-gray-400">또는</span>
         <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
       </div>
-      <div className="space-y-2.5">
-        <a
-          href="/api/v1/auth/kakao"
-          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] hover:opacity-90 transition-[opacity,transform]"
-          style={{ backgroundColor: '#FEE500', color: '#191919' }}
-          aria-label="카카오 계정으로 로그인"
-        >
-          <KakaoIcon />
-          카카오로 시작하기
-        </a>
-        <a
-          href="/api/v1/auth/naver"
-          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] hover:opacity-90 transition-[opacity,transform]"
-          style={{ backgroundColor: '#03C75A', color: '#ffffff' }}
-          aria-label="네이버 계정으로 로그인"
-        >
-          <NaverIcon />
-          네이버로 시작하기
-        </a>
-        <a
-          href="/api/v1/auth/apple"
-          className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold active:scale-[0.98] hover:opacity-90 transition-[opacity,transform]"
-          style={{ backgroundColor: '#000000', color: '#ffffff' }}
-          aria-label="애플 계정으로 로그인"
-        >
-          <AppleIcon />
-          Apple로 시작하기
-        </a>
+      <div className="space-y-2">
+        {kakaoUrl && (
+          <a
+            href={kakaoUrl}
+            className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-6 py-3 text-base font-semibold text-[#191919] hover:brightness-95 active:scale-[0.98] transition-[filter,transform]"
+            aria-label="카카오 계정으로 로그인"
+          >
+            <KakaoIcon />
+            카카오로 시작하기
+          </a>
+        )}
+        {naverUrl && (
+          <a
+            href={naverUrl}
+            className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#03C75A] px-6 py-3 text-base font-semibold text-white hover:brightness-95 active:scale-[0.98] transition-[filter,transform]"
+            aria-label="네이버 계정으로 로그인"
+          >
+            <NaverIcon />
+            네이버로 시작하기
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
-function LoginPageInner() {
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const devLogin = useDevLogin();
@@ -141,7 +156,8 @@ function LoginPageInner() {
         router.push(redirectTo);
       }
     } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast('error', msg || (mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));
     } finally {
       setIsLoading(false);
     }
@@ -156,14 +172,9 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-col bg-white dark:bg-gray-900" data-testid="login-page">
-      {/* Subtle sport-energy gradient decoration — blue tint fades out below the brand area */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-blue-50/80 to-transparent dark:from-blue-950/30 dark:to-transparent"
-        aria-hidden="true"
-      />
+    <div className="flex min-h-dvh flex-col bg-white dark:bg-gray-900" data-testid="login-page">
       {/* 상단 — 뒤로가기 */}
-      <div className="relative flex items-center px-4 pt-4">
+      <div className="flex items-center px-4 pt-4">
         <Link
           href="/home"
           className="inline-flex items-center gap-1.5 min-h-[44px] min-w-11 px-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
@@ -177,22 +188,22 @@ function LoginPageInner() {
       </div>
 
       {/* 상단 — 브랜드 */}
-      <div className="relative flex flex-col items-center justify-center px-6 pt-10 pb-10">
-        <h1 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white">TeamMeet</h1>
-        <p className="mt-2 text-base text-gray-400 leading-relaxed text-center">
+      <div className="flex flex-col items-center justify-center px-6 pt-8 pb-8">
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
+        <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
         </p>
       </div>
 
       {/* 이메일 로그인/회원가입 */}
-      <div className="relative flex-1 px-6">
+      <div className="flex-1 px-6">
         <div className="max-w-sm mx-auto">
           {/* 탭 */}
           <div className="flex mb-5">
             {(['login', 'register'] as const).map(tab => (
               <button key={tab} onClick={() => setMode(tab)}
                 data-testid={tab === 'login' ? 'auth-tab-login' : 'auth-tab-register'}
-                className={`flex-1 py-2.5 text-base font-semibold border-b-2 transition-colors ${
+                className={`flex-1 py-2.5 text-base font-medium border-b-2 transition-colors ${
                   mode === tab ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}>
                 {tab === 'login' ? '로그인' : '회원가입'}
@@ -201,8 +212,8 @@ function LoginPageInner() {
           </div>
 
           {/* 폼 */}
-          <form onSubmit={handleEmailSubmit} className="space-y-4" noValidate>
-            <FormField label="이메일 주소" htmlFor="login-email">
+          <form onSubmit={handleEmailSubmit} className="space-y-3" noValidate>
+            <FormField label="이메일 주소" htmlFor="login-email" labelClassName="sr-only">
               <Input
                 id="login-email"
                 type="email"
@@ -212,7 +223,7 @@ function LoginPageInner() {
                 className="text-base"
               />
             </FormField>
-            <FormField label="비밀번호" htmlFor="login-password">
+            <FormField label="비밀번호" htmlFor="login-password" labelClassName="sr-only">
               <Input
                 id="login-password"
                 type="password"
@@ -223,9 +234,9 @@ function LoginPageInner() {
               />
             </FormField>
             {mode === 'register' && (
-              <FormField label="닉네임" htmlFor="register-nickname">
+              <FormField label="닉네임" htmlFor="login-nickname" labelClassName="sr-only">
                 <Input
-                  id="register-nickname"
+                  id="login-nickname"
                   type="text"
                   placeholder="닉네임"
                   value={nickname}
@@ -286,13 +297,5 @@ function LoginPageInner() {
         </div>
       </div>}
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-dvh bg-white dark:bg-gray-900" />}>
-      <LoginPageInner />
-    </Suspense>
   );
 }

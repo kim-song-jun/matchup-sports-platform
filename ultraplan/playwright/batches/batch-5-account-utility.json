@@ -1,0 +1,17 @@
+{
+  "id": "batch-5-account-utility",
+  "lane": "C",
+  "priority": 2,
+  "stateProfile": "account",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "tab-switch"],
+  "rerunStates": ["default", "scrolled", "tab-switch"],
+  "runNaming": {
+    "manifest": "va-b5-<band>-<yyyymmdd>",
+    "capture": "va-b5-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b5-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

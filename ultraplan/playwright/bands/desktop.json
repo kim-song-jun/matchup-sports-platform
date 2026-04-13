@@ -1,0 +1,8 @@
+{
+  "id": "desktop",
+  "order": 3,
+  "runSuffix": "desktop",
+  "viewports": ["desktop-sm", "desktop-md", "desktop-lg"],
+  "recommendedExecution": "sequential",
+  "description": "Desktop band with the three canonical desktop viewport ids."
+}

@@ -52,10 +52,10 @@ export default function AdminTeamMatchDetailPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-2xs font-medium text-blue-500">
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-500">
                     {sportLabel[match.sportType] || match.sportType}
                   </span>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-medium text-gray-600">
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
                     {match.status}
                   </span>
                 </div>

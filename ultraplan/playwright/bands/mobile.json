@@ -1,0 +1,8 @@
+{
+  "id": "mobile",
+  "order": 1,
+  "runSuffix": "mobile",
+  "viewports": ["mobile-sm", "mobile-md", "mobile-lg"],
+  "recommendedExecution": "sequential",
+  "description": "Mobile band with the three canonical mobile viewport ids."
+}

@@ -3,15 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, X, Plus, Loader2 } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronRight, X, Plus, Loader2, CheckCircle } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { queryKeys } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { FormField } from '@/components/ui/form-field';
 
 const sportOptions = [
   { value: 'futsal', label: '풋살' },
@@ -32,7 +27,6 @@ const venueTypes = [
 export default function AdminVenueNewPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [form, setForm] = useState({
     name: '',
@@ -66,7 +60,6 @@ export default function AdminVenueNewPage() {
       await api.post('/admin/venues', payload);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.venues });
       toast('success', '시설이 등록되었어요');
       router.push('/admin/venues');
     },
@@ -107,8 +100,12 @@ export default function AdminVenueNewPage() {
     }
   };
 
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300 focus:bg-white dark:focus:bg-gray-700 transition-colors';
+  const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
+
   return (
     <div className="animate-fade-in max-w-2xl">
+      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
         <Link href="/admin/venues" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">시설 관리</Link>
         <ChevronRight size={14} />
@@ -118,24 +115,27 @@ export default function AdminVenueNewPage() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">시설 등록</h1>
 
       <div className="space-y-5">
+        {/* Name */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">기본 정보</h3>
 
-          <FormField label="시설명" htmlFor="admin-venue-new-name">
-            <Input id="admin-venue-new-name" type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" />
-          </FormField>
+          <div>
+            <label htmlFor="admin-venue-new-name" className={labelClass}>시설명</label>
+            <input id="admin-venue-new-name" type="text" value={form.name} onChange={(e) => updateField('name', e.target.value)} placeholder="예: 마포 풋살파크" className={inputClass} />
+          </div>
 
-          <FormField label="시설 유형" htmlFor="admin-venue-new-type">
-            <Select id="admin-venue-new-type" value={form.type} onChange={(e) => updateField('type', e.target.value)}>
+          <div>
+            <label htmlFor="admin-venue-new-type" className={labelClass}>시설 유형</label>
+            <select id="admin-venue-new-type" value={form.type} onChange={(e) => updateField('type', e.target.value)} className={inputClass}>
               <option value="">유형 선택</option>
               {venueTypes.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
-            </Select>
-          </FormField>
+            </select>
+          </div>
 
           <div>
-            <p id="sport-types-label" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">가능 종목</p>
+            <p id="sport-types-label" className={labelClass}>가능 종목</p>
             <div role="group" aria-labelledby="sport-types-label" className="flex flex-wrap gap-2">
               {sportOptions.map((s) => {
                 const selected = form.sportTypes.includes(s.value);
@@ -144,7 +144,7 @@ export default function AdminVenueNewPage() {
                     key={s.value}
                     type="button"
                     onClick={() => toggleSport(s.value)}
-                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                       selected
                         ? 'bg-gray-900 dark:bg-gray-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -157,52 +157,60 @@ export default function AdminVenueNewPage() {
             </div>
           </div>
 
-          <FormField label="설명" htmlFor="admin-venue-new-description">
-            <Textarea
+          <div>
+            <label htmlFor="admin-venue-new-description" className={labelClass}>설명</label>
+            <textarea
               id="admin-venue-new-description"
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               placeholder="시설의 특징, 편의시설 등을 소개해주세요"
               rows={3}
-              className="resize-none"
+              className={`${inputClass} resize-none`}
             />
-          </FormField>
+          </div>
         </div>
 
+        {/* Location */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">위치 정보</h3>
 
-          <FormField label="주소" htmlFor="admin-venue-new-address">
-            <Input id="admin-venue-new-address" type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="시/도" htmlFor="admin-venue-new-city">
-              <Input id="admin-venue-new-city" type="text" value={form.city} onChange={(e) => updateField('city', e.target.value)} placeholder="서울" />
-            </FormField>
-            <FormField label="구/군" htmlFor="admin-venue-new-district">
-              <Input id="admin-venue-new-district" type="text" value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="강남구" />
-            </FormField>
+          <div>
+            <label htmlFor="admin-venue-new-address" className={labelClass}>주소</label>
+            <input id="admin-venue-new-address" type="text" value={form.address} onChange={(e) => updateField('address', e.target.value)} placeholder="예: 서울시 마포구 월드컵로 123" className={inputClass} />
           </div>
 
-          <FormField label="전화번호" htmlFor="admin-venue-new-phone">
-            <Input id="admin-venue-new-phone" type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="02-1234-5678" />
-          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="admin-venue-new-city" className={labelClass}>시/도</label>
+              <input id="admin-venue-new-city" type="text" value={form.city} onChange={(e) => updateField('city', e.target.value)} placeholder="서울" className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="admin-venue-new-district" className={labelClass}>구/군</label>
+              <input id="admin-venue-new-district" type="text" value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="강남구" className={inputClass} />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="admin-venue-new-phone" className={labelClass}>전화번호</label>
+            <input id="admin-venue-new-phone" type="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="02-1234-5678" className={inputClass} />
+          </div>
         </div>
 
+        {/* Facilities & Price */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">시설 & 요금</h3>
 
-          <FormField label="부대시설" htmlFor="admin-venue-new-facility">
+          <div>
+            <label htmlFor="admin-venue-new-facility" className={labelClass}>부대시설</label>
             <div className="flex gap-2">
-              <Input
+              <input
                 id="admin-venue-new-facility"
                 type="text"
                 value={facilityInput}
                 onChange={(e) => setFacilityInput(e.target.value)}
                 onKeyDown={handleFacilityKeyDown}
                 placeholder="시설을 입력 후 Enter"
-                className="flex-1"
+                className={`flex-1 ${inputClass}`}
               />
               <button
                 type="button"
@@ -224,39 +232,42 @@ export default function AdminVenueNewPage() {
                 ))}
               </div>
             )}
-          </FormField>
+          </div>
 
-          <FormField label="시간당 요금 (원)" htmlFor="admin-venue-new-price">
-            <Input id="admin-venue-new-price" type="number" value={form.pricePerHour} onChange={(e) => updateField('pricePerHour', e.target.value)} placeholder="50000" />
-          </FormField>
+          <div>
+            <label htmlFor="admin-venue-new-price" className={labelClass}>시간당 요금 (원)</label>
+            <input id="admin-venue-new-price" type="number" value={form.pricePerHour} onChange={(e) => updateField('pricePerHour', e.target.value)} placeholder="50000" className={inputClass} />
+          </div>
         </div>
 
+        {/* Operating hours */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h3 className="text-md font-bold text-gray-900 dark:text-white">운영 시간</h3>
 
           <div>
-            <p className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">평일</p>
+            <p className={labelClass}>평일</p>
             <div className="flex items-center gap-2">
               <label htmlFor="admin-venue-new-weekday-open" className="sr-only">평일 오픈 시간</label>
-              <Input id="admin-venue-new-weekday-open" type="time" value={form.weekdayOpen} onChange={(e) => updateField('weekdayOpen', e.target.value)} />
+              <input id="admin-venue-new-weekday-open" type="time" value={form.weekdayOpen} onChange={(e) => updateField('weekdayOpen', e.target.value)} className={inputClass} />
               <span className="text-gray-400 shrink-0">~</span>
               <label htmlFor="admin-venue-new-weekday-close" className="sr-only">평일 마감 시간</label>
-              <Input id="admin-venue-new-weekday-close" type="time" value={form.weekdayClose} onChange={(e) => updateField('weekdayClose', e.target.value)} />
+              <input id="admin-venue-new-weekday-close" type="time" value={form.weekdayClose} onChange={(e) => updateField('weekdayClose', e.target.value)} className={inputClass} />
             </div>
           </div>
 
           <div>
-            <p className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">주말</p>
+            <p className={labelClass}>주말</p>
             <div className="flex items-center gap-2">
               <label htmlFor="admin-venue-new-weekend-open" className="sr-only">주말 오픈 시간</label>
-              <Input id="admin-venue-new-weekend-open" type="time" value={form.weekendOpen} onChange={(e) => updateField('weekendOpen', e.target.value)} />
+              <input id="admin-venue-new-weekend-open" type="time" value={form.weekendOpen} onChange={(e) => updateField('weekendOpen', e.target.value)} className={inputClass} />
               <span className="text-gray-400 shrink-0">~</span>
               <label htmlFor="admin-venue-new-weekend-close" className="sr-only">주말 마감 시간</label>
-              <Input id="admin-venue-new-weekend-close" type="time" value={form.weekendClose} onChange={(e) => updateField('weekendClose', e.target.value)} />
+              <input id="admin-venue-new-weekend-close" type="time" value={form.weekendClose} onChange={(e) => updateField('weekendClose', e.target.value)} className={inputClass} />
             </div>
           </div>
         </div>
 
+        {/* Submit */}
         <div className="flex items-center gap-3 pt-2">
           <Link
             href="/admin/venues"

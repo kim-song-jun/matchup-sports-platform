@@ -1,0 +1,8 @@
+{
+  "id": "A",
+  "name": "ultra-a",
+  "batchOrder": ["batch-2-main-discovery", "batch-1-public-auth"],
+  "priority": "highest",
+  "runnerLabel": "ultra-a-<band>",
+  "description": "Discovery and public/auth capture lane."
+}

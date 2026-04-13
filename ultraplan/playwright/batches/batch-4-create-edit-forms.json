@@ -1,0 +1,17 @@
+{
+  "id": "batch-4-create-edit-forms",
+  "lane": "B",
+  "priority": 1,
+  "stateProfile": "forms",
+  "bandPolicy": "all-9",
+  "defaultStates": ["default", "scrolled", "focus-first-input", "dialog-open"],
+  "rerunStates": ["default", "focus-first-input", "dialog-open"],
+  "runNaming": {
+    "manifest": "va-b4-<band>-<yyyymmdd>",
+    "capture": "va-b4-<band>-<yyyymmdd>",
+    "rerun": "va-rerun-b4-<band>-<reason>"
+  },
+  "routeSelection": {
+    "type": "batch"
+  }
+}

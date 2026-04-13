@@ -1,12 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { extractErrorMessage } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse, UserProfile } from '@/types/api';
@@ -33,14 +30,15 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const res = await api.patch<ApiResponse<UserProfile>>('/users/me', form);
-      const updated = res.data;
+      const res = await api.patch('/users/me', form);
+      const updated = (res as unknown as ApiResponse<UserProfile>).data;
       setUser(updated as never);
       queryClient.invalidateQueries({ queryKey: ['me'] });
       toast('success', '프로필이 수정되었어요');
       onClose();
     } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '수정에 실패했어요. 잠시 후 다시 시도해주세요'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '수정에 실패했어요. 잠시 후 다시 시도해주세요');
     } finally {
       setIsSubmitting(false);
     }
@@ -50,29 +48,30 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
     <Modal isOpen={isOpen} onClose={onClose} title="프로필 수정">
       <div className="space-y-4">
         <div>
-          <label htmlFor="profile-nickname" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">닉네임</label>
-          <Input id="profile-nickname" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} />
+          <label htmlFor="profile-nickname" className="block text-sm font-semibold text-gray-700 mb-1.5">닉네임</label>
+          <input id="profile-nickname" value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-colors" />
         </div>
         <div>
-          <label htmlFor="profile-bio" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">한 줄 소개</label>
-          <Textarea id="profile-bio" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })}
-            rows={2} className="resize-none" />
+          <label htmlFor="profile-bio" className="block text-sm font-semibold text-gray-700 mb-1.5">한 줄 소개</label>
+          <textarea id="profile-bio" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })}
+            rows={2} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-blue-300 focus:bg-white resize-none transition-colors" />
         </div>
         <div>
-          <label htmlFor="profile-phone" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">연락처</label>
-          <Input id="profile-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            placeholder="010-0000-0000" />
+          <label htmlFor="profile-phone" className="block text-sm font-semibold text-gray-700 mb-1.5">연락처</label>
+          <input id="profile-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            placeholder="010-0000-0000" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-blue-300 focus:bg-white transition-colors" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="profile-city" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">시/도</label>
-            <Input id="profile-city" value={form.locationCity} onChange={(e) => setForm({ ...form, locationCity: e.target.value })}
-              placeholder="서울" />
+            <label htmlFor="profile-city" className="block text-sm font-semibold text-gray-700 mb-1.5">시/도</label>
+            <input id="profile-city" value={form.locationCity} onChange={(e) => setForm({ ...form, locationCity: e.target.value })}
+              placeholder="서울" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-blue-300 focus:bg-white transition-colors" />
           </div>
           <div>
-            <label htmlFor="profile-district" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">구/군</label>
-            <Input id="profile-district" value={form.locationDistrict} onChange={(e) => setForm({ ...form, locationDistrict: e.target.value })}
-              placeholder="마포구" />
+            <label htmlFor="profile-district" className="block text-sm font-semibold text-gray-700 mb-1.5">구/군</label>
+            <input id="profile-district" value={form.locationDistrict} onChange={(e) => setForm({ ...form, locationDistrict: e.target.value })}
+              placeholder="마포구" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base outline-none focus:border-blue-300 focus:bg-white transition-colors" />
           </div>
         </div>
       </div>

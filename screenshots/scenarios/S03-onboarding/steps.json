@@ -1,0 +1,33 @@
+{
+  "scenario": "S03",
+  "name": "Onboarding Flow",
+  "startedAt": "2026-04-13T16:20:00+09:00",
+  "completedAt": "2026-04-13T16:40:00+09:00",
+  "matrixCombinations": 12,
+  "steps": [
+    { "step": 1, "action": "navigate", "target": "/onboarding", "description": "Initial load step 1 sport selection", "screenshot": "01-onboarding-initial.png" },
+    { "step": 2, "action": "observe", "target": "step indicator", "description": "Step indicator dots 1/2", "screenshot": "02-step-indicator.png" },
+    { "step": 3, "action": "hover", "target": "skip button", "description": "Skip button hover", "screenshot": "03-skip-hover.png" },
+    { "step": 4, "action": "click", "target": "skip button", "description": "Skip saves and navigates home", "screenshot": "04-skip-click.png" },
+    { "step": 5, "action": "observe", "target": "close X button", "description": "Close button default", "screenshot": "05-close-default.png" },
+    { "step": 6, "action": "hover", "target": "close X button", "description": "Close button hover", "screenshot": "06-close-hover.png" },
+    { "step": 7, "action": "click", "target": "close X button", "description": "Close navigates home", "screenshot": "07-close-click.png" },
+    { "step": 8, "action": "observe", "target": "soccer chip", "description": "Sport chip default state", "screenshot": "08-sport-soccer-default.png" },
+    { "step": 9, "action": "hover", "target": "soccer chip", "description": "Sport chip hover", "screenshot": "09-sport-soccer-hover.png" },
+    { "step": 10, "action": "click", "target": "soccer chip", "description": "Sport chip selected ring", "screenshot": "10-sport-soccer-selected.png" },
+    { "step": 11, "action": "click", "target": "soccer chip", "description": "Sport chip deselected", "screenshot": "11-sport-soccer-deselected.png" },
+    { "step": 12, "action": "click", "target": "futsal chip", "description": "Futsal selected", "screenshot": "12-sport-futsal-selected.png" },
+    { "step": 13, "action": "click", "target": "basketball chip", "description": "Basketball selected", "screenshot": "13-sport-basketball-selected.png" },
+    { "step": 14, "action": "observe", "target": "multi-select", "description": "3 sports selected simultaneously", "screenshot": "14-multi-select.png" },
+    { "step": 15, "action": "observe", "target": "next button", "description": "Next button default disabled", "screenshot": "15-next-default.png" },
+    { "step": 16, "action": "observe", "target": "next button", "description": "Next button enabled after selection", "screenshot": "16-next-enabled.png" },
+    { "step": 17, "action": "click", "target": "next button", "description": "Step 2 feature intro", "screenshot": "17-step2-features.png" },
+    { "step": 18, "action": "observe", "target": "step indicator", "description": "Step indicator 2/2", "screenshot": "18-step2-indicator.png" },
+    { "step": 19, "action": "observe", "target": "feature cards", "description": "3 feature cards layout", "screenshot": "19-feature-cards.png" },
+    { "step": 20, "action": "observe", "target": "start button", "description": "Start button default", "screenshot": "20-start-default.png" },
+    { "step": 21, "action": "hover", "target": "start button", "description": "Start button hover", "screenshot": "21-start-hover.png" },
+    { "step": 22, "action": "click", "target": "start button", "description": "Start saves and navigates home", "screenshot": "22-start-click.png" },
+    { "step": 23, "action": "click", "target": "back link", "description": "Back to step 1 from step 2", "screenshot": "23-back-to-step1.png" },
+    { "step": 24, "action": "observe", "target": "previous selections", "description": "Previously selected sports preserved", "screenshot": "24-selections-preserved.png" }
+  ]
+}

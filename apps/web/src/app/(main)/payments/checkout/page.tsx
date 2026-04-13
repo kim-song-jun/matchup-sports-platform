@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
+  ArrowLeft,
   CreditCard,
   Wallet,
   MapPin,
@@ -11,7 +12,6 @@ import {
   CheckCircle,
   Loader2,
 } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
@@ -22,7 +22,7 @@ import {
   usePurchaseLessonTicket,
 } from '@/hooks/use-api';
 import { getCheckoutPaymentMode } from '@/lib/payment-ui';
-import { formatAmount, formatDateTime, extractErrorMessage } from '@/lib/utils';
+import { formatAmount, formatDateTime } from '@/lib/utils';
 
 const paymentMethods = [
   { id: 'card', label: '신용/체크카드', icon: CreditCard, description: '모든 카드 가능' },
@@ -117,17 +117,27 @@ export default function CheckoutPage() {
         router.push(`/my/lesson-tickets?ticketId=${confirmedTicket.id}`);
       }
     } catch (err: unknown) {
-      toast('error', extractErrorMessage(err, '결제를 완료하지 못했어요.'));
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '결제를 완료하지 못했어요.');
     }
   };
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 pb-32">
-      <MobileGlassHeader title={isMockMode ? '테스트 결제' : '결제하기'} showBack compact />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center"
+        >
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-300" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h1>
+      </header>
 
       <div className="hidden @3xl:block mb-6">
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
-        <p className="text-xs text-gray-500 mt-1">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
+        <p className="text-base text-gray-500 mt-1">
           {isMockMode
             ? '현재 환경에서는 결제 시뮬레이션만 기록되고 실제 청구는 발생하지 않습니다'
             : '실제 결제 컨텍스트가 있는 주문만 처리됩니다'}
@@ -153,11 +163,11 @@ export default function CheckoutPage() {
           />
         ) : null}
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">주문 정보</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">주문 정보</h3>
           <div className="space-y-3">
             <div>
-              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-500 mb-1">
+              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-normal bg-blue-50 text-blue-500 mb-1">
                 {source === 'match' ? '매치' : source === 'lesson' ? '강좌' : '미지원'}
               </span>
               <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{name || '미지원 주문'}</p>
@@ -179,8 +189,8 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 수단</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 수단</h3>
           <div className="space-y-2">
             {paymentMethods.map((method) => {
               const Icon = method.icon;
@@ -218,15 +228,15 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-          <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">결제 금액</h3>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">결제 금액</h3>
           <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between">
-            <span className="text-sm font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
+            <span className="text-md font-bold text-gray-900 dark:text-white">최종 결제 금액</span>
             <span className="text-xl font-bold text-blue-500">{formatAmount(Number.isFinite(amount) ? amount : 0)}</span>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
           <button onClick={() => setAgreedToTerms(!agreedToTerms)} className="flex items-center gap-3 w-full text-left">
             <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
               agreedToTerms ? 'bg-blue-500 border-blue-500' : 'border-gray-300 dark:border-gray-500'

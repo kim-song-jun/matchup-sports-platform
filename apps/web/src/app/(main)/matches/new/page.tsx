@@ -3,15 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Check, Plus, ChevronRight } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, Check, Plus, ChevronRight } from 'lucide-react';
 import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
+import { sportLabel, levelLabel } from '@/lib/constants';
 import { getSportImageSet } from '@/lib/sport-image';
-import { useCreateMatch } from '@/hooks/use-api';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,7 +19,6 @@ import { FormField } from '@/components/ui/form-field';
 import { Card } from '@/components/ui/card';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { firstUploadUrl, type UploadAsset } from '@/lib/uploads';
-import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -28,8 +26,8 @@ export default function CreateMatchPage() {
   useRequireAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const createMatch = useCreateMatch();
   const [step, setStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageAssets, setImageAssets] = useState<UploadAsset[]>([]);
   const [uploadState, setUploadState] = useState<ImageUploadState>({
     hasPendingUploads: false,
@@ -74,41 +72,50 @@ export default function CreateMatchPage() {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!guardImageUpload()) return;
-    if (!form.venueId) {
-      toast('error', '현재는 등록된 시설만 선택할 수 있어요');
-      return;
-    }
 
-    createMatch.mutate({
-      title: form.title,
-      description: form.description,
-      sportType: form.sportType,
-      venueId: form.venueId,
-      matchDate: form.matchDate,
-      startTime: form.startTime,
-      endTime: form.endTime,
-      maxPlayers: form.maxPlayers,
-      fee: form.fee,
-      levelMin: form.levelMin,
-      levelMax: form.levelMax,
-      gender: form.gender,
-      ...(imageAssets.length > 0 ? { imageUrl: firstUploadUrl(imageAssets) } : {}),
-    }, {
-      onSuccess: () => {
-        toast('success', '매치가 만들어졌어요!');
-        router.push('/matches?created=true');
-      },
-      onError: (err) => {
-        toast('error', extractErrorMessage(err, '생성에 실패했어요. 잠시 후 다시 시도해주세요'));
-      },
-    });
+    setIsSubmitting(true);
+    try {
+      if (!form.venueId) {
+        toast('error', '현재는 등록된 시설만 선택할 수 있어요');
+        return;
+      }
+
+      await api.post('/matches', {
+        title: form.title,
+        description: form.description,
+        sportType: form.sportType,
+        venueId: form.venueId,
+        matchDate: form.matchDate,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        maxPlayers: form.maxPlayers,
+        fee: form.fee,
+        levelMin: form.levelMin,
+        levelMax: form.levelMax,
+        gender: form.gender,
+        ...(imageAssets.length > 0 ? { imageUrl: firstUploadUrl(imageAssets) } : {}),
+      });
+      toast('success', '매치가 만들어졌어요!');
+      router.push('/matches?created=true');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '생성에 실패했어요. 잠시 후 다시 시도해주세요');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 flex flex-col min-h-[calc(100dvh-56px-80px)]">
-      <MobileGlassHeader title="매치 만들기" showBack onBack={() => step > 0 ? setStep(step - 1) : router.back()} />
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+      {/* Header */}
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3">
+        <button onClick={() => step > 0 ? setStep(step - 1) : router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <ArrowLeft size={18} className="text-gray-600" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">매치 만들기</h1>
+      </header>
 
       <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/matches" className="hover:text-gray-600 transition-colors">매치</Link>
@@ -126,32 +133,26 @@ export default function CreateMatchPage() {
         <p className="text-xs text-gray-500 mt-2">Step {step + 1}. {steps[step]}</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-lg flex-1 flex flex-col">
+      <div className="px-5 @3xl:px-0 max-w-lg">
         {/* Step 0: Sport */}
         {step === 0 && (
-          <div className="space-y-3 mt-2 flex-1">
-            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
+          <div className="space-y-3 mt-2">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
             <div className="flex flex-wrap gap-2">
-              {sportTypes.map((type) => {
-                const accent = sportCardAccent[type];
-                const isSelected = form.sportType === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
-                    data-testid={`match-sport-${type}`}
-                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                      isSelected
-                        ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
-                        : accent
-                          ? `${accent.badge} hover:opacity-80`
-                          : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {sportLabel[type] || type}
-                  </button>
-                );
-              })}
+              {sportTypes.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
+                  data-testid={`match-sport-${type}`}
+                  className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                    form.sportType === type
+                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+                      : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {sportLabel[type] || type}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -159,7 +160,7 @@ export default function CreateMatchPage() {
         {/* Step 1: Match info */}
         {step === 1 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">매치 정보</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">매치 정보</h3>
             <FormField label="매치 제목" required htmlFor="match-title">
               <Input
                 id="match-title"
@@ -263,8 +264,8 @@ export default function CreateMatchPage() {
               <div className="flex gap-2">
                 {[{ value: 'any', label: '무관' }, { value: 'male', label: '남성' }, { value: 'female', label: '여성' }].map((g) => (
                   <button key={g.value} onClick={() => setForm({ ...form, gender: g.value })}
-                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                      form.gender === g.value ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
+                    className={`min-h-[44px] rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                      form.gender === g.value ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500'
                     }`}>
                     {g.label}
                   </button>
@@ -308,7 +309,7 @@ export default function CreateMatchPage() {
         {/* Step 2: Venue + Date */}
         {step === 2 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">장소와 시간</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">장소와 시간</h3>
             <FormField label="시설 선택" required>
               {Array.isArray(venues) && venues.length > 0 && (
                 <div className="space-y-2 mb-3">
@@ -316,10 +317,10 @@ export default function CreateMatchPage() {
                     <button key={v.id} onClick={() => setForm({ ...form, venueId: v.id, customVenue: '' })}
                       data-testid={`match-venue-${v.id}`}
                       className={`w-full text-left rounded-xl p-3 transition-colors ${
-                        form.venueId === v.id ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        form.venueId === v.id ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}>
                       <p className={`text-sm font-semibold ${form.venueId === v.id ? '' : 'text-gray-900 dark:text-gray-100'}`}>{v.name}</p>
-                      <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'text-white/60 dark:text-white/60' : 'text-gray-500'}`}>{v.address}</p>
+                      <p className={`text-xs mt-0.5 ${form.venueId === v.id ? 'text-white/60 dark:text-gray-900/60' : 'text-gray-500'}`}>{v.address}</p>
                     </button>
                   ))}
                 </div>
@@ -346,9 +347,6 @@ export default function CreateMatchPage() {
                 <Input id="match-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
               </FormField>
             </div>
-            {!form.venueId && form.matchDate && (
-              <p className="text-sm text-amber-600 dark:text-amber-400">시설을 선택해주세요</p>
-            )}
             <Button onClick={() => {
                 if (!form.venueId) { toast('error', '현재는 등록된 시설만 선택할 수 있어요'); return; }
                 if (!form.matchDate) { toast('error', '날짜를 선택해주세요'); return; }
@@ -358,7 +356,6 @@ export default function CreateMatchPage() {
                 setStep(3);
               }}
               data-testid="match-create-next-schedule"
-              disabled={!form.venueId || !form.matchDate || !form.startTime}
               fullWidth
               size="lg"
               className="mt-2">
@@ -370,7 +367,7 @@ export default function CreateMatchPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">확인</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">확인</h3>
             <Card variant="subtle" className="space-y-2.5">
               <ConfirmRow label="종목" value={sportLabel[form.sportType] || form.sportType} />
               {(form.venueId || form.customVenue) && (
@@ -386,17 +383,16 @@ export default function CreateMatchPage() {
               {form.rules && <ConfirmRow label="규칙" value={form.rules} />}
               {imageAssets.length > 0 && <ConfirmRow label="이미지" value={`${imageAssets.length}장`} />}
             </Card>
-            <Button onClick={handleSubmit} disabled={createMatch.isPending || uploadState.hasUploadErrors} aria-busy={createMatch.isPending}
+            <Button onClick={handleSubmit} disabled={isSubmitting || uploadState.hasUploadErrors} aria-busy={isSubmitting}
               data-testid="match-create-submit"
               fullWidth
               size="lg"
               className="gap-1.5">
-              {createMatch.isPending ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
+              {isSubmitting ? '생성 중...' : (<><Check size={16} /> 매치 만들기</>)}
             </Button>
           </div>
         )}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

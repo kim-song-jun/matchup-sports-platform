@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Star, Send } from 'lucide-react';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
-import { Textarea } from '@/components/ui/textarea';
 import { extractUploadUrls, type UploadAsset } from '@/lib/uploads';
 
 interface ReviewFormProps {
@@ -116,7 +115,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
 
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-5">리뷰 작성</h3>
+      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-5">리뷰 작성</h3>
 
       {/* Overall Rating - large */}
       <div className="mb-6 text-center">
@@ -180,13 +179,13 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
         <label htmlFor={`venue-review-comment-${venueId}`} className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
           후기 작성
         </label>
-        <Textarea
+        <textarea
           id={`venue-review-comment-${venueId}`}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="이용 후기를 자유롭게 작성해주세요"
           rows={4}
-          className="resize-none"
+          className="w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 dark:focus:border-blue-500 transition-colors resize-none"
         />
       </div>
 

@@ -3,15 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, Search, ShieldOff } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
-import { EmptyState } from '@/components/ui/empty-state';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { useUpdateVenue, useVenue, useVenueHub } from '@/hooks/use-api';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import type { Venue } from '@/types/api';
-import { extractErrorMessage } from '@/lib/utils';
 
 type VenueEditState = Pick<Venue, 'name' | 'address' | 'description' | 'phone' | 'city' | 'district' | 'pricePerHour'>;
 
@@ -72,7 +67,8 @@ export default function VenueEditPage() {
       toast('success', '시설 정보를 저장했어요.');
       router.push(`/venues/${venueId}`);
     } catch (error) {
-      toast('error', extractErrorMessage(error, '시설 정보를 저장하지 못했어요.'));
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast('error', message || '시설 정보를 저장하지 못했어요.');
     }
   }
 
@@ -86,35 +82,31 @@ export default function VenueEditPage() {
 
   if (!venue) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
-        <EmptyState
-          icon={Search}
-          title="시설 정보를 찾을 수 없어요"
-          description="삭제되었거나 존재하지 않는 시설이에요"
-          action={{ label: '시설 목록으로', href: '/venues' }}
-        />
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-gray-500">
+        시설 정보를 찾을 수 없어요.
       </div>
     );
   }
 
   if (!canEdit) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
-        <EmptyState
-          icon={ShieldOff}
-          title="시설 수정 권한이 없어요"
-          description="시설 관리자만 수정할 수 있어요"
-          action={{ label: '시설 상세로', href: `/venues/${venueId}` }}
-        />
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-gray-500">
+        시설 수정 권한이 없습니다.
       </div>
     );
   }
 
+  const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-base text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20';
   const labelClass = 'block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
-      <MobileGlassHeader title="시설 수정" showBack />
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex min-h-11 min-w-11 items-center justify-center rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700">
+          <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">시설 수정</h1>
+      </header>
 
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href={`/venues/${venueId}`} className="hover:text-gray-600 transition-colors">시설 상세</Link>
@@ -126,33 +118,33 @@ export default function VenueEditPage() {
         <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 space-y-4">
           <div>
             <label htmlFor="venue-name" className={labelClass}>시설명</label>
-            <Input id="venue-name" value={form.name} onChange={(event) => updateField('name', event.target.value)} />
+            <input id="venue-name" className={inputClass} value={form.name} onChange={(event) => updateField('name', event.target.value)} />
           </div>
           <div>
             <label htmlFor="venue-address" className={labelClass}>주소</label>
-            <Input id="venue-address" value={form.address} onChange={(event) => updateField('address', event.target.value)} />
+            <input id="venue-address" className={inputClass} value={form.address} onChange={(event) => updateField('address', event.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="venue-city" className={labelClass}>도시</label>
-              <Input id="venue-city" value={form.city} onChange={(event) => updateField('city', event.target.value)} />
+              <input id="venue-city" className={inputClass} value={form.city} onChange={(event) => updateField('city', event.target.value)} />
             </div>
             <div>
               <label htmlFor="venue-district" className={labelClass}>구/군</label>
-              <Input id="venue-district" value={form.district} onChange={(event) => updateField('district', event.target.value)} />
+              <input id="venue-district" className={inputClass} value={form.district} onChange={(event) => updateField('district', event.target.value)} />
             </div>
           </div>
           <div>
             <label htmlFor="venue-phone" className={labelClass}>전화번호</label>
-            <Input id="venue-phone" value={form.phone ?? ''} onChange={(event) => updateField('phone', event.target.value)} />
+            <input id="venue-phone" className={inputClass} value={form.phone ?? ''} onChange={(event) => updateField('phone', event.target.value)} />
           </div>
           <div>
             <label htmlFor="venue-price" className={labelClass}>시간당 이용요금</label>
-            <Input id="venue-price" type="number" value={form.pricePerHour ?? ''} onChange={(event) => updateField('pricePerHour', event.target.value ? Number(event.target.value) : null)} />
+            <input id="venue-price" type="number" className={inputClass} value={form.pricePerHour ?? ''} onChange={(event) => updateField('pricePerHour', event.target.value ? Number(event.target.value) : null)} />
           </div>
           <div>
             <label htmlFor="venue-description" className={labelClass}>시설 소개</label>
-            <Textarea id="venue-description" value={form.description ?? ''} onChange={(event) => updateField('description', event.target.value)} />
+            <textarea id="venue-description" className={`${inputClass} min-h-[110px]`} value={form.description ?? ''} onChange={(event) => updateField('description', event.target.value)} />
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, GraduationCap, Shield, Trophy, Users, type LucideIcon } from 'lucide-react';
+import { GraduationCap, Shield, Trophy, Users, type LucideIcon } from 'lucide-react';
 import { ErrorState } from '@/components/ui/error-state';
 import { Card } from '@/components/ui/card';
 import { SectionHeader } from '@/components/ui/section-header';
@@ -58,17 +58,8 @@ export default function AdminDashboardPage() {
         <MetricCard label="팀" value={stats?.totalTeams} loading={isLoading} icon={Shield} />
       </div>
 
-      <section className="mb-8" role="region" aria-label="처리 필요 항목">
-        <SectionHeader
-          title="처리 필요"
-          showMore={false}
-          className="mb-3"
-          action={
-            <div className="flex items-center gap-1.5 text-amber-500" aria-hidden="true">
-              <AlertTriangle size={14} />
-            </div>
-          }
-        />
+      <section className="mb-8">
+        <SectionHeader title="처리 필요" showMore={false} className="mb-3" />
         <div className="space-y-2.5">
           <ActionItem label="미처리 분쟁" count={pendingDisputes} href="/admin/disputes" loading={isLoading} />
           <ActionItem label="정산 대기" count={settlementsSummary?.pendingCount ?? 0} href="/admin/settlements" loading={isLoading} />
@@ -116,19 +107,15 @@ function MetricCard({ label, value, sub, loading, icon: Icon }: {
           <Icon size={18} className="text-blue-500 dark:text-blue-300" />
         </div>
       ) : null}
-      <dl>
-        <dt className="mb-1 text-xs text-gray-500 dark:text-gray-400">{label}</dt>
-        <dd>
-          {loading ? (
-            <div className="h-8 w-16 bg-gray-50 dark:bg-gray-700 rounded skeleton-shimmer" />
-          ) : (
-            <span className="text-3xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
-              {value != null ? value.toLocaleString() : '-'}
-            </span>
-          )}
-          {sub ? <p className="text-xs text-blue-500 font-medium mt-1">{sub}</p> : null}
-        </dd>
-      </dl>
+      <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">{label}</p>
+      {loading ? (
+        <div className="h-8 w-16 bg-gray-50 dark:bg-gray-700 rounded skeleton-shimmer" />
+      ) : (
+        <p className="text-3xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
+          {value != null ? value.toLocaleString() : '-'}
+        </p>
+      )}
+      {sub ? <p className="text-xs text-blue-500 font-medium mt-1">{sub}</p> : null}
     </Card>
   );
 }

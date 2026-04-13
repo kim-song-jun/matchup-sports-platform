@@ -55,10 +55,10 @@ export default function TeamMatchesPage() {
           <span>/</span>
           <span className="text-gray-700">경기 기록</span>
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">경기 기록</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">경기 기록</h2>
       </div>
 
-      <div className="px-5 @3xl:px-0">
+      <div className="px-5 @3xl:px-0 pb-8">
         {isLoading ? (
           <div className="space-y-3 mt-3">
             {[1, 2, 3].map((i) => (
@@ -83,15 +83,15 @@ export default function TeamMatchesPage() {
                   <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.99]">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sportCardAccent[match.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
+                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[match.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                           {sportLabel[match.sportType] || match.sportType}
                         </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.style}`}>
+                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
                           {st.text}
                         </span>
                       </div>
                     </div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                         <Calendar size={12} />
@@ -109,7 +109,6 @@ export default function TeamMatchesPage() {
           </div>
         )}
       </div>
-      <div className="h-24" />
     </div>
   );
 }

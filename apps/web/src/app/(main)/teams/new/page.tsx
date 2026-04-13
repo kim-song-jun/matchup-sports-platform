@@ -3,13 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, Globe, Video } from 'lucide-react';
-import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { ArrowLeft, ChevronRight, Globe, Video } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { useCreateTeam } from '@/hooks/use-api';
-import { sportLabel, sportCardAccent } from '@/lib/constants';
-import { extractErrorMessage } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { sportLabel } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,7 +23,7 @@ export default function CreateTeamPage() {
   const router = useRouter();
   const { toast } = useToast();
   useRequireAuth();
-  const createTeam = useCreateTeam();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -40,7 +38,7 @@ export default function CreateTeamPage() {
     shortsUrl: '',
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name) return toast('error', '팀명을 입력해주세요');
     if (!form.sportType) return toast('error', '종목을 선택해주세요');
     if (!form.city) return toast('error', '활동 지역을 선택해주세요');
@@ -60,20 +58,28 @@ export default function CreateTeamPage() {
       shortsUrl: form.shortsUrl || undefined,
     };
 
-    createTeam.mutate(payload, {
-      onSuccess: () => {
-        toast('success', '팀이 등록되었어요!');
-        router.push('/teams');
-      },
-      onError: (err) => {
-        toast('error', extractErrorMessage(err, '등록에 실패했어요. 잠시 후 다시 시도해주세요'));
-      },
-    });
+    setIsSubmitting(true);
+    try {
+      await api.post('/teams', payload);
+      toast('success', '팀이 등록되었어요!');
+      router.push('/teams');
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      toast('error', axiosErr?.response?.data?.message || '등록에 실패했어요. 잠시 후 다시 시도해주세요');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <MobileGlassHeader title="팀 등록" showBack />
+      {/* Mobile header */}
+      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50">
+        <button onClick={() => router.back()} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl -ml-1.5 hover:bg-gray-100 transition-colors">
+          <ArrowLeft size={20} className="text-gray-700" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">팀 등록</h1>
+      </header>
 
       {/* Desktop breadcrumb */}
       <div className="hidden @3xl:flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -96,17 +102,16 @@ export default function CreateTeamPage() {
 
         {/* 종목 */}
         <FormField label="종목" required className="mb-5">
-          <div className="flex flex-wrap gap-2" role="group" aria-label="종목 선택">
+          <div className="flex flex-wrap gap-2">
             {sportTypes.map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setForm({ ...form, sportType: type })}
-                aria-pressed={form.sportType === type}
-                className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   form.sportType === type
-                    ? sportCardAccent[type]?.badge || 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400'
-                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {sportLabel[type] || type}
@@ -135,7 +140,6 @@ export default function CreateTeamPage() {
               id="team-city"
               value={form.city}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
-              className="min-h-[44px]"
             >
               <option value="">선택</option>
               {cities.map(c => <option key={c} value={c}>{c}</option>)}
@@ -193,7 +197,7 @@ export default function CreateTeamPage() {
         <Card className="mb-5" padding="sm">
           <div className="flex items-center gap-2 mb-3">
             <Globe size={16} className="text-gray-500" />
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">SNS 링크</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">SNS 링크</h3>
           </div>
           <div className="space-y-3">
             <div>
@@ -230,7 +234,7 @@ export default function CreateTeamPage() {
         <Card className="mb-5" padding="sm">
           <div className="flex items-center gap-2 mb-3">
             <Video size={16} className="text-gray-500" />
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">홍보 영상 (Shorts)</h3>
           </div>
           <label htmlFor="team-shortsUrl" className="sr-only">홍보 영상 URL</label>
           <Input
@@ -245,15 +249,14 @@ export default function CreateTeamPage() {
         {/* 등록 버튼 */}
         <Button
           onClick={handleSubmit}
-          disabled={createTeam.isPending}
+          disabled={isSubmitting}
           fullWidth
           size="lg"
-          className="mb-6"
+          className="mb-8"
         >
-          {createTeam.isPending ? '등록 중...' : '팀 등록하기'}
+          {isSubmitting ? '등록 중...' : '팀 등록하기'}
         </Button>
       </div>
-      <div className="h-24" />
     </div>
   );
 }

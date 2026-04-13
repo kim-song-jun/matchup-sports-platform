@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { Target, Shield, Users, Zap, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check, Footprints } from 'lucide-react';
+import { Target, Shield, Users, Zap, Star, ArrowRight, Sparkles, Frown, SearchX, UserX, Check } from 'lucide-react';
 import { SportIconMap } from '@/components/icons/sport-icons';
-import { sportCardAccent } from '@/lib/constants';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { HeroScrollButton } from '@/components/landing/hero-scroll-button';
 import { LandingNav } from '@/components/landing/landing-nav';
@@ -25,8 +24,8 @@ const SPORTS = [
 
 const SUB_FEATURES = [
   { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-blue-500' },
-  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-blue-500' },
-  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-blue-500' },
+  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-emerald-500' },
+  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-amber-500' },
 ];
 
 const STEPS = [
@@ -57,19 +56,12 @@ export default function LandingPage() {
       <LandingNav />
 
       {/* ── Hero — 화이트 베이스, 텍스트 중심 ── */}
-      <section className="relative pt-36 pb-24 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
-        {/* Radial gradient decoration — subtle blue glow centered behind the hero text */}
-        <div
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-          aria-hidden="true"
-        >
-          <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[700px] h-[500px] bg-[radial-gradient(ellipse_at_50%_0%,rgba(49,130,246,0.08),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,rgba(49,130,246,0.12),transparent_70%)]" />
-        </div>
+      <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
         <div className="max-w-[1100px] mx-auto px-5">
-          <div className="max-w-[680px] mx-auto text-center break-keep">
+          <div className="max-w-[680px] mx-auto text-center">
             {/* Badge */}
             <ScrollReveal delay={0}>
-              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold tracking-wide px-4 py-2 rounded-full mb-8">
+              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
                 <Sparkles size={14} />
                 11개 종목 · 2,400+ 매칭 완료
               </div>
@@ -81,7 +73,7 @@ export default function LandingPage() {
                 내 수준에 딱 맞는
                 <br />
                 운동 메이트를{' '}
-                <span className="text-blue-500 whitespace-nowrap">AI가 찾아드려요</span>
+                <span className="text-blue-500">AI가 찾아드려요</span>
               </h1>
             </ScrollReveal>
 
@@ -103,10 +95,6 @@ export default function LandingPage() {
                 </Link>
                 <HeroScrollButton targetId="features-section" />
               </div>
-              <p className="mt-5 text-sm text-gray-400 dark:text-gray-500">
-                평균 <span className="text-gray-600 dark:text-gray-300 font-semibold">3분 이내</span> 매칭 · 만족도{' '}
-                <span className="text-gray-600 dark:text-gray-300 font-semibold">4.8</span> / 5.0
-              </p>
             </ScrollReveal>
           </div>
         </div>
@@ -120,7 +108,7 @@ export default function LandingPage() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
               {STATS.map((stat) => (
                 <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
-                  <span className="text-3xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
+                  <span className="text-2xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
                   <div className="text-xs text-gray-500 mt-2 font-medium">{stat.label}</div>
                 </div>
               ))}
@@ -143,8 +131,8 @@ export default function LandingPage() {
                   { icon: SearchX, text: '매번 상대 찾기가 힘든 주말', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
                   { icon: UserX, text: '약속했는데 노쇼 당한 경험', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
                 ] as const).map((pain) => (
-                  <div key={pain.text} className={`${pain.bg} rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center`}>
-                    <div className={`h-12 w-12 rounded-xl bg-white/60 dark:bg-white/10 flex items-center justify-center mx-auto mb-4`}>
+                  <div key={pain.text} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center">
+                    <div className={`h-12 w-12 rounded-xl ${pain.bg} flex items-center justify-center mx-auto mb-4`}>
                       <pain.icon size={20} className={pain.color} />
                     </div>
                     <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed font-medium">{pain.text}</p>
@@ -152,7 +140,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <p className="mt-10 text-lg text-gray-500 dark:text-gray-400">
-                TeamMeet이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
+                MatchUp이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
               </p>
             </div>
           </ScrollReveal>
@@ -180,7 +168,7 @@ export default function LandingPage() {
                 <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs font-semibold px-3 py-1 rounded-full mb-4">
                   <Target size={14} /> 핵심 기능
                 </div>
-                <h3 className="text-2xl lg:text-3xl font-bold mb-3">AI 매칭</h3>
+                <h3 className="text-2xl lg:text-2xl font-bold mb-3">AI 매칭</h3>
                 <p className="text-md text-gray-400 leading-relaxed max-w-[400px]">
                   실력, 위치, 시간, 매너 점수를 종합 분석해 나와 가장 잘 맞는 상대를 자동으로 찾아드려요. 경기할수록 AI가 더 정확해집니다.
                 </p>
@@ -202,11 +190,11 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="space-y-2.5">
-                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>실력 매칭</span><span className="text-blue-400 font-semibold">94%</span></div><div className="h-1.5 rounded-full bg-gray-700"><div className="h-full rounded-full bg-blue-500 w-[94%]" /></div></div>
-                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>매너 점수</span><span className="text-blue-400 font-semibold">98%</span></div><div className="h-1.5 rounded-full bg-gray-700"><div className="h-full rounded-full bg-blue-500 w-[98%]" /></div></div>
-                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>거리</span><span className="text-blue-400 font-semibold">2.1km</span></div><div className="h-1.5 rounded-full bg-gray-700"><div className="h-full rounded-full bg-blue-500 w-[85%]" /></div></div>
+                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>실력 매칭</span><span className="text-blue-400 font-semibold">94%</span></div><div className="h-1.5 rounded-full bg-white dark:bg-gray-800/5"><div className="h-full rounded-full bg-blue-500 w-[94%]" /></div></div>
+                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>매너 점수</span><span className="text-green-400 font-semibold">98%</span></div><div className="h-1.5 rounded-full bg-white dark:bg-gray-800/5"><div className="h-full rounded-full bg-green-500 w-[98%]" /></div></div>
+                    <div><div className="flex justify-between text-xs text-gray-500 mb-1"><span>거리</span><span className="text-amber-400 font-semibold">2.1km</span></div><div className="h-1.5 rounded-full bg-white dark:bg-gray-800/5"><div className="h-full rounded-full bg-amber-500 w-[85%]" /></div></div>
                   </div>
-                  <div className="mt-4 text-center text-xs font-bold text-blue-300 bg-blue-500/10 rounded-lg py-2 pointer-events-none select-none" aria-hidden="true">매칭 적합도 96%</div>
+                  <div className="mt-4 text-center text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg py-2">매칭 적합도 96%</div>
                 </div>
               </div>
             </div>
@@ -218,7 +206,7 @@ export default function LandingPage() {
               const Icon = f.icon;
               return (
                 <ScrollReveal key={f.title} delay={idx * 100}>
-                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-7 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-[colors,shadow] duration-300 h-full">
+                  <div className="group bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full">
                     <div className={`h-12 w-12 rounded-xl ${f.iconBg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
                       <Icon size={20} className="text-white" />
                     </div>
@@ -238,7 +226,7 @@ export default function LandingPage() {
           <ScrollReveal>
             <div className="text-center mb-12">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                <Footprints size={14} /> 이용 방법
+                이용 방법
               </span>
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 3단계로 시작하세요
@@ -306,7 +294,7 @@ export default function LandingPage() {
               {SPORTS.map((sport) => {
                 const Icon = SportIconMap[sport.key];
                 return (
-                  <div key={sport.key} className="shrink-0 w-[96px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform duration-200">
+                  <div key={sport.key} className="shrink-0 w-[88px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform duration-200">
                     <div className={`w-12 h-12 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={24} className={sport.iconColor} />}
                     </div>
@@ -323,7 +311,7 @@ export default function LandingPage() {
               {SPORTS.map((sport) => {
                 const Icon = SportIconMap[sport.key];
                 return (
-                  <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-blue-200 dark:hover:border-blue-800 transition-colors duration-300 cursor-default">
+                  <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:-translate-y-0.5 hover:border-blue-200 dark:hover:border-blue-800 transition-[colors,transform] duration-300 cursor-default">
                     <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`}>
                       {Icon && <Icon size={20} className={sport.iconColor} />}
                     </div>
@@ -331,18 +319,6 @@ export default function LandingPage() {
                   </div>
                 );
               })}
-            </div>
-          </ScrollReveal>
-
-          <ScrollReveal>
-            <div className="mt-10 text-center">
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-500 hover:text-blue-600 transition-colors"
-              >
-                내 종목으로 매칭 시작하기
-                <ArrowRight size={15} strokeWidth={2.5} />
-              </Link>
             </div>
           </ScrollReveal>
         </div>
@@ -365,10 +341,9 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {TESTIMONIALS.map((t, idx) => {
               const SportIcon = SportIconMap[t.sport];
-              const accent = sportCardAccent[t.sport];
               return (
                 <ScrollReveal key={t.author} delay={idx * 120}>
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 h-full flex flex-col">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 hover:-translate-y-0.5 transition-[colors,transform] duration-300 h-full flex flex-col">
                     <div className="flex gap-0.5 mb-4" role="img" aria-label={`${t.rating}점 만점`}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star key={i} size={14} className={i < t.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 dark:text-gray-600'} aria-hidden="true" />
@@ -378,16 +353,8 @@ export default function LandingPage() {
                       &ldquo;{t.quote}&rdquo;
                     </p>
                     <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
-                      {/* Avatar: initial circle + sport badge overlay */}
-                      <div className="relative shrink-0">
-                        <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                          <span className="text-sm font-bold text-gray-600 dark:text-gray-300">{t.author.charAt(0)}</span>
-                        </div>
-                        {SportIcon && (
-                          <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ${accent?.badge ?? 'bg-gray-50 text-gray-500'} flex items-center justify-center ring-2 ring-white dark:ring-gray-800`}>
-                            <SportIcon size={11} aria-hidden="true" />
-                          </div>
-                        )}
+                      <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center shrink-0">
+                        {SportIcon ? <SportIcon size={18} className="text-gray-500 dark:text-gray-400" /> : <span className="text-sm font-bold text-gray-500">{t.author.charAt(0)}</span>}
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-white text-base">{t.author}</p>
@@ -405,7 +372,7 @@ export default function LandingPage() {
       {/* ── Final CTA ── */}
       <section className="relative overflow-hidden bg-gray-900 dark:bg-black">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.12),transparent_60%)]" />
-        <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center break-keep">
+        <div className="relative max-w-[600px] mx-auto px-5 py-20 sm:py-28 text-center">
           <ScrollReveal>
             <p className="text-base text-blue-400 font-semibold mb-4">가입은 3초, 첫 매칭은 무료</p>
             <h2 className="text-3xl lg:text-4xl font-black text-white mb-6 tracking-tight leading-tight">

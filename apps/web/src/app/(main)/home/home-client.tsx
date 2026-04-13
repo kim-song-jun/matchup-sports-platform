@@ -447,20 +447,49 @@ export function HomePage() {
                 const accent = sportCardAccent[team.sportType];
                 const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
                 const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
+                const region = team.district || team.city;
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`relative h-9 w-9 rounded-xl ${accent?.tint || 'bg-gray-100'} shrink-0 overflow-hidden`}>
-                          <SafeImage src={teamLogo} fallbackSrc={fallbackTeamLogo} alt={`${team.name} logo`} fill className="rounded-lg object-cover" sizes="36px" />
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full flex flex-col">
+                      {/* 상단: 로고 + 팀명 + 모집중 */}
+                      <div className="flex items-start gap-2.5">
+                        <div className={`relative h-10 w-10 rounded-xl ${accent?.tint || 'bg-gray-100 dark:bg-gray-700'} shrink-0 overflow-hidden`}>
+                          <SafeImage src={teamLogo} fallbackSrc={fallbackTeamLogo} alt={`${team.name} logo`} fill className="rounded-xl object-cover" sizes="40px" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{sportLabel[team.sportType]} · {team.memberCount}{tc('people')}</p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate leading-snug">{team.name}</p>
+                          {/* 종목 배지 + 지역 */}
+                          <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                            <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-1.5 py-0.5 text-2xs font-medium shrink-0`}>
+                              {sportLabel[team.sportType]}
+                            </span>
+                            {region && (
+                              <span className="flex items-center gap-0.5 text-2xs text-gray-400 dark:text-gray-500 min-w-0">
+                                <MapPin size={9} className="shrink-0" aria-hidden="true" />
+                                <span className="truncate">{region}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {team.isRecruiting && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">{t('recruiting')}</span>}
+                        {team.isRecruiting && (
+                          <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 text-2xs font-medium text-emerald-600 dark:text-emerald-400">
+                            {t('recruiting')}
+                          </span>
+                        )}
                       </div>
-                      {team.description && <p className="text-xs text-gray-500 mt-2 line-clamp-1">{team.description}</p>}
+
+                      {/* 한줄 소개 */}
+                      <p className="mt-2 text-2xs text-gray-500 dark:text-gray-400 line-clamp-2 flex-1 leading-relaxed">
+                        {team.description || '소개가 없는 팀이에요.'}
+                      </p>
+
+                      {/* 하단: 인원수 + 레벨 */}
+                      <div className="mt-2.5 flex items-center gap-1 text-2xs text-gray-400 dark:text-gray-500">
+                        <Users size={9} className="shrink-0" aria-hidden="true" />
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{team.memberCount}{tc('people')}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{levelLabel[team.level] ?? '미정'}</span>
+                      </div>
                     </div>
                   </Link>
                 );

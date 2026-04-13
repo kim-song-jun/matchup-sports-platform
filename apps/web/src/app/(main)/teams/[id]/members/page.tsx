@@ -120,7 +120,7 @@ export default function TeamMembersPage() {
 
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
         <div>
-          <h2 data-testid="team-members-heading" className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{membersPageTitle}</h2>
+          <h2 data-testid="team-members-heading" className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{membersPageTitle}</h2>
           <p className="text-base text-gray-500 mt-1">
             {isLoading ? '불러오는 중...' : `팀 멤버 ${members.length}명`}
           </p>

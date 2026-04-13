@@ -166,28 +166,28 @@ export default function LessonDetailPage() {
             )}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
             <div className="pointer-events-none absolute bottom-4 left-4">
-              <span className="rounded-md px-3 py-1 text-2xs font-medium bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
+              <span className="rounded-md px-1.5 py-0.5 text-2xs font-medium bg-gray-900/70 text-white">{lessonTypeLabel[lesson.type]}</span>
             </div>
           </div>
 
           {/* 타이틀 */}
           <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded-full px-2 py-0.5 text-2xs font-normal ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${typeColor[lesson.type]}`}>{lessonTypeLabel[lesson.type]}</span>
               <span className="text-xs text-gray-500">{sportLabel[lesson.sportType]}</span>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>
+            <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white leading-tight">{lesson.title}</h2>
             {lesson.description && <p className="mt-3 text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">{lesson.description}</p>}
           </div>
 
           {/* 코치 */}
           {lesson.coachName && (
             <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">코치 소개</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">코치 소개</h3>
               <div className="flex items-start gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"><User size={28} /></div>
                 <div>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">{lesson.coachName}</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white">{lesson.coachName}</p>
                   {lesson.coachBio && <p className="text-sm text-gray-500 mt-1 leading-relaxed">{lesson.coachBio}</p>}
                   <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
                     {typeof lesson.host?.mannerScore === 'number' ? (
@@ -215,7 +215,7 @@ export default function LessonDetailPage() {
           <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <div className="flex items-center gap-2 mb-4">
               <BookOpen size={18} className="text-gray-500" />
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">커리큘럼</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">커리큘럼</h3>
               <span className="text-xs text-gray-500 ml-auto">총 {sampleCurriculum.length}개 섹션</span>
             </div>
             {sampleCurriculum.map((item, idx) => (
@@ -248,7 +248,7 @@ export default function LessonDetailPage() {
 
           {/* 이런 분께 추천 */}
           <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">이런 분께 추천합니다</h3>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">이런 분께 추천합니다</h3>
             {[
               `${sportLabel[lesson.sportType]}을(를) 처음 시작하시는 분`,
               '체계적으로 기초를 배우고 싶은 분',
@@ -263,7 +263,7 @@ export default function LessonDetailPage() {
 
           {/* 강좌 사진 */}
           <div className="mt-4 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">강좌 사진</h3>
             <div className="grid grid-cols-3 gap-2">
               {galleryImages.map((image, index) => (
                 <button

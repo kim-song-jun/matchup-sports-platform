@@ -103,7 +103,7 @@ export function TicketPlanSelector({
 
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">수강권 선택</h3>
+      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4">수강권 선택</h3>
 
       <div className="space-y-3">
         {activePlans.map((plan) => {

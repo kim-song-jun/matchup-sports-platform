@@ -156,7 +156,7 @@ export function HomePage() {
       {/* ═══ ZONE 1: 헤더 — 큰 인사, 날짜, CTA ═══ */}
       <header className="px-5 @3xl:px-0 pt-4 pb-2">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
           {mounted && isAuthenticated ? (
             user ? (
               user.nickname ? `${user.nickname}님` : '안녕하세요'
@@ -287,7 +287,7 @@ export function HomePage() {
       {!canRenderAuthenticated && (
         <section className="mt-8 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-900 dark:bg-gray-800 p-5">
-            <p className="text-lg font-bold text-white tracking-tight">{t('aiMatchIntro')}</p>
+            <p className="text-base font-bold text-white tracking-tight">{t('aiMatchIntro')}</p>
             <p className="text-sm text-gray-400 mt-1.5 leading-relaxed">{t('valueProposition')}</p>
             <Link href="/login" className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors">
               {t('getStarted')} <ArrowRight size={14} aria-hidden="true" />
@@ -622,7 +622,7 @@ const RecommendedMatchCard = React.memo(function RecommendedMatchCard({ match, p
             <span className="absolute top-2 left-2 text-2xs font-bold bg-gray-900/70 text-white rounded-md px-1.5 py-0.5">{timeBadge.text}</span>
           )}
           {accent && (
-            <span className={`absolute top-2 right-2 text-xs font-semibold rounded-full px-2 py-0.5 ${accent.badge}`}>
+            <span className={`absolute top-2 right-2 text-xs font-medium rounded-full px-2 py-0.5 ${accent.badge}`}>
               {sportLabel[match.sportType]}
             </span>
           )}

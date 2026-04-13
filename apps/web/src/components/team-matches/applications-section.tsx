@@ -63,7 +63,7 @@ export function ApplicationsSection({ matchId, isRecruiting }: ApplicationsSecti
   if (applications.length === 0) {
     return (
       <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+        <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
           <Users size={16} className="text-blue-500" />
           신청 현황
         </h2>
@@ -81,7 +81,7 @@ export function ApplicationsSection({ matchId, isRecruiting }: ApplicationsSecti
 
   return (
     <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+      <h2 className="text-base font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
         <Users size={16} className="text-blue-500" />
         신청 현황
         <span className="ml-auto text-sm font-normal text-gray-500">{applications.length}팀</span>
@@ -111,7 +111,7 @@ export function ApplicationsSection({ matchId, isRecruiting }: ApplicationsSecti
                     )}
                   </div>
                 </div>
-                <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${appStatus.className}`}>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${appStatus.className}`}>
                   {appStatus.label}
                 </span>
               </div>

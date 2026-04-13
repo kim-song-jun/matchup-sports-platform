@@ -58,7 +58,7 @@ export default function TournamentDetailPage() {
 
       <div className="px-5 @3xl:px-0">
         <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{data.title}</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{data.title}</h2>
           <p className="mt-1 text-sm text-gray-500">{sportLabel[data.sportType] || data.sportType}</p>
           <div className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
             <p className="flex items-center gap-2"><CalendarDays size={14} /> {formatMatchDate(data.eventDate)} {data.startTime ?? ''}</p>

@@ -172,7 +172,7 @@ export default function BadgesPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">뱃지</h1>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">뱃지</h1>
       </header>
 
       {/* Tabs */}
@@ -237,7 +237,7 @@ export default function BadgesPage() {
                         {badge.name}
                       </h3>
                       {badge.earned && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-2xs font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-2xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
                           획득
                         </span>
                       )}

@@ -117,7 +117,7 @@ export function TransferOwnershipModal({
       <div className="flex items-start gap-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 px-4 py-3 mb-5">
         <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
         <p className="text-xs text-red-600 dark:text-red-400">
-          소유권 이전 후 팀 삭제, 멤버 추방 등 팀장 전용 기능을 사용할 수 없게 됩니다.
+          소유권 이전 후 팀 삭제, 멤버 추방 등 팀장 전용 기능을 사용할 수 없게 돼요.
         </p>
       </div>
 

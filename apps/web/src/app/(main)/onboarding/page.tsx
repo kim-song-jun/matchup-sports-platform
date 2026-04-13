@@ -97,7 +97,7 @@ export default function OnboardingPage() {
         {/* Step 1: 종목 선택 */}
         {step === 'sport' && (
           <div className="flex-1 flex flex-col pt-10">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
               무슨 운동을
               <br />
               좋아하세요?
@@ -154,7 +154,7 @@ export default function OnboardingPage() {
         {/* Step 2: 핵심 기능 소개 */}
         {step === 'features' && (
           <div className="flex-1 flex flex-col pt-10">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
               TeamMeet은
               <br />
               이런 걸 해줘요

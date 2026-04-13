@@ -208,7 +208,7 @@ export default function TeamMatchEvaluatePage() {
       <div className="px-5 @3xl:px-0 @3xl:max-w-2xl @3xl:mx-auto">
         <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 mb-4">
           <p className="text-sm font-semibold text-blue-500">POST MATCH</p>
-          <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{match.title}</h2>
+          <h2 className="mt-1 text-base font-bold text-gray-900 dark:text-white">{match.title}</h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
             {participantTeams.map((team) => team.name).join(' vs ')}
           </p>
@@ -242,7 +242,7 @@ export default function TeamMatchEvaluatePage() {
             {submittedEvaluation ? (
               <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-5 mb-6 dark:border-green-900/50 dark:bg-green-950/20">
                 <CheckCircle2 size={30} className="text-green-600 dark:text-green-300" />
-                <p className="mt-3 text-lg font-bold text-green-800 dark:text-green-200">이미 평가를 제출했습니다</p>
+                <p className="mt-3 text-base font-bold text-green-800 dark:text-green-200">이미 평가를 제출했습니다</p>
                 <p className="mt-1 text-sm text-green-700 dark:text-green-200/80">
                   {opponentTeam?.name}에 대한 평가가 저장되어 중복 제출이 차단됩니다.
                 </p>

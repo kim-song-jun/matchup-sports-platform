@@ -46,7 +46,7 @@ export function MobilePageTopZone({
                   {eyebrow}
                 </div>
               )}
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
                 {title}
               </h1>
               {subtitle && (
@@ -68,7 +68,7 @@ export function MobilePageTopZone({
               {eyebrow}
             </div>
           )}
-          <h1 className="text-2xl font-bold tracking-[-0.03em] text-gray-900 dark:text-white">
+          <h1 className="text-xl font-bold tracking-[-0.03em] text-gray-900 dark:text-white">
             {title}
           </h1>
           {subtitle && (

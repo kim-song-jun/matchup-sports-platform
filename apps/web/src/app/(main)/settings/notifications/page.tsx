@@ -42,25 +42,25 @@ const SERVER_CATEGORIES: ServerCategoryConfig[] = [
   {
     key: 'matchEnabled',
     label: '매치 알림',
-    desc: '새 매치, 참가 확인, 경기 상태 변경을 계정 전체에서 동기화합니다.',
+    desc: '새 매치, 참가 확인, 경기 상태 변경을 계정 전체에서 동기화해요.',
     icon: Trophy,
   },
   {
     key: 'teamEnabled',
     label: '팀 알림',
-    desc: '팀 가입, 신청 승인/거절, 운영 공지를 계정 전체에서 동기화합니다.',
+    desc: '팀 가입, 신청 승인/거절, 운영 공지를 계정 전체에서 동기화해요.',
     icon: Users,
   },
   {
     key: 'chatEnabled',
     label: '채팅 알림',
-    desc: '새 메시지와 단체 채팅방 업데이트를 계정 전체에서 동기화합니다.',
+    desc: '새 메시지와 단체 채팅방 업데이트를 계정 전체에서 동기화해요.',
     icon: MessageCircle,
   },
   {
     key: 'paymentEnabled',
     label: '결제 알림',
-    desc: '결제 완료, 환불, 주문 상태 변경을 계정 전체에서 동기화합니다.',
+    desc: '결제 완료, 환불, 주문 상태 변경을 계정 전체에서 동기화해요.',
     icon: CreditCard,
   },
 ];
@@ -77,10 +77,6 @@ export default function NotificationsPage() {
     useState<BrowserPermissionState>('unsupported');
   const [savingKey, setSavingKey] = useState<ServerPreferenceKey | null>(null);
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -92,6 +88,10 @@ export default function NotificationsPage() {
       'Notification' in window ? window.Notification.permission : 'unsupported',
     );
   }, []);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleServerToggle = (key: ServerPreferenceKey, nextValue: boolean) => {
     setSavingKey(key);
@@ -165,7 +165,7 @@ export default function NotificationsPage() {
         <section className="rounded-2xl border border-gray-100 bg-white p-4 space-y-4 dark:border-gray-700 dark:bg-gray-800">
           <SectionHeading
             title="계정 전체에 저장되는 알림"
-            description="서버에 저장되는 category preference입니다."
+            description="로그인 상태, 기기, 브라우저가 달라져도 아래 설정이 유지됩니다."
           />
 
           {preferencesQuery.isLoading ? (
@@ -207,17 +207,36 @@ export default function NotificationsPage() {
           />
 
           <div className="divide-y divide-gray-50 dark:divide-gray-700">
-            <StatusRow
-              icon={Smartphone}
-              label="브라우저 Push 권한"
-              desc={browserPermissionDescription(browserPermission)}
-              value={browserPermissionLabel(browserPermission)}
-            />
+            {browserPermission === 'denied' ? (
+              <div className="flex items-start gap-3 py-4 first:pt-0 last:pb-0">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 shrink-0">
+                  <Smartphone size={18} className="text-orange-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-md font-medium text-gray-900 dark:text-gray-50">브라우저 Push 권한</p>
+                    <span className="rounded-md bg-orange-100 px-1.5 py-0.5 text-2xs font-medium text-orange-600 dark:bg-orange-900/40 dark:text-orange-300">
+                      차단됨
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    브라우저 설정에서 알림을 허용해주세요. 차단 상태에서는 Push 알림을 받을 수 없어요.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <StatusRow
+                icon={Smartphone}
+                label="브라우저 Push 권한"
+                desc={browserPermissionDescription(browserPermission)}
+                value={browserPermissionLabel(browserPermission)}
+              />
+            )}
             <div className="py-4 first:pt-0 last:pb-0">
               <ToggleRow
                 icon={Moon}
                 label="방해금지 시간"
-                desc={`${DND_START} ~ ${DND_END} 사이에는 이 기기에서만 Push 알림을 무음 처리합니다.`}
+                desc={`${DND_START} ~ ${DND_END} 사이에는 이 기기에서만 Push 알림을 무음 처리해요.`}
                 enabled={dndEnabled}
                 onToggle={handleDndToggle}
               />
@@ -226,13 +245,16 @@ export default function NotificationsPage() {
         </section>
 
         <section className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-4 space-y-2 dark:border-gray-700 dark:bg-gray-900/50">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-            현재 지원하지 않는 범위
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+              준비 중인 기능
+            </h3>
+            <span className="rounded-md bg-gray-200 px-1.5 py-0.5 text-2xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+              준비 중
+            </span>
+          </div>
           <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
-            이메일 알림, 마케팅 수신, 전체 마스터 토글은 아직 서버 저장 계약이
-            없습니다. 이번 라운드에서는 계정 동기화가 가능한 category 설정만
-            노출합니다.
+            이메일 알림, 마케팅 수신 동의, 전체 알림 일괄 끄기는 곧 지원될 예정이에요.
           </p>
         </section>
         <div className="h-24" />
@@ -426,12 +448,12 @@ function browserPermissionLabel(permission: BrowserPermissionState): string {
 function browserPermissionDescription(permission: BrowserPermissionState): string {
   switch (permission) {
     case 'granted':
-      return '이 브라우저에서 Push 표시 권한이 허용되어 있습니다.';
+      return '이 브라우저에서 Push 표시 권한이 허용되어 있어요.';
     case 'denied':
-      return '브라우저 설정에서 Push 차단을 해제해야 알림을 받을 수 있습니다.';
+      return '브라우저 설정에서 Push 차단을 해제해야 알림을 받을 수 있어요.';
     case 'default':
-      return '아직 브라우저 권한이 결정되지 않았습니다.';
+      return '아직 브라우저 권한이 결정되지 않았어요.';
     default:
-      return '현재 브라우저는 Push 권한 상태를 제공하지 않습니다.';
+      return '현재 브라우저는 Push 권한 상태를 제공하지 않아요.';
   }
 }

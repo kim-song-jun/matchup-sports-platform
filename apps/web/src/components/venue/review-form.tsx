@@ -116,7 +116,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
 
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-5">리뷰 작성</h3>
+      <h3 className="text-base font-bold text-gray-900 dark:text-white mb-5">리뷰 작성</h3>
 
       {/* Overall Rating - large */}
       <div className="mb-6 text-center">

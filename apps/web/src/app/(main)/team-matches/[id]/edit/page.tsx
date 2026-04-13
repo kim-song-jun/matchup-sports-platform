@@ -191,7 +191,7 @@ export default function EditTeamMatchPage() {
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white truncate flex-1">모집글 수정</h1>
       </MobileGlassHeader>
 
       {/* Desktop breadcrumb */}
@@ -520,7 +520,7 @@ export default function EditTeamMatchPage() {
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mb-4">
             <AlertTriangle size={24} className="text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">모집글을 취소하시겠어요?</h3>
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">모집글을 취소하시겠어요?</h3>
           <p className="text-base text-gray-500 dark:text-gray-400 mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
           <div className="mt-6 flex gap-3 w-full">
             <button

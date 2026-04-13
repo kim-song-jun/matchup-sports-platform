@@ -106,7 +106,7 @@ export default function CreateListingPage() {
           <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gray-100 text-gray-500 mb-4">
             <ShoppingBag size={28} />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매물을 등록해보세요</h2>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">매물을 등록해보세요</h2>
           <p className="text-base text-gray-500 mt-2">로그인하면 장비를 등록하고 거래할 수 있어요</p>
           <Link href="/login" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3.5 text-md font-bold text-white hover:bg-blue-600 transition-colors">
             로그인하고 시작하기

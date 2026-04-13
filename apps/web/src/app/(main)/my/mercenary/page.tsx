@@ -85,10 +85,10 @@ export default function MyMercenaryPage() {
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 용병 모집/신청</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">내 용병 모집/신청</h1>
       </MobileGlassHeader>
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 용병 모집/신청</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 용병 모집/신청</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">내 모집글과 지원 상태를 관리하세요</p>
       </div>
 
@@ -132,10 +132,10 @@ export default function MyMercenaryPage() {
             ) : myPosts.map((post) => (
               <div key={post.id} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:text-gray-300">
+                  <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-300">
                     {sportLabel[post.sportType] ?? post.sportType}
                   </span>
-                  <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     post.status === 'open'
                       ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400'
                       : post.status === 'filled'
@@ -209,10 +209,10 @@ export default function MyMercenaryPage() {
               return (
                 <div key={application.id} className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-semibold text-gray-500 dark:text-gray-300">
+                    <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-300">
                       {sportLabel[application.post.sportType] ?? application.post.sportType}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${statusBadgeClass(application.status)}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(application.status)}`}>
                       {statusLabel[application.status] ?? application.status}
                     </span>
                   </div>

@@ -73,7 +73,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
 
           {/* Top-right: lesson type badge */}
           <div className="absolute top-3 right-3">
-            <span className="text-2xs font-bold text-white bg-gray-900/60 rounded-md px-1.5 py-0.5 leading-none">
+            <span className="text-2xs font-medium text-white bg-gray-900/60 rounded-md px-1.5 py-0.5 leading-none">
               {lessonTypeLabel[lesson.type] || lesson.type}
             </span>
           </div>
@@ -88,16 +88,16 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           {/* Bottom-right: participant fill status */}
           <div className="absolute bottom-3 right-3">
             {isFull ? (
-              <span className="text-2xs font-bold text-white bg-gray-900/70 rounded-md px-2 py-1 leading-none">
+              <span className="text-2xs font-medium text-white bg-gray-900/70 rounded-md px-2 py-0.5 leading-none">
                 마감
               </span>
             ) : isAlmostFull ? (
-              <span className="text-2xs font-bold text-amber-100 bg-amber-600/80 rounded-md px-2 py-1 leading-none">
+              <span className="text-2xs font-medium text-white bg-blue-600/80 rounded-md px-2 py-0.5 leading-none">
                 <Clock size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (
-              <span className="text-2xs font-semibold text-white bg-gray-900/60 rounded-md px-2 py-1 leading-none">
+              <span className="text-2xs font-medium text-white bg-gray-900/60 rounded-md px-2 py-0.5 leading-none">
                 <Users size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
                 {lesson.currentParticipants}/{lesson.maxParticipants}
               </span>

@@ -62,7 +62,7 @@ export default function MyLessonsPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <MobileGlassHeader title="내가 등록한 강좌" showBack />
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내가 등록한 강좌</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내가 등록한 강좌</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">등록한 강좌를 관리하세요</p>
       </div>
 

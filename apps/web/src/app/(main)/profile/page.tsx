@@ -105,7 +105,7 @@ export default function ProfilePage() {
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">
             {t('myAccount')}
           </div>
-          <h1 className="text-2xl font-bold tracking-[-0.03em] text-gray-900 dark:text-white">
+          <h1 className="text-xl font-bold tracking-[-0.03em] text-gray-900 dark:text-white">
             {t('title')}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -221,12 +221,11 @@ export default function ProfilePage() {
       <div className="px-5 @3xl:px-0 py-2 @3xl:mt-4">
         {menuGroups.map((group, gIdx) => (
           <div key={group.label} className={gIdx === 0 ? '' : 'mt-4'}>
-            <p className="px-1 py-1.5 text-2xs font-semibold uppercase tracking-[0.12em] text-gray-400">
+            <p className="px-1 py-1.5 text-xs font-medium tracking-wide text-gray-400">
               {group.label}
             </p>
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
-              {group.items.map((item, idx) => {
-                const isLast = idx === group.items.length - 1;
+            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white divide-y divide-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:divide-gray-800">
+              {group.items.map((item) => {
                 const isLocked = mounted && !isAuthenticated;
                 return (
                   <div
@@ -235,21 +234,21 @@ export default function ProfilePage() {
                   >
                     <Link
                       href={mounted && isAuthenticated ? item.href : '/login'}
-                      className={`flex min-h-[44px] flex-1 items-center gap-3 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}
+                      className="flex min-h-[44px] flex-1 items-center gap-3 py-3"
                       tabIndex={isLocked ? -1 : undefined}
                       aria-hidden={isLocked ? 'true' : undefined}
                     >
-                      <item.icon size={18} className="text-gray-500" />
-                      <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
+                      <item.icon size={18} className="text-gray-400" />
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
                     </Link>
-                    <div className={`flex items-center gap-2 pl-2 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}>
+                    <div className="flex items-center gap-2 pl-2 py-3">
                       {item.quickAction && mounted && isAuthenticated && (
                         <Link
                           href={item.quickAction.href}
                           aria-label={`${item.label} ${item.quickAction.label}`}
-                          className="flex min-h-[44px] items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-500 transition-colors hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50"
+                          className="flex min-h-[44px] items-center gap-0.5 text-xs font-medium text-blue-500 transition-colors hover:text-blue-600"
                         >
-                          <Plus size={12} />
+                          <Plus size={12} aria-hidden="true" />
                           {item.quickAction.label}
                         </Link>
                       )}
@@ -264,7 +263,7 @@ export default function ProfilePage() {
                           aria-hidden="true"
                           className="flex min-h-[44px] min-w-10 items-center justify-end"
                         >
-                          <ChevronRight size={18} className="text-gray-300 dark:text-gray-600" />
+                          <ChevronRight size={16} className="text-gray-300 dark:text-gray-600" />
                         </Link>
                       )}
                     </div>
@@ -282,7 +281,7 @@ export default function ProfilePage() {
         {mounted && isAuthenticated && (
           <button onClick={() => { logout(); router.push('/login'); }} className="flex min-h-[44px] w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
             <LogOut size={20} className="text-gray-500" />
-            <span className="text-md font-medium text-gray-500">{tc('logout')}</span>
+            <span className="text-sm font-medium text-gray-500">{tc('logout')}</span>
           </button>
         )}
       </div>
@@ -352,7 +351,7 @@ function UpcomingSchedule() {
             role="tab"
             aria-selected={view === 'list'}
             onClick={() => setView('list')}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+            className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
             aria-label={t('listView')}
           >
             <List size={15} />
@@ -361,7 +360,7 @@ function UpcomingSchedule() {
             role="tab"
             aria-selected={view === 'calendar'}
             onClick={() => setView('calendar')}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+            className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
             aria-label={t('calendarView')}
           >
             <CalendarDays size={15} />

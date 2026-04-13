@@ -70,17 +70,17 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
 
           <div className="absolute bottom-3 right-3">
             {isFull ? (
-              <span className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-bold leading-none text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+              <span className="rounded-md bg-gray-900/70 px-2 py-0.5 text-2xs font-medium leading-none text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 마감
               </span>
             ) : isAlmostFull ? (
-              <span className="rounded-md bg-amber-600/80 px-2 py-1 text-2xs font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+              <span className="rounded-md bg-blue-600/80 px-2 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 <Clock size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (
               <span
-                className="rounded-md bg-gray-900/70 px-2 py-1 text-2xs font-semibold leading-none text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
+                className="rounded-md bg-gray-900/70 px-2 py-0.5 text-2xs font-medium leading-none text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
                 aria-label={`참가 ${match.currentPlayers}명, 최대 ${match.maxPlayers}명`}
               >
                 <Users size={10} className="mr-0.5 inline -mt-px" aria-hidden="true" />
@@ -91,7 +91,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
         </div>
 
         <div className="space-y-2 px-3.5 py-3">
-          <h3 className="truncate text-[15px] font-semibold leading-snug text-gray-900 dark:text-gray-100">
+          <h3 className="truncate text-md font-semibold leading-snug text-gray-900 dark:text-gray-100">
             {match.title}
           </h3>
 

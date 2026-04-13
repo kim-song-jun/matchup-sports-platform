@@ -234,14 +234,14 @@ export function MatchesPage() {
               placeholder={t('searchPlaceholder')}
               data-testid="match-search-input"
               onChange={(event) => setSearchInput(event.target.value)}
-              className="h-9 rounded-lg py-0 pl-9 pr-10 text-sm"
+              className="h-11 rounded-lg py-0 pl-9 pr-10 text-sm"
             />
             {searchInput && (
               <button
                 type="button"
                 aria-label={t('clearSearch')}
                 onClick={() => setSearchInput('')}
-                className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                className="absolute right-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
               >
                 <X size={13} />
               </button>
@@ -253,7 +253,7 @@ export function MatchesPage() {
             aria-pressed={showFilters}
             data-testid="match-filter-toggle"
             onClick={() => setShowFilters((prev) => !prev)}
-            className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+            className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors ${
               showFilters
                 ? 'bg-blue-500 text-white'
                 : 'border border-gray-200 bg-white text-gray-500 active:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700'
@@ -281,7 +281,7 @@ export function MatchesPage() {
               data-testid={testId}
               aria-pressed={isActive}
               onClick={() => updateFilters({ sport: isActive ? '' : filter.key })}
-              className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -299,7 +299,7 @@ export function MatchesPage() {
           data-testid="match-quick-today"
           aria-pressed={draftFilters.date === today}
           onClick={() => updateFilters({ date: draftFilters.date === today ? '' : today })}
-          className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.date === today
               ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
               : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
@@ -312,7 +312,7 @@ export function MatchesPage() {
           data-testid="match-quick-free"
           aria-pressed={draftFilters.fee === 'free'}
           onClick={() => updateFilters({ fee: draftFilters.fee === 'free' ? 'all' : 'free' })}
-          className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.fee === 'free'
               ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
               : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
@@ -325,7 +325,7 @@ export function MatchesPage() {
           data-testid="match-quick-beginner"
           aria-pressed={draftFilters.level === 'beginner'}
           onClick={() => updateFilters({ level: draftFilters.level === 'beginner' ? 'all' : 'beginner' })}
-          className={`shrink-0 min-h-[36px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.level === 'beginner'
               ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
               : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
@@ -338,7 +338,7 @@ export function MatchesPage() {
           data-testid="match-quick-available"
           aria-pressed={draftFilters.available}
           onClick={() => updateFilters({ available: !draftFilters.available })}
-          className={`inline-flex shrink-0 min-h-[36px] items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+          className={`inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
             draftFilters.available
               ? 'border border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
               : 'border border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600'
@@ -352,7 +352,7 @@ export function MatchesPage() {
             type="button"
             data-testid="match-clear-filters"
             onClick={handleClearFilters}
-            className="inline-flex shrink-0 min-h-[36px] items-center gap-1 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
+            className="inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
           >
             <X size={13} aria-hidden="true" />
             {t('clearFilters')}

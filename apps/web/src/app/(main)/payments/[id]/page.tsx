@@ -103,7 +103,7 @@ export default function PaymentDetailPage() {
           <ChevronRight size={14} />
           <span className="text-gray-700 dark:text-gray-300">상세</span>
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 상세</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">결제 상세</h2>
       </div>
 
       <div className="px-5 @3xl:px-0 max-w-lg mx-auto @3xl:mx-0 space-y-4 mt-4 @3xl:mt-0">
@@ -159,7 +159,7 @@ export default function PaymentDetailPage() {
           <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">연결된 일정</h3>
           <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${source.color}`}>
+              <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${source.color}`}>
                 {source.label}
               </span>
               <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{source.title}</p>
@@ -236,7 +236,7 @@ export default function PaymentDetailPage() {
             {refundPolicy.percentage > 0 ? (
               paymentMode.state === 'unavailable' ? (
                 <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  현재 환경에서는 legacy 실결제 환불을 처리할 수 없습니다. 운영 결제 연동이 복구된 뒤 다시 시도해주세요.
+                  현재 환경에서는 legacy 실결제 환불을 처리할 수 없어요. 운영 결제 연동이 복구된 뒤 다시 시도해주세요.
                 </div>
               ) : (
                 <Link
@@ -250,8 +250,8 @@ export default function PaymentDetailPage() {
             ) : (
               <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
                 {paymentMode.state === 'mock'
-                  ? '현재 정책상 이 테스트 결제는 환불 상태를 변경할 수 없습니다.'
-                  : '현재 정책상 이 결제는 환불할 수 없습니다.'}
+                  ? '현재 정책상 이 테스트 결제는 환불 상태를 변경할 수 없어요.'
+                  : '현재 정책상 이 결제는 환불할 수 없어요.'}
               </div>
             )}
           </div>

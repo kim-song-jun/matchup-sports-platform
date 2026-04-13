@@ -135,7 +135,7 @@ export default function MarketplacePage() {
             type="button"
             aria-pressed={activeListingType === filter.key}
             onClick={() => setActiveListingType(filter.key)}
-            className={`shrink-0 min-h-[36px] rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1 text-sm font-medium transition-colors ${
               activeListingType === filter.key
                 ? 'bg-blue-50 border border-blue-500 text-blue-600 dark:bg-blue-900/30 dark:border-blue-400 dark:text-blue-400'
                 : 'border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'

@@ -46,7 +46,7 @@ export function TrustSignalBanner({
           <Icon size={18} className={config.iconClass} />
         </div>
         <div className="min-w-0">
-          <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold ${config.label}`}>
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${config.label}`}>
             {label}
           </span>
           <p className="mt-2 text-sm font-semibold">{title}</p>

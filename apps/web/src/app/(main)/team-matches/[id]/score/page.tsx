@@ -345,7 +345,7 @@ export default function ScoreInputPage() {
             {isCompleted ? (
               <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-5 mb-8 text-center dark:border-green-900/50 dark:bg-green-950/20">
                 <CheckCircle2 size={30} className="mx-auto text-green-600 dark:text-green-300" />
-                <p className="mt-2 text-lg font-bold text-green-800 dark:text-green-200">저장된 경기 결과입니다</p>
+                <p className="mt-2 text-base font-bold text-green-800 dark:text-green-200">저장된 경기 결과입니다</p>
                 <p className="mt-1 text-sm text-green-700 dark:text-green-200/80">
                   새로고침 후에도 동일한 스코어가 유지됩니다.
                 </p>

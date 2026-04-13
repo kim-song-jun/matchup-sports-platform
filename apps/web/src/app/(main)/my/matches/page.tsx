@@ -59,7 +59,7 @@ export default function MyMatchesPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <MobileGlassHeader title="매치 히스토리" showBack />
       <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">매치 히스토리</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">매치 히스토리</h2>
         <p className="mt-1 text-sm text-gray-500">참가한 매치와 개설 매치를 확인하세요</p>
       </div>
 
@@ -134,10 +134,10 @@ export default function MyMatchesPage() {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                        <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500">
                           {sportLabel[match.sportType]}
                         </span>
-                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.style}`}>
                           {st.text}
                         </span>
                       </div>

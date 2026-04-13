@@ -28,7 +28,7 @@ export default function ReviewsPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <MobileGlassHeader title="내 평가" subtitle="매치가 끝나면 함께한 선수들을 평가해주세요." showBack />
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 평가</h1>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 평가</h1>
         <p className="text-sm text-gray-500 mt-1">매치가 끝나면 함께한 선수들을 평가해주세요</p>
       </div>
 

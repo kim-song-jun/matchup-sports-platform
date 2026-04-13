@@ -129,7 +129,7 @@
     "filteredResults": "조건 반영됨",
     "clearFilters": "필터 초기화",
     "noSearchResultsWithFilters": "필터를 조금 덜어내면 더 많은 매치를 볼 수 있어요",
-    "todayOnly": "오늘 경기",
+    "todayOnly": "오늘 매치",
     "freeOnly": "무료",
     "availableOnly": "자리 있음",
     "beginnerFriendly": "초보 환영",
@@ -242,7 +242,7 @@
     "listView": "리스트 보기",
     "calendarView": "캘린더 보기",
     "findMatch": "매치 찾기",
-    "findMatchLink": "매칭 찾기",
+    "findMatchLink": "매치 찾기",
     "viewAll": "전체 보기",
     "matchCount": "{count}매치"
   },

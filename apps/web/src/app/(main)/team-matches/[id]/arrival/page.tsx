@@ -208,9 +208,9 @@ export default function ArrivalCheckPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm text-blue-500 font-semibold">TEAM MATCH</p>
-              <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{match.title}</h2>
+              <h2 className="mt-1 text-base font-bold text-gray-900 dark:text-white">{match.title}</h2>
             </div>
-            <span className={`rounded-full px-2.5 py-1 text-2xs font-medium ${statusMeta?.className ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta?.className ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
               {statusMeta?.label ?? match.status}
             </span>
           </div>
@@ -306,7 +306,7 @@ export default function ArrivalCheckPage() {
               ) : (
                 <>
                   <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    현장에 도착했다면 현재 참여 팀 기준으로 도착 시각을 저장합니다.
+                    현장에 도착했다면 현재 참여 팀 기준으로 도착 시각을 저장해요.
                   </p>
                   <button
                     onClick={handleCheckIn}
@@ -364,7 +364,7 @@ export default function ArrivalCheckPage() {
             <div>
               <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">현재 지원 범위</p>
               <p className="mt-1 text-sm text-blue-800/90 dark:text-blue-200/80">
-                이번 단계에서는 도착 시각만 서버에 저장합니다. GPS 반경 판정, 현장 사진 업로드, 상대 팀 지각/노쇼 판정은 아직 연결되지 않아 이 화면에서 제공하지 않습니다.
+                이번 단계에서는 도착 시각만 서버에 저장해요. GPS 반경 판정, 현장 사진 업로드, 상대 팀 지각/노쇼 판정은 아직 연결되지 않아 이 화면에서 제공하지 않아요.
               </p>
             </div>
           </div>

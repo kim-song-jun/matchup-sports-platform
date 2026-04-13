@@ -139,7 +139,7 @@ export default function FeedPage() {
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <header className="px-5 pb-3 pt-4 @3xl:px-0">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{t('title')}</h1>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{t('title')}</h1>
       </header>
 
       <div className="px-5 mt-4 @3xl:px-0">

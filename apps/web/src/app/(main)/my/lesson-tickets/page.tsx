@@ -120,7 +120,7 @@ export default function MyLessonTicketsPage() {
       <MobileGlassHeader title="내 수강권" showBack />
 
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 수강권</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 수강권</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           결제 완료된 수강권만 실제 데이터 기준으로 보여드려요
         </p>
@@ -206,18 +206,18 @@ export default function MyLessonTicketsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         {isHighlighted ? (
-                          <span className="rounded-full bg-blue-500 px-2.5 py-1 text-2xs font-semibold text-white">
+                          <span className="rounded-md bg-blue-500 px-1.5 py-0.5 text-2xs font-medium text-white">
                             방금 등록됨
                           </span>
                         ) : null}
-                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-2xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-2xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                           {ticketTypeLabel[plan?.type ?? 'single'] ?? '수강권'}
                         </span>
-                        <span className={`rounded-full px-2.5 py-1 text-2xs font-semibold ${status.className}`}>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>
                           {status.label}
                         </span>
                         {lesson?.sportType ? (
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-2xs font-semibold text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                          <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-2xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
                             {sportLabel[lesson.sportType] ?? lesson.sportType}
                           </span>
                         ) : null}
@@ -230,7 +230,7 @@ export default function MyLessonTicketsPage() {
                     <div className="mt-3">
                       <Link
                         href={lesson ? `/lessons/${lesson.id}` : '/lessons'}
-                        className="inline-flex items-center gap-1 text-lg font-bold text-gray-900 transition-colors hover:text-blue-500 dark:text-white"
+                        className="inline-flex items-center gap-1 text-base font-bold text-gray-900 transition-colors hover:text-blue-500 dark:text-white"
                       >
                         {lesson?.title ?? '연결된 강좌 정보 없음'}
                         <ChevronRight size={16} />

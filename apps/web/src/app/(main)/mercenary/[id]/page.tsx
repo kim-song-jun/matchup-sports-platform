@@ -203,7 +203,7 @@ export default function MercenaryDetailPage() {
 
         <div className="flex items-center gap-2 mt-4 mb-2">
           <span
-            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${accent?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${accent?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}
           >
             {sportLabel[post.sportType] ?? post.sportType}
           </span>
@@ -219,7 +219,7 @@ export default function MercenaryDetailPage() {
           </span>
         </div>
 
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-1">
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white mb-1">
           {post.team?.name ?? '—'}
         </h1>
 
@@ -308,7 +308,7 @@ export default function MercenaryDetailPage() {
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
                           {application.user?.nickname ?? '지원자'}
                         </p>
-                        <span className={`rounded-full px-2 py-0.5 text-2xs font-semibold ${statusBadgeClass(application.status)}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(application.status)}`}>
                           {applicationStatusLabel[application.status] ?? application.status}
                         </span>
                       </div>
@@ -346,7 +346,7 @@ export default function MercenaryDetailPage() {
         {myApplicationStatus && !canManageApplications && (
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
             <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">내 신청 상태</h2>
-            <span className={`inline-flex rounded-full px-2 py-0.5 text-2xs font-semibold ${statusBadgeClass(myApplicationStatus)}`}>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(myApplicationStatus)}`}>
               {applicationStatusLabel[myApplicationStatus] ?? myApplicationStatus}
             </span>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">호스트의 승인/거절 결과가 여기에 반영됩니다.</p>
@@ -354,7 +354,10 @@ export default function MercenaryDetailPage() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      {/* Spacer so scroll content clears the fixed CTA on mobile */}
+      <div className="h-32 @3xl:hidden" />
+
+      <div className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] @3xl:bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 @3xl:relative @3xl:border-0 @3xl:px-0 @3xl:mt-4 @3xl:pb-4 max-w-lg @3xl:mx-0">
         {canEdit ? (
           <div className="flex gap-3">
             <Link
@@ -406,7 +409,7 @@ export default function MercenaryDetailPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
         </div>
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">
           모집글을 삭제하시겠어요?
         </h3>
         <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">
@@ -428,7 +431,6 @@ export default function MercenaryDetailPage() {
           </button>
         </div>
       </Modal>
-      <div className="h-24" />
     </div>
   );
 }

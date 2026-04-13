@@ -89,7 +89,7 @@ export default function MyListingsPage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
       <MobileGlassHeader title="내 장터 매물" showBack />
       <div className="hidden @3xl:block mb-4 px-5 @3xl:px-0 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 장터 매물</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 장터 매물</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">등록한 매물을 관리하세요</p>
       </div>
 
@@ -117,8 +117,8 @@ export default function MyListingsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`rounded-md px-2 py-0.5 text-2xs font-semibold ${st.style}`}>{st.text}</span>
-                      <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">{conditionLabel[listing.condition]}</span>
+                      <span className={`rounded-md px-1.5 py-0.5 text-2xs font-medium ${st.style}`}>{st.text}</span>
+                      <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-2xs font-medium text-gray-500 dark:text-gray-400">{conditionLabel[listing.condition]}</span>
                     </div>
                     <Link href={`/marketplace/${listing.id}`}>
                       <h3 className="text-sm font-semibold text-gray-900 transition-colors hover:text-blue-500 truncate dark:text-white">{listing.title}</h3>
@@ -184,7 +184,7 @@ export default function MyListingsPage() {
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mb-4">
             <AlertTriangle size={24} className="text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
           <p className="text-base text-gray-500 dark:text-gray-400 mt-2">삭제된 매물은 복구할 수 없습니다.</p>
           <div className="mt-6 flex gap-3 w-full">
             <button

@@ -290,7 +290,7 @@ export default function ChatRoomEmbed({
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <span className="text-lg font-bold text-gray-900 dark:text-white truncate block">
+            <span className="text-base font-bold text-gray-900 dark:text-white truncate block">
               {room?.name ?? '채팅방'}
             </span>
           </div>
@@ -440,7 +440,7 @@ export default function ChatRoomEmbed({
       {/* Quick Actions */}
       <div className="shrink-0 px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <span className="shrink-0 text-2xs font-semibold text-gray-400 dark:text-gray-500">빠른 메시지</span>
+          <span className="shrink-0 text-xs font-medium text-gray-400 dark:text-gray-500">빠른 메시지</span>
           {QUICK_ACTIONS.map((action) => (
             <button
               key={action.label}

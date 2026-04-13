@@ -20,7 +20,6 @@ import {
   Star,
   Ticket,
   Trophy,
-  Users,
 } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { Card } from '@/components/ui/card';
@@ -28,6 +27,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { MapPlaceholder } from '@/components/ui/map-placeholder';
 import { ReviewForm, type ReviewData } from '@/components/venue/review-form';
+import { SportIconMap } from '@/components/icons/sport-icons';
 
 const MediaLightbox = dynamic(
   () => import('@/components/ui/media-lightbox').then((m) => ({ default: m.MediaLightbox })),
@@ -48,36 +48,6 @@ const dayLabels: Record<string, string> = {
 
 const facilityTagColor = 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600';
 
-// Mock upcoming matches fallback — replace when venue-specific match API is available
-const mockUpcomingMatches = [
-  {
-    id: 'tm-101',
-    title: '서울 FC vs 강남 유나이티드',
-    matchDate: '2026-03-22',
-    startTime: '14:00',
-    homeTeam: '서울 FC',
-    awayTeam: '강남 유나이티드',
-    status: 'recruiting',
-  },
-  {
-    id: 'tm-102',
-    title: '성동 킥커스 vs TBD',
-    matchDate: '2026-03-23',
-    startTime: '10:00',
-    homeTeam: '성동 킥커스',
-    awayTeam: null,
-    status: 'recruiting',
-  },
-  {
-    id: 'tm-103',
-    title: '뚝섬 FC vs 왕십리 풋살',
-    matchDate: '2026-03-29',
-    startTime: '18:00',
-    homeTeam: '뚝섬 FC',
-    awayTeam: '왕십리 풋살',
-    status: 'matched',
-  },
-];
 
 type HubSection = 'overview' | 'goods' | 'passes' | 'events';
 
@@ -91,6 +61,7 @@ export default function VenueDetailPage() {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
 
   const { data: venue, isLoading, isError, refetch } = useVenue(venueId);
   const { data: hubData } = useVenueHub(venueId);
@@ -206,17 +177,32 @@ export default function VenueDetailPage() {
         <div className="px-5 @3xl:px-0">
           {/* Hero image */}
           <Card padding="none" className="overflow-hidden">
-            <button type="button" onClick={() => setShowMediaLightbox(true)} className="relative h-[220px] w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
-              <SafeImage src={heroImage} fallbackSrc={fallbackImages[0]} alt={venue.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 60vw" />
+            <button type="button" onClick={() => setShowMediaLightbox(true)} aria-label="이미지 전체 보기" className="relative h-[220px] w-full overflow-hidden bg-gray-100 dark:bg-gray-700">
+              {heroImageFailed ? (
+                <VenueHeroFallback sportType={venueSport} />
+              ) : (
+                <SafeImage
+                  src={heroImage}
+                  fallbackSrc={fallbackImages[0]}
+                  alt={venue.name}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  onError={() => setHeroImageFailed(true)}
+                />
+              )}
             </button>
             <div className="p-5">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{venue.name}</h2>
+                <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{venue.name}</h2>
                 {venueReviewCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-sm text-amber-500">
+                  <span
+                    className="inline-flex items-center gap-1 text-sm text-amber-500"
+                    aria-label={`별점 ${venueRating.toFixed(1)}점, 리뷰 ${venueReviewCount}건`}
+                  >
                     <Star size={12} fill="currentColor" aria-hidden="true" />
-                    {venueRating.toFixed(1)}
-                    <span className="text-gray-400 dark:text-gray-500">({venueReviewCount})</span>
+                    <span aria-hidden="true">{venueRating.toFixed(1)}</span>
+                    <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">({venueReviewCount})</span>
                   </span>
                 )}
               </div>
@@ -447,47 +433,12 @@ export default function VenueDetailPage() {
                 <Trophy size={16} className="text-blue-500" aria-hidden="true" />
                 이 구장 예정 경기
               </h3>
-              {mockUpcomingMatches.length > 0 ? (
-                <div className="space-y-2">
-                  {mockUpcomingMatches.map((match) => {
-                    const statusLabel = match.status === 'matched' ? '매칭완료' : '모집중';
-                    const statusColor = match.status === 'matched' ? 'text-green-600 dark:text-green-400' : 'text-blue-500';
-                    return (
-                      <Link
-                        key={match.id}
-                        href={`/team-matches/${match.id}`}
-                        className="block rounded-xl bg-gray-50 dark:bg-gray-800 p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1">
-                            {match.title}
-                          </p>
-                          <span className={`shrink-0 text-2xs font-semibold ${statusColor}`}>
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                          <Calendar size={12} className="shrink-0" aria-hidden="true" />
-                          <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          <Users size={12} className="shrink-0" aria-hidden="true" />
-                          <span>{match.homeTeam}</span>
-                          <span className="text-gray-300 dark:text-gray-600">vs</span>
-                          <span>{match.awayTeam ?? '상대팀 모집중'}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={Calendar}
-                  title="예정된 경기가 없어요"
-                  description="이 시설에서 매치를 만들어보세요"
-                  size="sm"
-                />
-              )}
+              <EmptyState
+                icon={Calendar}
+                title="예정 경기 준비 중이에요"
+                description="곧 예정 경기를 확인할 수 있어요"
+                size="sm"
+              />
               <Link
                 href="/team-matches/new"
                 className="block w-full text-center rounded-xl bg-blue-500 py-3 text-sm font-bold text-white hover:bg-blue-600 transition-colors mt-3"
@@ -546,11 +497,21 @@ export default function VenueDetailPage() {
   );
 }
 
+function VenueHeroFallback({ sportType }: { sportType: string }) {
+  const Icon = SportIconMap[sportType];
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-700">
+      {Icon && <Icon size={48} className="text-gray-400 dark:text-gray-500" aria-hidden="true" />}
+    </div>
+  );
+}
+
 function HubSectionTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
         active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
       }`}

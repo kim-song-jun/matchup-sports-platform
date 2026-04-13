@@ -82,7 +82,7 @@ export default function MyTeamMatchesPage() {
       <MobileGlassHeader title="내 팀 매칭" showBack />
       <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-4 px-5 @3xl:px-0 pt-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀 매칭</h2>
+          <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">내 팀 매칭</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">팀 매칭 모집 및 신청 현황을 관리하세요</p>
         </div>
         {activeTab === 'hosted' && (
@@ -139,10 +139,10 @@ export default function MyTeamMatchesPage() {
               return (
                 <div key={post.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
                       {sportLabel[post.sportType]}
                     </span>
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.style}`}>
                       {st.text}
                     </span>
                     <span className="text-xs text-gray-500 ml-auto">{post.teamName}</span>
@@ -225,7 +225,7 @@ export default function MyTeamMatchesPage() {
                 <Link key={app.id} href={`/team-matches/${tm.id}`} className="block">
                   <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 dark:hover:border-gray-600 transition-colors active:scale-[0.995]">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusConf.style}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConf.style}`}>
                         {statusConf.label}
                       </span>
                       {tm.hostTeam && (
@@ -276,7 +276,7 @@ export default function MyTeamMatchesPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500 dark:text-red-400" aria-hidden="true" />
         </div>
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
         <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
         <div className="mt-6 flex gap-3">
           <button

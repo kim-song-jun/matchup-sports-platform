@@ -11,7 +11,7 @@ export default function SettingsPage() {
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">
           환경
         </p>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">설정</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">설정</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">계정과 화면 환경을 가볍게 정리하세요.</p>
       </div>
 
@@ -73,7 +73,7 @@ export default function SettingsPage() {
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-4">
-      <h3 className="mb-1.5 px-1 text-2xs font-semibold uppercase tracking-[0.12em] text-gray-400">{title}</h3>
+      <h3 className="mb-1.5 px-1 text-xs font-medium tracking-wide text-gray-400">{title}</h3>
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white divide-y divide-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:divide-gray-700">
         {children}
       </div>

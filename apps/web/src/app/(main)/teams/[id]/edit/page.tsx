@@ -286,7 +286,7 @@ export default function EditTeamPage() {
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
             <AlertTriangle size={20} className="text-red-500" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">팀을 삭제할까요?</h3>
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">팀을 삭제할까요?</h3>
           <p className="mt-2 text-sm text-gray-500">삭제하면 되돌릴 수 없습니다.</p>
           <div className="mt-5 flex w-full gap-3">
             <button onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200">

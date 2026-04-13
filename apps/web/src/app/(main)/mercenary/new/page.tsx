@@ -129,7 +129,7 @@ export default function NewMercenaryPage() {
         <EmptyState
           icon={Users}
           title="팀을 먼저 만들어주세요"
-          description="용병 모집은 소속된 팀이 있어야 가능합니다"
+          description="용병 모집은 소속된 팀이 있어야 가능해요"
           action={{ label: '팀 만들기', href: '/teams/new' }}
         />
       </div>
@@ -187,10 +187,10 @@ export default function NewMercenaryPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{selectedTeam.name}</p>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                    종목은 팀 정보 기준으로 자동 고정됩니다.
+                    종목은 팀 정보 기준으로 자동 고정돼요.
                   </p>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${selectedAccent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${selectedAccent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
                       {sportLabel[selectedTeam.sportType] ?? selectedTeam.sportType}
                     </span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">

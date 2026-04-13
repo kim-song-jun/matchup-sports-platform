@@ -53,7 +53,7 @@ export default function PaymentsPage() {
       <MobileGlassHeader title="결제 내역" showBack />
 
       <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 pb-3">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">결제 내역</h1>
+        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">결제 내역</h1>
         <p className="text-xs text-gray-500 mt-0.5">실제 결제와 환불 상태를 확인하세요</p>
       </div>
 
@@ -131,7 +131,7 @@ export default function PaymentsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{source.title}</p>
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold ${status.bgColor} ${status.color}`}>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.bgColor} ${status.color}`}>
                             {status.label}
                           </span>
                         </div>

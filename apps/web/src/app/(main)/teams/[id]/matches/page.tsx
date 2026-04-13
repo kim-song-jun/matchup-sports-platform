@@ -55,7 +55,7 @@ export default function TeamMatchesPage() {
           <span>/</span>
           <span className="text-gray-700">경기 기록</span>
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">경기 기록</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">경기 기록</h2>
       </div>
 
       <div className="px-5 @3xl:px-0">
@@ -83,10 +83,10 @@ export default function TeamMatchesPage() {
                   <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.99]">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[match.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${sportCardAccent[match.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                           {sportLabel[match.sportType] || match.sportType}
                         </span>
-                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.style}`}>
                           {st.text}
                         </span>
                       </div>

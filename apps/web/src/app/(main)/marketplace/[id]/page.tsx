@@ -211,15 +211,15 @@ export default function ListingDetailPage() {
           {/* Title + price */}
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`rounded-full px-2 py-0.5 text-2xs font-normal ${conditionColor[listing.condition]}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${conditionColor[listing.condition]}`}>
                 {conditionLabel[listing.condition]}
               </span>
               <span className="text-xs text-gray-500">{sportLabel[listing.sportType]}</span>
               {listing.listingType === 'rent' && (
-                <span className="rounded-full px-2 py-0.5 text-2xs font-normal bg-blue-50 text-blue-600">대여</span>
+                <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600">대여</span>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{listing.title}</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{listing.title}</h1>
             <p className="text-2xl font-black text-gray-900 dark:text-white mt-2">{formatAmount(listing.price)}</p>
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
               <span className="flex items-center gap-1"><Eye size={14} />{listing.viewCount}</span>
@@ -282,7 +282,7 @@ export default function ListingDetailPage() {
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">안전거래 안내</p>
-                <p className="text-xs text-gray-500 mt-0.5">실제 안전결제는 아직 준비 중이며, 현재는 채팅 기반 거래만 지원합니다.</p>
+                <p className="text-xs text-gray-500 mt-0.5">실제 안전결제는 아직 준비 중이며, 현재는 채팅 기반 거래만 지원해요.</p>
               </div>
             </div>
           </div>
@@ -333,8 +333,8 @@ export default function ListingDetailPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500" />
         </div>
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-        <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
+        <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없어요.</p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => setShowDeleteConfirm(false)}

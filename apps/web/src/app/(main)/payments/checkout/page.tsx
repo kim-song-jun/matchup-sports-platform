@@ -126,7 +126,7 @@ export default function CheckoutPage() {
       <MobileGlassHeader title={isMockMode ? '테스트 결제' : '결제하기'} showBack compact />
 
       <div className="hidden @3xl:block mb-6">
-        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
+        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">{isMockMode ? '테스트 결제' : '결제하기'}</h2>
         <p className="text-xs text-gray-500 mt-1">
           {isMockMode
             ? '현재 환경에서는 결제 시뮬레이션만 기록되고 실제 청구는 발생하지 않습니다'
@@ -157,7 +157,7 @@ export default function CheckoutPage() {
           <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">주문 정보</h3>
           <div className="space-y-3">
             <div>
-              <span className="inline-block rounded-full px-2 py-0.5 text-2xs font-normal bg-blue-50 text-blue-500 mb-1">
+              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-500 mb-1">
                 {source === 'match' ? '매치' : source === 'lesson' ? '강좌' : '미지원'}
               </span>
               <p className="text-md font-semibold text-gray-900 dark:text-gray-100">{name || '미지원 주문'}</p>

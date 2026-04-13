@@ -174,7 +174,7 @@ export default function NewTeamMatchPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 mx-auto mb-4">
             <Users size={28} className="text-gray-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">팀을 먼저 만들어주세요</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">팀을 먼저 만들어주세요</h2>
           <p className="text-sm text-gray-500 mt-2">팀 매칭 모집글을 작성하려면 소속 팀이 필요해요</p>
           <Link href="/teams/new" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
             팀 만들기

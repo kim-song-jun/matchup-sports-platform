@@ -180,7 +180,7 @@ export default function EditMercenaryPage() {
               <p className="text-sm font-semibold text-gray-900 dark:text-white">{post.team?.name ?? '소속 팀'}</p>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">종목은 팀 정보 기준으로 고정됩니다.</p>
             </div>
-            <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${accent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${accent?.badge ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
               {sportLabel[post.sportType] ?? post.sportType}
             </span>
           </div>
@@ -321,7 +321,7 @@ export default function EditMercenaryPage() {
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
           <AlertTriangle size={24} className="text-red-500" />
         </div>
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
         <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
         <div className="mt-6 flex gap-3">
           <button

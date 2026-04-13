@@ -73,7 +73,7 @@ export default function LandingPage() {
                 내 수준에 딱 맞는
                 <br />
                 운동 메이트를{' '}
-                <span className="text-blue-500">AI가 찾아드려요</span>
+                <span className="text-blue-500 whitespace-nowrap">AI가 찾아드려요</span>
               </h1>
             </ScrollReveal>
 

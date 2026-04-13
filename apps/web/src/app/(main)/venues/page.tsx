@@ -102,7 +102,7 @@ export default function VenuesPage() {
           <button key={c} onClick={() => setActiveCity(c === '전체' ? '' : c)}
             className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               (activeCity === '' && c === '전체') || activeCity === c
-                ? 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-900'
+                ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}>
             {c}

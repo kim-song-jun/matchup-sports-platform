@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity, Info, HelpCircle, FileText, Shield } from 'lucide-react';
+import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity, Info, HelpCircle, FileText, Shield, Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
@@ -38,7 +38,7 @@ export default function ProfilePage() {
 
   const menuGroups: MenuGroup[] = [
     {
-      label: '매칭',
+      label: t('menuGroupMatching'),
       items: [
         { label: t('matchHistory'), icon: History, href: '/my/matches?tab=history' },
         { label: t('myMatches'), icon: Swords, href: '/my/matches?tab=created' },
@@ -46,22 +46,22 @@ export default function ProfilePage() {
       ],
     },
     {
-      label: '팀 & 용병',
+      label: t('menuGroupTeamMercenary'),
       items: [
         { label: t('myTeams'), icon: Users, href: '/my/teams' },
-        { label: t('myMercenary'), icon: UserCheck, href: '/my/mercenary', quickAction: { href: '/mercenary/new', label: '등록' } },
+        { label: t('myMercenary'), icon: UserCheck, href: '/my/mercenary', quickAction: { href: '/mercenary/new', label: tc('create') } },
       ],
     },
     {
-      label: '강좌 & 장터',
+      label: t('menuGroupLessonMarket'),
       items: [
         { label: t('myLessons'), icon: BookOpen, href: '/my/lessons' },
-        { label: '내 수강권', icon: Ticket, href: '/my/lesson-tickets' },
+        { label: t('myLessonTickets'), icon: Ticket, href: '/my/lesson-tickets' },
         { label: t('myListings'), icon: ShoppingBag, href: '/my/listings' },
       ],
     },
     {
-      label: '평가 & 결제',
+      label: t('menuGroupReviewPayment'),
       items: [
         { label: t('myReviews'), icon: Star, href: '/reviews' },
         { label: t('receivedReviews'), icon: MessageSquare, href: '/my/reviews-received' },
@@ -69,19 +69,19 @@ export default function ProfilePage() {
       ],
     },
     {
-      label: '활동 & 기록',
+      label: t('menuGroupActivityLog'),
       items: [
-        { label: '내 뱃지', icon: Award, href: '/badges' },
-        { label: '활동 피드', icon: Activity, href: '/feed' },
+        { label: t('myBadges'), icon: Award, href: '/badges' },
+        { label: t('activityFeed'), icon: Activity, href: '/feed' },
       ],
     },
     {
-      label: '서비스',
+      label: t('menuGroupService'),
       items: [
-        { label: '소개', icon: Info, href: '/about' },
-        { label: 'FAQ', icon: HelpCircle, href: '/faq' },
-        { label: '이용약관', icon: FileText, href: '/settings/terms' },
-        { label: '개인정보', icon: Shield, href: '/settings/privacy' },
+        { label: t('about'), icon: Info, href: '/about' },
+        { label: t('faq'), icon: HelpCircle, href: '/faq' },
+        { label: t('terms'), icon: FileText, href: '/settings/terms' },
+        { label: t('privacy'), icon: Shield, href: '/settings/privacy' },
       ],
     },
   ];
@@ -90,7 +90,7 @@ export default function ProfilePage() {
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
       <MobileGlassHeader
         title={t('title')}
-        subtitle="기록, 일정, 알림을 한 곳에서 정리하세요."
+        subtitle={t('subtitle')}
         actions={(
           <Link
             href="/settings"
@@ -105,13 +105,13 @@ export default function ProfilePage() {
       <div className="mb-6 hidden items-start justify-between gap-4 @3xl:flex">
         <div className="min-w-0">
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-blue-500">
-            내 계정
+            {t('myAccount')}
           </div>
           <h1 className="text-2xl font-bold tracking-[-0.03em] text-gray-900 dark:text-white">
             {t('title')}
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            기록, 일정, 알림을 한 곳에서 정리하세요.
+            {t('subtitle')}
           </p>
         </div>
         <Link href="/settings" className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
@@ -188,7 +188,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="px-3 py-3 text-center">
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
-                  <p className="mt-1 text-xs text-gray-500">종목</p>
+                  <p className="mt-1 text-xs text-gray-500">{t('sports')}</p>
                 </div>
               </div>
             </div>
@@ -229,14 +229,17 @@ export default function ProfilePage() {
             <div className="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
               {group.items.map((item, idx) => {
                 const isLast = idx === group.items.length - 1;
+                const isLocked = mounted && !isAuthenticated;
                 return (
                   <div
                     key={item.label}
-                    className="flex items-center justify-between px-3.5 transition-[colors,transform] hover:bg-gray-50 dark:hover:bg-gray-700/70 active:scale-[0.98]"
+                    className={`flex items-center justify-between px-3.5 transition-[colors,transform] hover:bg-gray-50 dark:hover:bg-gray-700/70 active:scale-[0.98] ${isLocked ? 'opacity-40 pointer-events-none' : ''}`}
                   >
                     <Link
                       href={mounted && isAuthenticated ? item.href : '/login'}
                       className={`flex min-h-[44px] flex-1 items-center gap-3 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}
+                      tabIndex={isLocked ? -1 : undefined}
+                      aria-hidden={isLocked ? 'true' : undefined}
                     >
                       <item.icon size={18} className="text-gray-500" />
                       <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
@@ -252,14 +255,20 @@ export default function ProfilePage() {
                           {item.quickAction.label}
                         </Link>
                       )}
-                      <Link
-                        href={mounted && isAuthenticated ? item.href : '/login'}
-                        tabIndex={-1}
-                        aria-hidden="true"
-                        className="flex min-h-[44px] min-w-10 items-center justify-end"
-                      >
-                        <ChevronRight size={18} className="text-gray-300 dark:text-gray-600" />
-                      </Link>
+                      {isLocked ? (
+                        <span className="flex min-h-[44px] min-w-10 items-center justify-end">
+                          <Lock size={14} className="text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        </span>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          className="flex min-h-[44px] min-w-10 items-center justify-end"
+                        >
+                          <ChevronRight size={18} className="text-gray-300 dark:text-gray-600" />
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );
@@ -337,7 +346,7 @@ function UpcomingSchedule() {
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">다가오는 매치와 일정을 빠르게 확인하세요.</p>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{t('upcomingScheduleDesc')}</p>
           </div>
           <div className="flex items-center gap-1" role="tablist">
             <button
@@ -358,7 +367,7 @@ function UpcomingSchedule() {
             >
               <CalendarDays size={16} />
             </button>
-            <Link href="/matches" className="ml-2 text-sm font-semibold text-blue-500">매칭 찾기</Link>
+            <Link href="/matches" className="ml-2 text-sm font-semibold text-blue-500">{t('findMatchLink')}</Link>
           </div>
         </div>
 

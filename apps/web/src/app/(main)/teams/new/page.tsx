@@ -8,7 +8,7 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { api } from '@/lib/api';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { extractErrorMessage } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,7 +106,7 @@ export default function CreateTeamPage() {
                 aria-pressed={form.sportType === type}
                 className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   form.sportType === type
-                    ? 'bg-blue-500 text-white'
+                    ? sportCardAccent[type]?.badge || 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-400'
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
@@ -136,6 +136,7 @@ export default function CreateTeamPage() {
               id="team-city"
               value={form.city}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
+              className="min-h-[44px]"
             >
               <option value="">선택</option>
               {cities.map(c => <option key={c} value={c}>{c}</option>)}

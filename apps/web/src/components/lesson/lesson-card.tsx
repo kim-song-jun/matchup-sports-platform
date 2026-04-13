@@ -61,7 +61,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
             sizes="(max-width: 768px) 100vw, 50vw"
           />
           {/* Gradient overlay for readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
           {/* Top-left: sport dot + name */}
           <div className="absolute top-3 left-3.5 flex items-center gap-1.5">
@@ -93,6 +93,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
               </span>
             ) : isAlmostFull ? (
               <span className="text-2xs font-bold text-amber-100 bg-amber-600/80 rounded-md px-2 py-1 leading-none">
+                <Clock size={10} className="inline -mt-px mr-0.5" aria-hidden="true" />
                 {remaining}자리 남음
               </span>
             ) : (

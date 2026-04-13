@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MessageCircle } from 'lucide-react';
+import { Lock, MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -49,7 +49,7 @@ function ChatRoomItem({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate" title={room.name ?? undefined}>
               {room.name}
             </h3>
             {room.lastMessageAt && (
@@ -59,7 +59,7 @@ function ChatRoomItem({
             )}
           </div>
           <div className="flex items-center justify-between mt-1.5">
-            <p className="text-sm text-gray-500 truncate flex-1 mr-2">
+            <p className="text-sm text-gray-500 truncate flex-1 mr-2" title={room.lastMessage ?? undefined}>
               {room.lastMessage ?? '대화를 시작해보세요'}
             </p>
             {(room.unreadCount ?? 0) > 0 && (
@@ -91,7 +91,17 @@ export default function ChatListPage() {
   const selectedRoom = chatRooms.find((r) => r.id === selectedRoomId);
 
   if (!clientAuth) {
-    return null;
+    return (
+      <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in dark:bg-gray-900">
+        <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
+        <EmptyState
+          icon={Lock}
+          title="로그인이 필요해요"
+          description="채팅을 시작하려면 로그인해주세요"
+          action={{ label: '로그인하기', href: '/login?redirect=/chat' }}
+        />
+      </div>
+    );
   }
 
   const emptyState = (
@@ -172,13 +182,15 @@ export default function ChatListPage() {
       </div>
 
       {/* MOBILE: Full-width list */}
-      <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900">
+      <div className="@3xl:hidden pt-[var(--safe-area-top)] animate-fade-in dark:bg-gray-900 flex flex-col min-h-[calc(100dvh-56px-80px)]">
         <MobileGlassHeader title={t('title')} subtitle={t('subtitle')} showBack />
-        <div className="px-5 mt-4">
+        <div className="flex-1 flex flex-col px-5 mt-4">
           {isLoading ? loadingState : isError ? (
             <ErrorState onRetry={refetch} message="채팅방을 불러오지 못했어요" />
           ) : chatRooms.length === 0 ? (
-            emptyState
+            <div className="flex-1 flex items-center justify-center">
+              {emptyState}
+            </div>
           ) : (
             <div className="space-y-3">{roomList(false)}</div>
           )}

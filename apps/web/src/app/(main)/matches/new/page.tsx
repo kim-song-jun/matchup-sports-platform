@@ -9,7 +9,7 @@ import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { sportLabel, levelLabel } from '@/lib/constants';
+import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
 import { getSportImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -109,7 +109,7 @@ export default function CreateMatchPage() {
   };
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 flex flex-col min-h-[calc(100dvh-56px-80px)]">
       <MobileGlassHeader title="매치 만들기" showBack onBack={() => step > 0 ? setStep(step - 1) : router.back()} />
 
       <div className="hidden @3xl:flex items-center gap-2 text-xs text-gray-500 mb-6">
@@ -128,26 +128,32 @@ export default function CreateMatchPage() {
         <p className="text-xs text-gray-500 mt-2">Step {step + 1}. {steps[step]}</p>
       </div>
 
-      <div className="px-5 @3xl:px-0 max-w-lg">
+      <div className="px-5 @3xl:px-0 max-w-lg flex-1 flex flex-col">
         {/* Step 0: Sport */}
         {step === 0 && (
-          <div className="space-y-3 mt-2">
+          <div className="space-y-3 mt-2 flex-1">
             <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
             <div className="flex flex-wrap gap-2">
-              {sportTypes.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
-                  data-testid={`match-sport-${type}`}
-                  className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                    form.sportType === type
-                      ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
-                      : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {sportLabel[type] || type}
-                </button>
-              ))}
+              {sportTypes.map((type) => {
+                const accent = sportCardAccent[type];
+                const isSelected = form.sportType === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
+                    data-testid={`match-sport-${type}`}
+                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                      isSelected
+                        ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
+                        : accent
+                          ? `${accent.badge} hover:opacity-80`
+                          : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {sportLabel[type] || type}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -342,6 +348,9 @@ export default function CreateMatchPage() {
                 <Input id="match-endTime" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
               </FormField>
             </div>
+            {!form.venueId && form.matchDate && (
+              <p className="text-sm text-amber-600 dark:text-amber-400">시설을 선택해주세요</p>
+            )}
             <Button onClick={() => {
                 if (!form.venueId) { toast('error', '현재는 등록된 시설만 선택할 수 있어요'); return; }
                 if (!form.matchDate) { toast('error', '날짜를 선택해주세요'); return; }
@@ -351,6 +360,7 @@ export default function CreateMatchPage() {
                 setStep(3);
               }}
               data-testid="match-create-next-schedule"
+              disabled={!form.venueId || !form.matchDate || !form.startTime}
               fullWidth
               size="lg"
               className="mt-2">

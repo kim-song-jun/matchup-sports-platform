@@ -162,7 +162,7 @@ body {
 .dark .text-teal-600 { color: #2DD4BF !important; }
 .dark .text-green-600 { color: #34C759 !important; }
 .dark .text-amber-600 { color: #FF9500 !important; }
-.dark .text-red-500 { color: #FF3B30 !important; }
+.dark .text-red-500 { color: #FF6369 !important; }
 
 /* Dark hover/focus state overrides */
 .dark .hover\:bg-gray-50:hover { background-color: #22262E !important; }
@@ -312,9 +312,9 @@ button:not(:disabled):active, a:active {
   background: linear-gradient(180deg, #0f1114 0%, #11161f 100%);
 }
 
+/* glass-mobile-surface and glass-mobile-panel: shared glass card/panel style */
 .glass-mobile-surface,
-.glass-mobile-panel,
-.glass-mobile-header {
+.glass-mobile-panel {
   border: 1px solid var(--glass-mobile-border-strong);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.72) 100%),
@@ -325,17 +325,35 @@ button:not(:disabled):active, a:active {
 }
 
 .dark .glass-mobile-surface,
-.dark .glass-mobile-panel,
-.dark .glass-mobile-header {
+.dark .glass-mobile-panel {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%),
     var(--glass-mobile-bg);
 }
 
+/* glass-mobile-header: Toss-style top navbar — translucent blur, edge-to-edge */
+.glass-mobile-header {
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.78) 100%);
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.dark .glass-mobile-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.82) 100%);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
+}
+
 .glass-mobile-nav,
 .floating-bottom-nav {
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.85);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.08),
     0 1px 4px rgba(0, 0, 0, 0.04),
@@ -346,30 +364,12 @@ button:not(:disabled):active, a:active {
 
 .dark .glass-mobile-nav,
 .dark .floating-bottom-nav {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(15, 23, 42, 0.80);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.3),
     0 1px 4px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.glass-mobile-header {
-  border-left: 0;
-  border-right: 0;
-  border-top: 0;
-  border-radius: 0;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(255, 255, 255, 0.94) 100%),
-    var(--glass-mobile-bg);
-}
-
-.dark .glass-mobile-header {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(15, 23, 42, 0.88) 100%),
-    var(--glass-mobile-bg);
 }
 
 .glass-mobile-chip,

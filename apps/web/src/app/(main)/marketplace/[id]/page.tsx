@@ -222,9 +222,9 @@ export default function ListingDetailPage() {
                 <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600">대여</span>
               )}
             </div>
-            <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-snug">{listing.title}</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-snug">{listing.title}</h1>
             <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{formatAmount(listing.price)}</p>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+            <div className="flex items-center gap-3 mt-1.5 text-sm text-gray-400 dark:text-gray-500">
               <span className="flex items-center gap-0.5"><Eye size={12} />{listing.viewCount}</span>
               <span className="flex items-center gap-0.5"><Heart size={12} />{listing.likeCount}</span>
               {listing.locationDistrict && (
@@ -235,7 +235,7 @@ export default function ListingDetailPage() {
 
           {/* Description */}
           <div className="mt-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-            <h3 className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">상품 설명</h3>
+            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-2">상품 설명</h3>
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">{listing.description}</p>
           </div>
 
@@ -257,7 +257,7 @@ export default function ListingDetailPage() {
           {/* Seller */}
           <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
             <div className="flex items-center justify-between mb-2.5">
-              <h3 className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">판매자</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">판매자</h3>
               <button
                 onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
                 className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-red-500 transition-colors"

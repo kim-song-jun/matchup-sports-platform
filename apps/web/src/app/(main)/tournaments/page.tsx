@@ -82,7 +82,7 @@ function TournamentCard({ event }: { event: Tournament }) {
       <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{event.title}</h3>
-          <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs text-gray-600 dark:text-gray-300">
+          <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs text-gray-600 dark:text-gray-300">
             {statusLabel(event.status)}
           </span>
         </div>
@@ -96,7 +96,7 @@ function TournamentCard({ event }: { event: Tournament }) {
           {(event.city || event.district) ? ` · ${[event.city, event.district].filter(Boolean).join(' ')}` : ''}
           {event.venueName ? ` · ${event.venueName}` : ''}
         </p>
-        <div className="mt-2 flex items-center gap-1.5 text-2xs text-gray-500">
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
           {event.team && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">팀: {event.team.name}</span>}
           {event.venue && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">장소: {event.venue.name}</span>}
           {typeof event.entryFee === 'number' && (

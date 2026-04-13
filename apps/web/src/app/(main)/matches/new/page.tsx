@@ -130,7 +130,7 @@ export default function CreateMatchPage() {
         {/* Step 0: Sport */}
         {step === 0 && (
           <div className="space-y-3 mt-2 flex-1">
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
+            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
             <div className="flex flex-wrap gap-2">
               {sportTypes.map((type) => {
                 const accent = sportCardAccent[type];
@@ -159,7 +159,7 @@ export default function CreateMatchPage() {
         {/* Step 1: Match info */}
         {step === 1 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">매치 정보</h3>
+            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">매치 정보</h3>
             <FormField label="매치 제목" required htmlFor="match-title">
               <Input
                 id="match-title"
@@ -308,7 +308,7 @@ export default function CreateMatchPage() {
         {/* Step 2: Venue + Date */}
         {step === 2 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">장소와 시간</h3>
+            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">장소와 시간</h3>
             <FormField label="시설 선택" required>
               {Array.isArray(venues) && venues.length > 0 && (
                 <div className="space-y-2 mb-3">
@@ -370,7 +370,7 @@ export default function CreateMatchPage() {
         {/* Step 3: Confirm */}
         {step === 3 && (
           <div className="space-y-4 mt-2">
-            <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-2">확인</h3>
+            <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">확인</h3>
             <Card variant="subtle" className="space-y-2.5">
               <ConfirmRow label="종목" value={sportLabel[form.sportType] || form.sportType} />
               {(form.venueId || form.customVenue) && (

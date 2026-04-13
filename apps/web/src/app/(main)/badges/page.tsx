@@ -237,7 +237,7 @@ export default function BadgesPage() {
                         {badge.name}
                       </h3>
                       {badge.earned && (
-                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-2xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                        <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
                           획득
                         </span>
                       )}

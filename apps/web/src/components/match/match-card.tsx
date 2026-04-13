@@ -65,7 +65,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
           </div>
 
           <div className="absolute bottom-3 left-3.5">
-            <span className="rounded-md bg-gray-900/70 px-1.5 py-0.5 text-2xs font-medium leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{formatCurrency(match.fee)}</span>
+            <span className="rounded-md bg-gray-900/70 px-2 py-1 text-sm font-bold leading-none text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{formatCurrency(match.fee)}</span>
           </div>
 
           <div className="absolute bottom-3 right-3">

@@ -362,7 +362,7 @@ export function MatchesPage() {
           {activeSummary.map((item) => (
             <span
               key={item}
-              className="rounded-full bg-blue-50 px-3 py-1.5 text-2xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
+              className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
             >
               {item}
             </span>

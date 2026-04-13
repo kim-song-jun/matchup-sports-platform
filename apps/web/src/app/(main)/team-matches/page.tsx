@@ -144,7 +144,7 @@ export default function TeamMatchesPage() {
           <div className="space-y-6">
             {isAuthenticated && myHostTeamIds.size > 0 && (
               <div>
-                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
+                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">내 팀 호스트 모집글</h2>
                 {myTeamMatches.length === 0 ? (
                   <EmptyState
                     icon={Search}
@@ -164,7 +164,7 @@ export default function TeamMatchesPage() {
             )}
             <div>
               {isAuthenticated && myHostTeamIds.size > 0 && (
-                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
+                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">다른 팀 매칭</h2>
               )}
               {otherMatches.length === 0 && isAuthenticated && myHostTeamIds.size > 0 ? (
                 <EmptyState

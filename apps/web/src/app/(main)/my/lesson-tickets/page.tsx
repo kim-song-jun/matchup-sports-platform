@@ -206,18 +206,18 @@ export default function MyLessonTicketsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         {isHighlighted ? (
-                          <span className="rounded-md bg-blue-500 px-1.5 py-0.5 text-2xs font-medium text-white">
+                          <span className="rounded-md bg-blue-500 px-2 py-0.5 text-xs font-medium text-white">
                             방금 등록됨
                           </span>
                         ) : null}
-                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-2xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                           {ticketTypeLabel[plan?.type ?? 'single'] ?? '수강권'}
                         </span>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>
                           {status.label}
                         </span>
                         {lesson?.sportType ? (
-                          <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-2xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                          <span className="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
                             {sportLabel[lesson.sportType] ?? lesson.sportType}
                           </span>
                         ) : null}

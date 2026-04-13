@@ -173,7 +173,7 @@ export default function TeamMatchDetailPage() {
           <div className="space-y-4">
             {/* 기본 정보 카드 */}
             <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 정보</h2>
+              <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 정보</h2>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 shrink-0">
@@ -240,7 +240,7 @@ export default function TeamMatchDetailPage() {
 
             {/* 경기 조건 */}
             <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 조건</h2>
+              <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">경기 조건</h2>
 
               {/* 실력등급 배지 + 무료초청 태그 */}
               <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -318,7 +318,7 @@ export default function TeamMatchDetailPage() {
             {/* 심판 배정 표 */}
             {!match.hasReferee && refereeRows.length > 0 && (
               <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Shield size={16} className="text-blue-500" />
                   심판 배정표
                 </h2>
@@ -346,7 +346,7 @@ export default function TeamMatchDetailPage() {
             {/* 호스트 팀 카드 */}
             {match.hostTeam && (
               <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-                <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">호스트 팀</h2>
+                <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">호스트 팀</h2>
                 <Link
                   href={`/teams/${match.hostTeam.id}`}
                   aria-label="호스트 팀 상세 보기"

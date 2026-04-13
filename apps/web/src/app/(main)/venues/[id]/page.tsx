@@ -240,7 +240,7 @@ export default function VenueDetailPage() {
 
               {/* 기본 정보 — 주소, 운영시간, 요금, 전화번호 */}
               <Card>
-                <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white mb-3">기본 정보</h3>
+                <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">기본 정보</h3>
                 <div className="space-y-3">
                   {/* 주소 */}
                   <div className="flex items-start gap-3">
@@ -312,7 +312,7 @@ export default function VenueDetailPage() {
 
               {/* 시설 정보 */}
               <Card>
-                <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white mb-3">시설 정보</h3>
+                <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">시설 정보</h3>
                 {venueFacilities.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {venueFacilities.map((facility: string) => (
@@ -332,7 +332,7 @@ export default function VenueDetailPage() {
 
               {/* 향후 7일 예약 */}
               <Card>
-                <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
+                <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-2">향후 7일 예약</h3>
                 {schedule.length === 0 ? (
                   <EmptyState icon={CalendarDays} title="예약이 없어요" size="sm" />
                 ) : (
@@ -347,7 +347,7 @@ export default function VenueDetailPage() {
               {/* 리뷰 */}
               <Card>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-md font-bold tracking-tight text-gray-900 dark:text-white">
+                  <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
                     리뷰 ({venueReviewCount})
                   </h3>
                   {venueReviewCount > 0 && (

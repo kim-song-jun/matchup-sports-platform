@@ -550,7 +550,7 @@ export default function NewTeamMatchPage() {
         {step === 4 && (
           <div className="space-y-4 animate-fade-in">
             <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-              <h3 className="text-base font-bold tracking-tight text-gray-900 dark:text-white mb-3">모집글 요약</h3>
+              <h3 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">모집글 요약</h3>
 
               <div className="space-y-3">
                 <SummaryRow label="제목" value={form.title} />

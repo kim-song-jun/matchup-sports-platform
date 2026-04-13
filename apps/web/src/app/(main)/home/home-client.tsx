@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import {
-  Plus, ArrowRight, Calendar, Swords, GraduationCap, UserPlus, MapPin,
+  Plus, ArrowRight, Calendar, UserPlus, MapPin,
   Search, Users, ShoppingBag, ChevronRight, Clock,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -141,78 +141,59 @@ export function HomePage() {
     return () => clearInterval(t);
   }, [bannerPaused, prefersReducedMotion]);
 
-  // Today's date string for hero
-  const todayLabel = useMemo(() => {
-    const d = new Date();
-    return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
-  }, []);
-
   return (
     <div className="pt-[var(--safe-area-top)]">
 
-      {/* ═══ ZONE 1: 헤더 — 큰 인사, 날짜, CTA ═══ */}
-      <header className="px-5 @3xl:px-0 pt-4 pb-2">
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
-        <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight mt-0.5">
-          {mounted && isAuthenticated ? (
-            user ? (
-              user.nickname ? `${user.nickname}님` : '안녕하세요'
-            ) : (
-              <span className="animate-pulse bg-gray-100 dark:bg-gray-700 rounded w-20 h-5 inline-block" />
-            )
-          ) : 'TeamMeet'}
-        </h1>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">{todayLabel}</p>
-        <div className="mt-3">
+      {/* ═══ ZONE 1: 헤더 + CTA (컴팩트 한 줄) ═══ */}
+      <section className="px-5 @3xl:px-0 pt-4 pb-1">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              {mounted && isAuthenticated ? (
+                user ? (
+                  user.nickname ? t('greeting', { nickname: user.nickname }) : '안녕하세요'
+                ) : (
+                  <span className="animate-pulse bg-gray-100 dark:bg-gray-700 rounded w-20 h-5 inline-block" />
+                )
+              ) : 'TeamMeet'}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {mounted && isAuthenticated
+                ? upcoming.length > 0 ? `${t('upcomingSchedule')} ${t('upcomingCount', { count: upcoming.length })}` : t('findMatchToday')
+                : t('findPartner')
+              }
+            </p>
+          </div>
           {canRenderAuthenticated ? (
-            <Link
-              href="/matches/new"
-              className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-600"
-            >
-              <Plus size={16} strokeWidth={2.5} aria-hidden="true" />
+            <Link href="/matches/new" className="flex min-h-[44px] items-center gap-1 rounded-xl bg-blue-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
+              <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
               {t('createMatch')}
-              <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-600"
-            >
+            <Link href="/login" className="flex min-h-[44px] items-center rounded-xl bg-blue-500 px-4 py-2 text-xs font-bold text-white hover:bg-blue-600 transition-colors">
               {tc('login')}
-              <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
             </Link>
           )}
         </div>
-      </header>
+      </section>
 
-      {/* ═══ 빠른 액션 그리드 — 서비스 핵심 기능 2×2 ═══ */}
-      <section className="mt-10 px-5 @3xl:px-0">
-        <div className="grid grid-cols-2 gap-3.5">
-          {quickActions.map(({ href, icon: Icon, label, desc }, idx) => {
-            const iconStyles = [
-              'bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400',
-              'bg-violet-50 dark:bg-violet-900/30 text-violet-500 dark:text-violet-400',
-              'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
-              'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
-            ];
-            return (
-              <Link key={href} href={href}>
-                <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 hover:bg-gray-50 dark:hover:bg-gray-700/80 active:scale-[0.97] transition-[colors,transform] h-full">
-                  <div className={`inline-flex items-center justify-center rounded-xl p-3 ${iconStyles[idx]}`}>
-                    <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white tracking-tight">{label}</p>
-                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{desc}</p>
-                </div>
-              </Link>
-            );
-          })}
+      {/* ═══ 빠른 액션 — 가로 스크롤 컴팩트 ═══ */}
+      <section className="mt-4 px-5 @3xl:px-0">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+          {quickActions.map(({ href, icon: Icon, label }) => (
+            <Link key={href} href={href}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-800 px-3.5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.97] transition-colors"
+            >
+              <Icon size={15} strokeWidth={1.8} className="text-gray-400" aria-hidden="true" />
+              {label}
+            </Link>
+          ))}
         </div>
       </section>
 
       {/* ═══ 다가오는 일정 — 로그인 유저 전용, 최대 3개 ═══ */}
       {canRenderAuthenticated && (upcoming.length > 0 || teamMatches.length > 0) && (
-        <section className="mt-10 px-5 @3xl:px-0">
+        <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">{t('upcomingSchedule')}</h2>
@@ -233,7 +214,7 @@ export function HomePage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{m.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {accent && <span className={`h-2 w-2 rounded-full ${accent.dot}`} aria-hidden="true" />}
@@ -249,15 +230,15 @@ export function HomePage() {
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
                         <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{d.getMonth()+1}/{d.getDate()}</span>
-                        <span className="text-2xs text-gray-500">{weekdays[d.getDay()]}</span>
+                        <span className="text-2xs text-gray-500 dark:text-gray-400">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{m.title}</p>
-                        <p className="text-xs text-gray-500">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{m.startTime} · {m.venue?.name || sportLabel[m.sportType]}</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {accent && <span className={`h-2 w-2 rounded-full ${accent.dot}`} aria-hidden="true" />}
-                        <span className={`text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-amber-500' : 'text-gray-500'}`}>
+                        <span className={`text-xs font-semibold ${m.currentPlayers / m.maxPlayers >= 0.7 ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`}>
                           {m.currentPlayers}/{m.maxPlayers}
                         </span>
                       </div>
@@ -272,11 +253,11 @@ export function HomePage() {
                     <div className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-white dark:hover:bg-gray-800 active:scale-[0.98] transition-colors">
                       <div className="flex flex-col items-center justify-center w-10 shrink-0">
                         <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{d.getMonth()+1}/{d.getDate()}</span>
-                        <span className="text-2xs text-gray-500">{weekdays[d.getDay()]}</span>
+                        <span className="text-2xs text-gray-500 dark:text-gray-400">{weekdays[d.getDay()]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{tm.title}</p>
-                        <p className="text-xs text-gray-500">{tm.startTime} · {t('teamMatch')}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{tm.startTime} · {t('teamMatch')}</p>
                       </div>
                       <span className="h-2 w-2 rounded-full bg-blue-400 shrink-0" aria-hidden="true" />
                     </div>
@@ -290,7 +271,7 @@ export function HomePage() {
 
       {/* 비로그인 가치 제안 — 토스 스타일 다크 패널 */}
       {!canRenderAuthenticated && (
-        <section className="mt-8 px-5 @3xl:px-0">
+        <section className="mt-3 px-5 @3xl:px-0">
           <div className="rounded-2xl bg-gray-900 dark:bg-gray-800 p-5">
             <p className="text-base font-bold text-white tracking-tight">{t('aiMatchIntro')}</p>
             <p className="text-sm text-gray-400 mt-1.5 leading-relaxed">{t('valueProposition')}</p>
@@ -303,7 +284,7 @@ export function HomePage() {
 
       {/* ═══ AI 추천 매치 — 가로 스크롤 프리뷰 ═══ */}
       {recommendedMatches.length > 0 && (
-        <section className="mt-8 px-5 @3xl:px-0">
+        <section className="mt-4 px-5 @3xl:px-0">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">AI 추천 매치</h2>
             <Link href="/matches" className="text-sm text-blue-500 font-medium min-h-[44px] flex items-center gap-0.5">
@@ -320,7 +301,7 @@ export function HomePage() {
 
       {/* 배너 (로그인 유저) — translateX 슬라이드 */}
       {canRenderAuthenticated && (
-        <section className="mt-8 px-5 @3xl:px-0">
+        <section className="mt-4 px-5 @3xl:px-0">
           <div
             className="relative h-32 overflow-hidden rounded-2xl"
             onMouseEnter={() => setBannerPaused(true)}
@@ -393,7 +374,7 @@ export function HomePage() {
       )}
 
       {/* ═══ ZONE 2: 매치 탐색 — 종목 필터 + 리스트 ═══ */}
-      <section className="mt-10 px-5 @3xl:px-0">
+      <section className="mt-6 px-5 @3xl:px-0">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
             <button key={type} onClick={() => handleSportClick(type)} aria-pressed={activeSport === type}
@@ -408,7 +389,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mt-5 px-5 @3xl:px-0">
+      <section className="mt-3 px-5 @3xl:px-0">
         <SectionHeader
           title={activeSport === 'all' ? t('recommendedMatches') : `${sportLabel[activeSport]} ${tc('matches')}`}
           count={filteredMatches.length}
@@ -440,7 +421,7 @@ export function HomePage() {
       </section>
 
       {/* ═══ ZONE 3: 팀 · 강좌 · 장터 — 배경 구분 ═══ */}
-      <div className="mt-10 bg-gray-50 dark:bg-gray-900/50 py-8">
+      <div className="mt-8 bg-gray-50/50 dark:bg-gray-800/20 py-6">
         {/* 팀 */}
         {teams.length > 0 && (
           <section className="px-5 @3xl:px-0">
@@ -462,38 +443,30 @@ export function HomePage() {
                         <p className="min-w-0 flex-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
                       </div>
 
-                      {/* 종목 · city · 모집중 */}
-                      <div className="flex items-center gap-1 mt-1.5 min-w-0">
-                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-1.5 py-0.5 text-2xs font-medium shrink-0`}>
+                      {/* 종목 · 인원 · 모집중 */}
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}>
                           {sportLabel[team.sportType]}
                         </span>
-                        {team.city && (
-                          <span className="flex items-center gap-0.5 text-2xs text-gray-400 dark:text-gray-500 shrink-0">
-                            <MapPin size={9} aria-hidden="true" />
-                            {team.city}
-                          </span>
-                        )}
+                        <span>{team.memberCount}{tc('people')}</span>
                         {team.isRecruiting && (
-                          <span className="ml-auto shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 text-2xs font-medium text-emerald-600 dark:text-emerald-400">
+                          <span className="ml-auto shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                             {t('recruiting')}
                           </span>
                         )}
-                      </div>
+                      </p>
 
                       {/* 소개 (있을 때만) */}
                       {team.description ? (
-                        <p className="mt-1.5 text-2xs text-gray-500 dark:text-gray-400 line-clamp-2 flex-1 leading-relaxed">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-1 flex-1">
                           {team.description}
                         </p>
                       ) : <div className="flex-1" />}
 
-                      {/* 인원수 + 레벨 */}
-                      <div className="mt-2 flex items-center gap-1 text-2xs text-gray-400 dark:text-gray-500">
-                        <Users size={9} className="shrink-0" aria-hidden="true" />
-                        <span className="font-medium text-gray-700 dark:text-gray-300">{team.memberCount}{tc('people')}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{levelLabel[team.level] ?? '미정'}</span>
-                      </div>
+                      {/* 지역 */}
+                      {team.city && (
+                        <p className="mt-0.5 text-2xs text-gray-400 dark:text-gray-500">{team.district || team.city}</p>
+                      )}
                     </div>
                   </Link>
                 );
@@ -519,30 +492,23 @@ export function HomePage() {
                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">{l.title}</p>
 
                       {/* 종목 배지 + 지역 — 2순위 */}
-                      <div className="flex items-center gap-1 mt-2 min-w-0">
-                        <span className={`${sportCardAccent[l.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-1.5 py-0.5 text-2xs font-medium shrink-0`}>
+                      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <span className={`${sportCardAccent[l.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal shrink-0`}>
                           {sportLabel[l.sportType]}
                         </span>
-                        {location && (
-                          <span className="flex items-center gap-0.5 text-2xs text-gray-400 dark:text-gray-500 min-w-0">
-                            <MapPin size={9} className="shrink-0" aria-hidden="true" />
-                            <span className="truncate">{location}</span>
-                          </span>
-                        )}
-                      </div>
+                        {location && <span className="truncate">{location}</span>}
+                      </p>
 
                       {/* 날짜 · 시간 — 3순위 */}
-                      <div className="flex items-center gap-1 mt-1 text-2xs text-gray-500 dark:text-gray-400">
-                        <Clock size={9} className="shrink-0" aria-hidden="true" />
-                        <span className="font-medium text-gray-700 dark:text-gray-300 shrink-0">{formatMatchDate(l.lessonDate)}</span>
-                        <span className="shrink-0">{l.startTime}~{l.endTime}</span>
-                      </div>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {formatMatchDate(l.lessonDate)} {l.startTime}~{l.endTime}
+                      </p>
 
                       {/* 가격 + 부가정보 — 하단 고정 */}
                       <div className="mt-auto pt-2.5">
                         <span className="text-base font-bold text-gray-900 dark:text-gray-100 leading-none">{formatCurrency(l.fee)}</span>
                         {(sessionInfo || l.coachName) && (
-                          <p className="mt-0.5 text-2xs text-gray-400 dark:text-gray-500 truncate">
+                          <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate">
                             {[sessionInfo, l.coachName ? `${l.coachName} 코치` : null].filter(Boolean).join(' · ')}
                           </p>
                         )}
@@ -588,7 +554,7 @@ export function HomePage() {
 
                         {/* 카테고리 · 위치 — 2순위, 한 줄 */}
                         {(item.category || location) && (
-                          <p className="mt-1 text-2xs text-gray-400 dark:text-gray-500 truncate">
+                          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 truncate">
                             {[item.category, location].filter(Boolean).join(' · ')}
                           </p>
                         )}
@@ -691,7 +657,7 @@ const RecommendedMatchCard = React.memo(function RecommendedMatchCard({ match, p
 
   return (
     <Link href={`/matches/${match.id}`} className="shrink-0 w-[260px]">
-      <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.97] transition-[colors,transform]">
+      <div className="rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-[0.97] transition-[colors,transform] duration-150">
         {/* 썸네일 이미지 */}
         <div className="relative h-[120px] bg-gray-100 dark:bg-gray-700 overflow-hidden">
           <SafeImage

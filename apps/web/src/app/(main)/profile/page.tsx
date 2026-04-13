@@ -165,7 +165,7 @@ export default function ProfilePage() {
                           ELO {sp.eloRating}
                         </span>
                       </div>
-                      <p className="mt-1 text-2xs text-gray-400 dark:text-gray-500">
+                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                         {t('matchRecord', { matchCount: sp.matchCount, winCount: sp.winCount })}
                       </p>
                     </div>
@@ -178,15 +178,15 @@ export default function ProfilePage() {
               <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-700">
                 <div className="flex-1 px-3 py-3 text-center">
                   <p className="text-3xl font-black text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                  <p className="mt-1 text-2xs font-medium text-gray-400">{t('totalMatches')}</p>
+                  <p className="mt-1 text-xs font-medium text-gray-400 dark:text-gray-500">{t('totalMatches')}</p>
                 </div>
                 <div className="flex-1 px-3 py-3 text-center">
                   <p className="text-3xl font-black text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                  <p className="mt-1 text-2xs font-medium text-gray-400">{t('mannerScore')}</p>
+                  <p className="mt-1 text-xs font-medium text-gray-400 dark:text-gray-500">{t('mannerScore')}</p>
                 </div>
                 <div className="flex-1 px-3 py-3 text-center">
                   <p className="text-3xl font-black text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
-                  <p className="mt-1 text-2xs font-medium text-gray-400">{t('sports')}</p>
+                  <p className="mt-1 text-xs font-medium text-gray-400 dark:text-gray-500">{t('sports')}</p>
                 </div>
               </div>
             </div>

@@ -250,7 +250,7 @@ export default function ArrivalCheckPage() {
           </div>
         ) : (
           <>
-            <div className="rounded-2xl bg-gray-900 px-5 py-5 text-center">
+            <div className="rounded-xl bg-gray-900 px-5 py-5 text-center">
               <p className="text-xs text-gray-400">경기 시작까지</p>
               <p className="mt-1 text-3xl font-bold tracking-wide text-white">{countdown}</p>
             </div>

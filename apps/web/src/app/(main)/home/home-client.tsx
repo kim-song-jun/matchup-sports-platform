@@ -7,7 +7,7 @@ import { useMatches, useTeams, useLessons, useListings, useTeamMatches } from '@
 import { useAuthStore } from '@/stores/auth-store';
 import {
   Plus, ArrowRight, Calendar, Swords, GraduationCap, UserPlus, MapPin,
-  Search, Users, ShoppingBag, ChevronRight,
+  Search, Users, ShoppingBag, ChevronRight, Clock,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
@@ -452,7 +452,7 @@ export function HomePage() {
                     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
                       <div className="flex items-center gap-2.5">
                         <div className={`relative h-9 w-9 rounded-xl ${accent?.tint || 'bg-gray-100'} shrink-0 overflow-hidden`}>
-                          <SafeImage src={teamLogo} fallbackSrc={fallbackTeamLogo} alt={`${team.name} logo`} fill className="rounded-[10px] object-cover" sizes="36px" />
+                          <SafeImage src={teamLogo} fallbackSrc={fallbackTeamLogo} alt={`${team.name} logo`} fill className="rounded-lg object-cover" sizes="36px" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
@@ -474,23 +474,50 @@ export function HomePage() {
           <section className="mt-8 px-5 @3xl:px-0">
             <SectionHeader title={t('recommendedLessons')} href="/lessons" showMore={lessons.length > 3} moreLabel={t('viewMore')} />
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
-              {lessons.map((l: Lesson) => (
-                <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
-                  <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{l.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">{sportLabel[l.sportType]}</p>
-                    <div className="flex items-center justify-between mt-3">
-                      {l.coachName && (
-                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-2xs font-bold text-gray-500">{l.coachName.charAt(0)}</span>
-                          {l.coachName} {t('coach')}
-                        </p>
-                      )}
-                      <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{formatCurrency(l.fee)}</span>
+              {lessons.map((l: Lesson) => {
+                const activePlans = l.ticketPlans?.filter(p => p.isActive) ?? [];
+                const multiPlan = activePlans.find(p => p.type === 'multi');
+                const sessionInfo = multiPlan?.totalSessions ? `${multiPlan.totalSessions}회` : null;
+                const location = l.venueName || l.venue?.name || null;
+                return (
+                  <Link key={l.id} href={`/lessons/${l.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full flex flex-col">
+                      {/* 제목 — 1순위 */}
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">{l.title}</p>
+
+                      {/* 종목 배지 + 지역 — 2순위 */}
+                      <div className="flex items-center gap-1 mt-2 min-w-0">
+                        <span className={`${sportCardAccent[l.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-1.5 py-0.5 text-2xs font-medium shrink-0`}>
+                          {sportLabel[l.sportType]}
+                        </span>
+                        {location && (
+                          <span className="flex items-center gap-0.5 text-2xs text-gray-400 dark:text-gray-500 min-w-0">
+                            <MapPin size={9} className="shrink-0" aria-hidden="true" />
+                            <span className="truncate">{location}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 날짜 · 시간 — 3순위 */}
+                      <div className="flex items-center gap-1 mt-1 text-2xs text-gray-500 dark:text-gray-400">
+                        <Clock size={9} className="shrink-0" aria-hidden="true" />
+                        <span className="font-medium text-gray-700 dark:text-gray-300 shrink-0">{formatMatchDate(l.lessonDate)}</span>
+                        <span className="shrink-0">{l.startTime}~{l.endTime}</span>
+                      </div>
+
+                      {/* 가격 + 부가정보 — 하단 고정 */}
+                      <div className="mt-auto pt-2.5">
+                        <span className="text-base font-bold text-gray-900 dark:text-gray-100 leading-none">{formatCurrency(l.fee)}</span>
+                        {(sessionInfo || l.coachName) && (
+                          <p className="mt-0.5 text-2xs text-gray-400 dark:text-gray-500 truncate">
+                            {[sessionInfo, l.coachName ? `${l.coachName} 코치` : null].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
@@ -503,18 +530,43 @@ export function HomePage() {
               {listings.map((item: MarketplaceListing) => {
                 const listingImage = getListingImage(item.imageUrls, item.id);
                 const fallbackListingImage = getListingImage(undefined, item.id);
+                const location = item.locationDistrict || item.locationCity;
+                const daysAgoText = (() => {
+                  if (!item.createdAt) return null;
+                  const diff = Math.floor((Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                  if (diff === 0) return '오늘';
+                  if (diff === 1) return '어제';
+                  return `${diff}일 전`;
+                })();
+                const typeLabel = item.listingType === 'rent' ? '대여' : item.listingType === 'group_buy' ? '공동구매' : '판매';
                 return (
                   <Link key={item.id} href={`/marketplace/${item.id}`}>
-                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.98]">
                       <div className="relative aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <SafeImage src={listingImage} fallbackSrc={fallbackListingImage} alt={item.title} fill className="object-cover" sizes="(max-width: 768px) 50vw, 33vw" />
+                        {/* 리스팅 타입 배지 */}
+                        <span className={`absolute top-2 left-2 rounded-full px-1.5 py-0.5 text-2xs font-medium leading-none ${item.listingType === 'rent' ? 'bg-amber-500/90 text-white' : item.listingType === 'group_buy' ? 'bg-green-500/90 text-white' : 'bg-gray-900/70 text-white'}`}>
+                          {typeLabel}
+                        </span>
                       </div>
-                      <div className="p-3">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.title}</p>
-                        <p className="text-base font-bold text-gray-900 dark:text-gray-100 mt-0.5">{formatCurrency(item.price)}</p>
-                        {item.listingType === 'rent' && (
-                          <span className="inline-block mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">{t('rent')}</span>
+                      <div className="p-3 flex flex-col">
+                        {/* 제목 — 1순위 */}
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">{item.title}</p>
+
+                        {/* 카테고리 · 위치 — 2순위, 한 줄 */}
+                        {(item.category || location) && (
+                          <p className="mt-1 text-2xs text-gray-400 dark:text-gray-500 truncate">
+                            {[item.category, location].filter(Boolean).join(' · ')}
+                          </p>
                         )}
+
+                        {/* 가격 + 등록일 — 하단 */}
+                        <div className="mt-2 flex items-baseline justify-between gap-1">
+                          <span className="text-base font-bold text-gray-900 dark:text-gray-100 leading-none">{formatCurrency(item.price)}</span>
+                          {daysAgoText && (
+                            <span className="text-2xs text-gray-400 dark:text-gray-500 shrink-0">{daysAgoText}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Link>

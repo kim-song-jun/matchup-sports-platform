@@ -237,9 +237,9 @@ export default function TeamDetailPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
               {/* Logo overlay */}
               <div className="absolute -bottom-6 left-5">
-                <div className="rounded-[20px] bg-white/95 p-1.5 shadow-sm">
+                <div className="rounded-2xl bg-white/95 p-1.5 shadow-sm">
                   <div className="relative h-14 w-14">
-                    <SafeImage src={logo} fallbackSrc={fallbackLogo} alt={`${currentTeam.name} logo`} fill className="rounded-[15px] object-cover" sizes="56px" />
+                    <SafeImage src={logo} fallbackSrc={fallbackLogo} alt={`${currentTeam.name} logo`} fill className="rounded-xl object-cover" sizes="56px" />
                   </div>
                 </div>
               </div>

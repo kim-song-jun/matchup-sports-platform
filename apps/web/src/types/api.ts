@@ -235,6 +235,7 @@ export interface MarketplaceListing {
   likeCount: number;
   rentalPricePerDay?: number;
   rentalDeposit?: number;
+  createdAt?: string;
   team?: { id: string; name: string };
   venue?: { id: string; name: string };
   seller?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore: number };

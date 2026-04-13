@@ -260,49 +260,49 @@ export default function TeamMatchDetailPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 @3xl:gap-5">
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">실력등급</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {match.skillGrade ? `${getGradeInfo(match.skillGrade).label} - ${getGradeInfo(match.skillGrade).desc}` : (match.requiredLevel ? levelLabel[match.requiredLevel] ?? match.requiredLevel : '제한 없음')}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">선출선수</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.proPlayerCount != null ? `${match.proPlayerCount}명` : (match.hasProPlayers ? '있음' : '없음')}</p>
                 </div>
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">경기방식</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.gameFormat || '-'}</p>
                 </div>
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">매치 유형</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {match.matchType ? (MATCH_TYPES.find(mt => mt.value === match.matchType)?.label ?? match.matchType) : '-'}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">경기 스타일</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {match.matchStyle ? matchStyleLabel[match.matchStyle] ?? match.matchStyle : '미정'}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">종목</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">
                     {sportLabel[match.sportType] ?? match.sportType}
                   </p>
                 </div>
                 {match.uniformColor && (
-                  <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                     <p className="text-xs text-gray-500 mb-0.5">유니폼 색상</p>
                     <p className="text-base font-semibold text-gray-900 dark:text-white">{match.uniformColor}</p>
                   </div>
                 )}
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">용병 허용</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.allowMercenary ? '허용' : '불가'}</p>
                 </div>
-                <div className="rounded-2xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
+                <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3.5 py-3">
                   <p className="text-xs text-gray-500 mb-0.5">심판 유무</p>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.hasReferee ? '있음' : '없음'}</p>
                 </div>

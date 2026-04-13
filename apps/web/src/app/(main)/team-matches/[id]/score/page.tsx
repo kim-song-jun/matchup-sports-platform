@@ -196,7 +196,7 @@ export default function ScoreInputPage() {
       </header>
 
       <div className="px-5 @3xl:px-0 @3xl:max-w-2xl @3xl:mx-auto">
-        <div className="rounded-2xl bg-gray-900 p-5 mb-4">
+        <div className="rounded-xl bg-gray-900 p-5 mb-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 text-center">
               <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-white/10">

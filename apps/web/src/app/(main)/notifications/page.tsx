@@ -121,7 +121,7 @@ export default function NotificationsPage() {
         subtitle={unreadCount > 0 ? t('unreadCount', { count: unreadCount }) : '중요한 업데이트와 알림을 모아봤어요.'}
         showBack
         actions={mounted && isAuthenticated && unreadCount > 0 ? (
-          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="glass-mobile-icon-button flex min-h-[44px] items-center justify-center rounded-2xl px-3.5 text-xs font-semibold text-gray-600 dark:text-gray-300" disabled={markAllRead.isPending}>
+          <button onClick={handleMarkAllRead} aria-label={t('markAllReadLabel')} className="glass-mobile-icon-button flex min-h-[44px] items-center justify-center rounded-xl px-3.5 text-xs font-semibold text-gray-600 dark:text-gray-300" disabled={markAllRead.isPending}>
             {t('markAllRead')}
           </button>
         ) : undefined}

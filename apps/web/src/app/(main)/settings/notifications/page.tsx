@@ -147,7 +147,7 @@ export default function NotificationsPage() {
       <div className="px-5 @3xl:px-0 max-w-2xl @3xl:max-w-[600px] mt-4 space-y-4 pb-8">
         <section className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
               <BellRing size={18} />
             </div>
             <div className="space-y-1">

@@ -452,7 +452,7 @@ export default function MatchDetailPage() {
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
               <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
-            <div className="mb-4 flex items-center justify-between rounded-2xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
+            <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-2">
               <span className="text-xs font-medium text-gray-400">매치 상태</span>
               <span data-testid="match-status-badge" className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass}`}>
                 {statusLabel}

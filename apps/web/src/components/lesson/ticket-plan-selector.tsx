@@ -87,7 +87,7 @@ export function TicketPlanSelector({
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         <div className="flex items-start gap-3 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">
             <Ticket size={18} aria-hidden="true" />
           </div>
           <div>

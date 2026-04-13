@@ -291,7 +291,7 @@ export default function TeamMatchEvaluatePage() {
                 </div>
 
                 {allRated && (
-                  <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-center">
+                  <div className="mt-4 rounded-xl bg-gray-900 p-5 text-center">
                     <p className="text-sm text-gray-400">종합 평점</p>
                     <div className="mt-1 flex items-center justify-center gap-2">
                       <Star size={24} className="text-amber-400" fill="currentColor" />

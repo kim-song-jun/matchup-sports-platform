@@ -29,7 +29,7 @@ export function MobilePageTopZone({
       <section data-testid={testId} className={cn('@3xl:hidden px-5 pt-4 pb-3', className)}>
         <div
           className={cn(
-            surface === 'panel' && 'glass-mobile-panel rounded-3xl px-4 py-4',
+            surface === 'panel' && 'glass-mobile-panel rounded-2xl px-4 py-4',
           )}
         >
           <div className="flex items-start justify-between gap-3">

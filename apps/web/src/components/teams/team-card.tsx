@@ -18,10 +18,11 @@ export interface TeamCardProps {
 export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCardProps) {
   const t = useTranslations('teams');
   const tl = useTranslations('levels');
-  const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
-  const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
-  const teamCoverImage = getTeamImage(team.sportType, team.coverImageUrl ?? null, team.id);
-  const fallbackTeamCoverImage = getTeamImage(team.sportType, undefined, team.id);
+  const primarySport = team.sportTypes?.[0] ?? team.sportType;
+  const teamLogo = getTeamLogo(team.name, primarySport, team.logoUrl, team.id);
+  const fallbackTeamLogo = getTeamLogo(team.name, primarySport, undefined, team.id);
+  const teamCoverImage = getTeamImage(primarySport, team.coverImageUrl ?? null, team.id);
+  const fallbackTeamCoverImage = getTeamImage(primarySport, undefined, team.id);
 
   return (
     <Link href={`/teams/${team.id}`}>

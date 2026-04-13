@@ -287,9 +287,10 @@ export function HomePage() {
             <SectionHeader title={t('activeTeams')} href="/teams" showMore={teams.length > 3} moreLabel={t('viewMore')} />
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 pr-5 @3xl:grid @3xl:grid-cols-3 @3xl:gap-3">
               {teams.map((team: SportTeam) => {
-                const accent = sportCardAccent[team.sportType];
-                const teamLogo = getTeamLogo(team.name, team.sportType, team.logoUrl, team.id);
-                const fallbackTeamLogo = getTeamLogo(team.name, team.sportType, undefined, team.id);
+                const primarySport = team.sportTypes?.[0] ?? team.sportType;
+                const accent = sportCardAccent[primarySport];
+                const teamLogo = getTeamLogo(team.name, primarySport, team.logoUrl, team.id);
+                const fallbackTeamLogo = getTeamLogo(team.name, primarySport, undefined, team.id);
                 return (
                   <Link key={team.id} href={`/teams/${team.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
@@ -299,11 +300,13 @@ export function HomePage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{team.name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{sportLabel[team.sportType]} · {team.memberCount}{tc('people')}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {(team.sportTypes ?? [team.sportType]).map(s => sportLabel[s]).join(' · ')} · {team.memberCount}{tc('people')}
+                          </p>
                         </div>
                         {team.isRecruiting && <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">{t('recruiting')}</span>}
                       </div>
-                      {team.description && <p className="text-xs text-gray-500 mt-2 line-clamp-1">{team.description}</p>}
+                      {team.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-1">{team.description}</p>}
                     </div>
                   </Link>
                 );

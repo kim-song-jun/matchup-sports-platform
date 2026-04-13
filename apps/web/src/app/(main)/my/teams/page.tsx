@@ -66,9 +66,11 @@ export default function MyTeamsPage() {
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[team.sportType]?.badge ?? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'}`}>
-                      {sportLabel[team.sportType]}
-                    </span>
+                    {(team.sportTypes ?? [team.sportType]).slice(0, 2).map((st) => (
+                      <span key={st} className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[st]?.badge ?? 'bg-blue-50 dark:bg-blue-900/30 text-blue-500'}`}>
+                        {sportLabel[st]}
+                      </span>
+                    ))}
                     <span className="rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
                       {levelLabel[team.level]}
                     </span>

@@ -42,7 +42,7 @@ export default function EditTeamPage() {
   const [photosText, setPhotosText] = useState('');
   const [form, setForm] = useState<CreateTeamInput>({
     name: '',
-    sportType: 'soccer',
+    sportTypes: ['soccer'],
     description: '',
     logoUrl: '',
     coverImageUrl: '',
@@ -63,7 +63,7 @@ export default function EditTeamPage() {
     if (!team) return;
     setForm({
       name: team.name,
-      sportType: team.sportType,
+      sportTypes: team.sportTypes ?? [team.sportType],
       description: team.description ?? '',
       logoUrl: team.logoUrl ?? '',
       coverImageUrl: team.coverImageUrl ?? '',
@@ -189,12 +189,32 @@ export default function EditTeamPage() {
             <input id="team-name" className={inputClass} value={form.name} onChange={(event) => updateField('name', event.target.value)} disabled={formDisabled} />
           </div>
           <div>
-            <label htmlFor="team-sport" className={labelClass}>종목</label>
-            <select id="team-sport" className={inputClass} value={form.sportType} onChange={(event) => updateField('sportType', event.target.value)} disabled={formDisabled}>
-              {sportOptions.map((sportType) => (
-                <option key={sportType} value={sportType}>{sportLabel[sportType] || sportType}</option>
-              ))}
-            </select>
+            <label className={labelClass}>종목 (복수 선택 가능)</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {sportOptions.map((st) => {
+                const selected = form.sportTypes.includes(st);
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    disabled={formDisabled}
+                    onClick={() => {
+                      const next = selected
+                        ? form.sportTypes.filter(s => s !== st)
+                        : [...form.sportTypes, st];
+                      if (next.length > 0) updateField('sportTypes', next);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+                      selected
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {sportLabel[st] || st}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <label htmlFor="team-description" className={labelClass}>팀 소개</label>

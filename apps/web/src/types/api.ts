@@ -839,7 +839,7 @@ export interface CreateMatchInput {
 
 export interface CreateTeamInput {
   name: string;
-  sportType: string;
+  sportTypes: string[];
   description?: string;
   logoUrl?: string;
   coverImageUrl?: string;

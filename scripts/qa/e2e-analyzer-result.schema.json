@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["completed", "blocked", "no-action"]
+    },
+    "set_id": {
+      "type": "string"
+    },
+    "images_analyzed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "issues_found": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "agent_all_ran": {
+      "type": "boolean"
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "report_path": {
+      "type": "string"
+    },
+    "remediation_path": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "set_id",
+    "images_analyzed",
+    "issues_found",
+    "agent_all_ran",
+    "changed_files",
+    "report_path",
+    "remediation_path",
+    "notes"
+  ]
+}

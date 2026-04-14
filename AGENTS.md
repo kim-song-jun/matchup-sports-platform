@@ -1,8 +1,8 @@
-# MatchUp — AGENTS.md
+# Teameet — AGENTS.md
 
 Scope: **entire repository**. 이 파일은 Codex용 프로젝트 엔트리이며, 세부 규칙은 하위 문서로 라우팅합니다.
 
-이 저장소는 전역 기준 문서인 `~/.codex/AGENTS.md`를 상속합니다. 이 파일에는 MatchUp 저장소에서만 필요한 구조, 런타임, 검증, 문서화 규칙만 추가합니다.
+이 저장소는 전역 기준 문서인 `~/.codex/AGENTS.md`를 상속합니다. 이 파일에는 Teameet 저장소에서만 필요한 구조, 런타임, 검증, 문서화 규칙만 추가합니다.
 
 ## Quick Templates
 
@@ -63,6 +63,7 @@ Errors:
 - `apps/web/public/mock/photoreal`: 실사형 로컬 mock 이미지와 attribution 문서.
 - `e2e`: Playwright E2E와 `e2e/fixtures` 페르소나/헬퍼.
 - `scripts/qa`: 수동 QA, route smoke, UI gap 감사 같은 보조 스크립트.
+- `ultraplan/runs/e2e-analyzer*`: 기능 단위 screenshot-set queue, task/report handoff, stale-job recovery state.
 - `scripts/docs`: 문서용 스크린샷 캡처 스크립트.
 - `deploy`: 프로덕션 Dockerfile 및 배포 compose.
 - `infra/load`: k6 부하 테스트 하네스.
@@ -200,6 +201,7 @@ Errors:
 - venue 도메인은 현재 public browse/review + admin CRUD까지만 canonical contract로 본다. team과 달리 venue owner/operator membership 모델은 아직 없으므로, 팀 허브 패턴을 venue self-service에 재사용하려면 ownership/permission 모델을 먼저 설계해야 한다.
 - 루트에 ad hoc 스크립트나 개인 메모 파일을 두지 않는다. 수동 QA 도구는 `scripts/qa/`, 문서 캡처 도구는 `scripts/docs/`, 버전 관리할 시각 레퍼런스는 `docs/reference/`로 보낸다.
 - 전수 시각 감사의 raw screenshot/console/network 산출물은 `output/playwright/visual-audit/`를 표준 경로로 사용한다. `docs/screenshots/`에는 문서에서 직접 참조할 canonical 결과만 승격한다.
+- 기능 단위 screenshot-set 분석/자동 remediation은 `scripts/qa/run-e2e-analyzer.mjs`를 canonical runner로 사용한다. monitor/cron 재실행 시 job 유실을 막기 위해 queue state는 `ultraplan/runs/e2e-analyzer*` 디스크 상태를 source of truth로 사용하고, broad visual audit의 `9` viewport baseline과 analyzer intake의 `11` code contract를 혼동하지 않는다.
 - `ec2-info` 같은 호스트/운영자 로컬 메모는 git에 커밋하지 않고 ignore 상태로만 유지한다.
 - `packages/`는 실제 공유 워크스페이스가 다시 필요해질 때만 되살린다. 빈 placeholder 디렉터리는 유지하지 않는다.
 - task 문서는 `.github/tasks/`를 표준 경로로 사용한다. 기존 task 문서가 있으면 그 문서를 single source of truth로 갱신한다.
@@ -271,7 +273,7 @@ The sections below fill project-specific gaps while preserving curated content a
 
 ### Codex Canonical Agent Docs
 
-- MatchUp의 Codex canonical agent docs는 `.codex/agents/`에 둔다.
+- Teameet의 Codex canonical agent docs는 `.codex/agents/`에 둔다.
 - `.claude/agents/prompts.md`는 Codex built-in `agent-*` 스킬이 읽는 compatibility entry다.
 - `.claude/agents/team-config.md`와 `.claude/agents/workflow.md`는 기존 Claude 운영 문서를 유지하되, Codex roster, alias, quality gate가 바뀌면 `.codex/agents/*`와 같은 변경에서 sync한다.
 - Codex 기준 agent 라우팅 우선순위는 `.codex/agents/prompts.md` → `.codex/agents/team-config.md` → `.codex/agents/workflow.md` → `.claude/agents/prompts.md` compatibility entry 순서로 본다.

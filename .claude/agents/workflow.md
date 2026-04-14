@@ -174,6 +174,7 @@ Builder 작업 재개
 - If `docker compose ps` shows `web` healthy but `localhost:3003` still 500s, check `lsof -nP -iTCP:3003 -sTCP:LISTEN` for a stale host-side `pnpm --filter web dev` or `next dev` shadow process before touching app code
 - Postgres/Redis: internal Docker network, `web` gated on API healthcheck
 - Nest validation: strict (`whitelist + forbidNonWhitelisted`)
+- feature screenshot-set analysis/retry loops use `scripts/qa/run-e2e-analyzer.mjs`; resume from `ultraplan/runs/e2e-analyzer*` queue state instead of relying on ephemeral loop memory
 
 ---
 

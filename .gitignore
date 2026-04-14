@@ -55,3 +55,4 @@ infra/load/tokens.txt
 # E2E screenshot binaries and transient queue state
 e2e/scenarios/screenshots/
 e2e/scenarios/queue/
+ultraplan/runs/e2e-analyzer*/

@@ -1,5 +1,5 @@
 {
-  "name": "matchup",
+  "name": "teameet",
   "private": true,
   "scripts": {
     "dev": "turbo dev",
@@ -20,6 +20,9 @@
     "qa:manual:ui-gaps": "node scripts/qa/manual-ui-gap-audit.mjs",
     "qa:visual:audit:manifest": "node scripts/qa/run-visual-audit.mjs manifest",
     "qa:visual:audit:capture": "node scripts/qa/run-visual-audit.mjs capture",
+    "qa:e2e:analyzer": "node scripts/qa/run-e2e-analyzer.mjs",
+    "qa:e2e:analyzer:tick": "node scripts/qa/run-e2e-analyzer.mjs tick",
+    "qa:e2e:analyzer:watch": "node scripts/qa/run-e2e-analyzer.mjs watch",
     "docs:screenshots:overview": "node scripts/docs/capture-overview-screenshots.mjs",
     "docs:screenshots:app": "node scripts/docs/capture-app-screenshots.mjs"
   },

@@ -1,4 +1,4 @@
-# Codex Agent Workflow — MatchUp
+# Codex Agent Workflow — Teameet
 
 ## Canonical Paths
 
@@ -70,6 +70,7 @@
 5. live runtime contract가 바뀌면 실제 dev port에서 확인할 것
 6. concurrent local Playwright runner는 shared `make dev`가 아니라 isolated compose targets로만 검증할 것
 7. shared dev stack과 isolated web runtime 모두 stack-local `.next` volume을 유지해 Next dev artifact cross-talk를 막을 것
+8. feature screenshot-set analysis는 `scripts/qa/run-e2e-analyzer.mjs`로 수행하고, interrupted job recovery는 `ultraplan/runs/e2e-analyzer*` 디스크 큐 기준으로 재개할 것
 
 ## Compatibility Rule
 

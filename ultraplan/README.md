@@ -1,6 +1,6 @@
 # UI/UX Ultraplan
 
-이 폴더는 MatchUp 저장소의 repo-wide UI/UX audit와 design-system buildout을 운영하는 workspace다.
+이 폴더는 Teameet 저장소의 repo-wide UI/UX audit와 design-system buildout을 운영하는 workspace다.
 
 규칙 자체를 새로 정의하지 않는다. 기존 canonical source는 그대로 유지한다.
 
@@ -17,9 +17,12 @@
 - design-system compliance: 약 `55%`
 - canonical visual routes: `92`
 - canonical viewports: `9`
+- analyzer intake viewport contract: `11` (`MS -> MM -> ML -> TS -> TM -> TL -> DS -> DM -> DL -> DXL -> DXXL`)
 - current component catalog helper entries: `12`
 - current asset representative render targets: `4`
 - existing broad visual audit artifact는 일부 재사용 가치가 있다
+
+위 `11` viewport contract는 **E2E analyzer intake** 전용이다. broad Playwright visual audit baseline `9` viewport와 혼동하지 않는다.
 
 ## Folder Map
 
@@ -35,6 +38,8 @@
   - broken flow 발견 시 즉시 작성할 버그 리포트 템플릿
 - [templates/page-review.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/ultraplan/templates/page-review.md)
   - page/module별 strengths/weaknesses 평가 템플릿
+- [e2e-analyzer/README.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/ultraplan/e2e-analyzer/README.md)
+  - feature screenshot set queue, monitor/cron entrypoints, recovery rules
 - `bugs/`
   - stop gate로 승격된 버그 리포트
 - `qc/`
@@ -54,3 +59,4 @@
 4. 병렬 실행이 필요하면 isolated runner를 쓴다.
 5. primitive default hardening 없이 adoption을 넓히지 않는다.
 6. broken flow는 디자인 이슈로 덮지 않고 bug report로 분기한다.
+7. long-running screenshot analysis는 ephemeral loop state가 아니라 `ultraplan/runs/e2e-analyzer*` 디스크 큐를 source of truth로 쓴다.

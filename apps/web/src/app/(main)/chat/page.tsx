@@ -106,6 +106,7 @@ export default function ChatListPage() {
       title={t('noChatRooms')}
       description={t('noChatRoomsDesc')}
       size="sm"
+      action={{ label: '매치 찾기', href: '/matches' }}
     />
   );
 

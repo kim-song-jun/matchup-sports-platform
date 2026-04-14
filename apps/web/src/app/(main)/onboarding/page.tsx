@@ -143,7 +143,7 @@ export default function OnboardingPage() {
         {step === 'features' && (
           <div className="flex-1 flex flex-col pt-10">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-              MatchUp은
+              Teameet은
               <br />
               이런 걸 해줘요
             </h1>

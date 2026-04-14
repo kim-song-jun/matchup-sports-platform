@@ -129,7 +129,7 @@ export default function LandingPage() {
               ))}
             </div>
             <p className="mt-10 text-lg text-gray-500 dark:text-gray-400">
-              MatchUp이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
+              Teameet이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
             </p>
           </div>
         </div>

@@ -126,7 +126,7 @@ export function LandingNav() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500">
               <span className="text-white font-black text-sm">M</span>
             </div>
-            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">MatchUp</span>
+            <span className="font-bold text-xl text-gray-900 dark:text-white tracking-tight">Teameet</span>
           </Link>
 
           {/* Desktop links */}

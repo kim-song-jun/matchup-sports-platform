@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useDebounce } from '@/hooks/use-debounce';
 import { ErrorState } from '@/components/ui/error-state';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { TeamCard } from '@/components/teams/team-card';
 import { Search, Users as UsersIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -66,15 +67,15 @@ export function TeamList() {
     <div className="space-y-4">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} aria-hidden="true" />
         <label htmlFor="team-search" className="sr-only">팀 검색</label>
-        <input
+        <Input
           id="team-search"
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="팀 이름으로 검색"
-          className="w-full rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-colors"
+          className="pl-10"
         />
       </div>
 
@@ -85,7 +86,7 @@ export function TeamList() {
             key={filter.key}
             type="button"
             onClick={() => setActiveSport(filter.key)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === filter.key
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -123,7 +124,7 @@ export function TeamList() {
         {isAuthenticated && (
           <h2 className="text-lg font-bold tracking-tight text-gray-900 dark:text-white mb-3">다른 팀</h2>
         )}
-        {!isLoading && (
+        {!isLoading && filteredTeams.length > 0 && (
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{filteredTeams.length}개 팀</p>
         )}
         {filteredTeams.length === 0 ? (
@@ -131,6 +132,9 @@ export function TeamList() {
             icon={UsersIcon}
             title={debouncedSearch || activeSport ? '조건에 맞는 팀이 없어요' : te('noTeams')}
             description={debouncedSearch || activeSport ? '다른 조건으로 검색해보세요' : te('noTeamsDesc')}
+            {...(!debouncedSearch && !activeSport && isAuthenticated && {
+              action: { label: '팀 만들기', href: '/teams/new' },
+            })}
             {...(activeSport && {
               secondaryAction: { label: '전체 보기', onClick: () => { setActiveSport(''); setSearchInput(''); } },
             })}

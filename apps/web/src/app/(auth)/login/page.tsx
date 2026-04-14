@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useDevLogin, useEmailLogin, useEmailRegister } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
+import { extractErrorMessage } from '@/lib/utils';
 
 // Allows only same-origin relative paths. Blocks absolute URLs, protocol-relative
 // paths (//), javascript:, data:, and any scheme-containing strings.
@@ -117,6 +119,17 @@ function SocialLoginButtons() {
   );
 }
 
+interface FieldErrors {
+  email?: string;
+  password?: string;
+  nickname?: string;
+}
+
+// Simple email format check
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -131,6 +144,8 @@ export default function LoginPage() {
   const [nickname, setNickname] = useState('');
   const [devNickname, setDevNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const redirectTo = sanitizeRedirect(searchParams.get('redirect'));
 
@@ -139,11 +154,39 @@ export default function LoginPage() {
     if (isAuthenticated) router.replace('/home');
   }, [isAuthenticated, router]);
 
+  // P0-LOGIN-8: reset form state when switching tabs
+  const handleModeSwitch = (tab: 'login' | 'register') => {
+    setMode(tab);
+    setEmail('');
+    setPassword('');
+    setNickname('');
+    setFieldErrors({});
+    setShowPassword(false);
+  };
+
+  // P0-LOGIN-7: client-side field validation — returns true if valid
+  const validateFields = (): boolean => {
+    const errors: FieldErrors = {};
+    if (!email) {
+      errors.email = '이메일을 입력해주세요';
+    } else if (!isValidEmail(email)) {
+      errors.email = '이메일 형식이 올바르지 않아요';
+    }
+    if (!password) {
+      errors.password = '비밀번호를 입력해주세요';
+    } else if (password.length < 6) {
+      errors.password = '비밀번호는 6자 이상이어야 해요';
+    }
+    if (mode === 'register' && !nickname) {
+      errors.nickname = '닉네임을 입력해주세요';
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleEmailSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!email || !password) return toast('error', '이메일과 비밀번호를 입력해주세요');
-    if (mode === 'register' && !nickname) return toast('error', '닉네임을 입력해주세요');
-    if (password.length < 6) return toast('error', '비밀번호는 6자 이상이어야 해요');
+    if (!validateFields()) return;
 
     setIsLoading(true);
     try {
@@ -156,19 +199,23 @@ export default function LoginPage() {
         router.push(redirectTo);
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', msg || (mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));
+      toast('error', extractErrorMessage(err, mode === 'register' ? '가입에 실패했어요' : '로그인에 실패했어요'));
     } finally {
       setIsLoading(false);
     }
   };
 
+  // P0-LOGIN-4: proper error handling in dev login catch
   const handleDevLogin = async (name?: string) => {
     setIsLoading(true);
     try {
       await devLogin.mutateAsync(name || devNickname || '테스트유저');
       router.push(redirectTo);
-    } catch { /* handled by mutation */ } finally { setIsLoading(false); }
+    } catch (err: unknown) {
+      toast('error', extractErrorMessage(err, '로그인에 실패했어요'));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -189,7 +236,7 @@ export default function LoginPage() {
 
       {/* 상단 — 브랜드 */}
       <div className="flex flex-col items-center justify-center px-6 pt-8 pb-8">
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">MatchUp</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">Teameet</h1>
         <p className="mt-2 text-base text-gray-500 leading-relaxed text-center">
           같이 운동할 사람, 찾고 계셨죠?
         </p>
@@ -198,13 +245,13 @@ export default function LoginPage() {
       {/* 이메일 로그인/회원가입 */}
       <div className="flex-1 px-6">
         <div className="max-w-sm mx-auto">
-          {/* 탭 */}
+          {/* P0-LOGIN-2: 탭 active 색상 blue-500/blue-400 */}
           <div className="flex mb-5">
             {(['login', 'register'] as const).map(tab => (
-              <button key={tab} onClick={() => setMode(tab)}
+              <button key={tab} onClick={() => handleModeSwitch(tab)}
                 data-testid={tab === 'login' ? 'auth-tab-login' : 'auth-tab-register'}
                 className={`flex-1 py-2.5 text-base font-medium border-b-2 transition-colors ${
-                  mode === tab ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
+                  mode === tab ? 'border-blue-500 dark:border-blue-400 text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
                 }`}>
                 {tab === 'login' ? '로그인' : '회원가입'}
               </button>
@@ -213,25 +260,47 @@ export default function LoginPage() {
 
           {/* 폼 */}
           <form onSubmit={handleEmailSubmit} className="space-y-3" noValidate>
-            <FormField label="이메일 주소" htmlFor="login-email" labelClassName="sr-only">
+            {/* P0-LOGIN-1: labelClassName="sr-only" 제거 — 라벨 시각적으로 표시 */}
+            {/* P0-LOGIN-7: error prop으로 인라인 필드 에러 전달 */}
+            <FormField label="이메일 주소" htmlFor="login-email" error={fieldErrors.email}>
               <Input
                 id="login-email"
                 type="email"
                 placeholder="이메일"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                error={!!fieldErrors.email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: undefined }));
+                }}
                 className="text-base"
               />
             </FormField>
-            <FormField label="비밀번호" htmlFor="login-password" labelClassName="sr-only">
-              <Input
-                id="login-password"
-                type="password"
-                placeholder="비밀번호 (6자 이상)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="text-base"
-              />
+            {/* P0-LOGIN-5: 비밀번호 show/hide 토글 */}
+            <FormField label="비밀번호" htmlFor="login-password" error={fieldErrors.password}>
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="비밀번호 (6자 이상)"
+                  value={password}
+                  error={!!fieldErrors.password}
+                  aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors(prev => ({ ...prev, password: undefined }));
+                  }}
+                  className="text-base pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                  className="absolute right-0 top-0 h-full min-h-[44px] min-w-[44px] w-12 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </FormField>
             {mode === 'login' && (
               <div className="flex justify-end">
@@ -245,18 +314,24 @@ export default function LoginPage() {
               </div>
             )}
             {mode === 'register' && (
-              <FormField label="닉네임" htmlFor="login-nickname" labelClassName="sr-only">
+              <FormField label="닉네임" htmlFor="login-nickname" error={fieldErrors.nickname}>
                 <Input
                   id="login-nickname"
                   type="text"
                   placeholder="닉네임"
                   value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
+                  error={!!fieldErrors.nickname}
+                  onChange={(e) => {
+                    setNickname(e.target.value);
+                    if (fieldErrors.nickname) setFieldErrors(prev => ({ ...prev, nickname: undefined }));
+                  }}
                   className="text-base"
                 />
               </FormField>
             )}
+            {/* P0-LOGIN-6: isLoading 시 spinner 아이콘 + disabled opacity 피드백 */}
             <Button type="submit" disabled={isLoading} data-testid="auth-submit" size="lg" fullWidth>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               {isLoading ? (mode === 'login' ? '로그인 중...' : '가입 중...') : mode === 'login' ? '로그인' : '가입하기'}
             </Button>
           </form>
@@ -264,12 +339,12 @@ export default function LoginPage() {
           {/* 소셜 로그인 */}
           <SocialLoginButtons />
 
-          {/* 둘러보기 — 로그인 없이 홈으로 */}
+          {/* P0-LOGIN-9: "로그인 없이 둘러보기" contrast 개선 */}
           <div className="mt-5 text-center">
             <Link
               href="/home"
               data-testid="browse-without-login"
-              className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors min-h-[44px]"
+              className="inline-flex items-center gap-1 text-sm text-gray-500 underline decoration-gray-300 underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300 transition-colors min-h-[44px]"
             >
               로그인 없이 둘러보기
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">

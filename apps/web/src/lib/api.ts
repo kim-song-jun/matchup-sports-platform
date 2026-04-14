@@ -32,9 +32,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
           const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refreshToken,
           });
@@ -42,13 +42,16 @@ api.interceptors.response.use(
           localStorage.setItem('refreshToken', data.data.refreshToken);
           originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`;
           return api(originalRequest);
+        } catch {
+          // Refresh failed — clear auth state and redirect to login
         }
-      } catch {
-        // Clear both localStorage and Zustand auth state
-        useAuthStore.getState().logout();
-        window.location.href = '/login';
-        return Promise.reject(error);
       }
+
+      // No valid session — logout and redirect with current path for post-login return
+      useAuthStore.getState().logout();
+      const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/login?redirect=${redirect}`;
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);

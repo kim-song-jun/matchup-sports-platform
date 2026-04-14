@@ -104,7 +104,7 @@ export function HomePage() {
       <header className="px-5 @3xl:px-0 pt-4 pb-2">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 tracking-tight">오늘의 매치</p>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-0.5">
-          {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'MatchUp'}
+          {mounted && isAuthenticated && user ? t('greeting', { nickname: user.nickname }) : 'Teameet'}
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           {canRenderAuthenticated

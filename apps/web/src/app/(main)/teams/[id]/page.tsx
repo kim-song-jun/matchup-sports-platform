@@ -20,6 +20,7 @@ import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { sportLabel } from '@/lib/constants';
+import { extractErrorMessage, formatFullDate } from '@/lib/utils';
 import { getTeamImage, getTeamImageSet, getTeamLogo, getListingImage, getSportImage } from '@/lib/sport-image';
 import type { Lesson, MarketplaceListing, Tournament } from '@/types/api';
 
@@ -49,6 +50,8 @@ export default function TeamDetailPage() {
   const [activeSection, setActiveSection] = useState<HubSection>('overview');
   const [mediaIndex, setMediaIndex] = useState(0);
   const [showMediaLightbox, setShowMediaLightbox] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
 
   const myMembership = myTeams?.find((myTeam) => myTeam.id === teamId);
   const isMyTeam = !!myMembership;
@@ -321,16 +324,21 @@ export default function TeamDetailPage() {
                 ) : isAuthenticated ? (
                   <Button
                     onClick={async () => {
+                      setIsApplying(true);
                       try {
                         await api.post(`/teams/${teamId}/apply`);
                         toast('success', '팀 가입 신청이 접수되었어요.');
-                      } catch {
-                        toast('error', '팀 가입 신청에 실패했어요.');
+                        setHasApplied(true);
+                      } catch (err) {
+                        toast('error', extractErrorMessage(err, '팀 가입 신청에 실패했어요.'));
+                      } finally {
+                        setIsApplying(false);
                       }
                     }}
+                    disabled={isApplying || hasApplied}
                     fullWidth
                   >
-                    팀 가입 신청
+                    {isApplying ? '신청 중...' : hasApplied ? '신청 완료' : '팀 가입 신청'}
                   </Button>
                 ) : (
                   <Link href={`/login?redirect=/teams/${teamId}`} className={buttonStyles({ fullWidth: true })}>
@@ -453,7 +461,7 @@ function HubEventsSection({ items }: { items: Tournament[] }) {
         <Link key={event.id} href={`/tournaments/${event.id}`} className="block">
           <Card padding="sm">
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{event.title}</p>
-            <p className="text-xs text-gray-500 mt-1">{event.eventDate}</p>
+            <p className="text-xs text-gray-500 mt-1">{formatFullDate(event.eventDate)}</p>
           </Card>
         </Link>
       ))}

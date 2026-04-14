@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { useCreateMercenaryPost, useMyTeams } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
-import { formatCurrency } from '@/lib/utils';
+import { extractErrorMessage, formatCurrency } from '@/lib/utils';
 
 const positionOptions = [
   { value: 'GK', label: '골키퍼 (GK)' },
@@ -44,19 +44,6 @@ const initialForm: FormState = {
   fee: '0',
   notes: '',
 };
-
-function extractErrorMessage(error: unknown, fallback: string) {
-  const maybeError = error as {
-    response?: { data?: { message?: string | string[] } };
-  };
-  const message = maybeError.response?.data?.message;
-
-  if (Array.isArray(message)) {
-    return message[0] ?? fallback;
-  }
-
-  return typeof message === 'string' ? message : fallback;
-}
 
 export default function NewMercenaryPage() {
   const router = useRouter();

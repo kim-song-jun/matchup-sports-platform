@@ -54,6 +54,7 @@ export default function CreateMatchPage() {
     rules: '',
   });
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const { data: venuesData } = useVenues(form.sportType ? { sportType: form.sportType } : undefined);
   const venues: Venue[] = Array.isArray(venuesData) ? venuesData : (venuesData?.items ?? []);
   const sampleImages = imageAssets.length === 0
@@ -364,7 +365,7 @@ export default function CreateMatchPage() {
             </FormField>
             <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-3">
               <FormField label="날짜" htmlFor="match-date">
-                <Input id="match-date" type="date" value={form.matchDate} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} />
+                <Input id="match-date" type="date" value={form.matchDate} min={todayStr} onChange={(e) => setForm({ ...form, matchDate: e.target.value })} />
               </FormField>
               <FormField label="시작 시간" htmlFor="match-startTime">
                 <Input id="match-startTime" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
@@ -377,8 +378,7 @@ export default function CreateMatchPage() {
                 if (!form.venueId) { toast('error', '현재는 등록된 시설만 선택할 수 있어요'); return; }
                 if (!form.matchDate) { toast('error', '날짜를 선택해주세요'); return; }
                 if (!form.startTime) { toast('error', '시작 시간을 입력해주세요'); return; }
-                const today = new Date().toISOString().split('T')[0];
-                if (form.matchDate < today) { toast('error', '과거 날짜는 선택할 수 없어요'); return; }
+                if (form.matchDate < todayStr) { toast('error', '과거 날짜는 선택할 수 없어요'); return; }
                 setStep(3);
               }}
               data-testid="match-create-next-schedule"

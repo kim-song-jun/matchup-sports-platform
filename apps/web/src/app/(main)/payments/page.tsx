@@ -151,7 +151,7 @@ export default function PaymentsPage() {
                           <span>{formatFullDate(payment.createdAt)}</span>
                         </div>
                         {source.venueName && (
-                          <p className="mt-1 text-xs text-gray-400 truncate">{source.venueName}</p>
+                          <p className="mt-1 text-xs text-gray-500 truncate">{source.venueName}</p>
                         )}
                       </div>
                     </div>
@@ -161,7 +161,7 @@ export default function PaymentsPage() {
                         <span className="block text-md font-bold text-gray-900 dark:text-white">
                           {formatAmount(payment.amount)}
                         </span>
-                        <div className="mt-1 flex items-center justify-end gap-1 text-2xs text-gray-400">
+                        <div className="mt-1 flex items-center justify-end gap-1 text-2xs text-gray-500">
                           <StatusIcon size={12} />
                           <span>{source.label}</span>
                         </div>

@@ -187,7 +187,7 @@ export default function NewTeamMatchPage() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">권한이 없어요</h2>
           <p className="text-sm text-gray-500 mt-2">매니저 이상 권한을 가진 팀이 없어요</p>
-          <p className="text-xs text-gray-400 mt-1">모집글을 작성하려면 팀의 owner 또는 manager여야 해요</p>
+          <p className="text-xs text-gray-500 mt-1">모집글을 작성하려면 팀의 owner 또는 manager여야 해요</p>
           <Link href="/teams/new" className="inline-block mt-6 rounded-xl bg-blue-500 px-8 py-3 text-base font-bold text-white hover:bg-blue-600 transition-colors">
             새 팀 만들기
           </Link>

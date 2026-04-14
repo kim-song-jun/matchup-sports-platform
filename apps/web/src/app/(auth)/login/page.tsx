@@ -138,7 +138,9 @@ export default function LoginPage() {
   const emailRegister = useEmailRegister();
   const { toast } = useToast();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(
+    searchParams.get('tab') === 'register' ? 'register' : 'login',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');

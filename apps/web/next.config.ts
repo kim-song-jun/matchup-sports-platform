@@ -33,6 +33,12 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/register', destination: '/login?tab=register', permanent: false },
+      { source: '/signup', destination: '/login?tab=register', permanent: false },
+    ];
+  },
   // 개발 시 API 프록시
   async rewrites() {
     // Rewrites are ignored in export mode (CAPACITOR_BUILD=true)

@@ -82,7 +82,7 @@ export default function AdminUsersPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-md font-medium text-gray-900 dark:text-white truncate">{u.nickname}</p>
-                    <span className="flex items-center gap-0.5 text-xs text-amber-500 shrink-0">
+                    <span className="flex items-center gap-0.5 text-xs text-amber-700 dark:text-amber-400 shrink-0">
                       <Star size={12} fill="currentColor" />
                       {u.mannerScore?.toFixed(1)}
                     </span>

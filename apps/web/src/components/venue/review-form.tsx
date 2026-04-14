@@ -60,7 +60,7 @@ function StarRating({
             </button>
           ))}
         </div>
-        <span className="ml-2 w-5 text-right text-base font-semibold text-amber-500">
+        <span className="ml-2 w-5 text-right text-base font-semibold text-amber-700 dark:text-amber-400">
           {value > 0 ? value : '-'}
         </span>
       </div>
@@ -138,7 +138,7 @@ export function ReviewForm({ venueId, venueType, onSubmit, onCancel }: ReviewFor
           ))}
         </div>
         {overallRating > 0 && (
-          <p className="text-2xl font-bold text-amber-500 mt-1">{overallRating}.0</p>
+          <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 mt-1">{overallRating}.0</p>
         )}
       </div>
 

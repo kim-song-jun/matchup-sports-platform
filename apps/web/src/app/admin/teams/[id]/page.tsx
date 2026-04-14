@@ -122,7 +122,7 @@ export default function AdminTeamDetailPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {member.mannerScore != null ? (
-                        <div className="flex items-center gap-1 text-xs text-amber-500">
+                        <div className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
                           <Star size={12} fill="currentColor" />
                           <span>{member.mannerScore.toFixed(1)}</span>
                         </div>

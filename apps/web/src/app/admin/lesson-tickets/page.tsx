@@ -814,9 +814,9 @@ export default function AdminLessonTicketsPage() {
         <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/30">
-              <XCircle size={16} className="text-amber-500" />
+              <XCircle size={16} className="text-amber-600" />
             </div>
-            <span className="text-xs text-gray-400">만료·소진</span>
+            <span className="text-xs text-gray-500">만료·소진</span>
           </div>
           <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
             {inactiveCount}<span className="text-sm font-medium text-gray-400 ml-1">건</span>

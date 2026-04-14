@@ -117,7 +117,7 @@ export default function LandingPage() {
             <div className="grid sm:grid-cols-3 gap-4">
               {([
                 { icon: Frown, text: '실력 차이가 너무 커서 재미없는 경기', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
-                { icon: SearchX, text: '매번 상대 찾기가 힘든 주말', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+                { icon: SearchX, text: '매번 상대 찾기가 힘든 주말', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
                 { icon: UserX, text: '약속했는데 노쇼 당한 경험', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
               ] as const).map((pain) => (
                 <div key={pain.text} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center">
@@ -323,7 +323,7 @@ export default function LandingPage() {
               <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
                 이미 많은 선수들이 경험하고 있어요
               </h2>
-              <p className="text-base text-gray-500 mt-3">평균 만족도 <span className="text-amber-500 font-semibold">4.8</span> / 5.0 · 리뷰 <span className="font-semibold text-gray-600 dark:text-gray-300">340</span>건</p>
+              <p className="text-base text-gray-500 mt-3">평균 만족도 <span className="text-amber-700 font-semibold">4.8</span> / 5.0 · 리뷰 <span className="font-semibold text-gray-600 dark:text-gray-300">340</span>건</p>
             </div>
           </ScrollReveal>
           <div className="grid md:grid-cols-3 gap-6">

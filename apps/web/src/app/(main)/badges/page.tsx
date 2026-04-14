@@ -24,7 +24,7 @@ interface BadgeInfo {
 
 // Static fallback badges shown when API returns no data
 const fallbackBadges: BadgeInfo[] = [
-  { id: 'badge-1', type: 'manner_player', name: '매너 플레이어', description: '상대방을 존중하며 경기하는 선수', requirement: '매너 점수 4.5 이상', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30', earned: true, earnedAt: '2026-02-15' },
+  { id: 'badge-1', type: 'manner_player', name: '매너 플레이어', description: '상대방을 존중하며 경기하는 선수', requirement: '매너 점수 4.5 이상', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30', earned: true, earnedAt: '2026-02-15' },
   { id: 'badge-2', type: 'punctual', name: '시간 약속왕', description: '항상 정시에 도착하는 시간 약속의 달인', requirement: '지각률 0%', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', earned: true, earnedAt: '2026-01-20' },
   { id: 'badge-3', type: 'referee_hero', name: '심판 영웅', description: '공정한 경기를 위해 심판을 자청하는 영웅', requirement: '심판 5회 이상', icon: Shield, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30', earned: false, progress: '3/5' },
   { id: 'badge-4', type: 'honest_team', name: '정직한 팀', description: '등록한 팀 정보와 실제가 일치하는 믿을 수 있는 팀', requirement: '정보 일치도 95% 이상', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30', earned: true, earnedAt: '2026-03-01' },
@@ -36,7 +36,7 @@ const fallbackBadges: BadgeInfo[] = [
 
 // Icon/color/bg metadata — API does not provide these UI properties
 const badgeVisualConfig: Record<string, { icon: typeof Star; color: string; bg: string }> = {
-  manner_player: { icon: Star, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/30' },
+  manner_player: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
   punctual: { icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30' },
   referee_hero: { icon: Shield, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/30' },
   honest_team: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30' },

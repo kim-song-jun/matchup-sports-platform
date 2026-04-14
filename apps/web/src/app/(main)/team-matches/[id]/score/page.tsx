@@ -301,7 +301,7 @@ export default function ScoreInputPage() {
 
             <div className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 mb-4">
               <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
-                <Trophy size={16} className="text-amber-500" />
+                <Trophy size={16} className="text-amber-600" />
                 쿼터별 누적 점수
               </h3>
               <div className="mt-3 overflow-x-auto scrollbar-hide">

@@ -77,7 +77,7 @@ export default function AdminStatisticsPage() {
       <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-4 mb-6">
         <MetricCard label="전체 사용자" value={overview.userGrowth.totalUsers.toLocaleString()} icon={Users} iconColor="bg-blue-50 text-blue-500" sub={`이번 달 +${overview.userGrowth.thisMonth}`} />
         <MetricCard label="활성 사용자" value={overview.userGrowth.activeUsers.toLocaleString()} icon={TrendingUp} iconColor="bg-green-50 text-green-500" sub={`성장률 ${overview.userGrowth.growthRate}%`} />
-        <MetricCard label="총 매출" value={formatAmount(stats.totalRevenue)} icon={DollarSign} iconColor="bg-amber-50 text-amber-500" sub={`활성 팀 ${stats.activeTeams}`} />
+        <MetricCard label="총 매출" value={formatAmount(stats.totalRevenue)} icon={DollarSign} iconColor="bg-amber-50 text-amber-600" sub={`활성 팀 ${stats.activeTeams}`} />
         <MetricCard label="등록 팀" value={overview.userGrowth.teamCount.toLocaleString()} icon={Trophy} iconColor="bg-gray-100 text-gray-600" sub={`활성 상품 ${stats.activeListings}`} />
       </div>
 

@@ -50,7 +50,7 @@ export function TransferOwnershipModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="팀 소유권 양도">
       <div className="flex items-center justify-center w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 mx-auto mb-4">
-        <Crown size={24} className="text-amber-500" />
+        <Crown size={24} className="text-amber-600" />
       </div>
 
       <p className="text-base text-gray-700 dark:text-gray-200 text-center mb-1">

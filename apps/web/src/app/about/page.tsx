@@ -56,7 +56,7 @@ const APPROACHES = [
     stat: '11종목 지원',
     color: 'bg-amber-500',
     iconBg: 'bg-amber-50 dark:bg-amber-900/30',
-    iconColor: 'text-amber-500',
+    iconColor: 'text-amber-600',
   },
 ];
 
@@ -94,7 +94,7 @@ const TEAM = [
 const STATS = [
   { value: '2,400+', label: '매칭 완료', color: 'text-blue-500' },
   { value: '520+', label: '활성 팀', color: 'text-emerald-500' },
-  { value: '11', label: '지원 종목', color: 'text-amber-500' },
+  { value: '11', label: '지원 종목', color: 'text-amber-700' },
   { value: '4.8', label: '평균 만족도', color: 'text-purple-500' },
 ];
 

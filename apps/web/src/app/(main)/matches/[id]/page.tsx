@@ -439,12 +439,12 @@ export default function MatchDetailPage() {
             {/* Progress */}
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">참가 현황</span>
-              <span data-testid="match-participant-count" className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-500' : 'text-blue-500'}`}>
+              <span data-testid="match-participant-count" className={`text-sm font-semibold ${isAlmostFull ? 'text-amber-700 dark:text-amber-400' : 'text-blue-500'}`}>
                 {match.currentPlayers}/{match.maxPlayers}명
               </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-4">
-              <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
+              <div className={`h-full w-full rounded-full transition-transform duration-300 origin-left ${isAlmostFull ? 'bg-amber-600' : 'bg-blue-500'}`} style={{ transform: `scaleX(${filledPercent / 100})` }} />
             </div>
             <div className="mb-4 flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
               <span className="text-sm text-gray-500">매치 상태</span>
@@ -663,7 +663,7 @@ export default function MatchDetailPage() {
       >
         <div className="flex flex-col items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/30">
-            <AlertTriangle size={24} className="text-amber-500" aria-hidden="true" />
+            <AlertTriangle size={24} className="text-amber-600" aria-hidden="true" />
           </div>
           <p className="text-center text-base text-gray-700 dark:text-gray-300">
             모집을 마감하시겠습니까?<br />
@@ -885,8 +885,8 @@ function InfoCard({ icon, label, value, sub, highlight }: {
         <span className="text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
       </div>
-      <p className={`text-md font-semibold ${highlight ? 'text-amber-500' : 'text-gray-900 dark:text-white'}`}>{value}</p>
-      {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>{sub}</p>}
+      <p className={`text-md font-semibold ${highlight ? 'text-amber-700 dark:text-amber-400' : 'text-gray-900 dark:text-white'}`}>{value}</p>
+      {sub && <p className={`text-xs mt-0.5 ${highlight ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>{sub}</p>}
     </div>
   );
 }

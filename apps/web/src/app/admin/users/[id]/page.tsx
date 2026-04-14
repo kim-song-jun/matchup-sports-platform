@@ -186,7 +186,7 @@ export default function AdminUserDetailPage() {
                 {user.email ? <p className="text-sm text-gray-500 mt-0.5">{user.email}</p> : null}
                 {user.bio ? <p className="text-base text-gray-600 dark:text-gray-300 mt-2">{user.bio}</p> : null}
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
-                  <div className="flex items-center gap-1 text-amber-500">
+                  <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
                     <Star size={14} fill="currentColor" />
                     <span className="text-base font-semibold">{user.mannerScore?.toFixed(1)}</span>
                   </div>
@@ -294,10 +294,10 @@ export default function AdminUserDetailPage() {
                 onClick={() => setActionType('warn')}
                 className="w-full flex items-center gap-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3 text-left hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
               >
-                <AlertTriangle size={18} className="text-amber-500 shrink-0" />
+                <AlertTriangle size={18} className="text-amber-600 shrink-0" />
                 <div>
                   <p className="text-base font-medium text-amber-700 dark:text-amber-400">경고 기록</p>
-                  <p className="text-xs text-amber-500">사용자 경고를 감사 로그에 남깁니다</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">사용자 경고를 감사 로그에 남깁니다</p>
                 </div>
               </button>
 

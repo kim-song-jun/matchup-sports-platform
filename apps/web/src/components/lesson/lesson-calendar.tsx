@@ -315,7 +315,7 @@ export function LessonCalendar({ schedules, onReserve }: LessonCalendarProps) {
                             취소된 수업
                           </span>
                         ) : isFull ? (
-                          <span className="text-xs font-semibold text-amber-500">마감</span>
+                          <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">마감</span>
                         ) : (
                           <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                             <CircleCheck size={13} aria-hidden="true" />
@@ -334,7 +334,7 @@ export function LessonCalendar({ schedules, onReserve }: LessonCalendarProps) {
                       )}
 
                       {session.note && (
-                        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                           {session.note}
                         </p>
                       )}

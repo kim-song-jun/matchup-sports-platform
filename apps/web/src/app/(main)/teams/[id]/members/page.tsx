@@ -164,7 +164,7 @@ export default function TeamMembersPage() {
               >
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 shrink-0">
                   {member.role === 'owner' ? (
-                    <Crown size={18} className="text-amber-500" aria-hidden="true" />
+                    <Crown size={18} className="text-amber-600" aria-hidden="true" />
                   ) : (
                     <User size={18} className="text-gray-500 dark:text-gray-400" aria-hidden="true" />
                   )}
@@ -185,7 +185,7 @@ export default function TeamMembersPage() {
                     )}
                   </div>
                   {member.user?.mannerScore != null && (
-                    <div className="flex items-center gap-1 text-xs text-amber-500 mt-0.5">
+                    <div className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                       <span>&#9733;</span>
                       <span className="font-semibold">{member.user.mannerScore.toFixed(1)}</span>
                     </div>

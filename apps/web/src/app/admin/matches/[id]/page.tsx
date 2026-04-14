@@ -174,11 +174,11 @@ export default function AdminMatchDetailPage() {
                 </div>
                 <div>
                   <p className="text-base font-semibold text-gray-900 dark:text-white">{match.host.nickname}</p>
-                  <div className="flex items-center gap-1 text-xs text-amber-500">
+                  <div className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
                     <Star size={12} fill="currentColor" />
                     <span>{match.host.mannerScore?.toFixed(1)}</span>
                     <span className="text-gray-300 dark:text-gray-600 mx-1">·</span>
-                    <span className="text-gray-400">{match.host.totalMatches}경기</span>
+                    <span className="text-gray-500">{match.host.totalMatches}경기</span>
                   </div>
                 </div>
               </div>

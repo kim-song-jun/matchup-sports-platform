@@ -274,7 +274,7 @@ export default function TeamMatchEvaluatePage() {
                           <p className="text-base font-semibold text-gray-900 dark:text-white">{item.label}</p>
                           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
                         </div>
-                        <div className="text-base font-bold text-amber-500">
+                        <div className="text-base font-bold text-amber-700 dark:text-amber-400">
                           {ratings[item.key] > 0 ? ratings[item.key].toFixed(0) : '-'}
                         </div>
                       </div>

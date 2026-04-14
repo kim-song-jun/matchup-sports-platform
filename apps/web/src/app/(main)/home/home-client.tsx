@@ -340,7 +340,7 @@ export function HomePage() {
                   <Link key={tournament.id} href={`/tournaments/${tournament.id}`} className="shrink-0 w-[200px] @3xl:w-auto">
                     <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors h-full">
                       <div className="flex items-center gap-2 mb-2">
-                        <Trophy size={14} className="text-amber-500" aria-hidden="true" />
+                        <Trophy size={14} className="text-amber-600" aria-hidden="true" />
                         <span className={`${accent?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
                           {sportLabel[tournament.sportType]}
                         </span>

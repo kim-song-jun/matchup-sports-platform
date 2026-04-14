@@ -15,7 +15,7 @@ import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications,
 import type { Notification } from '@/types/api';
 
 const typeConfig: Record<string, { icon: typeof Trophy; bg: string; text: string; darkBg: string }> = {
-  match:  { icon: Trophy,        bg: 'bg-amber-50',  text: 'text-amber-500',  darkBg: 'dark:bg-amber-900/30' },
+  match:  { icon: Trophy,        bg: 'bg-amber-50',  text: 'text-amber-600',  darkBg: 'dark:bg-amber-900/30' },
   team:   { icon: Users,         bg: 'bg-green-50',  text: 'text-green-500',  darkBg: 'dark:bg-green-900/30' },
   chat:   { icon: MessageCircle, bg: 'bg-blue-50',   text: 'text-blue-500',   darkBg: 'dark:bg-blue-900/30' },
   payment:{ icon: CreditCard,    bg: 'bg-emerald-50',text: 'text-emerald-500',darkBg: 'dark:bg-emerald-900/30' },

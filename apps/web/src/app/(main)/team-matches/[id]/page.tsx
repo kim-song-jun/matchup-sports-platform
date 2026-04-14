@@ -353,7 +353,7 @@ export default function TeamMatchDetailPage() {
                     <p className="text-md font-semibold text-gray-900 dark:text-white">{match.hostTeam.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {match.hostTeam.mannerScore != null && (
-                        <div className="flex items-center gap-0.5 text-xs text-amber-500">
+                        <div className="flex items-center gap-0.5 text-xs text-amber-700 dark:text-amber-400">
                           <Star size={12} fill="currentColor" />
                           <span className="font-semibold">{match.hostTeam.mannerScore.toFixed(1)}</span>
                         </div>

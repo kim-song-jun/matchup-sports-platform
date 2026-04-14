@@ -14,7 +14,7 @@ import type { Notification } from '@/types/api';
 type LucideIcon = typeof Trophy;
 
 const typeConfig: Record<string, { icon: LucideIcon; bg: string; text: string; darkBg: string }> = {
-  match:   { icon: Trophy,       bg: 'bg-amber-50',   text: 'text-amber-500',   darkBg: 'dark:bg-amber-900/30' },
+  match:   { icon: Trophy,       bg: 'bg-amber-50',   text: 'text-amber-600',   darkBg: 'dark:bg-amber-900/30' },
   badge:   { icon: Award,        bg: 'bg-purple-50',  text: 'text-purple-500',  darkBg: 'dark:bg-purple-900/30' },
   team:    { icon: Users,        bg: 'bg-green-50',   text: 'text-green-500',   darkBg: 'dark:bg-green-900/30' },
   payment: { icon: CreditCard,   bg: 'bg-emerald-50', text: 'text-emerald-500', darkBg: 'dark:bg-emerald-900/30' },

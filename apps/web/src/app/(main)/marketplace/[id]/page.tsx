@@ -261,7 +261,7 @@ export default function ListingDetailPage() {
               </div>
               <div className="flex-1">
                 <p className="text-md font-semibold text-gray-900 dark:text-white">{listing.seller?.nickname}</p>
-                <div className="flex items-center gap-1 text-sm text-amber-500 mt-0.5">
+                <div className="flex items-center gap-1 text-sm text-amber-700 dark:text-amber-400 mt-0.5">
                   <Star size={12} fill="currentColor" />
                   <span>{listing.seller?.mannerScore?.toFixed(1)}</span>
                 </div>

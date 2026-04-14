@@ -123,7 +123,7 @@ export default function VenueDetailPage() {
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{venue.name}</h2>
                 {venue.reviewCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-sm text-amber-500">
+                  <span className="inline-flex items-center gap-1 text-sm text-amber-700 dark:text-amber-400">
                     <Star size={12} fill="currentColor" />
                     {venue.rating.toFixed(1)}
                   </span>

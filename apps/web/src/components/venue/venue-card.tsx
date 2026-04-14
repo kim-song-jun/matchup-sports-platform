@@ -42,7 +42,7 @@ export function VenueCard({ venue, className }: VenueCardProps) {
             <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
             {venue.rating > 0 && (
               <span className="shrink-0 flex items-center gap-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100">
-                <Star size={12} fill="currentColor" className="text-amber-500" aria-hidden="true" />
+                <Star size={12} fill="currentColor" className="text-amber-600 dark:text-amber-400" aria-hidden="true" />
                 {venue.rating.toFixed(1)}
               </span>
             )}

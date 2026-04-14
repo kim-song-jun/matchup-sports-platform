@@ -90,7 +90,7 @@ function SocialLoginButtons() {
     <div className="mt-6">
       <div className="flex items-center gap-3 mb-4">
         <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
-        <span className="text-xs text-gray-400">또는</span>
+        <span className="text-xs text-gray-500">또는</span>
         <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
       </div>
       <div className="space-y-2">
@@ -253,7 +253,7 @@ export default function LoginPage() {
               <button key={tab} onClick={() => handleModeSwitch(tab)}
                 data-testid={tab === 'login' ? 'auth-tab-login' : 'auth-tab-register'}
                 className={`flex-1 py-2.5 text-base font-medium border-b-2 transition-colors ${
-                  mode === tab ? 'border-blue-500 dark:border-blue-400 text-gray-900 dark:text-white' : 'border-transparent text-gray-400 hover:text-gray-600'
+                  mode === tab ? 'border-blue-500 dark:border-blue-400 text-gray-900 dark:text-white' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}>
                 {tab === 'login' ? '로그인' : '회원가입'}
               </button>

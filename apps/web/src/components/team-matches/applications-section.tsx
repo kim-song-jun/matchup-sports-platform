@@ -104,7 +104,7 @@ export function ApplicationsSection({ matchId, isRecruiting }: ApplicationsSecti
                       {app.teamName ?? team?.name ?? '알 수 없는 팀'}
                     </span>
                     {team?.mannerScore != null && (
-                      <div className="flex items-center gap-0.5 text-xs text-amber-500 mt-0.5">
+                      <div className="flex items-center gap-0.5 text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                         <Star size={10} fill="currentColor" />
                         <span className="font-semibold">{team.mannerScore.toFixed(1)}</span>
                       </div>

@@ -65,7 +65,7 @@ export function MercenaryCard({ post, className }: MercenaryCardProps) {
               {teamName}
             </h3>
           </div>
-          <div className="flex items-center gap-1 text-xs text-amber-500 shrink-0">
+          <div className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 shrink-0">
             <Star size={12} fill="currentColor" aria-hidden="true" />
             <span className="font-semibold">{mannerScore.toFixed(1)}</span>
           </div>

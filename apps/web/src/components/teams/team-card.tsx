@@ -64,7 +64,7 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
           <div className="flex items-center justify-between gap-2">
             <h3 className="truncate text-md font-semibold text-gray-900 dark:text-gray-100">{team.name}</h3>
             {team.isRecruiting && (
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                 {t('recruiting')}
               </span>
             )}

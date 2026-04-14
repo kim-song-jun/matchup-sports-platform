@@ -15,7 +15,7 @@ import { formatCurrency } from '@/lib/utils';
 const statusLabel: Record<string, { text: string; style: string }> = {
   recruiting: { text: '모집중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
   open: { text: '모집중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  full: { text: '마감', style: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-300' },
+  full: { text: '마감', style: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300' },
   completed: { text: '완료', style: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
   cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-red-300' },
 };

@@ -20,7 +20,7 @@ const conditionLabel: Record<string, string> = {
 
 const statusConfig: Record<string, { text: string; style: string }> = {
   on_sale: { text: '판매중', style: 'text-blue-500' },
-  reserved: { text: '예약중', style: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+  reserved: { text: '예약중', style: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
   sold: { text: '판매완료', style: 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400' },
 };
 

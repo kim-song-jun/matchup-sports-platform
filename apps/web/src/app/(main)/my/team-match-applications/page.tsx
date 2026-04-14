@@ -9,7 +9,7 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { formatDateDot } from '@/lib/utils';
 
 const appStatusConfig: Record<string, { label: string; className: string }> = {
-  pending: { label: '대기중', className: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' },
+  pending: { label: '대기중', className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' },
   approved: { label: '승인됨', className: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' },
   rejected: { label: '거절됨', className: 'bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400' },
   withdrawn: { label: '취소됨', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },

@@ -130,7 +130,7 @@ export default function MyLessonsPage() {
                 ? { label: '취소됨', className: 'bg-red-50 dark:bg-red-900/30 text-red-500' }
                 : lesson.status === 'completed'
                   ? { label: '완료', className: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' }
-                  : { label: '마감', className: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300' };
+                  : { label: '마감', className: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' };
           return (
             <div key={lesson.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden hover:border-gray-200 transition-colors">
               {/* Card header */}

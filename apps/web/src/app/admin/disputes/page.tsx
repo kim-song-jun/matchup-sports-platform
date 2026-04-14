@@ -83,7 +83,7 @@ export default function AdminDisputesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">신고/분쟁 관리</h1>
-          <p className="text-base text-gray-400 mt-1">실제 운영 로그와 함께 분쟁을 처리하세요</p>
+          <p className="text-base text-gray-500 mt-1">실제 운영 로그와 함께 분쟁을 처리하세요</p>
         </div>
         <div className="flex items-center gap-3">
           {pendingCount > 0 && (

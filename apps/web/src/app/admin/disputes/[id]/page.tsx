@@ -154,7 +154,7 @@ export default function AdminDisputeDetailPage() {
         </div>
       </Modal>
 
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/admin/disputes" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">신고/분쟁</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">{dispute.id}</span>
@@ -174,7 +174,7 @@ export default function AdminDisputeDetailPage() {
                   </span>
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">{dispute.id}</h2>
-                <p className="text-sm text-gray-400 mt-1">접수일: {new Date(dispute.createdAt).toLocaleString('ko-KR')}</p>
+                <p className="text-sm text-gray-500 mt-1">접수일: {new Date(dispute.createdAt).toLocaleString('ko-KR')}</p>
               </div>
             </div>
 

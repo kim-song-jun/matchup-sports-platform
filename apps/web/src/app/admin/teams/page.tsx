@@ -46,7 +46,7 @@ export default function AdminTeamsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 관리</h1>
-          <p className="text-base text-gray-400 mt-1">등록된 팀과 클럽을 관리하세요</p>
+          <p className="text-base text-gray-500 mt-1">등록된 팀과 클럽을 관리하세요</p>
         </div>
         <Link href="/teams/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600">
           <Plus size={16} /> 팀 등록
@@ -98,7 +98,7 @@ export default function AdminTeamsPage() {
                 <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.level}</td>
                 <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{t.city} {t.district}</td>
                 <td className="px-5 py-3.5">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.isRecruiting ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.isRecruiting ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                     {t.isRecruiting ? '모집중' : '마감'}
                   </span>
                 </td>

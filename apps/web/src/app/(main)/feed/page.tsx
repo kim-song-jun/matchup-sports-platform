@@ -95,7 +95,7 @@ function ActivityItem({ notification }: { notification: Notification }) {
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
           {notification.body}
         </p>
-        <p className="text-2xs text-gray-400 dark:text-gray-500 mt-1">
+        <p className="text-2xs text-gray-500 dark:text-gray-400 mt-1">
           {formatTimeAgo(notification.createdAt)}
         </p>
       </div>
@@ -107,7 +107,7 @@ function Section({ label, items }: { label: string; items: Notification[] }) {
   if (items.length === 0) return null;
   return (
     <div className="mb-4">
-      <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 mb-1">
+      <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest px-1 mb-1">
         {label}
       </h2>
       <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 px-4">

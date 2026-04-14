@@ -62,7 +62,7 @@ export default function AdminTeamDetailPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/admin/teams" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">팀 관리</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">{team.name}</span>

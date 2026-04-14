@@ -57,7 +57,7 @@ export default function AdminLessonsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">강좌 관리</h1>
-          <p className="text-base text-gray-400 mt-1">등록된 강좌를 관리하세요</p>
+          <p className="text-base text-gray-500 mt-1">등록된 강좌를 관리하세요</p>
         </div>
         <Link href="/lessons" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600">
           <GraduationCap size={16} /> 강좌 등록

@@ -220,7 +220,7 @@ function NotificationCard({
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 dark:text-gray-500">{formatTimeAgo(notification.createdAt)}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(notification.createdAt)}</span>
             {!notification.isRead && <span data-testid="notification-unread-dot" className="flex h-2.5 w-2.5 rounded-full bg-blue-500" />}
           </div>
           <p className={`text-base mt-0.5 ${notification.isRead ? 'text-gray-600 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100 font-bold'}`}>

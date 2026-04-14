@@ -223,7 +223,7 @@ export default function AdminVenueEditPage() {
 
   return (
     <div className="animate-fade-in max-w-2xl">
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/admin/venues" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">시설 관리</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">시설 수정</span>

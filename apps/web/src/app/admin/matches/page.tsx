@@ -64,7 +64,7 @@ export default function AdminMatchesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">매치 관리</h1>
-        <p className="text-base text-gray-400 mt-1">전체 매치를 관리하세요</p>
+        <p className="text-base text-gray-500 mt-1">전체 매치를 관리하세요</p>
       </div>
 
       <AdminToolbar

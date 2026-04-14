@@ -89,7 +89,7 @@ export default function AdminMercenaryPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">용병 관리</h1>
-          <p className="text-base text-gray-400 mt-1">실제 등록된 모집글만 검토하고 삭제할 수 있습니다</p>
+          <p className="text-base text-gray-500 mt-1">실제 등록된 모집글만 검토하고 삭제할 수 있습니다</p>
         </div>
       </div>
 

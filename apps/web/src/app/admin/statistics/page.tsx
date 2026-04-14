@@ -57,7 +57,7 @@ export default function AdminStatisticsPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/admin/dashboard" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">대시보드</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">통계</span>
@@ -66,7 +66,7 @@ export default function AdminStatisticsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">통계</h1>
-          <p className="text-base text-gray-400 mt-1">mock 없이 실제 집계만 보여줍니다</p>
+          <p className="text-base text-gray-500 mt-1">mock 없이 실제 집계만 보여줍니다</p>
         </div>
         <div className="flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400">
           <Calendar size={14} />
@@ -230,7 +230,7 @@ function MetricCard({
         </div>
       </div>
       <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
-      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
+      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
       {sub ? <p className="text-xs text-blue-500 font-medium mt-1">{sub}</p> : null}
     </div>
   );

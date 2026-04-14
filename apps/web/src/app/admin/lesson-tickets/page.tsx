@@ -781,7 +781,7 @@ export default function AdminLessonTicketsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">수강권 관리</h1>
-          <p className="text-base text-gray-400 mt-1">발급된 수강권을 관리하세요</p>
+          <p className="text-base text-gray-500 mt-1">발급된 수강권을 관리하세요</p>
         </div>
       </div>
 
@@ -868,7 +868,7 @@ export default function AdminLessonTicketsPage() {
       </div>
 
       {/* Count label */}
-      <p className="text-sm text-gray-400 mb-3">{filtered.length}건의 수강권</p>
+      <p className="text-sm text-gray-500 mb-3">{filtered.length}건의 수강권</p>
 
       {/* Bulk toolbar */}
       <BulkToolbar

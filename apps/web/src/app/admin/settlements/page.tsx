@@ -123,7 +123,7 @@ export default function AdminSettlementsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">정산 관리</h1>
-          <p className="text-base text-gray-400 mt-1">실제 정산 상태와 운영 이력을 함께 검토하세요</p>
+          <p className="text-base text-gray-500 mt-1">실제 정산 상태와 운영 이력을 함께 검토하세요</p>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export default function AdminSettlementsPage() {
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{card.value}</p>
-            <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{card.label}</p>
           </div>
         ))}
       </div>

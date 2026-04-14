@@ -34,7 +34,7 @@ export default function AdminUsersPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">사용자 관리</h1>
-        <p className="text-base text-gray-400 mt-1">등록된 사용자를 관리하세요</p>
+        <p className="text-base text-gray-500 mt-1">등록된 사용자를 관리하세요</p>
       </div>
 
       <AdminToolbar

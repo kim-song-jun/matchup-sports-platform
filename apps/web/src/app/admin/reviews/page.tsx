@@ -84,7 +84,7 @@ export default function AdminReviewsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">평가 관리</h1>
-          <p className="text-base text-gray-400 mt-1">실제 리뷰와 평점만 표시합니다</p>
+          <p className="text-base text-gray-500 mt-1">실제 리뷰와 평점만 표시합니다</p>
         </div>
       </div>
 
@@ -182,7 +182,7 @@ function SummaryCard({
         </div>
       </div>
       <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-      <p className="text-sm text-gray-400 mt-0.5">{label}</p>
+      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
     </div>
   );
 }

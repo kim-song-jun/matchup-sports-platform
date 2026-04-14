@@ -31,7 +31,7 @@ export default function AdminVenuesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">시설 관리</h1>
-          <p className="text-base text-gray-400 mt-1">등록된 시설을 관리하고 새 시설을 추가하세요</p>
+          <p className="text-base text-gray-500 mt-1">등록된 시설을 관리하고 새 시설을 추가하세요</p>
         </div>
         <Link href="/admin/venues/new" className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors">
           <Plus size={16} />

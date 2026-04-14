@@ -96,7 +96,7 @@ export default function AdminPaymentsPage() {
     <div className="animate-fade-in">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">결제 관리</h1>
-        <p className="mt-1 text-base text-gray-400">저장된 실제 결제/환불 내역만 표시합니다</p>
+        <p className="mt-1 text-base text-gray-500">저장된 실제 결제/환불 내역만 표시합니다</p>
       </div>
 
       <AdminToolbar

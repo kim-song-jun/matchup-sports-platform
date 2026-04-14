@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { sportLabel } from '@/lib/constants';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import { useTeamMatches } from '@/hooks/use-api';
+import { formatDateShort } from '@/lib/utils';
 
 const statusLabel: Record<string, string> = {
   recruiting: '모집중',
@@ -59,7 +60,7 @@ export default function AdminTeamMatchesPage() {
         제목: tm.title,
         호스트팀: tm.hostTeam?.name ?? '-',
         종목: sportLabel[tm.sportType] || tm.sportType,
-        날짜: tm.matchDate,
+        날짜: formatDateShort(tm.matchDate),
         상태: statusLabel[tm.status] || tm.status,
         신청수: tm.applicationCount ?? 0,
       })),
@@ -69,7 +70,7 @@ export default function AdminTeamMatchesPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-4">
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
         <Link href="/admin/dashboard" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">관리자</Link>
         <ChevronRight size={12} />
         <span className="text-gray-700 dark:text-gray-300 font-medium">팀 매칭</span>
@@ -78,7 +79,7 @@ export default function AdminTeamMatchesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">팀 매칭 관리</h1>
-          <p className="text-base text-gray-400 mt-1">관리자 셸 안에서 팀 간 모집글을 검토하세요</p>
+          <p className="text-base text-gray-500 mt-1">관리자 셸 안에서 팀 간 모집글을 검토하세요</p>
         </div>
       </div>
 
@@ -127,7 +128,7 @@ export default function AdminTeamMatchesPage() {
                       <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{tm.hostTeam?.name ?? '-'}</span>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{sportLabel[tm.sportType] || tm.sportType}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{tm.matchDate}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">{formatDateShort(tm.matchDate)}</td>
                     <td className="px-5 py-3.5">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${statusColor[tm.status] || 'bg-gray-100 text-gray-500'}`}>
                         {statusLabel[tm.status] || tm.status}

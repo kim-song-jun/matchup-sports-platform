@@ -159,7 +159,7 @@ export default function AdminUserDetailPage() {
         </div>
       </Modal>
 
-      <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/admin/users" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">사용자 관리</Link>
         <ChevronRight size={14} />
         <span className="text-gray-700 dark:text-gray-300">{user.nickname}</span>
@@ -183,7 +183,7 @@ export default function AdminUserDetailPage() {
                     {user.adminStatus === 'suspended' ? '정지' : '활성'}
                   </span>
                 </div>
-                {user.email ? <p className="text-sm text-gray-400 mt-0.5">{user.email}</p> : null}
+                {user.email ? <p className="text-sm text-gray-500 mt-0.5">{user.email}</p> : null}
                 {user.bio ? <p className="text-base text-gray-600 dark:text-gray-300 mt-2">{user.bio}</p> : null}
                 <div className="flex items-center gap-3 mt-3 flex-wrap">
                   <div className="flex items-center gap-1 text-amber-500">

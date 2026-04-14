@@ -62,7 +62,7 @@ export default function MercenaryDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [processingApplicationId, setProcessingApplicationId] = useState<string | null>(null);
 
-  const { data: post, isLoading, isError, refetch } = useMercenaryPost(id);
+  const { data: post, isLoading, isError, error, refetch } = useMercenaryPost(id);
   const applyMutation = useApplyMercenary();
   const acceptMutation = useAcceptMercenaryApplication();
   const rejectMutation = useRejectMercenaryApplication();
@@ -77,6 +77,21 @@ export default function MercenaryDetailPage() {
           <div className="h-8 w-2/3 bg-gray-100 dark:bg-gray-700 rounded" />
           <div className="h-40 bg-gray-100 dark:bg-gray-700 rounded-xl" />
         </div>
+      </div>
+    );
+  }
+
+  const is404 = isError && (error as { response?: { status?: number } })?.response?.status === 404;
+
+  if (is404) {
+    return (
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={UserCheck}
+          title="모집글을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 모집글이에요"
+          action={{ label: '목록으로', href: '/mercenary' }}
+        />
       </div>
     );
   }

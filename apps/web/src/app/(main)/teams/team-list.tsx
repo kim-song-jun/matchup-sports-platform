@@ -86,6 +86,7 @@ export function TeamList() {
             key={filter.key}
             type="button"
             onClick={() => setActiveSport(filter.key)}
+            aria-pressed={activeSport === filter.key}
             className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === filter.key
                 ? 'bg-blue-500 text-white'

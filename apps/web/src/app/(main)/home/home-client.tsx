@@ -282,6 +282,7 @@ export function HomePage() {
               title={te('noMatches')}
               description={te('noMatchesDesc')}
               size="sm"
+              action={activeSport === 'all' ? { label: '매치 찾기', href: '/matches' } : undefined}
               secondaryAction={activeSport !== 'all' ? { label: t('viewAllMatches'), onClick: () => setActiveSport('all') } : undefined}
             />
           </div>

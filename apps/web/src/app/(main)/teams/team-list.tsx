@@ -11,10 +11,11 @@ import { Search, Users as UsersIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { sportLabel } from '@/lib/constants';
 import type { SportTeam, MyTeam } from '@/types/api';
+import type { SportType } from '@/types/enums.generated';
 
-const sportFilters = [
+const sportFilters: Array<{ key: SportType | ''; label: string }> = [
   { key: '', label: '전체' },
-  ...Object.entries(sportLabel).map(([key, label]) => ({ key, label })),
+  ...Object.entries(sportLabel).map(([key, label]) => ({ key: key as SportType, label })),
 ];
 
 export function TeamList() {
@@ -23,7 +24,7 @@ export function TeamList() {
   const { data, isLoading, error, refetch } = useTeams();
   const { data: myTeams } = useMyTeams();
 
-  const [activeSport, setActiveSport] = useState('');
+  const [activeSport, setActiveSport] = useState<SportType | ''>('');
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -66,7 +67,9 @@ export function TeamList() {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+        <label htmlFor="team-search" className="sr-only">팀 검색</label>
         <input
+          id="team-search"
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}

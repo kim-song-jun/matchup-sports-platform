@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService } from './web-push.service';
-import { presentNotification, notificationCategory } from './notification-presentation';
+import { presentNotification, notificationCategory, NotificationData } from './notification-presentation';
 import { UpdateNotificationPreferenceDto } from './dto/notification-preference.dto';
 import { UserBlocksService } from '../user-blocks/user-blocks.service';
 import { RedisCacheService } from '../redis/redis-cache.service';
@@ -26,7 +26,8 @@ export class NotificationsService {
     type: NotificationType;
     title: string;
     body: string;
-    data?: Record<string, unknown>;
+    /** Free-form notification payload stored as Prisma JsonValue. Not a REST input DTO. */
+    data?: NotificationData;
     /** Optional sender — if the recipient has blocked this user, the notification is suppressed. */
     fromUserId?: string;
   }) {

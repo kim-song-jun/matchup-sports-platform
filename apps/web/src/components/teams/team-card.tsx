@@ -83,7 +83,9 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
                 +{(team.sportTypes?.length ?? 1) - 2}
               </span>
             )}
-            <span>{tl(String(team.level) as Parameters<typeof tl>[0])} · {t('memberCount', { count: team.memberCount })}</span>
+            <span>{tl(String(team.level) as Parameters<typeof tl>[0])}</span>
+            <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+            <span>{t('memberCount', { count: team.memberCount })}</span>
           </div>
           {team.description && (
             <p className="mt-1 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{team.description}</p>

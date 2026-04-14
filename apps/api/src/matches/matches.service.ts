@@ -8,6 +8,7 @@ import { Prisma, NotificationType, SportType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CancelMatchDto, CreateMatchDto, MatchFilterDto, TeamConfigDto, UpdateMatchDto } from './dto/match.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationData } from '../notifications/notification-presentation';
 import { MatchingEngineService, RecommendationReason } from './matching-engine.service';
 
 const recommendedMatchSelect = {
@@ -818,7 +819,8 @@ export class MatchesService {
       type: NotificationType;
       title: string;
       body: string;
-      data: Record<string, unknown>;
+      /** Free-form notification payload stored as Prisma JsonValue. Not a REST input DTO. */
+      data: NotificationData;
     },
   ) {
     const participants = await this.prisma.matchParticipant.findMany({

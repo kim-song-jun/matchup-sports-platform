@@ -38,7 +38,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message:
         typeof message === 'string'
           ? message
-          : (message as Record<string, unknown>).message || message,
+          // NestJS HttpException.getResponse() returns string | object; cast is safe here.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- NestJS exception response is untyped
+          : (message as any).message || message,
       timestamp: new Date().toISOString(),
     });
   }

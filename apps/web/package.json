@@ -14,7 +14,8 @@
     "clean": "rm -rf .next out",
     "test": "vitest run",
     "test:watch": "vitest",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "ANALYZE=true next build",
+    "gen:enums": "node scripts/gen-enums.mjs"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.17",

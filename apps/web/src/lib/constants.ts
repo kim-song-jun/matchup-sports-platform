@@ -1,3 +1,7 @@
+// SportType and SPORT_TYPES — re-exported from generated enums (SSoT)
+export type { SportType } from '@/types/enums.generated';
+export { SPORT_TYPES } from '@/types/enums.generated';
+
 // Sport labels — single source of truth
 export const sportLabel: Record<string, string> = {
   soccer: '축구',

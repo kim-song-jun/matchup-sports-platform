@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { mockTeam1, mockTeam2, mockMyTeamMemberships } from '@/test/fixtures/teams';
 
 // Mock auth store
 let mockIsAuthenticated = true;
@@ -26,53 +27,6 @@ import { api } from '@/lib/api';
 
 const mockApi = api as unknown as { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
 
-const mockTeam1 = {
-  id: 'team-1',
-  name: '서울 FC',
-  sportType: 'SOCCER',
-  memberCount: 11,
-  level: 3,
-  isRecruiting: true,
-  description: null,
-  city: null,
-  district: null,
-  ownerId: 'user-1',
-};
-
-const mockTeam2 = {
-  id: 'team-2',
-  name: '한강 농구단',
-  sportType: 'BASKETBALL',
-  memberCount: 5,
-  level: 2,
-  isRecruiting: false,
-  description: null,
-  city: null,
-  district: null,
-  ownerId: 'user-1',
-};
-
-// Backend returns TeamMembership & { team: SportTeam } shape
-const mockMembership1 = {
-  id: 'mem-1',
-  teamId: 'team-1',
-  userId: 'user-1',
-  role: 'owner' as const,
-  status: 'active',
-  joinedAt: '2024-01-01T00:00:00.000Z',
-  team: mockTeam1,
-};
-
-const mockMembership2 = {
-  id: 'mem-2',
-  teamId: 'team-2',
-  userId: 'user-1',
-  role: 'member' as const,
-  status: 'active',
-  joinedAt: '2024-01-02T00:00:00.000Z',
-  team: mockTeam2,
-};
-
 function makeWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -92,7 +46,7 @@ describe('useMyTeams', () => {
     // Mock returns membership-wrapped shape (backend listUserTeams() contract)
     mockApi.get.mockResolvedValueOnce({
       status: 'success',
-      data: [mockMembership1, mockMembership2],
+      data: mockMyTeamMemberships,
     });
 
     const wrapper = makeWrapper();
@@ -144,10 +98,10 @@ describe('useTeams', () => {
     });
 
     const wrapper = makeWrapper();
-    const { result } = renderHook(() => useTeams({ sportType: 'SOCCER' }), { wrapper });
+    const { result } = renderHook(() => useTeams({ sportType: 'soccer' }), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockApi.get).toHaveBeenCalledWith('/teams', { params: { sportType: 'SOCCER' } });
+    expect(mockApi.get).toHaveBeenCalledWith('/teams', { params: { sportType: 'soccer' } });
     expect(result.current.data?.items).toHaveLength(1);
   });
 });

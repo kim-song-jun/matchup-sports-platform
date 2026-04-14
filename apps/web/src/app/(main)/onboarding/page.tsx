@@ -62,36 +62,21 @@ export default function OnboardingPage() {
       <div className="flex flex-col w-full h-full max-w-md mx-auto px-6 py-8 select-none">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex gap-1.5" aria-label={`진행 단계: ${step === 'sport' ? '1' : '2'}/2`}>
+          <div
+            className="flex gap-1.5"
+            role="group"
+            aria-label={`${step === 'sport' ? 1 : 2}단계 중 2단계`}
+          >
             <div className={`h-1 rounded-full transition-[width,background-color,color] duration-300 ${step === 'sport' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
             <div className={`h-1 rounded-full transition-[width,background-color,color] duration-300 ${step === 'features' ? 'w-8 bg-gray-900 dark:bg-white' : 'w-4 bg-gray-200 dark:bg-gray-700'}`} />
           </div>
-          {step === 'sport' ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={finish}
-                className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors min-h-[44px] flex items-center"
-              >
-                건너뛰기
-              </button>
-              <button
-                onClick={() => router.push('/home')}
-                aria-label="온보딩 닫기"
-                className="min-h-[44px] min-w-11 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M4.5 4.5L13.5 13.5M13.5 4.5L4.5 13.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={finish}
-              className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors min-h-[44px] flex items-center"
-            >
-              건너뛰기
-            </button>
-          )}
+          <button
+            onClick={finish}
+            aria-label="온보딩 건너뛰기"
+            className="text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors min-h-[44px] flex items-center"
+          >
+            건너뛰기
+          </button>
         </div>
 
         {/* Step 1: 종목 선택 */}
@@ -113,6 +98,7 @@ export default function OnboardingPage() {
                   <button
                     key={sport.key}
                     onClick={() => toggleSport(sport.key)}
+                    aria-pressed={isSelected}
                     className={`relative flex flex-col items-center gap-2 rounded-2xl p-4 transition-[background-color,color,border-color,transform] duration-200 active:scale-[0.96] ${
                       isSelected
                         ? 'ring-2 ring-blue-500 border border-blue-500 bg-blue-50 dark:bg-blue-950/20'

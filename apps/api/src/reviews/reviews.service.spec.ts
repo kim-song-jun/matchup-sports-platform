@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsService } from './reviews.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
+import { buildReview } from '../../test/fixtures/reviews';
 
 describe('ReviewsService', () => {
   let service: ReviewsService;
@@ -53,7 +54,7 @@ describe('ReviewsService', () => {
       comment: '매너가 좋은 플레이어입니다.',
     };
 
-    const createdReview = {
+    const createdReview = buildReview({
       id: 'review-1',
       matchId: 'match-1',
       authorId: 'user-1',
@@ -61,7 +62,7 @@ describe('ReviewsService', () => {
       skillRating: 4,
       mannerRating: 5,
       comment: '매너가 좋은 플레이어입니다.',
-    };
+    });
 
     it('should create a review and update user manner score', async () => {
       mockPrismaService.review.create.mockResolvedValue(createdReview);

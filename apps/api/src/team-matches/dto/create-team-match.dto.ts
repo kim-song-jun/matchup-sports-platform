@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID, IsInt, Min, Max, IsOptional, IsEnum, IsBoolean, Matches, IsIn, MaxLength } from 'class-validator';
+import { IsString, IsUUID, IsInt, Min, Max, IsOptional, IsEnum, IsBoolean, Matches, IsIn, MaxLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { SportType, MatchStyle } from '@prisma/client';
+import { VenueInfoDto } from './venue-info.dto';
 
 export class CreateTeamMatchDto {
   @ApiProperty() @IsUUID() hostTeamId!: string;
@@ -14,7 +16,13 @@ export class CreateTeamMatchDto {
   @ApiProperty({ required: false, default: 4 }) @IsOptional() @IsInt() @Min(1) @Max(10) quarterCount?: number;
   @ApiProperty() @IsString() venueName!: string;
   @ApiProperty() @IsString() venueAddress!: string;
-  @ApiProperty({ required: false }) @IsOptional() venueInfo?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, type: VenueInfoDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => VenueInfoDto)
+  venueInfo?: VenueInfoDto;
+
   @ApiProperty({ required: false, default: 0 }) @IsOptional() @IsInt() @Min(0) totalFee?: number;
   @ApiProperty({ required: false, default: 0 }) @IsOptional() @IsInt() @Min(0) opponentFee?: number;
   @ApiProperty({ required: false }) @IsOptional() @IsString() paymentDeadline?: string;

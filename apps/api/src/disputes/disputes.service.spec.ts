@@ -113,5 +113,24 @@ describe('DisputesService', () => {
         service.updateStatus('no-such-id', { status: 'resolved' as DisputeStatus }),
       ).toThrow(NotFoundException);
     });
+
+    it('records server-sourced actor in history (not client-supplied)', () => {
+      const created = service.create({
+        reporterTeamId: 'tX',
+        reportedTeamId: 'tY',
+        teamMatchId: 'tm-z',
+        type: 'no_show' as DisputeType,
+        description: 'actor test',
+      });
+
+      const result = service.updateStatus(created.id, {
+        status: 'investigating' as DisputeStatus,
+        actor: 'admin-user-uuid-from-jwt',
+      });
+
+      const lastEntry = result.history[result.history.length - 1];
+      // actor must equal what was passed (sourced from @CurrentUser in controller)
+      expect(lastEntry.actor).toBe('admin-user-uuid-from-jwt');
+    });
   });
 });

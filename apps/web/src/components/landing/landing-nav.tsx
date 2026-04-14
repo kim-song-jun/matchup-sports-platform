@@ -69,30 +69,37 @@ export function LandingNav() {
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
               aria-label={mobileOpen ? '메뉴 닫기' : '메뉴 열기'}
+              aria-expanded={mobileOpen}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
 
-        {/* Mobile dropdown */}
-        {mobileOpen && (
-          <div className="md:hidden animate-fade-in border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-            <div className="max-w-[1100px] mx-auto px-5 py-3 space-y-1">
-              {NAV_LINKS.map((link) => {
-                const isActive = pathname === link.href;
-                return (
-                  <Link key={link.href} href={link.href} className={`block text-md font-medium px-4 py-3 rounded-xl transition-colors ${
-                    isActive ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}>{link.label}</Link>
-                );
-              })}
-              <Link href="/login" className="block text-md font-medium px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 sm:hidden">
+        {/* Mobile dropdown — always rendered; visibility driven by classes for exit animation */}
+        <div className={`md:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 transition-[transform,opacity] duration-300 ease-out ${
+          mobileOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'
+        }`}>
+          <div className="max-w-[1100px] mx-auto px-5 py-3 space-y-1">
+            {NAV_LINKS.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link key={link.href} href={link.href} className={`block text-md font-medium px-4 py-3 rounded-xl transition-colors ${
+                  isActive ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}>{link.label}</Link>
+              );
+            })}
+            {/* CTA section — matches desktop action hierarchy */}
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-2 space-y-2 sm:hidden">
+              <Link href="/login" className="block text-md font-medium px-4 py-3 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 로그인
+              </Link>
+              <Link href="/login" className="block bg-blue-500 text-white rounded-xl py-3 text-center font-bold transition-colors hover:bg-blue-600 active:scale-[0.97]">
+                시작하기
               </Link>
             </div>
           </div>
-        )}
+        </div>
       </nav>
     </>
   );

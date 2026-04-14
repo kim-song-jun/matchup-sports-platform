@@ -355,11 +355,12 @@ export class AuthService implements OnModuleInit {
       }
 
       // 없으면 새로 생성
+      const DEV_ADMIN_NICKNAMES = ['매치업관리자'];
       if (!user) {
         user = await this.prisma.user.create({
           data: {
             nickname,
-            role: 'user',
+            role: DEV_ADMIN_NICKNAMES.includes(nickname) ? 'admin' : 'user',
             oauthProvider: 'kakao',
             oauthId: `dev_${nickname}_${Date.now()}`,
             sportTypes: ['futsal', 'basketball'],
@@ -387,6 +388,14 @@ export class AuthService implements OnModuleInit {
               preferredPositions: ['SG', 'SF'],
             },
           ],
+        });
+      }
+
+      // Ensure admin nicknames always have admin role (handles pre-existing user with wrong role)
+      if (DEV_ADMIN_NICKNAMES.includes(nickname) && user.role !== 'admin') {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { role: 'admin' },
         });
       }
 

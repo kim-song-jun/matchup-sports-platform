@@ -6,6 +6,7 @@ import { Bell, Trophy, Users, CreditCard, Award, AlertCircle } from 'lucide-reac
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useNotifications } from '@/hooks/use-api';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { notificationVisualType } from '@/lib/notification-center';
 import type { Notification } from '@/types/api';
 
@@ -123,7 +124,7 @@ export default function FeedPage() {
   const { isAuthenticated } = useRequireAuth();
   const [now] = useState(() => new Date());
 
-  const { data: notifications = [], isLoading } = useNotifications();
+  const { data: notifications = [], isLoading, isError, refetch } = useNotifications();
 
   const groups = groupByPeriod(notifications, now);
   const hasAny =
@@ -153,6 +154,8 @@ export default function FeedPage() {
               </div>
             ))}
           </div>
+        ) : isError ? (
+          <ErrorState onRetry={() => void refetch()} />
         ) : !hasAny ? (
           <EmptyState
             icon={Bell}

@@ -20,6 +20,8 @@ vi.mock('@/lib/api', () => {
 
 import { api } from '@/lib/api';
 import { useLessons, useMyLessonTickets, useVenueSchedule } from '../use-api';
+import { mockLesson, mockLessonTicketPlan, mockLessonTicket } from '@/test/fixtures/lessons';
+import { mockVenueScheduleSlot } from '@/test/fixtures/venues';
 
 const mockApi = api as unknown as { get: ReturnType<typeof vi.fn> };
 
@@ -41,38 +43,14 @@ describe('useLessons', () => {
   it('returns paginated lesson list', async () => {
     mockApi.get.mockResolvedValueOnce({
       status: 'success',
-      data: {
-        items: [
-          {
-            id: 'lesson-1',
-            hostId: 'host-1',
-            sportType: 'futsal',
-            type: 'group',
-            title: '주말 풋살 클래스',
-            description: null,
-            venueName: '강남 풋살파크',
-            lessonDate: '2026-04-20',
-            startTime: '10:00',
-            endTime: '12:00',
-            maxParticipants: 12,
-            currentParticipants: 5,
-            fee: 30000,
-            levelMin: 1,
-            levelMax: 3,
-            status: 'open',
-            coachName: null,
-            coachBio: null,
-          },
-        ],
-        nextCursor: null,
-      },
+      data: { items: [mockLesson], nextCursor: null },
     });
 
     const { result } = renderHook(() => useLessons(), { wrapper: makeWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.get).toHaveBeenCalledWith('/lessons', { params: undefined });
-    expect(result.current.data?.items[0].title).toBe('주말 풋살 클래스');
+    expect(result.current.data?.items[0].title).toBe(mockLesson.title);
   });
 });
 
@@ -84,17 +62,7 @@ describe('useVenueSchedule', () => {
   it('returns schedule slots for a venue', async () => {
     mockApi.get.mockResolvedValueOnce({
       status: 'success',
-      data: [
-        {
-          id: 'match-1',
-          title: '주말 풋살 매치',
-          sportType: 'futsal',
-          status: 'recruiting',
-          matchDate: '2026-04-21',
-          startTime: '18:00',
-          endTime: '20:00',
-        },
-      ],
+      data: [mockVenueScheduleSlot],
     });
 
     const { result } = renderHook(() => useVenueSchedule('venue-1'), { wrapper: makeWrapper() });
@@ -119,52 +87,14 @@ describe('useMyLessonTickets', () => {
   });
 
   it('returns the authenticated user ticket list', async () => {
+    const mockTicketWithPlan = {
+      ...mockLessonTicket,
+      plan: { ...mockLessonTicketPlan, name: '10회권', type: 'multi' as const, totalSessions: 10, price: 80000 },
+      lesson: mockLesson,
+    };
     mockApi.get.mockResolvedValueOnce({
       status: 'success',
-      data: [
-        {
-          id: 'ticket-1',
-          planId: 'plan-1',
-          userId: 'user-1',
-          lessonId: 'lesson-1',
-          status: 'active',
-          totalSessions: 10,
-          usedSessions: 2,
-          startDate: '2026-04-11',
-          expiresAt: '2026-05-11',
-          paidAmount: 80000,
-          purchasedAt: '2026-04-11T09:00:00.000Z',
-          plan: {
-            id: 'plan-1',
-            lessonId: 'lesson-1',
-            name: '10회권',
-            type: 'multi',
-            price: 80000,
-            isActive: true,
-            sortOrder: 0,
-          },
-          lesson: {
-            id: 'lesson-1',
-            hostId: 'host-1',
-            sportType: 'futsal',
-            type: 'group_lesson',
-            title: '주말 풋살 클래스',
-            description: null,
-            venueName: '강남 풋살파크',
-            lessonDate: '2026-04-20',
-            startTime: '10:00',
-            endTime: '12:00',
-            maxParticipants: 12,
-            currentParticipants: 5,
-            fee: 30000,
-            levelMin: 1,
-            levelMax: 3,
-            status: 'open',
-            coachName: null,
-            coachBio: null,
-          },
-        },
-      ],
+      data: [mockTicketWithPlan],
     });
 
     const { result } = renderHook(() => useMyLessonTickets(), { wrapper: makeWrapper() });

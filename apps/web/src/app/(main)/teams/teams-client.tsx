@@ -24,7 +24,7 @@ export function TeamsPage() {
         )}
       />
 
-      <div className="px-5 @3xl:px-0">
+      <div className="px-5 @3xl:px-0 pb-24">
         <TeamList />
       </div>
     </div>

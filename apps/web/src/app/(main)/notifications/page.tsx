@@ -7,6 +7,7 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { useAuthStore } from '@/stores/auth-store';
 import { Bell, Trophy, Users, MessageCircle, CreditCard, ChevronRight } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast';
 import { shouldHandleInAppNotificationNavigation } from '@/lib/notification-activation';
 import { resolveNotificationLink, notificationVisualType } from '@/lib/notification-center';
@@ -34,6 +35,7 @@ export default function NotificationsPage() {
   const {
     data: notifications = [],
     isLoading,
+    isError: isNotificationsError,
     refetch: refetchNotifications,
   } = useNotifications();
   const {
@@ -150,6 +152,8 @@ export default function NotificationsPage() {
               </div>
             ))}
           </div>
+        ) : isNotificationsError ? (
+          <ErrorState onRetry={() => void refetchNotifications()} />
         ) : notifications.length === 0 ? (
           <EmptyState
             icon={Bell}

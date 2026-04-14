@@ -36,7 +36,23 @@ type Summary = Record<
   | 'mercenaryPosts'
   | 'teamMatches'
   | 'teamMatchApplications'
-  | 'teamBadges',
+  | 'teamBadges'
+  | 'mercenaryApplications'
+  | 'payments'
+  | 'marketplaceOrders'
+  | 'lessonSchedules'
+  | 'lessonTickets'
+  | 'lessonAttendances'
+  | 'chatRooms'
+  | 'chatMessages'
+  | 'venueReviews'
+  | 'matchReviews'
+  | 'notifications'
+  | 'tournaments'
+  | 'settlements'
+  | 'reports'
+  | 'userBadges'
+  | 'teamTrustScores',
   SummaryBucket
 >;
 
@@ -56,6 +72,22 @@ function createSummary(): Summary {
     teamMatches: { created: 0, updated: 0 },
     teamMatchApplications: { created: 0, updated: 0 },
     teamBadges: { created: 0, updated: 0 },
+    mercenaryApplications: { created: 0, updated: 0 },
+    payments: { created: 0, updated: 0 },
+    marketplaceOrders: { created: 0, updated: 0 },
+    lessonSchedules: { created: 0, updated: 0 },
+    lessonTickets: { created: 0, updated: 0 },
+    lessonAttendances: { created: 0, updated: 0 },
+    chatRooms: { created: 0, updated: 0 },
+    chatMessages: { created: 0, updated: 0 },
+    venueReviews: { created: 0, updated: 0 },
+    matchReviews: { created: 0, updated: 0 },
+    notifications: { created: 0, updated: 0 },
+    tournaments: { created: 0, updated: 0 },
+    settlements: { created: 0, updated: 0 },
+    reports: { created: 0, updated: 0 },
+    userBadges: { created: 0, updated: 0 },
+    teamTrustScores: { created: 0, updated: 0 },
   };
 }
 
@@ -114,6 +146,10 @@ async function main() {
   const listingIds = new Map<MockListingKey, string>();
   const mercenaryIds = new Map<MockMercenaryKey, string>();
   const teamMatchIds = new Map<MockTeamMatchKey, string>();
+  const lessonScheduleIds = new Map<string, string>();
+  const chatRoomIds = new Map<string, string>();
+  const mercenaryApplicationIds = new Map<string, string>();
+  const participantIdByMatchAndUser = new Map<string, string>();
 
   if (checksumGateEnabled) {
     if (isFalseValue(process.env.DEPLOY_SYNC_MOCK_DATA)) {
@@ -168,6 +204,7 @@ async function main() {
             mannerScore: user.mannerScore,
             totalMatches: user.totalMatches,
             profileImageUrl: user.profileImageUrl,
+            role: user.role ?? 'user',
           },
         }),
       update: (id) =>
@@ -188,6 +225,7 @@ async function main() {
             mannerScore: user.mannerScore,
             totalMatches: user.totalMatches,
             profileImageUrl: user.profileImageUrl,
+            role: user.role ?? 'user',
           },
         }),
     });
@@ -460,6 +498,7 @@ async function main() {
             levelMin: match.levelMin,
             levelMax: match.levelMax,
             gender: match.gender,
+            status: match.status ?? 'recruiting',
           },
         }),
       update: (id) =>
@@ -478,6 +517,7 @@ async function main() {
             levelMin: match.levelMin,
             levelMax: match.levelMax,
             gender: match.gender,
+            status: match.status ?? 'recruiting',
           },
         }),
     });
@@ -489,7 +529,7 @@ async function main() {
     );
 
     for (const participantId of desiredParticipantIds) {
-      await createOrUpdateRecord({
+      const participantRecord = await createOrUpdateRecord({
         bucket: summary.matchParticipants,
         findExistingId: async () =>
           (
@@ -521,6 +561,7 @@ async function main() {
             },
           }),
       });
+      participantIdByMatchAndUser.set(`${record.id}:${participantId}`, participantRecord.id);
     }
 
     await prisma.matchParticipant.deleteMany({
@@ -761,7 +802,7 @@ async function main() {
             level: post.level,
             fee: post.fee,
             notes: post.notes,
-            status: 'open',
+            status: post.status ?? 'open',
           },
         }),
       update: (id) =>
@@ -775,7 +816,7 @@ async function main() {
             level: post.level,
             fee: post.fee,
             notes: post.notes,
-            status: 'open',
+            status: post.status ?? 'open',
           },
         }),
     });
@@ -822,7 +863,7 @@ async function main() {
             gameFormat: teamMatch.gameFormat,
             matchType: teamMatch.matchType,
             uniformColor: teamMatch.uniformColor,
-            status: 'recruiting',
+            status: teamMatch.status ?? 'recruiting',
           },
         }),
       update: (id) =>
@@ -849,7 +890,7 @@ async function main() {
             gameFormat: teamMatch.gameFormat,
             matchType: teamMatch.matchType,
             uniformColor: teamMatch.uniformColor,
-            status: 'recruiting',
+            status: teamMatch.status ?? 'recruiting',
             guestTeamId: null,
           },
         }),
@@ -942,6 +983,539 @@ async function main() {
           data: {
             name: badge.name,
             description: badge.description,
+          },
+        }),
+    });
+  }
+
+  // Seed mercenary applications
+  for (const app of catalog.mercenaryApplications) {
+    const postId = requireId(mercenaryIds, app.postKey, 'mercenary post');
+    const applicantId = requireId(userIds, app.applicantKey, 'mercenary applicant');
+    const appKey = `${app.postKey}:${app.applicantKey}`;
+    const record = await createOrUpdateRecord({
+      bucket: summary.mercenaryApplications,
+      findExistingId: async () =>
+        (
+          await prisma.mercenaryApplication.findUnique({
+            where: { postId_userId: { postId, userId: applicantId } },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.mercenaryApplication.create({
+          data: { postId, userId: applicantId, status: app.status, message: app.message },
+        }),
+      update: (id) =>
+        prisma.mercenaryApplication.update({
+          where: { id },
+          data: { status: app.status, message: app.message },
+        }),
+    });
+    mercenaryApplicationIds.set(appKey, record.id);
+  }
+
+  // Seed payments (requires MatchParticipant to exist, uses participantIdByMatchAndUser)
+  for (const payment of catalog.payments) {
+    const matchId = requireId(matchIds, payment.matchKey, 'payment match');
+    const payerId = requireId(userIds, payment.payerKey, 'payment payer');
+    const participantId = participantIdByMatchAndUser.get(`${matchId}:${payerId}`);
+    if (!participantId) {
+      console.warn(`Skipping payment ${payment.id}: no participant for match ${payment.matchKey} user ${payment.payerKey}`);
+      continue;
+    }
+    await createOrUpdateRecord({
+      bucket: summary.payments,
+      findExistingId: async () =>
+        (
+          await prisma.payment.findUnique({
+            where: { id: payment.id },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.payment.create({
+          data: {
+            id: payment.id,
+            orderId: payment.orderId,
+            userId: payerId,
+            amount: payment.amount,
+            status: payment.status,
+            participantId,
+          },
+        }),
+      update: (id) =>
+        prisma.payment.update({
+          where: { id },
+          data: { amount: payment.amount, status: payment.status },
+        }),
+    });
+  }
+
+  // Seed marketplace orders
+  for (const order of catalog.marketplaceOrders) {
+    const listingId = requireId(listingIds, order.listingKey, 'marketplace listing');
+    const buyerId = requireId(userIds, order.buyerKey, 'marketplace buyer');
+    const sellerId = requireId(userIds, order.sellerKey, 'marketplace seller');
+    await createOrUpdateRecord({
+      bucket: summary.marketplaceOrders,
+      findExistingId: async () =>
+        (
+          await prisma.marketplaceOrder.findUnique({
+            where: { orderId: order.orderId },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.marketplaceOrder.create({
+          data: {
+            orderId: order.orderId,
+            listingId,
+            buyerId,
+            sellerId,
+            amount: order.amount,
+            status: order.status,
+          },
+        }),
+      update: (id) =>
+        prisma.marketplaceOrder.update({
+          where: { id },
+          data: { amount: order.amount, status: order.status },
+        }),
+    });
+  }
+
+  // Seed lesson schedules
+  for (const schedule of catalog.lessonSchedules) {
+    const lessonId = requireId(lessonIds, schedule.lessonKey, 'lesson');
+    const scheduleKey = `${schedule.lessonKey}:${schedule.sessionDate.toISOString()}`;
+    const record = await createOrUpdateRecord({
+      bucket: summary.lessonSchedules,
+      findExistingId: async () =>
+        (
+          await prisma.lessonSchedule.findFirst({
+            where: { lessonId, sessionDate: schedule.sessionDate },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.lessonSchedule.create({
+          data: {
+            lessonId,
+            sessionDate: schedule.sessionDate,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            maxParticipants: schedule.maxParticipants,
+          },
+        }),
+      update: (id) =>
+        prisma.lessonSchedule.update({
+          where: { id },
+          data: {
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            maxParticipants: schedule.maxParticipants,
+          },
+        }),
+    });
+    lessonScheduleIds.set(scheduleKey, record.id);
+  }
+
+  // Seed lesson tickets
+  for (const ticket of catalog.lessonTickets) {
+    const lessonId = requireId(lessonIds, ticket.lessonKey, 'lesson');
+    const ownerId = requireId(userIds, ticket.ownerKey, 'lesson ticket owner');
+    const plan = await prisma.lessonTicketPlan.findFirst({
+      where: { lessonId, name: ticket.planName },
+      select: { id: true },
+    });
+    if (!plan) {
+      console.warn(`Skipping ticket ${ticket.id}: plan "${ticket.planName}" not found for lesson ${ticket.lessonKey}`);
+      continue;
+    }
+    await createOrUpdateRecord({
+      bucket: summary.lessonTickets,
+      findExistingId: async () =>
+        (
+          await prisma.lessonTicket.findUnique({
+            where: { id: ticket.id },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.lessonTicket.create({
+          data: {
+            id: ticket.id,
+            lessonId,
+            userId: ownerId,
+            planId: plan.id,
+            status: ticket.status,
+            usedSessions: ticket.usedSessions ?? 0,
+            paidAmount: ticket.paidAmount,
+            expiresAt: ticket.expiresAt,
+          },
+        }),
+      update: (id) =>
+        prisma.lessonTicket.update({
+          where: { id },
+          data: {
+            status: ticket.status,
+            usedSessions: ticket.usedSessions ?? 0,
+            paidAmount: ticket.paidAmount,
+            expiresAt: ticket.expiresAt,
+          },
+        }),
+    });
+  }
+
+  // Seed lesson attendances
+  for (const attendance of catalog.lessonAttendances) {
+    const scheduleKey = `${attendance.lessonKey}:${attendance.sessionDate.toISOString()}`;
+    const scheduleId = lessonScheduleIds.get(scheduleKey);
+    if (!scheduleId) {
+      console.warn(`Skipping attendance: no schedule for ${scheduleKey}`);
+      continue;
+    }
+    const userId = requireId(userIds, attendance.userKey, 'lesson attendance user');
+    await createOrUpdateRecord({
+      bucket: summary.lessonAttendances,
+      findExistingId: async () =>
+        (
+          await prisma.lessonAttendance.findUnique({
+            where: { scheduleId_userId: { scheduleId, userId } },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.lessonAttendance.create({
+          data: { scheduleId, userId, ticketId: attendance.ticketId, status: attendance.status },
+        }),
+      update: (id) =>
+        prisma.lessonAttendance.update({
+          where: { id },
+          data: { status: attendance.status },
+        }),
+    });
+  }
+
+  // Seed chat rooms and messages
+  for (const room of catalog.chatRooms) {
+    const participantIds = room.participantKeys.map((key) => requireId(userIds, key, 'chat participant'));
+    const teamMatchId = room.teamMatchKey ? teamMatchIds.get(room.teamMatchKey) ?? null : null;
+    const record = await createOrUpdateRecord({
+      bucket: summary.chatRooms,
+      findExistingId: async () =>
+        (
+          await prisma.chatRoom.findFirst({
+            where: teamMatchId ? { teamMatchId } : { id: { contains: '' } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: async () => {
+        const chatRoom = await prisma.chatRoom.create({
+          data: {
+            type: room.type,
+            teamMatchId,
+            participants: {
+              create: participantIds.map((userId) => ({ userId })),
+            },
+          },
+        });
+        return chatRoom;
+      },
+      update: (id) => prisma.chatRoom.update({ where: { id }, data: { type: room.type } }),
+    });
+    chatRoomIds.set(room.key, record.id);
+  }
+
+  for (const msg of catalog.chatMessages) {
+    const chatRoomId = chatRoomIds.get(msg.chatRoomKey);
+    if (!chatRoomId) continue;
+    const senderId = requireId(userIds, msg.senderKey, 'chat message sender');
+    const createdAt = new Date(Date.now() + msg.offsetMinutes * 60 * 1000);
+    await createOrUpdateRecord({
+      bucket: summary.chatMessages,
+      findExistingId: async () => null,
+      create: () =>
+        prisma.chatMessage.create({
+          data: { roomId: chatRoomId, senderId, content: msg.content, type: msg.type, createdAt },
+        }),
+      update: (id) => prisma.chatMessage.update({ where: { id }, data: { content: msg.content } }),
+    });
+  }
+
+  // Seed venue reviews
+  for (const review of catalog.venueReviews) {
+    const venueId = requireId(venueIds, review.venueKey, 'venue review venue');
+    const authorId = requireId(userIds, review.authorKey, 'venue review author');
+    await createOrUpdateRecord({
+      bucket: summary.venueReviews,
+      findExistingId: async () =>
+        (
+          await prisma.venueReview.findUnique({
+            where: { venueId_userId: { venueId, userId: authorId } },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.venueReview.create({
+          data: {
+            venueId,
+            userId: authorId,
+            rating: review.rating,
+            facilityRating: review.facilityRating,
+            accessRating: review.accessRating,
+            costRating: review.costRating,
+            comment: review.comment,
+          },
+        }),
+      update: (id) =>
+        prisma.venueReview.update({
+          where: { id },
+          data: {
+            rating: review.rating,
+            facilityRating: review.facilityRating,
+            accessRating: review.accessRating,
+            costRating: review.costRating,
+            comment: review.comment,
+          },
+        }),
+    });
+  }
+
+  // Seed match reviews (only for completed matches)
+  for (const review of catalog.matchReviews) {
+    const matchId = requireId(matchIds, review.matchKey, 'match review match');
+    const authorId = requireId(userIds, review.authorKey, 'match review author');
+    const targetId = requireId(userIds, review.targetKey, 'match review target');
+    await createOrUpdateRecord({
+      bucket: summary.matchReviews,
+      findExistingId: async () =>
+        (
+          await prisma.review.findUnique({
+            where: { matchId_authorId_targetId: { matchId, authorId, targetId } },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.review.create({
+          data: {
+            matchId,
+            authorId,
+            targetId,
+            mannerRating: review.mannerRating,
+            skillRating: review.skillRating,
+            comment: review.comment,
+          },
+        }),
+      update: (id) =>
+        prisma.review.update({
+          where: { id },
+          data: {
+            mannerRating: review.mannerRating,
+            skillRating: review.skillRating,
+            comment: review.comment,
+          },
+        }),
+    });
+  }
+
+  // Seed notifications
+  for (const notification of catalog.notifications) {
+    const recipientId = requireId(userIds, notification.recipientKey, 'notification recipient');
+    await createOrUpdateRecord({
+      bucket: summary.notifications,
+      findExistingId: async () => null,
+      create: () =>
+        prisma.notification.create({
+          data: {
+            userId: recipientId,
+            type: notification.type,
+            title: notification.title,
+            body: notification.body,
+            isRead: notification.isRead,
+          },
+        }),
+      update: (id) =>
+        prisma.notification.update({
+          where: { id },
+          data: { isRead: notification.isRead },
+        }),
+    });
+  }
+
+  // Seed tournaments
+  for (const tournament of catalog.tournaments) {
+    const organizerId = requireId(userIds, tournament.organizerKey, 'tournament organizer');
+    await createOrUpdateRecord({
+      bucket: summary.tournaments,
+      findExistingId: async () =>
+        (
+          await prisma.tournament.findFirst({
+            where: { title: tournament.title },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.tournament.create({
+          data: {
+            organizerId,
+            sportType: tournament.sportType,
+            title: tournament.title,
+            status: tournament.status,
+            startDate: tournament.startDate,
+            endDate: tournament.endDate,
+            maxParticipants: tournament.maxParticipants,
+            currentParticipants: tournament.currentParticipants,
+            entryFee: tournament.entryFee,
+            description: tournament.description,
+          },
+        }),
+      update: (id) =>
+        prisma.tournament.update({
+          where: { id },
+          data: {
+            status: tournament.status,
+            startDate: tournament.startDate,
+            endDate: tournament.endDate,
+            maxParticipants: tournament.maxParticipants,
+            currentParticipants: tournament.currentParticipants,
+            entryFee: tournament.entryFee,
+            description: tournament.description,
+          },
+        }),
+    });
+  }
+
+  // Seed settlements
+  for (const settlement of catalog.settlements) {
+    const recipientId = requireId(userIds, settlement.recipientKey, 'settlement recipient');
+    await createOrUpdateRecord({
+      bucket: summary.settlements,
+      findExistingId: async () =>
+        (
+          await prisma.settlementRecord.findFirst({
+            where: { sourceId: settlement.sourceId },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.settlementRecord.create({
+          data: {
+            sourceId: settlement.sourceId,
+            type: settlement.type,
+            amount: settlement.amount,
+            commission: settlement.commission,
+            netAmount: settlement.netAmount,
+            status: settlement.status,
+            recipientId,
+          },
+        }),
+      update: (id) =>
+        prisma.settlementRecord.update({
+          where: { id },
+          data: {
+            amount: settlement.amount,
+            commission: settlement.commission,
+            netAmount: settlement.netAmount,
+            status: settlement.status,
+          },
+        }),
+    });
+  }
+
+  // Seed reports
+  for (const report of catalog.reports) {
+    const reporterId = requireId(userIds, report.reporterKey, 'report reporter');
+    await createOrUpdateRecord({
+      bucket: summary.reports,
+      findExistingId: async () =>
+        (
+          await prisma.report.findFirst({
+            where: { reporterId, targetId: report.targetId },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.report.create({
+          data: {
+            reporterId,
+            targetType: report.targetType,
+            targetId: report.targetId,
+            reason: report.reason,
+            status: report.status,
+          },
+        }),
+      update: (id) =>
+        prisma.report.update({
+          where: { id },
+          data: { status: report.status },
+        }),
+    });
+  }
+
+  // Seed user badges
+  for (const badge of catalog.userBadges) {
+    const userId = requireId(userIds, badge.userKey, 'user badge user');
+    await createOrUpdateRecord({
+      bucket: summary.userBadges,
+      findExistingId: async () =>
+        (
+          await prisma.userBadge.findUnique({
+            where: { userId_type: { userId, type: badge.type } },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.userBadge.create({
+          data: { userId, type: badge.type, name: badge.name, description: badge.description },
+        }),
+      update: (id) =>
+        prisma.userBadge.update({
+          where: { id },
+          data: { name: badge.name, description: badge.description },
+        }),
+    });
+  }
+
+  // Seed team trust scores
+  for (const score of catalog.teamTrustScores) {
+    const teamId = requireId(teamIds, score.teamKey, 'team trust score team');
+    await createOrUpdateRecord({
+      bucket: summary.teamTrustScores,
+      findExistingId: async () =>
+        (
+          await prisma.teamTrustScore.findUnique({
+            where: { teamId },
+            select: { id: true },
+          })
+        )?.id ?? null,
+      create: () =>
+        prisma.teamTrustScore.create({
+          data: {
+            teamId,
+            selfLevel: score.selfLevel,
+            mannerScore: score.mannerScore,
+            lateRate: score.lateRate,
+            noShowRate: score.noShowRate,
+            cancelRate: score.cancelRate,
+            totalMatches: score.totalMatches,
+            totalWins: score.totalWins,
+          },
+        }),
+      update: (id) =>
+        prisma.teamTrustScore.update({
+          where: { id },
+          data: {
+            selfLevel: score.selfLevel,
+            mannerScore: score.mannerScore,
+            lateRate: score.lateRate,
+            noShowRate: score.noShowRate,
+            cancelRate: score.cancelRate,
+            totalMatches: score.totalMatches,
+            totalWins: score.totalWins,
           },
         }),
     });

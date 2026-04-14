@@ -10,8 +10,9 @@ import { ErrorState } from '@/components/ui/error-state';
 import { useToast } from '@/components/ui/toast';
 import { VenueCard } from '@/components/venue/venue-card';
 import type { Venue } from '@/types/api';
+import type { SportType } from '@/types/enums.generated';
 
-const sportFilters = [
+const sportFilters: Array<{ key: SportType | ''; label: string }> = [
   { key: '', label: '전체' },
   { key: 'futsal', label: '풋살' },
   { key: 'basketball', label: '농구' },
@@ -33,7 +34,7 @@ const fallbackVenues: Venue[] = [
 ];
 
 export default function VenuesPage() {
-  const [activeSport, setActiveSport] = useState('');
+  const [activeSport, setActiveSport] = useState<SportType | ''>('');
   const [activeCity, setActiveCity] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);

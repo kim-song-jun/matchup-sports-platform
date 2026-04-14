@@ -1,3 +1,101 @@
+// ── Enum imports (generated from Prisma schema — single source of truth) ──
+export type {
+  SportType,
+  VenueType,
+  MatchStatus,
+  ParticipantStatus,
+  PaymentStatus,
+  PaymentMethod,
+  OAuthProvider,
+  UserRole,
+  AdminUserStatus,
+  AdminUserAuditAction,
+  Gender,
+  NotificationType,
+  ChatRoomType,
+  ChatMessageType,
+  ListingStatus,
+  TeamRole,
+  TeamMembershipStatus,
+  MercenaryPostStatus,
+  MercenaryApplicationStatus,
+  ListingType,
+  ItemCondition,
+  OrderStatus,
+  TournamentStatus,
+  LessonType,
+  LessonStatus,
+  TicketType,
+  TicketStatus,
+  AttendanceStatus,
+  TeamMatchStatus,
+  TeamMatchApplicationStatus,
+  MatchStyle,
+  ParticipationType,
+  InvitationStatus,
+  SettlementType,
+  SettlementStatus,
+  ReportTargetType,
+  ReportStatus,
+} from './enums.generated';
+export { SPORT_TYPES, SPORTTYPE_VALUES } from './enums.generated';
+
+import type {
+  SportType,
+  MatchStatus,
+  PaymentStatus,
+  PaymentMethod,
+  NotificationType,
+  ChatRoomType,
+  ListingStatus,
+  TeamRole,
+  MercenaryPostStatus,
+  MercenaryApplicationStatus,
+  ListingType,
+  ItemCondition,
+  TournamentStatus,
+  LessonType,
+  LessonStatus,
+  TicketType,
+  TicketStatus,
+  AttendanceStatus,
+  TeamMatchStatus,
+  TeamMatchApplicationStatus,
+  MatchStyle,
+  InvitationStatus,
+  SettlementType,
+  SettlementStatus,
+} from './enums.generated';
+
+// ── Named interfaces for JSON fields (no more Record<string, unknown>) ──
+export interface TeamConfig {
+  maxRoster: number;
+  positions: string[];
+  ruleOverrides?: {
+    strictAge?: boolean;
+    strictLevel?: boolean;
+    positionLocked?: boolean;
+  };
+}
+
+export interface MatchResult {
+  winnerId?: string;
+  teamScores: Array<{ teamId: string; score: number }>;
+  events: Array<{ minute: number; type: string; playerId?: string }>;
+}
+
+export interface VenueCoords {
+  lat: number;
+  lng: number;
+}
+
+export interface VenueInfo {
+  indoor?: boolean;
+  parking?: boolean;
+  shower?: boolean;
+  notes?: string;
+}
+
 // ── Common API response wrapper ──
 export interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -17,7 +115,6 @@ export interface CursorPage<T> {
 }
 
 // ── Match types ──
-export type MatchStatus = 'recruiting' | 'full' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 
 export interface RecommendationReason {
   type: 'level' | 'distance' | 'popularity' | 'urgency' | 'new';
@@ -27,7 +124,7 @@ export interface RecommendationReason {
 export interface Match {
   id: string;
   hostId: string;
-  sportType: string;
+  sportType: SportType;
   title: string;
   description: string | null;
   venueId: string;
@@ -42,7 +139,7 @@ export interface Match {
   gender: string;
   status: MatchStatus;
   imageUrl?: string;
-  teamConfig: Record<string, unknown> | null;
+  teamConfig: TeamConfig | null;
   createdAt?: string;
   venue?: { id: string; name: string; city: string; district?: string; address?: string; rating?: number; reviewCount?: number; lat?: number; lng?: number; imageUrls?: string[] };
   host?: { id: string; nickname: string; profileImageUrl: string | null; mannerScore?: number; totalMatches?: number };
@@ -57,8 +154,8 @@ export interface MatchParticipant {
   matchId: string;
   userId: string;
   teamId: string | null;
-  status: string;
-  paymentStatus: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  paymentStatus: PaymentStatus;
   joinedAt?: string;
   nickname?: string;
   arrivedAt?: string | null;
@@ -78,8 +175,8 @@ export interface Venue {
   id: string;
   name: string;
   type: string;
-  sportType?: string;
-  sportTypes: string[];
+  sportType?: SportType;
+  sportTypes: SportType[];
   address: string;
   lat?: number;
   lng?: number;
@@ -105,8 +202,8 @@ export interface Lesson {
   hostId: string;
   teamId?: string | null;
   venueId?: string | null;
-  sportType: string;
-  type: string;
+  sportType: SportType;
+  type: LessonType;
   title: string;
   description: string | null;
   venueName: string | null;
@@ -118,7 +215,7 @@ export interface Lesson {
   fee: number;
   levelMin: number;
   levelMax: number;
-  status: string;
+  status: LessonStatus;
   coachName: string | null;
   coachBio: string | null;
   imageUrl?: string;
@@ -143,9 +240,7 @@ export interface LessonParticipant {
 }
 
 // ── Ticket types ──
-export type TicketType = 'single' | 'multi' | 'unlimited';
-export type TicketStatus = 'active' | 'expired' | 'exhausted' | 'refunded' | 'cancelled';
-export type AttendanceStatus = 'scheduled' | 'attended' | 'absent' | 'late' | 'cancelled';
+// TicketType, TicketStatus, AttendanceStatus re-exported from enums.generated
 
 // Ticket plan — product that coach creates
 export interface LessonTicketPlan {
@@ -222,12 +317,12 @@ export interface MarketplaceListing {
   venueId?: string | null;
   title: string;
   description: string;
-  sportType: string;
+  sportType: SportType;
   category: string;
-  condition: string;
+  condition: ItemCondition;
   price: number;
-  listingType: string;
-  status: string;
+  listingType: ListingType;
+  status: ListingStatus;
   imageUrls: string[];
   locationCity: string | null;
   locationDistrict: string | null;
@@ -244,7 +339,7 @@ export interface Tournament {
   id: string;
   title: string;
   description?: string | null;
-  sportType: string;
+  sportType: SportType;
   city?: string | null;
   district?: string | null;
   venueName?: string | null;
@@ -252,7 +347,7 @@ export interface Tournament {
   startTime?: string | null;
   endTime?: string | null;
   entryFee?: number | null;
-  status?: 'draft' | 'recruiting' | 'full' | 'ongoing' | 'completed' | 'cancelled';
+  status?: TournamentStatus;
   imageUrl?: string | null;
   teamId?: string | null;
   venueId?: string | null;
@@ -283,13 +378,13 @@ export interface UserProfile {
   lastLoginAt?: string;
   provider?: string;
   winCount?: number;
-  sportTypes?: string[];
+  sportTypes?: SportType[];
   sportProfiles?: SportProfile[];
 }
 
 export interface SportProfile {
   id: string;
-  sportType: string;
+  sportType: SportType;
   level: number;
   eloRating: number;
   preferredPositions: string[];
@@ -304,8 +399,8 @@ export interface SportProfile {
 export interface MyTeam {
   id: string;
   name: string;
-  sportType: string;
-  sportTypes: string[];
+  sportType: SportType;
+  sportTypes: SportType[];
   description: string | null;
   city: string | null;
   district: string | null;
@@ -315,7 +410,7 @@ export interface MyTeam {
   logoUrl?: string;
   coverImageUrl?: string | null;
   photos?: string[];
-  role: 'owner' | 'manager' | 'member';
+  role: TeamRole;
   joinedAt?: string;
 }
 
@@ -324,8 +419,8 @@ export interface SportTeam {
   id: string;
   ownerId?: string;
   name: string;
-  sportType: string;
-  sportTypes: string[];
+  sportType: SportType;
+  sportTypes: SportType[];
   description: string | null;
   city: string | null;
   district: string | null;
@@ -427,7 +522,7 @@ export interface TeamMatch {
   hostTeamId: string;
   hostUserId?: string;
   guestTeamId?: string | null;
-  sportType: string;
+  sportType: SportType;
   title: string;
   description?: string | null;
   matchDate: string;
@@ -437,7 +532,7 @@ export interface TeamMatch {
   quarterCount: number;
   venueName: string;
   venueAddress: string;
-  venueInfo?: Record<string, unknown>;
+  venueInfo?: VenueInfo | null;
   totalFee: number;
   opponentFee: number;
   requiredLevel?: number;
@@ -449,11 +544,11 @@ export interface TeamMatch {
   uniformColor?: string;
   isFreeInvitation?: boolean;
   allowMercenary?: boolean;
-  matchStyle?: string;
+  matchStyle?: MatchStyle;
   hasReferee?: boolean;
   notes?: string;
-  status: string;
-  refereeSchedule?: Record<string, unknown>;
+  status: TeamMatchStatus;
+  refereeSchedule?: Record<string, string> | null;
   scoreHome?: TeamMatchQuarterScoreMap | null;
   scoreAway?: TeamMatchQuarterScoreMap | null;
   resultHome?: TeamMatchOutcome | null;
@@ -470,7 +565,7 @@ export interface TeamMatchApplication {
   id: string;
   teamMatchId: string;
   applicantTeamId: string;
-  status: string;
+  status: TeamMatchApplicationStatus;
   message: string | null;
   teamName?: string;
   createdAt?: string;
@@ -486,12 +581,12 @@ export interface TeamMatchRefereeSchedule {
 // ── Notification ──
 export interface Notification {
   id: string;
-  type: string;
+  type: NotificationType;
   title: string;
   body: string;
   isRead: boolean;
   createdAt: string;
-  data?: Record<string, unknown> | null;
+  data?: Record<string, string | number | boolean | null> | null;
   category?: 'match' | 'team' | 'chat' | 'payment' | 'system';
   link?: string | null;
   ctaLabel?: string | null;
@@ -505,14 +600,14 @@ export interface NotificationPreference {
   paymentEnabled: boolean;
 }
 
-export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+// InvitationStatus re-exported from enums.generated
 
 export interface TeamInvitation {
   id: string;
   teamId: string;
   team: { id: string; name: string; logoUrl?: string };
   inviter: { id: string; nickname: string };
-  role: string;
+  role: TeamRole;
   status: InvitationStatus;
   expiresAt: string;
   createdAt: string;
@@ -522,8 +617,8 @@ export interface TeamInvitation {
 export interface Payment {
   id: string;
   amount: number;
-  method: string | null;
-  status: string;
+  method: PaymentMethod | null;
+  status: PaymentStatus;
   orderId: string;
   paymentKey?: string | null;
   pgProvider?: string | null;
@@ -542,7 +637,7 @@ export interface Payment {
     match?: {
       id: string;
       title: string;
-      sportType: string;
+      sportType: SportType;
       matchDate: string;
       startTime: string;
       endTime?: string;
@@ -627,7 +722,7 @@ export interface AdminStatisticsOverview {
 }
 
 // ── Chat (API contract) ──
-export type ChatRoomType = 'team_match' | 'direct' | 'team';
+// ChatRoomType re-exported from enums.generated
 
 export interface ChatRoom {
   id: string;
@@ -661,7 +756,7 @@ export interface MercenaryApplication {
   postId: string;
   userId: string;
   message: string | null;
-  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+  status: MercenaryApplicationStatus;
   appliedAt: string;
   decidedAt: string | null;
   decidedBy?: string | null;
@@ -674,7 +769,7 @@ export interface MercenaryViewerState {
   canManage: boolean;
   canApply: boolean;
   applyBlockReason: string | null;
-  myApplicationStatus: MercenaryApplication['status'] | null;
+  myApplicationStatus: MercenaryApplicationStatus | null;
   myApplicationId: string | null;
 }
 
@@ -682,7 +777,7 @@ export interface MercenaryPost {
   id: string;
   teamId: string;
   authorId?: string;
-  sportType: string;
+  sportType: SportType;
   matchDate: string;
   venue?: string;
   position?: string;
@@ -692,7 +787,7 @@ export interface MercenaryPost {
   notes?: string | null;
   /** @deprecated use notes — kept for backward compat with older API responses */
   description?: string | null;
-  status: 'open' | 'closed' | 'filled' | 'cancelled';
+  status: MercenaryPostStatus;
   team?: SportTeam;
   applications?: MercenaryApplication[];
   applicationCount?: number;
@@ -775,7 +870,7 @@ export interface Dispute {
 // ── Settlement ──
 export interface Settlement {
   id: string;
-  type: string;
+  type: SettlementType;
   amount: number;
   commission: number;
   netAmount: number;
@@ -783,7 +878,7 @@ export interface Settlement {
   recipientName: string;
   relatedId: string;
   description: string;
-  status: string;
+  status: SettlementStatus;
   processedAt: string | null;
   createdAt: string;
   failureReason?: string | null;
@@ -815,8 +910,8 @@ export interface VenueScheduleSlot {
   matchDate: string;
   startTime: string;
   endTime: string;
-  sportType: string;
-  status: string;
+  sportType: SportType;
+  status: MatchStatus;
 }
 
 // ── Create input types ──
@@ -824,7 +919,7 @@ export interface CreateMatchInput {
   title: string;
   description?: string;
   imageUrl?: string;
-  sportType: string;
+  sportType: string; // string kept for form compatibility — Phase 3 will narrow to SportType
   venueId: string;
   matchDate: string;
   startTime: string;
@@ -834,7 +929,7 @@ export interface CreateMatchInput {
   levelMin?: number;
   levelMax?: number;
   gender?: string;
-  teamConfig?: Record<string, unknown>;
+  teamConfig?: TeamConfig;
 }
 
 export interface CreateTeamInput {
@@ -871,7 +966,7 @@ export interface UpdateMatchInput {
   levelMin?: number;
   levelMax?: number;
   gender?: string;
-  teamConfig?: Record<string, unknown>;
+  teamConfig?: TeamConfig;
   status?: MatchStatus;
 }
 
@@ -896,8 +991,8 @@ export interface Upload {
 }
 
 export interface CreateLessonInput {
-  sportType: string;
-  type: string;
+  sportType: string; // string kept for form compatibility — Phase 3 will narrow to SportType
+  type: string; // string kept for form compatibility — Phase 3 will narrow to LessonType
   title: string;
   description?: string;
   venueId?: string;
@@ -921,13 +1016,13 @@ export interface CreateLessonInput {
 export interface CreateListingInput {
   title: string;
   description: string;
-  sportType: string;
+  sportType: string; // string kept for form compatibility — Phase 3 will narrow to SportType
   teamId?: string;
   venueId?: string;
   category: string;
-  condition: string;
+  condition: ItemCondition;
   price: number;
-  listingType: string;
+  listingType: ListingType;
   imageUrls?: string[];
   locationCity?: string;
   locationDistrict?: string;
@@ -937,11 +1032,11 @@ export interface CreateListingInput {
   groupBuyDeadline?: string;
 }
 
-export type UpdateListingInput = Partial<CreateListingInput> & { status?: string };
+export type UpdateListingInput = Partial<CreateListingInput> & { status?: ListingStatus };
 
 export interface CreateTournamentInput {
   title: string;
-  sportType: string;
+  sportType: string; // string kept for form compatibility — Phase 3 will narrow to SportType
   eventDate: string;
   description?: string;
   entryFee?: number;
@@ -995,7 +1090,7 @@ export interface AdminTeamMember {
   email?: string | null;
   profileImageUrl?: string | null;
   mannerScore?: number;
-  role: 'owner' | 'manager' | 'member';
+  role: TeamRole;
   joinedAt: string;
 }
 
@@ -1019,13 +1114,13 @@ export interface AdminTeamDetail extends SportTeam {
     venueName: string;
     totalFee: number;
     opponentFee: number;
-    status: string;
+    status: TeamMatchStatus;
   }>;
 }
 
 export interface CreateTeamMatchInput {
   hostTeamId: string;
-  sportType: string;
+  sportType: string; // string kept for form compatibility — Phase 3 will narrow to SportType
   title: string;
   matchDate: string;
   startTime: string;
@@ -1091,7 +1186,7 @@ export interface SendMessageInput {
 export interface CreateMercenaryPostInput {
   teamId: string;
   matchDate: string;
-  sportType: string;
+  sportType: string; // string kept for form compatibility — Phase 3 will narrow to SportType
   venue: string;
   position: string;
   count?: number;
@@ -1132,7 +1227,7 @@ export interface ArriveMatchInput {
 // ── MyTeamMatchApplication — applicant-side view of team match applications ──
 export interface MyTeamMatchApplication {
   id: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  status: TeamMatchApplicationStatus;
   message: string | null;
   createdAt: string;
   teamMatch: {

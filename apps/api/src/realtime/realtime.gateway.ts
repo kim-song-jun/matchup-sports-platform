@@ -53,6 +53,7 @@ export class RealtimeGateway
     private readonly chatService: ChatService,
   ) {}
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Socket.IO handleConnection requires ...args: any[]
   async handleConnection(client: Socket, ...args: any[]) {
     try {
       const token =

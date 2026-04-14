@@ -9,11 +9,13 @@ import {
   Max,
   MaxLength,
   IsNotEmpty,
-  IsObject,
   IsUUID,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SportType, VenueType } from '@prisma/client';
+import { OperatingHoursDto } from '../../venues/dto/operating-hours.dto';
 
 export class CreateVenueAdminDto {
   @ApiProperty({ description: '구장 이름', maxLength: 200 })
@@ -91,10 +93,11 @@ export class CreateVenueAdminDto {
   @IsOptional()
   facilities?: string[];
 
-  @ApiPropertyOptional({ description: '운영 시간 (JSON 객체)', example: { mon: '09:00-22:00' } })
-  @IsObject()
+  @ApiPropertyOptional({ description: '운영 시간 (요일별 HH:MM-HH:MM 또는 "closed")', type: OperatingHoursDto })
   @IsOptional()
-  operatingHours?: Record<string, string>;
+  @ValidateNested()
+  @Type(() => OperatingHoursDto)
+  operatingHours?: OperatingHoursDto;
 
   @ApiPropertyOptional({ description: '시간당 대여료 (원)', minimum: 0 })
   @IsInt()
@@ -189,10 +192,11 @@ export class UpdateVenueAdminDto {
   @IsOptional()
   facilities?: string[];
 
-  @ApiPropertyOptional({ description: '운영 시간 (JSON 객체)' })
-  @IsObject()
+  @ApiPropertyOptional({ description: '운영 시간 (요일별 HH:MM-HH:MM 또는 "closed")', type: OperatingHoursDto })
   @IsOptional()
-  operatingHours?: Record<string, string>;
+  @ValidateNested()
+  @Type(() => OperatingHoursDto)
+  operatingHours?: OperatingHoursDto;
 
   @ApiPropertyOptional({ description: '시간당 대여료 (원)', minimum: 0 })
   @IsInt()

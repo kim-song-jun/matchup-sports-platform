@@ -6,6 +6,7 @@ import { WebPushService } from './web-push.service';
 import { UserBlocksService } from '../user-blocks/user-blocks.service';
 import { RedisCacheService } from '../redis/redis-cache.service';
 import { NotificationType } from '@prisma/client';
+import { buildNotification } from '../../test/fixtures/notifications';
 
 const mockUserBlocksService = {
   isBlocked: jest.fn().mockResolvedValue(false),
@@ -65,14 +66,8 @@ describe('NotificationsService', () => {
   describe('findMine', () => {
     it('returns paginated notifications for the user', async () => {
       const items = [
-        {
-          id: 'n1', userId: 'u1', type: NotificationType.match_created,
-          title: 'Match!', body: 'Ready', data: {}, isRead: false, createdAt: new Date(),
-        },
-        {
-          id: 'n2', userId: 'u1', type: NotificationType.match_created,
-          title: 'Match2!', body: 'Ready2', data: {}, isRead: false, createdAt: new Date(),
-        },
+        buildNotification({ id: 'n1', userId: 'u1', title: 'Match!', body: 'Ready' }),
+        buildNotification({ id: 'n2', userId: 'u1', title: 'Match2!', body: 'Ready2' }),
       ];
       mockPrisma.notification.findMany.mockResolvedValue(items);
 
@@ -87,10 +82,9 @@ describe('NotificationsService', () => {
     });
 
     it('returns hasMore=true and nextCursor when there are more items', async () => {
-      const items = Array.from({ length: 21 }, (_, i) => ({
-        id: `n${i}`, userId: 'u1', type: NotificationType.match_created,
-        title: `N${i}`, body: 'Body', data: {}, isRead: false, createdAt: new Date(),
-      }));
+      const items = Array.from({ length: 21 }, (_, i) =>
+        buildNotification({ id: `n${i}`, userId: 'u1', title: `N${i}`, body: 'Body' }),
+      );
       mockPrisma.notification.findMany.mockResolvedValue(items);
 
       const result = await service.findMine('u1', { limit: 20 });
@@ -172,16 +166,13 @@ describe('NotificationsService', () => {
     });
 
     it('persists notification, emits realtime event, and calls webPushService.sendToUser', async () => {
-      const notification = {
+      const notification = buildNotification({
         id: 'n1',
         userId: 'u1',
-        type: NotificationType.match_created,
         title: 'Match!',
         body: 'Your match is ready',
         data: { matchId: 'match-1' },
-        isRead: false,
-        createdAt: new Date(),
-      };
+      });
       mockPrisma.notificationPreference.findUnique.mockResolvedValue(null);
       mockPrisma.notification.create.mockResolvedValue(notification);
 
@@ -281,15 +272,16 @@ describe('NotificationsService', () => {
   describe('markRead', () => {
     it('marks the notification as read', async () => {
       mockPrisma.notification.findUnique.mockResolvedValue({ id: 'n1', userId: 'u1' });
-      mockPrisma.notification.update.mockResolvedValue({
-        id: 'n1',
-        type: NotificationType.match_created,
-        title: 'Match!',
-        body: 'Your match is ready',
-        isRead: true,
-        data: { matchId: 'match-1' },
-        createdAt: new Date(),
-      });
+      mockPrisma.notification.update.mockResolvedValue(
+        buildNotification({
+          id: 'n1',
+          userId: 'u1',
+          title: 'Match!',
+          body: 'Your match is ready',
+          data: { matchId: 'match-1' },
+          isRead: true,
+        }),
+      );
 
       await service.markRead('n1', 'u1');
 

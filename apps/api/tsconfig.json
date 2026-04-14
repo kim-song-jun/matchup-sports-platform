@@ -20,7 +20,7 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "prisma/**/*"],
+  "include": ["src/**/*", "prisma/**/*", "test/fixtures/**/*", "test/helpers/**/*"],
   "ts-node": {
     "transpileOnly": true,
     "compilerOptions": {

@@ -8,7 +8,7 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiOkResponse, ApiUnauthorizedResponse, ApiNotFoundResponse } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { TeamsService } from '../teams/teams.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,6 +27,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '내 프로필 조회' })
+  @ApiOkResponse({ description: 'My full profile' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async getMyProfile(@CurrentUser('id') userId: string) {
     return this.usersService.findById(userId);
   }
@@ -35,6 +37,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '프로필 수정' })
+  @ApiOkResponse({ description: 'Profile updated' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async updateProfile(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProfileDto,
@@ -46,6 +50,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '내 매치 히스토리' })
+  @ApiOkResponse({ description: 'Match history list' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async getMyMatches(
     @CurrentUser('id') userId: string,
     @Query('status') status?: string,
@@ -59,6 +65,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '내게 온 팀 초대 목록 (pending)' })
+  @ApiOkResponse({ description: 'Pending invitation list' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async getMyInvitations(@CurrentUser('id') userId: string) {
     return this.teamsService.getMyInvitations(userId);
   }
@@ -68,6 +76,8 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '닉네임으로 사용자 검색 (최대 10명, 본인 제외)' })
   @ApiQuery({ name: 'q', description: '검색할 닉네임 (부분 일치)', required: true })
+  @ApiOkResponse({ description: 'User search results (max 10)' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async searchUsers(
     @CurrentUser('id') userId: string,
     @Query('q') query: string,
@@ -81,8 +91,15 @@ export class UsersController {
     return this.usersService.searchByNickname(query.trim(), userId);
   }
 
+  /**
+   * Public endpoint (intentional, whitelisted). Returns a limited public profile
+   * (nickname, profileImageUrl, gender, mannerScore, totalMatches, sportProfiles only).
+   * Full profile (email, phone, etc.) is only accessible via GET /users/me with JwtAuthGuard.
+   */
   @Get(':id')
-  @ApiOperation({ summary: '사용자 프로필 조회' })
+  @ApiOperation({ summary: '사용자 공개 프로필 조회 (공개)' })
+  @ApiOkResponse({ description: 'Limited public profile (nickname, profileImageUrl, mannerScore, sport profiles)' })
+  @ApiNotFoundResponse({ description: 'User not found' })
   async getProfile(@Param('id') id: string) {
     return this.usersService.getPublicProfile(id);
   }

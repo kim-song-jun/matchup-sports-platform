@@ -8,7 +8,8 @@ import { useVenues } from '@/hooks/use-api';
 import type { Venue } from '@/types/api';
 import { useToast } from '@/components/ui/toast';
 import { useRequireAuth } from '@/hooks/use-require-auth';
-import { sportLabel, levelLabel } from '@/lib/constants';
+import { sportLabel, levelLabel, sportCardAccent, SportType } from '@/lib/constants';
+import { SportIconMap } from '@/components/icons/sport-icons';
 import { getSportImageSet } from '@/lib/sport-image';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -139,20 +140,34 @@ export default function CreateMatchPage() {
           <div className="space-y-3 mt-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">어떤 종목인가요?</h3>
             <div className="flex flex-wrap gap-2">
-              {sportTypes.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
-                  data-testid={`match-sport-${type}`}
-                  className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-                    form.sportType === type
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                      : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {sportLabel[type] || type}
-                </button>
-              ))}
+              {sportTypes.map((type) => {
+                const Icon = SportIconMap[type as SportType];
+                const accent = sportCardAccent[type as SportType];
+                const isSelected = form.sportType === type;
+                // Convert dot color (e.g. 'bg-green-400') to icon text color (e.g. 'text-green-400')
+                const iconColor = accent?.dot ? accent.dot.replace('bg-', 'text-') : 'text-gray-400';
+                return (
+                  <button
+                    key={type}
+                    onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
+                    data-testid={`match-sport-${type}`}
+                    aria-pressed={isSelected}
+                    className={`inline-flex items-center gap-2 rounded-xl min-h-[44px] px-4 py-2.5 text-sm font-medium transition-colors ${
+                      isSelected
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {Icon && (
+                      <Icon
+                        size={16}
+                        className={isSelected ? 'text-white' : iconColor}
+                      />
+                    )}
+                    {sportLabel[type] || type}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

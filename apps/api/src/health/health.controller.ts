@@ -1,5 +1,5 @@
 import { Controller, Get, Inject } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import type Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 import { REDIS_CLIENT } from '../redis/redis.module';
@@ -14,6 +14,7 @@ export class HealthController {
 
   @Get('health')
   @ApiOperation({ summary: '헬스체크' })
+  @ApiOkResponse({ description: 'Service health status (ok or degraded)' })
   async health() {
     const dbOk = await this.prisma.$queryRaw`SELECT 1`
       .then(() => true)

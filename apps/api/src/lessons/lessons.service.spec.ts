@@ -376,6 +376,17 @@ describe('LessonsService', () => {
       });
     });
 
+    it('should throw ForbiddenException when caller lacks manager role for team-affiliated lesson', async () => {
+      teamMembershipServiceMock.assertRole.mockRejectedValue(
+        new ForbiddenException('팀 권한이 부족합니다'),
+      );
+
+      await expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        service.create('user-99', 'user', { ...createData, teamId: 'team-1' } as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('should use default values for optional fields', async () => {
       const minimalData = {
         sportType: SportType.basketball,

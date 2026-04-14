@@ -488,8 +488,8 @@ export class TeamMatchesService {
 
     if (evals.length === 0) return;
 
-    const avg = (field: keyof typeof evals[0]) =>
-      evals.reduce((sum: number, e: Record<string, unknown>) => sum + (e[field as string] as number), 0) / evals.length;
+    const avg = (field: keyof (typeof evals)[0]) =>
+      evals.reduce((sum: number, e) => sum + (e[field] as number), 0) / evals.length;
 
     await this.prisma.teamTrustScore.upsert({
       where: { teamId },
@@ -509,7 +509,7 @@ export class TeamMatchesService {
     });
   }
 
-  private normalizeQuarterScores(scoreMap: Record<string, unknown>, quarterCount: number, label: '홈팀' | '원정팀'): Record<string, number> {
+  private normalizeQuarterScores(scoreMap: Record<string, number>, quarterCount: number, label: '홈팀' | '원정팀'): Record<string, number> {
     if (!scoreMap || typeof scoreMap !== 'object' || Array.isArray(scoreMap)) {
       throw new BadRequestException(`${label} 점수 형식이 올바르지 않습니다`);
     }

@@ -206,7 +206,7 @@ export default function MercenaryDetailPage() {
         <div className="min-w-11" aria-hidden="true" />
       </MobileGlassHeader>
 
-      <div className="px-5 @3xl:px-0 pb-28">
+      <div className="px-5 @3xl:px-0 pb-40">
         <div className="hidden @3xl:flex items-center gap-2 px-5 @3xl:px-0 pt-4 mb-4 text-sm text-gray-500 dark:text-gray-400">
           <Link href="/mercenary" className="hover:text-blue-500 transition-colors">용병 모집</Link>
           <ChevronRight size={14} aria-hidden="true" />
@@ -366,7 +366,7 @@ export default function MercenaryDetailPage() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-20 lg:bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 lg:pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {canEdit ? (
           <div className="flex gap-3">
             <Link

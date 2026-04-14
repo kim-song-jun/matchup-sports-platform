@@ -1,5 +1,6 @@
 'use client';
 import { io, Socket } from 'socket.io-client';
+import type { NotificationType } from '@/types/enums.generated';
 
 // Event payload types for typed subscriptions
 export interface ChatMessagePayload {
@@ -13,11 +14,11 @@ export interface ChatMessagePayload {
 
 export interface NotificationPayload {
   id: string;
-  type: string;
+  type: NotificationType;
   title: string;
   body: string;
   isRead?: boolean;
-  data?: Record<string, unknown>;
+  data?: Record<string, string | number | boolean | null>;
   category?: 'match' | 'team' | 'chat' | 'payment' | 'system';
   link?: string | null;
   ctaLabel?: string | null;

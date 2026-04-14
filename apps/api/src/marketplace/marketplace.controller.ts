@@ -1,18 +1,11 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MarketplaceService } from './marketplace.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
-
-class ConfirmOrderPaymentDto {
-  @ApiProperty({ description: '토스페이먼츠 paymentKey' })
-  @IsString()
-  @IsNotEmpty()
-  paymentKey!: string;
-}
+import { ConfirmOrderPaymentDto } from './dto/confirm-order-payment.dto';
 
 @ApiTags('장터')
 @Controller('marketplace')

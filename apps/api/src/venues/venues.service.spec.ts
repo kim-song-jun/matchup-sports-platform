@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { SportType } from '@prisma/client';
 import { VenuesService } from './venues.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisCacheService } from '../redis/redis-cache.service';
+import { buildVenue } from '../../test/fixtures/venues';
 
 describe('VenuesService', () => {
   let service: VenuesService;
@@ -67,24 +69,8 @@ describe('VenuesService', () => {
 
   describe('findAll', () => {
     const mockVenues = [
-      {
-        id: 'venue-1',
-        name: '서울 풋살파크',
-        city: '서울',
-        district: '강남구',
-        sportTypes: ['futsal'],
-        rating: 4.5,
-        reviewCount: 10,
-      },
-      {
-        id: 'venue-2',
-        name: '부산 체육관',
-        city: '부산',
-        district: '해운대구',
-        sportTypes: ['basketball', 'badminton'],
-        rating: 4.2,
-        reviewCount: 8,
-      },
+      buildVenue({ id: 'venue-1', name: '서울 풋살파크', city: '서울', district: '강남구', rating: 4.5, reviewCount: 10 }),
+      buildVenue({ id: 'venue-2', name: '부산 체육관', city: '부산', district: '해운대구', sportTypes: [SportType.basketball, SportType.badminton], rating: 4.2, reviewCount: 8 }),
     ];
 
     it('should return all venues with no filter', async () => {

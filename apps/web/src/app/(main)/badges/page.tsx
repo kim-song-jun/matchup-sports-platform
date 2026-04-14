@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useAllBadgeTypes } from '@/hooks/use-api';
 import { formatDateCompact } from '@/lib/utils';
 import { TrustSignalBanner } from '@/components/ui/trust-signal-banner';
-import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 
 interface BadgeInfo {
@@ -53,8 +52,6 @@ export default function BadgesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
   const { data: apiBadges, isLoading, isError, refetch } = useAllBadgeTypes();
-  const hasLiveCatalog = Boolean(apiBadges?.length);
-
   // Merge API data with local UI metadata; fall back to static data when API is empty
   const badges: BadgeInfo[] = apiBadges && apiBadges.length > 0
     ? apiBadges.map((ab) => {
@@ -138,7 +135,7 @@ export default function BadgesPage() {
                   key={badge.id || `earned-${idx}`}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-white dark:bg-gray-800"
                 >
-                  <Icon size={14} />
+                  <Icon size={14} className={badge.color} />
                 </div>
               );
             })}

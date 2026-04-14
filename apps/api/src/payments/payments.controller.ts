@@ -28,8 +28,8 @@ export class PaymentsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '결제 승인' })
   @ApiBody({ type: ConfirmPaymentDto })
-  async confirm(@Body() dto: ConfirmPaymentDto) {
-    return this.paymentsService.confirm(dto);
+  async confirm(@CurrentUser('id') userId: string, @Body() dto: ConfirmPaymentDto) {
+    return this.paymentsService.confirm(dto, userId);
   }
 
   @Post('webhook')

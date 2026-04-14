@@ -20,9 +20,9 @@ const sportFilters = [
 ] as const;
 
 const banners = [
-  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-slate-800 dark:bg-slate-900', iconBg: 'bg-white/10', iconColor: 'text-emerald-300' },
-  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-gray-900 dark:bg-gray-950', iconBg: 'bg-white/10', iconColor: 'text-blue-300' },
-  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-slate-900 dark:bg-slate-950', iconBg: 'bg-white/10', iconColor: 'text-amber-300' },
+  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-slate-800 dark:bg-slate-700', iconBg: 'bg-white/10', iconColor: 'text-emerald-300' },
+  { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-gray-900 dark:bg-gray-800', iconBg: 'bg-white/10', iconColor: 'text-blue-300' },
+  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-slate-900 dark:bg-slate-800', iconBg: 'bg-white/10', iconColor: 'text-amber-300' },
 ] as const;
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];

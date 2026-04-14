@@ -101,7 +101,7 @@ export class UsersService {
     userId: string,
     options: { status?: string; cursor?: string; limit?: number },
   ) {
-    const limit = options.limit || 20;
+    const limit = options.limit ?? 20;
 
     const participants = await this.prisma.matchParticipant.findMany({
       where: {

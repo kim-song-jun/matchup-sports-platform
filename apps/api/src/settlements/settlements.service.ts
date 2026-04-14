@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class SettlementsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(filter: { status?: string; type?: string }) {
+  async findAll(filter: { status?: string; type?: string; cursor?: string; limit?: number }) {
     const where: {
       status?: SettlementStatus;
       type?: SettlementType;
@@ -19,15 +19,26 @@ export class SettlementsService {
       where.type = filter.type as SettlementType;
     }
 
+    const take = Math.min(filter.limit ?? 20, 100);
+
     const [items, total] = await this.prisma.$transaction([
       this.prisma.settlementRecord.findMany({
         where,
         orderBy: { createdAt: 'desc' },
+        take: take + 1,
+        ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
       }),
       this.prisma.settlementRecord.count({ where }),
     ]);
 
-    return { items, total };
+    const hasMore = items.length > take;
+    if (hasMore) items.pop();
+
+    return {
+      items,
+      total,
+      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+    };
   }
 
   async getById(id: string) {

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -193,7 +193,7 @@ describe('PaymentsService — production fallback without Toss key', () => {
       orderId: 'MU-111',
       paymentKey: 'pk-mock',
       amount: 15000,
-    });
+    }, 'user-1');
 
     expect(result.pgProvider).toBe('mock');
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -343,7 +343,7 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
         orderId: 'MU-111',
         paymentKey: 'pk-mock',
         amount: 15000,
-      });
+      }, 'user-1');
 
       expect(result.status).toBe('completed');
       expect(prismaMock.matchParticipant.update).toHaveBeenCalledWith(
@@ -364,7 +364,7 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
       prismaMock.payment.findUnique.mockResolvedValue(mockPayment({ status: 'pending', amount: 15000 }));
 
       await expect(
-        service.confirm({ orderId: 'MU-111', paymentKey: 'pk-mock', amount: 5000 }),
+        service.confirm({ orderId: 'MU-111', paymentKey: 'pk-mock', amount: 5000 }, 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -372,8 +372,19 @@ describe('PaymentsService — mock mode (no TOSS_SECRET_KEY)', () => {
       prismaMock.payment.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.confirm({ orderId: 'no-such', paymentKey: 'pk-mock' }),
+        service.confirm({ orderId: 'no-such', paymentKey: 'pk-mock' }, 'user-1'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when userId does not match payment owner', async () => {
+      // Payment belongs to user-1, but user-2 tries to confirm it
+      prismaMock.payment.findUnique.mockResolvedValue(
+        mockPayment({ userId: 'user-1', status: 'pending', amount: 15000 }),
+      );
+
+      await expect(
+        service.confirm({ orderId: 'MU-111', paymentKey: 'pk-mock', amount: 15000 }, 'user-2'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -548,7 +559,7 @@ describe('PaymentsService — real mode (TOSS_SECRET_KEY set)', () => {
         orderId: 'MU-111',
         paymentKey: 'pk-toss-real',
         amount: 15000,
-      });
+      }, 'user-1');
 
       expect(result.status).toBe('completed');
       expect(global.fetch).toHaveBeenCalledWith(
@@ -572,7 +583,7 @@ describe('PaymentsService — real mode (TOSS_SECRET_KEY set)', () => {
       prismaMock.payment.update.mockResolvedValue(mockPayment({ status: 'failed' }));
 
       await expect(
-        service.confirm({ orderId: 'MU-111', paymentKey: 'pk-bad', amount: 15000 }),
+        service.confirm({ orderId: 'MU-111', paymentKey: 'pk-bad', amount: 15000 }, 'user-1'),
       ).rejects.toThrow(BadRequestException);
 
       expect(prismaMock.payment.update).toHaveBeenCalledWith(

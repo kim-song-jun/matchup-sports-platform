@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { UpdateVenueDto } from './dto/update-venue.dto';
+import { CreateVenueReviewDto } from './dto/create-venue-review.dto';
 import { RedisCacheService } from '../redis/redis-cache.service';
 
 const VENUES_LIST_TTL = 300; // 5 minutes
@@ -15,9 +16,9 @@ export class VenuesService {
 
   async findAll(params?: { city?: string; type?: string; sportType?: string; cursor?: string; take?: number }) {
     const take = params?.take ?? 50;
-    const where: Record<string, unknown> = {};
+    const where: Prisma.VenueWhereInput = {};
     if (params?.city) where.city = params.city;
-    if (params?.type) where.type = params.type;
+    if (params?.type) where.type = params.type as Prisma.VenueWhereInput['type'];
     if (params?.sportType) where.sportTypes = { has: params.sportType as never };
 
     const cacheKey = `venues:list:${JSON.stringify({ ...where, cursor: params?.cursor, take })}`;
@@ -193,18 +194,18 @@ export class VenuesService {
     });
   }
 
-  async createReview(venueId: string, userId: string, data: Record<string, unknown>) {
+  async createReview(venueId: string, userId: string, data: CreateVenueReviewDto) {
     const review = await this.prisma.venueReview.create({
       data: {
         venueId,
         userId,
-        rating: data.rating as number,
-        facilityRating: data.facilityRating as number,
-        accessRating: data.accessRating as number,
-        costRating: data.costRating as number,
-        iceQuality: data.iceQuality as number | undefined,
-        comment: data.comment as string | undefined,
-        imageUrls: (data.imageUrls as string[]) || [],
+        rating: data.rating,
+        facilityRating: data.facilityRating,
+        accessRating: data.accessRating,
+        costRating: data.costRating,
+        iceQuality: data.iceQuality,
+        comment: data.comment,
+        imageUrls: data.imageUrls ?? [],
       },
     });
 

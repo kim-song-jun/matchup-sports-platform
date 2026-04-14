@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsEmail, MinLength, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsOptional, IsEmail, MinLength, IsNotEmpty, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class OAuthLoginDto {
   @ApiProperty({ description: 'OAuth 인증 코드' })
@@ -42,4 +42,13 @@ export class EmailLoginDto {
   @ApiProperty({ example: 'password123' })
   @IsString()
   password: string;
+}
+
+/** Dev-only: typed DTO so class-validator can reject malformed dev-login bodies. */
+export class DevLoginDto {
+  @ApiPropertyOptional({ example: '테스트유저', description: 'Nickname to log in or create (dev environment only)', maxLength: 50 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  nickname?: string;
 }

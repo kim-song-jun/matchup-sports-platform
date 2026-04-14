@@ -200,69 +200,69 @@ enum TournamentStatus {
 // ─── Models ──────────────────────────────────────────────
 
 model User {
-  id              String   @id @default(uuid())
-  email           String?  @unique
-  passwordHash    String?  @map("password_hash")
-  nickname        String   @unique
-  role            UserRole @default(user)
-  adminStatus     AdminUserStatus @default(active) @map("admin_status")
-  adminSuspensionReason String? @map("admin_suspension_reason")
-  profileImageUrl String?  @map("profile_image_url")
-  phone           String?
-  gender          Gender?
-  birthYear       Int?     @map("birth_year")
-  bio             String?
-  sportTypes      SportType[] @map("sport_types")
-  locationLat     Float?   @map("location_lat")
-  locationLng     Float?   @map("location_lng")
-  locationCity    String?  @map("location_city")
-  locationDistrict String? @map("location_district")
-  mannerScore     Float    @default(3.0) @map("manner_score")
-  totalMatches    Int      @default(0) @map("total_matches")
+  id                    String          @id @default(uuid())
+  email                 String?         @unique
+  passwordHash          String?         @map("password_hash")
+  nickname              String          @unique
+  role                  UserRole        @default(user)
+  adminStatus           AdminUserStatus @default(active) @map("admin_status")
+  adminSuspensionReason String?         @map("admin_suspension_reason")
+  profileImageUrl       String?         @map("profile_image_url")
+  phone                 String?
+  gender                Gender?
+  birthYear             Int?            @map("birth_year")
+  bio                   String?
+  sportTypes            SportType[]     @map("sport_types")
+  locationLat           Float?          @map("location_lat")
+  locationLng           Float?          @map("location_lng")
+  locationCity          String?         @map("location_city")
+  locationDistrict      String?         @map("location_district")
+  mannerScore           Float           @default(3.0) @map("manner_score")
+  totalMatches          Int             @default(0) @map("total_matches")
 
   // OAuth
-  oauthProvider   OAuthProvider @map("oauth_provider")
-  oauthId         String   @map("oauth_id")
+  oauthProvider OAuthProvider @map("oauth_provider")
+  oauthId       String        @map("oauth_id")
 
   // Timestamps
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  sportProfiles       UserSportProfile[]
-  hostedMatches       Match[]              @relation("HostedMatches")
-  matchParticipations MatchParticipant[]
-  reviews             Review[]             @relation("ReviewAuthor")
-  receivedReviews     Review[]             @relation("ReviewTarget")
-  payments            Payment[]
-  notifications       Notification[]
-  venueReviews        VenueReview[]
-  listings            MarketplaceListing[] @relation("ListingSeller")
-  orders              MarketplaceOrder[]   @relation("OrderBuyer")
-  soldOrders          MarketplaceOrder[]   @relation("OrderSeller")
-  hostedLessons       Lesson[]             @relation("LessonHost")
-  ownedVenues         Venue[]              @relation("VenueOwner")
-  lessonTickets       LessonTicket[]       @relation("UserLessonTickets")
-  lessonAttendances   LessonAttendance[]   @relation("UserLessonAttendances")
-  ownedTeams          SportTeam[]          @relation("TeamOwner")
-  organizedTournaments Tournament[]        @relation("TournamentOrganizer")
-  teamMemberships     TeamMembership[]     @relation("TeamMemberships")
-  mercenaryApplications MercenaryApplication[] @relation("UserMercenaryApplications")
-  authoredMercenaryPosts MercenaryPost[]  @relation("MercenaryAuthor")
+  sportProfiles          UserSportProfile[]
+  hostedMatches          Match[]                 @relation("HostedMatches")
+  matchParticipations    MatchParticipant[]
+  reviews                Review[]                @relation("ReviewAuthor")
+  receivedReviews        Review[]                @relation("ReviewTarget")
+  payments               Payment[]
+  notifications          Notification[]
+  venueReviews           VenueReview[]
+  listings               MarketplaceListing[]    @relation("ListingSeller")
+  orders                 MarketplaceOrder[]      @relation("OrderBuyer")
+  soldOrders             MarketplaceOrder[]      @relation("OrderSeller")
+  hostedLessons          Lesson[]                @relation("LessonHost")
+  ownedVenues            Venue[]                 @relation("VenueOwner")
+  lessonTickets          LessonTicket[]          @relation("UserLessonTickets")
+  lessonAttendances      LessonAttendance[]      @relation("UserLessonAttendances")
+  ownedTeams             SportTeam[]             @relation("TeamOwner")
+  organizedTournaments   Tournament[]            @relation("TournamentOrganizer")
+  teamMemberships        TeamMembership[]        @relation("TeamMemberships")
+  mercenaryApplications  MercenaryApplication[]  @relation("UserMercenaryApplications")
+  authoredMercenaryPosts MercenaryPost[]         @relation("MercenaryAuthor")
   chatParticipations     ChatRoomParticipant[]
-  sentMessages           ChatMessage[]        @relation("MessageSender")
+  sentMessages           ChatMessage[]           @relation("MessageSender")
   pushSubscriptions      PushSubscription[]
   uploads                Upload[]
-  sentInvitations        TeamInvitation[]     @relation("InvitationsSent")
-  receivedInvitations    TeamInvitation[]     @relation("InvitationsReceived")
+  sentInvitations        TeamInvitation[]        @relation("InvitationsSent")
+  receivedInvitations    TeamInvitation[]        @relation("InvitationsReceived")
   notificationPreference NotificationPreference?
   userBadges             UserBadge[]
-  sentReports            Report[]             @relation("ReportsSent")
-  blocksFrom             UserBlock[]          @relation("BlocksFrom")
-  blocksTo               UserBlock[]          @relation("BlocksTo")
-  receivedAdminAuditLogs AdminUserAuditLog[]  @relation("AdminAuditTarget")
-  actedAdminAuditLogs    AdminUserAuditLog[]  @relation("AdminAuditActor")
+  sentReports            Report[]                @relation("ReportsSent")
+  blocksFrom             UserBlock[]             @relation("BlocksFrom")
+  blocksTo               UserBlock[]             @relation("BlocksTo")
+  receivedAdminAuditLogs AdminUserAuditLog[]     @relation("AdminAuditTarget")
+  actedAdminAuditLogs    AdminUserAuditLog[]     @relation("AdminAuditActor")
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -279,8 +279,8 @@ model AdminUserAuditLog {
   note       String?
   createdAt  DateTime             @default(now()) @map("created_at")
 
-  user   User  @relation("AdminAuditTarget", fields: [userId], references: [id], onDelete: Cascade)
-  actor  User? @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  user  User  @relation("AdminAuditTarget", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([actorId])
@@ -307,34 +307,34 @@ model UserSportProfile {
 }
 
 model Venue {
-  id             String    @id @default(uuid())
-  ownerId        String?   @map("owner_id")
+  id             String      @id @default(uuid())
+  ownerId        String?     @map("owner_id")
   name           String
   type           VenueType
   sportTypes     SportType[] @map("sport_types")
   address        String
-  addressDetail  String?   @map("address_detail")
+  addressDetail  String?     @map("address_detail")
   lat            Float
   lng            Float
   city           String
   district       String
   phone          String?
   description    String?
-  imageUrls      String[]  @map("image_urls")
+  imageUrls      String[]    @map("image_urls")
   facilities     String[]
-  operatingHours Json      @map("operating_hours")
-  pricePerHour   Int?      @map("price_per_hour")
-  rating         Float     @default(0)
-  reviewCount    Int       @default(0) @map("review_count")
+  operatingHours Json        @map("operating_hours")
+  pricePerHour   Int?        @map("price_per_hour")
+  rating         Float       @default(0)
+  reviewCount    Int         @default(0) @map("review_count")
 
   // Ice rink specific
-  iceQualityAvg  Float?    @map("ice_quality_avg")
-  rinkSubType    String?   @map("rink_sub_type") // full_rink, half_rink
+  iceQualityAvg Float?  @map("ice_quality_avg")
+  rinkSubType   String? @map("rink_sub_type") // full_rink, half_rink
 
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner        User?      @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owner        User?                @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   matches      Match[]
   listings     MarketplaceListing[] @relation("VenueListings")
   tournaments  Tournament[]         @relation("VenueTournaments")
@@ -368,26 +368,26 @@ model VenueReview {
 }
 
 model Match {
-  id            String      @id @default(uuid())
-  hostId        String      @map("host_id")
-  sportType     SportType   @map("sport_type")
-  title         String
-  description   String?
-  imageUrl      String?     @map("image_url")
-  venueId       String      @map("venue_id")
-  matchDate     DateTime    @map("match_date") @db.Date
-  startTime     String      @map("start_time") // HH:mm
-  endTime       String      @map("end_time")   // HH:mm
-  maxPlayers    Int         @map("max_players")
-  currentPlayers Int        @default(0) @map("current_players")
-  fee           Int         @default(0)
-  levelMin      Int         @default(1) @map("level_min")
-  levelMax      Int         @default(5) @map("level_max")
-  gender        String      @default("any") // any, male, female
-  status        MatchStatus @default(recruiting)
-  teamConfig    Json?       @map("team_config")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  id             String      @id @default(uuid())
+  hostId         String      @map("host_id")
+  sportType      SportType   @map("sport_type")
+  title          String
+  description    String?
+  imageUrl       String?     @map("image_url")
+  venueId        String      @map("venue_id")
+  matchDate      DateTime    @map("match_date") @db.Date
+  startTime      String      @map("start_time") // HH:mm
+  endTime        String      @map("end_time") // HH:mm
+  maxPlayers     Int         @map("max_players")
+  currentPlayers Int         @default(0) @map("current_players")
+  fee            Int         @default(0)
+  levelMin       Int         @default(1) @map("level_min")
+  levelMax       Int         @default(5) @map("level_max")
+  gender         String      @default("any") // any, male, female
+  status         MatchStatus @default(recruiting)
+  teamConfig     Json?       @map("team_config")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   host         User               @relation("HostedMatches", fields: [hostId], references: [id])
   venue        Venue              @relation(fields: [venueId], references: [id])
@@ -396,27 +396,28 @@ model Match {
   reviews      Review[]
 
   @@index([sportType, status])
+  @@index([status, matchDate])
   @@index([matchDate])
   @@index([venueId])
   @@map("matches")
 }
 
 model MatchParticipant {
-  id            String            @id @default(uuid())
-  matchId       String            @map("match_id")
-  userId        String            @map("user_id")
-  teamId        String?           @map("team_id")
-  status        ParticipantStatus @default(pending)
-  paymentStatus PaymentStatus     @default(pending) @map("payment_status")
-  joinedAt      DateTime          @default(now()) @map("joined_at")
-  arrivedAt     DateTime?         @map("arrived_at")
-  arrivalPhotoUrl String?         @map("arrival_photo_url")
-  arrivalLat    Float?            @map("arrival_lat")
-  arrivalLng    Float?            @map("arrival_lng")
+  id              String            @id @default(uuid())
+  matchId         String            @map("match_id")
+  userId          String            @map("user_id")
+  teamId          String?           @map("team_id")
+  status          ParticipantStatus @default(pending)
+  paymentStatus   PaymentStatus     @default(pending) @map("payment_status")
+  joinedAt        DateTime          @default(now()) @map("joined_at")
+  arrivedAt       DateTime?         @map("arrived_at")
+  arrivalPhotoUrl String?           @map("arrival_photo_url")
+  arrivalLat      Float?            @map("arrival_lat")
+  arrivalLng      Float?            @map("arrival_lng")
 
-  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user    User   @relation(fields: [userId], references: [id])
-  team    Team?  @relation(fields: [teamId], references: [id])
+  match   Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id])
+  team    Team?    @relation(fields: [teamId], references: [id])
   payment Payment?
 
   @@unique([matchId, userId])
@@ -460,30 +461,31 @@ model Review {
 }
 
 model Payment {
-  id              String        @id @default(uuid())
-  userId          String        @map("user_id")
-  participantId   String        @unique @map("participant_id")
-  amount          Int
-  method          PaymentMethod?
-  status          PaymentStatus @default(pending)
-  pgProvider      String?       @map("pg_provider") // toss
-  pgTid           String?       @map("pg_tid")
-  paymentKey      String?       @unique @map("payment_key")
-  orderId         String        @unique @map("order_id")
-  receiptUrl      String?       @map("receipt_url")
-  cardNumber      String?       @map("card_number") // masked
-  refundAmount    Int?          @map("refund_amount")
-  refundReason    String?       @map("refund_reason")
-  paidAt          DateTime?     @map("paid_at")
-  refundedAt      DateTime?     @map("refunded_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id            String         @id @default(uuid())
+  userId        String         @map("user_id")
+  participantId String         @unique @map("participant_id")
+  amount        Int
+  method        PaymentMethod?
+  status        PaymentStatus  @default(pending)
+  pgProvider    String?        @map("pg_provider") // toss
+  pgTid         String?        @map("pg_tid")
+  paymentKey    String?        @unique @map("payment_key")
+  orderId       String         @unique @map("order_id")
+  receiptUrl    String?        @map("receipt_url")
+  cardNumber    String?        @map("card_number") // masked
+  refundAmount  Int?           @map("refund_amount")
+  refundReason  String?        @map("refund_reason")
+  paidAt        DateTime?      @map("paid_at")
+  refundedAt    DateTime?      @map("refunded_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   user        User             @relation(fields: [userId], references: [id])
   participant MatchParticipant @relation(fields: [participantId], references: [id])
 
   @@index([userId])
   @@index([status])
+  @@index([userId, status])
   @@map("payments")
 }
 
@@ -507,44 +509,45 @@ model Notification {
 // ─── Marketplace ─────────────────────────────────────────
 
 model MarketplaceListing {
-  id           String        @id @default(uuid())
-  sellerId     String        @map("seller_id")
-  teamId       String?       @map("team_id")
-  venueId      String?       @map("venue_id")
-  title        String
-  description  String
-  sportType    SportType     @map("sport_type")
-  category     String
-  condition    ItemCondition
-  price        Int
-  listingType  ListingType   @default(sell) @map("listing_type")
-  status       ListingStatus @default(active)
-  imageUrls    String[]      @map("image_urls")
-  locationCity String?       @map("location_city")
-  locationDistrict String?   @map("location_district")
-  viewCount    Int           @default(0) @map("view_count")
-  likeCount    Int           @default(0) @map("like_count")
+  id               String        @id @default(uuid())
+  sellerId         String        @map("seller_id")
+  teamId           String?       @map("team_id")
+  venueId          String?       @map("venue_id")
+  title            String
+  description      String
+  sportType        SportType     @map("sport_type")
+  category         String
+  condition        ItemCondition
+  price            Int
+  listingType      ListingType   @default(sell) @map("listing_type")
+  status           ListingStatus @default(active)
+  imageUrls        String[]      @map("image_urls")
+  locationCity     String?       @map("location_city")
+  locationDistrict String?       @map("location_district")
+  viewCount        Int           @default(0) @map("view_count")
+  likeCount        Int           @default(0) @map("like_count")
 
   // Rental fields
-  rentalPricePerDay Int?     @map("rental_price_per_day")
-  rentalDeposit     Int?     @map("rental_deposit")
+  rentalPricePerDay Int? @map("rental_price_per_day")
+  rentalDeposit     Int? @map("rental_deposit")
 
   // Group buy fields
-  groupBuyTarget    Int?     @map("group_buy_target")
-  groupBuyDeadline  DateTime? @map("group_buy_deadline")
-  groupBuyCurrent   Int?     @default(0) @map("group_buy_current")
+  groupBuyTarget   Int?      @map("group_buy_target")
+  groupBuyDeadline DateTime? @map("group_buy_deadline")
+  groupBuyCurrent  Int?      @default(0) @map("group_buy_current")
 
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-  expiresAt    DateTime?    @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  expiresAt DateTime? @map("expires_at")
 
-  seller  User               @relation("ListingSeller", fields: [sellerId], references: [id])
-  team    SportTeam?         @relation("TeamListings", fields: [teamId], references: [id], onDelete: SetNull)
-  venue   Venue?             @relation("VenueListings", fields: [venueId], references: [id], onDelete: SetNull)
-  orders  MarketplaceOrder[]
+  seller User               @relation("ListingSeller", fields: [sellerId], references: [id])
+  team   SportTeam?         @relation("TeamListings", fields: [teamId], references: [id], onDelete: SetNull)
+  venue  Venue?             @relation("VenueListings", fields: [venueId], references: [id], onDelete: SetNull)
+  orders MarketplaceOrder[]
 
   @@index([sportType, category])
   @@index([status])
+  @@index([status, sportType])
   @@index([locationCity])
   @@index([teamId, status, createdAt])
   @@index([venueId, status, createdAt])
@@ -552,26 +555,26 @@ model MarketplaceListing {
 }
 
 model MarketplaceOrder {
-  id          String      @id @default(uuid())
-  listingId   String      @map("listing_id")
-  buyerId     String      @map("buyer_id")
-  sellerId    String      @map("seller_id")
-  amount      Int
-  commission  Int         @default(0)
-  status      OrderStatus @default(pending)
-  paymentKey  String?     @unique @map("payment_key")
-  orderId     String      @unique @map("order_id")
+  id         String      @id @default(uuid())
+  listingId  String      @map("listing_id")
+  buyerId    String      @map("buyer_id")
+  sellerId   String      @map("seller_id")
+  amount     Int
+  commission Int         @default(0)
+  status     OrderStatus @default(pending)
+  paymentKey String?     @unique @map("payment_key")
+  orderId    String      @unique @map("order_id")
 
   // Rental
   rentalStartDate DateTime? @map("rental_start_date")
   rentalEndDate   DateTime? @map("rental_end_date")
 
-  paidAt      DateTime?   @map("paid_at")
-  shippedAt   DateTime?   @map("shipped_at")
-  deliveredAt DateTime?   @map("delivered_at")
-  completedAt DateTime?   @map("completed_at")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  paidAt      DateTime? @map("paid_at")
+  shippedAt   DateTime? @map("shipped_at")
+  deliveredAt DateTime? @map("delivered_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   listing MarketplaceListing @relation(fields: [listingId], references: [id])
   buyer   User               @relation("OrderBuyer", fields: [buyerId], references: [id])
@@ -585,10 +588,10 @@ model MarketplaceOrder {
 // ─── Lessons / 강좌 ─────────────────────────────────────
 
 enum LessonType {
-  group_lesson    // 그룹 레슨 (코치 진행)
-  practice_match  // 연습 경기
-  free_practice   // 자유 연습 (코트/링크 대여)
-  clinic          // 클리닉/워크숍
+  group_lesson // 그룹 레슨 (코치 진행)
+  practice_match // 연습 경기
+  free_practice // 자유 연습 (코트/링크 대여)
+  clinic // 클리닉/워크숍
 }
 
 enum LessonStatus {
@@ -599,66 +602,66 @@ enum LessonStatus {
 }
 
 enum TicketType {
-  single      // 1회권
-  multi       // 다회권 (N회)
-  unlimited   // 기간권 (무제한)
+  single // 1회권
+  multi // 다회권 (N회)
+  unlimited // 기간권 (무제한)
 }
 
 enum TicketStatus {
-  active      // 사용중
-  expired     // 기간 만료
-  exhausted   // 횟수 소진
-  refunded    // 환불됨
-  cancelled   // 취소됨
+  active // 사용중
+  expired // 기간 만료
+  exhausted // 횟수 소진
+  refunded // 환불됨
+  cancelled // 취소됨
 }
 
 enum AttendanceStatus {
-  scheduled   // 예약됨
-  attended    // 출석
-  absent      // 결석
-  late        // 지각
-  cancelled   // 취소됨
+  scheduled // 예약됨
+  attended // 출석
+  absent // 결석
+  late // 지각
+  cancelled // 취소됨
 }
 
 model Lesson {
-  id            String       @id @default(uuid())
-  hostId        String       @map("host_id")
-  teamId        String?      @map("team_id")
-  sportType     SportType    @map("sport_type")
-  type          LessonType
-  title         String
-  description   String?
-  venueId       String?      @map("venue_id")
-  venueName     String?      @map("venue_name") // 직접 입력
-  lessonDate    DateTime     @map("lesson_date") @db.Date
-  startTime     String       @map("start_time")
-  endTime       String       @map("end_time")
-  maxParticipants Int        @map("max_participants")
-  currentParticipants Int    @default(0) @map("current_participants")
-  fee           Int          @default(0)
-  levelMin      Int          @default(1) @map("level_min")
-  levelMax      Int          @default(5) @map("level_max")
-  status        LessonStatus @default(open)
-  imageUrls     String[]     @map("image_urls")
+  id                  String       @id @default(uuid())
+  hostId              String       @map("host_id")
+  teamId              String?      @map("team_id")
+  sportType           SportType    @map("sport_type")
+  type                LessonType
+  title               String
+  description         String?
+  venueId             String?      @map("venue_id")
+  venueName           String?      @map("venue_name") // 직접 입력
+  lessonDate          DateTime     @map("lesson_date") @db.Date
+  startTime           String       @map("start_time")
+  endTime             String       @map("end_time")
+  maxParticipants     Int          @map("max_participants")
+  currentParticipants Int          @default(0) @map("current_participants")
+  fee                 Int          @default(0)
+  levelMin            Int          @default(1) @map("level_min")
+  levelMax            Int          @default(5) @map("level_max")
+  status              LessonStatus @default(open)
+  imageUrls           String[]     @map("image_urls")
 
   // Coach info
-  coachName     String?      @map("coach_name")
-  coachBio      String?      @map("coach_bio")
-  coachImageUrl String?      @map("coach_image_url")
+  coachName     String? @map("coach_name")
+  coachBio      String? @map("coach_bio")
+  coachImageUrl String? @map("coach_image_url")
 
   // Recurring schedule
-  isRecurring    Boolean      @default(false) @map("is_recurring")
-  recurringDays  Int[]        @map("recurring_days") // e.g. [1,3,5] for Mon/Wed/Fri (0=Sun)
-  recurringUntil DateTime?    @map("recurring_until") @db.Date
+  isRecurring    Boolean   @default(false) @map("is_recurring")
+  recurringDays  Int[]     @map("recurring_days") // e.g. [1,3,5] for Mon/Wed/Fri (0=Sun)
+  recurringUntil DateTime? @map("recurring_until") @db.Date
 
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  host          User               @relation("LessonHost", fields: [hostId], references: [id])
-  team          SportTeam?         @relation("TeamLessons", fields: [teamId], references: [id], onDelete: SetNull)
-  ticketPlans   LessonTicketPlan[]
-  tickets       LessonTicket[]
-  schedules     LessonSchedule[]
+  host        User               @relation("LessonHost", fields: [hostId], references: [id])
+  team        SportTeam?         @relation("TeamLessons", fields: [teamId], references: [id], onDelete: SetNull)
+  ticketPlans LessonTicketPlan[]
+  tickets     LessonTicket[]
+  schedules   LessonSchedule[]
 
   @@index([sportType, status])
   @@index([lessonDate])
@@ -670,12 +673,12 @@ model Lesson {
 model LessonTicketPlan {
   id            String     @id @default(uuid())
   lessonId      String     @map("lesson_id")
-  name          String                          // e.g. "10회권", "1개월 무제한"
+  name          String // e.g. "10회권", "1개월 무제한"
   type          TicketType
   price         Int
   originalPrice Int?       @map("original_price") // for displaying discounts
-  totalSessions Int?       @map("total_sessions")  // required for multi type
-  validDays     Int?       @map("valid_days")       // required for unlimited type
+  totalSessions Int?       @map("total_sessions") // required for multi type
+  validDays     Int?       @map("valid_days") // required for unlimited type
   description   String?
   isActive      Boolean    @default(true) @map("is_active")
   sortOrder     Int        @default(0) @map("sort_order")
@@ -717,17 +720,17 @@ model LessonTicket {
 }
 
 model LessonSchedule {
-  id              String    @id @default(uuid())
-  lessonId        String    @map("lesson_id")
-  sessionDate     DateTime  @map("session_date") @db.Date
-  startTime       String    @map("start_time")   // HH:mm
-  endTime         String    @map("end_time")     // HH:mm
-  maxParticipants Int?      @map("max_participants")
+  id              String   @id @default(uuid())
+  lessonId        String   @map("lesson_id")
+  sessionDate     DateTime @map("session_date") @db.Date
+  startTime       String   @map("start_time") // HH:mm
+  endTime         String   @map("end_time") // HH:mm
+  maxParticipants Int?     @map("max_participants")
   note            String?
-  isCancelled     Boolean   @default(false) @map("is_cancelled")
-  cancelReason    String?   @map("cancel_reason")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  isCancelled     Boolean  @default(false) @map("is_cancelled")
+  cancelReason    String?  @map("cancel_reason")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   lesson      Lesson             @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   attendances LessonAttendance[]
@@ -738,14 +741,14 @@ model LessonSchedule {
 }
 
 model LessonAttendance {
-  id           String           @id @default(uuid())
-  scheduleId   String           @map("schedule_id")
-  ticketId     String           @map("ticket_id")
-  userId       String           @map("user_id")
-  status       AttendanceStatus @default(scheduled)
-  checkedInAt  DateTime?        @map("checked_in_at")
-  checkedInBy  String?          @map("checked_in_by") // userId of coach or staff who checked in
-  createdAt    DateTime         @default(now()) @map("created_at")
+  id          String           @id @default(uuid())
+  scheduleId  String           @map("schedule_id")
+  ticketId    String           @map("ticket_id")
+  userId      String           @map("user_id")
+  status      AttendanceStatus @default(scheduled)
+  checkedInAt DateTime?        @map("checked_in_at")
+  checkedInBy String?          @map("checked_in_by") // userId of coach or staff who checked in
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   schedule LessonSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   ticket   LessonTicket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
@@ -765,61 +768,61 @@ model SportTeam {
   name          String
   sportTypes    SportType[] @map("sport_types")
   description   String?
-  logoUrl       String?   @map("logo_url")
-  coverImageUrl String?   @map("cover_image_url")
-  photos        String[]  @default([])
+  logoUrl       String?     @map("logo_url")
+  coverImageUrl String?     @map("cover_image_url")
+  photos        String[]    @default([])
   city          String?
   district      String?
-  memberCount   Int       @default(1) @map("member_count")
-  level         Int       @default(3) // 팀 평균 레벨
-  isRecruiting  Boolean   @default(true) @map("is_recruiting")
-  contactInfo   String?   @map("contact_info") // 연락처/오픈카톡
+  memberCount   Int         @default(1) @map("member_count")
+  level         Int         @default(3) // 팀 평균 레벨
+  isRecruiting  Boolean     @default(true) @map("is_recruiting")
+  contactInfo   String?     @map("contact_info") // 연락처/오픈카톡
 
   // SNS & 홍보
-  instagramUrl  String?   @map("instagram_url")
-  youtubeUrl    String?   @map("youtube_url")
-  shortsUrl     String?   @map("shorts_url") // 홍보 영상 (shorts/reels)
-  kakaoOpenChat String?   @map("kakao_open_chat")
-  websiteUrl    String?   @map("website_url")
+  instagramUrl  String? @map("instagram_url")
+  youtubeUrl    String? @map("youtube_url")
+  shortsUrl     String? @map("shorts_url") // 홍보 영상 (shorts/reels)
+  kakaoOpenChat String? @map("kakao_open_chat")
+  websiteUrl    String? @map("website_url")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  owner         User      @relation("TeamOwner", fields: [ownerId], references: [id])
+  owner User @relation("TeamOwner", fields: [ownerId], references: [id])
 
-  teamMatches         TeamMatch[]         @relation("TeamMatchHost")
-  teamApplications    TeamMatchApplication[] @relation("TeamAppApplicant")
-  lessons             Lesson[]            @relation("TeamLessons")
-  listings            MarketplaceListing[] @relation("TeamListings")
-  tournaments         Tournament[]        @relation("TeamTournaments")
-  memberships         TeamMembership[]
-  mercenaryPosts      MercenaryPost[]
-  invitations         TeamInvitation[]
+  teamMatches      TeamMatch[]            @relation("TeamMatchHost")
+  teamApplications TeamMatchApplication[] @relation("TeamAppApplicant")
+  lessons          Lesson[]               @relation("TeamLessons")
+  listings         MarketplaceListing[]   @relation("TeamListings")
+  tournaments      Tournament[]           @relation("TeamTournaments")
+  memberships      TeamMembership[]
+  mercenaryPosts   MercenaryPost[]
+  invitations      TeamInvitation[]
 
   @@index([city, isRecruiting])
   @@map("sport_teams")
 }
 
 model Tournament {
-  id              String           @id @default(uuid())
-  organizerId     String           @map("organizer_id")
-  teamId          String?          @map("team_id")
-  venueId         String?          @map("venue_id")
-  sportType       SportType        @map("sport_type")
-  title           String
-  description     String?
-  startDate       DateTime         @map("start_date") @db.Date
-  endDate         DateTime         @map("end_date") @db.Date
-  entryFee        Int              @default(0) @map("entry_fee")
-  maxParticipants Int?             @map("max_participants")
-  currentParticipants Int          @default(0) @map("current_participants")
-  status          TournamentStatus @default(recruiting)
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  id                  String           @id @default(uuid())
+  organizerId         String           @map("organizer_id")
+  teamId              String?          @map("team_id")
+  venueId             String?          @map("venue_id")
+  sportType           SportType        @map("sport_type")
+  title               String
+  description         String?
+  startDate           DateTime         @map("start_date") @db.Date
+  endDate             DateTime         @map("end_date") @db.Date
+  entryFee            Int              @default(0) @map("entry_fee")
+  maxParticipants     Int?             @map("max_participants")
+  currentParticipants Int              @default(0) @map("current_participants")
+  status              TournamentStatus @default(recruiting)
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  organizer       User             @relation("TournamentOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
-  team            SportTeam?       @relation("TeamTournaments", fields: [teamId], references: [id], onDelete: SetNull)
-  venue           Venue?           @relation("VenueTournaments", fields: [venueId], references: [id], onDelete: SetNull)
+  organizer User       @relation("TournamentOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  team      SportTeam? @relation("TeamTournaments", fields: [teamId], references: [id], onDelete: SetNull)
+  venue     Venue?     @relation("VenueTournaments", fields: [venueId], references: [id], onDelete: SetNull)
 
   @@index([sportType, status])
   @@index([startDate, status])
@@ -853,20 +856,20 @@ model TeamMembership {
 // ─── Mercenary Posts ─────────────────────────────────────
 
 model MercenaryPost {
-  id          String              @id @default(uuid())
-  teamId      String              @map("team_id")
-  authorId    String              @map("author_id")
-  sportType   SportType           @map("sport_type")
-  matchDate   DateTime            @map("match_date")
-  venue       String
-  position    String
-  count       Int                 @default(1)
-  level       Int                 @default(3)
-  fee         Int                 @default(0)
-  notes       String?
-  status      MercenaryPostStatus @default(open)
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
+  id        String              @id @default(uuid())
+  teamId    String              @map("team_id")
+  authorId  String              @map("author_id")
+  sportType SportType           @map("sport_type")
+  matchDate DateTime            @map("match_date")
+  venue     String
+  position  String
+  count     Int                 @default(1)
+  level     Int                 @default(3)
+  fee       Int                 @default(0)
+  notes     String?
+  status    MercenaryPostStatus @default(open)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
 
   team         SportTeam              @relation(fields: [teamId], references: [id], onDelete: Cascade)
   author       User                   @relation("MercenaryAuthor", fields: [authorId], references: [id])
@@ -899,95 +902,102 @@ model MercenaryApplication {
 // ─── 팀 매칭 시스템 ─────────────────────────────────────
 
 enum TeamMatchStatus {
-  recruiting      // 모집중
-  applied         // 신청됨
-  approved        // 승인됨
-  rejected        // 거절됨
-  scheduled       // 경기예정
-  checking_in     // 도착확인중
-  in_progress     // 경기중
-  completed       // 경기완료
-  cancelled       // 취소
-  late            // 지각
-  no_show         // 노쇼
-  disputed        // 분쟁검토중
+  recruiting // 모집중
+  applied // 신청됨
+  approved // 승인됨
+  rejected // 거절됨
+  scheduled // 경기예정
+  checking_in // 도착확인중
+  in_progress // 경기중
+  completed // 경기완료
+  cancelled // 취소
+  late // 지각
+  no_show // 노쇼
+  disputed // 분쟁검토중
+}
+
+enum TeamMatchApplicationStatus {
+  pending
+  approved
+  rejected
+  withdrawn
 }
 
 enum MatchStyle {
-  friendly        // 친선전
-  competitive     // 실전형
-  manner_focused  // 매너 위주
+  friendly // 친선전
+  competitive // 실전형
+  manner_focused // 매너 위주
 }
 
 enum ParticipationType {
-  team            // 팀 참여
-  guest           // 게스트 참여
-  regular         // 정기 참여
-  mercenary       // 용병
+  team // 팀 참여
+  guest // 게스트 참여
+  regular // 정기 참여
+  mercenary // 용병
 }
 
 model TeamMatch {
-  id              String          @id @default(uuid())
-  hostTeamId      String          @map("host_team_id")
-  sportType       SportType       @map("sport_type")
+  id         String    @id @default(uuid())
+  hostTeamId String    @map("host_team_id")
+  sportType  SportType @map("sport_type")
 
   // 경기 정보
-  title           String
-  description     String?
-  matchDate       DateTime        @map("match_date") @db.Date
-  startTime       String          @map("start_time")
-  endTime         String          @map("end_time")
-  totalMinutes    Int             @default(120) @map("total_minutes")
-  quarterCount    Int             @default(4) @map("quarter_count") // 2,4,6,8,10
+  title        String
+  description  String?
+  matchDate    DateTime @map("match_date") @db.Date
+  startTime    String   @map("start_time")
+  endTime      String   @map("end_time")
+  totalMinutes Int      @default(120) @map("total_minutes")
+  quarterCount Int      @default(4) @map("quarter_count") // 2,4,6,8,10
 
   // 구장 정보
-  venueName       String          @map("venue_name")
-  venueAddress    String          @map("venue_address")
-  venueInfo       Json?           @map("venue_info") // 실내/외, 주차, 샤워실 등
+  venueName    String @map("venue_name")
+  venueAddress String @map("venue_address")
+  venueInfo    Json?  @map("venue_info") // 실내/외, 주차, 샤워실 등
 
   // 비용
-  totalFee        Int             @default(0) @map("total_fee")
-  opponentFee     Int             @default(0) @map("opponent_fee")
-  paymentDeadline String?         @map("payment_deadline")
-  cancellationPolicy String?      @map("cancellation_policy")
+  totalFee           Int     @default(0) @map("total_fee")
+  opponentFee        Int     @default(0) @map("opponent_fee")
+  paymentDeadline    String? @map("payment_deadline")
+  cancellationPolicy String? @map("cancellation_policy")
 
   // 매칭 조건
-  requiredLevel   Int?            @map("required_level")
-  hasProPlayers   Boolean         @default(false) @map("has_pro_players")
-  allowMercenary  Boolean         @default(true) @map("allow_mercenary")
-  matchStyle      MatchStyle      @default(friendly) @map("match_style")
-  hasReferee      Boolean         @default(false) @map("has_referee")
-  notes           String?
+  requiredLevel  Int?       @map("required_level")
+  hasProPlayers  Boolean    @default(false) @map("has_pro_players")
+  allowMercenary Boolean    @default(true) @map("allow_mercenary")
+  matchStyle     MatchStyle @default(friendly) @map("match_style")
+  hasReferee     Boolean    @default(false) @map("has_referee")
+  notes          String?
 
   // task 17: match meta fields
-  skillGrade        String?  @map("skill_grade")
-  gameFormat        String?  @map("game_format")
-  matchType         String?  @map("match_type")
-  proPlayerCount    Int      @default(0) @map("pro_player_count")
-  uniformColor      String?  @map("uniform_color")
-  isFreeInvitation  Boolean  @default(false) @map("is_free_invitation")
+  skillGrade       String? @map("skill_grade")
+  gameFormat       String? @map("game_format")
+  matchType        String? @map("match_type")
+  proPlayerCount   Int     @default(0) @map("pro_player_count")
+  uniformColor     String? @map("uniform_color")
+  isFreeInvitation Boolean @default(false) @map("is_free_invitation")
 
   // 상태
-  status          TeamMatchStatus @default(recruiting)
-  guestTeamId     String?         @map("guest_team_id") // 승인된 상대 팀
+  status      TeamMatchStatus @default(recruiting)
+  guestTeamId String?         @map("guest_team_id") // 승인된 상대 팀
 
   // 심판 배정 (JSON: 쿼터별 담당팀)
-  refereeSchedule Json?           @map("referee_schedule")
+  refereeSchedule Json? @map("referee_schedule")
 
   // 경기 결과
-  scoreHome       Json?           @map("score_home") // 쿼터별 점수
-  scoreAway       Json?           @map("score_away")
-  resultHome      String?         @map("result_home") // win/draw/lose
-  resultAway      String?         @map("result_away")
+  scoreHome  Json?   @map("score_home") // 쿼터별 점수
+  scoreAway  Json?   @map("score_away")
+  resultHome String? @map("result_home") // win/draw/lose
+  resultAway String? @map("result_away")
 
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  hostTeam        SportTeam       @relation("TeamMatchHost", fields: [hostTeamId], references: [id])
-  applications    TeamMatchApplication[]
-  arrivalChecks   ArrivalCheck[]
-  evaluations     MatchEvaluation[]
-  chatRoom        ChatRoom?
+  hostTeam      SportTeam              @relation("TeamMatchHost", fields: [hostTeamId], references: [id])
+  applications  TeamMatchApplication[]
+  arrivalChecks ArrivalCheck[]
+  evaluations   MatchEvaluation[]
+  chatRoom      ChatRoom?
 
   @@index([sportType, status])
   @@index([matchDate])
@@ -996,25 +1006,25 @@ model TeamMatch {
 }
 
 model TeamMatchApplication {
-  id              String          @id @default(uuid())
-  teamMatchId     String          @map("team_match_id")
-  applicantTeamId String          @map("applicant_team_id")
-  status          String          @default("pending") // pending, approved, rejected, withdrawn
+  id              String                     @id @default(uuid())
+  teamMatchId     String                     @map("team_match_id")
+  applicantTeamId String                     @map("applicant_team_id")
+  status          TeamMatchApplicationStatus @default(pending)
 
   // 상호 확인 체크 (2단계)
-  confirmedInfo   Boolean         @default(false) @map("confirmed_info") // 상대 팀 정보 확인
-  confirmedLevel  Boolean         @default(false) @map("confirmed_level") // 수준 차이 인지
-  proPlayerCheck  Boolean?        @map("pro_player_check") // 선수 출신 유무 확인
-  mercenaryCheck  Boolean?        @map("mercenary_check") // 용병 여부 확인
+  confirmedInfo  Boolean  @default(false) @map("confirmed_info") // 상대 팀 정보 확인
+  confirmedLevel Boolean  @default(false) @map("confirmed_level") // 수준 차이 인지
+  proPlayerCheck Boolean? @map("pro_player_check") // 선수 출신 유무 확인
+  mercenaryCheck Boolean? @map("mercenary_check") // 용병 여부 확인
 
-  message         String?         // 신청 메시지
+  message           String? // 신청 메시지
   participationType ParticipationType @default(team) @map("participation_type")
 
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  teamMatch       TeamMatch       @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
-  applicantTeam   SportTeam       @relation("TeamAppApplicant", fields: [applicantTeamId], references: [id])
+  teamMatch     TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+  applicantTeam SportTeam @relation("TeamAppApplicant", fields: [applicantTeamId], references: [id])
 
   @@unique([teamMatchId, applicantTeamId])
   @@index([applicantTeamId])
@@ -1022,89 +1032,89 @@ model TeamMatchApplication {
 }
 
 model ArrivalCheck {
-  id              String    @id @default(uuid())
-  teamMatchId     String    @map("team_match_id")
-  teamId          String    @map("team_id")
-  isHome          Boolean   @map("is_home") // 홈팀 여부
+  id          String  @id @default(uuid())
+  teamMatchId String  @map("team_match_id")
+  teamId      String  @map("team_id")
+  isHome      Boolean @map("is_home") // 홈팀 여부
 
   // 도착 인증
-  arrivedAt       DateTime? @map("arrived_at")
-  lat             Float?    // GPS 위도
-  lng             Float?    // GPS 경도
-  photoUrl        String?   @map("photo_url") // 현장 사진
+  arrivedAt DateTime? @map("arrived_at")
+  lat       Float? // GPS 위도
+  lng       Float? // GPS 경도
+  photoUrl  String?   @map("photo_url") // 현장 사진
 
   // 상대팀 확인
-  opponentStatus  String?   @map("opponent_status") // normal, late, no_show
-  opponentNote    String?   @map("opponent_note")
+  opponentStatus String? @map("opponent_status") // normal, late, no_show
+  opponentNote   String? @map("opponent_note")
 
   // 경기 완료 확인
-  gameCompleted   Boolean?  @map("game_completed")
+  gameCompleted Boolean? @map("game_completed")
 
-  createdAt       DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  teamMatch       TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+  teamMatch TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
 
   @@unique([teamMatchId, teamId])
   @@map("arrival_checks")
 }
 
 model MatchEvaluation {
-  id                String   @id @default(uuid())
-  teamMatchId       String   @map("team_match_id")
-  evaluatorTeamId   String   @map("evaluator_team_id")
-  evaluatedTeamId   String   @map("evaluated_team_id")
+  id              String @id @default(uuid())
+  teamMatchId     String @map("team_match_id")
+  evaluatorTeamId String @map("evaluator_team_id")
+  evaluatedTeamId String @map("evaluated_team_id")
 
   // 6항목 평가 (1-5)
-  levelAccuracy     Int      @map("level_accuracy")     // 수준 사전설명 일치
-  infoAccuracy      Int      @map("info_accuracy")      // 선수출신/용병 고지 일치
-  mannerRating      Int      @map("manner_rating")      // 매너
-  punctuality       Int      @map("punctuality")        // 시간 약속
-  paymentClarity    Int      @map("payment_clarity")    // 비용 정산
-  cooperation       Int      @map("cooperation")        // 경기 운영 협조
+  levelAccuracy  Int @map("level_accuracy") // 수준 사전설명 일치
+  infoAccuracy   Int @map("info_accuracy") // 선수출신/용병 고지 일치
+  mannerRating   Int @map("manner_rating") // 매너
+  punctuality    Int @map("punctuality") // 시간 약속
+  paymentClarity Int @map("payment_clarity") // 비용 정산
+  cooperation    Int @map("cooperation") // 경기 운영 협조
 
-  comment           String?
-  createdAt         DateTime @default(now()) @map("created_at")
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
 
-  teamMatch         TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
+  teamMatch TeamMatch @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
 
   @@unique([teamMatchId, evaluatorTeamId])
   @@map("match_evaluations")
 }
 
 model TeamTrustScore {
-  id              String    @id @default(uuid())
-  teamId          String    @unique @map("team_id")
+  id     String @id @default(uuid())
+  teamId String @unique @map("team_id")
 
   // 실력 관련
-  selfLevel       Int       @default(3) @map("self_level") // 자기기입
-  peerLevel       Float?    @map("peer_level")   // 상대평가 누적 평균
+  selfLevel Int    @default(3) @map("self_level") // 자기기입
+  peerLevel Float? @map("peer_level") // 상대평가 누적 평균
 
   // 신뢰 관련
-  infoAccuracy    Float     @default(100) @map("info_accuracy") // 정보 일치도 %
-  mannerScore     Float     @default(3.0) @map("manner_score")
-  lateRate        Float     @default(0) @map("late_rate")       // 지각률 %
-  noShowRate      Float     @default(0) @map("no_show_rate")    // 노쇼율 %
-  cancelRate      Float     @default(0) @map("cancel_rate")     // 취소율 %
+  infoAccuracy Float @default(100) @map("info_accuracy") // 정보 일치도 %
+  mannerScore  Float @default(3.0) @map("manner_score")
+  lateRate     Float @default(0) @map("late_rate") // 지각률 %
+  noShowRate   Float @default(0) @map("no_show_rate") // 노쇼율 %
+  cancelRate   Float @default(0) @map("cancel_rate") // 취소율 %
 
   // 통계
-  totalMatches    Int       @default(0) @map("total_matches")
-  totalWins       Int       @default(0) @map("total_wins")
-  totalDraws      Int       @default(0) @map("total_draws")
-  totalLosses     Int       @default(0) @map("total_losses")
-  refereeTimes    Int       @default(0) @map("referee_times") // 심판 봉사 횟수
+  totalMatches Int @default(0) @map("total_matches")
+  totalWins    Int @default(0) @map("total_wins")
+  totalDraws   Int @default(0) @map("total_draws")
+  totalLosses  Int @default(0) @map("total_losses")
+  refereeTimes Int @default(0) @map("referee_times") // 심판 봉사 횟수
 
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("team_trust_scores")
 }
 
 model Badge {
-  id              String   @id @default(uuid())
-  teamId          String   @map("team_id")
-  type            String   // manner_player, punctual, referee_hero, honest_team, newcomer
-  name            String
-  description     String?
-  earnedAt        DateTime @default(now()) @map("earned_at")
+  id          String   @id @default(uuid())
+  teamId      String   @map("team_id")
+  type        String // manner_player, punctual, referee_hero, honest_team, newcomer
+  name        String
+  description String?
+  earnedAt    DateTime @default(now()) @map("earned_at")
 
   @@index([teamId])
   @@map("badges")
@@ -1130,7 +1140,7 @@ model ChatRoom {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
-  teamMatch    TeamMatch?           @relation(fields: [teamMatchId], references: [id], onDelete: SetNull)
+  teamMatch    TeamMatch?            @relation(fields: [teamMatchId], references: [id], onDelete: SetNull)
   participants ChatRoomParticipant[]
   messages     ChatMessage[]
 
@@ -1178,7 +1188,7 @@ model Upload {
   originalName String   @map("original_name")
   mimetype     String
   size         Int
-  path         String   // relative path: uploads/YYYY/MM/cuid.webp
+  path         String // relative path: uploads/YYYY/MM/cuid.webp
   width        Int?
   height       Int?
   createdAt    DateTime @default(now()) @map("created_at")
@@ -1226,8 +1236,8 @@ model TeamInvitation {
   createdAt DateTime         @default(now()) @map("created_at")
 
   team    SportTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  inviter User     @relation("InvitationsSent", fields: [inviterId], references: [id])
-  invitee User     @relation("InvitationsReceived", fields: [inviteeId], references: [id])
+  inviter User      @relation("InvitationsSent", fields: [inviterId], references: [id])
+  invitee User      @relation("InvitationsReceived", fields: [inviteeId], references: [id])
 
   @@unique([teamId, inviteeId])
   @@index([inviteeId, status])
@@ -1266,16 +1276,16 @@ enum SettlementStatus {
 }
 
 model SettlementRecord {
-  id         String           @id @default(cuid())
-  type       SettlementType
-  sourceId   String           @map("source_id") // orderId / paymentId / ticketId
-  amount     Int              // gross amount
-  commission Int              // platform commission (10%)
-  netAmount  Int              @map("net_amount") // amount - commission
-  recipientId String?         @map("recipient_id") // seller or instructor
-  status     SettlementStatus @default(pending)
-  processedAt DateTime?       @map("processed_at")
-  createdAt  DateTime         @default(now()) @map("created_at")
+  id          String           @id @default(cuid())
+  type        SettlementType
+  sourceId    String           @map("source_id") // orderId / paymentId / ticketId
+  amount      Int // gross amount
+  commission  Int // platform commission (10%)
+  netAmount   Int              @map("net_amount") // amount - commission
+  recipientId String?          @map("recipient_id") // seller or instructor
+  status      SettlementStatus @default(pending)
+  processedAt DateTime?        @map("processed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   @@index([type, status])
   @@index([recipientId])

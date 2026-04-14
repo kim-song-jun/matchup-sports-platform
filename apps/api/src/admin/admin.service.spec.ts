@@ -391,8 +391,25 @@ describe('AdminService', () => {
 
       const result = await service.getPayments();
 
-      expect(result).toHaveLength(1);
-      expect(result[0].user?.nickname).toBe('alice');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].user?.nickname).toBe('alice');
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('returns nextCursor when there are more items', async () => {
+      // take default is 20; mock returns 21 items to trigger hasMore
+      const payments = Array.from({ length: 21 }, (_, i) => ({
+        id: `pay-${i + 1}`,
+        amount: 15000,
+        status: PaymentStatus.completed,
+        user: { id: `u${i + 1}`, nickname: `user${i + 1}`, email: null, profileImageUrl: null },
+      }));
+      prismaMock.payment.findMany.mockResolvedValue(payments);
+
+      const result = await service.getPayments();
+
+      expect(result.items).toHaveLength(20);
+      expect(result.nextCursor).toBe('pay-20');
     });
   });
 });

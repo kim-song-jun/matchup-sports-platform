@@ -5,8 +5,11 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { OperatingHoursDto } from './operating-hours.dto';
 
 export class UpdateVenueDto {
   @ApiPropertyOptional({ description: '시설명', maxLength: 200 })
@@ -62,9 +65,11 @@ export class UpdateVenueDto {
   @IsOptional()
   facilities?: string[];
 
-  @ApiPropertyOptional({ description: '운영 시간 JSON' })
+  @ApiPropertyOptional({ description: '운영 시간 (요일별 HH:MM-HH:MM 또는 "closed")', type: OperatingHoursDto })
   @IsOptional()
-  operatingHours?: Record<string, unknown>;
+  @ValidateNested()
+  @Type(() => OperatingHoursDto)
+  operatingHours?: OperatingHoursDto;
 
   @ApiPropertyOptional({ description: '시간당 대여료', minimum: 0 })
   @IsInt()

@@ -287,7 +287,7 @@ export function MatchesPage() {
               data-testid={testId}
               aria-pressed={isActive}
               onClick={() => updateFilters({ sport: isActive ? '' : filter.key })}
-              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              className={`shrink-0 min-h-[44px] rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -350,7 +350,7 @@ export function MatchesPage() {
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
           }`}
         >
-          <Sparkles size={14} />
+          <Sparkles size={14} aria-hidden="true" />
           {t('availableOnly')}
         </button>
       </div>

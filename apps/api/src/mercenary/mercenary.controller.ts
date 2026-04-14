@@ -9,12 +9,21 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiCreatedResponse,
+  ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+} from '@nestjs/swagger';
 import { MercenaryApplicationStatus } from '@prisma/client';
 import { MercenaryService } from './mercenary.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { CreateMercenaryPostDto } from './dto/create-mercenary-post.dto';
 import { UpdateMercenaryPostDto } from './dto/update-mercenary-post.dto';
 import { ApplyMercenaryDto } from './dto/apply-mercenary.dto';
@@ -27,6 +36,7 @@ export class MercenaryController {
 
   @Get()
   @ApiOperation({ summary: '용병 모집글 목록 (커서 페이지네이션)' })
+  @ApiOkResponse({ description: '용병 모집글 목록 반환' })
   async findAll(@Query() query: MercenaryQueryDto) {
     return this.mercenaryService.findAll(query);
   }
@@ -35,6 +45,8 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '내 용병 신청 목록' })
+  @ApiOkResponse({ description: '내 용병 신청 목록 반환' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
   async findMyApplications(
     @CurrentUser('id') userId: string,
     @Query('status') status?: MercenaryApplicationStatus,
@@ -44,7 +56,9 @@ export class MercenaryController {
 
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: '용병 모집글 상세' })
+  @ApiOperation({ summary: '용병 모집글 상세 (비인증 시 신청자 PII 제거)' })
+  @ApiOkResponse({ description: '용병 모집글 상세 반환' })
+  @ApiNotFoundResponse({ description: '모집글 없음' })
   async findOne(@Param('id') id: string, @CurrentUser('id') userId?: string) {
     const post = await this.mercenaryService.findOne(id, userId);
 
@@ -66,6 +80,9 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 모집글 생성 (팀 매니저+)' })
+  @ApiCreatedResponse({ description: '모집글 생성 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
   async create(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateMercenaryPostDto,
@@ -77,6 +94,9 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 모집글 수정 (작성자 또는 팀 매니저+)' })
+  @ApiOkResponse({ description: '모집글 수정 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
   async update(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -89,6 +109,9 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 모집글 삭제 (작성자 또는 팀 매니저+)' })
+  @ApiOkResponse({ description: '모집글 삭제 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
   async remove(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -100,6 +123,9 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 지원' })
+  @ApiCreatedResponse({ description: '용병 지원 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiNotFoundResponse({ description: '모집글 없음' })
   async apply(
     @Param('id') postId: string,
     @CurrentUser('id') userId: string,
@@ -112,6 +138,9 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 신청 승인 (팀 매니저+)' })
+  @ApiOkResponse({ description: '신청 승인 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
   async acceptApplication(
     @Param('id') postId: string,
     @Param('appId') appId: string,
@@ -124,6 +153,9 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 신청 거절 (팀 매니저+)' })
+  @ApiOkResponse({ description: '신청 거절 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
   async rejectApplication(
     @Param('id') postId: string,
     @Param('appId') appId: string,
@@ -136,6 +168,8 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '내 용병 신청 취소' })
+  @ApiOkResponse({ description: '신청 취소 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
   async withdrawApplication(
     @Param('id') postId: string,
     @CurrentUser('id') userId: string,

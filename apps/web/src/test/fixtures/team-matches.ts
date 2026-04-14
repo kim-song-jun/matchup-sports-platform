@@ -1,0 +1,78 @@
+import type { TeamMatch, TeamMatchApplication } from '@/types/api';
+import { mockTeam1, mockTeam2 } from './teams';
+
+export const mockTeamMatch: TeamMatch = {
+  id: 'tm-1',
+  hostTeamId: 'team-1',
+  sportType: 'soccer',
+  title: '주말 친선 경기 모집',
+  description: '',
+  matchDate: '2026-05-10',
+  startTime: '14:00',
+  endTime: '16:00',
+  totalMinutes: 120,
+  quarterCount: 4,
+  venueName: '서울 풋살장',
+  venueAddress: '서울시 송파구 올림픽로 25',
+  totalFee: 200000,
+  opponentFee: 100000,
+  requiredLevel: 3,
+  hasProPlayers: false,
+  allowMercenary: true,
+  matchStyle: 'friendly',
+  hasReferee: true,
+  notes: '',
+  status: 'recruiting',
+  skillGrade: 'B+',
+  gameFormat: '6:6',
+  matchType: 'invitation',
+  proPlayerCount: 0,
+  uniformColor: '파랑',
+  isFreeInvitation: false,
+  hostTeam: mockTeam1,
+};
+
+export const mockTeamMatchApplication: TeamMatchApplication = {
+  id: 'tma-1',
+  teamMatchId: 'tm-1',
+  applicantTeamId: 'team-2',
+  status: 'pending',
+  message: '참가 신청합니다',
+  createdAt: '2024-01-10T10:00:00.000Z',
+  applicantTeam: mockTeam2,
+};
+
+export const mockMyTeamMatchApplications = [
+  {
+    id: 'tma-1',
+    status: 'pending' as const,
+    message: '참가 신청합니다',
+    createdAt: '2024-01-10T10:00:00.000Z',
+    teamMatch: {
+      id: 'tm-1',
+      title: '주말 친선 경기 모집',
+      matchDate: '2026-05-10',
+      startTime: '14:00',
+      endTime: '16:00',
+      venueName: '서울 풋살장',
+      hostTeam: { id: 'team-1', name: '서울 FC' },
+    },
+    applicantTeam: { id: 'team-2', name: '한강 농구단' },
+  },
+  {
+    id: 'tma-2',
+    status: 'approved' as const,
+    message: null,
+    createdAt: '2024-01-08T09:00:00.000Z',
+    teamMatch: {
+      id: 'tm-2',
+      title: '평일 저녁 풋살',
+      matchDate: '2026-05-07',
+      startTime: '20:00',
+      endTime: '22:00',
+      venueName: '마포 실내 풋살장',
+      hostTeam: { id: 'team-3', name: '마포 FC' },
+    },
+    applicantTeam: { id: 'team-2', name: '한강 농구단' },
+  },
+];

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
+import { CreateReviewDto } from './dto/create-review.dto';
 
 @Injectable()
 export class ReviewsService {
@@ -9,33 +10,33 @@ export class ReviewsService {
     private readonly scoring: ScoringService,
   ) {}
 
-  async create(authorId: string, data: Record<string, unknown>) {
+  async create(authorId: string, data: CreateReviewDto) {
     const review = await this.prisma.review.create({
       data: {
-        matchId: data.matchId as string,
+        matchId: data.matchId,
         authorId,
-        targetId: data.targetId as string,
-        skillRating: data.skillRating as number,
-        mannerRating: data.mannerRating as number,
-        comment: data.comment as string | undefined,
+        targetId: data.targetId,
+        skillRating: data.skillRating,
+        mannerRating: data.mannerRating,
+        comment: data.comment,
       },
     });
 
     // 대상 사용자 매너 점수 업데이트
     const avg = await this.prisma.review.aggregate({
-      where: { targetId: data.targetId as string },
+      where: { targetId: data.targetId },
       _avg: { mannerRating: true },
     });
 
     if (avg._avg.mannerRating) {
       await this.prisma.user.update({
-        where: { id: data.targetId as string },
+        where: { id: data.targetId },
         data: { mannerScore: avg._avg.mannerRating },
       });
     }
 
     // Fire-and-forget: update ELO ratings for all participants of this match
-    void this.scoring.updateEloAfterMatch(data.matchId as string);
+    void this.scoring.updateEloAfterMatch(data.matchId);
 
     return review;
   }

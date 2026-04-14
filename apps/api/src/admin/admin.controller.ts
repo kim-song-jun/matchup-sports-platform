@@ -9,8 +9,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AdminUserStatus, MercenaryPostStatus } from '@prisma/client';
+import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { MercenaryPostStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AdminGuard } from '../common/guards/admin.guard';
@@ -28,6 +28,7 @@ import {
 
 @ApiTags('관리자')
 @UseGuards(JwtAuthGuard, AdminGuard)
+@ApiBearerAuth()
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -82,7 +83,7 @@ export class AdminController {
     return this.adminService.updateUserStatus(id, {
       actorId,
       actorLabel: actorLabel || 'admin',
-      status: body.status as AdminUserStatus,
+      status: body.status,
       note: body.note,
     });
   }
@@ -187,8 +188,15 @@ export class AdminController {
   }
 
   @Get('payments')
-  @ApiOperation({ summary: '결제 목록 (전체)' })
-  async getPayments() {
-    return this.adminService.getPayments();
+  @ApiOperation({ summary: '결제 목록 (커서 페이지네이션)' })
+  async getPayments(
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+    return this.adminService.getPayments(
+      cursor,
+      parsedLimit !== undefined && !Number.isNaN(parsedLimit) ? parsedLimit : undefined,
+    );
   }
 }

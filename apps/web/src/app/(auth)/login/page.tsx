@@ -233,6 +233,17 @@ export default function LoginPage() {
                 className="text-base"
               />
             </FormField>
+            {mode === 'login' && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                  onClick={() => toast('info', '비밀번호 재설정 기능은 준비 중이에요')}
+                >
+                  비밀번호를 잊으셨나요?
+                </button>
+              </div>
+            )}
             {mode === 'register' && (
               <FormField label="닉네임" htmlFor="login-nickname" labelClassName="sr-only">
                 <Input
@@ -269,8 +280,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* 개발 빠른 로그인 — 개발 환경에서만 표시 */}
-      {process.env.NODE_ENV !== 'production' && <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6" data-testid="dev-login-panel">
+      {/* 개발 빠른 로그인 — NEXT_PUBLIC_SHOW_DEV_LOGIN=true 일 때만 표시 */}
+      {process.env.NEXT_PUBLIC_SHOW_DEV_LOGIN === 'true' && <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-t-2xl px-6 pt-4 pb-6" data-testid="dev-login-panel">
         <p className="text-center text-xs text-gray-400 mb-3">개발 모드</p>
         <div className="flex gap-2 max-w-sm mx-auto">
           <Input
@@ -288,7 +299,7 @@ export default function LoginPage() {
           </Button>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
-          {['축구왕민수', '농구러버지영', '하키마스터준호'].map(name => (
+          {['축구왕민수', '농구러버지영', '하키마스터준호', '매치업관리자'].map(name => (
             <button key={name} onClick={() => handleDevLogin(name)} disabled={isLoading}
               className="rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 disabled:opacity-50 transition-colors">
               {name}

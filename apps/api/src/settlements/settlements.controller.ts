@@ -3,6 +3,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SettlementsService } from './settlements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ProcessSettlementDto } from './dto/process-settlement.dto';
 
 @ApiTags('관리자 - 정산')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -13,8 +15,19 @@ export class SettlementsController {
 
   @Get()
   @ApiOperation({ summary: '정산 목록 조회' })
-  findAll(@Query('status') status?: string, @Query('type') type?: string) {
-    return this.settlementsService.findAll({ status, type });
+  findAll(
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+    return this.settlementsService.findAll({
+      status,
+      type,
+      cursor,
+      limit: parsedLimit !== undefined && !Number.isNaN(parsedLimit) ? parsedLimit : undefined,
+    });
   }
 
   @Get('summary')
@@ -25,7 +38,15 @@ export class SettlementsController {
 
   @Patch(':id/process')
   @ApiOperation({ summary: '정산 처리' })
-  process(@Param('id') id: string, @Body() body: { action: string; note?: string; actor?: string }) {
-    return this.settlementsService.process(id, body);
+  process(
+    @Param('id') id: string,
+    @Body() body: ProcessSettlementDto,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.settlementsService.process(id, {
+      action: body.action,
+      note: body.note,
+      actor: actorId,
+    });
   }
 }

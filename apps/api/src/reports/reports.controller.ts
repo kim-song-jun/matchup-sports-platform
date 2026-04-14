@@ -13,6 +13,10 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
+  ApiOkResponse,
+  ApiCreatedResponse,
+  ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { ReportStatus, ReportTargetType } from '@prisma/client';
 import { ReportsService } from './reports.service';
@@ -30,6 +34,8 @@ export class ReportsController {
 
   @Post('reports')
   @ApiOperation({ summary: '신고 생성' })
+  @ApiCreatedResponse({ description: 'Report created' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   createReport(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateReportDto,
@@ -39,6 +45,8 @@ export class ReportsController {
 
   @Get('reports/me')
   @ApiOperation({ summary: '내 신고 목록' })
+  @ApiOkResponse({ description: 'My report list' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   getMyReports(@CurrentUser('id') userId: string) {
     return this.reportsService.getMyReports(userId);
   }
@@ -48,6 +56,9 @@ export class ReportsController {
   @ApiOperation({ summary: '관리자 — 전체 신고 목록' })
   @ApiQuery({ name: 'status', enum: ReportStatus, required: false })
   @ApiQuery({ name: 'targetType', enum: ReportTargetType, required: false })
+  @ApiOkResponse({ description: 'All reports (admin view)' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
+  @ApiForbiddenResponse({ description: 'Admin role required' })
   adminListReports(
     @Query('status') status?: ReportStatus,
     @Query('targetType') targetType?: string,
@@ -58,6 +69,9 @@ export class ReportsController {
   @Patch('admin/reports/:id')
   @UseGuards(AdminGuard)
   @ApiOperation({ summary: '관리자 — 신고 상태 업데이트' })
+  @ApiOkResponse({ description: 'Report status updated' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
+  @ApiForbiddenResponse({ description: 'Admin role required' })
   adminUpdateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateReportStatusDto,

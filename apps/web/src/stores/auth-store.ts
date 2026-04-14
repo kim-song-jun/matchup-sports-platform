@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { disconnectSocket } from '@/lib/realtime-client';
+import type { SportType } from '@/types/enums.generated';
 
 interface SportProfile {
   id: string;
-  sportType: string;
+  sportType: SportType;
   level: number;
   eloRating: number;
   preferredPositions: string[];
@@ -31,7 +32,7 @@ interface User {
   teamCount?: number;
   oauthProvider?: string;
   role?: string;
-  [key: string]: unknown;
+  phone?: string | null;
 }
 
 interface AuthState {

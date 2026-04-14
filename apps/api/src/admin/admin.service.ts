@@ -762,7 +762,7 @@ export class AdminService {
         description: data.description,
         imageUrls: data.imageUrls ?? [],
         facilities: data.facilities ?? [],
-        operatingHours: data.operatingHours ?? {},
+        operatingHours: (data.operatingHours ?? {}) as Prisma.InputJsonValue,
         pricePerHour: data.pricePerHour,
         rinkSubType: data.rinkSubType,
       },
@@ -791,7 +791,7 @@ export class AdminService {
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.imageUrls !== undefined ? { imageUrls: data.imageUrls } : {}),
         ...(data.facilities !== undefined ? { facilities: data.facilities } : {}),
-        ...(data.operatingHours !== undefined ? { operatingHours: data.operatingHours } : {}),
+        ...(data.operatingHours !== undefined ? { operatingHours: data.operatingHours as Prisma.InputJsonValue } : {}),
         ...(data.pricePerHour !== undefined ? { pricePerHour: data.pricePerHour } : {}),
         ...(data.rinkSubType !== undefined ? { rinkSubType: data.rinkSubType } : {}),
       },
@@ -821,8 +821,10 @@ export class AdminService {
     return { id };
   }
 
-  async getPayments() {
-    return this.prisma.payment.findMany({
+  async getPayments(cursor?: string, limit?: number) {
+    const take = Math.min(limit ?? PAGINATION.DEFAULT_LIMIT, PAGINATION.ADMIN_EXPORT_LIMIT);
+
+    const items = await this.prisma.payment.findMany({
       include: {
         user: { select: { id: true, nickname: true, email: true, profileImageUrl: true } },
         participant: {
@@ -836,8 +838,17 @@ export class AdminService {
         },
       },
       orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }],
-      take: PAGINATION.ADMIN_EXPORT_LIMIT,
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+
+    const hasMore = items.length > take;
+    if (hasMore) items.pop();
+
+    return {
+      items,
+      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+    };
   }
 
   private async ensureUserExists(id: string) {

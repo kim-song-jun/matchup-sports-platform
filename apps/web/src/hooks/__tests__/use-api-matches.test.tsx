@@ -26,22 +26,12 @@ import {
   useTeamMatchRefereeSchedule,
 } from '../use-api';
 import { api } from '@/lib/api';
+import { mockMatch } from '@/test/fixtures/matches';
 
 const mockApi = api as unknown as {
   post: ReturnType<typeof vi.fn>;
   get: ReturnType<typeof vi.fn>;
   patch: ReturnType<typeof vi.fn>;
-};
-
-const mockMatch = {
-  id: 'match-1',
-  sportType: 'SOCCER',
-  status: 'RECRUITING',
-  scheduledAt: '2025-06-01T10:00:00.000Z',
-  venueName: '서울 풋살장',
-  maxParticipants: 10,
-  currentParticipants: 5,
-  fee: 10000,
 };
 
 function makeWrapper() {
@@ -70,7 +60,7 @@ describe('useMatches', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.get).toHaveBeenCalledWith('/matches', { params: undefined });
     expect(result.current.data?.items).toHaveLength(1);
-    expect(result.current.data?.items[0].sportType).toBe('SOCCER');
+    expect(result.current.data?.items[0].sportType).toBe('soccer');
   });
 
   it('passes sportType filter param', async () => {
@@ -80,10 +70,10 @@ describe('useMatches', () => {
     });
 
     const wrapper = makeWrapper();
-    const { result } = renderHook(() => useMatches({ sportType: 'SOCCER' }), { wrapper });
+    const { result } = renderHook(() => useMatches({ sportType: 'soccer' }), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockApi.get).toHaveBeenCalledWith('/matches', { params: { sportType: 'SOCCER' } });
+    expect(mockApi.get).toHaveBeenCalledWith('/matches', { params: { sportType: 'soccer' } });
   });
 
   it('passes extended discovery params 그대로 to the api client', async () => {

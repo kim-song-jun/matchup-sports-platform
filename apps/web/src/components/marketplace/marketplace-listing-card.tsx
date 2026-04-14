@@ -56,7 +56,11 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
               {sportLabel[item.sportType] || t('other')}
             </span>
             <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {item.locationDistrict || item.locationCity || t('locationUndecided')} · {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition]) : item.condition}
+              {item.locationDistrict || item.locationCity || t('locationUndecided')}
+            </span>
+            <span className="text-gray-300 dark:text-gray-600 shrink-0" aria-hidden="true">·</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition]) : item.condition}
             </span>
           </div>
 
@@ -64,12 +68,14 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
           <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-1.5">{formatCurrency(item.price)}</p>
 
           {/* 하단: 타입 + 통계 */}
-          <div className="flex items-center justify-between mt-auto pt-1">
+          <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
             <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
               {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
             </span>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {t('likes', { count: item.likeCount })} · {t('views', { count: item.viewCount })}
+            <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+              <span>{t('likes', { count: item.likeCount })}</span>
+              <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+              <span>{t('views', { count: item.viewCount })}</span>
             </span>
           </div>
 

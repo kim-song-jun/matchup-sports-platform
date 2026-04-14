@@ -287,7 +287,7 @@ export default function MatchDetailPage() {
   }
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
+    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in pb-28 lg:pb-0">
       {/* Mobile header */}
       <MobileGlassHeader className="gap-3">
         <button onClick={() => router.back()} aria-label="뒤로 가기" className="glass-mobile-icon-button flex items-center justify-center min-h-11 min-w-11 rounded-xl">

@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiOkResponse, ApiCreatedResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { WebPushService } from './web-push.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -32,6 +32,8 @@ export class NotificationsController {
   @ApiQuery({ name: 'isRead', required: false, type: Boolean })
   @ApiQuery({ name: 'cursor', required: false, type: String })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkResponse({ description: 'Paginated notification list' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async findMine(
     @CurrentUser('id') userId: string,
     @Query('isRead') isRead?: string,
@@ -49,12 +51,15 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '읽지 않은 알림 수' })
+  @ApiOkResponse({ description: 'Unread notification count' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async getUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUnreadCount(userId);
   }
 
   @Get('vapid-public-key')
   @ApiOperation({ summary: 'VAPID 공개키 조회 (Web Push 구독 시 필요)' })
+  @ApiOkResponse({ description: 'VAPID public key' })
   getVapidPublicKey() {
     return { key: this.webPushService.getPublicKey() };
   }
@@ -63,6 +68,8 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '모든 알림 읽음 처리' })
+  @ApiOkResponse({ description: 'All notifications marked as read' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async markAllRead(@CurrentUser('id') userId: string) {
     return this.notificationsService.markAllRead(userId);
   }
@@ -71,6 +78,8 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '알림 읽음 처리' })
+  @ApiOkResponse({ description: 'Notification marked as read' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async markRead(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -82,6 +91,8 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Web Push 구독 등록' })
+  @ApiCreatedResponse({ description: 'Push subscription registered' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async pushSubscribe(
     @CurrentUser('id') userId: string,
     @Body() dto: PushSubscribeDto,
@@ -93,6 +104,8 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Web Push 구독 취소' })
+  @ApiOkResponse({ description: 'Push subscription removed' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async pushUnsubscribe(
     @CurrentUser('id') userId: string,
     @Body() dto: PushUnsubscribeDto,
@@ -104,6 +117,8 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '알림 설정 조회 (없으면 기본값 반환)' })
+  @ApiOkResponse({ description: 'Notification preferences' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async getPreferences(@CurrentUser('id') userId: string) {
     return this.notificationsService.getPreferences(userId);
   }
@@ -112,6 +127,8 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '알림 설정 업데이트 (upsert)' })
+  @ApiOkResponse({ description: 'Notification preferences updated' })
+  @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async updatePreferences(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateNotificationPreferenceDto,

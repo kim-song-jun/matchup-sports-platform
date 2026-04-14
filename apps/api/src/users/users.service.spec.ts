@@ -197,5 +197,18 @@ describe('UsersService', () => {
         }),
       );
     });
+
+    it('uses default limit of 20 when limit is 0 (nullish coalescing regression guard)', async () => {
+      // Regression: options.limit || 20 would coerce 0→20 incorrectly.
+      // With ?? 20 operator, 0 stays 0 but service caps take to limit+1=1.
+      // This test verifies Prisma is called with take=1 (0+1) not take=21 (20+1).
+      prismaMock.matchParticipant.findMany.mockResolvedValue([]);
+
+      await service.getMatchHistory('user-1', { limit: 0 });
+
+      expect(prismaMock.matchParticipant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 1 }),
+      );
+    });
   });
 });

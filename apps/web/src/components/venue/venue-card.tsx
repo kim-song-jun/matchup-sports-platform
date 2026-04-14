@@ -63,13 +63,13 @@ export function VenueCard({ venue, className }: VenueCardProps) {
             )}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{venue.address}</p>
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             {venue.pricePerHour && (
               <span>{formatCurrency(venue.pricePerHour)}/시간</span>
             )}
             {venue.reviewCount > 0 && (
               <>
-                <span className="text-gray-200 dark:text-gray-700" aria-hidden="true">·</span>
+                <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
                 <span>리뷰 {venue.reviewCount}</span>
               </>
             )}

@@ -3,6 +3,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DisputesService } from './disputes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateDisputeDto } from './dto/create-dispute.dto';
+import { UpdateDisputeStatusDto } from './dto/update-dispute-status.dto';
 
 @ApiTags('관리자 - 분쟁')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -25,31 +28,28 @@ export class DisputesController {
 
   @Post()
   @ApiOperation({ summary: '분쟁 생성' })
-  create(
-    @Body()
-    body: {
-      reporterTeamId: string;
-      reportedTeamId: string;
-      teamMatchId: string;
-      type: 'no_show' | 'late' | 'level_mismatch' | 'misconduct';
-      description: string;
-    },
-  ) {
-    return this.disputesService.create(body);
+  create(@Body() body: CreateDisputeDto) {
+    return this.disputesService.create({
+      reporterTeamId: body.reporterTeamId,
+      reportedTeamId: body.reportedTeamId,
+      teamMatchId: body.teamMatchId,
+      type: body.type,
+      description: body.description,
+    });
   }
 
   @Patch(':id/status')
   @ApiOperation({ summary: '분쟁 상태 변경' })
   updateStatus(
     @Param('id') id: string,
-    @Body()
-    body: {
-      status: 'pending' | 'investigating' | 'resolved' | 'dismissed';
-      resolution?: string;
-      note?: string;
-      actor?: string;
-    },
+    @Body() body: UpdateDisputeStatusDto,
+    @CurrentUser('id') actorId: string,
   ) {
-    return this.disputesService.updateStatus(id, body);
+    return this.disputesService.updateStatus(id, {
+      status: body.status,
+      resolution: body.resolution,
+      note: body.note,
+      actor: actorId,
+    });
   }
 }

@@ -104,46 +104,42 @@ export default function LandingPage() {
       {/* ── Stats ── */}
       <section className="pb-16 sm:pb-20">
         <div className="mx-5 lg:mx-auto lg:max-w-[800px]">
-          <ScrollReveal>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
-              {STATS.map((stat) => (
-                <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
-                  <span className="text-2xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
-                  <div className="text-xs text-gray-500 mt-2 font-medium">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </ScrollReveal>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border border-gray-100 dark:border-gray-700">
+            {STATS.map((stat) => (
+              <div key={stat.label} className="px-5 py-6 sm:px-6 sm:py-7 text-center">
+                <span className="text-2xl font-black text-gray-900 dark:text-white leading-none block">{stat.value}</span>
+                <div className="text-xs text-gray-500 mt-2 font-medium">{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── Pain Points ── */}
       <section className="pb-20 sm:pb-24">
         <div className="max-w-[800px] mx-auto px-5">
-          <ScrollReveal>
-            <div className="text-center">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight mb-10">
-                이런 경험, 있지 않나요?
-              </h2>
-              <div className="grid sm:grid-cols-3 gap-4">
-                {([
-                  { icon: Frown, text: '실력 차이가 너무 커서 재미없는 경기', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
-                  { icon: SearchX, text: '매번 상대 찾기가 힘든 주말', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-                  { icon: UserX, text: '약속했는데 노쇼 당한 경험', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
-                ] as const).map((pain) => (
-                  <div key={pain.text} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center">
-                    <div className={`h-12 w-12 rounded-xl ${pain.bg} flex items-center justify-center mx-auto mb-4`}>
-                      <pain.icon size={20} className={pain.color} />
-                    </div>
-                    <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed font-medium">{pain.text}</p>
+          <div className="text-center">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight mb-10">
+              이런 경험, 있지 않나요?
+            </h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {([
+                { icon: Frown, text: '실력 차이가 너무 커서 재미없는 경기', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
+                { icon: SearchX, text: '매번 상대 찾기가 힘든 주말', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+                { icon: UserX, text: '약속했는데 노쇼 당한 경험', color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-700' },
+              ] as const).map((pain) => (
+                <div key={pain.text} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 text-center">
+                  <div className={`h-12 w-12 rounded-xl ${pain.bg} flex items-center justify-center mx-auto mb-4`}>
+                    <pain.icon size={20} className={pain.color} />
                   </div>
-                ))}
-              </div>
-              <p className="mt-10 text-lg text-gray-500 dark:text-gray-400">
-                MatchUp이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
-              </p>
+                  <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed font-medium">{pain.text}</p>
+                </div>
+              ))}
             </div>
-          </ScrollReveal>
+            <p className="mt-10 text-lg text-gray-500 dark:text-gray-400">
+              MatchUp이 이 문제를 <span className="text-blue-500 font-semibold">기술로 해결</span>합니다.
+            </p>
+          </div>
         </div>
       </section>
 

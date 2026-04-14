@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
 import { BadgesService } from '../badges/badges.service';
+import { NotificationData } from '../notifications/notification-presentation';
 
 const BADGE_MATCH_MILESTONES = [
   { count: 10, type: 'match_10', name: '10경기 달성', description: '10경기를 완료한 사용자' },
@@ -70,7 +71,7 @@ export class SchedulerService {
 
       const penalisedParticipantIds = new Set<string>(
         alreadyPenalised
-          .map((n) => (n.data as Record<string, unknown> | null)?.['participantId'] as string | undefined)
+          .map((n) => (n.data as NotificationData | null)?.['participantId'] as string | undefined)
           .filter((id): id is string => typeof id === 'string'),
       );
 
@@ -172,7 +173,7 @@ export class SchedulerService {
     // Build per-user set of penalised participant IDs
     const penalisedByUser = new Map<string, Set<string>>();
     for (const n of penaltyNotifications) {
-      const participantId = (n.data as Record<string, unknown> | null)?.['participantId'];
+      const participantId = (n.data as NotificationData | null)?.['participantId'];
       if (typeof participantId !== 'string') continue;
       const set = penalisedByUser.get(n.userId) ?? new Set<string>();
       set.add(participantId);

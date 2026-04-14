@@ -3,35 +3,14 @@ import { NotFoundException } from '@nestjs/common';
 import { SettlementStatus, SettlementType } from '@prisma/client';
 import { SettlementsService } from './settlements.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildSettlementRecord } from '../../test/fixtures/settlements';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers — delegate to fixture builder for type-safe mock objects
 // ---------------------------------------------------------------------------
 
-const makeRecord = (overrides: Partial<{
-  id: string;
-  type: SettlementType;
-  status: SettlementStatus;
-  amount: number;
-  commission: number;
-  netAmount: number;
-  sourceId: string;
-  recipientId: string | null;
-  processedAt: Date | null;
-  createdAt: Date;
-}> = {}) => ({
-  id: 'settle-1',
-  type: SettlementType.match,
-  status: SettlementStatus.pending,
-  amount: 50000,
-  commission: 5000,
-  netAmount: 45000,
-  sourceId: 'pay-1',
-  recipientId: null,
-  processedAt: null,
-  createdAt: new Date(),
-  ...overrides,
-});
+const makeRecord = (overrides: Parameters<typeof buildSettlementRecord>[0] = {}) =>
+  buildSettlementRecord({ id: 'settle-1', sourceId: 'pay-1', ...overrides });
 
 // ---------------------------------------------------------------------------
 // Mock
@@ -116,6 +95,31 @@ describe('SettlementsService', () => {
 
       expect(result.items).toHaveLength(0);
       expect(result.total).toBe(0);
+    });
+
+    it('returns nextCursor when items exceed limit', async () => {
+      // take=2; mock returns 3 items to trigger hasMore
+      const records = [
+        makeRecord({ id: 'settle-1' }),
+        makeRecord({ id: 'settle-2' }),
+        makeRecord({ id: 'settle-3' }),
+      ];
+      prismaMock.$transaction.mockResolvedValue([records, 3]);
+
+      const result = await service.findAll({ limit: 2 });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBe('settle-2');
+    });
+
+    it('returns null nextCursor when items fit within limit', async () => {
+      const records = [makeRecord({ id: 'settle-1' })];
+      prismaMock.$transaction.mockResolvedValue([records, 1]);
+
+      const result = await service.findAll({ limit: 20 });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.nextCursor).toBeNull();
     });
   });
 

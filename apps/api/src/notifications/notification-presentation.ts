@@ -7,10 +7,17 @@ type NotificationRecord = {
   body: string;
   isRead: boolean;
   createdAt: Date;
+  /** Prisma JsonValue from DB — runtime-narrowed by asRecord(); not a REST input DTO. */
   data: unknown;
 };
 
 export type NotificationCategory = 'match' | 'team' | 'chat' | 'payment' | 'system';
+
+/**
+ * Notification payload shape after DB retrieval.
+ * Typed as Record because Prisma stores free-form JSON; runtime-narrowed via asRecord().
+ */
+export type NotificationData = Record<string, unknown>;
 
 export interface NotificationView {
   id: string;
@@ -19,21 +26,26 @@ export interface NotificationView {
   body: string;
   isRead: boolean;
   createdAt: Date;
-  data: Record<string, unknown> | null;
+  /** Prisma JsonValue narrowed to key-value object, or null for non-object payloads. */
+  data: NotificationData | null;
   category: NotificationCategory;
   link: string | null;
   ctaLabel: string | null;
 }
 
-function asRecord(data: unknown): Record<string, unknown> | null {
+/**
+ * Narrows Prisma JsonValue to a plain object.
+ * Cannot be a class-validator DTO because it represents DB output, not REST input.
+ */
+function asRecord(data: unknown): NotificationData | null {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return null;
   }
 
-  return data as Record<string, unknown>;
+  return data as NotificationData;
 }
 
-function readString(data: Record<string, unknown> | null, key: string) {
+function readString(data: NotificationData | null, key: string) {
   const value = data?.[key];
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
@@ -65,7 +77,7 @@ export function notificationCategory(type: NotificationType): NotificationCatego
   }
 }
 
-export function notificationLink(type: NotificationType, data: Record<string, unknown> | null) {
+export function notificationLink(type: NotificationType, data: NotificationData | null) {
   const explicitLink = readString(data, 'link');
   if (explicitLink) {
     return explicitLink;

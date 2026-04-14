@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -179,7 +180,7 @@ export class PaymentsService {
 
   // ── confirm ────────────────────────────────────────────────────────────────
 
-  async confirm(dto: ConfirmPaymentDto) {
+  async confirm(dto: ConfirmPaymentDto, userId: string) {
     const { orderId, paymentKey, amount } = dto;
 
     // Verify amount against DB record before calling Toss
@@ -189,6 +190,11 @@ export class PaymentsService {
 
     if (!pendingPayment) {
       throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
+    }
+
+    // Ensure the caller owns this payment (prevents one user from confirming another's payment)
+    if (pendingPayment.userId !== userId) {
+      throw new ForbiddenException('본인의 결제만 승인할 수 있습니다.');
     }
 
     if (amount !== undefined && pendingPayment.amount !== amount) {

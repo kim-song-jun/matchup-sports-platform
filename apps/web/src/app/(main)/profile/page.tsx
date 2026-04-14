@@ -367,11 +367,11 @@ function UpcomingSchedule() {
         ) : listMatches.length === 0 ? (
           <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-6 text-center dark:border-gray-700 dark:bg-gray-900/40">
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300">
-              <Calendar size={20} />
+              <Calendar size={20} aria-hidden="true" />
             </div>
             <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{te('noSchedule')}</p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{te('noScheduleDesc')}</p>
-            <Link href="/matches" className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:bg-gray-800 dark:hover:bg-gray-700">
+            <Link href="/matches" className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:bg-gray-800 dark:hover:bg-gray-700">
               {t('findMatch')}
             </Link>
           </div>

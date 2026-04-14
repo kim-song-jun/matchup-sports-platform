@@ -283,7 +283,7 @@ export default function LandingPage() {
                 const Icon = SportIconMap[sport.key];
                 return (
                   <div key={sport.key} className="shrink-0 w-[88px] bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 active:scale-[0.95] transition-transform duration-200">
-                    <div className={`w-12 h-12 rounded-xl ${sport.bg} flex items-center justify-center`}>
+                    <div className={`w-12 h-12 rounded-xl ${sport.bg} flex items-center justify-center`} aria-hidden="true">
                       {Icon && <Icon size={24} className={sport.iconColor} />}
                     </div>
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">{sport.name}</span>
@@ -300,7 +300,7 @@ export default function LandingPage() {
                 const Icon = SportIconMap[sport.key];
                 return (
                   <div key={sport.key} className="w-[108px] bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex flex-col items-center gap-2.5 hover:-translate-y-0.5 hover:border-blue-200 dark:hover:border-blue-800 transition-[colors,transform] duration-300 cursor-default">
-                    <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`}>
+                    <div className={`w-11 h-11 rounded-xl ${sport.bg} flex items-center justify-center`} aria-hidden="true">
                       {Icon && <Icon size={20} className={sport.iconColor} />}
                     </div>
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">{sport.name}</span>

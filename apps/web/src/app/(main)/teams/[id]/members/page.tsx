@@ -279,7 +279,7 @@ export default function TeamMembersPage() {
       {kickTarget && (
         <Modal isOpen={!!kickTarget} onClose={() => setKickTarget(null)} title="멤버 강퇴">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/20 mx-auto mb-4">
-            <AlertTriangle size={24} className="text-red-500" />
+            <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
           </div>
           <p className="text-base text-gray-700 dark:text-gray-200 text-center">
             <span className="font-bold">{kickTarget.name}</span>님을 강퇴하시겠어요?

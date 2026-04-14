@@ -334,7 +334,7 @@ export default function ListingDetailPage() {
       {/* 삭제 확인 모달 */}
       <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} size="sm">
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-          <AlertTriangle size={24} className="text-red-500" />
+          <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
         </div>
         <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
         <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>

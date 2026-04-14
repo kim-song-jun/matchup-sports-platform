@@ -221,7 +221,7 @@ function DeleteModal({
 
         <div className="flex flex-col items-center text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/30 mb-4">
-            <AlertTriangle size={28} className="text-red-500" />
+            <AlertTriangle size={28} className="text-red-500" aria-hidden="true" />
           </div>
           <h3 id="delete-modal-title" className="text-xl font-bold text-gray-900 dark:text-white mb-2">정말 탈퇴하시겠어요?</h3>
               <p className="text-base text-gray-500 dark:text-gray-400 mb-6">

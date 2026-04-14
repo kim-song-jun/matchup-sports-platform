@@ -143,7 +143,7 @@ export default function RefundRequestPage() {
         </div>
 
         <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 mb-5">
-          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
           <p className="text-sm text-amber-700 leading-relaxed">
             {isMockMode
               ? '테스트 환불은 즉시 상태만 변경되며 실제 카드 취소나 계좌 입금은 발생하지 않습니다.'

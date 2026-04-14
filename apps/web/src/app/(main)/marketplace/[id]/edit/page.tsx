@@ -331,7 +331,7 @@ export default function EditListingPage() {
         <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="매물 삭제" size="sm">
           <div className="pt-1">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-              <AlertTriangle size={24} className="text-red-500" />
+              <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
             </div>
             <h3 className="text-center text-lg font-bold text-gray-900 dark:text-white">매물을 삭제하시겠어요?</h3>
             <p className="mt-2 text-center text-base text-gray-500">삭제된 매물은 복구할 수 없습니다.</p>

@@ -187,7 +187,7 @@ export default function MyListingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-5" onClick={() => setDeleteTarget(null)}>
           <div role="dialog" aria-modal="true" aria-labelledby="delete-listing-modal-title" className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
+              <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
             </div>
             <h3 id="delete-listing-modal-title" className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
             <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>

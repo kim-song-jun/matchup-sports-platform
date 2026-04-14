@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useDeleteMercenaryPost, useMercenaryPost, useUpdateMercenaryPost } from '@/hooks/use-api';
 import { levelLabel, sportCardAccent, sportLabel } from '@/lib/constants';
-import { formatCurrency } from '@/lib/utils';
+import { extractErrorMessage, formatCurrency } from '@/lib/utils';
 import type { UpdateMercenaryPostInput } from '@/types/api';
 
 const positionOptions = [
@@ -37,18 +37,6 @@ interface FormData {
   level: number;
   fee: number;
   notes: string;
-}
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string | string[] } } };
-  const message = maybe.response?.data?.message;
-  if (Array.isArray(message)) {
-    return message[0] ?? fallback;
-  }
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message;
-  }
-  return fallback;
 }
 
 function toDateInputValue(value: string): string {
@@ -316,7 +304,7 @@ export default function EditMercenaryPage() {
         <div className="flex gap-3 mb-8">
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 transition-colors"
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 dark:border-red-800 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           >
             <Trash2 size={16} />
             삭제
@@ -333,11 +321,11 @@ export default function EditMercenaryPage() {
       </div>
 
       <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="모집글 삭제" size="sm">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
-          <AlertTriangle size={24} className="text-red-500" />
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/30 mx-auto mb-4">
+          <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
         </div>
         <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 삭제하시겠어요?</h3>
-        <p className="text-base text-gray-500 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
+        <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">삭제하면 되돌릴 수 없어요.</p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => setShowDeleteModal(false)}

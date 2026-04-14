@@ -49,6 +49,9 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
         {/* Content */}
         <div className="flex flex-1 flex-col min-w-0 py-0.5">
           <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
+          {item.description && (
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-snug">{item.description}</p>
+          )}
 
           {/* meta: 지역 · 종목 · 상태 */}
           <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-gray-400">

@@ -75,7 +75,7 @@ export default function LandingPage() {
 
             {/* Subtitle */}
             <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 mb-10 leading-relaxed max-w-[480px] mx-auto">
-              실력·위치·매너를 종합 분석해서
+              실력·위치·매너를 종합 분석해서{' '}
               <br className="hidden sm:block" />
               딱 맞는 상대와 매칭해드려요.
             </p>

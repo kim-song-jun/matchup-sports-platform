@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronRight, Lock, Trash2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useDeleteTeam, useMyTeams, useTeam, useUpdateTeam } from '@/hooks/use-api';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { useToast } from '@/components/ui/toast';
@@ -158,7 +159,12 @@ export default function EditTeamPage() {
   if (!canEdit) {
     return (
       <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
-        <p className="text-gray-500">팀 수정 권한이 없습니다.</p>
+        <EmptyState
+          icon={Lock}
+          title="수정 권한이 없어요"
+          description="팀 owner 또는 manager만 팀 정보를 수정할 수 있어요."
+          action={{ label: '팀 페이지로', href: `/teams/${params.id}` }}
+        />
       </div>
     );
   }

@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Lock } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useUpdateVenue, useVenue, useVenueHub } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import type { Venue } from '@/types/api';
@@ -90,8 +91,13 @@ export default function VenueEditPage() {
 
   if (!canEdit) {
     return (
-      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0 text-gray-500">
-        시설 수정 권한이 없습니다.
+      <div className="px-5 @3xl:px-0 pt-[var(--safe-area-top)] @3xl:pt-0">
+        <EmptyState
+          icon={Lock}
+          title="수정 권한이 없어요"
+          description="시설 관리자만 수정할 수 있어요."
+          action={{ label: '시설 페이지로', href: `/venues/${params.id}` }}
+        />
       </div>
     );
   }

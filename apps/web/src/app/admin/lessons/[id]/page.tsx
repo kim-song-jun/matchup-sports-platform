@@ -60,7 +60,7 @@ const typeColor: Record<string, string> = {
 const statusLabel: Record<string, string> = { open: '진행중', closed: '마감', completed: '완료', cancelled: '취소' };
 const statusColor: Record<string, string> = {
   open: 'bg-blue-50 text-blue-500', closed: 'bg-gray-100 text-gray-500',
-  completed: 'bg-green-50 text-green-500', cancelled: 'bg-red-50 text-red-500',
+  completed: 'bg-green-50 text-green-700', cancelled: 'bg-red-50 text-red-600',
 };
 const statusOptions = ['open', 'closed', 'completed', 'cancelled'];
 

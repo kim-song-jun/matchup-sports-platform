@@ -34,9 +34,9 @@ const typeLabel: Record<string, { text: string; color: string }> = {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: '대기', color: 'bg-gray-100 text-gray-600' },
-  processed: { label: '완료', color: 'bg-green-50 text-green-500' },
-  refunded: { label: '환불', color: 'bg-red-50 text-red-500' },
-  failed: { label: '실패', color: 'bg-amber-50 text-amber-600' },
+  processed: { label: '완료', color: 'bg-green-50 text-green-700' },
+  refunded: { label: '환불', color: 'bg-red-50 text-red-600' },
+  failed: { label: '실패', color: 'bg-amber-50 text-amber-800' },
 };
 
 export default function AdminSettlementsPage() {

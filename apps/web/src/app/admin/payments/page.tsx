@@ -27,10 +27,10 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  completed: 'bg-green-50 text-green-500',
+  completed: 'bg-green-50 text-green-700',
   pending: 'bg-gray-100 text-gray-500',
-  refunded: 'bg-red-50 text-red-500',
-  partial_refunded: 'bg-amber-50 text-amber-600',
+  refunded: 'bg-red-50 text-red-600',
+  partial_refunded: 'bg-amber-50 text-amber-800',
   failed: 'bg-gray-100 text-gray-400',
 };
 

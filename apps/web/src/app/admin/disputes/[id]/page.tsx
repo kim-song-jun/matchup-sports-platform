@@ -29,9 +29,9 @@ const typeLabel: Record<string, string> = {
 
 const typeColor: Record<string, string> = {
   no_show: 'bg-red-50 text-red-600',
-  late: 'bg-amber-50 text-amber-600',
+  late: 'bg-amber-50 text-amber-800',
   level_mismatch: 'bg-gray-100 text-gray-600',
-  misconduct: 'bg-red-50 text-red-500',
+  misconduct: 'bg-red-50 text-red-600',
 };
 
 const statusLabel: Record<string, string> = {
@@ -44,7 +44,7 @@ const statusLabel: Record<string, string> = {
 const statusColor: Record<string, string> = {
   pending: 'bg-gray-100 text-gray-600',
   investigating: 'bg-blue-50 text-blue-500',
-  resolved: 'bg-green-50 text-green-500',
+  resolved: 'bg-green-50 text-green-700',
   dismissed: 'bg-gray-100 text-gray-500',
 };
 

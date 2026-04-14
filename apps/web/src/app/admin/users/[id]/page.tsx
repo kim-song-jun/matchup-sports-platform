@@ -178,7 +178,7 @@ export default function AdminUserDetailPage() {
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                     user.adminStatus === 'suspended'
                       ? 'bg-red-50 text-red-600'
-                      : 'bg-green-50 text-green-600'
+                      : 'bg-green-50 text-green-700'
                   }`}>
                     {user.adminStatus === 'suspended' ? '정지' : '활성'}
                   </span>

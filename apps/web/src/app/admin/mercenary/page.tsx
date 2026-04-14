@@ -20,9 +20,9 @@ const statusLabel: Record<string, string> = {
 
 const statusColor: Record<string, string> = {
   open: 'bg-blue-50 text-blue-500',
-  filled: 'bg-green-50 text-green-600',
+  filled: 'bg-green-50 text-green-700',
   closed: 'bg-gray-100 text-gray-500',
-  cancelled: 'bg-red-50 text-red-500',
+  cancelled: 'bg-red-50 text-red-600',
 };
 
 const mercenaryFilters = [

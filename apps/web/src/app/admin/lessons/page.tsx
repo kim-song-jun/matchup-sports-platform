@@ -13,7 +13,7 @@ import { formatDateShort, formatCurrency } from '@/lib/utils';
 
 const typeLabel: Record<string, string> = { group_lesson: '그룹 레슨', practice_match: '연습 경기', free_practice: '자유 연습', clinic: '클리닉' };
 const statusLabel: Record<string, string> = { open: '진행중', closed: '마감', completed: '완료', cancelled: '취소' };
-const statusColor: Record<string, string> = { open: 'bg-green-50 text-green-600', closed: 'bg-gray-100 text-gray-500', completed: 'bg-blue-50 text-blue-600', cancelled: 'bg-red-50 text-red-500' };
+const statusColor: Record<string, string> = { open: 'bg-green-50 text-green-700', closed: 'bg-gray-100 text-gray-500', completed: 'bg-blue-50 text-blue-600', cancelled: 'bg-red-50 text-red-600' };
 
 export default function AdminLessonsPage() {
   const [search, setSearch] = useState('');

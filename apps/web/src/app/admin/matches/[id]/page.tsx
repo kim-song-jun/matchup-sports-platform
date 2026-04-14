@@ -22,7 +22,7 @@ const statusColor: Record<string, string> = {
   full: 'bg-gray-100 text-gray-500',
   in_progress: 'bg-blue-50 text-blue-500',
   completed: 'bg-gray-100 text-gray-500',
-  cancelled: 'bg-red-50 text-red-500',
+  cancelled: 'bg-red-50 text-red-600',
 };
 const statusOptions = ['recruiting', 'full', 'in_progress', 'completed', 'cancelled'];
 
@@ -30,9 +30,9 @@ const paymentStatusLabel: Record<string, string> = {
   completed: '결제완료', pending: '대기', refunded: '환불', failed: '실패',
 };
 const paymentStatusColor: Record<string, string> = {
-  completed: 'bg-green-50 text-green-500',
+  completed: 'bg-green-50 text-green-700',
   pending: 'bg-gray-100 text-gray-500',
-  refunded: 'bg-red-50 text-red-500',
+  refunded: 'bg-red-50 text-red-600',
   failed: 'bg-gray-100 text-gray-400',
 };
 

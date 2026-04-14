@@ -19,10 +19,10 @@ const statusLabel: Record<string, string> = {
 
 const statusColor: Record<string, string> = {
   recruiting: 'bg-blue-50 text-blue-500',
-  approved: 'bg-green-50 text-green-600',
-  matched: 'bg-green-50 text-green-600',
+  approved: 'bg-green-50 text-green-700',
+  matched: 'bg-green-50 text-green-700',
   completed: 'bg-gray-100 text-gray-500',
-  cancelled: 'bg-red-50 text-red-500',
+  cancelled: 'bg-red-50 text-red-600',
 };
 
 const teamMatchFilters = [

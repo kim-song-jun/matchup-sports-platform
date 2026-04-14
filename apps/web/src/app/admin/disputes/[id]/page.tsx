@@ -18,6 +18,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { useAdminDispute, useUpdateDisputeStatus } from '@/hooks/use-api';
+import { extractErrorMessage } from '@/lib/utils';
 
 const typeLabel: Record<string, string> = {
   no_show: '노쇼',
@@ -47,6 +48,17 @@ const statusColor: Record<string, string> = {
   dismissed: 'bg-gray-100 text-gray-500',
 };
 
+const auditActionLabel: Record<string, string> = {
+  reported: '접수됨',
+  investigation_started: '조사 시작',
+  resolved: '해결됨',
+  dismissed: '기각됨',
+};
+
+const auditActorLabel: Record<string, string> = {
+  system: '시스템 자동',
+};
+
 type ActionMode = 'investigating' | 'resolved' | 'dismissed' | null;
 
 export default function AdminDisputeDetailPage() {
@@ -74,9 +86,8 @@ export default function AdminDisputeDetailPage() {
       setActionMode(null);
       setAdminNote('');
       await refetch();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '분쟁 상태를 업데이트하지 못했어요.');
+    } catch (err) {
+      toast('error', extractErrorMessage(err, '분쟁 상태를 업데이트하지 못했어요.'));
     }
   };
 
@@ -236,7 +247,8 @@ export default function AdminDisputeDetailPage() {
             <div className="space-y-2">
               <button
                 onClick={() => setActionMode('investigating')}
-                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100 transition-colors"
+                disabled={dispute.status !== 'pending'}
+                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <AlertTriangle size={18} className="text-blue-500 shrink-0" />
                 <div>
@@ -246,7 +258,8 @@ export default function AdminDisputeDetailPage() {
               </button>
               <button
                 onClick={() => setActionMode('resolved')}
-                className="w-full flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-left hover:bg-green-100 transition-colors"
+                disabled={dispute.status !== 'investigating'}
+                className="w-full flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-left hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle size={18} className="text-green-500 shrink-0" />
                 <div>
@@ -256,7 +269,8 @@ export default function AdminDisputeDetailPage() {
               </button>
               <button
                 onClick={() => setActionMode('dismissed')}
-                className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+                disabled={dispute.status !== 'investigating' && dispute.status !== 'pending'}
+                className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Ban size={18} className="text-gray-500 shrink-0" />
                 <div>
@@ -280,10 +294,10 @@ export default function AdminDisputeDetailPage() {
               {(dispute.history ?? []).map((entry) => (
                 <div key={entry.id} className="rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{entry.action}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{auditActionLabel[entry.action] ?? entry.action}</p>
                     <span className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString('ko-KR')}</span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">actor: {entry.actor}</p>
+                  <p className="mt-1 text-xs text-gray-500">처리: {auditActorLabel[entry.actor] ?? entry.actor}</p>
                   {entry.note ? <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{entry.note}</p> : null}
                 </div>
               ))}

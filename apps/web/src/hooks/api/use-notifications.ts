@@ -9,7 +9,7 @@ import {
   unreadNotificationCount,
 } from '@/lib/notification-center';
 import type { Notification, NotificationPreference } from '@/types/api';
-import { extractData } from './shared';
+import { extractData, extractCollection } from './shared';
 import { queryKeys } from './query-keys';
 
 // ── Notifications ──
@@ -20,7 +20,7 @@ export function useNotifications(isRead?: boolean) {
     queryFn: async () => {
       const params = isRead !== undefined ? { isRead: String(isRead) } : undefined;
       const res = await api.get('/notifications', { params });
-      return extractData<Notification[]>(res);
+      return extractCollection<Notification>(res);
     },
     enabled: isAuthenticated,
     // Backfill notifications if a realtime event is missed during socket handshakes.

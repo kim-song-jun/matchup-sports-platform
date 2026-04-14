@@ -92,7 +92,7 @@ export default function AdminReviewsPage() {
         <SummaryCard label="총 평가수" value={totalReviews} icon={TrendingUp} iconColor="bg-blue-50 text-blue-500" />
         <SummaryCard label="전체 평균" value={avgTotal.toFixed(1)} icon={Star} iconColor="bg-amber-50 text-amber-500" />
         <SummaryCard label="평균 매너점수" value={avgManner.toFixed(1)} icon={Star} iconColor="bg-green-50 text-green-500" />
-        <SummaryCard label="평균 스킬점수" value={avgSkill.toFixed(1)} icon={Star} iconColor="bg-blue-50 text-blue-500" />
+        <SummaryCard label="평균 스킬점수" value={avgSkill.toFixed(1)} icon={Star} iconColor="bg-purple-50 text-purple-500" />
       </div>
 
       <AdminToolbar

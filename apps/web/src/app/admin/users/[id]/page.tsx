@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
-import { ChevronRight, Star, Trophy, MapPin, AlertTriangle, Ban, User, Shield, RefreshCw } from 'lucide-react';
+import { ChevronRight, Star, Trophy, MapPin, AlertTriangle, Ban, User, Shield, RefreshCw, ClipboardList, Copy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
@@ -13,6 +13,7 @@ import { SportIconMap } from '@/components/icons/sport-icons';
 import { useAdminUser } from '@/hooks/use-api';
 import type { SportProfile } from '@/types/api';
 import { sportLabel, levelLabel } from '@/lib/constants';
+import { extractErrorMessage } from '@/lib/utils';
 
 type ModerationAction = 'warn' | 'suspend' | 'reactivate' | null;
 
@@ -54,8 +55,7 @@ export default function AdminUserDetailPage() {
       setActionNote('');
       await refetch();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '관리 액션을 적용하지 못했어요.');
+      toast('error', extractErrorMessage(err, '관리 액션을 적용하지 못했어요.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -146,10 +146,14 @@ export default function AdminUserDetailPage() {
             <button
               onClick={() => void handleModerationAction()}
               disabled={isSubmitting || (requiresActionNote && !actionNote.trim())}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-base font-semibold text-white hover:bg-gray-800 transition-colors disabled:opacity-60"
+              className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold text-white transition-colors disabled:opacity-60 ${
+                actionType === 'suspend'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-gray-900 hover:bg-gray-800'
+              }`}
             >
               {isSubmitting ? <RefreshCw size={16} className="animate-spin" /> : null}
-              저장
+              {actionType === 'suspend' ? '계정 정지' : actionType === 'warn' ? '경고 기록' : '계정 활성화'}
             </button>
           </div>
         </div>
@@ -264,14 +268,28 @@ export default function AdminUserDetailPage() {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-400">사용자 ID</span>
-                <span className="text-gray-700 dark:text-gray-300 font-mono text-xs">{user.id?.slice(0, 12)}...</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user.id) return;
+                    void navigator.clipboard.writeText(user.id)
+                      .then(() => toast('success', '사용자 ID를 복사했어요'))
+                      .catch(() => toast('error', 'ID를 복사하지 못했어요'));
+                  }}
+                  className="flex items-center gap-1.5 min-h-[44px] px-1 rounded-md text-gray-700 dark:text-gray-300 font-mono text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  aria-label="사용자 ID 복사"
+                  title={user.id}
+                >
+                  <span>{user.id?.slice(0, 12)}...</span>
+                  <Copy size={12} className="text-gray-400 shrink-0" aria-hidden="true" />
+                </button>
               </div>
             </div>
           </div>
 
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">관리 액션</h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <button
                 onClick={() => setActionType('warn')}
                 className="w-full flex items-center gap-3 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3 text-left hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
@@ -326,7 +344,7 @@ export default function AdminUserDetailPage() {
               </div>
             ) : (
               <EmptyState
-                icon={Shield}
+                icon={ClipboardList}
                 title="아직 기록된 운영 액션이 없어요"
                 description="경고/정지/복구 이력이 여기에 누적됩니다"
                 size="sm"

@@ -159,8 +159,8 @@ export default function FeedPage() {
         ) : !hasAny ? (
           <EmptyState
             icon={Bell}
-            title={t('loginPromptTitle')}
-            description={t('loginPromptDesc')}
+            title={t('emptyTitle')}
+            description={t('emptyDesc')}
           />
         ) : (
           <>

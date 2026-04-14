@@ -54,7 +54,8 @@ export function AdminToolbar({
         )}
         {onDownload && (
           <button onClick={onDownload}
-            className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0">
+            disabled={count === 0}
+            className="flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 min-h-[44px] px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
             <Download size={12} />
             내보내기
           </button>
@@ -67,7 +68,7 @@ export function AdminToolbar({
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             {filters.map((f) => (
               <button key={f.key} onClick={() => onFilterChange?.(f.key)}
-                className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`shrink-0 rounded-md min-h-[44px] px-2.5 py-1 text-xs font-medium transition-colors inline-flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                   activeFilter === f.key
                     ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                     : 'bg-gray-50 text-gray-500 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'

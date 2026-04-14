@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// ── Error message extraction ──
+
+/** Pulls a user-safe message from an unknown thrown value (axios error, plain error, etc). */
+export function extractErrorMessage(error: unknown, fallback: string): string {
+  const maybe = error as { response?: { data?: { message?: string | string[] } } };
+  const message = maybe?.response?.data?.message;
+  if (Array.isArray(message)) return message[0] ?? fallback;
+  if (typeof message === 'string' && message.trim().length > 0) return message;
+  return fallback;
+}
+
 // ── Currency formatters ──
 
 /** 금액 표시 — 0이면 '무료', 그 외 'N원' */

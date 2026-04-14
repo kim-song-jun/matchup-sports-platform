@@ -208,6 +208,12 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
     adjust: '횟수 조정',
   }[mode];
 
+  const modalCta = {
+    extend: '연장',
+    status: '변경',
+    adjust: '조정',
+  }[mode];
+
   return (
     <div
       ref={overlayRef}
@@ -411,7 +417,7 @@ function TicketManageModal({ ticket, mode, onClose, onSave }: TicketManageModalP
             onClick={handleSave}
             className="flex-1 min-h-[44px] rounded-xl bg-blue-500 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors"
           >
-            저장
+            {modalCta}
           </button>
         </div>
       </div>
@@ -478,7 +484,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
             type="button"
             role="menuitem"
             onClick={() => trigger('extend')}
-            className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 min-h-[44px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <CalendarDays size={14} className="text-gray-400" aria-hidden="true" />
             만료일 연장
@@ -488,7 +494,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
             type="button"
             role="menuitem"
             onClick={() => trigger('status')}
-            className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 min-h-[44px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <RefreshCw size={14} className="text-gray-400" aria-hidden="true" />
             상태 변경
@@ -499,7 +505,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
               type="button"
               role="menuitem"
               onClick={() => trigger('adjust')}
-              className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-2.5 w-full px-4 min-h-[44px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               <MoreHorizontal size={14} className="text-gray-400" aria-hidden="true" />
               횟수 조정
@@ -512,7 +518,7 @@ function RowActionMenu({ ticket, onAction }: RowActionMenuProps) {
             href={`/admin/lessons/${ticket.lessonId}`}
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 w-full px-4 min-h-10 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2.5 w-full px-4 min-h-[44px] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <ExternalLink size={14} className="text-gray-400" aria-hidden="true" />
             상세 보기

@@ -297,7 +297,7 @@ export default function PricingPage() {
               지금 무료로 시작하세요
             </h2>
             <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
-              무료 요금제로 매칭을 체험하고,
+              무료 요금제로 매칭을 체험하고,{' '}
               <br className="hidden sm:block" />
               더 필요할 때 업그레이드하세요.
             </p>

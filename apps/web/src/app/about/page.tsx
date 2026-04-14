@@ -120,11 +120,11 @@ export default function AboutPage() {
 
             <ScrollReveal delay={150}>
               <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[540px] mx-auto">
-                주말 아침, 풋살화 끈을 묶으며 설레는 마음.
+                주말 아침, 풋살화 끈을 묶으며 설레는 마음.{' '}
                 <br className="hidden sm:block" />
-                그런데 상대가 없다면? 실력이 안 맞는다면?
+                그런데 상대가 없다면? 실력이 안 맞는다면?{' '}
                 <br className="hidden sm:block" />
-                우리는 그 설렘이 실망으로 바뀌는 순간을
+                우리는 그 설렘이 실망으로 바뀌는 순간을{' '}
                 <br className="hidden sm:block" />
                 없애고 싶었습니다.
               </p>
@@ -148,7 +148,7 @@ export default function AboutPage() {
                   운동 상대를 쉽게 찾을 수 있는 세상
                 </h2>
                 <p className="text-md text-gray-500 dark:text-gray-400 mt-5 leading-relaxed max-w-[480px] mx-auto">
-                  운동은 좋은 상대가 있어야 즐겁습니다.
+                  운동은 좋은 상대가 있어야 즐겁습니다.{' '}
                   <br className="hidden sm:block" />
                   Teameet은 기술로 그 상대를 연결하는 플랫폼입니다.
                 </p>
@@ -368,7 +368,7 @@ export default function AboutPage() {
             지금 시작하세요
           </h2>
           <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
-            당신의 피드백이 Teameet을 더 좋게 만듭니다.
+            당신의 피드백이 Teameet을 더 좋게 만듭니다.{' '}
             <br className="hidden sm:block" />
             함께 생활체육의 새로운 기준을 세워주세요.
           </p>

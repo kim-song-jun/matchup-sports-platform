@@ -369,7 +369,7 @@ export default function LandingPage() {
               지금 시작하세요
             </h2>
             <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
-              내 수준에 맞는 상대를 AI가 찾아드려요.
+              내 수준에 맞는 상대를 AI가 찾아드려요.{' '}
               <br className="hidden sm:block" />
               경기할수록 더 정확해지는 스마트 매칭.
             </p>

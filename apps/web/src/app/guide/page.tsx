@@ -317,7 +317,7 @@ export default function GuidePage() {
                 팀 매칭 이용법
               </h2>
               <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
-                팀을 등록하고 비슷한 실력의 상대 팀과 매칭하세요.
+                팀을 등록하고 비슷한 실력의 상대 팀과 매칭하세요.{' '}
                 <br className="hidden sm:block" />
                 AI가 팀 전체의 실력 균형을 분석해드려요.
               </p>
@@ -383,7 +383,7 @@ export default function GuidePage() {
                 용병 / 장터 이용법
               </h2>
               <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
-                인원이 부족할 때 용병을 구하거나,
+                인원이 부족할 때 용병을 구하거나,{' '}
                 <br className="hidden sm:block" />
                 운동 장비를 사고팔 수 있어요.
               </p>
@@ -495,7 +495,7 @@ export default function GuidePage() {
               이제 직접 경험해보세요
             </h2>
             <p className="text-md lg:text-lg text-gray-400 mb-10 leading-relaxed">
-              가이드를 다 읽으셨다면 준비 완료.
+              가이드를 다 읽으셨다면 준비 완료.{' '}
               <br className="hidden sm:block" />
               지금 가입하고 첫 매치를 시작하세요.
             </p>

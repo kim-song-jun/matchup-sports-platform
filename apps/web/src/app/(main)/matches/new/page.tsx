@@ -20,6 +20,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Card } from '@/components/ui/card';
 import { ImageUpload, type ImageUploadState } from '@/components/ui/image-upload';
 import { firstUploadUrl, type UploadAsset } from '@/lib/uploads';
+import { extractErrorMessage } from '@/lib/utils';
 
 const sportTypes = ['soccer', 'futsal', 'basketball', 'badminton', 'ice_hockey', 'swimming', 'tennis', 'baseball', 'volleyball', 'figure_skating', 'short_track'];
 
@@ -101,8 +102,7 @@ export default function CreateMatchPage() {
       toast('success', '매치가 만들어졌어요!');
       router.push('/matches?created=true');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      toast('error', axiosErr?.response?.data?.message || '생성에 실패했어요. 잠시 후 다시 시도해주세요');
+      toast('error', extractErrorMessage(err, '매치 생성에 실패했어요'));
     } finally {
       setIsSubmitting(false);
     }
@@ -149,7 +149,7 @@ export default function CreateMatchPage() {
                 return (
                   <button
                     key={type}
-                    onClick={() => { setForm({ ...form, sportType: type }); setStep(1); }}
+                    onClick={() => setForm({ ...form, sportType: type })}
                     data-testid={`match-sport-${type}`}
                     aria-pressed={isSelected}
                     className={`inline-flex items-center gap-2 rounded-xl min-h-[44px] px-4 py-2.5 text-sm font-medium transition-colors ${
@@ -169,6 +169,16 @@ export default function CreateMatchPage() {
                 );
               })}
             </div>
+            <Button
+              onClick={() => setStep(1)}
+              disabled={!form.sportType}
+              data-testid="match-create-next-sport"
+              fullWidth
+              size="lg"
+              className="mt-2"
+            >
+              다음
+            </Button>
           </div>
         )}
 
@@ -304,6 +314,7 @@ export default function CreateMatchPage() {
             <Button onClick={() => {
                 if (!guardImageUpload()) return;
                 if (!form.title) { toast('error', '매치 제목을 입력해주세요'); return; }
+                if (form.maxPlayers < 2) { toast('error', '최대 인원은 2명 이상이어야 해요'); return; }
                 if (form.levelMin > form.levelMax) {
                   setForm(prev => ({ ...prev, levelMin: prev.levelMax, levelMax: prev.levelMin }));
                   toast('info', '최소/최대 레벨이 자동으로 교정되었어요');

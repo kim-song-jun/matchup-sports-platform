@@ -240,10 +240,26 @@ export default function EditTeamPage() {
               </select>
             </div>
             <div className="flex items-end">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input type="checkbox" checked={!!form.isRecruiting} onChange={(event) => updateField('isRecruiting', event.target.checked)} disabled={formDisabled} />
-                모집중으로 표시
-              </label>
+              <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden text-sm font-medium" role="group" aria-label="모집 상태">
+                <button
+                  type="button"
+                  onClick={() => updateField('isRecruiting', true)}
+                  aria-pressed={!!form.isRecruiting}
+                  disabled={formDisabled}
+                  className={`px-4 py-2 transition-colors ${form.isRecruiting ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                >
+                  모집중
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('isRecruiting', false)}
+                  aria-pressed={!form.isRecruiting}
+                  disabled={formDisabled}
+                  className={`px-4 py-2 transition-colors border-l border-gray-200 dark:border-gray-700 ${!form.isRecruiting ? 'bg-gray-700 text-white dark:bg-gray-600' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                >
+                  모집마감
+                </button>
+              </div>
             </div>
           </div>
         </section>

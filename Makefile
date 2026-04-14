@@ -209,6 +209,16 @@ db-seed-mocks-deploy: ## Run checksum-gated mock sync as deploy would
 db-seed-images: ## Fill or refresh DB-backed image data without wiping records
 	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:images"
 
+.PHONY: db-seed-all
+db-seed-all: ## Seed everything: base data + mocks (admin/settlements/reports/22 users) + images
+	@echo "==> Seeding base data..."
+	@$(MAKE) db-seed
+	@echo "==> Seeding mock catalog (admin, settlements, reports, 22 users, 212 chat msgs, etc.)..."
+	@$(MAKE) db-seed-mocks
+	@echo "==> Seeding images..."
+	@$(MAKE) db-seed-images
+	@echo "✓ All seed data loaded."
+
 .PHONY: db-studio
 db-studio: ## Open Prisma Studio (exposes port 5555 only while running)
 	@echo "Prisma Studio will be available at http://localhost:5555"
@@ -224,11 +234,11 @@ redis-shell: ## Open redis-cli inside redis container
 	@$(DOCKER_DEV) exec redis redis-cli
 
 .PHONY: db-reset
-db-reset: ## DESTRUCTIVE: reset DB, re-migrate, re-seed
+db-reset: ## DESTRUCTIVE: reset DB, re-migrate, re-seed everything (base + mocks + images)
 	@echo "WARNING: This will wipe the dev database!"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm exec prisma migrate reset --force"
-	@$(MAKE) db-seed
+	@$(MAKE) db-seed-all
 
 # ─── Testing ──────────────────────────────────────────────────────────────────
 

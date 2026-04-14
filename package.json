@@ -13,6 +13,7 @@
     "db:seed": "pnpm --filter api db:seed",
     "db:seed:mocks": "pnpm --filter api db:seed:mocks",
     "db:seed:mocks:deploy": "pnpm --filter api db:seed:mocks:deploy",
+    "db:seed:all": "pnpm db:seed && pnpm db:seed:mocks && pnpm --filter api db:seed:images",
     "test:e2e": "pnpm exec playwright test --config=e2e/playwright.config.ts",
     "test:all": "pnpm --filter api test && pnpm --filter web test && pnpm exec playwright test --config=e2e/playwright.config.ts",
     "qa:manual:routes": "node scripts/qa/manual-route-smoke.mjs",

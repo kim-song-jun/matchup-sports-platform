@@ -19,7 +19,7 @@ import {
   useWithdrawMercenaryApplication,
 } from '@/hooks/use-api';
 import { sportLabel, levelLabel, sportCardAccent } from '@/lib/constants';
-import { formatFullDate, formatCurrency } from '@/lib/utils';
+import { extractErrorMessage, formatFullDate, formatCurrency } from '@/lib/utils';
 
 const positionLabel: Record<string, string> = {
   GK: '골키퍼',
@@ -35,18 +35,6 @@ const applicationStatusLabel: Record<string, string> = {
   rejected: '거절됨',
   withdrawn: '신청 취소',
 };
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string | string[] } } };
-  const message = maybe.response?.data?.message;
-  if (Array.isArray(message)) {
-    return message[0] ?? fallback;
-  }
-  if (typeof message === 'string' && message.trim().length > 0) {
-    return message;
-  }
-  return fallback;
-}
 
 function statusBadgeClass(status: string): string {
   if (status === 'accepted') return 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
@@ -308,7 +296,12 @@ export default function MercenaryDetailPage() {
           <section className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 mb-4">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">지원 목록</h2>
             {applications.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400">아직 지원자가 없어요.</p>
+              <EmptyState
+                icon={Users}
+                title="아직 지원자가 없어요"
+                description="용병 신청을 기다리고 있어요"
+                size="sm"
+              />
             ) : (
               <div className="space-y-3">
                 {applications.map((application) => {

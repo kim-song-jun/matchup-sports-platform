@@ -227,8 +227,9 @@ export default function EditMercenaryPage() {
             {positionOptions.map((option) => (
               <button
                 key={option.value}
+                type="button"
                 onClick={() => update('position', option.value)}
-                className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
+                className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors min-h-[44px] ${
                   form.position === option.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
@@ -276,8 +277,9 @@ export default function EditMercenaryPage() {
             {levelOptions.map((option) => (
               <button
                 key={option.value}
+                type="button"
                 onClick={() => update('level', option.value)}
-                className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors ${
+                className={`flex-1 rounded-xl border py-3 text-base font-semibold text-center transition-colors min-h-[44px] ${
                   form.level === option.value
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
                     : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'

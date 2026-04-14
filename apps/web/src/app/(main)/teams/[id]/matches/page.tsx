@@ -7,12 +7,9 @@ import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useTeam, useTeamMatches } from '@/hooks/use-api';
+import { formatMatchDate } from '@/lib/utils';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import type { TeamMatch } from '@/types/api';
-
-function getDayLabel(dateStr: string) {
-  return ['일', '월', '화', '수', '목', '금', '토'][new Date(dateStr).getDay()];
-}
 
 const statusLabel: Record<string, { text: string; style: string }> = {
   recruiting: { text: '모집중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
@@ -94,11 +91,11 @@ export default function TeamMatchesPage() {
                     <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                        <Calendar size={12} />
-                        <span>{match.matchDate} ({getDayLabel(match.matchDate)}) {match.startTime}</span>
+                        <Calendar size={12} aria-hidden="true" />
+                        <span>{formatMatchDate(match.matchDate)} {match.startTime}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                        <MapPin size={12} />
+                        <MapPin size={12} aria-hidden="true" />
                         <span className="truncate">{match.venueName}</span>
                       </div>
                     </div>

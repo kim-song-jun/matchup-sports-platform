@@ -11,9 +11,9 @@ import {
 import type { TeamMatchApplication } from '@/types/api';
 
 const appStatusMap: Record<string, { label: string; className: string }> = {
-  pending: { label: '대기중', className: 'bg-amber-50 text-amber-600' },
-  approved: { label: '승인', className: 'bg-green-50 text-green-600' },
-  rejected: { label: '거절', className: 'bg-red-50 text-red-500' },
+  pending: { label: '대기중', className: 'bg-amber-50 text-amber-800' },
+  approved: { label: '승인', className: 'bg-green-50 text-green-700' },
+  rejected: { label: '거절', className: 'bg-red-50 text-red-600' },
 };
 
 interface ApplicationsSectionProps {

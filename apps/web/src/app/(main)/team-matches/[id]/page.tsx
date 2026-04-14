@@ -238,7 +238,7 @@ export default function TeamMatchDetailPage() {
                   );
                 })()}
                 {match.isFreeInvitation && (
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal bg-green-50 text-green-600">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-normal bg-green-50 text-green-700">
                     무료초청
                   </span>
                 )}

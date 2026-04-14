@@ -32,19 +32,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: matchup_test
-          POSTGRES_PASSWORD: matchup_test
-          POSTGRES_DB: matchup_test
+          POSTGRES_USER: teameet_test
+          POSTGRES_PASSWORD: teameet_test
+          POSTGRES_DB: teameet_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U matchup_test"
+          --health-cmd "pg_isready -U teameet_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://matchup_test:matchup_test@localhost:5432/matchup_test
+      DATABASE_URL: postgresql://teameet_test:teameet_test@localhost:5432/teameet_test
       JWT_SECRET: ci-test-secret
       NODE_ENV: test
 
@@ -130,7 +130,7 @@ jobs:
             --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
             --filter 'protect deploy/.env' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ ec2-user@${{ secrets.EC2_HOST }}:~/matchup/
+            ./ ec2-user@${{ secrets.EC2_HOST }}:~/teameet/
 
       - name: Build and deploy
         timeout-minutes: 20
@@ -151,7 +151,7 @@ jobs:
           RESET_DB="${RESET_DB:-false}"
           RUN_SEED="${RUN_SEED:-false}"
 
-          cd ~/matchup
+          cd ~/teameet
 
           sync_env_from_github_secret() {
             local key="$1"
@@ -239,13 +239,13 @@ jobs:
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1
 
-          sudo docker build --no-cache -f deploy/Dockerfile.api -t matchup-api .
+          sudo docker build --no-cache -f deploy/Dockerfile.api -t teameet-api .
           sudo docker build --no-cache \
             -f deploy/Dockerfile.web \
             --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
             --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
             --build-arg INTERNAL_API_ORIGIN="${WEB_INTERNAL_API_ORIGIN}" \
-            -t matchup-web .
+            -t teameet-web .
 
           cd deploy
 
@@ -278,7 +278,7 @@ jobs:
           # closed instead of auto-resolving unknown drift.
           echo "[INFO] Bootstrapping deploy database..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts || true
+            run --rm --no-deps -T api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/bootstrap-deploy-db.ts" || true
           echo "[INFO] Build phase complete."
           EOF
 
@@ -286,7 +286,7 @@ jobs:
         timeout-minutes: 10
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
-            "RESET_DB='${{ inputs.reset_db }}' RUN_SEED='${{ inputs.run_seed }}' bash ~/matchup/deploy/restart-containers.sh"
+            "RESET_DB='${{ inputs.reset_db }}' RUN_SEED='${{ inputs.run_seed }}' bash ~/teameet/deploy/restart-containers.sh"
 
       - name: Health check
         run: |

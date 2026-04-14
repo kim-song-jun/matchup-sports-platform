@@ -6,8 +6,9 @@ import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useTournaments } from '@/hooks/use-api';
-import { sportLabel } from '@/lib/constants';
-import { formatCurrency, formatMatchDate } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
+import { formatCurrency, formatMatchDate, cn } from '@/lib/utils';
 import type { Tournament } from '@/types/api';
 
 function statusLabel(status?: string) {
@@ -76,36 +77,65 @@ export default function TournamentsPage() {
   );
 }
 
+const statusStyle: Record<string, string> = {
+  recruiting: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300',
+  full: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300',
+  ongoing: 'bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-300',
+  completed: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  cancelled: 'bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-red-300',
+};
+
 function TournamentCard({ event }: { event: Tournament }) {
+
   return (
     <Link href={`/tournaments/${event.id}`} className="block">
-      <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{event.title}</h3>
-          <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-2xs text-gray-600 dark:text-gray-300">
-            {statusLabel(event.status)}
-          </span>
+      <Card
+        variant="default"
+        padding="sm"
+        interactive
+        className="active:scale-[0.98] transition-[border-color,transform] duration-150"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center gap-1.5 flex-wrap">
+              <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', sportCardAccent[event.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300')}>
+                {sportLabel[event.sportType] || event.sportType}
+              </span>
+              <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', statusStyle[event.status ?? ''] ?? statusStyle.recruiting)}>
+                {statusLabel(event.status)}
+              </span>
+            </div>
+            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{event.title}</h3>
+          </div>
         </div>
-        <div className="mt-1.5 flex items-center gap-1.5 text-sm text-gray-500">
-          <CalendarDays size={13} />
-          <span>{formatMatchDate(event.eventDate)}</span>
-          {event.startTime && <span>{event.startTime}</span>}
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          {(sportLabel[event.sportType] || event.sportType)}
-          {(event.city || event.district) ? ` · ${[event.city, event.district].filter(Boolean).join(' ')}` : ''}
-          {event.venueName ? ` · ${event.venueName}` : ''}
-        </p>
-        <div className="mt-2 flex items-center gap-1.5 text-2xs text-gray-500">
-          {event.team && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">팀: {event.team.name}</span>}
-          {event.venue && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">장소: {event.venue.name}</span>}
-          {typeof event.entryFee === 'number' && (
-            <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-blue-600 dark:text-blue-300">
-              참가비 {formatCurrency(event.entryFee)}
-            </span>
+        <p className="mt-2.5 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+          <CalendarDays size={11} className="shrink-0 opacity-40" aria-hidden="true" />
+          <span>{formatMatchDate(event.eventDate)}{event.startTime ? ` ${event.startTime}` : ''}</span>
+          {(event.city || event.district) && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+              <span className="truncate">{[event.city, event.district].filter(Boolean).join(' ')}</span>
+            </>
           )}
-        </div>
-      </div>
+          {event.venueName && (
+            <>
+              <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+              <span className="truncate">{event.venueName}</span>
+            </>
+          )}
+        </p>
+        {(event.team || event.venue || typeof event.entryFee === 'number') && (
+          <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center gap-1.5 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+            {event.team && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">팀: {event.team.name}</span>}
+            {event.venue && <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">장소: {event.venue.name}</span>}
+            {typeof event.entryFee === 'number' && (
+              <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 font-medium text-gray-700 dark:text-gray-200">
+                참가비 {formatCurrency(event.entryFee)}
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
     </Link>
   );
 }

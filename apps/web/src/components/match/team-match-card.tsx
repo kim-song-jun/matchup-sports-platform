@@ -42,34 +42,34 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
     <Link href={`/team-matches/${match.id}`}>
       <Card
         variant="default"
-        padding="none"
+        padding="sm"
         interactive
         className={cn(
-          'p-4 transition-[transform] duration-200 active:scale-[0.98]',
+          'transition-[border-color,transform] duration-150 active:scale-[0.98]',
           className,
         )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2">
-              <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${status.className}`}>
-                {status.label}
-              </span>
               <span
-                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}
+                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}
               >
                 {sportLabel[match.sportType] ?? match.sportType}
               </span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
+                {status.label}
+              </span>
               {match.matchStyle && (
                 <>
-                  <span className="text-gray-200" aria-hidden="true">·</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-gray-200 dark:text-gray-600" aria-hidden="true">·</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {matchStyleLabel[match.matchStyle] ?? match.matchStyle}
                   </span>
                 </>
               )}
               {match.isFreeInvitation && (
-                <span className="ml-1 text-xs font-semibold text-green-600">
+                <span className="ml-1 rounded-full bg-green-50 text-green-600 dark:bg-green-950/30 dark:text-green-300 px-2 py-0.5 text-xs font-medium">
                   무료초청
                 </span>
               )}
@@ -80,14 +80,14 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
           </div>
         </div>
 
-        <p className="mt-2.5 text-sm leading-relaxed text-gray-500">
+        <p className="mt-2.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
           {formatMatchDate(match.matchDate)} {match.startTime}
-          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
           {match.venueName}
         </p>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {match.quarterCount}쿼터
-          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
           {match.skillGrade
             ? getGradeInfo(match.skillGrade).label
             : match.requiredLevel
@@ -95,22 +95,22 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
               : '제한없음'}
           {match.gameFormat && (
             <>
-              <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+              <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
               {match.gameFormat}
             </>
           )}
-          <span className="mx-1 text-gray-300" aria-hidden="true">·</span>
+          <span className="mx-1 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
           <span className="font-semibold text-gray-800 dark:text-gray-200">
             {formatCurrency(match.opponentFee ?? match.totalFee)}
           </span>
         </p>
 
-        <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
+        <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             신청 {String(match.applicationCount ?? 0)}팀
           </span>
           {match.hostTeam && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
               {match.hostTeam.name}
             </span>
           )}

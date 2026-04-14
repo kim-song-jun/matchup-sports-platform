@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { SafeImage } from '@/components/ui/safe-image';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { getVenueImageSet } from '@/lib/sport-image';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import type { Venue } from '@/types/api';
 
 export interface VenueCardProps {
@@ -39,21 +39,33 @@ export function VenueCard({ venue, className }: VenueCardProps) {
         {/* Text content */}
         <div className="flex-1 p-3 min-w-0 flex flex-col justify-center">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
+            <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{venue.name}</h3>
             {venue.rating > 0 && (
               <span className="shrink-0 flex items-center gap-0.5 text-xs font-semibold text-gray-900 dark:text-gray-100">
-                <Star size={10} fill="currentColor" className="text-amber-400" aria-hidden="true" />
+                <Star size={12} fill="currentColor" className="text-amber-500" aria-hidden="true" />
                 {venue.rating.toFixed(1)}
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {venue.sportTypes?.map((s: string) => sportLabel[s] || s).join(' · ')}
-          </p>
-          <p className="text-xs text-gray-500 mt-1 truncate">{venue.address}</p>
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {venue.sportTypes?.slice(0, 2).map((s: string) => (
+              <span
+                key={s}
+                className={`${sportCardAccent[s]?.badge || 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'} rounded-full px-2 py-0.5 text-xs font-medium`}
+              >
+                {sportLabel[s] || s}
+              </span>
+            ))}
+            {(venue.sportTypes?.length ?? 0) > 2 && (
+              <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                +{(venue.sportTypes?.length ?? 0) - 2}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{venue.address}</p>
+          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
             {venue.pricePerHour && (
-              <span>{new Intl.NumberFormat('ko-KR').format(venue.pricePerHour)}원/시간</span>
+              <span>{formatCurrency(venue.pricePerHour)}/시간</span>
             )}
             {venue.reviewCount > 0 && (
               <>

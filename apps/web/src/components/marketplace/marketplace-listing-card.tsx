@@ -52,10 +52,10 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
 
           {/* meta: 지역 · 종목 · 상태 */}
           <div className="flex items-center gap-1.5 mt-1">
-            <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-normal`}>
+            <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'} rounded-full px-2 py-0.5 text-xs font-medium`}>
               {sportLabel[item.sportType] || t('other')}
             </span>
-            <span className="text-sm text-gray-500 truncate">
+            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {item.locationDistrict || item.locationCity || t('locationUndecided')} · {conditionKeyMap[item.condition] ? t(conditionKeyMap[item.condition]) : item.condition}
             </span>
           </div>
@@ -65,7 +65,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
 
           {/* 하단: 타입 + 통계 */}
           <div className="flex items-center justify-between mt-auto pt-1">
-            <span className="rounded-full px-2 py-0.5 text-xs font-normal bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+            <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
               {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
             </span>
             <span className="text-xs text-gray-400 dark:text-gray-500">
@@ -74,7 +74,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
           </div>
 
           {(item.team || item.venue) && (
-            <div className="mt-1.5 flex items-center gap-1.5 text-2xs text-gray-500 dark:text-gray-400">
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               {item.team && (
                 <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5">
                   팀: {item.team.name}

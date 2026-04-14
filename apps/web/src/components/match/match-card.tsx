@@ -52,7 +52,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
             className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             sizes="(max-width: 768px) 100vw, 50vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
 
           <div className="absolute left-3.5 top-3.5 flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${dotColor} ring-[1.5px] ring-white/60`} aria-hidden="true" />
@@ -86,8 +86,8 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
           </div>
         </div>
 
-        <div className="space-y-2 px-3.5 py-3.5">
-          <h3 className="truncate text-sm font-semibold leading-snug text-gray-900 dark:text-gray-100">
+        <div className="space-y-2 px-3.5 py-3">
+          <h3 className="truncate text-md font-semibold leading-snug text-gray-900 dark:text-gray-100">
             {match.title}
           </h3>
 
@@ -96,7 +96,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
             <span className="shrink-0">{formatMatchDate(match.matchDate)} {match.startTime}</span>
             {match.venue?.name && (
               <>
-                <span className="shrink-0 opacity-30">·</span>
+                <span className="shrink-0 opacity-30" aria-hidden="true">·</span>
                 <span className="truncate">{match.venue.name}</span>
               </>
             )}
@@ -109,7 +109,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
                 ? `${match.venue.city} ${match.venue.district}`
                 : match.venue?.city || '지역 미정'}
             </span>
-            <span className="shrink-0 opacity-30">·</span>
+            <span className="shrink-0 opacity-30" aria-hidden="true">·</span>
             <span className="shrink-0">{friendlyLevel(match.levelMin, match.levelMax)}</span>
           </div>
 
@@ -120,7 +120,7 @@ export const MatchCard = React.memo(function MatchCard({ match, className }: Mat
                 return (
                   <span
                     key={reason.type}
-                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600 dark:bg-blue-950/30 dark:text-blue-300"
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600 dark:bg-blue-950/30 dark:text-blue-300"
                   >
                     <ReasonIcon size={10} aria-hidden="true" />
                     {reason.label}

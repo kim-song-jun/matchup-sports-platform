@@ -107,7 +107,7 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
         {/* Text content */}
         <div className="px-3.5 py-3">
           {/* Title */}
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate leading-snug">
+          <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate leading-snug">
             {lesson.title}
           </h3>
 
@@ -138,14 +138,14 @@ export const LessonCard = React.memo(function LessonCard({ lesson, className }: 
           </div>
 
           {(lesson.team || lesson.venue) && (
-            <div className="mt-2 flex items-center gap-1.5 text-2xs text-gray-500 dark:text-gray-400">
+            <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               {lesson.team && (
-                <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5">
+                <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs">
                   팀: {lesson.team.name}
                 </span>
               )}
               {lesson.venue && (
-                <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5">
+                <span className="rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs">
                   장소: {lesson.venue.name}
                 </span>
               )}

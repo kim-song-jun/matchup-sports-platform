@@ -53,7 +53,7 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2">
               <span
-                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500'} rounded-full px-2 py-0.5 text-xs font-medium`}
+                className={`${sportCardAccent[match.sportType]?.badge || 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'} rounded-full px-2 py-0.5 text-xs font-medium`}
               >
                 {sportLabel[match.sportType] ?? match.sportType}
               </span>

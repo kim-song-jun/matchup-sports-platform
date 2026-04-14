@@ -69,7 +69,7 @@ export function VenueCard({ venue, className }: VenueCardProps) {
             )}
             {venue.reviewCount > 0 && (
               <>
-                <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
+                <span className="text-gray-300 dark:text-gray-600 shrink-0" aria-hidden="true">·</span>
                 <span>리뷰 {venue.reviewCount}</span>
               </>
             )}

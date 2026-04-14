@@ -51,7 +51,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
           <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 truncate">{item.title}</h3>
 
           {/* meta: 지역 · 종목 · 상태 */}
-          <div className="flex items-center gap-1.5 mt-1">
+          <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
             <span className={`${sportCardAccent[item.sportType]?.badge || 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'} rounded-full px-2 py-0.5 text-xs font-medium`}>
               {sportLabel[item.sportType] || t('other')}
             </span>

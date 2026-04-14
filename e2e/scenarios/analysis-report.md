@@ -1,132 +1,139 @@
 # E2E Screenshot Analysis Report
-
-> Date: 2026-04-14
-> Screenshots analyzed: 18 | Skipped: 3 (duplicates) | Unmatched: 9
-> Agents: design-main, qa-uiux, ui-manager, ux-manager (4 per screenshot)
-> Total agent executions: ~72
+Generated: 2026-04-14
 
 ## Summary
 
-| Category | Count |
-|----------|-------|
-| **Total Issues** | **157** |
-| - 🔴 Critical | 44 |
-| - 🟡 Warning | 67 |
-| - 💡 Info | 46 |
-| **UX Improvements** | 50 |
-| **Weak Spots** | 30 |
-| **Code Fix Proposals** | 30 |
+| Metric | Value |
+|--------|-------|
+| Total screenshots analyzed | 149 |
+| 🔴 Critical issues | 27 |
+| 🟡 Warning issues | 21 |
+| 💡 Pass | 104 |
+| Code fixes applied | 4 |
 
-## Analyzed Screenshots (18)
+---
 
-| SC-ID | Page | Description | Verdict |
-|-------|------|-------------|---------|
-| SC-01-001-S01-M | / (teams) | Root redirect — wrong page captured | ❌ FAIL |
-| SC-01-001-S02-M | /landing | Landing page initial render | ❌ FAIL |
-| SC-01-002-S02-M | /home | Auth redirect to home | ❌ FAIL |
-| SC-01-003-S01-M | /login | Login page initial render | ❌ FAIL |
-| SC-01-004-S02-M | /login | Register tab active | ❌ FAIL |
-| SC-01-005-S03-M | /login | Password entered | ❌ FAIL |
-| SC-01-005-S04-M | /login | Submitting (no visual feedback) | ❌ FAIL |
-| SC-01-005-S05-M | /home | Post-login home | ❌ FAIL |
-| SC-01-007-S02-M | /login | Validation error (no error shown) | ❌ FAIL |
-| SC-01-011-S02-M | /home | Guest mode home | ❌ FAIL |
-| SC-01-018-S01-M | /onboarding | Step 1: Sport selection | ❌ FAIL |
-| SC-01-019-S02-M | /onboarding | Sport toggle selected | ❌ FAIL |
-| SC-01-019-S04-M | /onboarding | All deselected (no disabled guard) | ❌ FAIL |
-| SC-01-020-S01-M | /onboarding | Step 2: Features | ❌ FAIL |
-| SC-01-021-S01-M | /home | Post-onboarding home | ❌ FAIL |
-| SC-01-027-S01-M | /landing | Landing + LandingNav | ❌ FAIL |
-| SC-01-028-S02-M | /landing | Hamburger menu open | ❌ FAIL |
-| SC-01-029-S02-M | /guide | Empty page — render failure | ❌ FAIL |
+## Critical Issues (🔴)
 
-## Critical Issues — Priority P0
+### 1. Pink/Red Color Overlay CSS Bug
+**Screenshots**: SC-07-036-S03-D, SC-07-038-S01-D, SC-07-002-S01-D, SC-01-021-S01-M
+**Severity**: 🔴 Critical
+**Description**: Full-screen or partial pink/salmon/red tint overlay appears on certain desktop and mobile views. Likely caused by a CSS `background-color` leak from a parent element or a media query conflict.
+**Recommended fix**: Audit `globals.css` background color properties; check for `oklch` color token fallbacks that may resolve to reddish tints in certain rendering contexts.
 
-### 1. Dev mode panel exposed in production UI (8+ screenshots)
-- **Files**: `apps/web/src/app/(auth)/login/page.tsx`
-- **Fix**: Gate behind `NEXT_PUBLIC_SHOW_DEV_LOGIN` or strict `NODE_ENV === 'development'`
+### 2. Blank Page / Content Not Rendered
+**Screenshots**: SC-01-029-S02-M, SC-01-030-S01-M, SC-01-031-S01-M
+**Severity**: 🔴 Critical
+**Description**: Pages captured with zero body content — only header visible. Indicates React hydration failure or async data load timeout during E2E test run.
+**Recommended fix**: Add explicit `waitForLoadState('networkidle')` in Playwright tests; verify React Suspense fallback timing.
 
-### 2. Login form: placeholder-only labels (WCAG 1.3.1 violation)
-- **Files**: `apps/web/src/app/(auth)/login/page.tsx` L216, 226, 237
-- **Fix**: Remove `labelClassName="sr-only"`, show visible labels above inputs
+### 3. Dev Mode UI Exposed on Login Page
+**Screenshot**: SC-01-004-S05-M
+**Severity**: 🔴 Critical (Security)
+**Description**: Developer preset nickname chips and quick-login button visible to unauthenticated users. Must be gated behind `NODE_ENV !== 'production'` or behind a `process.env.NEXT_PUBLIC_DEV_MODE` flag.
 
-### 3. Active tab underline black instead of blue-500
-- **Files**: `apps/web/src/app/(auth)/login/page.tsx` L207
-- **Fix**: `border-gray-900` → `border-blue-500 dark:border-blue-400`
+### 4. Old Brand Name "TeamMeet" Visible
+**Screenshots**: SC-01-004-S05-M, SC-01-030-S01-M, SC-03-028-S01-M
+**Severity**: 🔴 Critical (Brand)
+**Description**: "TeamMeet" shown in UI — old brand name. Screenshots captured before brand rename was applied.
+**Status**: ✅ Fixed — renamed 24 frontend files (Teameet → MatchUp) via sed replace.
 
-### 4. No inline validation errors on login form
-- **Files**: `apps/web/src/app/(auth)/login/page.tsx`, `apps/web/src/components/ui/input.tsx`
-- **Fix**: Add `error` prop to Input component + `fieldErrors` state management
+### 5. Unauthorized Error Toast — No Recovery Path
+**Screenshot**: SC-07-035-S06-D
+**Severity**: 🔴 Critical
+**Description**: An "Unauthorized" error toast appears during form submission with no contextual guidance on how to re-authenticate or recover.
+**Recommended fix**: On 401 responses, trigger re-login modal or redirect to `/login?redirect=<current_path>` instead of a generic toast with no action.
 
-### 5. EmptyState overlaps bottom navigation (3+ screenshots)
-- **Files**: `apps/web/src/app/(main)/home/home-client.tsx`
-- **Fix**: Add `pb-28` wrapper around EmptyState sections
+### 6. Modal Backdrop Blur Too Aggressive
+**Screenshot**: SC-07-042-S01-M
+**Severity**: 🔴 Critical (Accessibility)
+**Description**: Modal backdrop blur is so extreme that text behind it is completely unreadable. Login input placeholder has insufficient contrast (WCAG fail).
+**Recommended fix**: Reduce `backdrop-blur` from `blur-xl` to `blur-sm`; verify input placeholder meets 4.5:1 contrast ratio.
 
-### 6. Login button disabled state has no visual feedback
-- **Files**: `apps/web/src/app/(auth)/login/page.tsx`
-- **Fix**: `disabled:opacity-60 disabled:cursor-not-allowed` + loading spinner
+### 7. Empty Chat State — No CTA
+**Screenshot**: SC-05-001-S01-M
+**Severity**: 🔴 Critical
+**Description**: Empty chat state shows no action prompts. Users have no way to initiate a conversation or understand next steps.
+**Recommended fix**: Add `<EmptyState action={{ label: '매치 찾기', href: '/matches' }} />` to the chat empty state.
 
-### 7. /guide page render failure — blank screen
-- **Files**: `apps/web/src/app/guide/page.tsx`, `apps/web/src/app/guide/layout.tsx`
-- **Fix**: Diagnose SSR/hydration failure
+### 8. E2E Navigation Failures (Test Infrastructure)
+**Screenshots**: SC-01-007-S01-D, SC-01-008-S01-D, SC-01-010-S01-M, SC-02-001-S03-M
+**Severity**: 🔴 Critical (Test Infrastructure — not production code)
+**Description**: Several scenarios captured the wrong page (FAQ instead of Kakao login, About instead of Naver login, onboarding instead of home). These are Playwright auth/navigation setup issues.
+**Recommended fix**: Review `e2e/global-setup.ts` storageState handling; ensure OAuth mock or dev-login is correctly applied before scenario navigation.
 
-### 8. Hamburger menu missing focus trap + overlay
-- **Files**: `apps/web/src/components/landing/landing-nav.tsx`
-- **Fix**: Add `role="dialog"` + `aria-modal="true"` + backdrop overlay
+### 9. Product Description Truncation — Marketplace
+**Screenshot**: SC-07-048-S05-M
+**Severity**: 🔴 Critical
+**Description**: Product card descriptions are cut off with no affordance to view full content — affects marketplace discoverability.
+**Recommended fix**: Use `line-clamp-2` with a "더 보기" expand button, or rely on navigation to product detail page.
 
-### 9. Onboarding: zero-sport disabled guard missing
-- **Files**: `apps/web/src/app/(main)/onboarding/page.tsx`
-- **Fix**: Disable "Next" button when no sport selected
+### 10. Content Illegible — Privacy/Terms Page
+**Screenshot**: SC-06-033-S01-M
+**Severity**: 🔴 Critical (Accessibility)
+**Description**: Text on the privacy/terms page is extremely small and compressed — fails WCAG minimum font size requirements.
+**Recommended fix**: Set minimum `text-sm` (14px) for body copy; add section headings (`text-base font-semibold`) and visual dividers.
 
-### 10. `extractErrorMessage()` not used in catch block
-- **Files**: `apps/web/src/app/(auth)/login/page.tsx` L158-160
-- **Fix**: Replace direct type assertion with project utility
+---
 
-## Repeated Patterns
+## Warning Issues (🟡)
 
-| # | Pattern | Occurrences | Files |
-|---|---------|-------------|-------|
-| 1 | Dev mode panel visible | 8+ screenshots | login/page.tsx |
-| 2 | Tab underline black not blue-500 | 5+ screenshots | login/page.tsx |
-| 3 | Placeholder-only labels | 5+ screenshots | login/page.tsx |
-| 4 | Bottom nav content overlap | 4+ screenshots | home-client.tsx, EmptyState |
-| 5 | Pink/salmon background tint | 3+ screenshots | Root layout |
-| 6 | Next.js "N" dev badge | 3+ screenshots | Dev overlay |
-| 7 | Dark banner hardcoded color | 3+ screenshots | home-client.tsx |
-| 8 | Sport filter no scroll affordance | 2+ screenshots | team-list.tsx, home-client.tsx |
+| Screenshot | Issue |
+|-----------|-------|
+| SC-02-004-S03-M | Notification badge misaligned; filter icon crowding search area |
+| SC-06-005-S01-M | Empty scheduled matches section — lacks actionable CTA |
+| SC-06-032-S01-M | Terms page — dense paragraph blocks, no visual section breaks |
+| SC-07-015-S01-D | Empty team search — vague copy, no suggested action |
+| SC-07-048-S01-M | Search bar low contrast on dark theme |
+| SC-07-045-S01-M | Odds display (4/7) lacks explanation; match status too subtle |
+| SC-07-051-S04-M | Likely duplicate frame of S03 — test capturing redundant step |
+| SC-03-001-S01-M | "다른 팀" empty state overlaps bottom nav (z-index/scroll bug) |
+| SC-01-003-S01-D | 404 error page — no action button to return to home |
+| SC-07-039-S01-D | Error state — reload button alone insufficient; no error context shown |
+| SC-01-002-S02-M | Match listing — filter scroll affordance missing (no fade gradient) |
+| SC-07-021-S01-M | Error recovery — only retry option, no contextual help |
+| SC-07-012-S01-D | Teams empty state — missing "팀 만들기" CTA in "다른 팀" section |
 
-## Pages Covered
+---
 
-| Area | Pages | Screenshots | Issues |
-|------|-------|-------------|--------|
-| Auth (Login/Register) | /login | 6 | 34 |
-| Home | /home | 4 | 28 |
-| Onboarding | /onboarding | 4 | 21 |
-| Landing | /landing | 3 | 16 |
-| Guide | /guide | 1 | 6 |
-| Root Redirect | / | 1 | 8 |
+## Code Fixes Applied ✅
 
-## Files Requiring Changes (Priority)
+| Fix | File(s) | Description |
+|-----|---------|-------------|
+| Brand rename Teameet → MatchUp | 24 frontend `.tsx`/`.ts` files | Mass replace across landing, auth, settings, admin, onboarding pages |
+| JSX whitespace bug | `faq/page.tsx`, `guide/page.tsx`, `pricing/page.tsx` | Added `{' '}` before hidden `<br>` to prevent text concatenation on mobile |
+| Hero headline widow | `landing/page.tsx` | Added `whitespace-nowrap` to blue span to prevent orphaned word |
+| Technical term exposed | `components/ui/image-upload.tsx:376` | Changed "제출 payload" → "제출 데이터" |
 
-| File | Issues | Priority |
-|------|--------|----------|
-| `apps/web/src/app/(auth)/login/page.tsx` | 20+ (labels, tab, catch, dev panel, password, disabled) | P0 |
-| `apps/web/src/app/(main)/home/home-client.tsx` | 15+ (EmptyState, banner, filters, spacing, CTA) | P0 |
-| `apps/web/src/app/(main)/onboarding/page.tsx` | 12+ (CTA color, disabled guard, color tokens, animation) | P1 |
-| `apps/web/src/components/landing/landing-nav.tsx` | 8+ (menu focus trap, overlay, CTA hierarchy) | P1 |
-| `apps/web/src/components/ui/input.tsx` | 3 (error prop, focus ring) | P1 |
-| `apps/web/src/app/guide/page.tsx` | 6 (render failure) | P0 |
-| `apps/web/src/app/landing/page.tsx` | 5 (hero padding, subtitle, CTA width) | P2 |
-| `apps/web/src/app/(main)/teams/team-list.tsx` | 3 (filter chip, search label) | P2 |
+---
 
-## Output Files
+## Recurring Patterns
 
-| File | Content | Entries |
-|------|---------|--------|
-| `e2e/scenarios/issues.log` | Design/QA/UI issues with severity | 157 |
-| `e2e/scenarios/ux-improvements.log` | UX improvement suggestions | 50 |
-| `e2e/scenarios/weak-spots.log` | Structural weak spots | 30 |
-| `e2e/scenarios/code-fixes.log` | Copy-paste-ready code fix proposals | 30 |
-| `e2e/scenarios/queue/unmatched-results.log` | Unmatched screenshot analyses | 1 |
-| `e2e/scenarios/queue/unmatched.log` | Unmatched file IDs | 9 |
-| `e2e/scenarios/queue/skipped.log` | Skipped duplicate IDs | 3 |
+### Pattern 1: Pink/Red Color Overlay (4 screenshots)
+A systematic CSS rendering artifact across SC-07-036, SC-07-038, SC-07-002, SC-01-021. Single root cause likely. Investigate:
+- `globals.css` `@layer base` background definitions
+- Tailwind CSS v4 `oklch` color token resolution fallbacks
+- Dark mode media query bleeding into light mode views
+
+### Pattern 2: Empty States Missing CTAs (5+ screenshots)
+Multiple empty states across chat, teams, matches, and venues lack actionable next steps. All should use `<EmptyState action={{ label, href }}>` from `components/ui/empty-state.tsx`.
+
+### Pattern 3: E2E Navigation Issues (4+ screenshots)
+The SC-07 admin area and several OAuth flows show the wrong page. E2E test infrastructure issue — not production code bugs. Review `global-setup.ts` auth handling and admin role assignment.
+
+### Pattern 4: Error States Without Context (3 screenshots)
+Generic "다시 불러오기" (retry) buttons appear without explaining what failed or offering alternative paths. All error states should include: error type, suggested action, and secondary navigation.
+
+---
+
+## Next Recommended Actions
+
+Priority order:
+
+1. **Pink overlay CSS bug** — Audit `globals.css` color tokens (1 fix likely resolves 4 screenshots)
+2. **Empty state CTAs** — Add `action` prop to `<EmptyState>` in chat, teams, matches, scheduled pages
+3. **Unauthorized toast → re-login flow** — Implement 401 → redirect with `?redirect=` param
+4. **Modal backdrop** — Reduce blur intensity; verify WCAG contrast on inputs
+5. **Terms/privacy typography** — Set min font size, add section structure
+6. **E2E test infrastructure** — Fix `global-setup.ts` auth/navigation for OAuth and admin flows
+7. **Marketplace truncation** — Add `line-clamp-2` + detail page link for product cards

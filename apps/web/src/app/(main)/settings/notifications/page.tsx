@@ -34,7 +34,8 @@ interface ServerCategoryConfig {
   icon: LucideIcon;
 }
 
-const DEVICE_DND_STORAGE_KEY = 'matchup:notification-dnd-enabled';
+const DEVICE_DND_STORAGE_KEY = 'teameet:notification-dnd-enabled';
+const LEGACY_DND_STORAGE_KEY = 'matchup:notification-dnd-enabled';
 const DND_START = '22:00';
 const DND_END = '08:00';
 
@@ -84,6 +85,13 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
+    }
+
+    // Migrate legacy key from 'matchup:' namespace to 'teameet:' on first mount
+    const legacyValue = window.localStorage.getItem(LEGACY_DND_STORAGE_KEY);
+    if (legacyValue !== null) {
+      window.localStorage.setItem(DEVICE_DND_STORAGE_KEY, legacyValue);
+      window.localStorage.removeItem(LEGACY_DND_STORAGE_KEY);
     }
 
     const savedDnd = window.localStorage.getItem(DEVICE_DND_STORAGE_KEY);

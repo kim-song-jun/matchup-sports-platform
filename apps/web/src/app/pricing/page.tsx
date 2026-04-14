@@ -103,7 +103,7 @@ export default function PricingPage() {
           </ScrollReveal>
           <ScrollReveal delay={200}>
             <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
-              투명하고 합리적인 가격.
+              투명하고 합리적인 가격.{' '}
               <br className="hidden sm:block" />
               필요한 만큼만 선택하세요.
             </p>

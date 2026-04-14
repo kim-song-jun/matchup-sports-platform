@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Sparkles, ShieldCheck, Layers } from 'lucide-react';
 import { sportLabel } from '@/lib/constants';
 import { SportIconMap } from '@/components/icons/sport-icons';
 
@@ -21,20 +22,20 @@ const features = [
   {
     title: 'AI가 딱 맞는 상대를 찾아줘요',
     desc: 'ELO 레이팅 기반으로 실력이 비슷한 상대와 자동 매칭',
-    accent: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-    dot: 'bg-blue-500',
+    accent: 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+    Icon: Sparkles,
   },
   {
     title: '노쇼 걱정 없는 신뢰 시스템',
     desc: '3단계 검증 + 매너 점수로 안전한 경기 환경',
-    accent: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800',
-    dot: 'bg-emerald-500',
+    accent: 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+    Icon: ShieldCheck,
   },
   {
     title: '팀 매칭부터 강좌, 장터까지',
     desc: '경기 매칭, 팀 관리, 레슨, 중고거래를 한 곳에서',
-    accent: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
-    dot: 'bg-amber-500',
+    accent: 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700',
+    Icon: Layers,
   },
 ];
 
@@ -127,7 +128,8 @@ export default function OnboardingPage() {
             <div className="mt-auto pt-6 space-y-3">
               <button
                 onClick={() => setStep('features')}
-                className="w-full py-3.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold text-base hover:bg-gray-800 dark:hover:bg-gray-100 active:scale-[0.98] transition-[background-color,color,border-color,transform]"
+                disabled={selectedSports.length === 0}
+                className="w-full py-3.5 rounded-xl bg-blue-500 text-white font-bold text-base hover:bg-blue-600 active:bg-blue-700 active:scale-[0.98] transition-[background-color,color,border-color,transform] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {selectedSports.length > 0
                   ? `${selectedSports.map(s => sportLabel[s] || s).join(', ')} 선택 완료`
@@ -159,7 +161,7 @@ export default function OnboardingPage() {
                   style={{ animationDelay: `${idx * 100}ms` }}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`h-2 w-2 rounded-full ${f.dot} mt-2 shrink-0`} />
+                    <f.Icon size={20} className="text-blue-500 mt-0.5 shrink-0" aria-hidden="true" />
                     <div>
                       <h3 className="text-base font-bold text-gray-900 dark:text-white">{f.title}</h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{f.desc}</p>
@@ -178,7 +180,7 @@ export default function OnboardingPage() {
               </button>
               <button
                 onClick={() => setStep('sport')}
-                className="w-full py-2 text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+                className="w-full min-h-[44px] flex items-center justify-center py-2 text-sm text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
               >
                 종목 다시 선택
               </button>

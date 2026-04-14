@@ -180,26 +180,20 @@ export default function GuidePage() {
       <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-20 lg:pt-44 lg:pb-24">
         <div className="max-w-[1100px] mx-auto px-5">
           <div className="max-w-[680px] mx-auto text-center">
-            <ScrollReveal delay={0}>
-              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
-                <BookOpen size={14} />
-                서비스 가이드
-              </div>
-            </ScrollReveal>
+            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
+              <BookOpen size={14} aria-hidden="true" />
+              서비스 가이드
+            </div>
 
-            <ScrollReveal delay={100}>
-              <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
-                이용 가이드
-              </h1>
-            </ScrollReveal>
+            <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
+              이용 가이드
+            </h1>
 
-            <ScrollReveal delay={200}>
-              <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
-                가입부터 매칭, 경기, 평가까지.
-                <br className="hidden sm:block" />
-                MatchUp 서비스 이용의 모든 것을 안내합니다.
-              </p>
-            </ScrollReveal>
+            <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
+              가입부터 매칭, 경기, 평가까지.{' '}
+              <br className="hidden sm:block" />
+              MatchUp 서비스 이용의 모든 것을 안내합니다.
+            </p>
           </div>
         </div>
 

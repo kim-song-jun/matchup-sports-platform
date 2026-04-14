@@ -24,8 +24,8 @@ const SPORTS = [
 
 const SUB_FEATURES = [
   { icon: Users, title: '팀 매칭', description: '팀 실력을 정밀 측정하고, 균형 잡힌 상대를 매칭해드려요.', iconBg: 'bg-blue-500' },
-  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-emerald-500' },
-  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-amber-500' },
+  { icon: Shield, title: '신뢰 시스템', description: '3단계 허위 방지와 6항목 상호 평가로 매너 있는 환경을 보장해요.', iconBg: 'bg-blue-500' },
+  { icon: Zap, title: '올인원', description: '매칭, 채팅, 결제, 용병, 장터까지 — 모든 것을 한 곳에서.', iconBg: 'bg-blue-500' },
 ];
 
 const STEPS = [
@@ -60,42 +60,34 @@ export default function LandingPage() {
         <div className="max-w-[1100px] mx-auto px-5">
           <div className="max-w-[680px] mx-auto text-center">
             {/* Badge */}
-            <ScrollReveal delay={0}>
-              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
-                <Sparkles size={14} />
-                11개 종목 · 2,400+ 매칭 완료
-              </div>
-            </ScrollReveal>
+            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
+              <Sparkles size={14} />
+              11개 종목 · 2,400+ 매칭 완료
+            </div>
 
             {/* Heading */}
-            <ScrollReveal delay={100}>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-6">
-                내 수준에 딱 맞는
-                <br />
-                운동 메이트를{' '}
-                <span className="text-blue-500">AI가 찾아드려요</span>
-              </h1>
-            </ScrollReveal>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-6">
+              내 수준에 딱 맞는
+              <br />
+              운동 메이트를{' '}
+              <span className="text-blue-500 whitespace-nowrap">AI가 찾아드려요</span>
+            </h1>
 
             {/* Subtitle */}
-            <ScrollReveal delay={200}>
-              <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 mb-10 leading-relaxed max-w-[480px] mx-auto">
-                실력·위치·매너를 종합 분석해서
-                <br className="hidden sm:block" />
-                딱 맞는 상대와 매칭해드려요.
-              </p>
-            </ScrollReveal>
+            <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 mb-10 leading-relaxed max-w-[480px] mx-auto">
+              실력·위치·매너를 종합 분석해서
+              <br className="hidden sm:block" />
+              딱 맞는 상대와 매칭해드려요.
+            </p>
 
             {/* CTA */}
-            <ScrollReveal delay={300}>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold rounded-2xl px-8 py-4 text-lg hover:bg-blue-600 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
-                  무료로 시작하기
-                  <ArrowRight size={18} strokeWidth={2.5} />
-                </Link>
-                <HeroScrollButton targetId="features-section" />
-              </div>
-            </ScrollReveal>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link href="/login" className="inline-flex items-center justify-center gap-2.5 bg-blue-500 text-white font-bold rounded-2xl px-8 py-4 text-lg hover:bg-blue-600 active:scale-[0.97] transition-[colors,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+                무료로 시작하기
+                <ArrowRight size={18} strokeWidth={2.5} />
+              </Link>
+              <HeroScrollButton targetId="features-section" />
+            </div>
           </div>
         </div>
 

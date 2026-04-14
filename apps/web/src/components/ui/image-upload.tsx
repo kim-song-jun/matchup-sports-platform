@@ -373,7 +373,7 @@ export function ImageUpload({
       </div>
 
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        업로드한 이미지만 저장되며, 예시 이미지는 제출 payload에 포함되지 않아요.
+        업로드한 이미지만 저장되며, 예시 이미지는 제출 데이터에 포함되지 않아요.
       </p>
 
       <input

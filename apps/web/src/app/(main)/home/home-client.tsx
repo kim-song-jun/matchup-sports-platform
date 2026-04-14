@@ -19,9 +19,15 @@ const sportFilters = [
   'ice_hockey', 'swimming', 'tennis',
 ] as const;
 
-const banners = [
+const BANNERS_GUEST = [
   { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-slate-800 dark:bg-slate-700', iconBg: 'bg-white/10', iconColor: 'text-emerald-300' },
   { title: '첫 매치 무료', desc: '지금 가입하고 무료 매치 즐기기', href: '/matches', icon: Gift, bg: 'bg-gray-900 dark:bg-gray-800', iconBg: 'bg-white/10', iconColor: 'text-blue-300' },
+  { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-slate-900 dark:bg-slate-800', iconBg: 'bg-white/10', iconColor: 'text-amber-300' },
+] as const;
+
+const BANNERS_AUTH = [
+  { title: '팀 매칭 오픈', desc: 'S~D 등급으로 딱 맞는 상대 찾기', href: '/team-matches', icon: Swords, bg: 'bg-slate-800 dark:bg-slate-700', iconBg: 'bg-white/10', iconColor: 'text-emerald-300' },
+  { title: '첫 매치 무료', desc: '지금 바로 무료 매치에 참여해보세요', href: '/matches', icon: Gift, bg: 'bg-gray-900 dark:bg-gray-800', iconBg: 'bg-white/10', iconColor: 'text-blue-300' },
   { title: '용병 모집', desc: '팀에 빈 자리? 용병을 구해보세요', href: '/mercenary', icon: Users, bg: 'bg-slate-900 dark:bg-slate-800', iconBg: 'bg-white/10', iconColor: 'text-amber-300' },
 ] as const;
 
@@ -52,6 +58,11 @@ export function HomePage() {
   const listings = listingData?.items ?? [];
   const teamMatches = teamMatchData?.items ?? [];
   const tournaments = tournamentData?.items ?? [];
+
+  const banners = useMemo(
+    () => (canRenderAuthenticated ? BANNERS_AUTH : BANNERS_GUEST),
+    [canRenderAuthenticated],
+  );
 
   const [activeSport, setActiveSport] = useState<string>('all');
   const [bannerIdx, setBannerIdx] = useState(0);
@@ -84,7 +95,7 @@ export function HomePage() {
     if (bannerPaused || prefersReducedMotion) return;
     const t = setInterval(() => setBannerIdx(i => (i + 1) % banners.length), 5000);
     return () => clearInterval(t);
-  }, [bannerPaused, prefersReducedMotion]);
+  }, [bannerPaused, prefersReducedMotion, banners.length]);
 
   return (
     <div className="pt-[var(--safe-area-top)]">
@@ -107,7 +118,7 @@ export function HomePage() {
               {t('createMatch')}
             </Link>
           ) : (
-            <Link href="/login" className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
+            <Link href="/login" className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-blue-500 px-4 py-2.5 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-500/10">
               {tc('login')}
             </Link>
           )}
@@ -209,7 +220,7 @@ export function HomePage() {
                   <button key={i} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBannerIdx(i); }}
                     aria-label={`배너 ${i + 1}`}
                     className="relative flex min-h-[44px] min-w-[44px] items-center justify-center p-2.5">
-                    <span className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-1.5 bg-white/30'}`} />
+                    <span className={`block h-1.5 rounded-full transition-[width,background-color] duration-300 ${bannerIdx === i ? 'w-4 bg-white' : 'w-2 bg-white/50'}`} />
                   </button>
                 ))}
               </div>
@@ -238,7 +249,7 @@ export function HomePage() {
       </section>
 
       {/* ═══ ZONE 2: 매치 탐색 (핵심 기능) ═══ */}
-      <section className="mt-10 px-5 @3xl:px-0">
+      <section className="mt-6 px-5 @3xl:px-0">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
           {sportFilters.map((type) => (
             <button key={type} onClick={() => handleSportClick(type)} aria-pressed={activeSport === type}
@@ -253,7 +264,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mt-4 px-5 @3xl:px-0">
+      <section className="mt-2 px-5 @3xl:px-0">
         <SectionHeader
           title={activeSport === 'all' ? t('recommendedMatches') : `${sportLabel[activeSport]} ${tc('matches')}`}
           count={filteredMatches.length}
@@ -265,13 +276,15 @@ export function HomePage() {
             {[1,2,3].map(i => <div key={i} className="h-[92px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
           </div>
         ) : filteredMatches.length === 0 ? (
-          <EmptyState
-            icon={Calendar}
-            title={te('noMatches')}
-            description={te('noMatchesDesc')}
-            size="sm"
-            secondaryAction={activeSport !== 'all' ? { label: t('viewAllMatches'), onClick: () => setActiveSport('all') } : undefined}
-          />
+          <div className="pb-28">
+            <EmptyState
+              icon={Calendar}
+              title={te('noMatches')}
+              description={te('noMatchesDesc')}
+              size="sm"
+              secondaryAction={activeSport !== 'all' ? { label: t('viewAllMatches'), onClick: () => setActiveSport('all') } : undefined}
+            />
+          </div>
         ) : (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2 stagger-children">
             {filteredMatches.slice(0, 6).map((m: Match, idx) => <MatchCard key={m.id} match={m} priority={idx === 0} />)}

@@ -31,19 +31,19 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
         padding="none"
         interactive
         className={cn(
-          'flex h-24 overflow-hidden transition-[transform] duration-150 active:scale-[0.98]',
+          'flex overflow-hidden transition-[transform] duration-150 active:scale-[0.98]',
           className,
         )}
       >
         {/* Square cover image */}
-        <div className="relative w-24 shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <div className="relative w-[120px] shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={teamCoverImage}
             fallbackSrc={fallbackTeamCoverImage}
             alt={team.name}
             fill
             className="object-cover"
-            sizes="96px"
+            sizes="120px"
           />
           <div className="absolute bottom-1.5 left-1.5 rounded-xl bg-white p-0.5 shadow-[0_1px_2px_rgba(0,0,0,0.08)] dark:bg-gray-800">
             <div className="relative h-7 w-7">
@@ -88,7 +88,7 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
             <span>{t('memberCount', { count: team.memberCount })}</span>
           </div>
           {team.description && (
-            <p className="mt-1 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{team.description}</p>
+            <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{team.description}</p>
           )}
           {(team.city || team.district) && (
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{team.district || team.city}</p>

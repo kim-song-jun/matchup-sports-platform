@@ -45,7 +45,9 @@
     "more": "More",
     "tournaments": "Tournaments",
     "badges": "Badges",
-    "activity": "Activity"
+    "activity": "Activity",
+    "settings": "Settings",
+    "service": "Service"
   },
   "sports": {
     "all": "All",
@@ -176,6 +178,9 @@
     "createListing": "List Item",
     "searchPlaceholder": "Search by item, brand, or sport",
     "categoryAll": "All",
+    "allSports": "All Sports",
+    "filterByType": "Filter by listing type",
+    "filterBySport": "Filter by sport",
     "categoryFutsalShoes": "Futsal Shoes",
     "categoryHockeyGear": "Hockey Gear",
     "categoryBasketballShoes": "Basketball Shoes",

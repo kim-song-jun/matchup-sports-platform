@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useTeams, useMyTeams } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -21,12 +22,23 @@ const sportFilters: Array<{ key: SportType | ''; label: string }> = [
 
 export function TeamList() {
   const te = useTranslations('empty');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
   const { data, isLoading, error, refetch } = useTeams();
   const { data: myTeams } = useMyTeams();
 
-  const [activeSport, setActiveSport] = useState<SportType | ''>('');
+  const rawSport = searchParams.get('sport');
+  const activeSport: SportType | '' = rawSport && sportFilters.some(f => f.key === rawSport) ? rawSport as SportType : '';
   const [searchInput, setSearchInput] = useState('');
+
+  const updateSportFilter = useCallback((sport: SportType | '') => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!sport) params.delete('sport'); else params.set('sport', sport);
+    const q = params.toString();
+    router.replace(pathname + (q ? `?${q}` : ''), { scroll: false });
+  }, [searchParams, router, pathname]);
   const debouncedSearch = useDebounce(searchInput, 300);
 
   const allTeams = data?.items ?? [];
@@ -54,7 +66,7 @@ export function TeamList() {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
-        {[1, 2, 3].map(i => <div key={i} className="h-24 rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
+        {[1, 2, 3].map(i => <div key={i} className="h-[120px] rounded-xl bg-gray-50 dark:bg-gray-800 skeleton-shimmer" />)}
       </div>
     );
   }
@@ -85,7 +97,7 @@ export function TeamList() {
           <button
             key={filter.key}
             type="button"
-            onClick={() => setActiveSport(filter.key)}
+            onClick={() => updateSportFilter(filter.key)}
             aria-pressed={activeSport === filter.key}
             className={`shrink-0 min-h-[44px] rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               activeSport === filter.key
@@ -137,7 +149,7 @@ export function TeamList() {
               action: { label: '팀 만들기', href: '/teams/new' },
             })}
             {...(activeSport && {
-              secondaryAction: { label: '전체 보기', onClick: () => { setActiveSport(''); setSearchInput(''); } },
+              secondaryAction: { label: '전체 보기', onClick: () => { updateSportFilter(''); setSearchInput(''); } },
             })}
           />
         ) : (

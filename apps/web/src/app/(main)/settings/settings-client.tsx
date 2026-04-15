@@ -1,19 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Moon, Sun, Monitor, LogOut } from 'lucide-react';
+import { Moon, Sun, Monitor, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore } from '@/stores/theme-store';
-
-export function SettingsBackButton() {
-  const router = useRouter();
-
-  return (
-    <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
-      <ArrowLeft size={20} className="text-gray-700" />
-    </button>
-  );
-}
 
 export function ThemePicker() {
   const { theme, setTheme } = useThemeStore();

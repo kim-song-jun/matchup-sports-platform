@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Swords, UserPlus, GraduationCap, Trophy, MapPin, MessageCircle, Bell, Award, X } from 'lucide-react';
+import { Swords, UserPlus, GraduationCap, Trophy, MapPin, MessageCircle, Bell, Award, Settings, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
@@ -18,6 +18,7 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
   const pathname = usePathname();
   const panelRef = useRef<HTMLDivElement>(null);
   const t = useTranslations('nav');
+  const tc = useTranslations('common');
   const { user, isAuthenticated } = useAuthStore();
   const chatUnread = useChatUnreadTotal();
   const { data: unreadData } = useUnreadCount();
@@ -195,6 +196,17 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
             {activityItems.map(({ href, icon: Icon, label }) => (
               <MenuLink key={href} href={href} icon={Icon} label={label} pathname={pathname} onClose={onClose} />
             ))}
+          </MenuGroup>
+
+          {/* Service group — always visible */}
+          <MenuGroup label={t('service')}>
+            <MenuLink
+              href="/settings"
+              icon={Settings}
+              label={tc('settings')}
+              pathname={pathname}
+              onClose={onClose}
+            />
           </MenuGroup>
         </div>
       </div>

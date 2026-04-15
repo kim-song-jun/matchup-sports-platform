@@ -36,7 +36,7 @@ export const TeamCard = React.memo(function TeamCard({ team, className }: TeamCa
         )}
       >
         {/* Square cover image */}
-        <div className="relative w-[120px] shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
+        <div className="relative w-[120px] min-h-[120px] shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800">
           <SafeImage
             src={teamCoverImage}
             fallbackSrc={fallbackTeamCoverImage}

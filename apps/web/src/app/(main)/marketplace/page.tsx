@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useState, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Plus, Package, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { MobilePageTopZone } from '@/components/layout/mobile-page-top-zone';
@@ -12,18 +12,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { MarketplaceListingCard } from '@/components/marketplace/marketplace-listing-card';
 import { useAuthStore } from '@/stores/auth-store';
-import { sportLabel } from '@/lib/constants';
+import { sportLabel, SPORT_TYPES } from '@/lib/constants';
 import type { MarketplaceListing } from '@/types/api';
-
-const categoryFilterKeys = [
-  { labelKey: 'categoryAll' as const, match: () => true },
-  { labelKey: 'categoryFutsalShoes' as const, match: (item: MarketplaceListing) => item.sportType === 'futsal' },
-  { labelKey: 'categoryHockeyGear' as const, match: (item: MarketplaceListing) => item.sportType === 'ice_hockey' },
-  { labelKey: 'categoryBasketballShoes' as const, match: (item: MarketplaceListing) => item.sportType === 'basketball' },
-  { labelKey: 'categoryRacket' as const, match: (item: MarketplaceListing) => item.sportType === 'badminton' },
-  { labelKey: 'categoryUniform' as const, match: (item: MarketplaceListing) => item.title?.toLowerCase().includes('유니폼') },
-  { labelKey: 'categoryProtective' as const, match: (item: MarketplaceListing) => item.title?.toLowerCase().includes('보호') || item.title?.toLowerCase().includes('장갑') },
-];
 
 type ListingTypeFilter = 'all' | 'sell' | 'rent' | 'group_buy';
 
@@ -39,20 +29,30 @@ export default function MarketplacePage() {
   const te = useTranslations('empty');
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
-  const [activeCategoryKey, setActiveCategoryKey] = useState('categoryAll');
-  const [activeListingType, setActiveListingType] = useState<ListingTypeFilter>('all');
+  const rawSport = searchParams.get('sport');
+  const activeSport = rawSport ?? '';
+  const rawType = searchParams.get('type');
+  const activeListingType: ListingTypeFilter = listingTypeFilters.some(f => f.key === rawType) ? rawType as ListingTypeFilter : 'all';
+
+  const updateFilter = useCallback((type: ListingTypeFilter, sport: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (type === 'all') params.delete('type'); else params.set('type', type);
+    if (!sport) params.delete('sport'); else params.set('sport', sport);
+    const q = params.toString();
+    router.replace(pathname + (q ? `?${q}` : ''), { scroll: false });
+  }, [searchParams, router, pathname]);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
   const { data, isLoading, error, refetch } = useListings();
   const allListings = data?.items ?? [];
-  const activeCategoryFilter = categoryFilterKeys.find((c) => c.labelKey === activeCategoryKey);
-  const categoryFiltered = activeCategoryFilter && activeCategoryKey !== 'categoryAll'
-    ? allListings.filter(activeCategoryFilter.match)
-    : allListings;
+  const sportFiltered = activeSport === ''
+    ? allListings
+    : allListings.filter((item: MarketplaceListing) => item.sportType === activeSport);
   const listingTypeFiltered = activeListingType === 'all'
-    ? categoryFiltered
-    : categoryFiltered.filter((item: MarketplaceListing) => item.listingType === activeListingType);
+    ? sportFiltered
+    : sportFiltered.filter((item: MarketplaceListing) => item.listingType === activeListingType);
   const listings = debouncedSearch
     ? listingTypeFiltered.filter((item: MarketplaceListing) =>
         item.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -101,14 +101,14 @@ export default function MarketplacePage() {
         </div>
       </div>
 
-      {/* 거래 유형 칩 */}
-      <div className="px-5 @3xl:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      {/* 필터 칩 — 거래 유형 */}
+      <div role="group" aria-label={t('filterByType')} className="px-5 @3xl:px-0 mb-2 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {listingTypeFilters.map((f) => (
           <button
             key={f.key}
             type="button"
             aria-pressed={activeListingType === f.key}
-            onClick={() => setActiveListingType(f.key)}
+            onClick={() => updateFilter(f.key, activeSport)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
               activeListingType === f.key
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
@@ -119,22 +119,33 @@ export default function MarketplacePage() {
           </button>
         ))}
       </div>
-
-      {/* 카테고리 칩 */}
-      <div className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {categoryFilterKeys.map((cat) => (
+      {/* 필터 칩 — 종목 */}
+      <div role="group" aria-label={t('filterBySport')} className="px-5 @3xl:px-0 mb-4 flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <button
+          type="button"
+          aria-pressed={activeSport === ''}
+          onClick={() => updateFilter(activeListingType, '')}
+          className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+            activeSport === ''
+              ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
+              : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+          }`}
+        >
+          {t('allSports')}
+        </button>
+        {SPORT_TYPES.map((sport) => (
           <button
-            key={cat.labelKey}
+            key={sport}
             type="button"
-            aria-pressed={activeCategoryKey === cat.labelKey}
-            onClick={() => setActiveCategoryKey(cat.labelKey)}
+            aria-pressed={activeSport === sport}
+            onClick={() => updateFilter(activeListingType, sport)}
             className={`shrink-0 min-h-[44px] rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
-              activeCategoryKey === cat.labelKey
+              activeSport === sport
                 ? 'bg-blue-500 text-white dark:bg-blue-500 dark:text-white'
                 : 'border border-gray-100 bg-gray-50 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
             }`}
           >
-            {t(cat.labelKey)}
+            {sportLabel[sport]}
           </button>
         ))}
       </div>
@@ -144,7 +155,7 @@ export default function MarketplacePage() {
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2].map(i => (
-              <div key={i} className="h-[100px] rounded-xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
+              <div key={i} className="h-[120px] rounded-xl bg-gray-100 dark:bg-gray-800 skeleton-shimmer" />
             ))}
           </div>
         ) : error ? (

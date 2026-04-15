@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ChevronRight, LogOut, CreditCard, ShoppingBag, Settings, Star, History, Pencil, Users, Calendar, Clock, Swords, BookOpen, UserCheck, MessageSquare, MessageCircle, Bell, List, CalendarDays, Ticket, Plus, Award, Activity, Info, HelpCircle, FileText, Shield, MapPin } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { MiniCalendar } from '@/components/ui/mini-calendar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -133,17 +134,17 @@ export default function ProfilePage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white">{user.nickname}</h2>
-                    {user.bio && <p className="mt-0.5 text-sm text-gray-500">{user.bio}</p>}
+                    {user.bio && <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{user.bio}</p>}
                     <div className="mt-1 flex items-center gap-2">
                       <div className="flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400">
                         <Star size={12} fill="currentColor" />
                         <span className="font-semibold">{user.mannerScore?.toFixed(1)}</span>
                       </div>
-                      <span className="text-gray-200">|</span>
-                      <span className="text-sm text-gray-500">{t('matchCount', { count: user.totalMatches })}</span>
+                      <span className="text-gray-200 dark:text-gray-600">|</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{t('matchCount', { count: user.totalMatches })}</span>
                     </div>
                   </div>
-                  <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="flex min-h-[40px] min-w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition-[colors,transform] hover:bg-gray-100 active:scale-[0.98] dark:bg-gray-700 dark:hover:bg-gray-600">
+                  <button aria-label={t('editProfile')} onClick={() => setShowEditModal(true)} className="flex min-h-[44px] min-w-11 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition-colors transition-transform hover:bg-gray-100 active:scale-[0.98] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600">
                     <Pencil size={16} />
                   </button>
                 </div>
@@ -158,7 +159,7 @@ export default function ProfilePage() {
                     <div key={sp.id} className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-700/60">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2.5">
-                          {SportIcon && <SportIcon size={15} className="shrink-0 text-gray-500" />}
+                          {SportIcon && <SportIcon size={15} className="shrink-0 text-gray-500 dark:text-gray-400" />}
                           <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{sportLabel[sp.sportType]}</span>
                           <span className="rounded-md bg-white px-1.5 py-0.5 text-2xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                             {levelLabel[sp.level]}
@@ -181,15 +182,15 @@ export default function ProfilePage() {
               <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-700">
                 <div className="px-3 py-3 text-center">
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
-                  <p className="mt-1 text-xs text-gray-500">{t('totalMatches')}</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('totalMatches')}</p>
                 </div>
                 <div className="px-3 py-3 text-center">
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{user.mannerScore?.toFixed(1) || '0'}</p>
-                  <p className="mt-1 text-xs text-gray-500">{t('mannerScore')}</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('mannerScore')}</p>
                 </div>
                 <div className="px-3 py-3 text-center">
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{user.sportProfiles?.length || 0}</p>
-                  <p className="mt-1 text-xs text-gray-500">종목</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">종목</p>
                 </div>
               </div>
             </div>
@@ -233,13 +234,13 @@ export default function ProfilePage() {
                 return (
                   <div
                     key={item.label}
-                    className="flex items-center justify-between px-3.5 transition-[colors,transform] hover:bg-gray-50 dark:hover:bg-gray-700/70 active:scale-[0.98]"
+                    className="flex items-center justify-between px-3.5 transition-colors transition-transform hover:bg-gray-50 dark:hover:bg-gray-700/70 active:scale-[0.98]"
                   >
                     <Link
                       href={mounted && isAuthenticated ? item.href : '/login'}
                       className={`flex min-h-[44px] flex-1 items-center gap-3 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}
                     >
-                      <item.icon size={18} className="text-gray-500" />
+                      <item.icon size={18} className="text-gray-500 dark:text-gray-400" />
                       <span className="text-md font-medium text-gray-800 dark:text-gray-200">{item.label}</span>
                     </Link>
                     <div className={`flex items-center gap-2 pl-2 py-3 ${isLast ? '' : 'border-b border-gray-100 dark:border-gray-700'}`}>
@@ -275,8 +276,8 @@ export default function ProfilePage() {
       <div className="px-5 @3xl:px-0 py-2">
         {mounted && isAuthenticated && (
           <button onClick={() => { logout(); router.push('/login'); }} className="flex min-h-[44px] w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
-            <LogOut size={20} className="text-gray-500" />
-            <span className="text-md font-medium text-gray-500">{tc('logout')}</span>
+            <LogOut size={20} className="text-gray-500 dark:text-gray-400" />
+            <span className="text-md font-medium text-gray-500 dark:text-gray-400">{tc('logout')}</span>
           </button>
         )}
       </div>
@@ -316,7 +317,7 @@ function QuickAccessLink({
 function UpcomingSchedule() {
   const t = useTranslations('profile');
   const te = useTranslations('empty');
-  const { data } = useMyMatches({ limit: '20' });
+  const { data, isLoading, error, refetch } = useMyMatches({ limit: '20' });
   const [view, setView] = useState<'list' | 'calendar'>('list');
 
   const matches = data?.items ?? [];
@@ -331,10 +332,34 @@ function UpcomingSchedule() {
     sportType: m.sportType,
   }));
 
+  if (isLoading) {
+    return (
+      <div className="mt-4 @3xl:mt-0">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="space-y-2">
+            <div className="h-[72px] rounded-xl bg-gray-100 dark:bg-gray-700 skeleton-shimmer" />
+            <div className="h-[72px] rounded-xl bg-gray-100 dark:bg-gray-700 skeleton-shimmer" />
+            <div className="h-[72px] rounded-xl bg-gray-100 dark:bg-gray-700 skeleton-shimmer" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-4 @3xl:mt-0">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <ErrorState onRetry={() => refetch()} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4 @3xl:mt-0">
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('upcomingSchedule')}</h3>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">다가오는 매치와 일정을 빠르게 확인하세요.</p>
@@ -344,7 +369,7 @@ function UpcomingSchedule() {
               role="tab"
               aria-selected={view === 'list'}
               onClick={() => setView('list')}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors ${view === 'list' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               aria-label={t('listView')}
             >
               <List size={16} />
@@ -353,7 +378,7 @@ function UpcomingSchedule() {
               role="tab"
               aria-selected={view === 'calendar'}
               onClick={() => setView('calendar')}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg transition-colors ${view === 'calendar' ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/30' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               aria-label={t('calendarView')}
             >
               <CalendarDays size={16} />
@@ -382,14 +407,14 @@ function UpcomingSchedule() {
               const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
               return (
                 <Link key={m.id} href={`/matches/${m.id}`}>
-                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-3 transition-[colors,transform] hover:bg-gray-50 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-900/30 dark:hover:bg-gray-700/60">
+                  <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-3 transition-colors transition-transform hover:bg-gray-50 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-900/30 dark:hover:bg-gray-700/60">
                     <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-white text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                       <span className="text-xs font-semibold">{d.getMonth() + 1}월</span>
                       <span className="text-base font-black leading-none">{d.getDate()}</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{m.title}</p>
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                         <span className="flex items-center gap-0.5"><Clock size={12} /> {m.startTime}</span>
                         <span>({weekdays[d.getDay()]})</span>
                       </div>

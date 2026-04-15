@@ -56,17 +56,17 @@ export default function LandingPage() {
       <LandingNav />
 
       {/* ── Hero — 화이트 베이스, 텍스트 중심 ── */}
-      <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 lg:pt-48 lg:pb-36">
+      <section className="relative pt-24 pb-16 sm:pt-28 sm:pb-20 lg:pt-32 lg:pb-24">
         <div className="max-w-[1100px] mx-auto px-5">
           <div className="max-w-[680px] mx-auto text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-8">
+            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
               <Sparkles size={14} />
               11개 종목 · 2,400+ 매칭 완료
             </div>
 
             {/* Heading */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.08] tracking-tight mb-4">
               내 수준에 딱 맞는
               <br />
               운동 메이트를{' '}
@@ -74,7 +74,7 @@ export default function LandingPage() {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 mb-10 leading-relaxed max-w-[480px] mx-auto">
+            <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 mb-7 leading-relaxed max-w-[480px] mx-auto">
               실력·위치·매너를 종합 분석해서{' '}
               <br className="hidden sm:block" />
               딱 맞는 상대와 매칭해드려요.

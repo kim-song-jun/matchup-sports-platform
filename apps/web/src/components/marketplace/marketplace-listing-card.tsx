@@ -35,14 +35,14 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
         className={cn('flex gap-3.5', className)}
       >
         {/* Thumbnail */}
-        <div className="relative h-[100px] w-[100px] shrink-0 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
+        <div className="relative w-[120px] min-h-[120px] shrink-0 rounded-xl bg-gray-50 dark:bg-gray-700 overflow-hidden">
           <SafeImage
             src={getListingImage(item.imageUrls, item.id)}
             fallbackSrc={getListingImage(undefined, item.id)}
             alt={item.title}
             fill
             className="object-cover"
-            sizes="100px"
+            sizes="120px"
           />
         </div>
 
@@ -73,7 +73,7 @@ export function MarketplaceListingCard({ item, className }: MarketplaceListingCa
           {/* 하단: 타입 + 통계 */}
           <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
             <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-              {item.listingType === 'rent' ? t('typeRent') : t('typeSell')}
+              {item.listingType === 'rent' ? t('typeRent') : item.listingType === 'group_buy' ? t('typeGroupBuy') : t('typeSell')}
             </span>
             <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
               <span>{t('likes', { count: item.likeCount })}</span>

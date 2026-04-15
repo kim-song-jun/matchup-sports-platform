@@ -35,12 +35,12 @@ export default function SettingsPage() {
         {/* 언어 */}
         <SettingsSection title="기타">
           <div className="flex items-center gap-3 px-3.5 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
               <Globe size={17} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">언어 설정</p>
-              <p className="mt-0.5 text-xs text-gray-500">한국어</p>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">한국어</p>
             </div>
           </div>
         </SettingsSection>
@@ -50,12 +50,12 @@ export default function SettingsPage() {
           <SettingsLink icon={FileText} label="이용약관" href="/settings/terms" />
           <SettingsLink icon={Shield} label="개인정보 처리방침" href="/settings/privacy" />
           <div className="flex items-center gap-3 px-3.5 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
               <Info size={17} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">앱 정보</p>
-              <p className="mt-0.5 text-xs text-gray-500">Teameet v1.0.0</p>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Teameet v1.0.0</p>
             </div>
           </div>
         </SettingsSection>
@@ -63,9 +63,6 @@ export default function SettingsPage() {
         {/* 로그아웃 */}
         <LogoutButton />
 
-        <div className="text-center">
-          <p className="text-xs text-gray-300">Teameet v1.0.0</p>
-        </div>
       </div>
 
     </div>
@@ -75,7 +72,7 @@ export default function SettingsPage() {
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-4">
-      <h3 className="mb-1.5 px-1 text-2xs font-semibold uppercase tracking-[0.12em] text-gray-500">{title}</h3>
+      <h3 className="mb-1.5 px-1 text-2xs font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{title}</h3>
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white divide-y divide-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:divide-gray-700">
         {children}
       </div>
@@ -86,14 +83,14 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 function SettingsLink({ icon: Icon, label, desc, href }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; desc?: string; href: string }) {
   return (
     <Link href={href} className="flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 dark:bg-gray-700">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-500 dark:text-gray-400 dark:bg-gray-700">
         <Icon size={17} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-900 dark:text-white">{label}</p>
-        {desc && <p className="mt-0.5 text-xs text-gray-500">{desc}</p>}
+        {desc && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{desc}</p>}
       </div>
-      <ChevronRight size={16} className="text-gray-300 shrink-0" />
+      <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 shrink-0" />
     </Link>
   );
 }

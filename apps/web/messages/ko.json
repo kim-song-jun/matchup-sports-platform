@@ -45,7 +45,9 @@
     "more": "더보기",
     "tournaments": "대회",
     "badges": "뱃지",
-    "activity": "활동"
+    "activity": "활동",
+    "settings": "설정",
+    "service": "서비스"
   },
   "sports": {
     "all": "전체",
@@ -176,6 +178,9 @@
     "createListing": "상품 등록하기",
     "searchPlaceholder": "상품명, 브랜드, 종목으로 검색",
     "categoryAll": "전체",
+    "allSports": "전체 종목",
+    "filterByType": "거래 유형 필터",
+    "filterBySport": "종목 필터",
     "categoryFutsalShoes": "풋살화",
     "categoryHockeyGear": "하키장비",
     "categoryBasketballShoes": "농구화",

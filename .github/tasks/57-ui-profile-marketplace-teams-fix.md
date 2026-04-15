@@ -13,13 +13,13 @@ All are frontend-only changes (no backend API or schema changes required).
 
 ## Original Conditions
 
-- [ ] Issue 1a: Dark mode profile card is broken (missing dark: variants)
-- [ ] Issue 1b: Non-authenticated users cannot access theme settings (profile page requires auth, more-menu has no settings link)
-- [ ] Issue 2a: Marketplace listing card images are square 100x100 — change to rectangular, card-height
-- [ ] Issue 2b: Two filter rows both starting with "전체" is confusing — collapse to single sport-type filter row
-- [ ] Issue 2c: Equipment category filters are sport-type proxies, not real categories — remove
-- [ ] Issue 3a: Team cards are too compact at fixed h-24 — expand
-- [ ] Issue 3b: Team cards need more visible content (description, location, member count)
+- [x] Issue 1a: Dark mode profile card is broken (missing dark: variants) ✅ FIXED (12 dark: variants added, transition-colors fix)
+- [x] Issue 1b: Non-authenticated users cannot access theme settings (profile page requires auth, more-menu has no settings link) ✅ FIXED (서비스 > 설정 added to more-menu)
+- [x] Issue 2a: Marketplace listing card images are square 100x100 — change to rectangular, card-height ✅ FIXED (120px wide, min-h-[120px], stretch height)
+- [x] Issue 2b: Two filter rows both starting with "전체" is confusing — collapse to single sport-type filter row ✅ FIXED (split into 2 separate rows with aria-labels)
+- [x] Issue 2c: Equipment category filters are sport-type proxies, not real categories — remove ✅ FIXED (replaced with sport-type filter chips)
+- [x] Issue 3a: Team cards are too compact at fixed h-24 — expand ✅ FIXED (removed fixed height)
+- [x] Issue 3b: Team cards need more visible content (description, location, member count) ✅ FIXED (120px image, line-clamp-2, min-h-[120px])
 
 ## User Scenarios
 
@@ -149,6 +149,10 @@ All are frontend-only changes (no backend API or schema changes required).
 - Profile page dark mode gaps (pre-existing missing `dark:` variants)
 - Marketplace filter design debt (sport-type proxied as equipment categories)
 - Team card visual undersizing (fixed height preventing content display)
+- `group_buy` listing type was rendering as "판매" in card badge — fixed ternary in `marketplace-listing-card.tsx`
+- Skeleton loader height was 100px vs 120px card min-height — fixed to 120px to prevent layout jump
+- `transition-[colors,transform]` invalid CSS syntax replaced with `transition-colors transition-transform` (3 instances in `profile/page.tsx`)
+- Added `role="group"` + `aria-label` (i18n) to both marketplace filter rows for screen reader accessibility
 
 ## Security Notes
 
@@ -171,5 +175,8 @@ All are frontend-only changes (no backend API or schema changes required).
 |----|----------|------------|------|
 | A1 | "Dark mode profile card broken" — exact corruption pattern unclear from text description | Builder should test entire profile page in dark mode and fix ALL contrast/background violations found, not just the ones identified in code review | 2026-04-15 |
 | A2 | User mentioned "location filter" as possible replacement for equipment filter | Deferred — requires backend `GET /marketplace/listings` to support `locationCity`/`locationDistrict` query params, which it currently does not. Out of scope for this task | 2026-04-15 |
-| A3 | Marketplace filter row layout — single row or two rows? | Single scrollable row with listing-type chips first, then a subtle divider (thin gray dot or bar), then sport-type chips. If too wide, horizontal scroll is acceptable (existing pattern) | 2026-04-15 |
+| A3 | Marketplace filter row layout — single row or two rows? | Implemented as 2 separate rows (listing-type row + sport-type row), each with `role="group"` and `aria-label`. Cleaner than a single scrollable row in practice | 2026-04-15 |
 | A4 | Team card target height | No fixed height — remove `h-24` and let content determine height. Expected natural height ~140-160px with 2-line description | 2026-04-15 |
+| A5 | Profile `UpcomingSchedule` loading/error state — missing skeleton/error boundary | Resolved in Task 58. Added 3× shimmer skeleton during load and `ErrorState` with retry on error. Tab buttons resized to `min-h-[44px]`, card header aligned to `items-center`. | 2026-04-15 |
+| A6 | Filter chip state — URL sync | Resolved in Task 58. Marketplace and Teams filter chips now derive state from `searchParams` with URL param validation. `router.replace({ scroll: false })` used on filter change. Teams skeleton height corrected to `h-[120px]`. | 2026-04-15 |
+| A7 | `settings-client.tsx` / `settings/page.tsx` dark mode gaps | Resolved in Task 58. Dead `SettingsBackButton` function and `ArrowLeft` import removed. Missing `dark:` variants added to section h3, icon wrappers, desc paragraph, and ChevronRight. Duplicate footer version text removed. `transition-colors transition-transform` syntax fix applied. | 2026-04-15 |

@@ -1,4 +1,4 @@
-# MatchUp QA Remediation Plan
+# Teameet QA Remediation Plan
 
 **Date:** 2026-04-07  
 **Scope:** Real-flow QA 실행 결과 기반 테스트/런타임/제품 개선 계획  

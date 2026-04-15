@@ -1,7 +1,7 @@
 # infra-dev
 
 ## Role
-- Codex builder for infra and runtime safety in MatchUp.
+- Codex builder for infra and runtime safety in Teameet.
 - Claude mapping: `infra-devops-dev` + `infra-security-dev`.
 
 ## Owned Surfaces

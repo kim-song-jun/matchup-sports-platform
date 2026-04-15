@@ -13,20 +13,20 @@
 
 1. `make dev` builds successfully, but the API container crashes during Nest boot.
 2. The direct failure is a native module load error from `bcrypt` inside the dev container.
-3. The Postgres healthcheck and Makefile readiness checks omit the database name, so `pg_isready` defaults to the user name and emits repeated `database "matchup_user" does not exist` logs.
+3. The Postgres healthcheck and Makefile readiness checks omit the database name, so `pg_isready` defaults to the user name and emits repeated `database "teameet_user" does not exist` logs.
 
 ## Root Cause
 
 - `deploy/Dockerfile.dev` used an Alpine/musl Node base while the workspace includes native addons such as `bcrypt`.
 - The dev node_modules cache could retain binaries that are incompatible with the current container runtime.
 - On the current arm64 + mounted-workspace dev path, native `bcrypt` can still surface an `invalid ELF header` even after the image/runtime correction, while production does not need that fallback.
-- Readiness checks were validating the server without targeting the configured `matchup_dev` database.
+- Readiness checks were validating the server without targeting the configured `teameet_dev` database.
 
 ## Planned Fix
 
 - Move the dev Docker image to a glibc-based Node image, install OpenSSL for Prisma, and preserve a clean dependency snapshot inside the image.
 - Rotate the dev node_modules volume keys, mount them with `nocopy`, and resync dependencies from the image through a dedicated compose service on each startup.
-- Pin all dev Postgres readiness checks to `matchup_dev`.
+- Pin all dev Postgres readiness checks to `teameet_dev`.
 - Keep Postgres and Redis on the internal Docker network only, and make the web container wait for an API healthcheck instead of bare process startup.
 - Preserve the production password hashing runtime on `bcrypt`, but let dev compose opt into `bcryptjs` explicitly through `AUTH_HASH_DRIVER` so `make dev` does not depend on a native addon load succeeding in the mounted workspace runtime.
 
@@ -35,7 +35,7 @@
 - Re-run `make dev` and confirm:
   - `api` stays up after Nest watch compilation
   - `web` stays up on port `3003`
-  - Postgres no longer emits repeated `database "matchup_user" does not exist` messages
+  - Postgres no longer emits repeated `database "teameet_user" does not exist` messages
 
 ## Pipeline Status
 
@@ -70,7 +70,7 @@
 - Infra:
   - Switched dev Docker runtime to `node:20-bookworm-slim` with OpenSSL installed.
   - Added `/opt/deps` snapshot bootstrap for dev `node_modules` volumes and a dedicated `deps` compose service.
-  - Fixed Postgres readiness checks in compose and Make targets to target `matchup_dev`.
+  - Fixed Postgres readiness checks in compose and Make targets to target `teameet_dev`.
   - Added explicit `web -> deps` startup dependency to reduce first-boot `next: not found` risk.
 - Frontend:
   - No source changes required.
@@ -145,7 +145,7 @@
   - `.claude/agents/workflow.md`
   - `.github/tasks/06-fix-make-dev-runtime.md`
 - Summary:
-  - Documented the glibc-based dev image, `deps` bootstrap flow, and `pg_isready -d matchup_dev` requirement.
+  - Documented the glibc-based dev image, `deps` bootstrap flow, and `pg_isready -d teameet_dev` requirement.
   - Recorded the dev-only `AUTH_HASH_DRIVER=bcryptjs` override while keeping production on native `bcrypt`.
   - Captured the health-gated `web` startup, internal-only DB/Redis dev network, and the validation evidence for `make dev`.
 - Open gaps:

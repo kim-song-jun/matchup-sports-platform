@@ -1,4 +1,4 @@
-# Agent Team Configuration — MatchUp
+# Agent Team Configuration — Teameet
 
 ## Team Structure (19 agents)
 

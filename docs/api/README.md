@@ -1,4 +1,4 @@
-# MatchUp API Integration Docs
+# Teameet API Integration Docs
 
 이 디렉터리는 프론트엔드 통합을 위한 실행 계약 문서다. Swagger는 참고용이고, 실제 구현 기준은 이 문서 세트다.
 

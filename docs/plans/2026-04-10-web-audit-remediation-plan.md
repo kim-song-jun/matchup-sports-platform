@@ -1,10 +1,10 @@
-# MatchUp Web Audit Remediation Plan
+# Teameet Web Audit Remediation Plan
 
 > Historical audit/planning note. Canonical design rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and current design remediation execution lives in `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** MatchUp 웹이 “문서상 완성”이 아니라 “현재 구현 범위와 검증 상태를 자신 있게 설명할 수 있는 상태”가 되도록 브랜드, mock surface, unsupported contract, QA coverage를 정리한다.
+**Goal:** Teameet 웹이 “문서상 완성”이 아니라 “현재 구현 범위와 검증 상태를 자신 있게 설명할 수 있는 상태”가 되도록 브랜드, mock surface, unsupported contract, QA coverage를 정리한다.
 
 **Architecture:** 먼저 truth source를 고정한다. 브랜드와 시나리오 허브를 단일 기준으로 맞춘 뒤, main app의 mock/false-affordance surface를 제거하고, 거래형·운영형 화면은 real-data 또는 honest unsupported contract로 정리한다. 마지막에 scenario docs와 Playwright를 실제 구현 상태에 맞게 write-back한다.
 
@@ -82,8 +82,8 @@ Expected: 구현 전 기준선이 별도 커밋으로 남는다.
 
 **Step 1: Make the naming decision explicit**
 
-Run: `rg -n "TeamMeet|MatchUp" apps/web/src/app apps/web/src/components apps/web/public docs README.md`
-Expected: 어디가 `MatchUp`, 어디가 `TeamMeet`인지 한 번에 보인다.
+Run: `rg -n "TeamMeet|Teameet" apps/web/src/app apps/web/src/components apps/web/public docs README.md`
+Expected: 어디가 `Teameet`, 어디가 `TeamMeet`인지 한 번에 보인다.
 
 **Step 2: Pick one canonical product name**
 

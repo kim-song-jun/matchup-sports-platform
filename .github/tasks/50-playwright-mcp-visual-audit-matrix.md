@@ -759,4 +759,4 @@ Purpose:
 
 아래 문장을 자연스럽게 말할 수 있으면 완료다.
 
-“이제 MatchUp의 의미 있는 시각 route 전부를 9개 viewport와 주요 interaction state 기준으로 Playwright MCP에서 재현할 수 있고, 각 캡처는 fully-loaded 조건과 persona/context, 실패 분류, follow-up 근거까지 함께 남는다.”
+“이제 Teameet의 의미 있는 시각 route 전부를 9개 viewport와 주요 interaction state 기준으로 Playwright MCP에서 재현할 수 있고, 각 캡처는 fully-loaded 조건과 persona/context, 실패 분류, follow-up 근거까지 함께 남는다.”

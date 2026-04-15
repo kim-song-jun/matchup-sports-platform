@@ -34,7 +34,7 @@
   "user": {
     "id": "user-id",
     "email": "player@example.com",
-    "nickname": "matchup-player"
+    "nickname": "teameet-player"
   }
 }
 ```

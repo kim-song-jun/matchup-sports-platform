@@ -1,6 +1,6 @@
-# MatchUp Design System Reference
+# Teameet Design System Reference
 
-> **Agent-consumable reference.** This document is the single source for any agent needing to understand the current state of the MatchUp design system — tokens, components, assets, compliance, and remediation priorities. It does NOT define rules (that is `DESIGN.md`). It reports the gap between rules and reality.
+> **Agent-consumable reference.** This document is the single source for any agent needing to understand the current state of the Teameet design system — tokens, components, assets, compliance, and remediation priorities. It does NOT define rules (that is `DESIGN.md`). It reports the gap between rules and reality.
 
 Audit date: 2026-04-12
 Baseline commit: `9ba813a25a349f4d60a1b5412ed8c90a455beb68`

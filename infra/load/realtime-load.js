@@ -1,5 +1,5 @@
 /**
- * k6 WebSocket load test for MatchUp RealtimeGateway (Socket.IO)
+ * k6 WebSocket load test for Teameet RealtimeGateway (Socket.IO)
  *
  * Env vars:
  *   BASE_URL          WebSocket base URL (default: ws://localhost:8100)

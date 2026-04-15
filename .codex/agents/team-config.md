@@ -1,8 +1,8 @@
-# Codex Agent Team Configuration — MatchUp
+# Codex Agent Team Configuration — Teameet
 
 ## Canonical Policy
 
-- 이 파일은 MatchUp의 Codex canonical team config다.
+- 이 파일은 Teameet의 Codex canonical team config다.
 - `.codex/agents/`가 source of truth이고, `.claude/agents/prompts.md`는 built-in Codex skill compatibility entry만 담당한다.
 - Codex roster는 **16 agents**로 운영한다. Claude의 19-agent 세분화는 builder 내부 ownership note로 흡수한다.
 

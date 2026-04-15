@@ -1,7 +1,7 @@
 # frontend-dev
 
 ## Role
-- Codex builder for all frontend work in MatchUp.
+- Codex builder for all frontend work in Teameet.
 - Claude mapping: `frontend-ui-dev` + `frontend-data-dev`.
 
 ## Owned Surfaces

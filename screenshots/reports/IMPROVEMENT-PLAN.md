@@ -31,8 +31,8 @@
 
 | # | 이슈 | 파일 | 수정 방법 | 난이도 |
 |---|------|------|-----------|--------|
-| B1 | **DESIGN.md 자체 브랜드명 "MatchUp" 잔존** — canonical source 불일치 | `DESIGN.md` (1행 포함 5곳+) | `sed -i 's/MatchUp/TeamMeet/g' DESIGN.md` 후 맥락 검토. **B2 수정 전 필수 선행** | S |
-| B2 | **UI 전체 "MatchUp" → "TeamMeet" 교체** — 로고·헤더·Admin 사이드바·랜딩 전체 | `grep -rn "MatchUp" apps/web/src/` | 텍스트 치환 + 로고 SVG `<text>/<title>` 수정 + `public/` 로고 이미지 교체 | M |
+| B1 | **DESIGN.md 자체 브랜드명 "Teameet" 잔존** — canonical source 불일치 | `DESIGN.md` (1행 포함 5곳+) | `sed -i 's/Teameet/TeamMeet/g' DESIGN.md` 후 맥락 검토. **B2 수정 전 필수 선행** | S |
+| B2 | **UI 전체 "Teameet" → "TeamMeet" 교체** — 로고·헤더·Admin 사이드바·랜딩 전체 | `grep -rn "Teameet" apps/web/src/` | 텍스트 치환 + 로고 SVG `<text>/<title>` 수정 + `public/` 로고 이미지 교체 | M |
 
 ---
 
@@ -128,7 +128,7 @@
 | **컬러 단독 상태 표시** | 001·091·148·181 (전 배치) | §12 "컬러만으로 상태 전달 금지" | `grep -rn "bg-red-\|bg-amber-" apps/web/src/` → 텍스트+아이콘 누락 건 전수 확인 |
 | **EmptyState 미사용** | 001·091·148 | §13 "반드시 empty-state.tsx 사용" | `grep -rn "return null\|데이터가 없\|결과가 없" apps/web/src/` → 교체 |
 | **Utility 페이지 hero 블록** | 091·148 (동일 이슈 반복 미수정) | §4.3 utility page hero 금지 | `/my/*`, `/profile`, `/settings` 상단 대형 배너 전면 제거 |
-| **브랜드명 MatchUp 잔존** | 148·181 + DESIGN.md | 브랜드명 지시 (TeamMeet) | `grep -rn "MatchUp" apps/web/src/ DESIGN.md` 전수 교체 |
+| **브랜드명 Teameet 잔존** | 148·181 + DESIGN.md | 브랜드명 지시 (TeamMeet) | `grep -rn "Teameet" apps/web/src/ DESIGN.md` 전수 교체 |
 | **한쪽 색상 보더** (`border-l-4`) | 148·CLAUDE.md | §4.2 Border | `grep -rn "border-l-" apps/web/src/` → 전체 보더 또는 배경 톤으로 교체 |
 
 ---
@@ -152,7 +152,7 @@
 
 ```
 [P0-B1] DESIGN.md 브랜드명 수정
-  → [P0-B2] UI 전체 MatchUp → TeamMeet 교체
+  → [P0-B2] UI 전체 Teameet → TeamMeet 교체
     → [P1-1] 랜딩 hero 재설계 (브랜드명 확정 후)
 
 [P0-A1] 폰트 경로 수정 (빌드 블로커)

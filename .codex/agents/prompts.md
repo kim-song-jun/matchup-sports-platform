@@ -1,6 +1,6 @@
-# Codex Agent Prompts — MatchUp
+# Codex Agent Prompts — Teameet
 
-이 디렉토리는 MatchUp의 **Codex canonical agent 문서**다. Codex 글로벌 `agent-*` 스킬은 현재 `.codex/agents/`를 직접 읽지 않으므로, 최소 호환 프롬프트 entry는 `.claude/agents/prompts.md`에도 유지한다.
+이 디렉토리는 Teameet의 **Codex canonical agent 문서**다. Codex 글로벌 `agent-*` 스킬은 현재 `.codex/agents/`를 직접 읽지 않으므로, 최소 호환 프롬프트 entry는 `.claude/agents/prompts.md`에도 유지한다.
 
 ## Roster Mapping
 

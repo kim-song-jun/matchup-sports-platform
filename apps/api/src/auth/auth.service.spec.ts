@@ -237,7 +237,7 @@ describe('AuthService', () => {
     });
 
     it('links to existing email account when provider lookup misses but email matches', async () => {
-      const emailUser = mockUser({ email: 'mock_kakao_abc123@dev.matchup.kr' });
+      const emailUser = mockUser({ email: 'mock_kakao_abc123@dev.teameet.kr' });
       // 1st findFirst (by providerId) → null, 2nd findFirst (by email) → emailUser
       prismaMock.user.findFirst
         .mockResolvedValueOnce(null)

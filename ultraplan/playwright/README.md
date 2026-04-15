@@ -1,7 +1,7 @@
 # Ultraplan Playwright Layer
 
 This folder is a machine-readable planning layer for a future orchestration wrapper.
-It does not define new audit rules. It only encodes the MatchUp visual-audit contract in structured files.
+It does not define new audit rules. It only encodes the Teameet visual-audit contract in structured files.
 
 ## What lives here
 

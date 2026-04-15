@@ -1,4 +1,4 @@
-# MatchUp
+# Teameet
 
 > 생활체육 동호인을 위한 멀티스포츠 소셜 매칭 플랫폼
 
@@ -538,10 +538,10 @@ docker build \
   --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
   --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
   --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
-  -t matchup-web .
+  -t teameet-web .
 
 # Backend 이미지 빌드
-docker build -f deploy/Dockerfile.api -t matchup-api .
+docker build -f deploy/Dockerfile.api -t teameet-api .
 
 # 프로덕션 전체 실행
 docker-compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
@@ -549,7 +549,7 @@ docker-compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 ```
 
 - Nginx 리버스 프록시로 Frontend(3000) / Backend(8100) 라우팅
-- GitHub Actions는 코드를 EC2 `~/matchup`에 `rsync`한 뒤 이미지 빌드, `prisma/bootstrap-deploy-db.ts`로 DB bootstrap/migration을 적용하고, checksum-gated `prisma/seed-mocks.ts --checksum-gate`, `prisma/seed-images.ts`를 수행
+- GitHub Actions는 코드를 EC2 `~/teameet`에 `rsync`한 뒤 이미지 빌드, `prisma/bootstrap-deploy-db.ts`로 DB bootstrap/migration을 적용하고, checksum-gated `prisma/seed-mocks.ts --checksum-gate`, `prisma/seed-images.ts`를 수행
 - 프로덕션 배포는 `DB_PASSWORD`, `JWT_SECRET`만 필수이며, `TOSS_*`가 비어 있으면 결제 기능만 mock mode로 동작한다
 - `DEPLOY_SYNC_MOCK_DATA`는 기본 `true`이며, 정확히 `false`일 때만 deploy mock sync를 끈다
 - 신규/빈 운영 DB는 `bootstrap-deploy-db.ts`가 `db push + migrate resolve`로 현재 schema를 먼저 고정하고, 기존 운영 DB는 계속 `migrate deploy` 경로를 사용한다

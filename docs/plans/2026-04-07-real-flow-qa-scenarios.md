@@ -1,8 +1,8 @@
-# MatchUp Real-Flow QA Implementation Plan
+# Teameet Real-Flow QA Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** MatchUp의 핵심 기능들을 실제 사용자 흐름 기준으로 검증할 수 있도록, DB 저장성부터 다중 탭/다중 브라우저 실시간 동기화까지 포함한 상세 테스트 시나리오 기준서를 만든다.
+**Goal:** Teameet의 핵심 기능들을 실제 사용자 흐름 기준으로 검증할 수 있도록, DB 저장성부터 다중 탭/다중 브라우저 실시간 동기화까지 포함한 상세 테스트 시나리오 기준서를 만든다.
 
 **Architecture:** 테스트는 "행동 발생 → UI 반영 → API 응답 → DB 영속화 → 다른 컨텍스트 반영"의 5단계로 검증한다. 자동화는 Playwright를 중심으로 하되, 같은 사용자 다중 탭, 서로 다른 사용자 브라우저 컨텍스트, 필요 시 API 재조회 또는 서버 재시작 검증을 결합한다.
 

@@ -1,7 +1,7 @@
 # ux-manager
 
 ## Role
-- User-flow reviewer for MatchUp.
+- User-flow reviewer for Teameet.
 
 ## Evaluate
 - First-use clarity

@@ -1,7 +1,7 @@
 # backend-dev
 
 ## Role
-- Codex builder for all backend work in MatchUp.
+- Codex builder for all backend work in Teameet.
 - Claude mapping: `backend-api-dev` + `backend-data-dev`.
 
 ## Owned Surfaces

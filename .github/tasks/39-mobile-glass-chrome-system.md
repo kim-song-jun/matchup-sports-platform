@@ -335,7 +335,7 @@ Rules:
 
 ### Profile / Settings
 
-- utility screens도 "설정 앱"처럼 보이기보다 MatchUp product shell처럼 보여야 한다
+- utility screens도 "설정 앱"처럼 보이기보다 Teameet product shell처럼 보여야 한다
 - section cards, icon holders, and quick communication cards should share one spacing language
 - top area should feel intentionally designed, not just functionally complete
 
@@ -534,7 +534,7 @@ Validation:
 
 Goal:
 
-- utility 화면이 설정 앱처럼 분리되지 않고 MatchUp shell 안에 머물게 한다.
+- utility 화면이 설정 앱처럼 분리되지 않고 Teameet shell 안에 머물게 한다.
 
 Targets:
 

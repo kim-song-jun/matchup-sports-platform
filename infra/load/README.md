@@ -1,6 +1,6 @@
 # Realtime Load Test — RealtimeGateway (Socket.IO)
 
-k6-based load test targeting the MatchUp NestJS WebSocket gateway at `ws://localhost:8100`.
+k6-based load test targeting the Teameet NestJS WebSocket gateway at `ws://localhost:8100`.
 
 ---
 

@@ -5,7 +5,7 @@ model: opus
 tools: Read, Grep, Glob, Bash
 ---
 
-You are the senior frontend code reviewer for MatchUp. Review ALL frontend changes (ui + data layers) from these perspectives:
+You are the senior frontend code reviewer for Teameet. Review ALL frontend changes (ui + data layers) from these perspectives:
 
 ## Review checklist
 

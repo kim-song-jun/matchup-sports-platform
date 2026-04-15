@@ -14,6 +14,8 @@ const MORE_PATHS = [
   '/badges', '/team-matches', '/mercenary', '/profile',
 ];
 
+const CREATION_PATHS = ['/matches/new', '/teams/new', '/mercenary/new', '/lessons/new'];
+
 export function BottomNav() {
   const pathname = usePathname();
   const chatUnread = useChatUnreadTotal();
@@ -22,6 +24,8 @@ export function BottomNav() {
   const totalUnread = chatUnread + notifUnread;
   const t = useTranslations('nav');
   const [showMore, setShowMore] = useState(false);
+
+  if (CREATION_PATHS.includes(pathname)) return null;
 
   const navItems = [
     { href: '/home', icon: Home, label: t('home'), testId: 'bottom-nav-home' },

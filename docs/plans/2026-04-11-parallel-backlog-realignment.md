@@ -1,4 +1,4 @@
-# MatchUp Parallel Backlog Realignment
+# Teameet Parallel Backlog Realignment
 
 > Date: 2026-04-11
 > Scope: existing docs/tasks/codebase cross-check -> next parallel task slate
@@ -22,7 +22,7 @@
   - `docs/IMPLEMENTATION_STATUS.md`
   - `docs/PAGE_FEATURES.md`
   - `docs/TEAM_MATCHING_SPEC.md`
-  - `docs/MatchUp_통합기획서_PRD_v3.md`
+  - `docs/Teameet_통합기획서_PRD_v3.md`
 - 진행/회고 문서
   - `docs/WORK_SUMMARY.md`
   - `docs/plans/2026-04-09-comprehensive-improvement-plan.md`
@@ -53,7 +53,7 @@
 
 ### 2. Still incomplete or misleading
 
-- 브랜드 표기가 `MatchUp`과 `TeamMeet`로 갈라져 있다.
+- 브랜드 표기가 `Teameet`과 `TeamMeet`로 갈라져 있다.
 - 일부 high-traffic 사용자 화면이 여전히 dev/mock/sample fallback을 품고 있다.
 - 팀 매치 운영 서브플로우(`arrival`, `score`)는 route-local mock에 의존한다.
 - 용병 플로우는 상세 페이지는 존재하지만 create/apply/approve/status 전체 여정은 아직 닫히지 않았다.
@@ -185,7 +185,7 @@
 
 ## Expected Outcome
 
-이 task slate가 끝나면 MatchUp은 다음 상태에 도달해야 한다.
+이 task slate가 끝나면 Teameet은 다음 상태에 도달해야 한다.
 
 - 브랜드와 문서가 하나의 이름으로 설명된다.
 - 주요 사용자/관리자 화면에서 sample/mock이 실데이터처럼 보이지 않는다.

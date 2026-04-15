@@ -1,4 +1,4 @@
-# MatchUp - AI 스포츠 매칭 플랫폼 프로젝트 현황
+# Teameet - AI 스포츠 매칭 플랫폼 프로젝트 현황
 
 > 최종 업데이트: 2026-04-12 | 스크린샷: v4 (Playwright 자동 캡처)
 
@@ -6,7 +6,7 @@
 
 ## 1. 프로젝트 개요
 
-MatchUp은 생활체육 동호인을 위한 AI 기반 멀티스포츠 소셜 매칭 플랫폼입니다.
+Teameet은 생활체육 동호인을 위한 AI 기반 멀티스포츠 소셜 매칭 플랫폼입니다.
 축구, 풋살, 농구, 배드민턴 등 11개 종목의 개인 및 팀을 AI로 최적 매칭합니다.
 
 ### 핵심 가치
@@ -105,7 +105,7 @@ Canonical source of truth: [`DESIGN.md`](../DESIGN.md)
 ![FAQ - 모바일](screenshots/v4_intro/faq_mobile.png)
 
 ### 4.5 소개 (`/about`)
-비전/미션 + 문제 인식 + 접근법 + 숫자로 보는 MatchUp + 가치관 + 팀 소개.
+비전/미션 + 문제 인식 + 접근법 + 숫자로 보는 Teameet + 가치관 + 팀 소개.
 
 **데스크탑:**
 ![소개 - 데스크탑](screenshots/v4_intro/about_desktop.png)

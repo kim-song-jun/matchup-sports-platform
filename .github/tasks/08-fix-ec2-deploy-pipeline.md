@@ -8,7 +8,7 @@
 - The production EC2 host was in an API crash loop because `TOSS_SECRET_KEY` was treated as required at boot in production even though the payment services already support mock mode.
 - The production web image also baked `localhost:8111` into rewrites because `INTERNAL_API_ORIGIN` was not passed at build time.
 - Follow-up live validation on 2026-04-11 showed the production `web` container also needs `HOSTNAME=0.0.0.0`; otherwise Next standalone can bind only to the container IP and fail the localhost healthcheck even while logging `Ready`.
-- Follow-up live validation on 2026-04-11 also confirmed `deploy/docker-compose.prod.yml` is image-only for `web`/`api`, so manual recovery must rebuild `matchup-web:latest` with `deploy/Dockerfile.web` directly before `compose up`.
+- Follow-up live validation on 2026-04-11 also confirmed `deploy/docker-compose.prod.yml` is image-only for `web`/`api`, so manual recovery must rebuild `teameet-web:latest` with `deploy/Dockerfile.web` directly before `compose up`.
 
 ## Goal
 
@@ -30,7 +30,7 @@
 ## User Scenarios
 
 - Operator reads `ec2-info` and connects to the real EC2 host without trial-and-error.
-- A push to `main` completes `CI / Deploy` and redeploys the latest code without leaving `matchup_api` in a restart loop.
+- A push to `main` completes `CI / Deploy` and redeploys the latest code without leaving `teameet_api` in a restart loop.
 - An operator can understand manual recovery steps without assuming unsupported Docker Compose commands or a Git worktree on the host.
 - The deploy job fails immediately when truly required env is missing, but still succeeds when Toss payment secrets are intentionally unset.
 - If the operator manages Toss secrets in GitHub Actions, the deploy job syncs them into the protected EC2 `deploy/.env` before preflight and clears stale host values when the repo secret is empty.
@@ -57,7 +57,7 @@
 - Deploy job supports both `docker compose` and `docker-compose` on the EC2 target.
 - Deploy job fails fast only when truly required env such as DB/JWT is missing.
 - Deploy job can source `TOSS_SECRET_KEY` from GitHub repo secrets and persist or blank it in EC2 `deploy/.env` before starting containers according to the repo secret state.
-- `deploy/docker-compose.prod.yml` passes payment secrets into `matchup_api` when present without making them mandatory.
+- `deploy/docker-compose.prod.yml` passes payment secrets into `teameet_api` when present without making them mandatory.
 - `deploy/docker-compose.prod.yml` pins `HOSTNAME=0.0.0.0` for the standalone Next runtime so localhost healthchecks and nginx dependency gates succeed.
 - The web production build uses `INTERNAL_API_ORIGIN=http://api:8100` unless explicitly overridden.
 - Mock payment checkout/detail/refund surfaces visibly disclose that charges and refunds are simulated, and legacy real-payment refund CTAs stay blocked when provider state is unavailable.

@@ -1277,6 +1277,7 @@
 ---
 
 ### SC-05-050: 알림 클릭 — 개별 읽음 처리
+<!-- 분석: SC-05-050-S01-M 스크린샷 — "문제가 발생했어요" API 에러 상태 노출 -->
 
 | 항목 | 값 |
 |------|-----|
@@ -1297,9 +1298,9 @@
 
 | # | 검증 항목 | D | T | M |
 |---|-----------|---|---|---|
-| V1 | `data-testid="notification-card-{id}"` | ☐ | ☐ | ☐ |
-| V2 | Link vs button 렌더링 분기 | ☐ | ☐ | ☐ |
-| V3 | CTA 텍스트 + ChevronRight 표시 | ☐ | ☐ | ☐ |
+| V1 | `data-testid="notification-card-{id}"` | ☐ | ☐ | ❌ |
+| V2 | Link vs button 렌더링 분기 | ☐ | ☐ | ❌ |
+| V3 | CTA 텍스트 + ChevronRight 표시 | ☐ | ☐ | ❌ |
 
 ---
 

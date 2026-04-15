@@ -6,7 +6,7 @@ All P0 dead-ends and P1 discoverability gaps resolved. Navigation infrastructure
 
 ## Context
 
-MatchUp has 12+ core feature domains implemented across backend API and frontend pages, but users cannot effectively discover or reach many of them. The gap between "feature exists in code" and "user can find it in the app" is the single largest UX issue in the current build.
+Teameet has 12+ core feature domains implemented across backend API and frontend pages, but users cannot effectively discover or reach many of them. The gap between "feature exists in code" and "user can find it in the app" is the single largest UX issue in the current build.
 
 **Root causes identified:**
 1. Bottom navigation exposes only 5 of 12+ feature areas (Home, Matches, Lessons, Marketplace, Profile)

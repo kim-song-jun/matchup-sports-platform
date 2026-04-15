@@ -2,7 +2,7 @@
 
 ## Context
 
-MatchUp is pre-production. Four features are required before launch: match edit/cancel API hardening, image upload pipeline, Toss Payments real integration, and OAuth social login. Current codebase already has partial implementations (PATCH /matches/:id exists, payment service has TODO stubs, OAuth handler throws `not yet implemented`).
+Teameet is pre-production. Four features are required before launch: match edit/cancel API hardening, image upload pipeline, Toss Payments real integration, and OAuth social login. Current codebase already has partial implementations (PATCH /matches/:id exists, payment service has TODO stubs, OAuth handler throws `not yet implemented`).
 
 ## Goal
 

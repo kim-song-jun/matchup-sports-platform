@@ -41,7 +41,7 @@
   "status": "success",
   "data": {
     "id": "user-id",
-    "nickname": "matchup-player",
+    "nickname": "teameet-player",
     "profileImageUrl": "/uploads/profile.jpg",
     "locationCity": "Seoul"
   },

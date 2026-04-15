@@ -1,4 +1,4 @@
-# Codex Compatibility Prompts — MatchUp
+# Codex Compatibility Prompts — Teameet
 
 이 파일은 **Codex 글로벌 `agent-*` 스킬 compatibility entry**다. Codex canonical 문서는 `.codex/agents/`가 source of truth이며, 이 파일은 현재 Codex built-in skill이 자동 탐색하는 `.claude/agents/prompts.md` 경로를 채우기 위해 유지한다.
 

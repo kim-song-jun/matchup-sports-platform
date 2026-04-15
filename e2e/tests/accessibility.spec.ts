@@ -61,6 +61,42 @@ test.describe('Landing pages', () => {
     await expect(page.locator('h1')).toBeVisible();
   });
 
+  test('mobile menu drawer covers the viewport when opened', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/about');
+    await page.waitForTimeout(1000);
+
+    await page.getByRole('button', { name: '메뉴 열기' }).click();
+
+    const dialog = page.getByRole('dialog', { name: '모바일 메뉴' });
+    await expect(dialog).toBeVisible();
+
+    const box = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        innerHeight: window.innerHeight,
+      };
+    });
+
+    expect(box.top).toBe(64);
+    expect(Math.abs(box.bottom - box.innerHeight)).toBeLessThanOrEqual(1);
+
+    const bottomHit = await page.evaluate(() => {
+      const dialogElement = document.querySelector<HTMLElement>('[role="dialog"][aria-label="모바일 메뉴"]');
+      const target = document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 4);
+
+      return {
+        insideDialog: Boolean(dialogElement && target && dialogElement.contains(target)),
+        tagName: target?.tagName ?? null,
+      };
+    });
+
+    expect(bottomHit.insideDialog).toBe(true);
+    expect(bottomHit.tagName).not.toBe('H2');
+  });
+
   test('login page loads', async ({ page }) => {
     await page.goto('/login');
     await page.waitForTimeout(500);

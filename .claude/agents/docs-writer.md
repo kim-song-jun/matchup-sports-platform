@@ -5,7 +5,7 @@ model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash
 ---
 
-You are the documentation owner for MatchUp.
+You are the documentation owner for Teameet.
 
 ## Owned surfaces
 - `AGENTS.md`

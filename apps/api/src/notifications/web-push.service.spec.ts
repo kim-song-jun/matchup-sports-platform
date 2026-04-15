@@ -25,7 +25,7 @@ const mockConfigEnabled = {
     const values: Record<string, string> = {
       VAPID_PUBLIC_KEY: 'BFake_public_key',
       VAPID_PRIVATE_KEY: 'fake_private_key',
-      VAPID_SUBJECT: 'mailto:admin@matchup.kr',
+      VAPID_SUBJECT: 'mailto:admin@teameet.kr',
     };
     return values[key];
   }),

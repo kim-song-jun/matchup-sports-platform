@@ -190,8 +190,8 @@
 
 ### Phase 19.B6 — 회귀 검증
 
-- [ ] **B6.1** `pnpm --filter @matchup/web exec tsc --noEmit`
-- [ ] **B6.2** `pnpm --filter @matchup/web test`
+- [ ] **B6.1** `pnpm --filter @teameet/web exec tsc --noEmit`
+- [ ] **B6.2** `pnpm --filter @teameet/web test`
 - [ ] **B6.3** local dev (`pnpm dev`)에서 매치 생성 → 사진 첨부 → 상세 페이지 표시 시각 검증
 - [ ] **B6.4** e2e 추가:
   - [ ] `e2e/tests/matches.spec.ts`에 "사진 첨부 후 매치 생성" 시나리오 (Playwright `page.setInputFiles`)

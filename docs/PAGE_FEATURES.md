@@ -1,4 +1,4 @@
-# MatchUp 페이지별 기능 명세서
+# Teameet 페이지별 기능 명세서
 
 > 최종 업데이트: 2026-04-11
 > 현재 구현 surface 기준 명세. 검증 상태는 `docs/scenarios/index.md`를 source of truth로 사용한다.

@@ -1,4 +1,4 @@
-# MatchUp - AI 기반 멀티스포츠 소셜 매칭 플랫폼
+# Teameet - AI 기반 멀티스포츠 소셜 매칭 플랫폼
 
 풋살/농구/아이스하키/배드민턴 등 생활체육 종목의 개인 및 팀을 AI로 최적 매칭하는 플랫폼.
 
@@ -419,6 +419,6 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
    # 키 생성: node -e "const wp = require('web-push'); console.log(wp.generateVAPIDKeys())"
    VAPID_PUBLIC_KEY=
    VAPID_PRIVATE_KEY=
-   VAPID_SUBJECT=mailto:admin@matchup.kr
+   VAPID_SUBJECT=mailto:admin@teameet.kr
    ```
    Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요.

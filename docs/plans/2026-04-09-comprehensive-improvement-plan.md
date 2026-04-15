@@ -1,4 +1,4 @@
-# MatchUp Comprehensive Improvement Plan
+# Teameet Comprehensive Improvement Plan
 
 > **Date**: 2026-04-09
 > **Scope**: 프로젝트 전반 분석 기반 개선점 + 신규 기능 계획

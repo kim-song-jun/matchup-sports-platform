@@ -32,7 +32,7 @@ Priority: P1
 
 ## Goal
 
-모바일 UI에 절제된 glass chrome system을 도입해, MatchUp의 모바일 셸과 상단 경험을 더 현대적이고 응집감 있게 만든다.
+모바일 UI에 절제된 glass chrome system을 도입해, Teameet의 모바일 셸과 상단 경험을 더 현대적이고 응집감 있게 만든다.
 
 핵심 목표:
 

@@ -178,7 +178,7 @@ function Item({ item }) {  // ← 각 Item이 자체 hook 보유
   - [ ] `react-hooks/rules-of-hooks: error`
   - [ ] `react-hooks/exhaustive-deps: warn` (warn 유지 OK)
 - [ ] **C.3** 누락이면 추가
-- [ ] **C.4** `pnpm --filter @matchup/web lint` 실행 → hooks rule 위반 0 확인
+- [ ] **C.4** `pnpm --filter @teameet/web lint` 실행 → hooks rule 위반 0 확인
   - 현재 위반이 더 있으면 모두 같은 PR에서 fix (scope 작아 안전)
 - [ ] **C.5** `.github/workflows/deploy.yml`이 lint를 fail-on-error로 돌리는지 확인 (이미 그런 것으로 사전 조사됨)
 
@@ -219,8 +219,8 @@ function Item({ item }) {  // ← 각 Item이 자체 hook 보유
 
 - [ ] **E.1** Local production build:
   ```bash
-  pnpm --filter @matchup/web build
-  pnpm --filter @matchup/web start
+  pnpm --filter @teameet/web build
+  pnpm --filter @teameet/web start
   ```
 - [ ] **E.2** 진범 페이지를 브라우저에서 직접 진입 → DevTools Console에 React #310 없음 확인
 - [ ] **E.3** 다음 시나리오 중 해당하는 것 수동 실행 (어떤 페이지였느냐에 따라):
@@ -232,7 +232,7 @@ function Item({ item }) {  // ← 각 Item이 자체 hook 보유
 - [ ] **E.4** Network throttling Slow 3G로 한번 더 진입 → loading → success 전환에서 hook 위반 없음
 - [ ] **E.5** Vitest:
   ```bash
-  pnpm --filter @matchup/web test -- --run <해당 페이지의 test 파일>
+  pnpm --filter @teameet/web test -- --run <해당 페이지의 test 파일>
   ```
 - [ ] **E.6** E2E 1개 시나리오 (해당 페이지 cover):
   ```bash

@@ -104,7 +104,7 @@ For each screenshot, check these 10 items:
 6. Glass usage (nav/header/overlay only)
 7. Shadow restraint (hairline-depth)
 8. Information hierarchy (time→place→people→price)
-9. Brand consistency (TeamMeet, not MatchUp)
+9. Brand consistency (TeamMeet, not Teameet)
 10. Dark mode tokens (dark: variants present)
 
 OUTPUT: Write your review to:

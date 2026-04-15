@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: matchup_postgres
+    container_name: teameet_postgres
     restart: always
     command: >
       postgres
@@ -10,13 +10,13 @@ services:
       -c max_connections=100
       -c work_mem=4MB
     environment:
-      POSTGRES_USER: ${DB_USER:-matchup}
+      POSTGRES_USER: ${DB_USER:-teameet}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-matchup}
+      POSTGRES_DB: ${DB_NAME:-teameet}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-matchup}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-teameet}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,7 +27,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: matchup_redis
+    container_name: teameet_redis
     restart: always
     command: >
       redis-server
@@ -45,13 +45,13 @@ services:
           memory: 256M
 
   api:
-    image: matchup-api:latest
-    container_name: matchup_api
+    image: teameet-api:latest
+    container_name: teameet_api
     restart: always
     volumes:
       - uploads_data:/app/apps/api/uploads
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-matchup}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-matchup}
+      DATABASE_URL: postgresql://${DB_USER:-teameet}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-teameet}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
       TOSS_CLIENT_KEY: ${TOSS_CLIENT_KEY:-}
@@ -86,8 +86,8 @@ services:
           memory: 512M
 
   web:
-    image: matchup-web:latest
-    container_name: matchup_web
+    image: teameet-web:latest
+    container_name: teameet_web
     restart: always
     environment:
       NEXT_PUBLIC_API_URL: /api/v1
@@ -119,7 +119,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: matchup_nginx
+    container_name: teameet_nginx
     restart: always
     ports:
       - "80:80"

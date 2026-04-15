@@ -1,6 +1,6 @@
-# MatchUp Design Document Map
+# Teameet Design Document Map
 
-이 문서는 MatchUp 디자인 문서의 읽는 순서와 역할을 고정하는 navigation hub다.
+이 문서는 Teameet 디자인 문서의 읽는 순서와 역할을 고정하는 navigation hub다.
 규칙을 정의하거나 바꾸는 문서는 아니며, canonical source of truth는 항상 `DESIGN.md`다.
 
 ## 1. Read Order

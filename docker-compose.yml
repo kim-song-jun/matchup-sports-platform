@@ -32,25 +32,25 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: matchup_postgres_dev
+    container_name: teameet_postgres_dev
     environment:
-      POSTGRES_USER: matchup_user
-      POSTGRES_PASSWORD: matchup_password
-      POSTGRES_DB: matchup_dev
+      POSTGRES_USER: teameet_user
+      POSTGRES_PASSWORD: teameet_password
+      POSTGRES_DB: teameet_dev
     # Internal Docker network only.
     expose:
       - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U matchup_user -d matchup_dev"]
+      test: ["CMD-SHELL", "pg_isready -U teameet_user -d teameet_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: matchup_redis_dev
+    container_name: teameet_redis_dev
     # Internal Docker network only.
     expose:
       - "6379"
@@ -64,11 +64,11 @@ services:
 
   api:
     <<: *app-base
-    container_name: matchup_api_dev
+    container_name: teameet_api_dev
     command: sh -c "cd /app/apps/api && pnpm db:generate && pnpm dev"
     environment:
       TZ: Asia/Seoul
-      DATABASE_URL: postgresql://matchup_user:matchup_password@postgres:5432/matchup_dev
+      DATABASE_URL: postgresql://teameet_user:teameet_password@postgres:5432/teameet_dev
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: dev-secret
       API_PORT: 8111
@@ -97,7 +97,7 @@ services:
 
   web:
     <<: *app-base
-    container_name: matchup_web_dev
+    container_name: teameet_web_dev
     command: pnpm --filter web dev
     volumes:
       - type: bind

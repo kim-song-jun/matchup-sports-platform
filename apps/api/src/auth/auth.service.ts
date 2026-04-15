@@ -215,7 +215,7 @@ export class AuthService implements OnModuleInit {
     const clientId = process.env.NAVER_CLIENT_ID!;
     const clientSecret = process.env.NAVER_CLIENT_SECRET!;
     const redirect = redirectUri ?? process.env.NAVER_REDIRECT_URI ?? '';
-    const state = 'matchup';
+    const state = 'teameet';
 
     const tokenRes = await fetch(
       `https://nid.naver.com/oauth2.0/token?grant_type=authorization_code&client_id=${clientId}&client_secret=${clientSecret}&redirect_uri=${encodeURIComponent(redirect)}&code=${code}&state=${state}`,
@@ -268,7 +268,7 @@ export class AuthService implements OnModuleInit {
     );
     return {
       providerId: `mock_${provider}_${code}`,
-      email: `mock_${provider}_${code}@dev.matchup.kr`,
+      email: `mock_${provider}_${code}@dev.teameet.kr`,
       nickname: `${provider}_dev_${code.slice(0, 6)}`,
       profileImage: null,
     };

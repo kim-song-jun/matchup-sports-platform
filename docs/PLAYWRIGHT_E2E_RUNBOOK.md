@@ -1,6 +1,6 @@
 # Playwright E2E Runbook
 
-이 문서는 MatchUp 저장소의 Playwright 실행 계약과 병렬 실행 방법의 canonical runbook이다.
+이 문서는 Teameet 저장소의 Playwright 실행 계약과 병렬 실행 방법의 canonical runbook이다.
 
 ## 목적
 
@@ -149,7 +149,7 @@ node scripts/qa/run-e2e-isolated.mjs env NotifSmoke
 {
   "initialized": false,
   "runId": "notifsmoke",
-  "composeProjectName": "matchup-e2e-notifsmoke",
+  "composeProjectName": "teameet-e2e-notifsmoke",
   "authDir": ".../tmp/e2e-runs/notifsmoke/auth",
   "outputDir": ".../tmp/e2e-runs/notifsmoke/artifacts/test-results"
 }
@@ -232,6 +232,7 @@ Operational rules:
 - `--allow-bootstrap-writes`는 local `localhost` API에만 허용한다. clean local DB에서 dynamic route fixture가 정말 필요할 때만 명시적으로 켠다.
 - broad capture는 `batch + viewport band` 단위로 나눈다. 예: `mobile-sm,mobile-md,mobile-lg` -> `tablet-*` -> `desktop-*`.
 - runner는 `.run.lock`으로 같은 `run-id`의 동시 실행을 막는다. 이미 실행 중이면 `run-id "<id>" is already in use`로 실패한다.
+- `menu-open`, `dialog-open`, `drawer-open` 같은 fixed overlay state는 viewport-only screenshot을 canonical evidence로 쓴다. full-page stitch는 overlay 뒤 본문을 다시 이어 붙여 false-positive를 만들 수 있으므로, 이 상태의 판정은 viewport artifact와 DOM hit-test를 기준으로 한다.
 
 ### Visual audit artifact layout
 

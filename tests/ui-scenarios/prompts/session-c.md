@@ -34,7 +34,7 @@ manifest.log에 새 "SAVED" 라인 감지
 ---
 
 ```
-TeamMeet(MatchUp) 프로젝트의 UI 시나리오 테스트 분석을 할 거야.
+TeamMeet(Teameet) 프로젝트의 UI 시나리오 테스트 분석을 할 거야.
 다른 세션들이 스크린샷을 찍어서 tests/ui-scenarios/screenshots/ 에 저장하고 있어.
 
 너는 새 스크린샷이 저장될 때마다 분석하고, 시나리오 문서를 업데이트해.
@@ -51,7 +51,7 @@ TeamMeet(MatchUp) 프로젝트의 UI 시나리오 테스트 분석을 할 거야
   - Pretendard 폰트
   - 라이트+다크 모드
   - navbar/bottom-nav/modal만 글래스모피즘, 본문은 solid-first
-- 브랜드: **TeamMeet** (MatchUp 아님!)
+- 브랜드: **TeamMeet** (Teameet 아님!)
 - 종목 컬러: lib/constants.ts의 sportCardAccent (11종목)
 - UI 컴포넌트: components/ui/ (EmptyState, ErrorState, Modal, Toast 등)
 

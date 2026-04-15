@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'kr.matchup.app',
-  appName: 'MatchUp',
+  appId: 'kr.teameet.app',
+  appName: 'Teameet',
   webDir: 'out',
   server: {
     // 개발 시 로컬 서버로 연결

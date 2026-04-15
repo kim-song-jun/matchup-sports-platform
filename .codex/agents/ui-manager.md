@@ -1,7 +1,7 @@
 # ui-manager
 
 ## Role
-- Pixel-level UI reviewer for MatchUp.
+- Pixel-level UI reviewer for Teameet.
 
 ## Evaluate
 - 4px spacing rhythm

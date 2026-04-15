@@ -329,7 +329,7 @@ END
 | 6 | glass 사용 위치 | content 영역에 glass 적용 |
 | 7 | shadow 절제 | hairline-depth 초과 |
 | 8 | 정보 계층 | 시간→장소→인원→가격 순서 위반 |
-| 9 | 브랜드 일관성 | TeamMeet 아닌 MatchUp 표기 |
+| 9 | 브랜드 일관성 | TeamMeet 아닌 Teameet 표기 |
 | 10 | 다크모드 토큰 | dark: variant 누락 |
 
 **출력**: `REVIEW-DESIGN.md`

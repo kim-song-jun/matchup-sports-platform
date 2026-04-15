@@ -9,7 +9,7 @@ Priority: P0
 
 ## Context
 
-현재 저장소는 문서/manifest/metadata는 `MatchUp`, 실제 일부 공개 UI와 auth/admin shell은 `TeamMeet`를 사용한다. `apps/web/public/favicon.ico`도 없어 공개 페이지 브라우저 스모크에서 404가 확인됐다.
+현재 저장소는 문서/manifest/metadata는 `Teameet`, 실제 일부 공개 UI와 auth/admin shell은 `TeamMeet`를 사용한다. `apps/web/public/favicon.ico`도 없어 공개 페이지 브라우저 스모크에서 404가 확인됐다.
 
 이 상태는 “무엇을 만들고 있는가”라는 가장 기본적인 제품 설명을 흔든다. 기능 구현 이전에 제품 명칭과 public shell이 먼저 하나의 진실 소스로 정리되어야 한다.
 
@@ -64,7 +64,7 @@ Priority: P0
 
 ## Validation
 
-- `rg -n "TeamMeet|MatchUp" apps/web/src/app apps/web/src/components apps/web/public`
+- `rg -n "TeamMeet|Teameet" apps/web/src/app apps/web/src/components apps/web/public`
 - `pnpm --filter web exec tsc --noEmit`
 - 공개 브라우저 스모크
   - `/landing`
@@ -86,10 +86,10 @@ Priority: P0
 
 ## Execution Report (2026-04-11)
 
-- public/auth/admin shell의 visible brand string을 `MatchUp` / `MatchUp Admin`으로 정렬했다.
-- root metadata의 `title`, `template`, `authors`, `openGraph.siteName`, `twitter/openGraph title`, `icons`를 `MatchUp` 기준으로 맞췄다.
-- `apps/web/public/manifest.json`의 `name` / `short_name`이 `MatchUp`임을 유지했다.
-- `apps/web/public/favicon.ico`와 `apps/web/public/favicon.svg`를 기준 favicon asset으로 정리하고, E2E admin shell 기대값도 `MatchUp Admin`으로 맞췄다.
+- public/auth/admin shell의 visible brand string을 `Teameet` / `Teameet Admin`으로 정렬했다.
+- root metadata의 `title`, `template`, `authors`, `openGraph.siteName`, `twitter/openGraph title`, `icons`를 `Teameet` 기준으로 맞췄다.
+- `apps/web/public/manifest.json`의 `name` / `short_name`이 `Teameet`임을 유지했다.
+- `apps/web/public/favicon.ico`와 `apps/web/public/favicon.svg`를 기준 favicon asset으로 정리하고, E2E admin shell 기대값도 `Teameet Admin`으로 맞췄다.
 
 ### Files Updated
 
@@ -113,7 +113,7 @@ Priority: P0
 
 ### Validation Result
 
-- `rg -n "TeamMeet|MatchUp" apps/web/src/app apps/web/src/components apps/web/public`
+- `rg -n "TeamMeet|Teameet" apps/web/src/app apps/web/src/components apps/web/public`
   - task scope 기준 `TeamMeet` 잔존 없음
 - `curl -I http://localhost:3003/favicon.ico`
   - `200 OK`
@@ -131,7 +131,7 @@ Priority: P0
 
 ### Acceptance Criteria Check
 
-- [x] 브라우저 title, `siteName`, PWA `name`, visible shell heading이 `MatchUp` 기준으로 정렬되었다.
+- [x] 브라우저 title, `siteName`, PWA `name`, visible shell heading이 `Teameet` 기준으로 정렬되었다.
 - [x] 공개 페이지, 로그인, 설정, admin shell에서 task scope 기준 다른 브랜드명이 남지 않는다.
 - [x] `/favicon.ico` 요청이 `200 OK`를 반환한다.
 - [x] 기존 route 구조와 SEO 메타 의미를 유지한 채 metadata drift만 정리했다.

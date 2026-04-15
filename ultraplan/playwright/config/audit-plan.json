@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "repo": "MatchUp",
+  "repo": "Teameet",
   "canonicalOutputRoot": "output/playwright/visual-audit",
   "captureMode": "full-page",
   "executionPolicy": {

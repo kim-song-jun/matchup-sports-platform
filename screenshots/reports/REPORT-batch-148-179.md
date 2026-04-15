@@ -15,7 +15,7 @@
 
 ### 🔴 Critical Issues
 
-- **[00148, 00157, 00166, 00173, ALL]** **브랜드명 위반 — "MatchUp" 전체 잔존**: 로고, 사이드바, Admin 헤더("MatchUp Admin"), 랜딩 전체에 "MatchUp" 표시. 브랜드명은 **TeamMeet**. → Fix needed: 앱 셸 전체(로고·헤더·admin 사이드바·랜딩)에서 "MatchUp" → "TeamMeet" 전면 교체.
+- **[00148, 00157, 00166, 00173, ALL]** **브랜드명 위반 — "Teameet" 전체 잔존**: 로고, 사이드바, Admin 헤더("Teameet Admin"), 랜딩 전체에 "Teameet" 표시. 브랜드명은 **TeamMeet**. → Fix needed: 앱 셸 전체(로고·헤더·admin 사이드바·랜딩)에서 "Teameet" → "TeamMeet" 전면 교체.
 
 - **[00163, 00164, 00171]** **랜딩 hero — 전면 파란 그라디언트 + 곡선 wave divider**: DESIGN.md Section 5: "glossy glass showcase, stacked heavy shadows 금지". 그라디언트 blob이 copy/CTA보다 시각적으로 우세. → Fix needed: solid 배경 + 클린 섹션 대비로 교체. 헤드라인·CTA가 시각 1순위여야 함.
 
@@ -74,7 +74,7 @@
 ## Patterns & Recurring Issues
 
 ### P1: 브랜드명 위반 (Critical — 전체 32장)
-"MatchUp"이 모든 화면에 잔존. **TeamMeet**으로 전면 교체가 최우선.
+"Teameet"이 모든 화면에 잔존. **TeamMeet**으로 전면 교체가 최우선.
 
 ### P2: 유틸리티 페이지 Hero 블록 (Critical — 반복)
 마이페이지 hero 배너 (00152, 00159, 00169). 이전 배치에서도 지적되었으나 미해결.

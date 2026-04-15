@@ -13,6 +13,11 @@ tmp/
 output/
 e2e/.auth/
 *.log
+.claude/scheduled_tasks.lock
+tmp-*.png
+tmp-*.jpg
+tmp-*.jpeg
+tmp-*.webp
 .claude/agents/*.bak.*
 *.bak.*
 ec2-info
@@ -55,4 +60,8 @@ infra/load/tokens.txt
 # E2E screenshot binaries and transient queue state
 e2e/scenarios/screenshots/
 e2e/scenarios/queue/
+screenshots/scenarios/**/*.png
+screenshots/scenarios/**/*.jpg
+screenshots/scenarios/**/*.jpeg
+screenshots/scenarios/**/*.webp
 ultraplan/runs/e2e-analyzer*/

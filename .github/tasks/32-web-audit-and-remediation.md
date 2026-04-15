@@ -12,7 +12,7 @@ Status: Proposed (partially superseded by tasks 33-40)
 
 ## Execution Progress (2026-04-11)
 
-- `apps/web` 메타데이터, public/auth/main/admin 주요 표기, 랜딩/어바웃/가이드/FAQ 카피를 `MatchUp`으로 단일화했다.
+- `apps/web` 메타데이터, public/auth/main/admin 주요 표기, 랜딩/어바웃/가이드/FAQ 카피를 `Teameet`으로 단일화했다.
 - `/favicon.svg`를 추가하고 `Metadata.icons`에 연결해 브라우저 favicon 404를 제거했다.
 - `my/matches`, `my/lessons`, `my/listings`에서 local mock/sample fallback을 제거하고 real-data-first + honest empty state로 전환했다.
 - `my/matches` 참가 이력 탭은 실데이터 미연동 상태를 `TrustSignalBanner`로 명시하도록 바꿨다.
@@ -57,7 +57,7 @@ Status: Proposed (partially superseded by tasks 33-40)
 
 ### 1. 브랜드 소스가 둘로 갈라져 있다
 
-- 문서와 manifest는 `MatchUp`을 사용한다.
+- 문서와 manifest는 `Teameet`을 사용한다.
 - 실제 웹 메타데이터와 UI 표기는 `TeamMeet`를 사용한다.
 - 저장소 내부 문서도 이 충돌을 이미 인지하고 있다.
 
@@ -122,7 +122,7 @@ Status: Proposed (partially superseded by tasks 33-40)
 
 ## Recommended Execution Order
 
-1. 브랜드 기준선 고정 (`MatchUp` vs `TeamMeet` 단일화)
+1. 브랜드 기준선 고정 (`Teameet` vs `TeamMeet` 단일화)
 2. high-traffic user mock surface 제거 (`my/*`, `venues/[id]`)
 3. team-match 운영 페이지 정리 (`arrival`, `score`)
 4. lesson / marketplace / checkout / notifications contract 정리

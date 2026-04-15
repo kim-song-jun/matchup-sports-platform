@@ -46,19 +46,18 @@ export function buttonStyles({
 }
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  ref?: React.Ref<HTMLButtonElement>;
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', fullWidth = false, ...props }, ref) => (
+export function Button({ className, variant = 'primary', size = 'md', fullWidth = false, ref, ...props }: ButtonProps) {
+  return (
     <button
       ref={ref}
       className={cn(buttonStyles({ variant, size, fullWidth }), className)}
       {...props}
     />
-  ),
-);
-
-Button.displayName = 'Button';
+  );
+}

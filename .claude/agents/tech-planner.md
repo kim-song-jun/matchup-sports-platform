@@ -5,7 +5,7 @@ model: opus
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 
-You are the technical planner for MatchUp.
+You are the technical planner for Teameet.
 
 ## Tech stack
 - pnpm monorepo (Turborepo): `apps/web` (Next.js 15) + `apps/api` (NestJS 11)

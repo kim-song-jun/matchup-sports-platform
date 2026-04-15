@@ -1,4 +1,4 @@
-# MatchUp EC2 배포 가이드
+# Teameet EC2 배포 가이드
 
 ## 1. EC2 인스턴스 생성
 
@@ -18,7 +18,7 @@
 ### AWS 콘솔에서 EC2 생성
 
 1. **AWS 콘솔** → EC2 → "인스턴스 시작"
-2. **이름**: `matchup-server`
+2. **이름**: `teameet-server`
 3. **AMI**: Amazon Linux 2023 (기본)
 4. **인스턴스 유형**: `t3.small`
 5. **키 페어**: 새로 생성 또는 기존 키 선택 → `.pem` 파일 다운로드
@@ -48,10 +48,10 @@
 EC2에 SSH 접속 후 아래 한 줄 실행:
 
 ```bash
-ssh -i matchup-key.pem ec2-user@<EC2_퍼블릭_IP>
+ssh -i teameet-key.pem ec2-user@<EC2_퍼블릭_IP>
 
 # 원클릭 설치 + 배포
-curl -sL https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/main/deploy/setup-ec2.sh | bash
+curl -sL https://raw.githubusercontent.com/kim-song-jun/teameet-sports-platform/main/deploy/setup-ec2.sh | bash
 ```
 
 > `setup-ec2.sh`는 `TOSS_*` 값을 주면 `deploy/.env`에 반영합니다. 값을 비워 둬도 배포는 계속되며, 결제 기능만 mock mode로 동작합니다.
@@ -70,7 +70,7 @@ curl -sL https://raw.githubusercontent.com/kim-song-jun/matchup-sports-platform/
 
 완료 후 출력:
 ```
-🎉 MatchUp 배포 완료!
+🎉 Teameet 배포 완료!
   🌐 웹사이트:  http://<EC2_IP>
   📚 API 문서:  http://<EC2_IP>/docs
   🏥 헬스체크:  http://<EC2_IP>/api/v1/health
@@ -99,9 +99,9 @@ GitHub 레포 → Settings → Secrets and variables → Actions → "New reposi
 
 ```bash
 # 로컬에서 .pem 파일 내용 복사
-cat matchup-key.pem | pbcopy  # macOS
+cat teameet-key.pem | pbcopy  # macOS
 # 또는
-cat matchup-key.pem            # 출력 후 전체 복사
+cat teameet-key.pem            # 출력 후 전체 복사
 ```
 
 이 내용을 `EC2_SSH_KEY` Secret에 붙여넣기.
@@ -118,7 +118,7 @@ GitHub Actions 트리거
 3. lint + type-check + test
   ↓ (빌드 성공 시)
 4. SSH로 EC2 접속
-5. rsync로 `~/matchup` 작업 트리 동기화 (`deploy/.env` 보호)
+5. rsync로 `~/teameet` 작업 트리 동기화 (`deploy/.env` 보호)
 6. GitHub repo secrets의 `TOSS_*` 값을 EC2 `deploy/.env`의 source of truth로 먼저 동기화
 7. `deploy/.env` 필수 값(`DB_PASSWORD`, `JWT_SECRET`) preflight 검증
 8. API / Web Docker 이미지 빌드
@@ -135,7 +135,7 @@ GitHub Actions 트리거
 🎉 배포 완료
 ```
 
-> 운영 서버의 `~/matchup`는 CI가 동기화한 mirror일 수 있어 `.git`이 없을 수 있습니다. 서버에서 `git pull`이 항상 가능하다고 가정하지 않습니다.
+> 운영 서버의 `~/teameet`는 CI가 동기화한 mirror일 수 있어 `.git`이 없을 수 있습니다. 서버에서 `git pull`이 항상 가능하다고 가정하지 않습니다.
 
 ---
 
@@ -145,9 +145,9 @@ GitHub Actions 트리거
 
 ```bash
 # Database
-DB_USER=matchup
+DB_USER=teameet
 DB_PASSWORD=<자동생성된_24자_비밀번호>
-DB_NAME=matchup
+DB_NAME=teameet
 
 # JWT
 JWT_SECRET=<자동생성된_48자_시크릿>
@@ -216,8 +216,8 @@ Nginx 라우팅:
 ### 서버 접속
 
 ```bash
-ssh -i matchup-key.pem ec2-user@<EC2_IP>
-cd ~/matchup/deploy
+ssh -i teameet-key.pem ec2-user@<EC2_IP>
+cd ~/teameet/deploy
 
 if docker compose version >/dev/null 2>&1; then
   export COMPOSE="docker compose"
@@ -233,9 +233,9 @@ fi
 $COMPOSE -f docker-compose.prod.yml ps
 
 # 로그 확인
-docker logs matchup_api -f --tail 50
-docker logs matchup_web -f --tail 50
-docker logs matchup_nginx -f --tail 50
+docker logs teameet_api -f --tail 50
+docker logs teameet_web -f --tail 50
+docker logs teameet_nginx -f --tail 50
 
 # 리소스 사용량
 docker stats --no-stream
@@ -260,27 +260,27 @@ $COMPOSE -f docker-compose.prod.yml restart web
 
 ```bash
 # 권장: GitHub Actions의 workflow_dispatch로 CI / Deploy 재실행
-# 서버의 ~/matchup는 Git worktree가 아닐 수 있으므로 서버 내부 git pull을 기본 절차로 쓰지 않는다.
+# 서버의 ~/teameet는 Git worktree가 아닐 수 있으므로 서버 내부 git pull을 기본 절차로 쓰지 않는다.
 
 rsync -avz --delete \
   --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
   --filter 'protect deploy/.env' \
-  -e "ssh -i matchup-key.pem -o StrictHostKeyChecking=no" \
-  ./ ec2-user@<EC2_IP>:~/matchup/
+  -e "ssh -i teameet-key.pem -o StrictHostKeyChecking=no" \
+  ./ ec2-user@<EC2_IP>:~/teameet/
 
-ssh -i matchup-key.pem ec2-user@<EC2_IP> '
+ssh -i teameet-key.pem ec2-user@<EC2_IP> '
   set -e
-  cd ~/matchup
+  cd ~/teameet
   set -a
   . deploy/.env
   set +a
-  sudo docker build -f deploy/Dockerfile.api -t matchup-api .
+  sudo docker build -f deploy/Dockerfile.api -t teameet-api .
   sudo docker build \
     -f deploy/Dockerfile.web \
     --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
     --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
     --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
-    -t matchup-web .
+    -t teameet-web .
   # docker-compose.prod.yml is image-only for web/api, so use direct docker build
   # before compose up when you need a fresh production image.
   cd deploy
@@ -296,8 +296,8 @@ ssh -i matchup-key.pem ec2-user@<EC2_IP> '
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
   curl -fsS http://localhost:8100/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null
   curl -fsS http://localhost/landing > /dev/null
-  sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
-  sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
+  sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+  sudo docker exec teameet_api npx ts-node prisma/seed-images.ts
 '
 ```
 
@@ -305,25 +305,25 @@ ssh -i matchup-key.pem ec2-user@<EC2_IP> '
 
 ```bash
 # DB 백업
-docker exec matchup_postgres pg_dump -U matchup matchup > backup_$(date +%Y%m%d).sql
+docker exec teameet_postgres pg_dump -U teameet teameet > backup_$(date +%Y%m%d).sql
 
 # DB 복원
-cat backup.sql | docker exec -i matchup_postgres psql -U matchup matchup
+cat backup.sql | docker exec -i teameet_postgres psql -U teameet teameet
 
 # Prisma Studio (DB 브라우저)
-docker exec -it matchup_api npx prisma studio
+docker exec -it teameet_api npx prisma studio
 ```
 
 ### 시드 데이터 (초기 데이터 입력)
 
 ```bash
-docker exec matchup_api npx ts-node prisma/seed.ts
+docker exec teameet_api npx ts-node prisma/seed.ts
 ```
 
 ### DB bootstrap / migration (deploy-safe)
 
 ```bash
-docker exec matchup_api npx ts-node prisma/bootstrap-deploy-db.ts
+docker exec teameet_api npx ts-node prisma/bootstrap-deploy-db.ts
 ```
 
 빈 DB는 현재 schema bootstrap + migration history 정렬까지 자동 처리하고, migration history가 없는 비어 있지 않은 DB는 drift로 간주해 실패한다.
@@ -331,7 +331,7 @@ docker exec matchup_api npx ts-node prisma/bootstrap-deploy-db.ts
 ### checksum-gated canonical mock sync (deploy 기본값)
 
 ```bash
-docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
 ```
 
 `DEPLOY_SYNC_MOCK_DATA=false`가 아닌 한 배포 시 이 명령이 자동 실행된다. checksum이 같으면 skip되고, catalog 또는 KST 날짜 anchor가 바뀌었을 때만 canonical mock dataset을 다시 sync한다.
@@ -339,7 +339,7 @@ docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
 ### 이미지 데이터 보강 (운영 안전)
 
 ```bash
-docker exec matchup_api npx ts-node prisma/seed-images.ts
+docker exec teameet_api npx ts-node prisma/seed-images.ts
 ```
 
 ---
@@ -350,7 +350,7 @@ docker exec matchup_api npx ts-node prisma/seed-images.ts
 
 1. 도메인 구매 (가비아, Namecheap 등)
 2. DNS 설정: A 레코드 → EC2 퍼블릭 IP
-3. `deploy/nginx.conf`의 `server_name _` → `server_name matchup.kr www.matchup.kr`
+3. `deploy/nginx.conf`의 `server_name _` → `server_name teameet.kr www.teameet.kr`
 
 ### SSL 인증서 (Let's Encrypt)
 
@@ -360,7 +360,7 @@ sudo yum install -y certbot || sudo apt install -y certbot
 
 # Nginx 중지 후 인증서 발급
 $COMPOSE -f docker-compose.prod.yml stop nginx
-sudo certbot certonly --standalone -d matchup.kr -d www.matchup.kr
+sudo certbot certonly --standalone -d teameet.kr -d www.teameet.kr
 
 # nginx.conf에 SSL 설정 추가 후 재시작
 $COMPOSE -f docker-compose.prod.yml up -d nginx
@@ -409,8 +409,8 @@ echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
 
 ```bash
 # PostgreSQL 상태 확인
-docker logs matchup_postgres
-docker exec matchup_postgres pg_isready -U matchup
+docker logs teameet_postgres
+docker exec teameet_postgres pg_isready -U teameet
 ```
 
 ### 포트 충돌

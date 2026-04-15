@@ -189,14 +189,16 @@ export function MatchesPage() {
         )}
       >
         <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            data-testid="match-clear-filters"
-            className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            {t('clearFilters')}
-          </button>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              data-testid="match-clear-filters"
+              className="min-h-[44px] shrink-0 rounded-full border border-gray-100 bg-white px-3 text-xs font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              {t('clearFilters')}
+            </button>
+          )}
           <div className="flex overflow-hidden rounded-full border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <button
               type="button"
@@ -275,7 +277,9 @@ export function MatchesPage() {
         </div>
       </div>
 
-      <div className="mb-3 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide @3xl:px-0">
+      <div
+        className="mb-3 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide scroll-fade-x @3xl:px-0"
+      >
         {SPORT_FILTERS.map((filter) => {
           const isActive = draftFilters.sport === filter.key;
           const testId = filter.key ? `match-sport-${filter.key}` : 'match-sport-all';
@@ -299,13 +303,15 @@ export function MatchesPage() {
         })}
       </div>
 
-      <div className="mb-4 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide @3xl:px-0">
+      <div
+        className="mb-4 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide scroll-fade-x @3xl:px-0"
+      >
         <button
           type="button"
           data-testid="match-quick-today"
           aria-pressed={draftFilters.date === today}
           onClick={() => updateFilters({ date: draftFilters.date === today ? '' : today })}
-          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.date === today
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -318,7 +324,7 @@ export function MatchesPage() {
           data-testid="match-quick-free"
           aria-pressed={draftFilters.fee === 'free'}
           onClick={() => updateFilters({ fee: draftFilters.fee === 'free' ? 'all' : 'free' })}
-          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.fee === 'free'
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -331,7 +337,7 @@ export function MatchesPage() {
           data-testid="match-quick-beginner"
           aria-pressed={draftFilters.level === 'beginner'}
           onClick={() => updateFilters({ level: draftFilters.level === 'beginner' ? 'all' : 'beginner' })}
-          className={`shrink-0 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`shrink-0 min-h-[44px] rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.level === 'beginner'
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -344,7 +350,7 @@ export function MatchesPage() {
           data-testid="match-quick-available"
           aria-pressed={draftFilters.available}
           onClick={() => updateFilters({ available: !draftFilters.available })}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+          className={`inline-flex shrink-0 min-h-[44px] items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
             draftFilters.available
               ? 'bg-blue-500 text-white'
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
@@ -467,7 +473,7 @@ export function MatchesPage() {
         </div>
       )}
 
-      <div className="px-5 @3xl:px-0">
+      <div className="px-5 pb-24 @3xl:px-0">
         {isLoading ? (
           <div className="flex flex-col gap-3 @3xl:grid @3xl:grid-cols-2">
             {[1, 2, 3, 4].map((value) => (

@@ -77,12 +77,12 @@
     // ... 기존 인덱스/관계 ...
   }
   ```
-- [ ] **A.2** `pnpm --filter @matchup/api exec prisma migrate dev --name add_team_match_meta_fields` 실행 → 신규 migration sql 생성 확인
+- [ ] **A.2** `pnpm --filter @teameet/api exec prisma migrate dev --name add_team_match_meta_fields` 실행 → 신규 migration sql 생성 확인
 - [ ] **A.3** 생성된 SQL을 read하고 다음 검증:
   - [ ] `ALTER TABLE team_matches ADD COLUMN ...` 6개
   - [ ] DEFAULT 값 명시 (NOT NULL 컬럼은 무중단 반영 가능)
   - [ ] backfill 불필요 (default 또는 nullable)
-- [ ] **A.4** `pnpm --filter @matchup/api exec prisma generate` 재실행 → 클라이언트 타입 업데이트 확인
+- [ ] **A.4** `pnpm --filter @teameet/api exec prisma generate` 재실행 → 클라이언트 타입 업데이트 확인
 - [ ] **A.5** `apps/api/prisma/seed.ts`에서 `TeamMatch` 시드가 있다면 신규 필드 일부 채워서 검증 데이터로 활용 (있는지 grep 필요)
 
 ### Acceptance
@@ -201,7 +201,7 @@
   - [ ] `gameFormat`이 raw string으로 표시 — 그대로 OK
 
 ### Acceptance
-- [ ] `pnpm --filter @matchup/web exec tsc --noEmit` 통과
+- [ ] `pnpm --filter @teameet/web exec tsc --noEmit` 통과
 - [ ] 새 글 작성 → 상세 페이지 진입 → 6필드 모두 표시 (수동 시각 검증)
 
 ---

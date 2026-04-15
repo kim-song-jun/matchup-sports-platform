@@ -170,7 +170,7 @@ useEffect(() => {
 | `pnpm test` (전체) | 미실행 | task 17/18 PR validation에서 재실행 |
 | `playwright test --list` | 미실행 (이미 71 test files 카운트됨) | 사전 조사로 충분 |
 
-**Note**: pnpm filter syntax (`@matchup/web`)가 동작하지 않음 — workspace package 이름이 `web`/`api`로 단순. 향후 명령은 `pnpm --filter web ...` 또는 `cd apps/web && npx ...` 사용 필요.
+**Note**: pnpm filter syntax (`@teameet/web`)가 동작하지 않음 — workspace package 이름이 `web`/`api`로 단순. 향후 명령은 `pnpm --filter web ...` 또는 `cd apps/web && npx ...` 사용 필요.
 
 ---
 

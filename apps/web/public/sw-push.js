@@ -1,5 +1,5 @@
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? { title: 'MatchUp', body: '새 알림이 있습니다' };
+  const data = event.data?.json() ?? { title: 'Teameet', body: '새 알림이 있습니다' };
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,

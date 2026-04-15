@@ -29,7 +29,7 @@ import type {
   VenueType,
 } from '@prisma/client';
 
-export const MOCK_EMAIL_DOMAIN = 'dev.matchup.mock';
+export const MOCK_EMAIL_DOMAIN = 'dev.teameet.mock';
 export const DEV_MOCK_CATALOG_VERSION = 4;
 
 export const MOCK_PROFILE_IMAGE_PATHS = [
@@ -2844,7 +2844,7 @@ export function buildDevMockCatalog(seedDateKey = getKstDateKey()) {
       teamKey: 'shuttleLab',
       type: 'newcomer',
       name: '신생팀',
-      description: '최근 MatchUp에 새로 등록된 신생 팀입니다.',
+      description: '최근 Teameet에 새로 등록된 신생 팀입니다.',
     },
     {
       teamKey: 'blueLine',
@@ -2868,7 +2868,7 @@ export function buildDevMockCatalog(seedDateKey = getKstDateKey()) {
       teamKey: 'gangdongLanes',
       type: 'newcomer',
       name: '신생 클럽',
-      description: '최근 MatchUp에 새로 등록된 신생 수영 클럽입니다.',
+      description: '최근 Teameet에 새로 등록된 신생 수영 클럽입니다.',
     },
   ];
 

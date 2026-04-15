@@ -25,7 +25,7 @@ async function bootstrap() {
   app.enableCors({
     origin:
       process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL || 'https://matchup.kr'
+        ? process.env.FRONTEND_URL || 'https://teameet.kr'
         : true,
     credentials: true,
   });

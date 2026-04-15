@@ -167,54 +167,162 @@ const MERCENARY_FEATURES = [
   },
 ];
 
+const GUIDE_JUMP_LINKS = [
+  {
+    href: '#guide-start',
+    icon: BookOpen,
+    title: '가입부터 첫 매치까지',
+    description: '회원가입, 프로필 설정, 탐색, 참가 흐름을 6단계로 빠르게 확인하세요.',
+  },
+  {
+    href: '#team-guide',
+    icon: Users,
+    title: '팀 매칭 흐름',
+    description: '팀 등록부터 상대 확정, 경기 후 평가까지 필요한 단계만 모았습니다.',
+  },
+  {
+    href: '#mercenary-marketplace-guide',
+    icon: ShoppingBag,
+    title: '용병 / 장터 핵심',
+    description: '인원 보강과 장비 거래를 어떤 순서로 쓰는지 바로 이해할 수 있어요.',
+  },
+] as const;
+
+const FIRST_MATCH_CHECKLIST = [
+  '소셜 로그인으로 바로 가입',
+  'AI 추천 또는 직접 검색으로 매치 탐색',
+  '결제 후 채팅방에서 일정과 장소 확인',
+] as const;
+
 /* ── Component ── */
 
 export default function GuidePage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
+    <main id="main-content" className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
 
       {/* ── Nav ── */}
       <LandingNav />
 
       {/* ── Hero ── */}
-      <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-20 lg:pt-44 lg:pb-24">
+      <section className="relative pt-28 pb-12 sm:pt-32 sm:pb-14 lg:pt-36 lg:pb-16">
         <div className="max-w-[1100px] mx-auto px-5">
-          <div className="max-w-[680px] mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
-              <BookOpen size={14} aria-hidden="true" />
-              서비스 가이드
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+            <div className="max-w-[680px] text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-semibold px-4 py-2 rounded-full mb-6">
+                <BookOpen size={14} aria-hidden="true" />
+                서비스 가이드
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
+                이용 가이드
+              </h1>
+
+              <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[560px] mx-auto lg:mx-0">
+                처음 가입하는 순간부터 첫 매치를 마치고 평가를 남길 때까지.
+                <br className="hidden sm:block" />
+                어디서 시작하고 무엇을 눌러야 하는지 가장 빠른 흐름만 정리했습니다.
+              </p>
+
+              <div className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start">
+                {['가입', '매치 탐색', '참가 확정', '경기 / 평가'].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-700"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                <a
+                  href="#guide-start"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2.5 rounded-2xl bg-blue-500 px-6 py-3.5 text-base font-bold text-white transition-[colors,transform] duration-200 hover:bg-blue-600 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                >
+                  6단계 바로 보기
+                  <ArrowRight size={18} strokeWidth={2.5} />
+                </a>
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-gray-200 dark:border-gray-700 px-6 py-3.5 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                >
+                  바로 시작하기
+                </Link>
+              </div>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                {GUIDE_JUMP_LINKS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/70 p-4 text-left transition-colors hover:bg-white dark:hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                    >
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 border border-gray-100 dark:border-gray-700">
+                        <Icon size={18} aria-hidden="true" />
+                      </div>
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white">{item.title}</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                        {item.description}
+                      </p>
+                    </a>
+                  );
+                })}
+              </div>
             </div>
 
-            <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-5">
-              이용 가이드
-            </h1>
-
-            <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[480px] mx-auto">
-              가입부터 매칭, 경기, 평가까지.{' '}
-              <br className="hidden sm:block" />
-              Teameet 서비스 이용의 모든 것을 안내합니다.
-            </p>
+            <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/70 p-5 lg:p-6">
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                첫 매치 전에 확인할 것
+              </p>
+              <h2 className="mt-3 text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                3분 안에 끝내는 핵심 체크
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                헤더 CTA만 찾지 않아도 되도록, 첫 화면에서 바로 필요한 행동과 확인 포인트를 모아뒀어요.
+              </p>
+              <ul className="mt-5 space-y-3">
+                {FIRST_MATCH_CHECKLIST.map((item, index) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+                  >
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+                      {index + 1}
+                    </div>
+                    <span className="text-sm font-medium leading-6 text-gray-700 dark:text-gray-200">
+                      {item}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="#team-guide"
+                className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+              >
+                팀 매칭 흐름도 함께 보기
+                <ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </div>
           </div>
         </div>
-
       </section>
 
       {/* ── Step-by-Step Tutorial ── */}
-      <section className="py-16 sm:py-20 bg-gray-50 dark:bg-gray-800/30">
+      <section id="guide-start" className="scroll-mt-24 py-14 sm:py-16 bg-gray-50 dark:bg-gray-800/30">
         <div className="max-w-[960px] mx-auto px-5">
-          <ScrollReveal>
-            <div className="text-center mb-14">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
-                시작하기
-              </span>
-              <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
-                6단계로 시작하는 스포츠 매칭
-              </h2>
-              <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[400px] mx-auto leading-relaxed">
-                처음 사용하시는 분도 쉽게 따라할 수 있어요.
-              </p>
-            </div>
-          </ScrollReveal>
+          <div className="text-center mb-12 sm:mb-14">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full mb-4">
+              첫 매치 경로
+            </span>
+            <h2 className="text-2xl lg:text-4xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">
+              6단계로 시작하는 스포츠 매칭
+            </h2>
+            <p className="text-md text-gray-500 dark:text-gray-400 mt-3 max-w-[440px] mx-auto leading-relaxed">
+              처음 사용하시는 분도 바로 따라갈 수 있도록, 실제 행동 순서만 남겼어요.
+            </p>
+          </div>
 
           <div className="space-y-8 lg:space-y-12">
             {STEPS.map((step, idx) => {
@@ -305,7 +413,7 @@ export default function GuidePage() {
       </section>
 
       {/* ── Team Matching Guide ── */}
-      <section className="py-20 sm:py-28">
+      <section id="team-guide" className="scroll-mt-24 py-20 sm:py-28">
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-14">
@@ -371,7 +479,10 @@ export default function GuidePage() {
       </section>
 
       {/* ── Mercenary & Marketplace Guide ── */}
-      <section className="py-20 sm:py-28 bg-gray-50 dark:bg-gray-800/30">
+      <section
+        id="mercenary-marketplace-guide"
+        className="scroll-mt-24 py-20 sm:py-28 bg-gray-50 dark:bg-gray-800/30"
+      >
         <div className="max-w-[960px] mx-auto px-5">
           <ScrollReveal>
             <div className="text-center mb-14">
@@ -511,6 +622,6 @@ export default function GuidePage() {
       </section>
 
       <LandingFooter />
-    </div>
+    </main>
   );
 }

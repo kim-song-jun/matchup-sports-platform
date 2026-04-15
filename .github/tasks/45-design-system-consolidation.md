@@ -76,7 +76,7 @@ Priority: P1
 ### Project Director: Approved
 
 - 기존 audit와 partial remediation은 충분히 쌓였다. 이제 같은 문제를 페이지별로 다시 고치는 대신 design system consolidation으로 묶는 것이 맞다.
-- 이번 범위는 리디자인이 아니라 현재 MatchUp visual language를 유지한 채 재사용 구조를 닫는 작업으로 정의한다.
+- 이번 범위는 리디자인이 아니라 현재 Teameet visual language를 유지한 채 재사용 구조를 닫는 작업으로 정의한다.
 - 우선순위는 `primitive foundation -> form consolidation -> repeated surface normalization -> dark mode cleanup -> design/QA/docs` 순서로 고정한다.
 
 ### Tech Planner
@@ -88,7 +88,7 @@ Priority: P1
 
 ## Context
 
-Task 29, 30, 33, 41을 거치면서 MatchUp의 UI는 이미 여러 핵심 정리를 끝냈다.
+Task 29, 30, 33, 41을 거치면서 Teameet의 UI는 이미 여러 핵심 정리를 끝냈다.
 
 - skip link, label, image fallback, brand alignment, mobile glass chrome 같은 기반 정리는 존재한다.
 - `globals.css`에는 color, typography, motion, mobile glass token이 정리되어 있다.
@@ -104,11 +104,11 @@ Task 29, 30, 33, 41을 거치면서 MatchUp의 UI는 이미 여러 핵심 정리
 4. public landing / auth / main app / admin surface가 같은 브랜드 톤 위에 있지만 accent, spacing, surface 언어가 아직 완전히 정렬되지는 않았다.
 5. 새 페이지를 만들수록 shared abstraction보다 page-local utility 조합을 다시 쓰게 되는 구조다.
 
-이 task의 목적은 “전면 리디자인”이 아니라, 이미 만들어진 MatchUp UI를 유지보수 가능한 design system shape로 끌어올리는 것이다.
+이 task의 목적은 “전면 리디자인”이 아니라, 이미 만들어진 Teameet UI를 유지보수 가능한 design system shape로 끌어올리는 것이다.
 
 ## Goal
 
-- MatchUp의 frontend UI를 `token -> primitive -> repeated surface -> route migration` 순서로 재정리한다.
+- Teameet의 frontend UI를 `token -> primitive -> repeated surface -> route migration` 순서로 재정리한다.
 - 반복되는 form/card/CTA 스타일을 shared primitive와 surface pattern으로 끌어올린다.
 - dark mode와 semantic accent 사용을 현재보다 더 예측 가능한 구조로 정리한다.
 - 기존 mobile glass chrome, trust-first tone, honest-data contract를 유지한 채 drift를 줄인다.
@@ -116,7 +116,7 @@ Task 29, 30, 33, 41을 거치면서 MatchUp의 UI는 이미 여러 핵심 정리
 ## Original Conditions (checkboxes)
 
 - [x] 계획만 수립하고, 이번 턴에서는 구현하지 않는다.
-- [x] 기존 MatchUp 브랜드 톤과 mobile-first language는 유지한다.
+- [x] 기존 Teameet 브랜드 톤과 mobile-first language는 유지한다.
 - [x] 새 리디자인이 아니라 consolidation / systemization 범위로 정의한다.
 - [x] 최소 primitive layer 도입 방향을 task 범위에 포함한다.
 - [x] create/edit form duplication과 one-off field styling을 우선 해소 대상으로 둔다.
@@ -268,7 +268,7 @@ Then 색상만이 아니라 구조와 copy로도 상태를 이해할 수 있다
 ### Wave 1 — Primitive Foundation
 
 - 최소 primitive set을 추가한다.
-- 새 primitive는 current MatchUp tone에 맞춰 thin abstraction으로 유지한다.
+- 새 primitive는 current Teameet tone에 맞춰 thin abstraction으로 유지한다.
 - broad `one-size-fits-all` abstraction은 만들지 않는다.
 
 ### Wave 2 — Form Consolidation
@@ -368,7 +368,7 @@ card, section header, chip, CTA tone을 공통 규칙으로 정리한다.
 
 ## Acceptance Criteria
 
-- `components/ui`에 MatchUp tone에 맞는 최소 primitive layer가 생긴다.
+- `components/ui`에 Teameet tone에 맞는 최소 primitive layer가 생긴다.
 - `matches/new`, `marketplace/new`, `teams/new`가 duplicated local field styling 없이 shared primitive를 사용한다.
 - representative list/detail/public/auth/admin routes가 shared card/header/button/input language를 사용한다.
 - `login`과 `settings/account`도 같은 form language를 사용한다.

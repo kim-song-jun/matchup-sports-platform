@@ -1,4 +1,4 @@
-# MatchUp QA Scenario Index
+# Teameet QA Scenario Index
 
 이 문서는 실제 검증의 허브다. 개별 시나리오 체크는 각 문서에서 진행하고, 전체 상태 집계와 discussion은 이 파일에서 관리한다.
 
@@ -27,7 +27,7 @@
   - 기본 확인:
     - Web: `http://localhost:3003`
     - API: `http://localhost:8111/api/v1/health`
-    - Docker Postgres runtime: `docker compose exec -T postgres psql -U matchup_user -d matchup_dev -c 'SELECT 1;'`
+    - Docker Postgres runtime: `docker compose exec -T postgres psql -U teameet_user -d teameet_dev -c 'SELECT 1;'`
   - 현재 full Playwright bundle은 `make dev-local`을 공식 지원하지 않는다. 다만 non-admin shared attach/debug에서는 docker-postgres check를 best-effort로만 본다.
 - Isolated stack path:
   - concurrent local runner가 필요하면 `make e2e-isolated-up RUN=<id>` / `make test-e2e-isolated RUN=<id>` / `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` / `make e2e-isolated-down RUN=<id>`를 사용한다.

@@ -1,4 +1,4 @@
-# MatchUp — Makefile
+# Teameet — Makefile
 # Monorepo: pnpm workspaces + Turborepo
 # Backend: NestJS (apps/api, port 8111) | Frontend: Next.js (apps/web, port 3003)
 # DB: PostgreSQL (internal Docker network) | Cache: Redis (internal Docker network)
@@ -23,7 +23,7 @@ DOCKER_DEV := docker compose -f $(DEV_COMPOSE)
 init: ## First-time setup: deps + .env + docker + migrate + seed
 	@echo ""
 	@echo "╔════════════════════════════════════════════╗"
-	@echo "║  MatchUp — Initial Project Setup           ║"
+	@echo "║  Teameet — Initial Project Setup           ║"
 	@echo "╚════════════════════════════════════════════╝"
 	@echo ""
 	@$(MAKE) --no-print-directory _check-prereqs
@@ -75,7 +75,7 @@ _init-env:
 			const k = wp.generateVAPIDKeys(); \
 			console.log('VAPID_PUBLIC_KEY=' + k.publicKey); \
 			console.log('VAPID_PRIVATE_KEY=' + k.privateKey); \
-			console.log('VAPID_SUBJECT=mailto:admin@matchup.kr'); \
+			console.log('VAPID_SUBJECT=mailto:admin@teameet.kr'); \
 		" >> "$(ENV_FILE)" 2>/dev/null && echo "  ✓ VAPID keys appended to .env" \
 		|| echo "  ⚠ web-push not installed yet — VAPID keys will be generated after install"; \
 	else \
@@ -95,7 +95,7 @@ _init-deps:
 			const k = wp.generateVAPIDKeys(); \
 			console.log('VAPID_PUBLIC_KEY=' + k.publicKey); \
 			console.log('VAPID_PRIVATE_KEY=' + k.privateKey); \
-			console.log('VAPID_SUBJECT=mailto:admin@matchup.kr'); \
+			console.log('VAPID_SUBJECT=mailto:admin@teameet.kr'); \
 		" >> "$(ENV_FILE)" && echo "  ✓ VAPID keys appended to .env"; \
 	fi
 
@@ -106,7 +106,7 @@ _init-docker:
 	@$(DOCKER_DEV) up -d postgres redis
 	@echo "  ▸ Waiting for postgres health..."
 	@for i in 1 2 3 4 5 6 7 8 9 10 11 12; do \
-		if $(DOCKER_DEV) exec -T postgres pg_isready -U matchup_user -d matchup_dev >/dev/null 2>&1; then \
+		if $(DOCKER_DEV) exec -T postgres pg_isready -U teameet_user -d teameet_dev >/dev/null 2>&1; then \
 			echo "  ✓ postgres is ready"; break; \
 		fi; \
 		if [ "$$i" = "12" ]; then echo "  ✗ postgres failed to start"; exit 1; fi; \
@@ -155,7 +155,7 @@ up: ## Start full dev environment in Docker Compose (detached)
 	@$(DOCKER_DEV) up -d --build
 	@echo "Waiting for postgres to be ready..."
 	@$(DOCKER_DEV) exec -T postgres sh -c \
-		'until pg_isready -U matchup_user -d matchup_dev; do sleep 1; done' 2>/dev/null || true
+		'until pg_isready -U teameet_user -d teameet_dev; do sleep 1; done' 2>/dev/null || true
 	@echo "Docker development stack is up."
 
 .PHONY: dev-api
@@ -227,7 +227,7 @@ db-studio: ## Open Prisma Studio (exposes port 5555 only while running)
 
 .PHONY: db-shell
 db-shell: ## Open psql shell inside postgres container
-	@$(DOCKER_DEV) exec postgres psql -U matchup_user -d matchup_dev
+	@$(DOCKER_DEV) exec postgres psql -U teameet_user -d teameet_dev
 
 .PHONY: redis-shell
 redis-shell: ## Open redis-cli inside redis container
@@ -355,10 +355,10 @@ clean: ## Clean all build artifacts
 
 .PHONY: deploy-build
 deploy-build: ## Build production Docker images
-	@echo "Building matchup-api image..."
-	@docker build -f $(DEPLOY_DIR)/Dockerfile.api -t matchup-api:latest $(ROOT_DIR)
-	@echo "Building matchup-web image..."
-	@docker build -f $(DEPLOY_DIR)/Dockerfile.web -t matchup-web:latest $(ROOT_DIR)
+	@echo "Building teameet-api image..."
+	@docker build -f $(DEPLOY_DIR)/Dockerfile.api -t teameet-api:latest $(ROOT_DIR)
+	@echo "Building teameet-web image..."
+	@docker build -f $(DEPLOY_DIR)/Dockerfile.web -t teameet-web:latest $(ROOT_DIR)
 	@echo "Images built successfully."
 
 .PHONY: deploy-up
@@ -382,8 +382,8 @@ vapid-keys: ## Generate new VAPID keys for Web Push
 		console.log('VAPID_PRIVATE_KEY=' + k.privateKey);"
 
 .PHONY: clear
-clear: ## Find and kill processes blocking MatchUp dev ports (interactive y/N)
-	@printf "\n▸ Checking MatchUp dev ports (3003, 8111, 5555)...\n"
+clear: ## Find and kill processes blocking Teameet dev ports (interactive y/N)
+	@printf "\n▸ Checking Teameet dev ports (3003, 8111, 5555)...\n"
 	@command -v lsof >/dev/null 2>&1 || { printf "  ✗ lsof not found\n"; exit 1; }
 	@found=0; docker_detected=0; \
 	for port in 3003 8111 5555; do \
@@ -421,7 +421,7 @@ clear: ## Find and kill processes blocking MatchUp dev ports (interactive y/N)
 	done; \
 	printf "\n"; \
 	if [ "$$found" = "0" ]; then \
-		printf "  \033[32m✓ All MatchUp dev ports are free.\033[0m\n"; \
+		printf "  \033[32m✓ All Teameet dev ports are free.\033[0m\n"; \
 	fi; \
 	if [ "$$docker_detected" = "1" ]; then \
 		printf "\n  \033[36mHint:\033[0m run \033[1mmake down\033[0m to stop Docker containers cleanly.\n"; \
@@ -431,7 +431,7 @@ clear: ## Find and kill processes blocking MatchUp dev ports (interactive y/N)
 .PHONY: help
 help: ## Show this help
 	@echo ""
-	@echo "MatchUp — Available make targets"
+	@echo "Teameet — Available make targets"
 	@echo "================================================"
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@echo ""

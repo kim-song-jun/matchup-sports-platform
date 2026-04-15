@@ -9,7 +9,7 @@ Priority: P0
 
 ## Context
 
-MatchUp has 70+ frontend routes, 15+ backend controllers, and a comprehensive Prisma schema. The core features (matching, teams, marketplace, lessons, mercenary, tournaments, venues, chat, badges, payments, reviews) are all **implemented** but many remain effectively invisible to users because navigation paths are missing, incomplete, or buried.
+Teameet has 70+ frontend routes, 15+ backend controllers, and a comprehensive Prisma schema. The core features (matching, teams, marketplace, lessons, mercenary, tournaments, venues, chat, badges, payments, reviews) are all **implemented** but many remain effectively invisible to users because navigation paths are missing, incomplete, or buried.
 
 The user's core complaint: "All the features exist but they're hidden -- tournaments, group buys, uniforms, team details, match details, marketplace details. I need menu tabs, hub pages, and home page links so the service actually works. Also verify that DB writes, API contracts, and frontend-backend integration all work end-to-end."
 

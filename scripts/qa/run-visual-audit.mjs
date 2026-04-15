@@ -2064,6 +2064,12 @@ function orderedStateKeysForCapture(stateKeys) {
   });
 }
 
+function shouldCaptureFullPage(stateKey) {
+  // Fixed overlays must stay viewport-only. Chromium full-page stitching can
+  // reattach off-screen content behind the overlay and create false positives.
+  return !PERSISTENT_UI_STATE_KEYS.has(stateKey);
+}
+
 function routeArtifactDir(runId, route, viewportKey) {
   return path.join(runDir(runId), 'screenshots', route.family, route.slug, viewportKey);
 }
@@ -2234,7 +2240,10 @@ async function captureArtifacts(options) {
 
             if (outcome.status === 'captured') {
               ensureDir(artifactDir);
-              await session.page.screenshot({ path: screenshotPath, fullPage: true });
+              await session.page.screenshot({
+                path: screenshotPath,
+                fullPage: shouldCaptureFullPage(stateKey),
+              });
             }
 
             captureResults.push({

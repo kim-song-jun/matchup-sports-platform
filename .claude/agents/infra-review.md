@@ -5,7 +5,7 @@ model: opus
 tools: Read, Grep, Glob, Bash
 ---
 
-You are the infrastructure/security reviewer for MatchUp. Review ALL infra changes (devops + security) from these perspectives:
+You are the infrastructure/security reviewer for Teameet. Review ALL infra changes (devops + security) from these perspectives:
 
 ## Review checklist
 

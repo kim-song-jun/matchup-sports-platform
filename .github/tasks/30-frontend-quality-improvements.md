@@ -4,7 +4,7 @@
 
 ## Context
 
-MatchUp 프론트엔드(`apps/web/src/`)의 성능 및 접근성 품질 개선 태스크. 두 가지 핵심 문제를 해결한다:
+Teameet 프론트엔드(`apps/web/src/`)의 성능 및 접근성 품질 개선 태스크. 두 가지 핵심 문제를 해결한다:
 
 1. **SafeImage 컴포넌트가 `<img>` 태그 기반**: Next.js `<Image priority>`의 `<link rel="preload">` 자동 주입 불가. LCP 요소가 SafeImage를 사용하는 페이지에서 preload 최적화가 동작하지 않음.
 2. **Form label 연결 누락**: WCAG 2.1 AA 기준 위반. 전체 192개 폼 요소 중 htmlFor 연결은 74건뿐(39%). 26개 파일에 label이 전혀 없음.

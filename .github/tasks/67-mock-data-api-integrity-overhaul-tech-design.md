@@ -329,7 +329,7 @@ Audit script must emit a markdown table as part of `guard-matrix.spec.ts` output
 - **Factory parity tests.** `factories/*.spec.ts` — each factory produces a row that satisfies Prisma type + passes relevant DTO validation (round-trip via `class-transformer + class-validator`).
 - **Scenario smoke tests.** `scenarios/*.spec.ts` — each scenario leaves DB in expected state (counts asserted).
 - **Guard matrix test.** §1.ADR-6 + §6.
-- **Seed idempotency test.** `prisma/seed.spec.ts` — run seed twice, assert no duplicates, no orphans. Run in CI under `DATABASE_URL=postgresql://…/matchup_seed_test` ephemeral DB.
+- **Seed idempotency test.** `prisma/seed.spec.ts` — run seed twice, assert no duplicates, no orphans. Run in CI under `DATABASE_URL=postgresql://…/teameet_seed_test` ephemeral DB.
 - **DTO coverage.** snapshot test: every exported DTO is importable and `validate()` rejects obvious bad input for three key fields.
 
 ### 7.2 Frontend
@@ -392,7 +392,7 @@ Both behind `20260414_add_count_caches` migration.
 
 1. `pnpm gen:enums --check` — fails on schema-vs-frontend drift.
 2. `pnpm msw:coverage` — fails on Swagger routes missing handlers.
-3. `pnpm --filter @matchup/api test -- guard-matrix.spec` — fails on guard drift.
+3. `pnpm --filter @teameet/api test -- guard-matrix.spec` — fails on guard drift.
 4. Seed smoke job: spin up Postgres + Redis, run migrations + seed twice, assert counts.
 
 ---

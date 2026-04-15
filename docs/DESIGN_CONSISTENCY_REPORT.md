@@ -1,4 +1,4 @@
-# MatchUp 디자인 통일성 검사 보고서
+# Teameet 디자인 통일성 검사 보고서
 
 > 이 문서는 audit snapshot이다. 규칙 정의는 `DESIGN.md`, 문서 내비게이션은 `docs/DESIGN_DOCUMENT_MAP.md`, 현재 디자인 개선 실행 계약은 `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`를 따른다.
 > 검사일: 2026-04-10 (원본: 2026-03-25)

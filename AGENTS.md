@@ -105,6 +105,7 @@ Errors:
 - `scripts/qa/run-visual-audit.mjs`의 bootstrap write는 기본 비활성이다. clean local DB에서 dynamic route fixture가 꼭 필요할 때만 `--allow-bootstrap-writes`를 명시하고, `localhost`가 아닌 API target에는 사용하지 않는다.
 - visual audit artifact는 같은 `run-id`를 재사용해 누적하지 않는다. `RUN`은 기본적으로 새 값으로 주고, broad capture는 `batch + viewport band` 단위로 쪼개서 실행한다. 예외는 `batch-8-rerun`으로, 이때만 기존 `capture-results.json`이 있는 같은 `run-id`를 다시 사용한다.
 - shared Next dev(`localhost:3003`) 기준 broad visual audit를 viewport band 여러 개로 병렬 실행하지 않는다. 장시간 capture에서 `net::ERR_CONNECTION_RESET`/`ERR_EMPTY_RESPONSE`가 반복되므로 `mobile -> tablet -> desktop` 순차 실행을 기본값으로 사용하고, blocker는 각 band 종료 후 `batch-8-rerun`이나 route-level targeted rerun으로 정리한다.
+- fixed overlay가 열린 상태(`menu-open`, `dialog-open`, `drawer-open`)의 캡처는 full-page로 저장하지 않는다. 전체 페이지 stitch는 viewport 밖 본문을 다시 이어 붙여 false-positive를 만들 수 있으므로, 이 상태의 증거는 viewport-only screenshot과 browser hit-test(`elementFromPoint`)로 검증한다.
 - shared Docker dev stack(`make dev`, `localhost:3003/8111`) 기준 full Playwright는 single active runner only다. 두 개 이상의 local runner가 필요하면 `make e2e-isolated-up RUN=<id>` / `make test-e2e-isolated RUN=<id>` / `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` / `make e2e-isolated-down RUN=<id>` 경로만 사용한다. 상세 runbook은 `docs/PLAYWRIGHT_E2E_RUNBOOK.md`를 기준으로 본다.
 - Next dev 기준 `/home`은 첫 컴파일 비용이 특히 무거워 120초를 넘길 수 있다. Playwright 세션 안정화나 수동 캡처 스크립트의 첫 진입점으로는 `/home`보다 `/login`, `/landing`, `/matches` 같은 더 가벼운 경로를 먼저 워밍업한 뒤 대상 페이지로 이동한다.
 - Playwright가 자체 `webServer`로 Next dev를 cold start할 때 `apps/web/.next/routes-manifest.json` 또는 `app-paths-manifest.json` ENOENT가 간헐적으로 날 수 있다. 이 경우 제품 회귀로 단정하지 말고, 이미 떠 있는 docker `web`에 붙이거나 dev server를 충분히 prewarm한 뒤 재검증한다.
@@ -166,7 +167,9 @@ Errors:
 - shadow는 깊이감 보조 수단으로만 사용한다. content card에서 deep shadow, stacked shadow, glow shadow를 기본 스타일로 쓰지 않는다.
 - border는 subtle full-border 또는 borderless separation 중 하나만 선택한다. thick border, one-side accent border, border-heavy nested container는 금지한다.
 - 레이아웃은 Toss-like clean layout을 기준으로 `text-first`, `section-clear`, `action-obvious` 상태를 우선한다. utility page를 hero/card showcase처럼 만들지 않는다.
+- public informational page(`landing`, `about`, `guide`, `pricing`, `faq`)의 above-the-fold는 badge/title만으로 비워두지 않는다. 첫 화면 안에 primary CTA 또는 next-step summary가 즉시 보여야 하고, 핵심 heading/summary는 `ScrollReveal` 같은 viewport-intersection 연출 뒤에 숨기지 않는다.
 - 모바일 glass language는 `chrome only` 원칙을 따른다. bottom nav, sticky header, overlay 같은 floating/mobile shell에는 glass를 쓸 수 있지만, dense content card와 거래형 본문 surface는 기본적으로 solid를 유지한다.
+- `backdrop-blur`/`backdrop-filter`가 걸린 fixed header/nav 안에 viewport-fixed drawer나 sheet를 직접 중첩하지 않는다. blur parent가 fixed descendant의 containing block이 되어 `top/bottom` anchor가 깨질 수 있으므로, 모바일 drawer는 header 바깥 sibling layer로 렌더한다.
 - account / utility root page(`profile`, `settings`, `notifications`, `chat`, `reviews`)는 discovery-style intro를 쓰지 않는다. 이런 화면의 모바일 상단은 `MobileGlassHeader`, 본문은 compact solid card rhythm을 기본값으로 본다.
 - Mock/fixture source of truth:
   - `apps/api/test/fixtures/`

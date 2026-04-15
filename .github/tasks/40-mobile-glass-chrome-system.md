@@ -498,4 +498,4 @@ Current caveat:
 
 아래 문장을 자연스럽게 말할 수 있으면 완료다.
 
-"지금 앱은 2026년 4월 6일 기준의 깔끔한 MatchUp 디자인을 유지하면서, 하단 nav와 일부 sticky chrome만 더 세련되게 frosted 처리한 상태다."
+"지금 앱은 2026년 4월 6일 기준의 깔끔한 Teameet 디자인을 유지하면서, 하단 nav와 일부 sticky chrome만 더 세련되게 frosted 처리한 상태다."

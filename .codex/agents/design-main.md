@@ -1,7 +1,7 @@
 # design-main
 
 ## Role
-- Theme and brand reviewer for MatchUp.
+- Theme and brand reviewer for Teameet.
 
 ## Design Source Priority
 - `.impeccable.md`

@@ -1,10 +1,10 @@
 #!/bin/bash
-# MatchUp EC2 초기 설정 스크립트
+# Teameet EC2 초기 설정 스크립트
 # 사용법: ssh ec2-user@<IP> 접속 후 이 스크립트 실행
 
 set -e
 
-echo "🚀 MatchUp EC2 초기 설정 시작"
+echo "🚀 Teameet EC2 초기 설정 시작"
 
 write_toss_env() {
   local tmp_env
@@ -58,8 +58,8 @@ fi
 
 # 5. 프로젝트 클론
 echo "📥 프로젝트 클론..."
-REPO_URL="https://github.com/kim-song-jun/matchup-sports-platform.git"
-APP_DIR="$HOME/matchup"
+REPO_URL="https://github.com/kim-song-jun/teameet-sports-platform.git"
+APP_DIR="$HOME/teameet"
 
 if [ -d "$APP_DIR" ]; then
   if [ -d "$APP_DIR/.git" ]; then
@@ -122,13 +122,13 @@ set -a
 . ./deploy/.env
 set +a
 
-sudo docker build -f deploy/Dockerfile.api -t matchup-api .
+sudo docker build -f deploy/Dockerfile.api -t teameet-api .
 sudo docker build \
   -f deploy/Dockerfile.web \
   --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
   --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
   --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
-  -t matchup-web .
+  -t teameet-web .
 
 cd deploy
 $COMPOSE -f docker-compose.prod.yml up -d postgres redis
@@ -164,17 +164,17 @@ for i in $(seq 1 45); do
   fi
   if [ "$i" -eq 45 ]; then
     echo "❌ API가 제시간에 준비되지 않았습니다."
-    sudo docker logs matchup_api --tail 120 || true
+    sudo docker logs teameet_api --tail 120 || true
     exit 1
   fi
   sleep 2
 done
 
 echo "🧩 checksum-gated mock sync 실행..."
-sudo docker exec matchup_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
 
 echo "🖼️ 이미지 backfill sync 실행..."
-sudo docker exec matchup_api npx ts-node prisma/seed-images.ts
+sudo docker exec teameet_api npx ts-node prisma/seed-images.ts
 
 # 12. 상태 확인
 echo ""
@@ -202,12 +202,12 @@ fi
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "YOUR_EC2_IP")
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🎉 MatchUp 배포 완료!"
+echo "🎉 Teameet 배포 완료!"
 echo ""
 echo "  🌐 웹사이트:  http://$PUBLIC_IP"
 echo "  📚 API 문서:  http://$PUBLIC_IP/docs"
 echo "  🏥 헬스체크:  http://$PUBLIC_IP/api/v1/health"
 echo ""
-echo "  📋 로그 확인: docker logs matchup_api -f"
+echo "  📋 로그 확인: docker logs teameet_api -f"
 echo "  📋 전체 상태: $COMPOSE -f docker-compose.prod.yml ps"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

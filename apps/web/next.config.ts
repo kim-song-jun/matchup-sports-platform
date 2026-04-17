@@ -1,3 +1,4 @@
+import path from 'path';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
 import bundleAnalyzer from '@next/bundle-analyzer';
@@ -19,6 +20,9 @@ const nextConfig: NextConfig = {
   output: isCapacitorBuild ? 'export' : isProd ? 'standalone' : undefined,
   experimental: {
     optimizePackageImports: ['next-intl', '@tanstack/react-query'],
+  },
+  turbopack: {
+    root: path.resolve(__dirname, '../..'),
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

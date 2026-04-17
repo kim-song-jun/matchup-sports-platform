@@ -2,6 +2,40 @@
 export type { SportType } from '@/types/enums.generated';
 export { SPORT_TYPES } from '@/types/enums.generated';
 
+export const TEAM_SPORT_TYPES = [
+  'soccer',
+  'futsal',
+  'basketball',
+  'badminton',
+  'ice_hockey',
+  'swimming',
+  'tennis',
+  'baseball',
+  'volleyball',
+  'figure_skating',
+  'short_track',
+] as const;
+
+export const TEAM_CITIES = [
+  '서울',
+  '경기',
+  '인천',
+  '부산',
+  '대구',
+  '대전',
+  '광주',
+  '울산',
+  '세종',
+  '강원',
+  '충북',
+  '충남',
+  '전북',
+  '전남',
+  '경북',
+  '경남',
+  '제주',
+] as const;
+
 // Sport labels — single source of truth
 export const sportLabel: Record<string, string> = {
   soccer: '축구',

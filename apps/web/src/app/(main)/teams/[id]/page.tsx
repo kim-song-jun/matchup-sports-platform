@@ -19,7 +19,7 @@ import { useLeaveTeam, useMyTeams, useTeam, useTeamHub } from '@/hooks/use-api';
 import { useToast } from '@/components/ui/toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
-import { sportLabel } from '@/lib/constants';
+import { levelLabel, sportLabel } from '@/lib/constants';
 import { extractErrorMessage, formatFullDate } from '@/lib/utils';
 import { getTeamImage, getTeamImageSet, getTeamLogo, getListingImage, getSportImage } from '@/lib/sport-image';
 import type { Lesson, MarketplaceListing, Tournament } from '@/types/api';
@@ -92,11 +92,13 @@ export default function TeamDetailPage() {
   const hubPasses = hubData?.passes ?? [];
   const hubEvents = hubData?.events ?? [];
 
+  const uploadedPhotoCount = (currentTeam.photos ?? []).filter(Boolean).length;
+  const galleryLimit = uploadedPhotoCount > 0 ? uploadedPhotoCount : 4;
   const coverImage = getTeamImage(currentTeam.sportType, currentTeam.coverImageUrl, currentTeam.id);
-  const gallery = getTeamImageSet(currentTeam.sportType, currentTeam.photos, currentTeam.id, 4);
+  const gallery = getTeamImageSet(currentTeam.sportType, currentTeam.photos, currentTeam.id, galleryLimit);
   const logo = getTeamLogo(currentTeam.name, currentTeam.sportType, currentTeam.logoUrl, currentTeam.id);
   const fallbackCover = getTeamImage(currentTeam.sportType, undefined, currentTeam.id);
-  const fallbackGallery = getTeamImageSet(currentTeam.sportType, undefined, currentTeam.id, 4);
+  const fallbackGallery = getTeamImageSet(currentTeam.sportType, undefined, currentTeam.id, galleryLimit);
   const fallbackLogo = getTeamLogo(currentTeam.name, currentTeam.sportType, undefined, currentTeam.id);
   const mediaImages = [coverImage, ...gallery]
     .filter((image): image is string => Boolean(image))
@@ -193,6 +195,7 @@ export default function TeamDetailPage() {
               <p className="text-sm text-gray-500">
                 {sportLabel[currentTeam.sportType] || currentTeam.sportType} · {currentTeam.memberCount}명
                 {(currentTeam.city || currentTeam.district) ? ` · ${[currentTeam.city, currentTeam.district].filter(Boolean).join(' ')}` : ''}
+                {levelLabel[currentTeam.level] ? ` · ${levelLabel[currentTeam.level]}` : ''}
               </p>
               {currentTeam.description && <p className="mt-3 text-base text-gray-600 whitespace-pre-line">{currentTeam.description}</p>}
             </div>
@@ -233,6 +236,17 @@ export default function TeamDetailPage() {
 
           {activeSection === 'overview' && (
             <div className="space-y-4 mt-4">
+              <Card>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 정보</h3>
+                <div className="grid grid-cols-1 @3xl:grid-cols-2 gap-3 text-sm">
+                  <InfoRow label="연락처" value={currentTeam.contactInfo} isLink={Boolean(currentTeam.contactInfo?.startsWith('http') || currentTeam.contactInfo?.startsWith('tel:') || currentTeam.contactInfo?.startsWith('mailto:'))} />
+                  <InfoRow label="Instagram" value={currentTeam.instagramUrl} isLink />
+                  <InfoRow label="YouTube" value={currentTeam.youtubeUrl} isLink />
+                  <InfoRow label="Kakao OpenChat" value={currentTeam.kakaoOpenChat} isLink />
+                  <InfoRow label="Shorts URL" value={currentTeam.shortsUrl} isLink />
+                  <InfoRow label="Website URL" value={currentTeam.websiteUrl} isLink />
+                </div>
+              </Card>
               <Card>
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 여정</h3>
                 <div className="grid grid-cols-1 @3xl:grid-cols-3 gap-2">
@@ -387,6 +401,36 @@ function HubSectionTab({ label, active, onClick }: { label: string; active: bool
     >
       {label}
     </button>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  isLink = false,
+}: {
+  label: string;
+  value?: string | null;
+  isLink?: boolean;
+}) {
+  if (!value) return null;
+
+  return (
+    <div className="rounded-xl bg-gray-50 dark:bg-gray-800 px-3 py-3">
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>
+      {isLink ? (
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 block break-all text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          {value}
+        </a>
+      ) : (
+        <p className="mt-1 break-all text-sm font-medium text-gray-900 dark:text-gray-100">{value}</p>
+      )}
+    </div>
   );
 }
 

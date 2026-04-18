@@ -1248,6 +1248,44 @@ export interface UserPublicProfile {
   recentMatchCount?: number;
 }
 
+// ── Team Balancing (Task 71) ──
+export interface ComposeTeamsInput {
+  strategy?: 'random' | 'balanced';
+  teamCount?: number;
+  seed?: number;
+}
+
+/** A single participant in a balanced-team preview/compose response. */
+export interface MatchTeamMember {
+  userId: string;
+  nickname: string;
+  profileImageUrl: string | null;
+  eloRating: number;
+  hasProfile: boolean;
+}
+
+export interface TeamAssignment {
+  index: number;
+  name: string;
+  color: string;
+  avgElo: number;
+  members: MatchTeamMember[];
+}
+
+export interface BalanceMetrics {
+  maxEloGap: number;
+  variance: number;
+  stdDev: number;
+  teamAvgElos: number[];
+  coldStartCount: number;
+}
+
+export interface PreviewTeamsResponse {
+  teams: TeamAssignment[];
+  metrics: BalanceMetrics;
+  seed: number;
+}
+
 // ── MyTeamMatchApplication — applicant-side view of team match applications ──
 export interface MyTeamMatchApplication {
   id: string;

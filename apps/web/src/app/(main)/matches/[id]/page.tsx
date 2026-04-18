@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, AlertTriangle, CheckCircle2, Camera } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Star, Clock, CreditCard, Share2, ChevronRight, Pencil, Trophy, AlertTriangle, CheckCircle2, Camera, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
+import { AutoBalanceModal } from '@/components/match/auto-balance-modal';
+import { TeamAssignmentDisplay } from '@/components/match/team-assignment-display';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SafeImage } from '@/components/ui/safe-image';
 import { Modal } from '@/components/ui/modal';
@@ -49,6 +51,7 @@ export default function MatchDetailPage() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [autoBalanceOpen, setAutoBalanceOpen] = useState(false);
 
   const joinMutation = useMutation<MatchParticipant, unknown, { openCheckout: boolean }>({
     mutationFn: async () => {
@@ -492,6 +495,19 @@ export default function MatchDetailPage() {
                         재모집 시작
                       </button>
                     )}
+                    {/* Auto-balance button: host + recruiting/full + >=2 confirmed participants */}
+                    {['recruiting', 'full'].includes(match.status) &&
+                      (match.participants?.filter((p: MatchParticipant) => p.status === 'confirmed').length ?? 0) >= 2 && (
+                      <button
+                        onClick={() => setAutoBalanceOpen(true)}
+                        data-testid="match-host-auto-balance-button"
+                        aria-label="팀 자동 구성 열기"
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      >
+                        <Sparkles size={15} aria-hidden="true" />
+                        팀 자동 구성
+                      </button>
+                    )}
                     <button
                       onClick={() => handleHostStatusChange('completed', '매치를 완료 처리했어요')}
                       disabled={updateMatchMutation.isPending}
@@ -616,37 +632,55 @@ export default function MatchDetailPage() {
             </button>
           </div>
 
+          {/* Team assignment — shown after teams are composed */}
+          {(match.teams?.length ?? 0) > 0 && (
+            <TeamAssignmentDisplay
+              teams={match.teams!}
+              participants={match.participants ?? []}
+            />
+          )}
+
           {/* Participants */}
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">
               참가자 ({match.participants?.length || 0})
             </h3>
             <div className="space-y-2.5">
-              {match.participants?.map((p: MatchParticipant) => (
-                <div key={p.id} className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
-                    {p.user?.nickname?.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
-                      {p.user?.nickname}
-                      {p.userId === match.hostId && (
-                        <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
+              {match.participants?.map((p: MatchParticipant) => {
+                const assignedTeam = p.teamId
+                  ? match.teams?.find((t) => t.id === p.teamId)
+                  : null;
+                return (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-400">
+                      {p.user?.nickname?.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-medium text-gray-800 dark:text-gray-200 truncate">
+                        {p.user?.nickname}
+                        {p.userId === match.hostId && (
+                          <span className="ml-1.5 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">호스트</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {assignedTeam && (
+                        <span className="rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-xs font-medium">
+                          {assignedTeam.name}
+                        </span>
                       )}
-                    </p>
+                      {p.arrivedAt && (
+                        <CheckCircle2 size={14} className="text-green-500" aria-label="도착 완료" />
+                      )}
+                      <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
+                        p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {p.status === 'confirmed' ? '확정' : '대기'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {p.arrivedAt && (
-                      <CheckCircle2 size={14} className="text-green-500" aria-label="도착 완료" />
-                    )}
-                    <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${
-                      p.status === 'confirmed' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {p.status === 'confirmed' ? '확정' : '대기'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           </div>
@@ -847,6 +881,20 @@ export default function MatchDetailPage() {
         initialIndex={mediaIndex}
         onClose={() => setShowMediaLightbox(false)}
         title={`${match.title} 사진`}
+      />
+
+      {/* 팀 자동 구성 모달 */}
+      <AutoBalanceModal
+        matchId={matchId}
+        open={autoBalanceOpen}
+        onClose={() => setAutoBalanceOpen(false)}
+        onConfirmed={() => {
+          queryClient.invalidateQueries({ queryKey: ['matches', matchId] });
+          toast('success', '팀 구성이 완료되었어요!');
+        }}
+        defaultTeamCount={2}
+        sportType={match.sportType}
+        participantCount={match.participants?.filter((p: MatchParticipant) => p.status === 'confirmed').length}
       />
 
       {/* 결제 모달 */}

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Swords, UserPlus, GraduationCap, Trophy, MapPin, MessageCircle, Bell, Award, Settings, X } from 'lucide-react';
+import { Swords, UserPlus, GraduationCap, Trophy, MapPin, MessageCircle, Bell, Award, Settings, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/stores/auth-store';
 import { useChatUnreadTotal, useUnreadCount } from '@/hooks/use-api';
@@ -23,6 +23,8 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
   const chatUnread = useChatUnreadTotal();
   const { data: unreadData } = useUnreadCount();
   const notifUnread = unreadData?.count ?? 0;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const dragStartY = useRef<number | null>(null);
 
   // Close on route change
   useEffect(() => {
@@ -78,6 +80,22 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
 
   if (!isOpen) return null;
 
+  const handleDragStart = (e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY;
+  };
+
+  const handleDragEnd = (e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    const delta = dragStartY.current - e.changedTouches[0].clientY;
+    if (delta > 40) {
+      setIsExpanded(true);
+    } else if (delta < -40) {
+      if (isExpanded) setIsExpanded(false);
+      else onClose();
+    }
+    dragStartY.current = null;
+  };
+
   const matchingItems = [
     { href: '/team-matches', icon: Swords, label: t('teamMatching') },
     { href: '/mercenary', icon: UserPlus, label: t('mercenary') },
@@ -110,21 +128,25 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
       {/* Sheet */}
       <div
         ref={panelRef}
-        className="relative w-full max-h-[70vh] overflow-y-auto rounded-t-2xl bg-white dark:bg-gray-900 animate-slide-up"
+        className={cn(
+          'relative w-full overflow-y-auto rounded-t-2xl bg-white dark:bg-gray-900 animate-slide-up transition-[max-height] duration-300 ease-in-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          isExpanded ? 'max-h-[92vh]' : 'max-h-[70vh]',
+        )}
       >
-        {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="h-1 w-10 rounded-full bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
-        </div>
-        {/* Close button */}
-        <div className="flex justify-end px-4 pb-1">
-          <button
-            onClick={onClose}
-            aria-label="메뉴 닫기"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            <X size={20} />
-          </button>
+        {/* Drag handle — tap to toggle fullscreen, swipe to resize/close */}
+        <div
+          className="flex items-center justify-center py-4 cursor-pointer select-none"
+          onClick={() => setIsExpanded(v => !v)}
+          onTouchStart={handleDragStart}
+          onTouchEnd={handleDragEnd}
+          role="button"
+          tabIndex={0}
+          aria-label={isExpanded ? '메뉴 축소' : '메뉴 전체화면으로 보기'}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') setIsExpanded(v => !v);
+          }}
+        >
+          <div className="h-1.5 w-10 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true" />
         </div>
 
         {/* Profile row */}
@@ -133,26 +155,28 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
             <Link
               href="/profile"
               onClick={onClose}
-              className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-3 rounded-2xl px-3 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 transition-colors"
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20 text-sm font-bold text-blue-600 dark:text-blue-400">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-500 text-base font-bold text-white">
                 {user.nickname?.charAt(0)}
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.nickname}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">프로필 보기</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{user.nickname}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">프로필 보기</p>
               </div>
+              <ChevronRight size={16} className="shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
             </Link>
           ) : (
             <Link
               href="/login"
               onClick={onClose}
-              className="flex min-h-[44px] items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex min-h-[44px] items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 transition-colors"
             >
               로그인
             </Link>
           )}
         </div>
+        <hr className="mx-4 border-gray-100 dark:border-gray-800" />
 
         <div className="px-4 pb-5 space-y-1">
           {/* Matching group */}
@@ -217,7 +241,7 @@ export function MoreMenu({ isOpen, onClose }: MoreMenuProps) {
 function MenuGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="pt-3">
-      <p className="px-3 mb-1 text-2xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+      <p className="px-3 mb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
         {label}
       </p>
       <div className="space-y-0.5">{children}</div>
@@ -246,13 +270,13 @@ function MenuLink({
       href={href}
       onClick={onClose}
       className={cn(
-        'flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+        'flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900',
         isActive
           ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400'
           : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800',
       )}
     >
-      <Icon size={18} strokeWidth={isActive ? 2 : 1.5} aria-hidden="true" />
+      <Icon size={20} strokeWidth={isActive ? 2 : 1.5} aria-hidden="true" />
       <span className="flex-1">{label}</span>
       {badge !== undefined && (
         <span

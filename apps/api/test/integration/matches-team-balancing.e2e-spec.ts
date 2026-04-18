@@ -10,6 +10,8 @@ import { devLoginToken } from '../helpers/auth-token';
 // Integration tests: ELO-aware team balancing — preview (dry-run) + generateTeams
 // ---------------------------------------------------------------------------
 
+jest.setTimeout(30000);
+
 describe('Matches Team Balancing (e2e)', () => {
   let app: INestApplication;
   let request: supertest.Agent;

@@ -35,7 +35,8 @@ export default function AdminDashboardPage() {
   }
 
   const stats = statsQuery.data;
-  const disputes = disputesQuery.data ?? [];
+  // CursorPage<Dispute> — array is in `.data`
+  const disputes = disputesQuery.data?.data ?? [];
   const settlementsSummary = settlementsSummaryQuery.data;
   const pendingDisputes = disputes.filter((dispute) => ['pending', 'investigating'].includes(dispute.status)).length;
   const todayKey = adminDashboardDateFormatter.format(new Date());

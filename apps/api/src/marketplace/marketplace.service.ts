@@ -1,12 +1,25 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, SportType, ItemCondition, ListingStatus, Prisma, TeamRole } from '@prisma/client';
+import {
+  NotificationType,
+  SportType,
+  ItemCondition,
+  ListingStatus,
+  Prisma,
+  TeamRole,
+  OrderStatus,
+  DisputeTargetType,
+  DisputeStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettlementsService } from '../settlements/settlements.service';
@@ -298,12 +311,16 @@ export class MarketplaceService {
       }
     }
 
+    // T+7 days from payment confirmation is the auto-release deadline
+    const autoReleaseAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
     const updated = await this.prisma.marketplaceOrder.update({
       where: { orderId },
       data: {
-        status: 'paid',
+        status: OrderStatus.escrow_held,
         paymentKey,
         paidAt: new Date(),
+        autoReleaseAt,
       },
     });
 
@@ -316,17 +333,252 @@ export class MarketplaceService {
       data: { orderId: order.id, listingId: order.listingId },
     });
 
-    // Fire-and-forget: settlement record for marketplace sale
+    // Settlement is recorded at escrow_held (status=held), released only on buyer confirm or auto-release
     this.settlementsService
-      .recordSettlement({
-        type: 'marketplace',
-        amount: order.amount,
-        sourceId: order.id,
-        recipientId: order.sellerId,
-      })
+      .recordMarketplaceSettlement(order.id, order.orderId, order.sellerId, order.amount)
       .catch((err) => this.logger.error(`Settlement record failed for marketplace order ${order.id}: ${err}`));
 
     return updated;
+  }
+
+  /**
+   * Seller marks the order as shipped.
+   * Allowed from: escrow_held
+   */
+  async shipOrder(orderId: string, sellerId: string) {
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id: orderId },
+      include: { listing: { select: { title: true } } },
+    });
+    if (!order) throw new NotFoundException('주문을 찾을 수 없습니다.');
+    if (order.sellerId !== sellerId) throw new ForbiddenException('판매자만 배송 처리를 할 수 있습니다.');
+
+    const result = await this.prisma.marketplaceOrder.updateMany({
+      where: { id: orderId, status: OrderStatus.escrow_held },
+      data: { status: OrderStatus.shipped, shippedAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('ORDER_INVALID_STATE: 에스크로 보관 상태에서만 배송 처리가 가능합니다.');
+    }
+
+    await this.notificationsService.create({
+      userId: order.buyerId,
+      type: NotificationType.marketplace_order_shipped,
+      title: '상품이 발송되었어요',
+      body: `"${order.listing.title}" 상품이 발송되었습니다. 배송을 확인해주세요.`,
+      data: { orderId: order.id },
+    });
+
+    return this.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
+  }
+
+  /**
+   * Seller (or system) marks the order as delivered.
+   * Allowed from: shipped
+   */
+  async deliverOrder(orderId: string, sellerId: string) {
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id: orderId },
+      include: { listing: { select: { title: true } } },
+    });
+    if (!order) throw new NotFoundException('주문을 찾을 수 없습니다.');
+    if (order.sellerId !== sellerId) throw new ForbiddenException('판매자만 배송 완료를 처리할 수 있습니다.');
+
+    const result = await this.prisma.marketplaceOrder.updateMany({
+      where: { id: orderId, status: OrderStatus.shipped },
+      data: { status: OrderStatus.delivered, deliveredAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('ORDER_INVALID_STATE: 배송중 상태에서만 배송 완료 처리가 가능합니다.');
+    }
+
+    await this.notificationsService.create({
+      userId: order.buyerId,
+      type: NotificationType.marketplace_order_delivered,
+      title: '상품이 도착했어요',
+      body: `"${order.listing.title}" 상품이 배달되었습니다. 수령을 확인해주세요.`,
+      data: { orderId: order.id },
+    });
+
+    return this.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
+  }
+
+  /**
+   * Buyer confirms receipt — releases escrow to seller immediately.
+   * Allowed from: shipped or delivered
+   */
+  async confirmReceipt(orderId: string, buyerId: string) {
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id: orderId },
+      include: { listing: { select: { title: true } } },
+    });
+    if (!order) throw new NotFoundException('주문을 찾을 수 없습니다.');
+    if (order.buyerId !== buyerId) throw new ForbiddenException('구매자만 수령을 확인할 수 있습니다.');
+
+    const now = new Date();
+    const result = await this.prisma.marketplaceOrder.updateMany({
+      where: {
+        id: orderId,
+        status: { in: [OrderStatus.shipped, OrderStatus.delivered] },
+      },
+      data: {
+        status: OrderStatus.completed,
+        confirmedReceiptAt: now,
+        releasedAt: now,
+        completedAt: now,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('ORDER_INVALID_STATE: 배송중 또는 배송완료 상태에서만 수령 확인이 가능합니다.');
+    }
+
+    await this.releaseSettlementForOrder(order.id, order.sellerId);
+
+    await this.notificationsService.create({
+      userId: order.sellerId,
+      type: NotificationType.marketplace_order_completed,
+      title: '구매가 확정되었어요',
+      body: `"${order.listing.title}" 상품의 구매가 확정되어 정산이 시작됩니다.`,
+      data: { orderId: order.id },
+    });
+
+    return this.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
+  }
+
+  /**
+   * Auto-release triggered by cron when autoReleaseAt has passed.
+   * Allowed from: shipped, delivered (no open disputes).
+   * Uses auto_released status for audit differentiation from buyer-confirmed completion.
+   */
+  async autoRelease(orderId: string) {
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id: orderId },
+      include: { listing: { select: { title: true } } },
+    });
+    if (!order) throw new NotFoundException(`주문 ${orderId}을(를) 찾을 수 없습니다.`);
+
+    const now = new Date();
+    const result = await this.prisma.marketplaceOrder.updateMany({
+      where: {
+        id: orderId,
+        status: { in: [OrderStatus.escrow_held, OrderStatus.shipped, OrderStatus.delivered] },
+      },
+      data: {
+        status: OrderStatus.auto_released,
+        releasedAt: now,
+        completedAt: now,
+      },
+    });
+    if (result.count === 0) {
+      this.logger.warn(`Auto-release skipped for order ${orderId}: not in releasable state`);
+      return;
+    }
+
+    await this.releaseSettlementForOrder(order.id, order.sellerId);
+
+    await this.notificationsService.create({
+      userId: order.buyerId,
+      type: NotificationType.marketplace_order_completed,
+      title: '거래가 자동 완료되었어요',
+      body: `"${order.listing.title}" 거래가 자동으로 완료 처리되었습니다.`,
+      data: { orderId: order.id },
+    });
+    await this.notificationsService.create({
+      userId: order.sellerId,
+      type: NotificationType.marketplace_order_completed,
+      title: '거래가 자동 완료되어 정산됩니다',
+      body: `"${order.listing.title}" 거래가 자동 완료되어 정산이 시작됩니다.`,
+      data: { orderId: order.id },
+    });
+  }
+
+  /**
+   * Buyer files a marketplace dispute, freezing the order in `disputed` state.
+   * Rate-limit: max 3 per buyer per 24 hours. Idempotent guard via unique orderId on Dispute.
+   */
+  async fileDispute(
+    orderId: string,
+    buyerId: string,
+    dto: { type: string; description: string; attachmentUrls?: string[] },
+  ) {
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id: orderId },
+      include: { listing: { select: { title: true } } },
+    });
+    if (!order) throw new NotFoundException('주문을 찾을 수 없습니다.');
+    if (order.buyerId !== buyerId) throw new ForbiddenException('구매자만 분쟁을 신청할 수 있습니다.');
+    const disputeEligible: OrderStatus[] = [OrderStatus.escrow_held, OrderStatus.shipped, OrderStatus.delivered];
+    if (!disputeEligible.includes(order.status)) {
+      throw new BadRequestException('현재 주문 상태에서는 분쟁을 신청할 수 없습니다.');
+    }
+
+    // Rate-limit: max 3 per buyer per 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentCount = await this.prisma.dispute.count({
+      where: { buyerId, createdAt: { gt: twentyFourHoursAgo } },
+    });
+    if (recentCount >= 3) {
+      throw new HttpException('24시간 내 분쟁 신청 한도(3건)를 초과했습니다.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const existing = await this.prisma.dispute.findUnique({ where: { orderId } });
+    if (existing) {
+      throw new ConflictException('이 주문에 대한 분쟁이 이미 접수되어 있습니다.');
+    }
+
+    const dispute = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.marketplaceOrder.updateMany({
+        where: {
+          id: orderId,
+          status: { in: [OrderStatus.escrow_held, OrderStatus.shipped, OrderStatus.delivered] },
+        },
+        data: { status: OrderStatus.disputed },
+      });
+      if (updateResult.count === 0) {
+        throw new BadRequestException('현재 주문 상태에서는 분쟁을 신청할 수 없습니다.');
+      }
+
+      return tx.dispute.create({
+        data: {
+          targetType: DisputeTargetType.marketplace_order,
+          orderId,
+          type: dto.type,
+          buyerId,
+          sellerId: order.sellerId,
+          description: dto.description,
+          evidence: dto.attachmentUrls ?? [],
+          status: DisputeStatus.filed,
+        },
+        include: {
+          buyer: { select: { id: true, nickname: true } },
+          seller: { select: { id: true, nickname: true } },
+          messages: true,
+        },
+      });
+    });
+
+    // Fan-out notification (fire-and-forget)
+    this.notificationsService
+      .create({
+        userId: order.sellerId,
+        type: NotificationType.marketplace_order_disputed,
+        title: '분쟁이 접수되었어요',
+        body: `"${order.listing.title}" 주문에 대한 분쟁이 접수되었습니다. 48시간 내에 답변해주세요.`,
+        data: { disputeId: dispute.id, orderId: order.id },
+        fromUserId: buyerId,
+      })
+      .catch((err) => this.logger.error(`Dispute notification failed: ${err}`));
+
+    return dispute;
+  }
+
+  /** Transitions the held SettlementRecord for this order to completed (released). */
+  private async releaseSettlementForOrder(orderDbId: string, sellerId: string): Promise<void> {
+    this.settlementsService
+      .releaseSettlement(orderDbId)
+      .catch((err) =>
+        this.logger.error(`Settlement release failed for order ${orderDbId} seller ${sellerId}: ${err}`),
+      );
   }
 
   private tossAuthHeader(): string {

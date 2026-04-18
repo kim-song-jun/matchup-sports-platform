@@ -1,9 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
+  ArrowLeft,
+  AlertCircle,
+  Package,
+  ExternalLink,
+  Scale,
   ChevronRight,
   AlertTriangle,
   CheckCircle,
@@ -11,310 +16,378 @@ import {
   Calendar,
   MapPin,
   Shield,
-  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { useAdminDispute, useUpdateDisputeStatus } from '@/hooks/use-api';
-import { extractErrorMessage } from '@/lib/utils';
+import { DisputeMessageThread } from '@/components/dispute/dispute-message-thread';
+import { DisputeResolveModal } from '@/components/dispute/dispute-resolve-modal';
+import { formatAmount, extractErrorMessage } from '@/lib/utils';
+import { useAdminDispute, useReviewDispute, useResolveDispute } from '@/hooks/use-api';
+import type { DisputeMessage } from '@/components/dispute/dispute-message-thread';
+
+// useAdminDispute(id) → { data: Dispute; isLoading; isError; refetch }
+// Dispute from types/dispute.ts:
+//   { id, targetType, orderId, teamMatchId, type, status, reason, description,
+//     reporter?, respondent?, events?: DisputeEvent[], adminNotes?, resolvedAt?, resolutionAmount? }
+//
+// useReviewDispute() → legacy team-match status transition (filed→admin_reviewing)
+// useResolveDispute() → final resolution (admin_reviewing→resolved_*|dismissed)
+
+const statusConfig: Record<string, { label: string; color: string }> = {
+  filed: { label: '접수됨', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
+  seller_responded: { label: '판매자 응답', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
+  admin_reviewing: { label: '검토중', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
+  resolved_refund: { label: '환불 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
+  resolved_release: { label: '지급 완료', color: 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' },
+  resolved_partial: { label: '부분 환불', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
+  dismissed: { label: '기각됨', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },
+  withdrawn: { label: '취하됨', color: 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500' },
+};
 
 const typeLabel: Record<string, string> = {
+  // Marketplace
+  not_delivered: '상품 미수령',
+  not_as_described: '상품 상태 불일치',
+  damaged: '파손',
+  other: '기타',
+  // Legacy team-match
   no_show: '노쇼',
   late: '지각',
   level_mismatch: '실력 차이',
   misconduct: '비매너',
 };
 
-const typeColor: Record<string, string> = {
-  no_show: 'bg-red-50 text-red-600',
-  late: 'bg-amber-50 text-amber-800',
-  level_mismatch: 'bg-gray-100 text-gray-600',
-  misconduct: 'bg-red-50 text-red-600',
-};
+const RESOLVED_STATUSES = new Set(['resolved_refund', 'resolved_release', 'resolved_partial', 'dismissed', 'withdrawn']);
 
-const statusLabel: Record<string, string> = {
-  pending: '대기중',
-  investigating: '조사중',
-  resolved: '해결됨',
-  dismissed: '기각됨',
-};
-
-const statusColor: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  investigating: 'bg-blue-50 text-blue-500',
-  resolved: 'bg-green-50 text-green-700',
-  dismissed: 'bg-gray-100 text-gray-500',
-};
-
-const auditActionLabel: Record<string, string> = {
-  reported: '접수됨',
-  investigation_started: '조사 시작',
-  resolved: '해결됨',
-  dismissed: '기각됨',
-};
-
-const auditActorLabel: Record<string, string> = {
-  system: '시스템 자동',
-};
-
-type ActionMode = 'investigating' | 'resolved' | 'dismissed' | null;
+type LegacyActionMode = 'review' | null;
 
 export default function AdminDisputeDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const disputeId = params.id as string;
   const { toast } = useToast();
+
   const { data: dispute, isLoading, isError, refetch } = useAdminDispute(disputeId);
-  const updateStatus = useUpdateDisputeStatus();
-  const [actionMode, setActionMode] = useState<ActionMode>(null);
+  const reviewDispute = useReviewDispute();
+  const resolveDispute = useResolveDispute();
+
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [legacyActionMode, setLegacyActionMode] = useState<LegacyActionMode>(null);
   const [adminNote, setAdminNote] = useState('');
 
-  const handleSubmit = async () => {
-    if (!actionMode) return;
+  const isMarketplace = !!(dispute?.orderId);
+  const isResolved = dispute ? RESOLVED_STATUSES.has(dispute.status) : false;
 
+  // Map DisputeEvent → DisputeMessage for thread component
+  const threadMessages: DisputeMessage[] = (dispute?.events ?? []).map((event) => ({
+    id: event.id,
+    senderId: event.actorUserId,
+    senderName: event.actor?.nickname ?? null,
+    senderRole: event.actorRole,
+    content: event.message,
+    createdAt: event.createdAt,
+  }));
+
+  const handleReview = async () => {
+    if (!adminNote.trim()) {
+      toast('error', '메모를 입력해주세요');
+      return;
+    }
     try {
-      await updateStatus.mutateAsync({
-        id: disputeId,
-        data: {
-          status: actionMode,
-          note: adminNote,
-          resolution: actionMode === 'resolved' ? adminNote : undefined,
-        },
-      });
-      toast('success', '분쟁 상태를 업데이트했어요');
-      setActionMode(null);
+      await reviewDispute.mutateAsync({ id: disputeId, data: { note: adminNote } });
+      toast('success', '검토 상태로 변경됐어요');
+      setLegacyActionMode(null);
       setAdminNote('');
-      await refetch();
     } catch (err) {
-      toast('error', extractErrorMessage(err, '분쟁 상태를 업데이트하지 못했어요.'));
+      toast('error', extractErrorMessage(err, '상태 변경에 실패했어요.'));
     }
   };
 
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-8 w-48 rounded-lg bg-gray-100 dark:bg-gray-800" />
+        <div className="h-8 w-48 rounded-xl bg-gray-100 dark:bg-gray-800" />
         <div className="h-40 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+        <div className="h-60 rounded-2xl bg-gray-100 dark:bg-gray-800" />
       </div>
     );
   }
 
   if (isError) {
-    return <ErrorState message="분쟁 상세를 불러오지 못했어요" onRetry={() => void refetch()} />;
+    return <ErrorState message="분쟁 정보를 불러오지 못했어요" onRetry={() => void refetch()} />;
   }
 
   if (!dispute) {
     return (
       <EmptyState
-        icon={AlertTriangle}
+        icon={AlertCircle}
         title="분쟁을 찾을 수 없어요"
-        description="삭제되었거나 접근할 수 없는 분쟁입니다"
+        description="삭제되었거나 존재하지 않는 분쟁이에요"
         action={{ label: '목록으로', href: '/admin/disputes' }}
       />
     );
   }
 
+  const sc = statusConfig[dispute.status] ?? { label: dispute.status, color: 'bg-gray-100 text-gray-500' };
+
   return (
-    <div className="animate-fade-in">
-      <Modal isOpen={actionMode !== null} onClose={() => setActionMode(null)} title="운영 판단 기록" size="sm">
+    <div className="animate-fade-in space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="목록으로"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
+          </button>
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <Link href="/admin/disputes" className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">신고/분쟁</Link>
+              <ChevronRight size={14} aria-hidden="true" />
+              <span className="font-mono text-gray-700 dark:text-gray-300">{dispute.id}</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">분쟁 상세</h1>
+          </div>
+        </div>
+
+        {!isResolved && (
+          <div className="flex items-center gap-2 shrink-0">
+            {dispute.status === 'filed' && (
+              <button
+                type="button"
+                onClick={() => setLegacyActionMode('review')}
+                className="flex items-center gap-2 min-h-[44px] rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 px-4 py-2.5 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+              >
+                <AlertTriangle size={15} aria-hidden="true" />
+                검토 시작
+              </button>
+            )}
+            {(dispute.status === 'admin_reviewing' || dispute.status === 'seller_responded') && (
+              <button
+                type="button"
+                onClick={() => setShowResolveModal(true)}
+                className="flex items-center gap-2 min-h-[44px] rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
+              >
+                <Scale size={16} aria-hidden="true" />
+                분쟁 처리
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Review modal (for filed→admin_reviewing transition) */}
+      <Modal isOpen={legacyActionMode === 'review'} onClose={() => setLegacyActionMode(null)} title="검토 시작" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            {actionMode === 'investigating'
-              ? '조사 시작 메모를 남기면 히스토리에 기록됩니다.'
-              : actionMode === 'resolved'
-                ? '해결 근거와 조치 내용을 남기면 resolution과 감사 로그에 함께 남습니다.'
-                : '기각 사유를 남기면 감사 로그에 기록됩니다.'}
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            검토 시작 메모를 남기면 감사 이벤트에 기록됩니다.
           </p>
-          <label htmlFor="admin-dispute-note" className="sr-only">운영 메모</label>
+          <label htmlFor="admin-review-note" className="sr-only">운영 메모</label>
           <textarea
-            id="admin-dispute-note"
+            id="admin-review-note"
             value={adminNote}
             onChange={(e) => setAdminNote(e.target.value)}
             rows={4}
-            placeholder="운영 메모를 입력하세요"
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+            placeholder="검토 사유 또는 메모를 입력하세요"
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-base text-gray-900 dark:text-white placeholder:text-gray-400 resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
           />
           <div className="flex gap-3">
             <button
-              onClick={() => setActionMode(null)}
-              className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              onClick={() => setLegacyActionMode(null)}
+              className="flex-1 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               취소
             </button>
             <button
-              onClick={() => void handleSubmit()}
-              disabled={updateStatus.isPending}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 py-3 text-base font-semibold text-white hover:bg-gray-800 transition-colors disabled:opacity-60"
+              onClick={() => void handleReview()}
+              disabled={reviewDispute.isPending}
+              className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-base font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-60"
             >
-              {updateStatus.isPending ? <RefreshCw size={16} className="animate-spin" /> : null}
-              저장
+              {reviewDispute.isPending ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
+              검토 시작
             </button>
           </div>
         </div>
       </Modal>
 
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/admin/disputes" className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">신고/분쟁</Link>
-        <ChevronRight size={14} />
-        <span className="text-gray-700 dark:text-gray-300">{dispute.id}</span>
-      </div>
-
-      <div className="grid grid-cols-1 @3xl:grid-cols-[1fr_320px] gap-6">
-        <div className="space-y-4">
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${typeColor[dispute.type] || 'bg-gray-100 text-gray-600'}`}>
-                    {typeLabel[dispute.type] || dispute.type}
-                  </span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor[dispute.status] || 'bg-gray-100 text-gray-600'}`}>
-                    {statusLabel[dispute.status] || dispute.status}
-                  </span>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{dispute.id}</h2>
-                <p className="text-sm text-gray-500 mt-1">접수일: {new Date(dispute.createdAt).toLocaleString('ko-KR')}</p>
-              </div>
+      {/* Meta grid */}
+      <div className="grid @3xl:grid-cols-2 gap-4">
+        {/* Info */}
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">분쟁 정보</h2>
+          <dl className="space-y-2.5">
+            <div className="flex justify-between items-start gap-4">
+              <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">출처</dt>
+              <dd>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${isMarketplace ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}`}>
+                  {isMarketplace ? '장터' : '팀매치'}
+                </span>
+              </dd>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4">
-                <p className="text-xs font-semibold text-blue-500 uppercase mb-1">신고팀</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white">{dispute.reporterTeam?.name ?? '-'}</p>
-                <p className="text-xs text-gray-500 mt-1">팀장: {dispute.reporterTeam?.captain ?? '-'}</p>
-                <p className="text-xs text-blue-600 mt-1">신뢰도 {dispute.reporterTeam?.trustScore ?? '-'}</p>
-              </div>
-              <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 p-4">
-                <p className="text-xs font-semibold text-red-500 uppercase mb-1">피신고팀</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white">{dispute.reportedTeam?.name ?? '-'}</p>
-                <p className="text-xs text-gray-500 mt-1">팀장: {dispute.reportedTeam?.captain ?? '-'}</p>
-                <p className="text-xs text-red-600 mt-1">신뢰도 {dispute.reportedTeam?.trustScore ?? '-'}</p>
-              </div>
+            <div className="flex justify-between items-start gap-4">
+              <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">유형</dt>
+              <dd className="text-sm font-medium text-gray-900 dark:text-white text-right">{typeLabel[dispute.type] ?? dispute.type}</dd>
             </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">매치 정보</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calendar size={14} className="text-gray-400" />
-                  <span className="text-xs text-gray-400">날짜/시간</span>
-                </div>
-                <p className="text-base font-semibold text-gray-900 dark:text-white">{dispute.match?.date ?? '-'}</p>
-                <p className="text-xs text-gray-400">{dispute.match?.startTime ?? '-'} ~ {dispute.match?.endTime ?? '-'}</p>
+            <div className="flex justify-between items-start gap-4">
+              <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">상태</dt>
+              <dd><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sc.color}`}>{sc.label}</span></dd>
+            </div>
+            <div className="flex justify-between items-start gap-4">
+              <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">신고일</dt>
+              <dd className="text-sm text-gray-700 dark:text-gray-300">{new Date(dispute.createdAt).toLocaleDateString('ko-KR')}</dd>
+            </div>
+            {dispute.resolvedAt && (
+              <div className="flex justify-between items-start gap-4">
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">처리일</dt>
+                <dd className="text-sm text-gray-700 dark:text-gray-300">{new Date(dispute.resolvedAt).toLocaleDateString('ko-KR')}</dd>
               </div>
-              <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <MapPin size={14} className="text-gray-400" />
-                  <span className="text-xs text-gray-400">장소</span>
-                </div>
-                <p className="text-base font-semibold text-gray-900 dark:text-white">{dispute.match?.venue ?? '-'}</p>
-                <p className="text-xs text-gray-400 truncate">{dispute.match?.address ?? '-'}</p>
+            )}
+            {dispute.resolutionAmount !== null && dispute.resolutionAmount !== undefined && (
+              <div className="flex justify-between items-start gap-4">
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">처리 금액</dt>
+                <dd className="text-sm font-bold text-blue-500">{formatAmount(dispute.resolutionAmount)}</dd>
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">신고 내용</h3>
-            <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-4">
-              <p className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">{dispute.description}</p>
-              {dispute.resolution ? (
-                <div className="mt-4 rounded-xl bg-green-50 px-3 py-3 text-sm text-green-700">
-                  해결 내용: {dispute.resolution}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">첨부 자료</h3>
-            <div className="space-y-2">
-              {(dispute.evidence ?? []).map((item) => (
-                <div key={item.id} className="rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.type}</p>
-                  <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+            )}
+            {dispute.adminNotes && (
+              <div className="pt-2 border-t border-gray-50 dark:border-gray-700">
+                <p className="text-xs text-gray-400 mb-1">운영 메모</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.adminNotes}</p>
+              </div>
+            )}
+          </dl>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영 액션</h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setActionMode('investigating')}
-                disabled={dispute.status !== 'pending'}
-                className="w-full flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-left hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <AlertTriangle size={18} className="text-blue-500 shrink-0" />
-                <div>
-                  <p className="text-base font-medium text-blue-700">조사 시작</p>
-                  <p className="text-xs text-blue-500">검토 시작 시점을 감사 로그에 남깁니다</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setActionMode('resolved')}
-                disabled={dispute.status !== 'investigating'}
-                className="w-full flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-left hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CheckCircle size={18} className="text-green-500 shrink-0" />
-                <div>
-                  <p className="text-base font-medium text-green-700">해결 처리</p>
-                  <p className="text-xs text-green-500">조치 내용과 함께 분쟁을 종료합니다</p>
-                </div>
-              </button>
-              <button
-                onClick={() => setActionMode('dismissed')}
-                disabled={dispute.status !== 'investigating' && dispute.status !== 'pending'}
-                className="w-full flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Ban size={18} className="text-gray-500 shrink-0" />
-                <div>
-                  <p className="text-base font-medium text-gray-700">기각 처리</p>
-                  <p className="text-xs text-gray-500">근거 부족 등으로 종료합니다</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영 메모</h3>
-            <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-4 text-sm text-gray-600 dark:text-gray-300">
-              {dispute.adminNotes || '아직 남겨진 운영 메모가 없습니다.'}
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">감사 로그</h3>
-            <div className="space-y-3">
-              {(dispute.history ?? []).map((entry) => (
-                <div key={entry.id} className="rounded-xl bg-gray-50 dark:bg-gray-700/50 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{auditActionLabel[entry.action] ?? entry.action}</p>
-                    <span className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString('ko-KR')}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">처리: {auditActorLabel[entry.actor] ?? entry.actor}</p>
-                  {entry.note ? <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{entry.note}</p> : null}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">운영 원칙</h3>
-            <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-4 text-sm text-gray-600 dark:text-gray-300">
-              <div className="flex items-start gap-2">
-                <Shield size={14} className="mt-0.5 text-gray-400 shrink-0" />
-                <span>상태 변경은 모두 감사 로그에 남고, 해결/기각 시 메모를 함께 기록해야 합니다.</span>
+        {/* Parties */}
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">당사자</h2>
+          <dl className="space-y-3">
+            {dispute.reporter && (
+              <div className="flex justify-between items-center gap-4">
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">신고인</dt>
+                <dd>
+                  <Link href={`/admin/users/${dispute.reporter.id}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1">
+                    {dispute.reporter.nickname}
+                    <ExternalLink size={12} aria-hidden="true" />
+                  </Link>
+                </dd>
               </div>
-            </div>
+            )}
+            {dispute.respondent && (
+              <div className="flex justify-between items-center gap-4">
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">피신고인</dt>
+                <dd>
+                  <Link href={`/admin/users/${dispute.respondent.id}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1">
+                    {dispute.respondent.nickname}
+                    <ExternalLink size={12} aria-hidden="true" />
+                  </Link>
+                </dd>
+              </div>
+            )}
+            {isMarketplace && dispute.orderId && (
+              <div className="flex justify-between items-center gap-4">
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">주문</dt>
+                <dd>
+                  <Link href={`/admin/orders/${dispute.orderId}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1 font-mono">
+                    <Package size={12} className="shrink-0" aria-hidden="true" />
+                    <span className="truncate max-w-[160px]">{dispute.orderId}</span>
+                    <ExternalLink size={12} className="shrink-0" aria-hidden="true" />
+                  </Link>
+                </dd>
+              </div>
+            )}
+            {!isMarketplace && dispute.teamMatchId && (
+              <div className="flex justify-between items-center gap-4">
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">팀 매치</dt>
+                <dd>
+                  <Link href={`/admin/team-matches/${dispute.teamMatchId}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1 font-mono">
+                    <span className="truncate max-w-[160px]">{dispute.teamMatchId}</span>
+                    <ExternalLink size={12} className="shrink-0" aria-hidden="true" />
+                  </Link>
+                </dd>
+              </div>
+            )}
+          </dl>
+
+          {/* Dispute reason/description */}
+          <div className="pt-3 border-t border-gray-50 dark:border-gray-700">
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mb-2 uppercase tracking-wide">신고 내용</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{dispute.reason}</p>
+            {dispute.description && dispute.description !== dispute.reason && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">{dispute.description}</p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Match info — shown for team-match disputes */}
+      {!isMarketplace && (
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">팀 매치 정보</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5">
+              <div className="flex items-center gap-2 mb-1">
+                <Calendar size={14} className="text-gray-400" aria-hidden="true" />
+                <span className="text-xs text-gray-400">매치 ID</span>
+              </div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white font-mono">{dispute.teamMatchId ?? '-'}</p>
+            </div>
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3.5">
+              <div className="flex items-center gap-2 mb-1">
+                <MapPin size={14} className="text-gray-400" aria-hidden="true" />
+                <span className="text-xs text-gray-400">신고 유형</span>
+              </div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{typeLabel[dispute.type] ?? dispute.type}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Message thread */}
+      <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-50 dark:border-gray-700 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">메시지 스레드</h2>
+          <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+            <Shield size={12} aria-hidden="true" />
+            <span>관리자 뷰</span>
+          </div>
+        </div>
+        <div className="max-h-[480px] overflow-y-auto">
+          <DisputeMessageThread
+            messages={threadMessages}
+            currentUserId="admin"
+          />
+        </div>
+      </div>
+
+      {/* Resolve modal — shown for marketplace OR team-match in admin_reviewing */}
+      <DisputeResolveModal
+        isOpen={showResolveModal}
+        onClose={() => setShowResolveModal(false)}
+        disputeId={disputeId}
+        totalAmount={dispute.resolutionAmount ?? 0}
+        resolveDisputeMutation={{
+          mutate: (vars, callbacks) => {
+            resolveDispute.mutate(
+              {
+                id: vars.id,
+                data: {
+                  action: vars.decision as 'refund' | 'release' | 'partial' | 'dismiss',
+                  amount: vars.amount,
+                  note: vars.note ?? '',
+                },
+              },
+              callbacks,
+            );
+          },
+          isPending: resolveDispute.isPending,
+        }}
+      />
     </div>
   );
 }

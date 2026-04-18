@@ -1,4 +1,4 @@
-import type { SportTeam } from '@/types/api';
+import type { SportTeam, TeamApplication } from '@/types/api';
 
 export const mockTeam1: SportTeam = {
   id: 'team-1',
@@ -58,4 +58,20 @@ export const mockTeamMember = {
   status: 'active' as const,
   joinedAt: '2024-02-01T00:00:00.000Z',
   user: { id: 'user-2', nickname: '상대유저', profileImageUrl: null },
+};
+
+export const mockTeamApplication1: TeamApplication = {
+  id: 'app-1',
+  teamId: 'team-1',
+  userId: 'user-3',
+  user: { id: 'user-3', nickname: '신청자A', profileImageUrl: null, mannerScore: 4.2 },
+  createdAt: '2024-03-01T00:00:00.000Z',
+};
+
+export const mockTeamApplication2: TeamApplication = {
+  id: 'app-2',
+  teamId: 'team-1',
+  userId: 'user-4',
+  user: { id: 'user-4', nickname: '신청자B', profileImageUrl: null, mannerScore: 3.8 },
+  createdAt: '2024-03-02T00:00:00.000Z',
 };

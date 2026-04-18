@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import type {
   ChatRoom,
   ChatMessage,
+  ChatRoomType,
   CursorPage,
   PaginatedResponse,
   CreateChatRoomInput,
@@ -86,6 +87,24 @@ export function useSendMessage() {
     },
     onSuccess: () => {
       // New messages arrive via WebSocket — only refresh rooms list for preview update
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms });
+    },
+  });
+}
+
+// Opens or reuses a direct (1:1) chat room with another user.
+// Returns the ChatRoom so the caller can redirect to /chat/:id.
+export function useStartDirectChat() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ withUserId }: { withUserId: string }) => {
+      const res = await api.post('/chat/rooms', {
+        type: 'direct' as ChatRoomType,
+        participantIds: [withUserId],
+      });
+      return extractData<ChatRoom>(res);
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.rooms });
     },
   });

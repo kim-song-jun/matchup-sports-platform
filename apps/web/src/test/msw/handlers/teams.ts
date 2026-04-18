@@ -1,6 +1,13 @@
 import { http } from 'msw';
 import { success, paged } from './_utils';
-import { mockTeam1, mockTeam2, mockMyTeamMemberships, mockTeamMember } from '../../fixtures/teams';
+import {
+  mockTeam1,
+  mockTeam2,
+  mockMyTeamMemberships,
+  mockTeamMember,
+  mockTeamApplication1,
+  mockTeamApplication2,
+} from '../../fixtures/teams';
 
 export const teamsHandlers = [
   http.get('/api/v1/teams/me', () => {
@@ -54,6 +61,22 @@ export const teamsHandlers = [
 
   http.post('/api/v1/teams/:id/transfer-ownership', ({ params }) => {
     return success({ teamId: params.id as string, message: '소유권이 이전되었습니다' });
+  }),
+
+  // Applications (pending join requests)
+  http.get('/api/v1/teams/:id/applications', ({ params }) => {
+    return success([
+      { ...mockTeamApplication1, teamId: params.id as string },
+      { ...mockTeamApplication2, teamId: params.id as string },
+    ]);
+  }),
+
+  http.patch('/api/v1/teams/:id/applications/:applicantUserId/accept', ({ params }) => {
+    return success({ teamId: params.id as string, userId: params.applicantUserId as string, status: 'active' });
+  }),
+
+  http.patch('/api/v1/teams/:id/applications/:applicantUserId/reject', ({ params }) => {
+    return success({ teamId: params.id as string, userId: params.applicantUserId as string, status: 'left' });
   }),
 
   // Invitations

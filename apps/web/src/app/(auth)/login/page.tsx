@@ -304,17 +304,7 @@ export default function LoginPage() {
                 </button>
               </div>
             </FormField>
-            {mode === 'login' && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                  onClick={() => toast('info', '비밀번호 재설정 기능은 준비 중이에요')}
-                >
-                  비밀번호를 잊으셨나요?
-                </button>
-              </div>
-            )}
+            {/* Password reset not yet implemented — link removed to avoid misleading users */}
             {mode === 'register' && (
               <FormField label="닉네임" htmlFor="login-nickname" error={fieldErrors.nickname}>
                 <Input

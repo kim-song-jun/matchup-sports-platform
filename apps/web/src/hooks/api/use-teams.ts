@@ -8,6 +8,7 @@ import type {
   SportTeam,
   TeamHub,
   TeamInvitation,
+  TeamApplication,
   CreateTeamInput,
 } from '@/types/api';
 import { extractData } from './shared';
@@ -233,6 +234,50 @@ export function useTransferTeamOwnership() {
       queryClient.invalidateQueries({ queryKey: queryKeys.teamMembers.list(teamId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(teamId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.teams.me });
+    },
+  });
+}
+
+// ── Team Applications (membership join requests) ──
+
+export function useTeamApplications(teamId: string | undefined, opts?: { enabled?: boolean }) {
+  return useQuery<TeamApplication[]>({
+    queryKey: queryKeys.teamApplications.byTeam(teamId ?? ''),
+    queryFn: async () => {
+      const res = await api.get(`/teams/${teamId}/applications`);
+      return extractData<TeamApplication[]>(res);
+    },
+    enabled: Boolean(teamId) && (opts?.enabled ?? true),
+    staleTime: 30_000,
+  });
+}
+
+export function useAcceptTeamApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ teamId, applicantUserId }: { teamId: string; applicantUserId: string }) => {
+      const res = await api.patch(`/teams/${teamId}/applications/${applicantUserId}/accept`);
+      return extractData<{ success: boolean }>(res);
+    },
+    onSuccess: (_, { teamId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamApplications.byTeam(teamId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMembers.list(teamId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(teamId) });
+    },
+  });
+}
+
+export function useRejectTeamApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ teamId, applicantUserId }: { teamId: string; applicantUserId: string }) => {
+      const res = await api.patch(`/teams/${teamId}/applications/${applicantUserId}/reject`);
+      return extractData<{ success: boolean }>(res);
+    },
+    onSuccess: (_, { teamId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamApplications.byTeam(teamId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMembers.list(teamId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.teams.detail(teamId) });
     },
   });
 }

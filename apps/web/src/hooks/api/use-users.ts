@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
-import type { UserProfile } from '@/types/api';
+import type { UserProfile, UserPublicProfile } from '@/types/api';
 import { extractData } from './shared';
 import { queryKeys } from './query-keys';
 
@@ -81,6 +81,22 @@ export function useUserProfile(id: string) {
       return extractData<UserProfile>(res);
     },
     enabled: !!id,
+  });
+}
+
+// ── User public profile (PII-stripped) ──
+// Uses a distinct cache key from useUserProfile to avoid type ambiguity.
+// The server applies toPublicProfile() projector (Wave 2B) so the response
+// never contains email/phone/birthYear regardless of which hook is used.
+export function useUserPublicProfile(userId: string) {
+  return useQuery<UserPublicProfile>({
+    queryKey: queryKeys.userPublic(userId),
+    queryFn: async () => {
+      const res = await api.get(`/users/${userId}`);
+      return extractData<UserPublicProfile>(res);
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

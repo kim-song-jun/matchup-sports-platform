@@ -42,6 +42,14 @@ export const usersHandlers = [
   }),
 
   http.get('/api/v1/users/:id', ({ params }) => {
-    return success({ ...mockUser, id: params.id as string });
+    // Return PII-stripped public profile (no email/phone per §9.1)
+    return success({
+      id: params.id as string,
+      nickname: mockUser.nickname,
+      profileImageUrl: mockUser.profileImageUrl,
+      sportProfiles: [],
+      mannerScore: mockUser.mannerScore,
+      recentMatchCount: mockUser.totalMatches,
+    });
   }),
 ];

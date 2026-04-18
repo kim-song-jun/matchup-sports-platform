@@ -27,6 +27,26 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
+ * Clears a Web Push subscription: deletes server record first, then
+ * unsubscribes the browser. Server-first ensures no orphaned subscriptions.
+ * Exported for testability.
+ */
+export async function cleanupPushSubscription(subscription: PushSubscription): Promise<void> {
+  const endpoint = subscription.endpoint;
+  // API delete first — ensures server state cleared even if unsubscribe fails
+  try {
+    await api.delete('/notifications/push-unsubscribe', { data: { endpoint } });
+  } catch (err) {
+    console.warn('[push] push-unsubscribe API request failed:', err);
+  }
+  try {
+    await subscription.unsubscribe();
+  } catch (err) {
+    console.warn('[push] subscription.unsubscribe() failed:', err);
+  }
+}
+
+/**
  * Registers a Web Push subscription after login and unregisters it on logout.
  * No-op if the browser does not support ServiceWorker + PushManager.
  * Falls back to Capacitor PushNotifications on native platforms.
@@ -132,9 +152,7 @@ export function usePushRegistration(): void {
     const subscription = subscriptionRef.current;
     if (!subscription) return;
 
-    const endpoint = subscription.endpoint;
-    subscription.unsubscribe().catch(() => {});
-    api.delete('/notifications/push-unsubscribe', { data: { endpoint } }).catch(() => {});
     subscriptionRef.current = null;
+    void cleanupPushSubscription(subscription);
   }, [isAuthenticated]);
 }

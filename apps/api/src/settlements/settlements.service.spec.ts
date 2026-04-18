@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
 import { SettlementsService } from './settlements.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +23,7 @@ const prismaMock = {
     findFirst: jest.fn(),
     count: jest.fn(),
     findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
@@ -208,27 +209,29 @@ describe('SettlementsService', () => {
 
   describe('process', () => {
     it('approve action sets status to completed', async () => {
-      const record = makeRecord({ id: 'settle-1' });
+      const record = makeRecord({ id: 'settle-1', status: SettlementStatus.pending });
       const updated = { ...record, status: SettlementStatus.completed, processedAt: new Date() };
       prismaMock.settlementRecord.findUnique.mockResolvedValue(record);
-      prismaMock.settlementRecord.update.mockResolvedValue(updated);
+      prismaMock.settlementRecord.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.settlementRecord.findUniqueOrThrow.mockResolvedValue(updated);
 
       const result = await service.process('settle-1', { action: 'approve' });
 
       expect(result.status).toBe(SettlementStatus.completed);
-      expect(prismaMock.settlementRecord.update).toHaveBeenCalledWith(
+      expect(prismaMock.settlementRecord.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'settle-1' },
+          where: { id: 'settle-1', status: SettlementStatus.pending },
           data: expect.objectContaining({ status: SettlementStatus.completed }),
         }),
       );
     });
 
     it('reject action sets status to failed', async () => {
-      const record = makeRecord({ id: 'settle-1' });
+      const record = makeRecord({ id: 'settle-1', status: SettlementStatus.pending });
       const updated = { ...record, status: SettlementStatus.failed, processedAt: new Date() };
       prismaMock.settlementRecord.findUnique.mockResolvedValue(record);
-      prismaMock.settlementRecord.update.mockResolvedValue(updated);
+      prismaMock.settlementRecord.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.settlementRecord.findUniqueOrThrow.mockResolvedValue(updated);
 
       const result = await service.process('settle-1', { action: 'reject', note: '계좌 오류' });
 
@@ -239,6 +242,14 @@ describe('SettlementsService', () => {
       prismaMock.settlementRecord.findUnique.mockResolvedValue(null);
 
       await expect(service.process('no-such-id', { action: 'approve' })).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException when record is already finalized (not pending)', async () => {
+      const record = makeRecord({ id: 'settle-1', status: SettlementStatus.completed });
+      prismaMock.settlementRecord.findUnique.mockResolvedValue(record);
+      prismaMock.settlementRecord.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.process('settle-1', { action: 'approve' })).rejects.toThrow(ConflictException);
     });
   });
 
@@ -450,10 +461,8 @@ describe('SettlementsService', () => {
   // ── createPayoutBatch ───────────────────────────────────────────────────────
 
   describe('createPayoutBatch', () => {
-    it('returns empty array for empty input', async () => {
-      const result = await service.createPayoutBatch([]);
-
-      expect(result).toEqual([]);
+    it('throws BadRequestException for empty input', async () => {
+      await expect(service.createPayoutBatch([])).rejects.toThrow(BadRequestException);
       expect(prismaMock.settlementRecord.findMany).not.toHaveBeenCalled();
     });
 
@@ -468,15 +477,15 @@ describe('SettlementsService', () => {
       const payout1 = buildPayout({ recipientId: 'seller-1', grossAmount: 100000, platformFee: 10000, netAmount: 90000 });
       const payout2 = buildPayout({ recipientId: 'seller-2', grossAmount: 30000, platformFee: 3000, netAmount: 27000 });
 
-      // Simulate $transaction callback with race guard data
+      // Simulate $transaction callback — race guard is now via updateMany count check
       prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
         const txMock = {
           payout: { create: jest.fn() },
           settlementRecord: {
-            findMany: jest.fn()
-              .mockResolvedValueOnce([records[0], records[1]]) // seller-1 race guard
-              .mockResolvedValueOnce([records[2]]),             // seller-2 race guard
-            updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+            // No inner findMany race guard — replaced by atomic updateMany claim
+            updateMany: jest.fn()
+              .mockResolvedValueOnce({ count: 2 }) // seller-1: both records linked
+              .mockResolvedValueOnce({ count: 1 }), // seller-2: one record linked
           },
         };
         txMock.payout.create
@@ -488,6 +497,27 @@ describe('SettlementsService', () => {
       const result = await service.createPayoutBatch(['s1', 's2', 's3']);
 
       expect(result).toHaveLength(2);
+    });
+
+    it('throws ConflictException when concurrent batch claims records first', async () => {
+      const records = [
+        makeRecord({ id: 's1', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+        makeRecord({ id: 's2', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+      ];
+      prismaMock.settlementRecord.findMany.mockResolvedValue(records);
+
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: { create: jest.fn().mockResolvedValue(buildPayout({ recipientId: 'seller-1' })) },
+          settlementRecord: {
+            // Concurrent batch already claimed one record — count mismatch triggers conflict
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        };
+        return cb(txMock as unknown as typeof prismaMock);
+      });
+
+      await expect(service.createPayoutBatch(['s1', 's2'])).rejects.toThrow(ConflictException);
     });
 
     it('throws when records are not in completed status', async () => {

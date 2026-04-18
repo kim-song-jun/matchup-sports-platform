@@ -143,14 +143,14 @@ describe('PayoutsController', () => {
   // ── markPaid ─────────────────────────────────────────────────────────────────
 
   describe('markPaid', () => {
-    it('delegates to service.markPayoutPaid with id and note', () => {
+    it('delegates to service.markPayoutPaid with id, adminId, and note', () => {
       const body: MarkPayoutPaidDto = { note: 'KB ref#9912' };
       const expected = { id: payoutId, status: 'paid' };
       mockService.markPayoutPaid.mockReturnValue(expected);
 
       const result = controller.markPaid(payoutId, body, adminId);
 
-      expect(mockService.markPayoutPaid).toHaveBeenCalledWith(payoutId, 'KB ref#9912');
+      expect(mockService.markPayoutPaid).toHaveBeenCalledWith(payoutId, adminId, 'KB ref#9912');
       expect(result).toEqual(expected);
     });
 
@@ -160,20 +160,20 @@ describe('PayoutsController', () => {
 
       controller.markPaid(payoutId, body, adminId);
 
-      expect(mockService.markPayoutPaid).toHaveBeenCalledWith(payoutId, undefined);
+      expect(mockService.markPayoutPaid).toHaveBeenCalledWith(payoutId, adminId, undefined);
     });
   });
 
   // ── markFailed ────────────────────────────────────────────────────────────────
 
   describe('markFailed', () => {
-    it('delegates to service.markPayoutFailed with id, reason and note', () => {
+    it('delegates to service.markPayoutFailed with id, reason, note, and adminId', () => {
       const body: MarkPayoutFailedDto = { reason: '계좌번호 오류', note: '재시도 예정' };
       mockService.markPayoutFailed.mockReturnValue({ id: payoutId, status: 'failed' });
 
       controller.markFailed(payoutId, body, adminId);
 
-      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '계좌번호 오류', '재시도 예정');
+      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '계좌번호 오류', '재시도 예정', adminId);
     });
 
     it('passes undefined note when body.note is absent', () => {
@@ -182,7 +182,7 @@ describe('PayoutsController', () => {
 
       controller.markFailed(payoutId, body, adminId);
 
-      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '수취인 정보 불일치', undefined);
+      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '수취인 정보 불일치', undefined, adminId);
     });
 
     it('returns service result', () => {

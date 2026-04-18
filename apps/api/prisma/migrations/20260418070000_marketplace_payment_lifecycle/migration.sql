@@ -219,3 +219,33 @@ ALTER TABLE "disputes"
     FOREIGN KEY ("team_match_id")
     REFERENCES "team_matches"("id")
     ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- ─── Step 12: Add force-release audit columns to marketplace_orders ────────
+
+ALTER TABLE "marketplace_orders"
+  ADD COLUMN IF NOT EXISTS "force_released_by_admin_id" TEXT,
+  ADD COLUMN IF NOT EXISTS "force_released_at"          TIMESTAMP(3);
+
+-- ─── Step 13: Create dispute_events table ─────────────────────────────────
+
+CREATE TABLE "dispute_events" (
+  "id"            TEXT NOT NULL,
+  "dispute_id"    TEXT NOT NULL,
+  "actor_role"    "DisputeActorRole",
+  "actor_user_id" TEXT,
+  "event_type"    TEXT NOT NULL,
+  "payload"       JSONB,
+  "created_at"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT "dispute_events_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX "dispute_events_dispute_id_created_at_idx"
+  ON "dispute_events"("dispute_id", "created_at");
+
+-- dispute_events.dispute_id -> disputes.id (CASCADE delete)
+ALTER TABLE "dispute_events"
+  ADD CONSTRAINT "dispute_events_dispute_id_fkey"
+    FOREIGN KEY ("dispute_id")
+    REFERENCES "disputes"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;

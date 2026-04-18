@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,10 +18,14 @@ const mockPrisma = {
     updateMany: jest.fn(),
     count: jest.fn(),
     findUniqueOrThrow: jest.fn(),
+    findFirst: jest.fn(),
   },
   disputeMessage: {
     create: jest.fn(),
     findMany: jest.fn(),
+  },
+  disputeEvent: {
+    create: jest.fn().mockResolvedValue({}),
   },
   marketplaceOrder: {
     findUnique: jest.fn(),
@@ -171,13 +176,42 @@ describe('DisputesService', () => {
       mockPrisma.dispute.findUnique.mockResolvedValueOnce(dispute);
 
       const updatedDispute = { ...dispute, status: DisputeStatus.seller_responded, messages: [] };
-      const newMessage = buildDisputeMessage({ disputeId: dispute.id, authorId: 'seller1' });
-      mockPrisma.$transaction.mockResolvedValueOnce([updatedDispute, newMessage]);
+
+      // Implementation now uses $transaction(async cb) with atomic updateMany
+      mockPrisma.$transaction.mockImplementationOnce(async (cb: (tx: typeof mockPrisma) => unknown) => {
+        const txMock = {
+          dispute: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(updatedDispute),
+          },
+          disputeMessage: { create: jest.fn().mockResolvedValue({}) },
+          disputeEvent: { create: jest.fn().mockResolvedValue({}) },
+        };
+        return cb(txMock as unknown as typeof mockPrisma);
+      });
 
       const result = await service.sellerRespond(dispute.id, 'seller1', 'Item was as described.');
 
       expect(result.status).toBe(DisputeStatus.seller_responded);
       expect(mockPrisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('throws ConflictException when concurrent response wins the race', async () => {
+      const dispute = buildDispute({ sellerId: 'seller1', status: DisputeStatus.filed });
+      mockPrisma.dispute.findUnique.mockResolvedValueOnce(dispute);
+
+      mockPrisma.$transaction.mockImplementationOnce(async (cb: (tx: typeof mockPrisma) => unknown) => {
+        const txMock = {
+          dispute: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+          disputeMessage: { create: jest.fn() },
+          disputeEvent: { create: jest.fn() },
+        };
+        return cb(txMock as unknown as typeof mockPrisma);
+      });
+
+      await expect(service.sellerRespond(dispute.id, 'seller1', 'Response')).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('throws ForbiddenException when non-seller responds', async () => {
@@ -282,7 +316,7 @@ describe('DisputesService', () => {
       );
     });
 
-    it('calls cancelByPaymentKey on refund action', async () => {
+    it('calls cancelByPaymentKey AFTER db claim on refund action', async () => {
       const dispute = buildDispute({ status: DisputeStatus.admin_reviewing });
       mockPrisma.dispute.findUnique.mockResolvedValueOnce({
         ...dispute,
@@ -290,19 +324,31 @@ describe('DisputesService', () => {
         seller: { id: 's1', nickname: 'S' },
         order: { id: 'ord1', paymentKey: 'pk-test', amount: 50000, sellerId: 's1' },
       });
-      mockPrisma.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) => cb(mockPrisma));
-      mockPrisma.dispute.updateMany.mockResolvedValueOnce({ count: 1 });
-      mockPrisma.marketplaceOrder.update.mockResolvedValueOnce({});
-      mockPrisma.settlementRecord.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      // $transaction commits DB claim first, then Toss is called outside
+      mockPrisma.$transaction.mockImplementationOnce(async (cb: (tx: typeof mockPrisma) => unknown) => {
+        const txMock = {
+          dispute: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+          marketplaceOrder: { update: jest.fn().mockResolvedValue({}) },
+          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+          disputeEvent: { create: jest.fn().mockResolvedValue({}) },
+        };
+        return cb(txMock as unknown as typeof mockPrisma);
+      });
       mockPrisma.dispute.findUniqueOrThrow.mockResolvedValueOnce({
         ...dispute,
         status: DisputeStatus.resolved_refund,
         messages: [],
       });
 
-      await service.resolveDispute(dispute.id, 'refund', 'Refund issued');
+      await service.resolveDispute(dispute.id, 'refund', 'Refund issued', 'admin1');
 
+      // Verify ordering: DB claim (via $transaction) before Toss cancel
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockPaymentsService.cancelByPaymentKey).toHaveBeenCalledWith('pk-test', '분쟁 해결: 환불 처리');
+      expect(mockPrisma.$transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        mockPaymentsService.cancelByPaymentKey.mock.invocationCallOrder[0],
+      );
     });
   });
 

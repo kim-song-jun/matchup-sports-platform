@@ -359,22 +359,30 @@ describe('MarketplaceService', () => {
   // ── confirmOrderPayment ─────────────────────────────────────────────────────
 
   describe('confirmOrderPayment (mock Toss mode)', () => {
+    // Helper: wire $transaction to execute the async callback with a tx mock
+    const makeOrderTxMock = (
+      updateManyResult: { count: number },
+      updatedOrder: ReturnType<typeof mockOrder>,
+    ) => ({
+      marketplaceOrder: {
+        updateMany: jest.fn().mockResolvedValue(updateManyResult),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(updatedOrder),
+      },
+    });
+
     it('transitions order to escrow_held and sets autoReleaseAt', async () => {
       const order = mockOrder({ status: 'pending' });
-      const updated = mockOrder({
-        status: OrderStatus.escrow_held,
-        paymentKey: 'pk-mock',
-        paidAt: new Date(),
-      });
+      const updated = mockOrder({ status: OrderStatus.escrow_held, paymentKey: 'pk-mock', paidAt: new Date() });
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
-      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 1 });
-      prismaMock.marketplaceOrder.findUniqueOrThrow.mockResolvedValue(updated);
       settlementsServiceMock.recordMarketplaceSettlement.mockResolvedValue({});
+
+      const txMock = makeOrderTxMock({ count: 1 }, updated);
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) => cb(txMock));
 
       const result = await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
 
       expect(result.status).toBe(OrderStatus.escrow_held);
-      expect(prismaMock.marketplaceOrder.updateMany).toHaveBeenCalledWith(
+      expect(txMock.marketplaceOrder.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             status: OrderStatus.escrow_held,
@@ -385,41 +393,39 @@ describe('MarketplaceService', () => {
       );
     });
 
-    it('awaits marketplace settlement (not fire-and-forget)', async () => {
+    it('settlement is created inside the transaction (atomicity with order update)', async () => {
       const order = mockOrder({ status: 'pending' });
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
-      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 1 });
-      prismaMock.marketplaceOrder.findUniqueOrThrow.mockResolvedValue(
-        mockOrder({ status: OrderStatus.escrow_held }),
-      );
       settlementsServiceMock.recordMarketplaceSettlement.mockResolvedValue({});
+
+      const txMock = makeOrderTxMock({ count: 1 }, mockOrder({ status: OrderStatus.escrow_held }));
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) => cb(txMock));
 
       await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
 
+      // Settlement must be called with the tx client as 5th arg for atomicity
       expect(settlementsServiceMock.recordMarketplaceSettlement).toHaveBeenCalledWith(
         order.id,
         order.orderId,
         order.sellerId,
         order.amount,
+        txMock,
       );
     });
 
-    it('notifies seller on payment confirmation', async () => {
+    it('notifies seller after transaction commits (fire-and-forget)', async () => {
       const order = mockOrder({ status: 'pending' });
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
-      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 1 });
-      prismaMock.marketplaceOrder.findUniqueOrThrow.mockResolvedValue(
-        mockOrder({ status: OrderStatus.escrow_held }),
-      );
       settlementsServiceMock.recordMarketplaceSettlement.mockResolvedValue({});
+      notificationsServiceMock.create.mockResolvedValue(undefined);
+
+      const txMock = makeOrderTxMock({ count: 1 }, mockOrder({ status: OrderStatus.escrow_held }));
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) => cb(txMock));
 
       await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
 
       expect(notificationsServiceMock.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'user-1',
-          type: 'marketplace_order',
-        }),
+        expect.objectContaining({ userId: 'user-1', type: 'marketplace_order' }),
       );
     });
 
@@ -443,8 +449,15 @@ describe('MarketplaceService', () => {
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(
         mockOrder({ status: OrderStatus.escrow_held }),
       );
-      // updateMany returns count=0 because status is not 'pending'
-      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 0 });
+      // updateMany returns count=0 because status is not 'pending' — triggers ConflictException inside tx
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          marketplaceOrder: {
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+            findUniqueOrThrow: jest.fn(),
+          },
+        }),
+      );
 
       await expect(
         service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2'),

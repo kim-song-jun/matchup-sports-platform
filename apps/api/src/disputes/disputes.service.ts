@@ -11,6 +11,7 @@ import {
   DisputeTargetType,
   NotificationType,
   OrderStatus,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -26,7 +27,10 @@ export class DisputesService {
 
   /**
    * Seller responds to a filed dispute.
-   * Status transitions: filed → seller_responded
+   * Status transitions: filed → seller_responded.
+   *
+   * Race safety: atomic updateMany with status=filed filter prevents concurrent
+   * double-responses between the pre-check and the state transition (TOCTOU).
    */
   async sellerRespond(disputeId: string, sellerId: string, body: string) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id: disputeId } });
@@ -38,21 +42,30 @@ export class DisputesService {
       throw new BadRequestException('접수 상태의 분쟁에만 응답할 수 있습니다.');
     }
 
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.dispute.update({
-        where: { id: disputeId },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Atomic claim: only transition if still in filed status
+      const claimResult = await tx.dispute.updateMany({
+        where: { id: disputeId, status: DisputeStatus.filed },
         data: { status: DisputeStatus.seller_responded },
-        include: { messages: true },
-      }),
-      this.prisma.disputeMessage.create({
+      });
+      if (claimResult.count === 0) {
+        throw new ConflictException('DISPUTE_NOT_AWAITING_RESPONSE: 분쟁이 이미 처리되었습니다.');
+      }
+
+      await tx.disputeMessage.create({
         data: {
           disputeId,
           authorId: sellerId,
           role: DisputeActorRole.seller,
           body,
         },
-      }),
-    ]);
+      });
+
+      return tx.dispute.findUniqueOrThrow({
+        where: { id: disputeId },
+        include: { messages: true },
+      });
+    });
 
     // Notify buyer (fire-and-forget — notification failure must not fail this operation)
     this.notificationsService
@@ -232,17 +245,17 @@ export class DisputesService {
     if (action === 'refund') {
       if (!dispute.order) throw new BadRequestException('주문 정보를 찾을 수 없습니다.');
 
-      // Execute Toss cancel outside transaction — network call
-      if (dispute.order.paymentKey) {
-        await this.paymentsService.cancelByPaymentKey(
-          dispute.order.paymentKey,
-          '분쟁 해결: 환불 처리',
-        );
-      }
-
+      // Claim the dispute first (inside transaction) BEFORE calling Toss.
+      // This prevents two concurrent admins from both triggering a Toss cancel.
+      // resolvedByAdminId: null filter ensures only one admin wins when
+      // the dispute is in admin_reviewing and both admins hit the endpoint simultaneously.
       await this.prisma.$transaction(async (tx) => {
         const result = await tx.dispute.updateMany({
-          where: { id: disputeId, status: { notIn: closedStatuses } },
+          where: {
+            id: disputeId,
+            status: { notIn: closedStatuses },
+            resolvedByAdminId: null,
+          },
           data: {
             status: DisputeStatus.resolved_refund,
             resolution,
@@ -261,7 +274,26 @@ export class DisputesService {
           where: { orderId: dispute.orderId! },
           data: { status: 'refunded' },
         });
+        await tx.disputeEvent.create({
+          data: {
+            disputeId,
+            actorRole: DisputeActorRole.admin,
+            actorUserId: adminId ?? null,
+            eventType: 'refund',
+            payload: { resolution, orderId: dispute.orderId } as Prisma.JsonObject,
+          },
+        });
       });
+
+      // Toss cancel runs after the DB claim commits.
+      // Known trade-off: if Toss fails, DB shows resolved_refund but no actual refund.
+      // This is acceptable — admin must retry via Toss dashboard.
+      if (dispute.order.paymentKey) {
+        await this.paymentsService.cancelByPaymentKey(
+          dispute.order.paymentKey,
+          '분쟁 해결: 환불 처리',
+        );
+      }
 
       // Notify parties (fire-and-forget)
       this.notificationsService
@@ -307,6 +339,15 @@ export class DisputesService {
             data: { status: 'completed', releasedAt: now, processedAt: now },
           });
         }
+        await tx.disputeEvent.create({
+          data: {
+            disputeId,
+            actorRole: DisputeActorRole.admin,
+            actorUserId: adminId ?? null,
+            eventType: 'release',
+            payload: { resolution, orderId: dispute.orderId } as Prisma.JsonObject,
+          },
+        });
       });
 
       this.notificationsService
@@ -348,6 +389,15 @@ export class DisputesService {
             data: { status: dispute.priorOrderStatus },
           });
         }
+        await tx.disputeEvent.create({
+          data: {
+            disputeId,
+            actorRole: DisputeActorRole.admin,
+            actorUserId: adminId ?? null,
+            eventType: 'dismiss',
+            payload: { resolution, orderId: dispute.orderId } as Prisma.JsonObject,
+          },
+        });
       });
 
       this.notificationsService
@@ -430,6 +480,15 @@ export class DisputesService {
           data: { status: dispute.priorOrderStatus },
         });
       }
+      await tx.disputeEvent.create({
+        data: {
+          disputeId: id,
+          actorRole: DisputeActorRole.buyer,
+          actorUserId: buyerId,
+          eventType: 'withdraw',
+          payload: { orderId: dispute.orderId } as Prisma.JsonObject,
+        },
+      });
       return tx.dispute.findUniqueOrThrow({ where: { id }, include: { messages: true } });
     });
 

@@ -61,7 +61,7 @@ export class MarketplaceCron {
         await this.marketplaceService.autoRelease(order.id);
         this.logger.log(`Auto-released order ${order.orderId}`);
       } catch (err) {
-        this.logger.error(`Auto-release failed for order ${order.orderId}: ${err}`);
+        this.logger.error(`Auto-release failed for order ${order.orderId}`, err instanceof Error ? err.stack : String(err));
       }
     }
   }

@@ -313,38 +313,41 @@ export class MarketplaceService {
     // T+7 days from payment confirmation is the auto-release deadline
     const autoReleaseAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-    // Race guard: only transition from pending to prevent double-processing
-    const updateResult = await this.prisma.marketplaceOrder.updateMany({
-      where: { orderId, status: OrderStatus.pending },
-      data: {
-        status: OrderStatus.escrow_held,
-        paymentKey,
-        paidAt: new Date(),
-        autoReleaseAt,
-      },
+    // Atomically: claim the order (race guard) + create escrow settlement record.
+    // Both steps must succeed together — settlement must not exist without the order transition.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.marketplaceOrder.updateMany({
+        where: { orderId, status: OrderStatus.pending },
+        data: {
+          status: OrderStatus.escrow_held,
+          paymentKey,
+          paidAt: new Date(),
+          autoReleaseAt,
+        },
+      });
+      if (updateResult.count === 0) {
+        throw new ConflictException('ORDER_ALREADY_PROCESSED: 이미 처리된 주문입니다.');
+      }
+
+      await this.settlementsService.recordMarketplaceSettlement(
+        order.id,
+        order.orderId,
+        order.sellerId,
+        order.amount,
+        tx,
+      );
+
+      return tx.marketplaceOrder.findUniqueOrThrow({ where: { orderId } });
     });
-    if (updateResult.count === 0) {
-      throw new ConflictException('ORDER_ALREADY_PROCESSED: 이미 처리된 주문입니다.');
-    }
 
-    const updated = await this.prisma.marketplaceOrder.findUniqueOrThrow({ where: { orderId } });
-
-    // Notify seller
-    await this.notificationsService.create({
+    // Notify seller after commit (fire-and-forget — notification failure must not roll back payment)
+    this.notificationsService.create({
       userId: order.sellerId,
       type: NotificationType.marketplace_order,
       title: '새 주문이 들어왔어요',
       body: `"${order.listing.title}" 상품에 주문이 접수되었습니다.`,
       data: { orderId: order.id, listingId: order.listingId },
-    });
-
-    // Settlement recorded at escrow_held (status=held). Failure propagates to caller.
-    await this.settlementsService.recordMarketplaceSettlement(
-      order.id,
-      order.orderId,
-      order.sellerId,
-      order.amount,
-    );
+    }).catch(() => void 0);
 
     return updated;
   }

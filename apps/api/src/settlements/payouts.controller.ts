@@ -71,9 +71,9 @@ export class PayoutsController {
   markPaid(
     @Param('id') id: string,
     @Body() body: MarkPayoutPaidDto,
-    @CurrentUser('id') _adminId: string,
+    @CurrentUser('id') adminId: string,
   ) {
-    return this.settlementsService.markPayoutPaid(id, body.note);
+    return this.settlementsService.markPayoutPaid(id, adminId, body.note);
   }
 
   @Patch(':id/mark-failed')
@@ -84,8 +84,8 @@ export class PayoutsController {
   markFailed(
     @Param('id') id: string,
     @Body() body: MarkPayoutFailedDto,
-    @CurrentUser('id') _adminId: string,
+    @CurrentUser('id') adminId: string,
   ) {
-    return this.settlementsService.markPayoutFailed(id, body.reason, body.note);
+    return this.settlementsService.markPayoutFailed(id, body.reason, body.note, adminId);
   }
 }

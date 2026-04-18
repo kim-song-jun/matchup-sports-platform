@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import {
   AdminUserAuditAction,
   AdminUserStatus,
+  DisputeActorRole,
   LessonStatus,
   MatchStatus,
   MercenaryPostStatus,
@@ -886,7 +887,13 @@ export class AdminService {
     return this.prisma.$transaction(async (tx) => {
       const updateResult = await tx.marketplaceOrder.updateMany({
         where: { id: orderId, status: { in: releasableStatuses } },
-        data: { status: OrderStatus.auto_released, releasedAt: now, completedAt: now },
+        data: {
+          status: OrderStatus.auto_released,
+          releasedAt: now,
+          completedAt: now,
+          forceReleasedByAdminId: adminId,
+          forceReleasedAt: now,
+        },
       });
       if (updateResult.count === 0) {
         throw new ConflictException(
@@ -907,6 +914,20 @@ export class AdminService {
         if (!existing) {
           throw new NotFoundException(`주문 ${orderId}의 에스크로 정산 레코드를 찾을 수 없습니다.`);
         }
+      }
+
+      // Emit DisputeEvent audit row if a dispute exists for this order
+      const dispute = await tx.dispute.findFirst({ where: { orderId } });
+      if (dispute) {
+        await tx.disputeEvent.create({
+          data: {
+            disputeId: dispute.id,
+            actorRole: DisputeActorRole.admin,
+            actorUserId: adminId,
+            eventType: 'force_release',
+            payload: { orderId, adminId, priorStatus: order.status },
+          },
+        });
       }
 
       return tx.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });

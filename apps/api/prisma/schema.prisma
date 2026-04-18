@@ -606,9 +606,11 @@ model MarketplaceOrder {
   shippedAt          DateTime? @map("shipped_at")
   deliveredAt        DateTime? @map("delivered_at")
   completedAt        DateTime? @map("completed_at")
-  autoReleaseAt      DateTime? @map("auto_release_at")      // when escrow auto-releases (T+7 after delivered)
-  releasedAt         DateTime? @map("released_at")          // actual release timestamp
-  confirmedReceiptAt DateTime? @map("confirmed_receipt_at") // buyer explicitly confirmed receipt
+  autoReleaseAt      DateTime? @map("auto_release_at")         // when escrow auto-releases (T+7 after delivered)
+  releasedAt         DateTime? @map("released_at")             // actual release timestamp
+  confirmedReceiptAt DateTime? @map("confirmed_receipt_at")    // buyer explicitly confirmed receipt
+  forceReleasedByAdminId String? @map("force_released_by_admin_id") // admin who force-released the escrow
+  forceReleasedAt    DateTime? @map("force_released_at")       // timestamp of admin force-release
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
@@ -1491,6 +1493,7 @@ model Dispute {
   buyer     User              @relation("BuyerDisputes", fields: [buyerId], references: [id])
   seller    User              @relation("SellerDisputes", fields: [sellerId], references: [id])
   messages  DisputeMessage[]
+  events    DisputeEvent[]
 
   @@index([status])
   @@index([buyerId])
@@ -1511,4 +1514,19 @@ model DisputeMessage {
 
   @@index([disputeId, createdAt])
   @@map("dispute_messages")
+}
+
+model DisputeEvent {
+  id          String            @id @default(cuid())
+  disputeId   String            @map("dispute_id")
+  actorRole   DisputeActorRole? @map("actor_role")
+  actorUserId String?           @map("actor_user_id")
+  eventType   String            @map("event_type")   // e.g. 'refund', 'release', 'dismiss', 'withdraw', 'force_release'
+  payload     Json?                                   // additional context (adminId, note, etc.)
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+  @@map("dispute_events")
 }

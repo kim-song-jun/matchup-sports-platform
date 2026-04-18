@@ -1,5 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeCommission } from '../common/constants/commission';
@@ -85,6 +85,12 @@ export class SettlementsService {
     };
   }
 
+  /**
+   * Processes a pending settlement record.
+   * Only transitions from `pending` status — throws 409 if already finalized.
+   *
+   * Actions: 'approve' → completed, 'reject' → failed, other → processing.
+   */
   async process(id: string, data: { action: string; note?: string; actor?: string }) {
     const record = await this.prisma.settlementRecord.findUnique({ where: { id } });
     if (!record) {
@@ -105,10 +111,18 @@ export class SettlementsService {
         newStatus = SettlementStatus.processing;
     }
 
-    return this.prisma.settlementRecord.update({
-      where: { id },
+    // Atomic guard: only process from pending to prevent double-finalization
+    const result = await this.prisma.settlementRecord.updateMany({
+      where: { id, status: SettlementStatus.pending },
       data: { status: newStatus, processedAt },
     });
+    if (result.count === 0) {
+      throw new ConflictException(
+        `SETTLEMENT_ALREADY_FINALIZED: 정산 ${id}이(가) 이미 처리 완료되었습니다. 현재 상태: ${record.status}`,
+      );
+    }
+
+    return this.prisma.settlementRecord.findUniqueOrThrow({ where: { id } });
   }
 
   /**
@@ -163,17 +177,20 @@ export class SettlementsService {
    * @param orderPublicId - The MarketplaceOrder.orderId (MU-MKT-... string), used as sourceId
    * @param sellerId - The recipient seller
    * @param amount - Gross transaction amount
+   * @param tx - Optional Prisma transaction client for atomicity with caller's transaction
    */
   async recordMarketplaceSettlement(
     orderDbId: string,
     orderPublicId: string,
     sellerId: string,
     amount: number,
+    tx?: Prisma.TransactionClient,
   ) {
     const commission = computeCommission(amount);
     const netAmount = amount - commission;
+    const db = tx ?? this.prisma;
 
-    return this.prisma.settlementRecord.create({
+    return db.settlementRecord.create({
       data: {
         type: SettlementType.marketplace,
         sourceId: orderPublicId,
@@ -292,14 +309,19 @@ export class SettlementsService {
    * All records are locked to their respective payout inside a single transaction.
    * A shared batchId is generated for the entire batch run.
    *
+   * Race safety: updateMany with `payoutId: null` filter is the atomic claim.
+   * If another batch linked any record before us, count < group.length → ConflictException.
+   *
    * @param settlementIds - IDs of SettlementRecords to include in payouts
    * @param adminNote - Optional note to attach to each payout
    * @returns Array of created Payout records
    */
   async createPayoutBatch(settlementIds: string[], adminNote?: string) {
-    if (settlementIds.length === 0) return [];
+    if (settlementIds.length === 0) {
+      throw new BadRequestException('PAYOUT_BATCH_EMPTY: 최소 1개 이상의 정산 ID를 지정해야 합니다.');
+    }
 
-    // Load all records, verify they are releasable (completed + no existing payout)
+    // Load all records; verify they are releasable (completed + no existing payout) for early UX error
     const records = await this.prisma.settlementRecord.findMany({
       where: { id: { in: settlementIds } },
     });
@@ -308,8 +330,8 @@ export class SettlementsService {
       (r) => r.status !== SettlementStatus.completed || r.payoutId !== null,
     );
     if (invalid.length > 0) {
-      throw new Error(
-        `일부 정산 레코드가 지급 처리 불가 상태입니다: ${invalid.map((r) => r.id).join(', ')}`,
+      throw new ConflictException(
+        `SETTLEMENT_ALREADY_BATCHED: 일부 정산 레코드가 지급 처리 불가 상태입니다: ${invalid.map((r) => r.id).join(', ')}`,
       );
     }
 
@@ -331,20 +353,6 @@ export class SettlementsService {
         const platformFee = group.reduce((sum, r) => sum + r.commission, 0);
         const netAmount = group.reduce((sum, r) => sum + r.netAmount, 0);
 
-        // Race guard: verify records are still unpaid inside the transaction
-        const freshRecords = await tx.settlementRecord.findMany({
-          where: {
-            id: { in: group.map((r) => r.id) },
-            status: SettlementStatus.completed,
-            payoutId: null,
-          },
-        });
-        if (freshRecords.length !== group.length) {
-          throw new ConflictException(
-            `PAYOUT_RACE: 일부 정산 레코드가 다른 배치에서 이미 처리되었습니다. (recipientId=${recipientId})`,
-          );
-        }
-
         const payout = await tx.payout.create({
           data: {
             batchId,
@@ -356,10 +364,23 @@ export class SettlementsService {
             ...(adminNote ? { note: adminNote } : {}),
           },
         });
-        await tx.settlementRecord.updateMany({
-          where: { id: { in: group.map((r) => r.id) } },
+
+        // Atomic claim: only link records that are still unlinked.
+        // count < group.length means a concurrent batch already claimed some.
+        const linkResult = await tx.settlementRecord.updateMany({
+          where: {
+            id: { in: group.map((r) => r.id) },
+            status: SettlementStatus.completed,
+            payoutId: null,
+          },
           data: { payoutId: payout.id },
         });
+        if (linkResult.count !== group.length) {
+          throw new ConflictException(
+            `SETTLEMENT_ALREADY_BATCHED: 일부 정산 레코드가 다른 배치에서 이미 처리되었습니다. (recipientId=${recipientId})`,
+          );
+        }
+
         payouts.push(payout);
       }
       return payouts;

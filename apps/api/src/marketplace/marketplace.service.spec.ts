@@ -367,12 +367,14 @@ describe('MarketplaceService', () => {
         paidAt: new Date(),
       });
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
-      prismaMock.marketplaceOrder.update.mockResolvedValue(updated);
+      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.marketplaceOrder.findUniqueOrThrow.mockResolvedValue(updated);
+      settlementsServiceMock.recordMarketplaceSettlement.mockResolvedValue({});
 
       const result = await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
 
       expect(result.status).toBe(OrderStatus.escrow_held);
-      expect(prismaMock.marketplaceOrder.update).toHaveBeenCalledWith(
+      expect(prismaMock.marketplaceOrder.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             status: OrderStatus.escrow_held,
@@ -383,15 +385,17 @@ describe('MarketplaceService', () => {
       );
     });
 
-    it('fires marketplace settlement in held status (fire-and-forget)', async () => {
+    it('awaits marketplace settlement (not fire-and-forget)', async () => {
       const order = mockOrder({ status: 'pending' });
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
-      prismaMock.marketplaceOrder.update.mockResolvedValue(mockOrder({ status: OrderStatus.escrow_held }));
+      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.marketplaceOrder.findUniqueOrThrow.mockResolvedValue(
+        mockOrder({ status: OrderStatus.escrow_held }),
+      );
+      settlementsServiceMock.recordMarketplaceSettlement.mockResolvedValue({});
 
       await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
 
-      // Give fire-and-forget a tick to execute
-      await new Promise((r) => setImmediate(r));
       expect(settlementsServiceMock.recordMarketplaceSettlement).toHaveBeenCalledWith(
         order.id,
         order.orderId,
@@ -403,7 +407,11 @@ describe('MarketplaceService', () => {
     it('notifies seller on payment confirmation', async () => {
       const order = mockOrder({ status: 'pending' });
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(order);
-      prismaMock.marketplaceOrder.update.mockResolvedValue(mockOrder({ status: OrderStatus.escrow_held }));
+      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.marketplaceOrder.findUniqueOrThrow.mockResolvedValue(
+        mockOrder({ status: OrderStatus.escrow_held }),
+      );
+      settlementsServiceMock.recordMarketplaceSettlement.mockResolvedValue({});
 
       await service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2');
 
@@ -431,14 +439,16 @@ describe('MarketplaceService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('throws BadRequestException when order is already processed', async () => {
+    it('throws ConflictException when order is already processed (race guard)', async () => {
       prismaMock.marketplaceOrder.findUnique.mockResolvedValue(
         mockOrder({ status: OrderStatus.escrow_held }),
       );
+      // updateMany returns count=0 because status is not 'pending'
+      prismaMock.marketplaceOrder.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(
         service.confirmOrderPayment('MU-MKT-abc123', 'pk-mock', 'user-2'),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -564,6 +574,8 @@ describe('MarketplaceService', () => {
       prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: unknown) => unknown) => {
         return cb({
           marketplaceOrder: {
+            // findUnique inside transaction (for serializable re-read)
+            findUnique: jest.fn().mockResolvedValue({ status: OrderStatus.escrow_held }),
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
           dispute: {
@@ -574,6 +586,7 @@ describe('MarketplaceService', () => {
               buyer: {},
               seller: {},
               messages: [],
+              priorOrderStatus: OrderStatus.escrow_held,
             }),
           },
         });

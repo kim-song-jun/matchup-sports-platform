@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { PayoutStatus } from '@prisma/client';
 import { SettlementsService } from './settlements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
@@ -28,8 +29,12 @@ export class PayoutsController {
       parsedLimit !== undefined && !Number.isNaN(parsedLimit)
         ? Math.min(Math.max(1, parsedLimit), 100)
         : undefined;
-    // @ts-expect-error Wave 1 service pending — findAllPayouts added by backend-data-dev
-    return this.settlementsService.findAllPayouts({ status, cursor, limit: safeLimit });
+    const allowedStatuses: PayoutStatus[] = ['pending', 'processing', 'paid', 'failed'];
+    const safeStatus =
+      status && allowedStatuses.includes(status as PayoutStatus)
+        ? (status as PayoutStatus)
+        : undefined;
+    return this.settlementsService.findAllPayouts({ status: safeStatus, cursor, limit: safeLimit });
   }
 
   @Get('eligible')
@@ -81,7 +86,6 @@ export class PayoutsController {
     @Body() body: MarkPayoutFailedDto,
     @CurrentUser('id') _adminId: string,
   ) {
-    // @ts-expect-error Wave 1 service pending — markPayoutFailed added by backend-data-dev
     return this.settlementsService.markPayoutFailed(id, body.reason, body.note);
   }
 }

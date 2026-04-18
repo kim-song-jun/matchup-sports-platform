@@ -33,6 +33,8 @@ const prismaMock = {
     create: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
   },
   $transaction: jest.fn(),
 };
@@ -457,20 +459,25 @@ describe('SettlementsService', () => {
 
     it('creates one payout per unique recipientId', async () => {
       const records = [
-        makeRecord({ id: 's1', recipientId: 'seller-1', status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
-        makeRecord({ id: 's2', recipientId: 'seller-1', status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
-        makeRecord({ id: 's3', recipientId: 'seller-2', status: SettlementStatus.completed, payoutId: null, netAmount: 27000 }),
+        makeRecord({ id: 's1', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+        makeRecord({ id: 's2', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+        makeRecord({ id: 's3', recipientId: 'seller-2', amount: 30000, commission: 3000, status: SettlementStatus.completed, payoutId: null, netAmount: 27000 }),
       ];
       prismaMock.settlementRecord.findMany.mockResolvedValue(records);
 
-      const payout1 = buildPayout({ recipientId: 'seller-1', amount: 90000 });
-      const payout2 = buildPayout({ recipientId: 'seller-2', amount: 27000 });
+      const payout1 = buildPayout({ recipientId: 'seller-1', grossAmount: 100000, platformFee: 10000, netAmount: 90000 });
+      const payout2 = buildPayout({ recipientId: 'seller-2', grossAmount: 30000, platformFee: 3000, netAmount: 27000 });
 
-      // Simulate $transaction callback
+      // Simulate $transaction callback with race guard data
       prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
         const txMock = {
           payout: { create: jest.fn() },
-          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
+          settlementRecord: {
+            findMany: jest.fn()
+              .mockResolvedValueOnce([records[0], records[1]]) // seller-1 race guard
+              .mockResolvedValueOnce([records[2]]),             // seller-2 race guard
+            updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+          },
         };
         txMock.payout.create
           .mockResolvedValueOnce(payout1)
@@ -509,16 +516,21 @@ describe('SettlementsService', () => {
       const payout = buildPayout({ id: 'payout-1', status: PayoutStatus.pending });
       const paid = { ...payout, status: PayoutStatus.paid, paidAt: new Date() };
       prismaMock.payout.findUnique.mockResolvedValue(payout);
-      prismaMock.payout.update.mockResolvedValue(paid);
 
-      const result = await service.markPayoutPaid('payout-1');
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(paid),
+          },
+          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        };
+        return cb(txMock as unknown as typeof prismaMock);
+      });
+
+      const result = await service.markPayoutPaid('payout-1', 'admin-1');
 
       expect(result.status).toBe(PayoutStatus.paid);
-      expect(prismaMock.payout.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: PayoutStatus.paid, paidAt: expect.any(Date) }),
-        }),
-      );
     });
 
     it('is idempotent when payout is already paid', async () => {
@@ -528,27 +540,38 @@ describe('SettlementsService', () => {
       const result = await service.markPayoutPaid('payout-1');
 
       expect(result.status).toBe(PayoutStatus.paid);
-      expect(prismaMock.payout.update).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for unknown payout', async () => {
       prismaMock.payout.findUnique.mockResolvedValue(null);
 
-      await expect(service.markPayoutPaid('ghost-id')).rejects.toThrow(NotFoundException);
+      await expect(service.markPayoutPaid('ghost-id', 'admin-1')).rejects.toThrow(NotFoundException);
     });
 
     it('stores note when provided', async () => {
       const payout = buildPayout({ status: PayoutStatus.processing });
+      const paid = { ...payout, status: PayoutStatus.paid, note: 'Transfer ref: TXN-9999' };
       prismaMock.payout.findUnique.mockResolvedValue(payout);
-      prismaMock.payout.update.mockResolvedValue({
-        ...payout,
-        status: PayoutStatus.paid,
-        note: 'Transfer ref: TXN-9999',
+
+      let capturedUpdateData: unknown;
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: {
+            updateMany: jest.fn().mockImplementationOnce((args: unknown) => {
+              capturedUpdateData = args;
+              return { count: 1 };
+            }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(paid),
+          },
+          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        };
+        return cb(txMock as unknown as typeof prismaMock);
       });
 
-      await service.markPayoutPaid(payout.id, 'Transfer ref: TXN-9999');
+      await service.markPayoutPaid(payout.id, 'admin-1', 'Transfer ref: TXN-9999');
 
-      expect(prismaMock.payout.update).toHaveBeenCalledWith(
+      expect(capturedUpdateData).toEqual(
         expect.objectContaining({
           data: expect.objectContaining({ note: 'Transfer ref: TXN-9999' }),
         }),

@@ -7,10 +7,8 @@
 -- ADD VALUE statement uses a separate DO $$ BEGIN ... END $$ guard pattern
 -- to be idempotent and safe.
 
--- ─── Step 1: Extend PaymentStatus enum ─────────────────────────────────────
-
-ALTER TYPE "PaymentStatus" ADD VALUE IF NOT EXISTS 'held';
-ALTER TYPE "PaymentStatus" ADD VALUE IF NOT EXISTS 'released';
+-- ─── Step 1: PaymentStatus enum — no new values needed for marketplace lifecycle ─────────────────
+-- 'held' and 'released' are NOT added: marketplace uses OrderStatus.escrow_held/auto_released instead.
 
 -- ─── Step 2: Extend SettlementStatus enum ──────────────────────────────────
 
@@ -39,10 +37,10 @@ ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'auto_released';
 CREATE TYPE "DisputeStatus" AS ENUM (
   'filed',
   'seller_responded',
-  'under_review',
+  'admin_reviewing',
   'resolved_refund',
   'resolved_release',
-  'resolved_partial',
+  'withdrawn',
   'dismissed'
 );
 
@@ -61,7 +59,8 @@ CREATE TYPE "PayoutStatus" AS ENUM (
   'pending',
   'processing',
   'paid',
-  'failed'
+  'failed',
+  'cancelled'
 );
 
 -- ─── Step 6: Extend marketplace_orders table ───────────────────────────────
@@ -84,41 +83,53 @@ ALTER TABLE "settlement_records"
 CREATE INDEX IF NOT EXISTS "settlement_records_payout_id_idx"
   ON "settlement_records"("payout_id");
 
+CREATE UNIQUE INDEX IF NOT EXISTS "settlement_records_order_id_type_key"
+  ON "settlement_records"("order_id", "type");
+
 -- ─── Step 8: Create payouts table ─────────────────────────────────────────
 
 CREATE TABLE "payouts" (
-  "id"           TEXT NOT NULL,
-  "recipient_id" TEXT NOT NULL,
-  "amount"       INTEGER NOT NULL,
-  "status"       "PayoutStatus" NOT NULL DEFAULT 'pending',
-  "note"         TEXT,
-  "paid_at"      TIMESTAMP(3),
-  "created_at"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at"   TIMESTAMP(3) NOT NULL,
+  "id"                       TEXT NOT NULL,
+  "batch_id"                 TEXT NOT NULL,
+  "recipient_id"             TEXT NOT NULL,
+  "gross_amount"             INTEGER NOT NULL,
+  "platform_fee"             INTEGER NOT NULL,
+  "net_amount"               INTEGER NOT NULL,
+  "status"                   "PayoutStatus" NOT NULL DEFAULT 'pending',
+  "note"                     TEXT,
+  "failure_reason"           TEXT,
+  "paid_at"                  TIMESTAMP(3),
+  "processed_at"             TIMESTAMP(3),
+  "marked_paid_by_admin_id"  TEXT,
+  "created_at"               TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at"               TIMESTAMP(3) NOT NULL,
 
   CONSTRAINT "payouts_pkey" PRIMARY KEY ("id")
 );
 
+CREATE INDEX "payouts_batch_id_idx" ON "payouts"("batch_id");
 CREATE INDEX "payouts_recipient_id_status_idx" ON "payouts"("recipient_id", "status");
 CREATE INDEX "payouts_status_idx" ON "payouts"("status");
 
 -- ─── Step 9: Create disputes table ────────────────────────────────────────
 
 CREATE TABLE "disputes" (
-  "id"           TEXT NOT NULL,
-  "target_type"  "DisputeTargetType" NOT NULL,
-  "order_id"     TEXT,
-  "team_match_id" TEXT,
-  "type"         TEXT NOT NULL,
-  "status"       "DisputeStatus" NOT NULL DEFAULT 'filed',
-  "buyer_id"     TEXT NOT NULL,
-  "seller_id"    TEXT NOT NULL,
-  "description"  TEXT NOT NULL,
-  "evidence"     TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-  "resolved_at"  TIMESTAMP(3),
-  "resolution"   TEXT,
-  "created_at"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at"   TIMESTAMP(3) NOT NULL,
+  "id"                    TEXT NOT NULL,
+  "target_type"           "DisputeTargetType" NOT NULL,
+  "order_id"              TEXT,
+  "team_match_id"         TEXT,
+  "type"                  TEXT NOT NULL,
+  "status"                "DisputeStatus" NOT NULL DEFAULT 'filed',
+  "buyer_id"              TEXT NOT NULL,
+  "seller_id"             TEXT NOT NULL,
+  "description"           TEXT NOT NULL,
+  "evidence"              TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  "prior_order_status"    "OrderStatus" NOT NULL,
+  "resolved_by_admin_id"  TEXT,
+  "resolved_at"           TIMESTAMP(3),
+  "resolution"            TEXT,
+  "created_at"            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at"            TIMESTAMP(3) NOT NULL,
 
   CONSTRAINT "disputes_pkey" PRIMARY KEY ("id")
 );

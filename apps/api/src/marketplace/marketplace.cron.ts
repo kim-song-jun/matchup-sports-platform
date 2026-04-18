@@ -8,7 +8,7 @@ import { DisputeStatus, OrderStatus } from '@prisma/client';
 const RESOLVED_DISPUTE_STATUSES: DisputeStatus[] = [
   DisputeStatus.resolved_refund,
   DisputeStatus.resolved_release,
-  DisputeStatus.resolved_partial,
+  DisputeStatus.withdrawn,
   DisputeStatus.dismissed,
 ];
 

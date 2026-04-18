@@ -4,7 +4,12 @@ import { getPrismaTestClient, disconnectPrismaTestClient } from '../helpers/pris
 import { truncateAll } from '../helpers/db-cleanup';
 import { devLoginToken } from '../helpers/auth-token';
 import { PrismaClient, OrderStatus, DisputeStatus, SettlementStatus } from '@prisma/client';
-import { createListing, createEscrowOrder } from '../fixtures/marketplace';
+import {
+  createListing,
+  createEscrowOrder,
+  createHeldSettlement,
+  createReleasedSettlement,
+} from '../fixtures/marketplace';
 import { createSinaro, createMarketSeller } from '../fixtures/personas';
 
 // ---------------------------------------------------------------------------
@@ -71,7 +76,6 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
     it('creates a pending order for a buyer, returning orderId + amount', async () => {
       const listing = await createListing(prisma, sellerId, { price: 50000 });
 
-      // Create order via API — returns the payment prepare payload
       const orderRes = await request
         .post(`/api/v1/marketplace/listings/${listing.id}/order`)
         .set('Authorization', `Bearer ${buyerToken}`);
@@ -80,7 +84,6 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       expect(orderRes.body.data.payment.amount).toBe(50000);
       expect(orderRes.body.data.payment.orderId).toMatch(/^MU-MKT-/);
 
-      // Verify the DB record is in pending state
       const order = await prisma.marketplaceOrder.findFirst({
         where: { buyerId: buyerId, listingId: listing.id },
       });
@@ -89,25 +92,11 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
     });
 
     it('settlement record is in held status after escrow_held order is created', async () => {
-      // Use fixture to create an escrow_held order (bypasses Toss API in integration tests)
       const listing = await createListing(prisma, sellerId, { price: 50000 });
       const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId);
 
-      // Manually seed a settlement record as confirmOrderPayment would do
-      await prisma.settlementRecord.create({
-        data: {
-          type: 'marketplace',
-          sourceId: order.orderId,
-          orderId: order.id,
-          amount: order.amount,
-          commission: order.commission,
-          netAmount: order.amount - order.commission,
-          recipientId: sellerId,
-          status: SettlementStatus.held,
-        },
-      });
+      await createHeldSettlement(prisma, order.id, order.orderId, sellerId, order.amount);
 
-      // Verify held settlement exists with correct commission (10%)
       const settlement = await prisma.settlementRecord.findFirst({
         where: { recipientId: sellerId, status: SettlementStatus.held },
       });
@@ -139,19 +128,8 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       expect(deliverRes.status).toBe(201);
       expect(deliverRes.body.data.status).toBe(OrderStatus.delivered);
 
-      // Seed a settlement record in held status (as would be done at payment confirm)
-      await prisma.settlementRecord.create({
-        data: {
-          type: 'marketplace',
-          sourceId: order.orderId,
-          orderId: order.id,
-          amount: order.amount,
-          commission: order.commission,
-          netAmount: order.amount - order.commission,
-          recipientId: sellerId,
-          status: SettlementStatus.held,
-        },
-      });
+      // Seed held settlement
+      await createHeldSettlement(prisma, order.id, order.orderId, sellerId, order.amount);
 
       // Buyer confirms receipt → escrow released
       const receiptRes = await request
@@ -160,9 +138,6 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
 
       expect(receiptRes.status).toBe(201);
       expect(receiptRes.body.data.status).toBe(OrderStatus.completed);
-
-      // Give fire-and-forget a tick
-      await new Promise((r) => setImmediate(r));
 
       // Verify settlement released
       const settlement = await prisma.settlementRecord.findFirst({
@@ -208,13 +183,17 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
 
       const frozen = await prisma.marketplaceOrder.findUnique({ where: { id: order.id } });
       expect(frozen!.status).toBe(OrderStatus.disputed);
+
+      // priorOrderStatus must be captured at filing time
+      const dispute = await prisma.dispute.findFirst({ where: { orderId: order.id } });
+      expect(dispute!.priorOrderStatus).toBe(OrderStatus.escrow_held);
     });
 
     it('admin resolves dispute with release action → seller gets funds', async () => {
       const listing = await createListing(prisma, sellerId, { price: 50000 });
       const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId);
 
-      // Create dispute directly
+      // Create dispute with priorOrderStatus
       const dispute = await prisma.dispute.create({
         data: {
           targetType: 'marketplace_order',
@@ -224,22 +203,12 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
           sellerId,
           description: 'Item was not delivered as promised.',
           status: DisputeStatus.filed,
+          priorOrderStatus: OrderStatus.escrow_held,
         },
       });
 
       // Seed held settlement
-      await prisma.settlementRecord.create({
-        data: {
-          type: 'marketplace',
-          sourceId: order.orderId,
-          orderId: order.id,
-          amount: order.amount,
-          commission: order.commission,
-          netAmount: order.amount - order.commission,
-          recipientId: sellerId,
-          status: SettlementStatus.held,
-        },
-      });
+      await createHeldSettlement(prisma, order.id, order.orderId, sellerId, order.amount);
 
       // Update order to disputed
       await prisma.marketplaceOrder.update({
@@ -256,14 +225,15 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       expect(resolveRes.status).toBe(200);
       expect(resolveRes.body.data.status).toBe(DisputeStatus.resolved_release);
 
-      // Give fire-and-forget a tick
-      await new Promise((r) => setImmediate(r));
-
       const updatedOrder = await prisma.marketplaceOrder.findUnique({ where: { id: order.id } });
       expect(updatedOrder!.status).toBe(OrderStatus.completed);
+
+      // Settlement should be released inside the transaction
+      const settlement = await prisma.settlementRecord.findFirst({ where: { orderId: order.id } });
+      expect(settlement!.status).toBe(SettlementStatus.completed);
     });
 
-    it('partial action is rejected with 400', async () => {
+    it('partial action is rejected with 400 at DTO validation level', async () => {
       const listing = await createListing(prisma, sellerId);
       const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId);
       const dispute = await prisma.dispute.create({
@@ -274,7 +244,8 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
           buyerId,
           sellerId,
           description: 'Item arrived with damage to the packaging.',
-          status: DisputeStatus.under_review,
+          status: DisputeStatus.admin_reviewing,
+          priorOrderStatus: OrderStatus.escrow_held,
         },
       });
       await prisma.marketplaceOrder.update({
@@ -285,9 +256,85 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       const res = await request
         .patch(`/api/v1/admin/disputes/${dispute.id}/resolve`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ action: 'partial', refundPercent: 50 });
+        .send({ action: 'partial' });
 
       expect(res.status).toBe(400);
+    });
+
+    // MP-E4: Buyer withdraws dispute → order restored to priorOrderStatus
+    it('buyer withdraws dispute → order restored to prior status, no completedAt', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        status: OrderStatus.delivered,
+      });
+
+      const dispute = await prisma.dispute.create({
+        data: {
+          targetType: 'marketplace_order',
+          orderId: order.id,
+          type: 'not_as_described',
+          buyerId,
+          sellerId,
+          description: 'Dispute filed in error.',
+          status: DisputeStatus.filed,
+          priorOrderStatus: OrderStatus.delivered,
+        },
+      });
+      await prisma.marketplaceOrder.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.disputed },
+      });
+
+      const res = await request
+        .post(`/api/v1/disputes/${dispute.id}/withdraw`)
+        .set('Authorization', `Bearer ${buyerToken}`);
+
+      // Endpoint may be 200 or 201 depending on controller; verify DB state regardless
+      const updatedDispute = await prisma.dispute.findUnique({ where: { id: dispute.id } });
+      expect(updatedDispute!.status).toBe(DisputeStatus.withdrawn);
+
+      const updatedOrder = await prisma.marketplaceOrder.findUnique({ where: { id: order.id } });
+      // Order must be restored to delivered — NOT forced to completed
+      expect(updatedOrder!.status).toBe(OrderStatus.delivered);
+      expect(updatedOrder!.completedAt).toBeNull();
+    });
+
+    // MP-R1: Admin dismiss → order restored to priorOrderStatus
+    it('admin dismiss → order restored to prior status, not forced to completed', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        status: OrderStatus.shipped,
+      });
+
+      const dispute = await prisma.dispute.create({
+        data: {
+          targetType: 'marketplace_order',
+          orderId: order.id,
+          type: 'damaged',
+          buyerId,
+          sellerId,
+          description: 'Minor damage, easily fixable.',
+          status: DisputeStatus.admin_reviewing,
+          priorOrderStatus: OrderStatus.shipped,
+        },
+      });
+      await prisma.marketplaceOrder.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.disputed },
+      });
+
+      const res = await request
+        .patch(`/api/v1/admin/disputes/${dispute.id}/resolve`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ action: 'dismiss', note: '근거 불충분, 기각' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe(DisputeStatus.dismissed);
+
+      const updatedOrder = await prisma.marketplaceOrder.findUnique({ where: { id: order.id } });
+      // Must restore to shipped, not force complete
+      expect(updatedOrder!.status).toBe(OrderStatus.shipped);
+      expect(updatedOrder!.completedAt).toBeNull();
     });
   });
 
@@ -299,22 +346,15 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId);
 
       // Create a completed settlement (simulating released escrow)
-      const settlement = await prisma.settlementRecord.create({
-        data: {
-          type: 'marketplace',
-          sourceId: order.orderId,
-          orderId: order.id,
-          amount: order.amount,
-          commission: order.commission,
-          netAmount: order.amount - order.commission,
-          recipientId: sellerId,
-          status: SettlementStatus.completed,
-          releasedAt: new Date(),
-        },
-      });
+      const settlement = await createReleasedSettlement(
+        prisma,
+        order.id,
+        order.orderId,
+        sellerId,
+        order.amount,
+      );
 
-      // List released settlements (admin endpoint — using admin settlements service via API)
-      // This tests the service directly via the API layer
+      // List released settlements
       const listRes = await request
         .get('/api/v1/admin/settlements')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -322,10 +362,137 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
 
       expect(listRes.status).toBe(200);
 
-      // Verify the settlement is listed
       const found = (listRes.body.data.items as Array<{ id: string }>)
         .find((s) => s.id === settlement.id);
       expect(found).toBeDefined();
+    });
+
+    // MP-R2: createPayoutBatch groups by recipient and uses batchId
+    it('createPayoutBatch creates one payout per recipient with batchId', async () => {
+      const listing = await createListing(prisma, sellerId);
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        amount: 50000,
+      });
+
+      const settlement = await createReleasedSettlement(
+        prisma,
+        order.id,
+        order.orderId,
+        sellerId,
+        order.amount,
+      );
+
+      const batchRes = await request
+        .post('/api/v1/admin/payouts/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ settlementIds: [settlement.id], note: 'Test batch' });
+
+      expect(batchRes.status).toBe(201);
+      const payouts = batchRes.body.data as Array<{
+        id: string;
+        batchId: string;
+        grossAmount: number;
+        platformFee: number;
+        netAmount: number;
+        status: string;
+      }>;
+      expect(payouts).toHaveLength(1);
+      expect(payouts[0].batchId).toBeTruthy();
+      expect(payouts[0].grossAmount).toBe(50000);
+      expect(payouts[0].platformFee).toBe(5000);
+      expect(payouts[0].netAmount).toBe(45000);
+      expect(payouts[0].status).toBe('pending');
+    });
+
+    // MP-R3: markPayoutPaid
+    it('markPayoutPaid transitions payout to paid and cascades processedAt', async () => {
+      const listing = await createListing(prisma, sellerId);
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        amount: 50000,
+      });
+      const settlement = await createReleasedSettlement(
+        prisma,
+        order.id,
+        order.orderId,
+        sellerId,
+        order.amount,
+      );
+
+      const batchRes = await request
+        .post('/api/v1/admin/payouts/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ settlementIds: [settlement.id] });
+
+      expect(batchRes.status).toBe(201);
+      const payoutId = batchRes.body.data[0].id as string;
+
+      const paidRes = await request
+        .patch(`/api/v1/admin/payouts/${payoutId}/mark-paid`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ note: 'Wire transfer ref #12345' });
+
+      expect(paidRes.status).toBe(200);
+      expect(paidRes.body.data.status).toBe('paid');
+
+      // Cascade: settlement processedAt should be set
+      const updatedSettlement = await prisma.settlementRecord.findUnique({
+        where: { id: settlement.id },
+      });
+      expect(updatedSettlement!.processedAt).not.toBeNull();
+    });
+  });
+
+  // ── MP-E1: confirmOrderPayment idempotency ──────────────────────────────────
+
+  describe('MP-E1: confirmOrderPayment race guard', () => {
+    it('second call on already-processed order returns 409', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId);
+      // Order is already escrow_held — simulates second confirm call
+      const res = await request
+        .post(`/api/v1/marketplace/orders/${order.orderId}/confirm`)
+        .set('Authorization', `Bearer ${buyerToken}`)
+        .send({ paymentKey: 'test-pk', orderId: order.orderId, amount: order.amount });
+
+      // Should return 400/409 since order is already escrow_held
+      expect([400, 409]).toContain(res.status);
+    });
+  });
+
+  // ── MP-E2: fileDispute twice on same order ──────────────────────────────────
+
+  describe('MP-E2: duplicate dispute rejection', () => {
+    it('filing dispute twice on same order returns 409', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId);
+
+      // First dispute
+      await prisma.dispute.create({
+        data: {
+          targetType: 'marketplace_order',
+          orderId: order.id,
+          type: 'not_as_described',
+          buyerId,
+          sellerId,
+          description: 'First dispute.',
+          status: DisputeStatus.filed,
+          priorOrderStatus: OrderStatus.escrow_held,
+        },
+      });
+      await prisma.marketplaceOrder.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.disputed },
+      });
+
+      const res = await request
+        .post(`/api/v1/marketplace/orders/${order.id}/dispute`)
+        .set('Authorization', `Bearer ${buyerToken}`)
+        .send({
+          type: 'not_as_described',
+          description: 'Trying to file a second dispute on the same order.',
+        });
+
+      expect(res.status).toBe(409);
     });
   });
 });

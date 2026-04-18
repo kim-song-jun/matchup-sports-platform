@@ -1,12 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AdminUserAuditAction,
   AdminUserStatus,
   LessonStatus,
   MatchStatus,
   MercenaryPostStatus,
+  OrderStatus,
   PaymentStatus,
   Prisma,
+  SettlementStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PAGINATION } from '../common/constants/pagination';
@@ -849,6 +851,66 @@ export class AdminService {
       items,
       nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
     };
+  }
+
+  /**
+   * Admin force-releases escrow for a marketplace order.
+   * Transitions order from any pre-completion escrow state to auto_released.
+   * Releases the held settlement record atomically.
+   * Does NOT issue a Toss cancellation — only use when buyer or seller has agreed.
+   *
+   * @param orderId - MarketplaceOrder.id (PK)
+   * @param adminId - Admin user performing the operation (for audit trail)
+   */
+  async forceReleaseOrder(orderId: string, adminId: string) {
+    const releasableStatuses: OrderStatus[] = [
+      OrderStatus.escrow_held,
+      OrderStatus.shipped,
+      OrderStatus.delivered,
+      OrderStatus.disputed,
+    ];
+
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id: orderId },
+      select: { id: true, orderId: true, status: true, sellerId: true },
+    });
+    if (!order) throw new NotFoundException(`주문 ${orderId}을(를) 찾을 수 없습니다.`);
+    if (!releasableStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `ORDER_INVALID_STATE: 현재 상태(${order.status})에서는 강제 지급할 수 없습니다.`,
+      );
+    }
+
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.marketplaceOrder.updateMany({
+        where: { id: orderId, status: { in: releasableStatuses } },
+        data: { status: OrderStatus.auto_released, releasedAt: now, completedAt: now },
+      });
+      if (updateResult.count === 0) {
+        throw new ConflictException(
+          'ORDER_RACE: 주문 상태가 동시에 변경되었습니다.',
+        );
+      }
+
+      // Release held settlement inside transaction
+      const settlementResult = await tx.settlementRecord.updateMany({
+        where: { orderId, status: SettlementStatus.held },
+        data: { status: SettlementStatus.completed, releasedAt: now, processedAt: now },
+      });
+      if (settlementResult.count === 0) {
+        // Settlement may already be completed (idempotent) — check
+        const existing = await tx.settlementRecord.findFirst({
+          where: { orderId, status: SettlementStatus.completed },
+        });
+        if (!existing) {
+          throw new NotFoundException(`주문 ${orderId}의 에스크로 정산 레코드를 찾을 수 없습니다.`);
+        }
+      }
+
+      return tx.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
+    });
   }
 
   private async ensureUserExists(id: string) {

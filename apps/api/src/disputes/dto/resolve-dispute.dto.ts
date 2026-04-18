@@ -1,19 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * Short tokens that map to Prisma DisputeStatus values in the service layer:
  *   'refund'  -> resolved_refund
  *   'release' -> resolved_release
- *   'partial' -> resolved_partial
  *   'dismiss' -> dismissed
+ *
+ * 'partial' (resolved_partial) is NOT supported and will be rejected by the service.
  */
-const RESOLVE_ACTIONS = ['refund', 'release', 'partial', 'dismiss'] as const;
+const RESOLVE_ACTIONS = ['refund', 'release', 'dismiss'] as const;
 export type ResolveAction = (typeof RESOLVE_ACTIONS)[number];
 
 export class ResolveDisputeDto {
   @ApiProperty({
-    description: '처리 액션 (refund=환불, release=판매자 지급, partial=부분환불, dismiss=기각)',
+    description: '처리 액션 (refund=환불, release=판매자 지급, dismiss=기각)',
     enum: RESOLVE_ACTIONS,
   })
   @IsIn(RESOLVE_ACTIONS)
@@ -27,15 +28,4 @@ export class ResolveDisputeDto {
   @IsString()
   @MaxLength(1000)
   note?: string;
-
-  @ApiPropertyOptional({
-    description: '부분환불 비율 (0–100, action=partial 시 필수)',
-    minimum: 1,
-    maximum: 99,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(99)
-  refundPercent?: number;
 }

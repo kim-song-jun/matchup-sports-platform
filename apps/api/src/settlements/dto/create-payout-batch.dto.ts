@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class CreatePayoutBatchDto {
   @ApiPropertyOptional({
@@ -8,7 +8,8 @@ export class CreatePayoutBatchDto {
   })
   @IsOptional()
   @IsArray()
-  @IsUUID('4', { each: true })
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
   settlementIds?: string[];
 
   @ApiPropertyOptional({

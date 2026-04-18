@@ -89,7 +89,7 @@ describe('DisputesAdminController', () => {
 
   describe('startReview', () => {
     it('delegates to service.startReview with id and adminId', () => {
-      const expected = { id: disputeId, status: 'under_review' };
+      const expected = { id: disputeId, status: 'admin_reviewing' };
       mockService.startReview.mockReturnValue(expected);
 
       const result = controller.startReview(disputeId, adminId);
@@ -113,17 +113,26 @@ describe('DisputesAdminController', () => {
       expect(result).toEqual(expected);
     });
 
-    it('delegates partial action with refundPercent', () => {
-      const body: ResolveDisputeDto = {
-        action: 'partial',
-        refundPercent: 50,
-        note: '부분 귀책',
-      };
-      mockService.resolve.mockReturnValue({ id: disputeId, status: 'resolved_partial' });
+    it('delegates release action to service.resolve', () => {
+      const body: ResolveDisputeDto = { action: 'release', note: '판매자 귀책 없음' };
+      const expected = { id: disputeId, status: 'resolved_release' };
+      mockService.resolve.mockReturnValue(expected);
 
-      controller.resolve(disputeId, body, adminId);
+      const result = controller.resolve(disputeId, body, adminId);
 
       expect(mockService.resolve).toHaveBeenCalledWith(disputeId, adminId, body);
+      expect(result).toEqual(expected);
+    });
+
+    it('delegates dismiss action to service.resolve', () => {
+      const body: ResolveDisputeDto = { action: 'dismiss', note: '근거 불충분' };
+      const expected = { id: disputeId, status: 'dismissed' };
+      mockService.resolve.mockReturnValue(expected);
+
+      const result = controller.resolve(disputeId, body, adminId);
+
+      expect(mockService.resolve).toHaveBeenCalledWith(disputeId, adminId, body);
+      expect(result).toEqual(expected);
     });
   });
 });

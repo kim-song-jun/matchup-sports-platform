@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeCommission } from '../common/constants/commission';
 
@@ -91,7 +92,7 @@ export class SettlementsService {
     }
 
     let newStatus: SettlementStatus;
-    let processedAt: Date | undefined = new Date();
+    const processedAt: Date = new Date();
 
     switch (data.action) {
       case 'approve':
@@ -247,13 +248,55 @@ export class SettlementsService {
   }
 
   /**
+   * Lists all Payout records with optional filtering.
+   */
+  async findAllPayouts(filter: {
+    status?: PayoutStatus;
+    recipientId?: string;
+    batchId?: string;
+    cursor?: string;
+    limit?: number;
+  }) {
+    const take = Math.min(filter.limit ?? 20, 100);
+    const where = {
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.recipientId ? { recipientId: filter.recipientId } : {}),
+      ...(filter.batchId ? { batchId: filter.batchId } : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.payout.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: take + 1,
+        include: {
+          recipient: { select: { id: true, nickname: true } },
+        },
+        ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
+      }),
+      this.prisma.payout.count({ where }),
+    ]);
+
+    const hasMore = items.length > take;
+    if (hasMore) items.pop();
+
+    return {
+      items,
+      total,
+      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+    };
+  }
+
+  /**
    * Groups the given SettlementRecord IDs by recipientId and creates one Payout per seller.
    * All records are locked to their respective payout inside a single transaction.
+   * A shared batchId is generated for the entire batch run.
    *
    * @param settlementIds - IDs of SettlementRecords to include in payouts
+   * @param adminNote - Optional note to attach to each payout
    * @returns Array of created Payout records
    */
-  async createPayoutBatch(settlementIds: string[]) {
+  async createPayoutBatch(settlementIds: string[], adminNote?: string) {
     if (settlementIds.length === 0) return [];
 
     // Load all records, verify they are releasable (completed + no existing payout)
@@ -278,15 +321,39 @@ export class SettlementsService {
       grouped.get(record.recipientId)!.push(record);
     }
 
+    // Shared batch identifier for this admin batch run
+    const batchId = randomUUID();
+
     return this.prisma.$transaction(async (tx) => {
       const payouts = [];
       for (const [recipientId, group] of grouped.entries()) {
-        const totalNet = group.reduce((sum, r) => sum + r.netAmount, 0);
+        const grossAmount = group.reduce((sum, r) => sum + r.amount, 0);
+        const platformFee = group.reduce((sum, r) => sum + r.commission, 0);
+        const netAmount = group.reduce((sum, r) => sum + r.netAmount, 0);
+
+        // Race guard: verify records are still unpaid inside the transaction
+        const freshRecords = await tx.settlementRecord.findMany({
+          where: {
+            id: { in: group.map((r) => r.id) },
+            status: SettlementStatus.completed,
+            payoutId: null,
+          },
+        });
+        if (freshRecords.length !== group.length) {
+          throw new ConflictException(
+            `PAYOUT_RACE: 일부 정산 레코드가 다른 배치에서 이미 처리되었습니다. (recipientId=${recipientId})`,
+          );
+        }
+
         const payout = await tx.payout.create({
           data: {
+            batchId,
             recipientId,
-            amount: totalNet,
+            grossAmount,
+            platformFee,
+            netAmount,
             status: PayoutStatus.pending,
+            ...(adminNote ? { note: adminNote } : {}),
           },
         });
         await tx.settlementRecord.updateMany({
@@ -301,23 +368,81 @@ export class SettlementsService {
 
   /**
    * Marks a pending/processing Payout as paid.
+   * Race guard: uses updateMany to ensure status hasn't changed concurrently.
+   * Cascades: marks all linked SettlementRecords as processedAt=now.
    *
    * @param payoutId - Payout record ID
+   * @param adminId - Admin user ID making the change (optional for backwards compat)
    * @param note - Optional external reference or note from admin
    */
-  async markPayoutPaid(payoutId: string, note?: string) {
+  async markPayoutPaid(payoutId: string, adminId?: string, note?: string) {
     const payout = await this.prisma.payout.findUnique({ where: { id: payoutId } });
     if (!payout) throw new NotFoundException(`지급 ${payoutId}을(를) 찾을 수 없습니다.`);
 
     if (payout.status === PayoutStatus.paid) return payout;
 
-    return this.prisma.payout.update({
-      where: { id: payoutId },
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.payout.updateMany({
+        where: { id: payoutId, status: { in: [PayoutStatus.pending, PayoutStatus.processing] } },
+        data: {
+          status: PayoutStatus.paid,
+          paidAt: new Date(),
+          processedAt: new Date(),
+          ...(adminId ? { markedPaidByAdminId: adminId } : {}),
+          ...(note !== undefined ? { note } : {}),
+        },
+      });
+      if (result.count === 0) {
+        throw new ConflictException(
+          `PAYOUT_RACE: 지급 ${payoutId} 상태가 동시에 변경되었습니다. 현재 상태: ${payout.status}`,
+        );
+      }
+      // Cascade: mark all linked settlements as processedAt
+      await tx.settlementRecord.updateMany({
+        where: { payoutId },
+        data: { processedAt: new Date() },
+      });
+      return tx.payout.findUniqueOrThrow({
+        where: { id: payoutId },
+        include: { recipient: { select: { id: true, nickname: true } } },
+      });
+    });
+  }
+
+  /**
+   * Marks a pending/processing Payout as failed.
+   * Race guard: only transitions from pending or processing.
+   *
+   * @param payoutId - Payout record ID
+   * @param reason - Required failure reason
+   * @param note - Optional additional note
+   * @param adminId - Optional admin user ID making the change
+   */
+  async markPayoutFailed(payoutId: string, reason: string, note?: string, adminId?: string) {
+    const payout = await this.prisma.payout.findUnique({ where: { id: payoutId } });
+    if (!payout) throw new NotFoundException(`지급 ${payoutId}을(를) 찾을 수 없습니다.`);
+
+    if (payout.status === PayoutStatus.failed) return payout;
+
+    const result = await this.prisma.payout.updateMany({
+      where: { id: payoutId, status: { in: [PayoutStatus.pending, PayoutStatus.processing] } },
       data: {
-        status: PayoutStatus.paid,
-        paidAt: new Date(),
+        status: PayoutStatus.failed,
+        failureReason: reason,
+        processedAt: new Date(),
+        ...(adminId ? { markedPaidByAdminId: adminId } : {}),
         ...(note !== undefined ? { note } : {}),
       },
+    });
+    if (result.count === 0) {
+      throw new ConflictException(
+        `PAYOUT_RACE: 지급 ${payoutId} 상태가 동시에 변경되었습니다. 현재 상태: ${payout.status}`,
+      );
+    }
+
+    return this.prisma.payout.findUniqueOrThrow({
+      where: { id: payoutId },
+      include: { recipient: { select: { id: true, nickname: true } } },
     });
   }
 }

@@ -209,7 +209,6 @@ export class AdminController {
     @Param('id') orderId: string,
     @CurrentUser('id') adminId: string,
   ) {
-    // @ts-expect-error Wave 1 service pending — forceReleaseOrder added by backend-data-dev
     return this.adminService.forceReleaseOrder(orderId, adminId);
   }
 }

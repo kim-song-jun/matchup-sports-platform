@@ -55,8 +55,6 @@ enum PaymentStatus {
   refunded
   partial_refunded
   failed
-  held     // escrow: funds held on platform
-  released // escrow: funds released to seller
 }
 
 enum PaymentMethod {
@@ -1324,10 +1322,10 @@ enum SettlementStatus {
 enum DisputeStatus {
   filed
   seller_responded
-  under_review
+  admin_reviewing
   resolved_refund
   resolved_release
-  resolved_partial
+  withdrawn
   dismissed
 }
 
@@ -1347,6 +1345,7 @@ enum PayoutStatus {
   processing
   paid
   failed
+  cancelled
 }
 
 model SettlementRecord {
@@ -1367,6 +1366,7 @@ model SettlementRecord {
   order  MarketplaceOrder? @relation("OrderSettlements", fields: [orderId], references: [id], onDelete: SetNull)
   payout Payout?           @relation("PayoutSettlements", fields: [payoutId], references: [id], onDelete: SetNull)
 
+  @@unique([orderId, type])
   @@index([type, status])
   @@index([recipientId])
   @@index([payoutId])
@@ -1442,18 +1442,25 @@ model UserBlock {
 // ─── Payout (admin-triggered seller bank transfers) ─────
 
 model Payout {
-  id          String      @id @default(cuid())
-  recipientId String      @map("recipient_id") // seller user id
-  amount      Int         // total net amount (sum of included settlement net amounts)
-  status      PayoutStatus @default(pending)
-  note        String?
-  paidAt      DateTime?   @map("paid_at")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id                  String       @id @default(cuid())
+  batchId             String       @map("batch_id")          // shared across all payouts in one admin batch run
+  recipientId         String       @map("recipient_id")      // seller user id
+  grossAmount         Int          @map("gross_amount")      // sum of settlement gross amounts
+  platformFee         Int          @map("platform_fee")      // sum of settlement commissions
+  netAmount           Int          @map("net_amount")        // grossAmount - platformFee; transferred to seller
+  status              PayoutStatus @default(pending)
+  note                String?
+  failureReason       String?      @map("failure_reason")
+  paidAt              DateTime?    @map("paid_at")
+  processedAt         DateTime?    @map("processed_at")
+  markedPaidByAdminId String?      @map("marked_paid_by_admin_id")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
 
   recipient    User               @relation("UserPayouts", fields: [recipientId], references: [id])
   settlements  SettlementRecord[] @relation("PayoutSettlements")
 
+  @@index([batchId])
   @@index([recipientId, status])
   @@index([status])
   @@map("payouts")
@@ -1462,20 +1469,22 @@ model Payout {
 // ─── Dispute (marketplace order & team-match disputes) ──
 
 model Dispute {
-  id          String            @id @default(cuid())
-  targetType  DisputeTargetType @map("target_type")
-  orderId     String?           @unique @map("order_id")      // FK when targetType = marketplace_order
-  teamMatchId String?           @map("team_match_id")         // FK when targetType = team_match
-  type        String            @map("type")                  // reason code e.g. "item_not_received", "item_not_as_described"
-  status      DisputeStatus     @default(filed)
-  buyerId     String            @map("buyer_id")              // disputing party (or host for team-match)
-  sellerId    String            @map("seller_id")             // responding party
-  description String
-  evidence    String[]          @default([])                  // URLs to uploaded evidence files
-  resolvedAt  DateTime?         @map("resolved_at")
-  resolution  String?                                         // admin resolution note
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id                String            @id @default(cuid())
+  targetType        DisputeTargetType @map("target_type")
+  orderId           String?           @unique @map("order_id")         // FK when targetType = marketplace_order
+  teamMatchId       String?           @map("team_match_id")            // FK when targetType = team_match
+  type              String            @map("type")                     // reason code e.g. "item_not_received", "item_not_as_described"
+  status            DisputeStatus     @default(filed)
+  buyerId           String            @map("buyer_id")                 // disputing party (or host for team-match)
+  sellerId          String            @map("seller_id")                // responding party
+  description       String
+  evidence          String[]          @default([])                     // URLs to uploaded evidence files
+  priorOrderStatus  OrderStatus       @map("prior_order_status")       // order status at time of dispute filing; used to restore on withdraw/dismiss
+  resolvedByAdminId String?           @map("resolved_by_admin_id")     // admin who resolved the dispute
+  resolvedAt        DateTime?         @map("resolved_at")
+  resolution        String?                                            // admin resolution note
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
 
   order     MarketplaceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
   teamMatch TeamMatch?        @relation("TeamMatchDisputes", fields: [teamMatchId], references: [id], onDelete: SetNull)

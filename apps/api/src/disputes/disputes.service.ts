@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -53,7 +54,7 @@ export class DisputesService {
       }),
     ]);
 
-    // Notify buyer
+    // Notify buyer (fire-and-forget — notification failure must not fail this operation)
     this.notificationsService
       .create({
         userId: dispute.buyerId,
@@ -84,7 +85,7 @@ export class DisputesService {
     const closedStatuses: DisputeStatus[] = [
       DisputeStatus.resolved_refund,
       DisputeStatus.resolved_release,
-      DisputeStatus.resolved_partial,
+      DisputeStatus.withdrawn,
       DisputeStatus.dismissed,
     ];
     if (closedStatuses.includes(dispute.status)) {
@@ -196,21 +197,16 @@ export class DisputesService {
    * Admin resolves a dispute.
    * Actions:
    *  - 'refund'   → refund buyer via Toss, set order=refunded, settlement=refunded
-   *  - 'release'  → release funds to seller, set order=completed
-   *  - 'partial'  → not supported by current schema (throws 400)
-   *  - 'dismiss'  → no financial action, set order back to previous state
+   *  - 'release'  → release funds to seller, set order=completed, settlement released inside tx
+   *  - 'partial'  → not supported (throws 400)
+   *  - 'dismiss'  → no financial action, restore order to priorOrderStatus
    */
   async resolveDispute(
     disputeId: string,
-    action: 'refund' | 'release' | 'partial' | 'dismiss',
+    action: 'refund' | 'release' | 'dismiss',
     resolution: string,
+    adminId?: string,
   ) {
-    if (action === 'partial') {
-      throw new BadRequestException(
-        'DISPUTE_PARTIAL_NOT_SUPPORTED: 부분 환불은 현재 지원되지 않습니다.',
-      );
-    }
-
     const dispute = await this.prisma.dispute.findUnique({
       where: { id: disputeId },
       include: {
@@ -224,7 +220,7 @@ export class DisputesService {
     const closedStatuses: DisputeStatus[] = [
       DisputeStatus.resolved_refund,
       DisputeStatus.resolved_release,
-      DisputeStatus.resolved_partial,
+      DisputeStatus.withdrawn,
       DisputeStatus.dismissed,
     ];
     if (closedStatuses.includes(dispute.status)) {
@@ -236,7 +232,7 @@ export class DisputesService {
     if (action === 'refund') {
       if (!dispute.order) throw new BadRequestException('주문 정보를 찾을 수 없습니다.');
 
-      // Execute Toss cancel (outside transaction — network call)
+      // Execute Toss cancel outside transaction — network call
       if (dispute.order.paymentKey) {
         await this.paymentsService.cancelByPaymentKey(
           dispute.order.paymentKey,
@@ -245,19 +241,22 @@ export class DisputesService {
       }
 
       await this.prisma.$transaction(async (tx) => {
-        await tx.dispute.update({
-          where: { id: disputeId },
+        const result = await tx.dispute.updateMany({
+          where: { id: disputeId, status: { notIn: closedStatuses } },
           data: {
             status: DisputeStatus.resolved_refund,
             resolution,
             resolvedAt: now,
+            ...(adminId ? { resolvedByAdminId: adminId } : {}),
           },
         });
+        if (result.count === 0) {
+          throw new ConflictException('DISPUTE_CONCURRENT_UPDATE: 분쟁 상태가 동시에 변경되었습니다.');
+        }
         await tx.marketplaceOrder.update({
           where: { id: dispute.orderId! },
           data: { status: OrderStatus.refunded },
         });
-        // Mark settlement as refunded
         await tx.settlementRecord.updateMany({
           where: { orderId: dispute.orderId! },
           data: { status: 'refunded' },
@@ -271,7 +270,7 @@ export class DisputesService {
           type: NotificationType.marketplace_order_refunded,
           title: '분쟁이 해결되었어요 — 환불 처리',
           body: '분쟁이 환불 처리로 해결되었습니다.',
-          data: { disputeId },
+          data: { disputeId, orderId: dispute.orderId },
         })
         .catch(() => void 0);
       this.notificationsService
@@ -280,34 +279,35 @@ export class DisputesService {
           type: NotificationType.marketplace_dispute_resolved,
           title: '분쟁 해결 결과',
           body: '분쟁이 환불 처리로 해결되었습니다.',
-          data: { disputeId },
+          data: { disputeId, orderId: dispute.orderId },
         })
         .catch(() => void 0);
     } else if (action === 'release') {
       await this.prisma.$transaction(async (tx) => {
-        await tx.dispute.update({
-          where: { id: disputeId },
+        const result = await tx.dispute.updateMany({
+          where: { id: disputeId, status: { notIn: closedStatuses } },
           data: {
             status: DisputeStatus.resolved_release,
             resolution,
             resolvedAt: now,
+            ...(adminId ? { resolvedByAdminId: adminId } : {}),
           },
         });
+        if (result.count === 0) {
+          throw new ConflictException('DISPUTE_CONCURRENT_UPDATE: 분쟁 상태가 동시에 변경되었습니다.');
+        }
         await tx.marketplaceOrder.update({
           where: { id: dispute.orderId! },
           data: { status: OrderStatus.completed, releasedAt: now, completedAt: now },
         });
-      });
-
-      // Release held settlement
-      if (dispute.orderId) {
-        this.prisma.settlementRecord
-          .updateMany({
+        // Release held settlement inside transaction to ensure atomicity
+        if (dispute.orderId) {
+          await tx.settlementRecord.updateMany({
             where: { orderId: dispute.orderId, status: 'held' },
             data: { status: 'completed', releasedAt: now, processedAt: now },
-          })
-          .catch(() => void 0);
-      }
+          });
+        }
+      });
 
       this.notificationsService
         .create({
@@ -315,7 +315,7 @@ export class DisputesService {
           type: NotificationType.marketplace_dispute_resolved,
           title: '분쟁이 해결되었어요 — 대금 지급',
           body: '분쟁이 대금 지급으로 해결되었습니다.',
-          data: { disputeId },
+          data: { disputeId, orderId: dispute.orderId },
         })
         .catch(() => void 0);
       this.notificationsService
@@ -324,26 +324,31 @@ export class DisputesService {
           type: NotificationType.marketplace_dispute_resolved,
           title: '분쟁 해결 결과',
           body: '분쟁이 판매자 대금 지급으로 해결되었습니다.',
-          data: { disputeId },
+          data: { disputeId, orderId: dispute.orderId },
         })
         .catch(() => void 0);
     } else {
-      // dismiss — no financial action
-      await this.prisma.dispute.update({
-        where: { id: disputeId },
-        data: {
-          status: DisputeStatus.dismissed,
-          resolution,
-          resolvedAt: now,
-        },
-      });
-      // Return order to a neutral completed state
-      if (dispute.orderId) {
-        await this.prisma.marketplaceOrder.update({
-          where: { id: dispute.orderId },
-          data: { status: OrderStatus.completed, completedAt: now },
+      // dismiss — no financial action; restore order to state before dispute was filed
+      await this.prisma.$transaction(async (tx) => {
+        const result = await tx.dispute.updateMany({
+          where: { id: disputeId, status: { notIn: closedStatuses } },
+          data: {
+            status: DisputeStatus.dismissed,
+            resolution,
+            resolvedAt: now,
+            ...(adminId ? { resolvedByAdminId: adminId } : {}),
+          },
         });
-      }
+        if (result.count === 0) {
+          throw new ConflictException('DISPUTE_CONCURRENT_UPDATE: 분쟁 상태가 동시에 변경되었습니다.');
+        }
+        if (dispute.orderId) {
+          await tx.marketplaceOrder.update({
+            where: { id: dispute.orderId },
+            data: { status: dispute.priorOrderStatus },
+          });
+        }
+      });
 
       this.notificationsService
         .create({
@@ -351,7 +356,7 @@ export class DisputesService {
           type: NotificationType.marketplace_dispute_resolved,
           title: '분쟁이 기각되었어요',
           body: '분쟁 신청이 기각 처리되었습니다.',
-          data: { disputeId },
+          data: { disputeId, orderId: dispute.orderId },
         })
         .catch(() => void 0);
     }
@@ -397,7 +402,7 @@ export class DisputesService {
     return this.addMessage(id, authorId, role, dto.body);
   }
 
-  /** Buyer withdraws a filed/seller_responded dispute. */
+  /** Buyer withdraws a filed/seller_responded dispute. Restores order to priorOrderStatus. */
   async withdraw(id: string, buyerId: string) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
     if (!dispute) throw new NotFoundException('분쟁을 찾을 수 없습니다.');
@@ -409,20 +414,26 @@ export class DisputesService {
     }
 
     const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.dispute.update({
-        where: { id },
-        data: { status: DisputeStatus.dismissed, resolution: '구매자 자발 철회', resolvedAt: now },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.dispute.updateMany({
+        where: { id, status: { in: withdrawableStatuses } },
+        data: { status: DisputeStatus.withdrawn, resolution: '구매자 자발 철회', resolvedAt: now },
       });
+      if (updateResult.count === 0) {
+        throw new ConflictException('DISPUTE_CONCURRENT_UPDATE: 분쟁 상태가 동시에 변경되었습니다.');
+      }
       if (dispute.orderId) {
+        // Restore order to the state it was in before the dispute was filed.
+        // Do NOT set completedAt — cron handles auto-release naturally.
         await tx.marketplaceOrder.update({
           where: { id: dispute.orderId },
-          data: { status: OrderStatus.completed, completedAt: now },
+          data: { status: dispute.priorOrderStatus },
         });
       }
+      return tx.dispute.findUniqueOrThrow({ where: { id }, include: { messages: true } });
     });
 
-    return this.prisma.dispute.findUniqueOrThrow({ where: { id }, include: { messages: true } });
+    return result;
   }
 
   /** Admin alias for findAllAdmin. */
@@ -439,7 +450,7 @@ export class DisputesService {
     return this.getDispute(id, '', true);
   }
 
-  /** Admin moves dispute to under_review status. */
+  /** Admin moves dispute to admin_reviewing status. */
   async startReview(id: string, adminId: string) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
     if (!dispute) throw new NotFoundException('분쟁을 찾을 수 없습니다.');
@@ -451,9 +462,16 @@ export class DisputesService {
       throw new BadRequestException('검토 전환이 불가한 상태입니다.');
     }
 
-    return this.prisma.dispute.update({
+    const result = await this.prisma.dispute.updateMany({
+      where: { id, status: { in: [DisputeStatus.filed, DisputeStatus.seller_responded] } },
+      data: { status: DisputeStatus.admin_reviewing },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('DISPUTE_CONCURRENT_UPDATE: 분쟁 상태가 동시에 변경되었습니다.');
+    }
+
+    return this.prisma.dispute.findUniqueOrThrow({
       where: { id },
-      data: { status: DisputeStatus.under_review },
       include: { messages: true },
     });
   }
@@ -462,9 +480,9 @@ export class DisputesService {
   resolve(
     id: string,
     adminId: string,
-    dto: { action: 'refund' | 'release' | 'partial' | 'dismiss'; note?: string },
+    dto: { action: 'refund' | 'release' | 'dismiss'; note?: string },
   ) {
-    return this.resolveDispute(id, dto.action, dto.note ?? '');
+    return this.resolveDispute(id, dto.action, dto.note ?? '', adminId);
   }
 
   /**

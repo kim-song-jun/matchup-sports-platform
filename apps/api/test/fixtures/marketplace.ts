@@ -14,6 +14,7 @@ import {
   DisputeActorRole,
   DisputeTargetType,
   PayoutStatus,
+  SettlementStatus,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { computeCommission } from '../../src/common/constants/commission';
@@ -116,6 +117,58 @@ export async function createReleasedOrder(
   });
 }
 
+/**
+ * Creates a completed SettlementRecord for a released marketplace order.
+ */
+export async function createReleasedSettlement(
+  prisma: PrismaClient,
+  orderId: string,       // MarketplaceOrder.id (PK)
+  orderPublicId: string, // MarketplaceOrder.orderId (MU-MKT-... string)
+  sellerId: string,
+  amount: number,
+) {
+  const commission = Math.round(amount * 0.1);
+  return prisma.settlementRecord.create({
+    data: {
+      type: 'marketplace',
+      sourceId: orderPublicId,
+      orderId,
+      amount,
+      commission,
+      netAmount: amount - commission,
+      recipientId: sellerId,
+      status: SettlementStatus.completed,
+      releasedAt: new Date(),
+      processedAt: new Date(),
+    },
+  });
+}
+
+/**
+ * Creates a held SettlementRecord for an escrow-held marketplace order.
+ */
+export async function createHeldSettlement(
+  prisma: PrismaClient,
+  orderId: string,
+  orderPublicId: string,
+  sellerId: string,
+  amount: number,
+) {
+  const commission = Math.round(amount * 0.1);
+  return prisma.settlementRecord.create({
+    data: {
+      type: 'marketplace',
+      sourceId: orderPublicId,
+      orderId,
+      amount,
+      commission,
+      netAmount: amount - commission,
+      recipientId: sellerId,
+      status: SettlementStatus.held,
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // In-memory build helpers (pure objects, no DB I/O) — for unit test mocks
 // ---------------------------------------------------------------------------
@@ -123,22 +176,36 @@ export async function createReleasedOrder(
 export function buildPayout(
   overrides: Partial<{
     id: string;
+    batchId: string;
     recipientId: string;
-    amount: number;
+    grossAmount: number;
+    platformFee: number;
+    netAmount: number;
     status: PayoutStatus;
     note: string | null;
+    failureReason: string | null;
     paidAt: Date | null;
+    processedAt: Date | null;
+    markedPaidByAdminId: string | null;
     createdAt: Date;
     updatedAt: Date;
   }> = {},
 ): Payout {
+  const grossAmount = overrides.grossAmount ?? 50000;
+  const platformFee = overrides.platformFee ?? 5000;
   return {
     id: overrides.id ?? `payout-${randomUUID().slice(0, 8)}`,
+    batchId: overrides.batchId ?? `batch-${randomUUID().slice(0, 8)}`,
     recipientId: overrides.recipientId ?? 'user-seller-id',
-    amount: overrides.amount ?? 45000,
+    grossAmount,
+    platformFee,
+    netAmount: overrides.netAmount ?? grossAmount - platformFee,
     status: overrides.status ?? PayoutStatus.pending,
     note: overrides.note !== undefined ? overrides.note : null,
+    failureReason: overrides.failureReason !== undefined ? overrides.failureReason : null,
     paidAt: overrides.paidAt !== undefined ? overrides.paidAt : null,
+    processedAt: overrides.processedAt !== undefined ? overrides.processedAt : null,
+    markedPaidByAdminId: overrides.markedPaidByAdminId !== undefined ? overrides.markedPaidByAdminId : null,
     createdAt: overrides.createdAt ?? new Date('2026-04-10'),
     updatedAt: overrides.updatedAt ?? new Date('2026-04-10'),
   };
@@ -149,13 +216,19 @@ export function buildPayoutBatch(
   count: number = 3,
   statusOverride?: PayoutStatus,
 ): Payout[] {
-  return Array.from({ length: count }, (_, i) =>
-    buildPayout({
+  const batchId = `batch-${randomUUID().slice(0, 8)}`;
+  return Array.from({ length: count }, (_, i) => {
+    const grossAmount = (i + 1) * 50000;
+    const platformFee = Math.round(grossAmount * 0.1);
+    return buildPayout({
+      batchId,
       recipientId,
-      amount: (i + 1) * 45000,
+      grossAmount,
+      platformFee,
+      netAmount: grossAmount - platformFee,
       status: statusOverride ?? PayoutStatus.pending,
-    }),
-  );
+    });
+  });
 }
 
 export function buildDispute(
@@ -170,6 +243,8 @@ export function buildDispute(
     sellerId: string;
     description: string;
     evidence: string[];
+    priorOrderStatus: OrderStatus;
+    resolvedByAdminId: string | null;
     resolvedAt: Date | null;
     resolution: string | null;
     createdAt: Date;
@@ -187,6 +262,8 @@ export function buildDispute(
     sellerId: overrides.sellerId ?? 'user-seller-id',
     description: overrides.description ?? 'Item was not as described in the listing.',
     evidence: overrides.evidence ?? [],
+    priorOrderStatus: overrides.priorOrderStatus ?? OrderStatus.escrow_held,
+    resolvedByAdminId: overrides.resolvedByAdminId !== undefined ? overrides.resolvedByAdminId : null,
     resolvedAt: overrides.resolvedAt !== undefined ? overrides.resolvedAt : null,
     resolution: overrides.resolution !== undefined ? overrides.resolution : null,
     createdAt: overrides.createdAt ?? new Date('2026-04-12'),

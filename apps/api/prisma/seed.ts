@@ -995,11 +995,15 @@ async function main() {
   // Payout for the seller
   const payout = await prisma.payout.create({
     data: {
+      batchId: 'seed-batch-2026-04-01',
       recipientId: seller.id,
-      amount: settlementCompleted.netAmount,
+      grossAmount: settlementCompleted.amount,
+      platformFee: settlementCompleted.commission,
+      netAmount: settlementCompleted.netAmount,
       status: 'paid',
       note: '4월 1차 정산',
       paidAt: new Date('2026-04-10'),
+      processedAt: new Date('2026-04-10'),
     },
   });
 
@@ -1038,6 +1042,7 @@ async function main() {
       sellerId: users[0].id,
       description: '상품 설명과 달리 스크래치가 심합니다. 환불 요청합니다.',
       evidence: [],
+      priorOrderStatus: 'delivered', // order was delivered before buyer filed dispute
     },
   });
 

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { SettlementStatus, SettlementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { computeCommission } from '../common/constants/commission';
 
 @Injectable()
 export class SettlementsService {
@@ -50,7 +51,7 @@ export class SettlementsService {
   }
 
   async getSummary() {
-    const [totalAgg, commissionAgg, pendingAgg, processedCount, pendingCount, failedCount] =
+    const [totalAgg, commissionAgg, pendingAgg, refundedAgg, processedCount, pendingCount, refundedCount, failedCount] =
       await this.prisma.$transaction([
         this.prisma.settlementRecord.aggregate({ _sum: { amount: true } }),
         this.prisma.settlementRecord.aggregate({
@@ -61,8 +62,13 @@ export class SettlementsService {
           where: { status: SettlementStatus.pending },
           _sum: { amount: true },
         }),
+        this.prisma.settlementRecord.aggregate({
+          where: { status: SettlementStatus.refunded },
+          _sum: { amount: true },
+        }),
         this.prisma.settlementRecord.count({ where: { status: SettlementStatus.completed } }),
         this.prisma.settlementRecord.count({ where: { status: SettlementStatus.pending } }),
+        this.prisma.settlementRecord.count({ where: { status: SettlementStatus.refunded } }),
         this.prisma.settlementRecord.count({ where: { status: SettlementStatus.failed } }),
       ]);
 
@@ -70,10 +76,10 @@ export class SettlementsService {
       total: totalAgg._sum.amount ?? 0,
       commission: commissionAgg._sum.commission ?? 0,
       pending: pendingAgg._sum.amount ?? 0,
-      refunded: 0, // SettlementStatus enum has no 'refunded' value
+      refunded: refundedAgg._sum.amount ?? 0,
       processedCount,
       pendingCount,
-      refundedCount: 0,
+      refundedCount,
       failedCount,
     };
   }
@@ -120,7 +126,7 @@ export class SettlementsService {
       lesson: SettlementType.lesson,
     };
 
-    const commission = Math.round(data.amount * 0.1);
+    const commission = computeCommission(data.amount);
     const netAmount = data.amount - commission;
 
     return this.prisma.settlementRecord.create({

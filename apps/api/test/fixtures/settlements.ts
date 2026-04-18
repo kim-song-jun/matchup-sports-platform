@@ -10,12 +10,15 @@ export function buildSettlementRecord(
     id: string;
     type: SettlementType;
     sourceId: string;
+    orderId: string | null;
     amount: number;
     commission: number;
     netAmount: number;
     recipientId: string | null;
     status: SettlementStatus;
     processedAt: Date | null;
+    releasedAt: Date | null;
+    payoutId: string | null;
     createdAt: Date;
   }> = {},
 ): SettlementRecord {
@@ -25,12 +28,15 @@ export function buildSettlementRecord(
     id: overrides.id ?? `settle-${randomUUID().slice(0, 8)}`,
     type: overrides.type ?? SettlementType.match,
     sourceId: overrides.sourceId ?? 'pay-test-id',
+    orderId: overrides.orderId !== undefined ? overrides.orderId : null,
     amount,
     commission,
     netAmount: overrides.netAmount ?? amount - commission,
     recipientId: overrides.recipientId !== undefined ? overrides.recipientId : null,
     status: overrides.status ?? SettlementStatus.pending,
     processedAt: overrides.processedAt ?? null,
+    releasedAt: overrides.releasedAt ?? null,
+    payoutId: overrides.payoutId !== undefined ? overrides.payoutId : null,
     createdAt: overrides.createdAt ?? new Date('2026-02-01'),
   };
 }

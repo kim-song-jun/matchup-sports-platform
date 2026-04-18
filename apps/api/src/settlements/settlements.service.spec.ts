@@ -146,13 +146,16 @@ describe('SettlementsService', () => {
 
   describe('getSummary', () => {
     it('returns aggregated totals and counts', async () => {
-      // Transaction order: totalAgg, commissionAgg, pendingAgg, processedCount, pendingCount, failedCount
+      // Transaction order: totalAgg, commissionAgg, pendingAgg, refundedAgg,
+      //                    processedCount, pendingCount, refundedCount, failedCount
       prismaMock.$transaction.mockResolvedValue([
         { _sum: { amount: 565000 } },
         { _sum: { commission: 25000 } },
         { _sum: { amount: 265000 } },
+        { _sum: { amount: 50000 } },
         3,
         4,
+        1,
         1,
       ]);
 
@@ -161,8 +164,10 @@ describe('SettlementsService', () => {
       expect(summary.total).toBe(565000);
       expect(summary.commission).toBe(25000);
       expect(summary.pending).toBe(265000);
+      expect(summary.refunded).toBe(50000);
       expect(summary.processedCount).toBe(3);
       expect(summary.pendingCount).toBe(4);
+      expect(summary.refundedCount).toBe(1);
       expect(summary.failedCount).toBe(1);
     });
 
@@ -171,6 +176,8 @@ describe('SettlementsService', () => {
         { _sum: { amount: null } },
         { _sum: { commission: null } },
         { _sum: { amount: null } },
+        { _sum: { amount: null } },
+        0,
         0,
         0,
         0,
@@ -181,7 +188,9 @@ describe('SettlementsService', () => {
       expect(summary.total).toBe(0);
       expect(summary.commission).toBe(0);
       expect(summary.pending).toBe(0);
+      expect(summary.refunded).toBe(0);
       expect(summary.processedCount).toBe(0);
+      expect(summary.refundedCount).toBe(0);
     });
   });
 

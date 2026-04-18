@@ -12,7 +12,10 @@ async function main() {
   await prisma.chatMessage.deleteMany();
   await prisma.chatRoomParticipant.deleteMany();
   await prisma.chatRoom.deleteMany();
+  await prisma.disputeMessage.deleteMany();
+  await prisma.dispute.deleteMany();
   await prisma.settlementRecord.deleteMany();
+  await prisma.payout.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.lessonAttendance.deleteMany();
   await prisma.lessonTicket.deleteMany();
@@ -946,6 +949,108 @@ async function main() {
     ],
   });
   console.log('  ✅ 11 marketplace listings created');
+
+  // ── Marketplace Orders, Dispute, Payout (lifecycle seed) ──
+  const listings = await prisma.marketplaceListing.findMany({ take: 3, orderBy: { createdAt: 'asc' } });
+  const seller = users[2]; // CCM stick seller
+  const buyer = users[1];  // buyer persona
+
+  // Order 1: completed escrow (buyer confirmed receipt, funds released)
+  const orderCompleted = await prisma.marketplaceOrder.create({
+    data: {
+      listingId: listings[0].id,
+      buyerId: buyer.id,
+      sellerId: seller.id,
+      amount: listings[0].price,
+      commission: Math.round(listings[0].price * 0.1),
+      orderId: `MU-MKT-SEED-001`,
+      status: 'completed',
+      paymentKey: 'seed-toss-key-001',
+      paidAt: new Date('2026-04-01'),
+      shippedAt: new Date('2026-04-02'),
+      deliveredAt: new Date('2026-04-04'),
+      confirmedReceiptAt: new Date('2026-04-05'),
+      releasedAt: new Date('2026-04-05'),
+      autoReleaseAt: new Date('2026-04-11'), // T+7 from delivered, not reached
+      completedAt: new Date('2026-04-05'),
+    },
+  });
+
+  // Settlement for the completed order
+  const settlementCompleted = await prisma.settlementRecord.create({
+    data: {
+      type: 'marketplace',
+      sourceId: orderCompleted.id,
+      orderId: orderCompleted.id,
+      amount: orderCompleted.amount,
+      commission: orderCompleted.commission,
+      netAmount: orderCompleted.amount - orderCompleted.commission,
+      recipientId: seller.id,
+      status: 'completed',
+      processedAt: new Date('2026-04-05'),
+      releasedAt: new Date('2026-04-05'),
+    },
+  });
+
+  // Payout for the seller
+  const payout = await prisma.payout.create({
+    data: {
+      recipientId: seller.id,
+      amount: settlementCompleted.netAmount,
+      status: 'paid',
+      note: '4월 1차 정산',
+      paidAt: new Date('2026-04-10'),
+    },
+  });
+
+  // Link settlement to payout
+  await prisma.settlementRecord.update({
+    where: { id: settlementCompleted.id },
+    data: { payoutId: payout.id },
+  });
+
+  // Order 2: disputed (buyer filed dispute, escrow held)
+  const orderDisputed = await prisma.marketplaceOrder.create({
+    data: {
+      listingId: listings[1].id,
+      buyerId: buyer.id,
+      sellerId: users[0].id, // different seller
+      amount: listings[1].price,
+      commission: Math.round(listings[1].price * 0.1),
+      orderId: `MU-MKT-SEED-002`,
+      status: 'disputed',
+      paymentKey: 'seed-toss-key-002',
+      paidAt: new Date('2026-04-08'),
+      shippedAt: new Date('2026-04-09'),
+      deliveredAt: new Date('2026-04-10'),
+      autoReleaseAt: new Date('2026-04-17'), // T+7 from delivered
+    },
+  });
+
+  // Dispute for the second order
+  const dispute = await prisma.dispute.create({
+    data: {
+      targetType: 'marketplace_order',
+      orderId: orderDisputed.id,
+      type: 'item_not_as_described',
+      status: 'filed',
+      buyerId: buyer.id,
+      sellerId: users[0].id,
+      description: '상품 설명과 달리 스크래치가 심합니다. 환불 요청합니다.',
+      evidence: [],
+    },
+  });
+
+  await prisma.disputeMessage.create({
+    data: {
+      disputeId: dispute.id,
+      authorId: buyer.id,
+      role: 'buyer',
+      body: '발송된 상품에 설명에 없는 큰 스크래치가 있습니다. 사진 첨부하겠습니다.',
+    },
+  });
+
+  console.log('  ✅ 2 marketplace orders + 1 dispute + 1 payout created');
 
   // ── Lessons / 강좌 ──
   await prisma.lesson.createMany({

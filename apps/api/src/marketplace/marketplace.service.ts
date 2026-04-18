@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { PAGINATION } from '../common/constants/pagination';
+import { computeCommission } from '../common/constants/commission';
 import { TeamMembershipService } from '../teams/team-membership.service';
 
 // Toss Payments confirm response shape (shared subset used here)
@@ -248,7 +249,7 @@ export class MarketplaceService {
       throw new BadRequestException('자신의 매물을 구매할 수 없습니다.');
     }
 
-    const commission = Math.round(listing.price * 0.10);
+    const commission = computeCommission(listing.price);
     const orderId = `MU-MKT-${randomUUID()}`;
 
     const order = await this.prisma.marketplaceOrder.create({

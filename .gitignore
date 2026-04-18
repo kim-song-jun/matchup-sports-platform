@@ -18,6 +18,14 @@ tmp-*.png
 tmp-*.jpg
 tmp-*.jpeg
 tmp-*.webp
+/*-current*.png
+/*-current*.jpg
+/*-current*.jpeg
+/*-current*.webp
+/*-after*.png
+/*-after*.jpg
+/*-after*.jpeg
+/*-after*.webp
 .claude/agents/*.bak.*
 *.bak.*
 ec2-info

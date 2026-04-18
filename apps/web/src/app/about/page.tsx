@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Heart, Brain, Shield, Target, TrendingUp } from 'lucide-react';
+import { ArrowRight, Brain, Heart, Shield, Target, TrendingUp } from 'lucide-react';
 import { ScrollReveal } from '@/components/landing/scroll-reveal';
 import { LandingNav } from '@/components/landing/landing-nav';
 import { LandingFooter } from '@/components/landing/landing-footer';
@@ -93,68 +93,141 @@ const TEAM = [
 
 const STATS = [
   { value: '2,400+', label: '매칭 완료', color: 'text-blue-500' },
-  { value: '520+', label: '활성 팀', color: 'text-emerald-500' },
-  { value: '11', label: '지원 종목', color: 'text-amber-700' },
-  { value: '4.8', label: '평균 만족도', color: 'text-purple-500' },
+  { value: '520+', label: '활성 팀', color: 'text-gray-900 dark:text-white' },
+  { value: '11', label: '지원 종목', color: 'text-gray-900 dark:text-white' },
+  { value: '4.8', label: '평균 만족도', color: 'text-gray-900 dark:text-white' },
 ];
+
+const HERO_POINTS = [
+  {
+    title: '실력 맞는 상대 연결',
+    description: 'ELO와 경기 이력으로 비슷한 수준의 팀과 경기를 찾습니다.',
+  },
+  {
+    title: '노쇼를 줄이는 신뢰 구조',
+    description: '매너 평가와 운영 기록으로 반복 불참 리스크를 낮춥니다.',
+  },
+] as const;
 
 /* ── Component ── */
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
-
       <LandingNav />
 
       {/* ── Hero ── */}
-      <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-24 lg:pt-48 lg:pb-32">
+      <section className="relative pt-24 pb-8 sm:pt-28 sm:pb-10 lg:pt-32 lg:pb-12">
         <div className="max-w-[1100px] mx-auto px-5">
-          <div className="max-w-[680px] mx-auto text-center">
-            <ScrollReveal delay={0}>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-white leading-[1.15] tracking-tight mb-6">
-                Teameet을
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start">
+            <div className="max-w-[680px]">
+              <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200">
+                소개
+              </span>
+              <h1 className="mt-5 text-4xl font-black leading-[1.1] tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl">
+                Teameet을 만든 이유,
                 <br />
-                만든 이유
+                그리고 바로 할 수 있는 일
               </h1>
-            </ScrollReveal>
-
-            <ScrollReveal delay={150}>
-              <p className="text-lg lg:text-xl text-gray-500 dark:text-gray-400 leading-relaxed max-w-[540px] mx-auto">
-                주말 아침, 풋살화 끈을 묶으며 설레는 마음.{' '}
-                <br className="hidden sm:block" />
-                그런데 상대가 없다면? 실력이 안 맞는다면?{' '}
-                <br className="hidden sm:block" />
-                우리는 그 설렘이 실망으로 바뀌는 순간을{' '}
-                <br className="hidden sm:block" />
-                없애고 싶었습니다.
+              <p className="mt-5 max-w-[620px] text-base leading-7 text-gray-700 dark:text-gray-200 sm:text-lg">
+                주말 아침, 풋살화 끈을 묶는 설렘이 상대를 못 찾아 실망으로 바뀌는 순간이
+                반복됐습니다. Teameet은 그 시간을 줄이고, 비슷한 수준의 사람끼리 더 쉽게
+                경기를 성사시키기 위해 시작했습니다.
               </p>
-            </ScrollReveal>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-2xl bg-blue-500 px-6 py-3.5 text-base font-bold text-white transition-[colors,transform] duration-200 hover:bg-blue-600 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+                >
+                  지금 시작하기
+                  <ArrowRight size={18} strokeWidth={2.5} />
+                </Link>
+                <Link
+                  href="/guide"
+                  className="inline-flex min-h-[48px] items-center justify-center rounded-2xl border border-gray-200 px-6 py-3.5 text-base font-semibold text-gray-700 transition-colors duration-200 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
+                >
+                  이용 가이드 보기
+                </Link>
+              </div>
+              <div className="mt-7 grid gap-3 sm:max-w-[440px] sm:grid-cols-2">
+                {HERO_POINTS.map((point) => (
+                  <div
+                    key={point.title}
+                    className="rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800"
+                  >
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{point.title}</p>
+                    <p className="mt-1.5 text-sm leading-6 text-gray-700 dark:text-gray-200">
+                      {point.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                먼저 이용 흐름을 확인하고 싶다면 가이드를 보고, 준비가 됐다면 바로 매칭을
+                시작할 수 있습니다.
+              </p>
+            </div>
+
+            <aside className="rounded-3xl border border-gray-100 bg-gray-50 p-6 dark:border-gray-800 dark:bg-gray-800/90 sm:p-7">
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-200">한눈에 보는 Teameet</p>
+              <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight text-gray-900 dark:text-white">
+                모든 사람이 자기 수준에 맞는 운동 상대를 더 빨리 찾도록
+              </h2>
+              <p className="mt-4 text-sm leading-6 text-gray-700 dark:text-gray-200 sm:text-base">
+                정보만 읽고 끝나는 소개 페이지가 아니라, 무엇을 해결하고 어디서 시작하면
+                되는지 첫 화면 안에서 바로 이해되도록 구성했습니다.
+              </p>
+              <div className="mt-6 space-y-4">
+                {APPROACHES.map((approach) => {
+                  const Icon = approach.icon;
+                  return (
+                    <div key={approach.title} className="flex gap-3 rounded-2xl bg-white px-4 py-3 dark:bg-gray-900/80">
+                      <div
+                        className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${approach.iconBg}`}
+                      >
+                        <Icon size={18} className={approach.iconColor} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {approach.title}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-200">
+                          {approach.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </aside>
           </div>
         </div>
-
-        {/* Background — clean, no decorative blobs */}
       </section>
 
       {/* ── Mission ── */}
-      <section className="pb-20 sm:pb-28">
+      <section className="pb-12 sm:pb-16">
         <div className="max-w-[800px] mx-auto px-5">
-          <ScrollReveal>
-            <div className="relative bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-8 sm:p-12 text-center">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(49,130,246,0.06),transparent_60%)] rounded-3xl" />
-              <div className="relative">
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white leading-tight tracking-tight">
-                  모든 사람이 자기 수준에 맞는
-                  <br />
-                  운동 상대를 쉽게 찾을 수 있는 세상
-                </h2>
-                <p className="text-md text-gray-500 dark:text-gray-400 mt-5 leading-relaxed max-w-[480px] mx-auto">
-                  운동은 좋은 상대가 있어야 즐겁습니다.{' '}
-                  <br className="hidden sm:block" />
-                  Teameet은 기술로 그 상대를 연결하는 플랫폼입니다.
-                </p>
-              </div>
+          <div className="rounded-3xl border border-gray-100 bg-gray-50 p-8 text-center dark:border-gray-800 dark:bg-gray-800 sm:p-10">
+            <p className="text-sm font-semibold text-blue-600 dark:text-blue-200">우리의 기준</p>
+            <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight text-gray-900 dark:text-white sm:text-3xl lg:text-4xl">
+              좋은 경기는 좋은 상대에서 시작됩니다
+            </h2>
+            <p className="mx-auto mt-4 max-w-[560px] text-base leading-7 text-gray-700 dark:text-gray-200">
+              상대를 찾는 데 쓰는 시간을 줄이고, 실력과 태도가 맞는 사람끼리 더 자주
+              즐겁게 운동할 수 있도록 연결 구조를 다듬고 있습니다.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+              <span className="rounded-full bg-white px-3.5 py-2 text-sm font-medium text-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                실력 기반 추천
+              </span>
+              <span className="rounded-full bg-white px-3.5 py-2 text-sm font-medium text-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                매너·신뢰 기록
+              </span>
+              <span className="rounded-full bg-white px-3.5 py-2 text-sm font-medium text-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                11개 종목 통합 경험
+              </span>
             </div>
-          </ScrollReveal>
+          </div>
         </div>
       </section>
 
@@ -236,7 +309,7 @@ export default function AboutPage() {
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                         {a.title}
                       </h3>
-                      <span className={`text-xs font-bold ${a.iconColor} ${a.iconBg} rounded-full px-2.5 py-0.5`}>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${a.iconColor} ${a.iconBg}`}>
                         {a.stat}
                       </span>
                     </div>

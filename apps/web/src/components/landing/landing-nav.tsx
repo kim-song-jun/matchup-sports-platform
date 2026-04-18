@@ -203,7 +203,7 @@ export function LandingNav() {
                   aria-current={isActive ? 'page' : undefined}
                   className={`text-base font-medium px-3 py-2 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 ${
                     isActive
-                      ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                      ? 'font-semibold text-blue-700 bg-blue-100/90 dark:bg-blue-900/40 dark:text-blue-100'
                       : 'text-gray-500 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >

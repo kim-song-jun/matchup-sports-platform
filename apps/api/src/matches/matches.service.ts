@@ -3,14 +3,17 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { Prisma, NotificationType, SportType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CancelMatchDto, CreateMatchDto, MatchFilterDto, TeamConfigDto, UpdateMatchDto } from './dto/match.dto';
+import { CancelMatchDto, ComposeTeamsDto, CreateMatchDto, MatchFilterDto, TeamConfigDto, UpdateMatchDto } from './dto/match.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationData } from '../notifications/notification-presentation';
 import { MatchingEngineService, RecommendationReason } from './matching-engine.service';
 import { BadgesService } from '../badges/badges.service';
+import { TeamBalancingService, ParticipantWithElo, BalancedDistribution } from './team-balancing.service';
 
 const recommendedMatchSelect = {
   id: true,
@@ -161,11 +164,14 @@ type MatchStatus = 'recruiting' | 'full' | 'in_progress' | 'cancelled' | 'comple
 
 @Injectable()
 export class MatchesService {
+  private readonly logger = new Logger(MatchesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly matchingEngine: MatchingEngineService,
     private readonly badgesService: BadgesService,
+    private readonly teamBalancing: TeamBalancingService,
   ) {}
 
   async findAll(filter: MatchFilterDto) {
@@ -656,53 +662,177 @@ export class MatchesService {
     return { message: '매치에서 탈퇴했습니다.' };
   }
 
-  async generateTeams(matchId: string, userId: string) {
+  /**
+   * Loads confirmed participants and resolves their ELO ratings for the given sport.
+   * Participants without a UserSportProfile for the match's sportType receive eloRating=1000
+   * and hasProfile=false (cold-start). PII fields (email, phone, oauthId) are excluded.
+   */
+  private async buildParticipantsWithElo(
+    matchId: string,
+    sportType: SportType,
+  ): Promise<ParticipantWithElo[]> {
+    const participants = await this.prisma.matchParticipant.findMany({
+      where: { matchId, status: 'confirmed' },
+      select: {
+        id: true,
+        userId: true,
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            profileImageUrl: true,
+          },
+        },
+      },
+    });
+
+    if (participants.length === 0) {
+      return [];
+    }
+
+    const userIds = participants.map((p) => p.userId);
+    const sportProfiles = await this.prisma.userSportProfile.findMany({
+      where: { userId: { in: userIds }, sportType },
+      select: { userId: true, eloRating: true },
+    });
+
+    const eloByUser = new Map(sportProfiles.map((p) => [p.userId, p.eloRating]));
+
+    const coldStartCount = userIds.filter((id) => !eloByUser.has(id)).length;
+    if (coldStartCount > 0) {
+      this.logger.debug(
+        `buildParticipantsWithElo: matchId=${matchId} sportType=${sportType} coldStartCount=${coldStartCount}/${participants.length}`,
+      );
+    }
+
+    return participants.map((p) => {
+      const elo = eloByUser.get(p.userId);
+      return {
+        participantId: p.id,
+        userId: p.userId,
+        nickname: p.user.nickname,
+        profileImageUrl: p.user.profileImageUrl,
+        eloRating: elo ?? 1000,
+        hasProfile: elo !== undefined,
+      };
+    });
+  }
+
+  /**
+   * Validates host ownership and match status for team assignment.
+   * Returns match with teamConfig and sportType for downstream use.
+   */
+  private async assertTeamAssignmentEligible(
+    matchId: string,
+    userId: string,
+  ) {
     const match = await this.prisma.match.findUnique({
       where: { id: matchId },
       select: {
         id: true,
         hostId: true,
+        sportType: true,
+        status: true,
         teamConfig: true,
-        participants: {
-          where: { status: 'confirmed' },
-        },
       },
     });
 
-    if (!match) throw new NotFoundException('매치를 찾을 수 없습니다.');
-    if (match.hostId !== userId)
-      throw new ForbiddenException('호스트만 팀을 구성할 수 있습니다.');
-
-    // TODO: AI 기반 팀 밸런싱 로직 구현
-    // 현재는 단순 랜덤 배분
-
-    const teamCount = (match.teamConfig as TeamConfigDto | null)?.teamCount ?? 2;
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
-    const teamNames = ['A팀', 'B팀', 'C팀', 'D팀'];
-
-    const teams = await Promise.all(
-      Array.from({ length: teamCount }, (_, i) =>
-        this.prisma.team.create({
-          data: {
-            matchId,
-            name: teamNames[i],
-            color: colors[i],
-          },
-        }),
-      ),
-    );
-
-    // 참가자를 팀에 배분
-    const participants = match.participants;
-    for (let i = 0; i < participants.length; i++) {
-      const teamIndex = i % teamCount;
-      await this.prisma.matchParticipant.update({
-        where: { id: participants[i].id },
-        data: { teamId: teams[teamIndex].id },
-      });
+    if (!match) {
+      throw new NotFoundException('MATCH_NOT_FOUND');
+    }
+    if (match.hostId !== userId) {
+      throw new ForbiddenException('MATCH_NOT_HOST');
+    }
+    if (match.status !== 'recruiting' && match.status !== 'full') {
+      throw new ConflictException('MATCH_NOT_OPEN_FOR_TEAM_ASSIGNMENT');
     }
 
-    return teams;
+    return match;
+  }
+
+  /**
+   * Preview team composition without persisting. Returns the same
+   * BalancedDistribution shape as generateTeams. No DB writes are performed.
+   */
+  async previewTeams(matchId: string, userId: string, dto: ComposeTeamsDto) {
+    const match = await this.assertTeamAssignmentEligible(matchId, userId);
+
+    const teamCount = dto.teamCount ?? (match.teamConfig as TeamConfigDto | null)?.teamCount ?? 2;
+    const participants = await this.buildParticipantsWithElo(matchId, match.sportType as SportType);
+
+    // TeamBalancingService validates NO_PARTICIPANTS / TEAM_COUNT_INVALID / TEAM_COUNT_EXCEEDS_PARTICIPANTS
+    const distribution = this.teamBalancing.balance(participants, teamCount, dto.seed);
+
+    return distribution;
+  }
+
+  /**
+   * Composes teams with ELO-aware snake-draft and persists the result atomically.
+   * Existing Team records for the match are deleted and re-created within a single
+   * $transaction to prevent orphaned rows on re-roll.
+   *
+   * Strategy 'random' and 'balanced' both use the same snake-draft algorithm in v1.
+   * The seed provides differentiated distributions for perceived re-roll behavior.
+   */
+  async generateTeams(matchId: string, userId: string, dto: ComposeTeamsDto = {}) {
+    const match = await this.assertTeamAssignmentEligible(matchId, userId);
+
+    const teamCount = dto.teamCount ?? (match.teamConfig as TeamConfigDto | null)?.teamCount ?? 2;
+    const participants = await this.buildParticipantsWithElo(matchId, match.sportType as SportType);
+
+    // TeamBalancingService validates NO_PARTICIPANTS / TEAM_COUNT_INVALID / TEAM_COUNT_EXCEEDS_PARTICIPANTS
+    const distribution: BalancedDistribution = this.teamBalancing.balance(
+      participants,
+      teamCount,
+      dto.seed,
+    );
+
+    // Persist atomically: reset → delete prior teams → create new teams → assign participants
+    const persistedTeams = await this.prisma.$transaction(async (tx) => {
+      // 1. Reset all participant teamIds for this match
+      await tx.matchParticipant.updateMany({
+        where: { matchId },
+        data: { teamId: null },
+      });
+
+      // 2. Delete prior Team records for this match
+      await tx.team.deleteMany({ where: { matchId } });
+
+      // 3. Create new Team records in order
+      const createdTeams = await Promise.all(
+        distribution.teams.map((t) =>
+          tx.team.create({
+            data: { matchId, name: t.name, color: t.color },
+          }),
+        ),
+      );
+
+      // 4. Assign participants to their teams
+      await Promise.all(
+        distribution.teams.map((assignment, idx) => {
+          const participantIds = assignment.members.map((m) => m.participantId);
+          if (participantIds.length === 0) return Promise.resolve();
+          return tx.matchParticipant.updateMany({
+            where: { id: { in: participantIds } },
+            data: { teamId: createdTeams[idx].id },
+          });
+        }),
+      );
+
+      return createdTeams;
+    });
+
+    // Build response with persisted team IDs merged into the distribution shape
+    const teamsWithIds = distribution.teams.map((assignment, idx) => ({
+      ...assignment,
+      id: persistedTeams[idx].id,
+    }));
+
+    return {
+      teams: teamsWithIds,
+      metrics: distribution.metrics,
+      seed: distribution.seed,
+    };
   }
 
   async complete(matchId: string, userId: string) {

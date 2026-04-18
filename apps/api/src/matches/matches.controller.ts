@@ -8,6 +8,8 @@ import {
   Body,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,11 +20,12 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
+  ApiConflictResponse,
 } from '@nestjs/swagger';
 import { MatchesService } from './matches.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { ArriveMatchDto, CancelMatchDto, CreateMatchDto, MatchFilterDto, UpdateMatchDto } from './dto/match.dto';
+import { ArriveMatchDto, CancelMatchDto, ComposeTeamsDto, CreateMatchDto, MatchFilterDto, PreviewTeamsResponseDto, UpdateMatchDto } from './dto/match.dto';
 
 @ApiTags('매치')
 @Controller('matches')
@@ -131,18 +134,39 @@ export class MatchesController {
     return this.matchesService.leave(id, userId);
   }
 
+  @Post(':id/teams/preview')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 자동 구성 미리보기 (dry-run, DB 변경 없음)' })
+  @ApiOkResponse({ description: '팀 배정 preview — DB를 변경하지 않음', type: PreviewTeamsResponseDto })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '호스트 전용 (MATCH_NOT_HOST)' })
+  @ApiNotFoundResponse({ description: '매치 없음 (MATCH_NOT_FOUND)' })
+  @ApiConflictResponse({ description: '팀 배정 불가 상태 (MATCH_NOT_OPEN_FOR_TEAM_ASSIGNMENT)' })
+  async previewTeams(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ComposeTeamsDto,
+  ) {
+    return this.matchesService.previewTeams(id, userId, dto);
+  }
+
   @Post(':id/teams')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '팀 자동 구성' })
-  @ApiCreatedResponse({ description: '팀 구성 성공' })
+  @ApiOperation({ summary: '팀 자동 구성 및 확정 (ELO snake-draft, $transaction 원자성)' })
+  @ApiCreatedResponse({ description: '팀 구성 성공 — teams/metrics/seed 반환' })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
-  @ApiForbiddenResponse({ description: '호스트 전용' })
+  @ApiForbiddenResponse({ description: '호스트 전용 (MATCH_NOT_HOST)' })
+  @ApiNotFoundResponse({ description: '매치 없음 (MATCH_NOT_FOUND)' })
+  @ApiConflictResponse({ description: '팀 배정 불가 상태 (MATCH_NOT_OPEN_FOR_TEAM_ASSIGNMENT)' })
   async generateTeams(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
+    @Body() dto: ComposeTeamsDto,
   ) {
-    return this.matchesService.generateTeams(id, userId);
+    return this.matchesService.generateTeams(id, userId, dto);
   }
 
   @Post(':id/complete')

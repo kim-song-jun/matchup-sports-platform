@@ -199,6 +199,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **강좌**: 그룹레슨/연습경기/자유연습/클리닉 + 티켓(1회권/다회권/기간권) + 출석 관리
 - **팀 신뢰 점수**: 6항목 상호평가 → TeamTrustScore 누적
 - **채팅**: Prisma `ChatRoom`/`ChatMessage`/`ChatParticipant` 모델로 영속화. cursor 기반 페이지네이션, `teamMatchId` 연동, get-or-create. in-memory stub 완전 제거. `ChatService`가 persist → broadcast 단일 경로 (REST + WS 공통)
+- **팀 자동 구성 (Task 71)**: ELO snake-draft 기반 균등 팀 배정 — `TeamBalancingService`가 `UserSportProfile.eloRating`을 ELO 내림차순 정렬 후 snake-draft (A-B-B-A-A-B-... 또는 A-B-C-C-B-A-... 다팀 snake)로 배분. Preview API로 dry-run 확인 후 확정 시 `$transaction`으로 원자 교체. Cold-start(`UserSportProfile` 없음) 참가자는 eloRating=1000 fallback. 알고리즘 설계 문서: `docs/design/task-71-team-balancing.md`
 
 ### 팀 역할 기반 권한 (Phase 1-5 추가)
 
@@ -225,6 +226,10 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 ### 매치 (`/matches`)
 `GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` | `POST :id/close` | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete`
+
+**팀 자동 구성** (Task 71 추가):
+`POST :id/teams/preview` (호스트 전용, 팀 자동 구성 dry-run preview — body: `ComposeTeamsDto { strategy?, teamCount?, seed? }`, response: `PreviewTeamsResponseDto { teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed }`. DB 변경 없음)
+`POST :id/teams` — Task 71로 확장: `ComposeTeamsDto` body 수락, ELO snake-draft(`TeamBalancingService`) 경유, `$transaction` 원자 교체. body 없는 기존 클라이언트는 `autoBalance` 플래그 기반 default 동작 유지 (back-compat).
 
 ### 팀 (`/teams`)
 `GET /` | `GET me` (소유 팀 목록, JwtAuthGuard) | `GET :id` | `POST /` | `PATCH :id` | `DELETE :id` | `POST :id/apply`
@@ -345,6 +350,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useStartDirectChat()` — 1:1 채팅방 생성 mutation (`POST /chat/rooms` type=direct), 생성 후 `/chat/:roomId` redirect (Task 69 추가)
 - `useCloseMercenaryPost()` — 용병 모집글 종료 mutation (`POST /mercenary/:id/close`) (Task 69 추가)
 - `useCancelMercenaryPost()` — 용병 모집글 취소 mutation (`POST /mercenary/:id/cancel`) (Task 69 추가)
+- `usePreviewTeams(matchId)` — 팀 자동 구성 preview (dry-run) (`POST /matches/:id/teams/preview`), 호스트 전용. 응답: `{ teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed }` (Task 71 추가)
+- `useComposeTeams(matchId)` — 팀 배정 확정 (`POST /matches/:id/teams`), 성공 시 `['match', matchId]` + `['match-participants', matchId]` invalidate (Task 71 추가)
 
 ### 에러 처리 규칙
 - **에러 메시지**: `catch (err)` 블록에서 직접 타입 단언 금지. `extractErrorMessage(err, 'fallback 메시지')` (`@/lib/utils`) 사용

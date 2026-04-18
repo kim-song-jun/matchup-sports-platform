@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MatchingEngineService } from './matching-engine.service';
 import { BadgesService } from '../badges/badges.service';
+import { TeamBalancingService } from './team-balancing.service';
 import { SportType } from '@prisma/client';
 
 describe('MatchesService', () => {
@@ -34,6 +35,11 @@ describe('MatchesService', () => {
     userSportProfile: {
       findMany: jest.fn(),
     },
+    team: {
+      create: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
   };
 
   const mockNotificationsService = {
@@ -51,6 +57,10 @@ describe('MatchesService', () => {
     awardIfEligible: jest.fn().mockResolvedValue(false),
   };
 
+  const mockTeamBalancingService = {
+    balance: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,6 +69,7 @@ describe('MatchesService', () => {
         { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: MatchingEngineService, useValue: mockMatchingEngineService },
         { provide: BadgesService, useValue: mockBadgesService },
+        { provide: TeamBalancingService, useValue: mockTeamBalancingService },
       ],
     }).compile();
 
@@ -73,6 +84,11 @@ describe('MatchesService', () => {
     mockMatchingEngineService.calculateReasons.mockReturnValue([
       { type: 'level', label: '내 레벨에 맞는 경기' },
     ]);
+    mockTeamBalancingService.balance.mockReturnValue({
+      teams: [],
+      metrics: { maxEloGap: 0, variance: 0, stdDev: 0, teamAvgElos: [], coldStartCount: 0 },
+      seed: 42,
+    });
   });
 
   it('should be defined', () => {

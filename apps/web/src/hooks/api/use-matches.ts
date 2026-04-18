@@ -11,6 +11,8 @@ import type {
   UpdateMatchInput,
   CancelMatchPayload,
   ArriveMatchInput,
+  ComposeTeamsInput,
+  PreviewTeamsResponse,
 } from '@/types/api';
 import { extractData } from './shared';
 import { queryKeys } from './query-keys';
@@ -185,6 +187,38 @@ export function useDeleteUpload() {
     mutationFn: async (uploadId: string) => {
       const res = await api.delete(`/uploads/${uploadId}`);
       return extractData<{ id: string }>(res);
+    },
+  });
+}
+
+// ── Team Balancing (Task 71) ──
+
+/**
+ * Dry-run team composition — does NOT persist any data.
+ * Returns preview of balanced team assignments with ELO metrics.
+ */
+export function usePreviewTeams(matchId: string) {
+  return useMutation<PreviewTeamsResponse, Error, ComposeTeamsInput>({
+    mutationFn: async (input) => {
+      const res = await api.post(`/matches/${matchId}/teams/preview`, input);
+      return extractData<PreviewTeamsResponse>(res);
+    },
+  });
+}
+
+/**
+ * Persist team assignments — creates Team records and updates MatchParticipant.teamId.
+ * Invalidates match detail so the page reflects the new teams immediately.
+ */
+export function useComposeTeams(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<PreviewTeamsResponse, Error, ComposeTeamsInput>({
+    mutationFn: async (input) => {
+      const res = await api.post(`/matches/${matchId}/teams`, input);
+      return extractData<PreviewTeamsResponse>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.matches.detail(matchId) });
     },
   });
 }

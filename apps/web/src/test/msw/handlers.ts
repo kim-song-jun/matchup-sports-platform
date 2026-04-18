@@ -15,6 +15,7 @@ import { venuesHandlers } from './handlers/venues';
 import { reviewsHandlers } from './handlers/reviews';
 import { notificationsHandlers } from './handlers/notifications';
 import { adminHandlers } from './handlers/admin';
+import { disputesHandlers } from './handlers/disputes';
 import { miscHandlers } from './handlers/misc';
 
 export const handlers = [
@@ -32,5 +33,6 @@ export const handlers = [
   ...reviewsHandlers,
   ...notificationsHandlers,
   ...adminHandlers,
+  ...disputesHandlers,
   ...miscHandlers,
 ];

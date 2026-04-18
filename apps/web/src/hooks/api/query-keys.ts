@@ -46,6 +46,20 @@ export const queryKeys = {
     list: (params?: Record<string, string>) => ['listings', params] as const,
     detail: (id: string) => ['listings', id] as const,
   },
+  orders: {
+    all: ['orders'] as const,
+    mine: ['orders', 'me'] as const,
+    detail: (id: string) => ['orders', id] as const,
+  },
+  disputes: {
+    all: ['disputes'] as const,
+    mine: (role?: string) => ['disputes', 'me', role] as const,
+    detail: (id: string) => ['disputes', id] as const,
+  },
+  payouts: {
+    all: ['payouts'] as const,
+    eligible: ['payouts', 'eligible'] as const,
+  },
   payments: {
     all: ['payments'] as const,
     detail: (id: string) => ['payments', id] as const,
@@ -112,5 +126,7 @@ export const queryKeys = {
     dispute: (id: string) => ['admin', 'dispute', id] as const,
     settlements: ['admin', 'settlements'] as const,
     settlementsSummary: ['admin', 'settlements', 'summary'] as const,
+    payouts: (params?: Record<string, string>) => ['admin', 'payouts', params] as const,
+    payoutsEligible: ['admin', 'payouts', 'eligible'] as const,
   },
 } as const;

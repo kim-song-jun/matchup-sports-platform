@@ -15,3 +15,4 @@ export * from './use-notifications';
 export * from './use-admin';
 export * from './use-badges';
 export * from './use-reviews';
+export * from './use-disputes';

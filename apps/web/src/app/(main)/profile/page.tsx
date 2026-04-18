@@ -156,7 +156,7 @@ export default function ProfilePage() {
                 {user.sportProfiles.map((sp: SportProfile) => {
                   const SportIcon = SportIconMap[sp.sportType];
                   return (
-                    <div key={sp.id} className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-700/60">
+                    <div key={sp.id} className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2.5 dark:border-gray-700/60 dark:bg-gray-900/50">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2.5">
                           {SportIcon && <SportIcon size={15} className="shrink-0 text-gray-500 dark:text-gray-400" />}
@@ -178,7 +178,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-900/40">
+            <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50/80 dark:border-gray-700/60 dark:bg-gray-900/70">
               <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-700">
                 <div className="px-3 py-3 text-center">
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{user.totalMatches || 0}</p>
@@ -390,13 +390,13 @@ function UpcomingSchedule() {
         {view === 'calendar' ? (
           <MiniCalendar matches={calendarMatches} />
         ) : listMatches.length === 0 ? (
-          <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-6 text-center dark:border-gray-700 dark:bg-gray-900/40">
+          <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-6 text-center dark:border-gray-700/60 dark:bg-gray-900/70">
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300">
               <Calendar size={20} aria-hidden="true" />
             </div>
             <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{te('noSchedule')}</p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{te('noScheduleDesc')}</p>
-            <Link href="/matches" className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-900/40 dark:bg-gray-800 dark:hover:bg-gray-700">
+            <Link href="/matches" className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-500 transition-colors hover:bg-blue-50 dark:border-blue-500/30 dark:bg-gray-700 dark:text-blue-400 dark:hover:bg-gray-600">
               {t('findMatch')}
             </Link>
           </div>

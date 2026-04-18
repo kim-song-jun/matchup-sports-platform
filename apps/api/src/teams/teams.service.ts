@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
@@ -17,6 +18,8 @@ const INVITATION_EXPIRY_DAYS = 7;
 
 @Injectable()
 export class TeamsService {
+  private readonly logger = new Logger(TeamsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: TeamMembershipService,
@@ -303,15 +306,18 @@ export class TeamsService {
       }
       // left or removed — allow re-application; role intentionally resets to member
       // (prior owners/managers re-apply as regular members; promotion is granted separately)
-      return this.prisma.teamMembership.update({
+      const membership = await this.prisma.teamMembership.update({
         where: { id: existing.id },
         data: { role: 'member', status: 'pending' },
       });
+      await this.fanOutApplicationReceivedNotification(teamId, team.name, userId, membership);
+      return membership;
     }
 
     // No existing record — create fresh application
+    let membership;
     try {
-      return await this.prisma.teamMembership.create({
+      membership = await this.prisma.teamMembership.create({
         data: { teamId, userId, role: 'member', status: 'pending' },
       });
     } catch (e) {
@@ -319,6 +325,198 @@ export class TeamsService {
         throw new ConflictException({ code: 'TEAM_APPLY_DUPLICATE', message: 'Duplicate application request' });
       }
       throw e;
+    }
+    await this.fanOutApplicationReceivedNotification(teamId, team.name, userId, membership);
+    return membership;
+  }
+
+  /**
+   * Lists pending team membership applications. Requires manager+ role.
+   */
+  async listApplications(teamId: string, actorUserId: string) {
+    await this.membershipService.assertRole(teamId, actorUserId, TeamRole.manager);
+
+    return this.prisma.teamMembership.findMany({
+      where: { teamId, status: 'pending' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            profileImageUrl: true,
+            mannerScore: true,
+          },
+        },
+      },
+      orderBy: { joinedAt: 'desc' },
+    });
+  }
+
+  /**
+   * Accepts a pending team membership application. Requires manager+ role.
+   * Transitions status pending → active, increments memberCount.
+   * Notifies the applicant fire-and-forget.
+   */
+  async acceptApplication(teamId: string, applicantUserId: string, actorUserId: string) {
+    await this.membershipService.assertRole(teamId, actorUserId, TeamRole.manager);
+
+    const team = await this.findById(teamId);
+
+    const application = await this.prisma.teamMembership.findFirst({
+      where: { teamId, userId: applicantUserId, status: 'pending' },
+    });
+    if (!application) {
+      throw new NotFoundException({
+        code: 'TEAM_APPLICATION_NOT_FOUND',
+        message: '대기 중인 신청을 찾을 수 없습니다.',
+      });
+    }
+
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const updated = await tx.teamMembership.updateMany({
+            where: { id: application.id, status: 'pending' },
+            data: { status: 'active' },
+          });
+          if (updated.count === 0) {
+            throw new ConflictException({
+              code: 'TEAM_APPLICATION_ALREADY_PROCESSED',
+              message: '신청이 이미 처리되었습니다.',
+            });
+          }
+
+          await tx.sportTeam.update({
+            where: { id: teamId },
+            data: { memberCount: { increment: 1 } },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      // P2034: transaction conflict (serializable isolation) — concurrent accept race
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code: string }).code === 'P2034'
+      ) {
+        throw new ConflictException({
+          code: 'TEAM_APPLICATION_ALREADY_PROCESSED',
+          message: '다른 요청과 충돌했습니다. 다시 시도해주세요.',
+        });
+      }
+      throw error;
+    }
+
+    // Fire-and-forget notification to applicant
+    void this.notificationsService.create({
+      userId: applicantUserId,
+      type: 'team_application_accepted',
+      title: '팀 가입 신청이 수락되었어요',
+      body: `${team.name} 팀에 가입되었습니다.`,
+      data: { teamId, teamName: team.name },
+    });
+
+    return { accepted: true };
+  }
+
+  /**
+   * Rejects a pending team membership application. Requires manager+ role.
+   * Transitions status pending → left (preserves re-apply path).
+   * Notifies the applicant fire-and-forget.
+   */
+  async rejectApplication(teamId: string, applicantUserId: string, actorUserId: string) {
+    await this.membershipService.assertRole(teamId, actorUserId, TeamRole.manager);
+
+    const team = await this.findById(teamId);
+
+    const application = await this.prisma.teamMembership.findFirst({
+      where: { teamId, userId: applicantUserId, status: 'pending' },
+    });
+    if (!application) {
+      throw new NotFoundException({
+        code: 'TEAM_APPLICATION_NOT_FOUND',
+        message: '대기 중인 신청을 찾을 수 없습니다.',
+      });
+    }
+
+    const rejected = await this.prisma.teamMembership.updateMany({
+      where: { id: application.id, status: 'pending' },
+      // Use 'left' so the applicant can re-apply; 'removed' would be permanent block
+      data: { status: 'left' },
+    });
+    if (rejected.count === 0) {
+      throw new ConflictException({
+        code: 'TEAM_APPLICATION_ALREADY_PROCESSED',
+        message: '신청이 이미 처리되었습니다.',
+      });
+    }
+
+    // Fire-and-forget notification to applicant
+    void this.notificationsService.create({
+      userId: applicantUserId,
+      type: 'team_application_rejected',
+      title: '팀 가입 신청이 거절되었어요',
+      body: `${team.name} 팀 가입 신청이 거절되었습니다.`,
+      data: { teamId, teamName: team.name },
+    });
+
+    return { rejected: true };
+  }
+
+  /**
+   * Fans out team_application_received notifications to all active owner+manager members.
+   * Fire-and-forget: errors are caught and logged; they do not fail the mutation.
+   */
+  private async fanOutApplicationReceivedNotification(
+    teamId: string,
+    teamName: string,
+    applicantUserId: string,
+    _membership: { id: string },
+  ) {
+    try {
+      const applicant = await this.prisma.user.findFirst({
+        where: { id: applicantUserId, deletedAt: null },
+        select: { id: true, nickname: true },
+      });
+
+      const managers = await this.prisma.teamMembership.findMany({
+        where: {
+          teamId,
+          role: { in: [TeamRole.owner, TeamRole.manager] },
+          status: 'active',
+        },
+        select: { userId: true },
+      });
+
+      await Promise.all(
+        managers.map((m) =>
+          this.notificationsService.create({
+            userId: m.userId,
+            type: 'team_application_received',
+            title: '새 팀 가입 신청이 있어요',
+            body: `${applicant?.nickname ?? '누군가'}님이 ${teamName} 팀에 가입 신청했습니다.`,
+            data: {
+              teamId,
+              teamName,
+              applicantUserId,
+              applicantNickname: applicant?.nickname ?? null,
+            },
+          }).catch((err) =>
+            this.logger.warn('team_application_received notify failed', { userId: m.userId, err: err?.message }),
+          ),
+        ),
+      );
+    } catch (err) {
+      // Notification fan-out failure must not fail the apply mutation
+      this.logger.warn(`fanOutApplicationReceivedNotification failed for team ${teamId}`, { err });
     }
   }
 

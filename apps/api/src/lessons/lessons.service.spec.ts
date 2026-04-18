@@ -646,10 +646,11 @@ describe('LessonsService', () => {
           }),
         }),
       );
+      // type corrected from marketplace_order to lesson_ticket_purchased in Wave 1
       expect(notificationsServiceMock.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'instructor-1',
-          type: 'marketplace_order',
+          type: 'lesson_ticket_purchased',
         }),
       );
     });

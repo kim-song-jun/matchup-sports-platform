@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from '../teams/team-membership.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ChatService } from '../chat/chat.service';
+import { BadgesService } from '../badges/badges.service';
 import { CreateTeamMatchDto } from './dto/create-team-match.dto';
 import { ApplyTeamMatchDto } from './dto/apply-team-match.dto';
 import { CheckInTeamMatchDto } from './dto/check-in-team-match.dto';
@@ -11,9 +14,14 @@ import { TeamMatchQueryDto } from './dto/team-match-query.dto';
 
 @Injectable()
 export class TeamMatchesService {
+  private readonly logger = new Logger(TeamMatchesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly teamMembershipService: TeamMembershipService,
+    private readonly notificationsService: NotificationsService,
+    private readonly chatService: ChatService,
+    private readonly badgesService: BadgesService,
   ) {}
 
   async findAll(filter: TeamMatchQueryDto) {
@@ -161,7 +169,10 @@ export class TeamMatchesService {
   }
 
   async apply(matchId: string, userId: string, data: ApplyTeamMatchDto) {
-    const match = await this.prisma.teamMatch.findUnique({ where: { id: matchId } });
+    const match = await this.prisma.teamMatch.findUnique({
+      where: { id: matchId },
+      include: { hostTeam: { select: { name: true } } },
+    });
     if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
     if (match.status !== 'recruiting') throw new BadRequestException('모집 중이 아닙니다');
 
@@ -174,7 +185,7 @@ export class TeamMatchesService {
     // Require manager+ to apply on behalf of a team
     await this.teamMembershipService.assertRole(applicantTeamId, userId, 'manager');
 
-    return this.prisma.teamMatchApplication.create({
+    const application = await this.prisma.teamMatchApplication.create({
       data: {
         teamMatchId: matchId,
         applicantTeamId,
@@ -186,12 +197,22 @@ export class TeamMatchesService {
         participationType: 'team',
       },
     });
+
+    // Fire-and-forget: notify host team's owner+managers
+    void this.fanOutTeamMatchNotification(match.hostTeamId, {
+      type: NotificationType.team_match_applied,
+      title: '팀 매치 신청이 들어왔어요',
+      body: `"${match.title ?? match.hostTeam?.name}" 매치에 상대 팀이 신청했습니다.`,
+      data: { teamMatchId: matchId },
+    });
+
+    return application;
   }
 
   async approveApplication(matchId: string, appId: string, userId: string) {
     const match = await this.prisma.teamMatch.findUnique({
       where: { id: matchId },
-      select: { status: true, hostTeamId: true },
+      select: { status: true, hostTeamId: true, title: true },
     });
     if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
     if (match.status !== 'recruiting') throw new BadRequestException('이미 매칭이 완료된 경기입니다');
@@ -199,15 +220,15 @@ export class TeamMatchesService {
     // Require manager+ on host team
     await this.teamMembershipService.assertRole(match.hostTeamId, userId, 'manager');
 
-    return this.prisma.$transaction(async (tx) => {
-      const app = await tx.teamMatchApplication.update({
+    const app = await this.prisma.$transaction(async (tx) => {
+      const updatedApp = await tx.teamMatchApplication.update({
         where: { id: appId },
         data: { status: 'approved' },
       });
 
       await tx.teamMatch.update({
         where: { id: matchId },
-        data: { status: 'scheduled', guestTeamId: app.applicantTeamId },
+        data: { status: 'scheduled', guestTeamId: updatedApp.applicantTeamId },
       });
 
       await tx.teamMatchApplication.updateMany({
@@ -215,24 +236,48 @@ export class TeamMatchesService {
         data: { status: 'rejected' },
       });
 
-      return app;
+      return updatedApp;
     });
+
+    // After commit: auto-create team_match chat room for both teams' owner+managers.
+    // Await so chatRoomId is available for the notification deep-link.
+    const room = await this.createTeamMatchChatRoom(matchId, match.hostTeamId, app.applicantTeamId);
+
+    // After commit: notify applicant team's owner+managers
+    void this.fanOutTeamMatchNotification(app.applicantTeamId, {
+      type: NotificationType.team_match_approved,
+      title: '팀 매치 신청이 승인되었어요',
+      body: `"${match.title ?? '팀 매치'}" 매치 신청이 승인되었습니다.`,
+      data: { teamMatchId: matchId, ...(room ? { chatRoomId: room.id } : {}) },
+    });
+
+    return app;
   }
 
   async rejectApplication(matchId: string, appId: string, userId: string) {
     const match = await this.prisma.teamMatch.findUnique({
       where: { id: matchId },
-      select: { hostTeamId: true },
+      select: { hostTeamId: true, title: true },
     });
     if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
 
     // Require manager+ on host team
     await this.teamMembershipService.assertRole(match.hostTeamId, userId, 'manager');
 
-    return this.prisma.teamMatchApplication.update({
+    const app = await this.prisma.teamMatchApplication.update({
       where: { id: appId },
       data: { status: 'rejected' },
     });
+
+    // Fire-and-forget: notify applicant team's owner+managers
+    void this.fanOutTeamMatchNotification(app.applicantTeamId, {
+      type: NotificationType.team_match_rejected,
+      title: '팀 매치 신청이 거절되었어요',
+      body: `"${match.title ?? '팀 매치'}" 매치 신청이 거절되었습니다.`,
+      data: { teamMatchId: matchId },
+    });
+
+    return app;
   }
 
   async getApplications(matchId: string, userId: string) {
@@ -295,6 +340,7 @@ export class TeamMatchesService {
         status: true,
         hostTeamId: true,
         guestTeamId: true,
+        venueInfo: true,
         applications: {
           where: { status: 'approved' },
           select: { applicantTeamId: true, status: true },
@@ -319,6 +365,32 @@ export class TeamMatchesService {
 
     // Require member+ to check in (any team member can check in)
     await this.teamMembershipService.assertRole(data.teamId, userId, 'member');
+
+    // Geo-fence check (Haversine, 200m) — parity with matches.arrive
+    // TeamMatch stores coords in venueInfo JSON if available. Skip when absent.
+    if (data.lat != null && data.lng != null) {
+      const venueInfo = match.venueInfo as Record<string, unknown> | null;
+      const venueLat = typeof venueInfo?.lat === 'number' ? venueInfo.lat : null;
+      const venueLng = typeof venueInfo?.lng === 'number' ? venueInfo.lng : null;
+      if (venueLat != null && venueLng != null) {
+        const R = 6371000;
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const dLat = toRad(data.lat - venueLat);
+        const dLng = toRad(data.lng - venueLng);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(venueLat)) * Math.cos(toRad(data.lat)) * Math.sin(dLng / 2) ** 2;
+        const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (distance > 200) {
+          throw new BadRequestException({
+            code: 'CHECK_IN_OUT_OF_RANGE',
+            message: '구장에서 너무 멀어요. 200m 이내에서만 인증할 수 있어요.',
+          });
+        }
+      } else {
+        this.logger.warn('team-match check-in: venue coordinates missing, geo-fence skipped', { teamMatchId: matchId });
+      }
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const existingArrival = await tx.arrivalCheck.findUnique({
@@ -398,7 +470,7 @@ export class TeamMatchesService {
     this.assertResultPair(data.resultHome, data.resultAway);
     this.assertResultMatchesScores(scoreHome, scoreAway, data.resultHome, data.resultAway);
 
-    return this.prisma.teamMatch.update({
+    const completed = await this.prisma.teamMatch.update({
       where: { id: matchId },
       data: {
         status: 'completed',
@@ -408,6 +480,11 @@ export class TeamMatchesService {
         resultAway: data.resultAway,
       },
     });
+
+    // Fire-and-forget: award badges for all active members of both participating teams
+    void this.awardBadgesForTeamMatch(match.hostTeamId, guestTeamId);
+
+    return completed;
   }
 
   async evaluate(matchId: string, userId: string, data: EvaluateTeamMatchDto) {
@@ -576,5 +653,101 @@ export class TeamMatchesService {
     return match.guestTeamId
       ?? match.applications?.find((application) => application.status === 'approved')?.applicantTeamId
       ?? null;
+  }
+
+  /**
+   * Fan-out a notification to all active owner+managers of a given team.
+   * Fire-and-forget: errors are caught and swallowed to never fail mutations.
+   */
+  private async fanOutTeamMatchNotification(
+    teamId: string,
+    notification: {
+      type: NotificationType;
+      title: string;
+      body: string;
+      data: Record<string, unknown>;
+    },
+  ) {
+    try {
+      const managers = await this.prisma.teamMembership.findMany({
+        where: { teamId, role: { in: ['owner', 'manager'] }, status: 'active' },
+        select: { userId: true },
+      });
+
+      await Promise.all(
+        managers.map((m) =>
+          this.notificationsService.create({
+            userId: m.userId,
+            type: notification.type,
+            title: notification.title,
+            body: notification.body,
+            data: notification.data,
+          }),
+        ),
+      );
+    } catch (err) {
+      console.warn(`[TeamMatchesService] fanOutTeamMatchNotification failed for team ${teamId}:`, err);
+    }
+  }
+
+  /**
+   * Creates a team_match chat room for the two participating teams' owner+managers.
+   * Uses ChatService.getOrCreateTeamMatchRoom for idempotency.
+   * Errors are caught and swallowed — chat failure does not fail the approve mutation.
+   */
+  private async createTeamMatchChatRoom(
+    teamMatchId: string,
+    hostTeamId: string,
+    guestTeamId: string,
+  ): Promise<{ id: string } | null> {
+    try {
+      const [hostManagers, guestManagers] = await Promise.all([
+        this.prisma.teamMembership.findMany({
+          where: { teamId: hostTeamId, role: { in: ['owner', 'manager'] }, status: 'active' },
+          select: { userId: true },
+        }),
+        this.prisma.teamMembership.findMany({
+          where: { teamId: guestTeamId, role: { in: ['owner', 'manager'] }, status: 'active' },
+          select: { userId: true },
+        }),
+      ]);
+
+      const participantUserIds = [
+        ...hostManagers.map((m) => m.userId),
+        ...guestManagers.map((m) => m.userId),
+      ];
+
+      return await this.chatService.getOrCreateTeamMatchRoom(teamMatchId, participantUserIds);
+    } catch (err) {
+      console.warn(`[TeamMatchesService] createTeamMatchChatRoom failed for match ${teamMatchId}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Awards badges to all active members of both participating teams after match completion.
+   * Fire-and-forget — errors per member are swallowed.
+   */
+  private async awardBadgesForTeamMatch(hostTeamId: string, guestTeamId: string) {
+    try {
+      const memberships = await this.prisma.teamMembership.findMany({
+        where: {
+          teamId: { in: [hostTeamId, guestTeamId] },
+          status: 'active',
+        },
+        select: { userId: true },
+      });
+
+      await Promise.all(
+        memberships.map((m) =>
+          this.badgesService.awardIfEligible(m.userId, 'first_team_match_completed', {
+            name: '첫 팀 매치 완료',
+            description: '플랫폼에서 첫 번째 팀 매치를 완료한 팀 멤버',
+          }).catch(() => { /* badge award failure is non-critical */ }),
+        ),
+      );
+    } catch (err) {
+      console.warn(`[TeamMatchesService] awardBadgesForTeamMatch failed:`, err);
+    }
   }
 }

@@ -176,4 +176,34 @@ export class MercenaryController {
   ) {
     return this.mercenaryService.withdrawApplication(postId, userId);
   }
+
+  @Post(':id/close')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '용병 모집글 마감 (작성자 또는 팀 매니저+)' })
+  @ApiOkResponse({ description: '모집글 마감 성공, 신청자 전원에게 알림 전송' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
+  @ApiNotFoundResponse({ description: '모집글 없음' })
+  async closePost(
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.mercenaryService.closePost(postId, userId);
+  }
+
+  @Post(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '용병 모집글 취소 (작성자 또는 팀 매니저+)' })
+  @ApiOkResponse({ description: '모집글 취소 성공, 신청자 전원에게 알림 전송' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
+  @ApiNotFoundResponse({ description: '모집글 없음' })
+  async cancelPost(
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.mercenaryService.cancelPost(postId, userId);
+  }
 }

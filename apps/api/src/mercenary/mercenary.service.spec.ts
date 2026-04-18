@@ -82,6 +82,15 @@ const teamMembershipMock = {
   getMembership: jest.fn(),
 };
 
+const notificationsServiceMock = {
+  create: jest.fn().mockResolvedValue({}),
+};
+
+const chatServiceMock = {
+  getOrCreateDirectRoom: jest.fn().mockResolvedValue({ id: 'direct-room-1' }),
+  getOrCreateTeamMatchRoom: jest.fn().mockResolvedValue({ id: 'tm-room-1' }),
+};
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -93,14 +102,28 @@ describe('MercenaryService', () => {
     jest.clearAllMocks();
     prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
     prismaMock.sportTeam.findUnique.mockResolvedValue({ sportTypes: ['FUTSAL'] });
+    notificationsServiceMock.create.mockResolvedValue({});
+    chatServiceMock.getOrCreateDirectRoom.mockResolvedValue({ id: 'direct-room-1' });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MercenaryService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: TeamMembershipService, useValue: teamMembershipMock },
+        { provide: 'NotificationsService', useValue: notificationsServiceMock },
+        { provide: 'ChatService', useValue: chatServiceMock },
       ],
-    }).compile();
+    })
+      .overrideProvider(MercenaryService)
+      .useFactory({
+        factory: () => new MercenaryService(
+          prismaMock as unknown as PrismaService,
+          teamMembershipMock as unknown as import('../teams/team-membership.service').TeamMembershipService,
+          notificationsServiceMock as unknown as import('../notifications/notifications.service').NotificationsService,
+          chatServiceMock as unknown as import('../chat/chat.service').ChatService,
+        ),
+      })
+      .compile();
 
     service = module.get<MercenaryService>(MercenaryService);
   });
@@ -410,6 +433,38 @@ describe('MercenaryService', () => {
       );
     });
 
+    it('includes chatRoomId in mercenary_accepted notification data', async () => {
+      const post = mockPost({ count: 2 });
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(post);
+      teamMembershipMock.assertRole.mockResolvedValue({ role: 'manager' });
+      prismaMock.mercenaryApplication.findFirst
+        .mockResolvedValueOnce(mockApp())
+        .mockResolvedValueOnce(mockApp({ status: 'accepted' }));
+      prismaMock.mercenaryApplication.updateMany.mockResolvedValueOnce({ count: 1 });
+      prismaMock.mercenaryApplication.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1); // less than post.count
+
+      await service.acceptApplication('post-1', 'app-1', 'user-1');
+      // Flush microtasks so fire-and-forget notifications are dispatched
+      await new Promise((r) => setImmediate(r));
+
+      expect(chatServiceMock.getOrCreateDirectRoom).toHaveBeenCalledWith(
+        post.authorId,
+        'user-99',
+        expect.objectContaining({ systemMessage: '용병 지원이 수락되었습니다' }),
+      );
+      expect(notificationsServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'mercenary_accepted',
+          data: expect.objectContaining({
+            postId: 'post-1',
+            chatRoomId: 'direct-room-1',
+          }),
+        }),
+      );
+    });
+
     it('does not mark post as filled when count is not yet reached', async () => {
       const post = mockPost({ count: 3 });
       prismaMock.mercenaryPost.findUnique.mockResolvedValue(post);
@@ -539,6 +594,100 @@ describe('MercenaryService', () => {
       prismaMock.mercenaryApplication.findUnique.mockResolvedValue(mockApp({ status: 'accepted' }));
 
       await expect(service.withdrawApplication('post-1', 'user-99')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // closePost
+  // -------------------------------------------------------------------------
+  describe('closePost', () => {
+    beforeEach(() => {
+      teamMembershipMock.assertRole.mockResolvedValue({});
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open' }));
+      prismaMock.mercenaryApplication.findMany.mockResolvedValue([
+        mockApp({ userId: 'applicant-a', status: 'pending' }),
+        mockApp({ id: 'app-2', userId: 'applicant-b', status: 'accepted' }),
+      ]);
+      prismaMock.mercenaryPost.update.mockResolvedValue(mockPost({ status: 'closed' }));
+    });
+
+    it('transitions post status to closed', async () => {
+      await service.closePost('post-1', 'user-1');
+      await new Promise((r) => setImmediate(r));
+      expect(prismaMock.mercenaryPost.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'closed' } }),
+      );
+    });
+
+    it('returns { closed: true }', async () => {
+      const result = await service.closePost('post-1', 'user-1');
+      expect(result).toEqual({ closed: true });
+    });
+
+    it('fans out mercenary_closed notifications to pending+accepted applicants', async () => {
+      await service.closePost('post-1', 'user-1');
+      await new Promise((r) => setImmediate(r));
+      expect(notificationsServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'mercenary_closed' }),
+      );
+    });
+
+    it('throws BadRequestException when post is already closed', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'closed' }));
+      await expect(service.closePost('post-1', 'user-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows team manager to close post (non-author)', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open', authorId: 'other' }));
+      await expect(service.closePost('post-1', 'manager-user')).resolves.toEqual({ closed: true });
+      expect(teamMembershipMock.assertRole).toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when post does not exist', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(null);
+      await expect(service.closePost('missing', 'user-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // cancelPost
+  // -------------------------------------------------------------------------
+  describe('cancelPost', () => {
+    beforeEach(() => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open', authorId: 'user-1' }));
+      prismaMock.mercenaryApplication.findMany.mockResolvedValue([
+        mockApp({ userId: 'applicant-a' }),
+      ]);
+      prismaMock.mercenaryPost.update.mockResolvedValue(mockPost({ status: 'cancelled' }));
+    });
+
+    it('transitions post status to cancelled', async () => {
+      await service.cancelPost('post-1', 'user-1');
+      expect(prismaMock.mercenaryPost.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'cancelled' } }),
+      );
+    });
+
+    it('returns { cancelled: true }', async () => {
+      const result = await service.cancelPost('post-1', 'user-1');
+      expect(result).toEqual({ cancelled: true });
+    });
+
+    it('fans out mercenary_cancelled notifications to all applicants', async () => {
+      await service.cancelPost('post-1', 'user-1');
+      await new Promise((r) => setImmediate(r));
+      expect(notificationsServiceMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'mercenary_cancelled' }),
+      );
+    });
+
+    it('throws ForbiddenException when non-author tries to cancel', async () => {
+      await expect(service.cancelPost('post-1', 'other-user')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when post is already cancelled', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'cancelled', authorId: 'user-1' }));
+      await expect(service.cancelPost('post-1', 'user-1')).rejects.toThrow(BadRequestException);
     });
   });
 

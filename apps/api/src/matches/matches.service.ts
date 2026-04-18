@@ -10,6 +10,7 @@ import { CancelMatchDto, CreateMatchDto, MatchFilterDto, TeamConfigDto, UpdateMa
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationData } from '../notifications/notification-presentation';
 import { MatchingEngineService, RecommendationReason } from './matching-engine.service';
+import { BadgesService } from '../badges/badges.service';
 
 const recommendedMatchSelect = {
   id: true,
@@ -164,6 +165,7 @@ export class MatchesService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly matchingEngine: MatchingEngineService,
+    private readonly badgesService: BadgesService,
   ) {}
 
   async findAll(filter: MatchFilterDto) {
@@ -737,6 +739,31 @@ export class MatchesService {
         status: 'completed',
       },
     });
+
+    // Immediately follow up with review_pending to encourage review submissions
+    await this.notifyParticipants(matchId, userId, {
+      type: NotificationType.review_pending,
+      title: '상대방을 평가해주세요',
+      body: '경기가 끝났어요. 리뷰를 남기면 신뢰 점수가 올라가요.',
+      data: {
+        matchId,
+        action: 'review',
+      },
+    });
+
+    // Fire-and-forget: award badges for all participants after match completion
+    const participants = await this.prisma.matchParticipant.findMany({
+      where: { matchId },
+      select: { userId: true },
+    });
+    void Promise.all(
+      participants.map((p) =>
+        this.badgesService.awardIfEligible(p.userId, 'first_match_completed', {
+          name: '첫 매치 완료',
+          description: '플랫폼에서 첫 번째 매치를 완료한 플레이어',
+        }).catch(() => { /* badge award failure is non-critical */ }),
+      ),
+    );
 
     return completed;
   }

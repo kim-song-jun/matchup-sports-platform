@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { SettlementStatus, SettlementType } from '@prisma/client';
+import { PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
 import { SettlementsService } from './settlements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildSettlementRecord } from '../../test/fixtures/settlements';
+import { buildPayout } from '../../test/fixtures/marketplace';
 
 // ---------------------------------------------------------------------------
 // Helpers — delegate to fixture builder for type-safe mock objects
@@ -19,12 +20,19 @@ const makeRecord = (overrides: Parameters<typeof buildSettlementRecord>[0] = {})
 const prismaMock = {
   settlementRecord: {
     findMany: jest.fn(),
+    findFirst: jest.fn(),
     count: jest.fn(),
     findUnique: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     aggregate: jest.fn(),
     groupBy: jest.fn(),
+  },
+  payout: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
   },
   $transaction: jest.fn(),
 };
@@ -325,6 +333,226 @@ describe('SettlementsService', () => {
       prismaMock.settlementRecord.findUnique.mockResolvedValue(null);
 
       await expect(service.markProcessed('ghost-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── recordMarketplaceSettlement ─────────────────────────────────────────────
+
+  describe('recordMarketplaceSettlement', () => {
+    it('creates a settlement record with held status', async () => {
+      const created = makeRecord({
+        type: SettlementType.marketplace,
+        amount: 50000,
+        commission: 5000,
+        netAmount: 45000,
+        status: SettlementStatus.held,
+        orderId: 'order-db-id',
+        recipientId: 'seller-1',
+      });
+      prismaMock.settlementRecord.create.mockResolvedValue(created);
+
+      const result = await service.recordMarketplaceSettlement(
+        'order-db-id',
+        'MU-MKT-abc123',
+        'seller-1',
+        50000,
+      );
+
+      expect(result.status).toBe(SettlementStatus.held);
+      expect(result.commission).toBe(5000);
+      expect(prismaMock.settlementRecord.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: SettlementType.marketplace,
+            status: SettlementStatus.held,
+            orderId: 'order-db-id',
+            sourceId: 'MU-MKT-abc123',
+            recipientId: 'seller-1',
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── releaseSettlement ────────────────────────────────────────────────────────
+
+  describe('releaseSettlement', () => {
+    it('transitions held record to completed', async () => {
+      const held = makeRecord({ status: SettlementStatus.held, orderId: 'order-db-id' });
+      const released = { ...held, status: SettlementStatus.completed, releasedAt: new Date() };
+      prismaMock.settlementRecord.findFirst.mockResolvedValue(held);
+      prismaMock.settlementRecord.update.mockResolvedValue(released);
+
+      const result = await service.releaseSettlement('order-db-id');
+
+      expect(result.status).toBe(SettlementStatus.completed);
+      expect(prismaMock.settlementRecord.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: SettlementStatus.completed,
+            releasedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('is idempotent when already released (completed)', async () => {
+      const completed = makeRecord({ status: SettlementStatus.completed, orderId: 'order-db-id' });
+      // First findFirst: no held record found
+      // Second findFirst: existing record is already completed
+      prismaMock.settlementRecord.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(completed);
+
+      const result = await service.releaseSettlement('order-db-id');
+
+      expect(result.status).toBe(SettlementStatus.completed);
+      expect(prismaMock.settlementRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when no held record found and no existing record', async () => {
+      prismaMock.settlementRecord.findFirst
+        .mockResolvedValueOnce(null)  // first: no held record
+        .mockResolvedValueOnce(null); // second: no existing record at all
+
+      await expect(service.releaseSettlement('order-db-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── listReleasedSettlements ─────────────────────────────────────────────────
+
+  describe('listReleasedSettlements', () => {
+    it('returns completed settlements without payout', async () => {
+      const records = [
+        makeRecord({ status: SettlementStatus.completed, payoutId: null }),
+        makeRecord({ id: 'settle-2', status: SettlementStatus.completed, payoutId: null }),
+      ];
+      prismaMock.$transaction.mockResolvedValue([records, 2]);
+
+      const result = await service.listReleasedSettlements({});
+
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(2);
+    });
+
+    it('filters by recipientId when provided', async () => {
+      prismaMock.$transaction.mockResolvedValue([[], 0]);
+
+      await service.listReleasedSettlements({ recipientId: 'seller-1' });
+
+      const txCall = prismaMock.$transaction.mock.calls[0][0];
+      expect(txCall).toBeDefined();
+    });
+  });
+
+  // ── createPayoutBatch ───────────────────────────────────────────────────────
+
+  describe('createPayoutBatch', () => {
+    it('returns empty array for empty input', async () => {
+      const result = await service.createPayoutBatch([]);
+
+      expect(result).toEqual([]);
+      expect(prismaMock.settlementRecord.findMany).not.toHaveBeenCalled();
+    });
+
+    it('creates one payout per unique recipientId', async () => {
+      const records = [
+        makeRecord({ id: 's1', recipientId: 'seller-1', status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+        makeRecord({ id: 's2', recipientId: 'seller-1', status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+        makeRecord({ id: 's3', recipientId: 'seller-2', status: SettlementStatus.completed, payoutId: null, netAmount: 27000 }),
+      ];
+      prismaMock.settlementRecord.findMany.mockResolvedValue(records);
+
+      const payout1 = buildPayout({ recipientId: 'seller-1', amount: 90000 });
+      const payout2 = buildPayout({ recipientId: 'seller-2', amount: 27000 });
+
+      // Simulate $transaction callback
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: { create: jest.fn() },
+          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
+        };
+        txMock.payout.create
+          .mockResolvedValueOnce(payout1)
+          .mockResolvedValueOnce(payout2);
+        return cb(txMock as unknown as typeof prismaMock);
+      });
+
+      const result = await service.createPayoutBatch(['s1', 's2', 's3']);
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('throws when records are not in completed status', async () => {
+      const records = [
+        makeRecord({ id: 's1', status: SettlementStatus.held, payoutId: null }),
+      ];
+      prismaMock.settlementRecord.findMany.mockResolvedValue(records);
+
+      await expect(service.createPayoutBatch(['s1'])).rejects.toThrow();
+    });
+
+    it('throws when records already have a payoutId', async () => {
+      const records = [
+        makeRecord({ id: 's1', status: SettlementStatus.completed, payoutId: 'existing-payout' }),
+      ];
+      prismaMock.settlementRecord.findMany.mockResolvedValue(records);
+
+      await expect(service.createPayoutBatch(['s1'])).rejects.toThrow();
+    });
+  });
+
+  // ── markPayoutPaid ──────────────────────────────────────────────────────────
+
+  describe('markPayoutPaid', () => {
+    it('transitions payout to paid status', async () => {
+      const payout = buildPayout({ id: 'payout-1', status: PayoutStatus.pending });
+      const paid = { ...payout, status: PayoutStatus.paid, paidAt: new Date() };
+      prismaMock.payout.findUnique.mockResolvedValue(payout);
+      prismaMock.payout.update.mockResolvedValue(paid);
+
+      const result = await service.markPayoutPaid('payout-1');
+
+      expect(result.status).toBe(PayoutStatus.paid);
+      expect(prismaMock.payout.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: PayoutStatus.paid, paidAt: expect.any(Date) }),
+        }),
+      );
+    });
+
+    it('is idempotent when payout is already paid', async () => {
+      const paid = buildPayout({ id: 'payout-1', status: PayoutStatus.paid, paidAt: new Date() });
+      prismaMock.payout.findUnique.mockResolvedValue(paid);
+
+      const result = await service.markPayoutPaid('payout-1');
+
+      expect(result.status).toBe(PayoutStatus.paid);
+      expect(prismaMock.payout.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for unknown payout', async () => {
+      prismaMock.payout.findUnique.mockResolvedValue(null);
+
+      await expect(service.markPayoutPaid('ghost-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('stores note when provided', async () => {
+      const payout = buildPayout({ status: PayoutStatus.processing });
+      prismaMock.payout.findUnique.mockResolvedValue(payout);
+      prismaMock.payout.update.mockResolvedValue({
+        ...payout,
+        status: PayoutStatus.paid,
+        note: 'Transfer ref: TXN-9999',
+      });
+
+      await service.markPayoutPaid(payout.id, 'Transfer ref: TXN-9999');
+
+      expect(prismaMock.payout.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ note: 'Transfer ref: TXN-9999' }),
+        }),
+      );
     });
   });
 });

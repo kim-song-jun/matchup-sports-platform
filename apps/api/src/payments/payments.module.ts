@@ -8,5 +8,6 @@ import { SettlementsModule } from '../settlements/settlements.module';
   imports: [NotificationsModule, SettlementsModule],
   controllers: [PaymentsController],
   providers: [PaymentsService],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

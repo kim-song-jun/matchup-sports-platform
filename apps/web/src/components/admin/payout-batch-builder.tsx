@@ -94,7 +94,7 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Wallet size={36} className="text-gray-300 dark:text-gray-600 mb-3" aria-hidden="true" />
         <p className="text-base font-semibold text-gray-700 dark:text-gray-300">지급 대기 정산이 없어요</p>
-        <p className="text-sm text-gray-400 mt-1">처리 완료된 정산이 생기면 여기에 표시됩니다</p>
+        <p className="text-sm text-gray-400 mt-1">처리 완료된 정산이 생기면 여기에 표시돼요</p>
       </div>
     );
   }
@@ -108,7 +108,7 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
       <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 px-4 py-3">
         <Info size={16} className="text-blue-500 shrink-0 mt-0.5" aria-hidden="true" />
         <p className="text-sm text-blue-700 dark:text-blue-300">
-          수취인을 선택한 후 배치를 생성하면, 선택된 수취인의 모든 정산이 한 번에 처리됩니다.
+          수취인을 선택한 후 배치를 생성하면, 선택된 수취인의 모든 정산이 한 번에 처리돼요.
         </p>
       </div>
 
@@ -145,13 +145,13 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
                   <button
                     onClick={toggleAll}
                     aria-label="전체 선택"
-                    className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                    className={`flex h-5 w-5 items-center justify-center rounded border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                       allSelected
                         ? 'bg-blue-500 border-blue-500'
                         : 'border-gray-300 dark:border-gray-600'
                     }`}
                   >
-                    {allSelected ? <CheckCircle size={10} className="text-white" aria-hidden="true" /> : null}
+                    {allSelected ? <CheckCircle size={12} className="text-white" aria-hidden="true" /> : null}
                   </button>
                 </th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">수취인</th>
@@ -170,23 +170,31 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
                   <tr
                     key={settlement.recipientId}
                     onClick={() => toggleRow(settlement.recipientId)}
-                    className={`transition-colors cursor-pointer ${
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault();
+                        toggleRow(settlement.recipientId);
+                      }
+                    }}
+                    tabIndex={0}
+                    aria-selected={isSelected}
+                    className={`transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                       isSelected
                         ? 'bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-50/80'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
                     }`}
-                    aria-selected={isSelected}
                   >
                     <td className="px-4 py-3.5">
+                      {/* Decorative visual checkbox — interaction handled by full row */}
                       <div
-                        className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-colors ${
+                        className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
                           isSelected
                             ? 'bg-blue-500 border-blue-500'
                             : 'border-gray-300 dark:border-gray-600'
                         }`}
                         aria-hidden="true"
                       >
-                        {isSelected ? <CheckCircle size={10} className="text-white" aria-hidden="true" /> : null}
+                        {isSelected ? <CheckCircle size={12} className="text-white" aria-hidden="true" /> : null}
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">

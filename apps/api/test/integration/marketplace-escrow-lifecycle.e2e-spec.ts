@@ -11,6 +11,7 @@ import {
   createReleasedSettlement,
 } from '../fixtures/marketplace';
 import { createSinaro, createMarketSeller } from '../fixtures/personas';
+import { MarketplaceCron } from '../../src/marketplace/marketplace.cron';
 
 // ---------------------------------------------------------------------------
 // Marketplace escrow lifecycle integration tests
@@ -23,6 +24,7 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
   let request: ReturnType<typeof import('supertest')['agent']>;
   let prisma: PrismaClient;
   let closeApp: () => Promise<void>;
+  let cron: MarketplaceCron;
 
   // Tokens
   let buyerToken: string;
@@ -39,6 +41,7 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
     app = testApp.app;
     request = testApp.request;
     closeApp = testApp.close;
+    cron = app.get(MarketplaceCron);
   });
 
   beforeEach(async () => {
@@ -261,11 +264,13 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       expect(res.status).toBe(400);
     });
 
-    // MP-E4: Buyer withdraws dispute → order restored to priorOrderStatus
-    it('buyer withdraws dispute → order restored to prior status, no completedAt', async () => {
+    // MP-E4: Buyer withdraws dispute → order restored to priorOrderStatus + autoReleaseAt preserved
+    it('buyer withdraws dispute → order restored to prior status, no completedAt, autoReleaseAt unchanged', async () => {
+      const originalAutoReleaseAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
       const listing = await createListing(prisma, sellerId, { price: 50000 });
       const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
         status: OrderStatus.delivered,
+        autoReleaseAt: originalAutoReleaseAt,
       });
 
       const dispute = await prisma.dispute.create({
@@ -297,6 +302,8 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
       // Order must be restored to delivered — NOT forced to completed
       expect(updatedOrder!.status).toBe(OrderStatus.delivered);
       expect(updatedOrder!.completedAt).toBeNull();
+      // autoReleaseAt must be preserved (not overwritten to null or now)
+      expect(updatedOrder!.autoReleaseAt?.getTime()).toBe(originalAutoReleaseAt.getTime());
     });
 
     // MP-R1: Admin dismiss → order restored to priorOrderStatus
@@ -493,6 +500,253 @@ describe('Marketplace Escrow Lifecycle (e2e)', () => {
         });
 
       expect(res.status).toBe(409);
+    });
+  });
+
+  // ── Cron auto-release sweeper (real DB) ────────────────────────────────────
+
+  describe('Cron auto-release sweeper', () => {
+    // MP-E1: Cron auto-release happy path — hit real DB, call handler directly
+    it('auto-releases orders whose autoReleaseAt has passed and no open dispute', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      // autoReleaseAt is in the past
+      const pastDate = new Date(Date.now() - 60 * 1000);
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        status: OrderStatus.escrow_held,
+        autoReleaseAt: pastDate,
+      });
+      await createHeldSettlement(prisma, order.id, order.orderId, sellerId, order.amount);
+
+      // Ensure cron is not disabled
+      const prevDisable = process.env.DISABLE_MARKETPLACE_CRON;
+      process.env.DISABLE_MARKETPLACE_CRON = 'false';
+
+      try {
+        await cron.autoReleaseEscrow();
+      } finally {
+        process.env.DISABLE_MARKETPLACE_CRON = prevDisable ?? '';
+      }
+
+      const updatedOrder = await prisma.marketplaceOrder.findUnique({ where: { id: order.id } });
+      expect(updatedOrder!.status).toBe(OrderStatus.auto_released);
+      expect(updatedOrder!.releasedAt).not.toBeNull();
+    });
+
+    // Open dispute blocks cron auto-release
+    it('does NOT auto-release when an open dispute exists on the order', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      const pastDate = new Date(Date.now() - 60 * 1000);
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        status: OrderStatus.escrow_held,
+        autoReleaseAt: pastDate,
+      });
+
+      // Create an open dispute (not in a terminal state)
+      await prisma.dispute.create({
+        data: {
+          targetType: 'marketplace_order',
+          orderId: order.id,
+          type: 'not_delivered',
+          buyerId,
+          sellerId,
+          description: 'Order not delivered, blocking auto-release.',
+          status: DisputeStatus.filed,
+          priorOrderStatus: OrderStatus.escrow_held,
+        },
+      });
+      await prisma.marketplaceOrder.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.disputed },
+      });
+
+      const prevDisable = process.env.DISABLE_MARKETPLACE_CRON;
+      process.env.DISABLE_MARKETPLACE_CRON = 'false';
+
+      await cron.autoReleaseEscrow();
+
+      process.env.DISABLE_MARKETPLACE_CRON = prevDisable ?? '';
+
+      const unchangedOrder = await prisma.marketplaceOrder.findUnique({ where: { id: order.id } });
+      // Must remain disputed — cron must NOT have touched it
+      expect(unchangedOrder!.status).toBe(OrderStatus.disputed);
+    });
+  });
+
+  // ── Concurrent confirmReceipt race ─────────────────────────────────────────
+
+  describe('Concurrent confirmReceipt race guard', () => {
+    // MP-R2: One wins, one gets 409 (updateMany race guard)
+    it('second concurrent confirmReceipt on same order returns 409', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 50000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        status: OrderStatus.delivered,
+      });
+      await createHeldSettlement(prisma, order.id, order.orderId, sellerId, order.amount);
+
+      // Fire two concurrent requests
+      const [res1, res2] = await Promise.all([
+        request
+          .post(`/api/v1/marketplace/orders/${order.id}/confirm-receipt`)
+          .set('Authorization', `Bearer ${buyerToken}`),
+        request
+          .post(`/api/v1/marketplace/orders/${order.id}/confirm-receipt`)
+          .set('Authorization', `Bearer ${buyerToken}`),
+      ]);
+
+      const statuses = [res1.status, res2.status].sort();
+      // One must succeed (201), the other must be rejected (409)
+      expect(statuses).toContain(201);
+      expect(statuses).toContain(409);
+    });
+  });
+
+  // ── Payout batch edge cases ────────────────────────────────────────────────
+
+  describe('Payout batch edge cases', () => {
+    // MP-R10: Empty batch → 400
+    it('createPayoutBatch with empty settlementIds returns 400', async () => {
+      const res = await request
+        .post('/api/v1/admin/payouts/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ settlementIds: [] });
+
+      expect(res.status).toBe(400);
+    });
+
+    // MP-R11: Mark-paid on already-paid payout is idempotent (service returns early)
+    it('markPayoutPaid on already-paid payout returns 200 (idempotent)', async () => {
+      const listing = await createListing(prisma, sellerId);
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, {
+        amount: 50000,
+      });
+      const settlement = await createReleasedSettlement(
+        prisma,
+        order.id,
+        order.orderId,
+        sellerId,
+        order.amount,
+      );
+
+      // Create payout batch
+      const batchRes = await request
+        .post('/api/v1/admin/payouts/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ settlementIds: [settlement.id] });
+      expect(batchRes.status).toBe(201);
+
+      const payoutId = batchRes.body.data[0].id as string;
+
+      // Mark paid once
+      const firstPaidRes = await request
+        .patch(`/api/v1/admin/payouts/${payoutId}/mark-paid`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ note: 'First payment' });
+      expect(firstPaidRes.status).toBe(200);
+      expect(firstPaidRes.body.data.status).toBe('paid');
+
+      // Mark paid again — service short-circuits with early return, not 409
+      const secondPaidRes = await request
+        .patch(`/api/v1/admin/payouts/${payoutId}/mark-paid`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ note: 'Duplicate attempt' });
+      expect(secondPaidRes.status).toBe(200);
+      expect(secondPaidRes.body.data.status).toBe('paid');
+    });
+  });
+
+  // ── Orders endpoints ───────────────────────────────────────────────────────
+
+  describe('GET /marketplace/orders/me', () => {
+    it('returns buyer orders list with pagination', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 40000 });
+      await createEscrowOrder(prisma, listing.id, buyerId, sellerId, { amount: 40000 });
+
+      const res = await request
+        .get('/api/v1/marketplace/orders/me')
+        .set('Authorization', `Bearer ${buyerToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      expect(res.body.data.items.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.data).toHaveProperty('nextCursor');
+    });
+
+    it('returns only buyer orders when role=buyer (default)', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 40000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, { amount: 40000 });
+
+      const res = await request
+        .get('/api/v1/marketplace/orders/me')
+        .query({ role: 'buyer' })
+        .set('Authorization', `Bearer ${buyerToken}`);
+
+      expect(res.status).toBe(200);
+      const ids = (res.body.data.items as Array<{ id: string }>).map((i) => i.id);
+      expect(ids).toContain(order.id);
+    });
+
+    it('returns only seller orders when role=seller', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 40000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, { amount: 40000 });
+
+      const res = await request
+        .get('/api/v1/marketplace/orders/me')
+        .query({ role: 'seller' })
+        .set('Authorization', `Bearer ${sellerToken}`);
+
+      expect(res.status).toBe(200);
+      const ids = (res.body.data.items as Array<{ id: string }>).map((i) => i.id);
+      expect(ids).toContain(order.id);
+    });
+
+    it('returns 401 without auth token', async () => {
+      const res = await request.get('/api/v1/marketplace/orders/me');
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /marketplace/orders/:id', () => {
+    it('returns order detail for buyer', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 40000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, { amount: 40000 });
+
+      const res = await request
+        .get(`/api/v1/marketplace/orders/${order.id}`)
+        .set('Authorization', `Bearer ${buyerToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.id).toBe(order.id);
+      expect(res.body.data.status).toBe(OrderStatus.escrow_held);
+    });
+
+    it('returns 403 for non-participant', async () => {
+      const listing = await createListing(prisma, sellerId, { price: 40000 });
+      const order = await createEscrowOrder(prisma, listing.id, buyerId, sellerId, { amount: 40000 });
+
+      // Third-party user
+      const thirdParty = await prisma.user.create({
+        data: {
+          nickname: 'third_party_order_test',
+          role: 'user',
+          oauthProvider: 'email',
+          oauthId: 'email_third_party_order_test',
+        },
+      });
+      const thirdPartyToken = await devLoginToken(request, thirdParty.nickname);
+
+      const res = await request
+        .get(`/api/v1/marketplace/orders/${order.id}`)
+        .set('Authorization', `Bearer ${thirdPartyToken}`);
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 for non-existent order', async () => {
+      const res = await request
+        .get('/api/v1/marketplace/orders/non-existent-id')
+        .set('Authorization', `Bearer ${buyerToken}`);
+
+      expect(res.status).toBe(404);
     });
   });
 });

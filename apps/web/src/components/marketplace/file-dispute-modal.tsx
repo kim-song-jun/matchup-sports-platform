@@ -10,22 +10,23 @@ import { extractErrorMessage } from '@/lib/utils';
 // useFileDispute(): UseMutationResult<void, Error, FileDisputeVars>
 // interface FileDisputeVars {
 //   orderId: string;
-//   type: DisputeType;
+//   type: ApiDisputeType;   // 'not_delivered' | 'not_as_described' | 'damaged' | 'other'
 //   description: string;
 // }
 
-type DisputeType = 'item_not_received' | 'item_not_as_described' | 'payment_issue' | 'other';
+/** API-aligned dispute type enum (maps directly to backend DisputeType). */
+type ApiDisputeType = 'not_delivered' | 'not_as_described' | 'damaged' | 'other';
 
-const disputeTypeOptions: { value: DisputeType; label: string; description: string }[] = [
-  { value: 'item_not_received', label: '상품 미수령', description: '상품을 아직 받지 못했어요' },
-  { value: 'item_not_as_described', label: '상품 상태 불일치', description: '설명과 다른 상품이 도착했어요' },
-  { value: 'payment_issue', label: '결제 문제', description: '결제 관련 문제가 발생했어요' },
-  { value: 'other', label: '기타', description: '위 항목에 해당하지 않는 문제예요' },
+const disputeTypeOptions: { value: ApiDisputeType; label: string; desc: string }[] = [
+  { value: 'not_delivered', label: '상품 미수령', desc: '상품을 아직 받지 못했어요' },
+  { value: 'not_as_described', label: '상품 상태 불일치', desc: '설명과 다른 상품이 도착했어요' },
+  { value: 'damaged', label: '파손', desc: '상품이 파손된 상태로 도착했어요' },
+  { value: 'other', label: '기타', desc: '위 항목에 해당하지 않는 문제예요' },
 ];
 
 interface FileDisputeVars {
   orderId: string;
-  type: DisputeType;
+  type: ApiDisputeType;
   description: string;
 }
 
@@ -42,11 +43,11 @@ interface FileDisputeModalProps {
 
 /**
  * Modal for buyers to file a dispute against an order.
- * Visible when order status is in {paid, shipped, delivered} and no prior dispute exists.
+ * Visible when order status is in {escrow_held, shipped, delivered} and no prior dispute exists.
  */
 export function FileDisputeModal({ isOpen, onClose, orderId, fileDisputeMutation }: FileDisputeModalProps) {
   const { toast } = useToast();
-  const [selectedType, setSelectedType] = useState<DisputeType | ''>('');
+  const [selectedType, setSelectedType] = useState<ApiDisputeType | ''>('');
   const [description, setDescription] = useState('');
 
   const isValid = selectedType !== '' && description.trim().length >= 10;
@@ -83,7 +84,7 @@ export function FileDisputeModal({ isOpen, onClose, orderId, fileDisputeMutation
         <div className="flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-4">
           <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
           <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
-            분쟁 신청 후 운영팀이 양측 의견을 수렴해 최대 3영업일 내 결정합니다.
+            분쟁 신청 후 운영팀이 양측 의견을 수렴해 최대 3영업일 내 결정해요.
             허위 신청 시 이용이 제한될 수 있어요.
           </p>
         </div>
@@ -98,7 +99,7 @@ export function FileDisputeModal({ isOpen, onClose, orderId, fileDisputeMutation
               {disputeTypeOptions.map((option) => (
                 <label
                   key={option.value}
-                  className={`flex items-start gap-3 rounded-xl p-3 cursor-pointer border transition-colors ${
+                  className={`flex items-start gap-3 rounded-xl p-3 cursor-pointer border transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 ${
                     selectedType === option.value
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
                       : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600'
@@ -114,7 +115,7 @@ export function FileDisputeModal({ isOpen, onClose, orderId, fileDisputeMutation
                   />
                   <div>
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{option.label}</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{option.description}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{option.desc}</p>
                   </div>
                 </label>
               ))}

@@ -36,7 +36,7 @@ export function ConfirmReceiptButton({ orderId, status, confirmReceiptMutation }
       { orderId },
       {
         onSuccess: () => {
-          toast('success', '수령을 확인했어요. 판매자에게 대금이 지급됩니다.');
+          toast('success', '수령을 확인했어요. 판매자에게 대금이 지급돼요.');
           setShowConfirm(false);
         },
         onError: (err) => {
@@ -62,7 +62,7 @@ export function ConfirmReceiptButton({ orderId, status, confirmReceiptMutation }
       <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} size="sm" title="수령 확인">
         <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
           상품을 실제로 받으셨나요?<br />
-          확인 후에는 취소할 수 없으며, 판매자에게 즉시 대금이 지급됩니다.
+          확인 후에는 취소할 수 없으며, 판매자에게 즉시 대금이 지급돼요.
         </p>
         <div className="mt-6 flex gap-3">
           <button

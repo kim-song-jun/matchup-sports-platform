@@ -8,36 +8,16 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { useMyDisputes } from '@/hooks/use-api';
+import {
+  USER_DISPUTE_STATUS_LABELS,
+  DISPUTE_TYPE_LABELS,
+  ACTIVE_DISPUTE_STATUSES,
+} from '@/lib/dispute-labels';
 
 // useMyDisputes(role?: 'buyer' | 'seller' | 'all') → InfiniteQuery<CursorPage<Dispute>>
 // Dispute.status: DisputeStatus union from types/dispute.ts
 
 type DisputeTab = 'active' | 'resolved';
-
-const STATUS_LABELS: Record<string, { text: string; color: string }> = {
-  filed: { text: '검토 대기', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
-  seller_responded: { text: '판매자 응답', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  admin_reviewing: { text: '운영팀 검토 중', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  resolved_refund: { text: '환불 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  resolved_release: { text: '지급 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  resolved_partial: { text: '부분 환불', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  dismissed: { text: '기각됨', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },
-  withdrawn: { text: '취하됨', color: 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500' },
-};
-
-const ACTIVE_STATUSES = new Set(['filed', 'seller_responded', 'admin_reviewing']);
-
-const TYPE_LABELS: Record<string, string> = {
-  not_delivered: '상품 미수령',
-  not_as_described: '상품 상태 불일치',
-  damaged: '파손',
-  other: '기타',
-  // legacy team-match types
-  no_show: '노쇼',
-  late: '지각',
-  level_mismatch: '실력 차이',
-  misconduct: '비매너',
-};
 
 export default function MyDisputesPage() {
   const router = useRouter();
@@ -53,8 +33,8 @@ export default function MyDisputesPage() {
   // Filter by tab: active vs resolved
   const disputes = allDisputes.filter((d) =>
     activeTab === 'active'
-      ? ACTIVE_STATUSES.has(d.status)
-      : !ACTIVE_STATUSES.has(d.status),
+      ? ACTIVE_DISPUTE_STATUSES.has(d.status)
+      : !ACTIVE_DISPUTE_STATUSES.has(d.status),
   );
 
   return (
@@ -121,13 +101,13 @@ export default function MyDisputesPage() {
             description={
               activeTab === 'active'
                 ? '주문 상세에서 문제가 생기면 분쟁 신청을 해주세요'
-                : '처리된 분쟁이 생기면 여기에 표시됩니다'
+                : '처리된 분쟁이 생기면 여기에 표시돼요'
             }
           />
         ) : (
           disputes.map((dispute) => {
-            const statusConfig = STATUS_LABELS[dispute.status] ?? STATUS_LABELS.filed;
-            const isActive = ACTIVE_STATUSES.has(dispute.status);
+            const statusConfig = USER_DISPUTE_STATUS_LABELS[dispute.status] ?? USER_DISPUTE_STATUS_LABELS.filed;
+            const isActive = ACTIVE_DISPUTE_STATUSES.has(dispute.status);
             return (
               <Link
                 key={dispute.id}
@@ -141,7 +121,7 @@ export default function MyDisputesPage() {
                         {statusConfig.text}
                       </span>
                       <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                        {TYPE_LABELS[dispute.type] ?? dispute.type}
+                        {DISPUTE_TYPE_LABELS[dispute.type] ?? dispute.type}
                       </span>
                     </div>
                     <p className="text-base font-semibold text-gray-900 dark:text-white truncate">

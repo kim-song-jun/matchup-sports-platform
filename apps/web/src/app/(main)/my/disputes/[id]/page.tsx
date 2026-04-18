@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { extractErrorMessage } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useDispute, useAddDisputeMessage } from '@/hooks/use-api';
+import { USER_DISPUTE_STATUS_LABELS, DISPUTE_TYPE_LABELS, RESOLVED_DISPUTE_STATUSES } from '@/lib/dispute-labels';
 import type { DisputeMessage } from '@/components/dispute/dispute-message-thread';
 
 // useDispute(id)           → { data: Dispute | undefined; isLoading; isError; refetch }
@@ -18,26 +19,6 @@ import type { DisputeMessage } from '@/components/dispute/dispute-message-thread
 //
 // Dispute.events: DisputeEvent[] (actorRole: 'buyer'|'seller'|'admin'|'system', message)
 // We adapt DisputeEvent → DisputeMessage for the thread component.
-
-const STATUS_LABELS: Record<string, { text: string; color: string }> = {
-  filed: { text: '검토 대기', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
-  seller_responded: { text: '판매자 응답', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  admin_reviewing: { text: '운영팀 검토 중', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  resolved_refund: { text: '환불 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  resolved_release: { text: '지급 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  resolved_partial: { text: '부분 환불', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  dismissed: { text: '기각됨', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },
-  withdrawn: { text: '취하됨', color: 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500' },
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  not_delivered: '상품 미수령',
-  not_as_described: '상품 상태 불일치',
-  damaged: '파손',
-  other: '기타',
-};
-
-const RESOLVED_STATUSES = new Set(['resolved_refund', 'resolved_release', 'resolved_partial', 'dismissed', 'withdrawn']);
 
 export default function DisputeDetailPage() {
   const params = useParams();
@@ -53,7 +34,15 @@ export default function DisputeDetailPage() {
   const { data: dispute, isLoading, isError, refetch } = useDispute(disputeId);
   const addMessage = useAddDisputeMessage();
 
-  const isResolved = dispute ? RESOLVED_STATUSES.has(dispute.status) : false;
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [dispute?.events]);
+
+  // Guard: useRequireAuth triggers redirect, but render must still be safe
+  if (!user) return null;
+
+  const isResolved = dispute ? RESOLVED_DISPUTE_STATUSES.has(dispute.status) : false;
 
   // Map DisputeEvent → DisputeMessage for the thread component
   const threadMessages: DisputeMessage[] = (dispute?.events ?? []).map((event) => ({
@@ -64,11 +53,6 @@ export default function DisputeDetailPage() {
     content: event.message,
     createdAt: event.createdAt,
   }));
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [dispute?.events]);
 
   const handleSendMessage = () => {
     const content = messageInput.trim();
@@ -122,7 +106,7 @@ export default function DisputeDetailPage() {
     );
   }
 
-  const statusConfig = STATUS_LABELS[dispute.status] ?? STATUS_LABELS.filed;
+  const statusConfig = USER_DISPUTE_STATUS_LABELS[dispute.status] ?? USER_DISPUTE_STATUS_LABELS.filed;
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in flex flex-col min-h-dvh">
@@ -146,7 +130,7 @@ export default function DisputeDetailPage() {
               {statusConfig.text}
             </span>
             <span className="text-xs text-gray-400 dark:text-gray-500">
-              {TYPE_LABELS[dispute.type] ?? dispute.type}
+              {DISPUTE_TYPE_LABELS[dispute.type] ?? dispute.type}
             </span>
           </div>
 
@@ -172,7 +156,7 @@ export default function DisputeDetailPage() {
       <div className="flex-1 overflow-y-auto mt-3">
         <DisputeMessageThread
           messages={threadMessages}
-          currentUserId={user?.id ?? ''}
+          currentUserId={user.id}
         />
         <div ref={bottomRef} />
       </div>

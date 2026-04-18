@@ -1,3 +1,4 @@
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MarketplaceController } from './marketplace.controller';
 import { MarketplaceService } from './marketplace.service';
@@ -20,6 +21,9 @@ const mockService = {
   deliverOrder: jest.fn(),
   confirmReceipt: jest.fn(),
   fileDispute: jest.fn(),
+  // Wave B service methods (added by backend-api-dev)
+  listMyOrders: jest.fn(),
+  getOrderForUser: jest.fn(),
 };
 
 const userId = 'user-buyer-001';
@@ -119,6 +123,89 @@ describe('MarketplaceController', () => {
       await (controller as any).fileDispute(orderId, body, userId);
 
       expect(mockService.fileDispute).toHaveBeenCalledWith(orderId, userId, body);
+    });
+  });
+
+  // ── listMyOrders ─────────────────────────────────────────────────────────────
+
+  describe('listMyOrders', () => {
+    it('delegates to service.listMyOrders with default buyer role and no pagination', async () => {
+      const expected = { items: [{ id: orderId, status: 'escrow_held' }], nextCursor: null };
+      mockService.listMyOrders.mockResolvedValue(expected);
+
+      const result = await (controller as any).listMyOrders(userId, undefined, undefined, undefined);
+
+      expect(mockService.listMyOrders).toHaveBeenCalledWith(userId, 'buyer', undefined, undefined);
+      expect(result).toEqual(expected);
+    });
+
+    it('passes role=seller when explicitly provided', async () => {
+      const expected = { items: [], nextCursor: null };
+      mockService.listMyOrders.mockResolvedValue(expected);
+
+      await (controller as any).listMyOrders(userId, 'seller', undefined, undefined);
+
+      expect(mockService.listMyOrders).toHaveBeenCalledWith(userId, 'seller', undefined, undefined);
+    });
+
+    it('coerces invalid role to buyer', async () => {
+      mockService.listMyOrders.mockResolvedValue({ items: [], nextCursor: null });
+
+      await (controller as any).listMyOrders(userId, 'admin', undefined, undefined);
+
+      expect(mockService.listMyOrders).toHaveBeenCalledWith(userId, 'buyer', undefined, undefined);
+    });
+
+    it('parses and clamps limit', async () => {
+      mockService.listMyOrders.mockResolvedValue({ items: [], nextCursor: null });
+
+      await (controller as any).listMyOrders(userId, undefined, undefined, '999');
+
+      expect(mockService.listMyOrders).toHaveBeenCalledWith(userId, 'buyer', undefined, 100);
+    });
+
+    it('passes cursor through when provided', async () => {
+      const cursor = 'cursor-abc';
+      const expected = { items: [], nextCursor: null };
+      mockService.listMyOrders.mockResolvedValue(expected);
+
+      await (controller as any).listMyOrders(userId, undefined, cursor, '20');
+
+      expect(mockService.listMyOrders).toHaveBeenCalledWith(userId, 'buyer', cursor, 20);
+    });
+  });
+
+  // ── getOrder ─────────────────────────────────────────────────────────────────
+
+  describe('getOrder', () => {
+    it('delegates to service.getOrderForUser with id and userId', async () => {
+      const expected = { id: orderId, status: 'escrow_held', buyerId: userId };
+      mockService.getOrderForUser.mockResolvedValue(expected);
+
+      const result = await (controller as any).getOrder(orderId, userId);
+
+      expect(mockService.getOrderForUser).toHaveBeenCalledWith(orderId, userId);
+      expect(result).toEqual(expected);
+    });
+
+    it('propagates ForbiddenException when service throws 403', async () => {
+      mockService.getOrderForUser.mockRejectedValue(
+        new ForbiddenException('이 주문에 접근할 권한이 없습니다.'),
+      );
+
+      await expect((controller as any).getOrder(orderId, 'other-user')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('propagates NotFoundException when service throws 404', async () => {
+      mockService.getOrderForUser.mockRejectedValue(
+        new NotFoundException('주문을 찾을 수 없습니다.'),
+      );
+
+      await expect((controller as any).getOrder('non-existent', userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

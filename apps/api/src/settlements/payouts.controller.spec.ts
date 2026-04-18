@@ -70,6 +70,32 @@ describe('PayoutsController', () => {
         limit: 100,
       });
     });
+
+    it('rejects invalid status values — passes undefined to service', () => {
+      mockService.findAllPayouts.mockReturnValue({ items: [], nextCursor: null });
+
+      controller.findAll('invalid_status', undefined, undefined);
+
+      expect(mockService.findAllPayouts).toHaveBeenCalledWith({
+        status: undefined,
+        cursor: undefined,
+        limit: undefined,
+      });
+    });
+
+    it('accepts all valid PayoutStatus enum values', () => {
+      mockService.findAllPayouts.mockReturnValue({ items: [], nextCursor: null });
+      const validStatuses = ['pending', 'processing', 'paid', 'failed'] as const;
+
+      for (const status of validStatuses) {
+        controller.findAll(status, undefined, undefined);
+        expect(mockService.findAllPayouts).toHaveBeenCalledWith({
+          status,
+          cursor: undefined,
+          limit: undefined,
+        });
+      }
+    });
   });
 
   // ── findEligible ─────────────────────────────────────────────────────────────
@@ -148,6 +174,25 @@ describe('PayoutsController', () => {
       controller.markFailed(payoutId, body, adminId);
 
       expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '계좌번호 오류', '재시도 예정');
+    });
+
+    it('passes undefined note when body.note is absent', () => {
+      const body: MarkPayoutFailedDto = { reason: '수취인 정보 불일치' };
+      mockService.markPayoutFailed.mockReturnValue({ id: payoutId, status: 'failed' });
+
+      controller.markFailed(payoutId, body, adminId);
+
+      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '수취인 정보 불일치', undefined);
+    });
+
+    it('returns service result', () => {
+      const body: MarkPayoutFailedDto = { reason: '은행 점검' };
+      const expected = { id: payoutId, status: 'failed', failureReason: '은행 점검' };
+      mockService.markPayoutFailed.mockReturnValue(expected);
+
+      const result = controller.markFailed(payoutId, body, adminId);
+
+      expect(result).toEqual(expected);
     });
   });
 });

@@ -11,8 +11,6 @@ import {
   Scale,
   ChevronRight,
   AlertTriangle,
-  CheckCircle,
-  Ban,
   Calendar,
   MapPin,
   Shield,
@@ -26,6 +24,8 @@ import { DisputeMessageThread } from '@/components/dispute/dispute-message-threa
 import { DisputeResolveModal } from '@/components/dispute/dispute-resolve-modal';
 import { formatAmount, extractErrorMessage } from '@/lib/utils';
 import { useAdminDispute, useReviewDispute, useResolveDispute } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
+import { ADMIN_DISPUTE_STATUS_LABELS, DISPUTE_TYPE_LABELS, RESOLVED_DISPUTE_STATUSES } from '@/lib/dispute-labels';
 import type { DisputeMessage } from '@/components/dispute/dispute-message-thread';
 
 // useAdminDispute(id) → { data: Dispute; isLoading; isError; refetch }
@@ -33,34 +33,8 @@ import type { DisputeMessage } from '@/components/dispute/dispute-message-thread
 //   { id, targetType, orderId, teamMatchId, type, status, reason, description,
 //     reporter?, respondent?, events?: DisputeEvent[], adminNotes?, resolvedAt?, resolutionAmount? }
 //
-// useReviewDispute() → legacy team-match status transition (filed→admin_reviewing)
+// useReviewDispute() → status transition (filed→admin_reviewing)
 // useResolveDispute() → final resolution (admin_reviewing→resolved_*|dismissed)
-
-const statusConfig: Record<string, { label: string; color: string }> = {
-  filed: { label: '접수됨', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
-  seller_responded: { label: '판매자 응답', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  admin_reviewing: { label: '검토중', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  resolved_refund: { label: '환불 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  resolved_release: { label: '지급 완료', color: 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' },
-  resolved_partial: { label: '부분 환불', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  dismissed: { label: '기각됨', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },
-  withdrawn: { label: '취하됨', color: 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500' },
-};
-
-const typeLabel: Record<string, string> = {
-  // Marketplace
-  not_delivered: '상품 미수령',
-  not_as_described: '상품 상태 불일치',
-  damaged: '파손',
-  other: '기타',
-  // Legacy team-match
-  no_show: '노쇼',
-  late: '지각',
-  level_mismatch: '실력 차이',
-  misconduct: '비매너',
-};
-
-const RESOLVED_STATUSES = new Set(['resolved_refund', 'resolved_release', 'resolved_partial', 'dismissed', 'withdrawn']);
 
 type LegacyActionMode = 'review' | null;
 
@@ -69,6 +43,7 @@ export default function AdminDisputeDetailPage() {
   const router = useRouter();
   const disputeId = params.id as string;
   const { toast } = useToast();
+  const { user } = useAuthStore();
 
   const { data: dispute, isLoading, isError, refetch } = useAdminDispute(disputeId);
   const reviewDispute = useReviewDispute();
@@ -79,7 +54,7 @@ export default function AdminDisputeDetailPage() {
   const [adminNote, setAdminNote] = useState('');
 
   const isMarketplace = !!(dispute?.orderId);
-  const isResolved = dispute ? RESOLVED_STATUSES.has(dispute.status) : false;
+  const isResolved = dispute ? RESOLVED_DISPUTE_STATUSES.has(dispute.status) : false;
 
   // Map DisputeEvent → DisputeMessage for thread component
   const threadMessages: DisputeMessage[] = (dispute?.events ?? []).map((event) => ({
@@ -131,7 +106,7 @@ export default function AdminDisputeDetailPage() {
     );
   }
 
-  const sc = statusConfig[dispute.status] ?? { label: dispute.status, color: 'bg-gray-100 text-gray-500' };
+  const sc = ADMIN_DISPUTE_STATUS_LABELS[dispute.status] ?? { label: dispute.status, color: 'bg-gray-100 text-gray-500' };
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -186,7 +161,7 @@ export default function AdminDisputeDetailPage() {
       <Modal isOpen={legacyActionMode === 'review'} onClose={() => setLegacyActionMode(null)} title="검토 시작" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            검토 시작 메모를 남기면 감사 이벤트에 기록됩니다.
+            검토 시작 메모를 남기면 감사 이벤트에 기록돼요.
           </p>
           <label htmlFor="admin-review-note" className="sr-only">운영 메모</label>
           <textarea
@@ -232,7 +207,7 @@ export default function AdminDisputeDetailPage() {
             </div>
             <div className="flex justify-between items-start gap-4">
               <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">유형</dt>
-              <dd className="text-sm font-medium text-gray-900 dark:text-white text-right">{typeLabel[dispute.type] ?? dispute.type}</dd>
+              <dd className="text-sm font-medium text-gray-900 dark:text-white text-right">{DISPUTE_TYPE_LABELS[dispute.type] ?? dispute.type}</dd>
             </div>
             <div className="flex justify-between items-start gap-4">
               <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">상태</dt>
@@ -342,7 +317,7 @@ export default function AdminDisputeDetailPage() {
                 <MapPin size={14} className="text-gray-400" aria-hidden="true" />
                 <span className="text-xs text-gray-400">신고 유형</span>
               </div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">{typeLabel[dispute.type] ?? dispute.type}</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{DISPUTE_TYPE_LABELS[dispute.type] ?? dispute.type}</p>
             </div>
           </div>
         </div>
@@ -360,7 +335,7 @@ export default function AdminDisputeDetailPage() {
         <div className="max-h-[480px] overflow-y-auto">
           <DisputeMessageThread
             messages={threadMessages}
-            currentUserId="admin"
+            currentUserId={user?.id ?? ''}
           />
         </div>
       </div>
@@ -370,15 +345,13 @@ export default function AdminDisputeDetailPage() {
         isOpen={showResolveModal}
         onClose={() => setShowResolveModal(false)}
         disputeId={disputeId}
-        totalAmount={dispute.resolutionAmount ?? 0}
         resolveDisputeMutation={{
           mutate: (vars, callbacks) => {
             resolveDispute.mutate(
               {
                 id: vars.id,
                 data: {
-                  action: vars.decision as 'refund' | 'release' | 'partial' | 'dismiss',
-                  amount: vars.amount,
+                  action: vars.decision as 'refund' | 'release' | 'dismiss',
                   note: vars.note ?? '',
                 },
               },

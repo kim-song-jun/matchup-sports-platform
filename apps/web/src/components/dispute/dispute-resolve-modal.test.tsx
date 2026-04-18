@@ -24,7 +24,6 @@ const defaultProps = {
   isOpen: true,
   onClose: vi.fn(),
   disputeId: 'dispute-1',
-  totalAmount: 50000,
   resolveDisputeMutation: makeMutation(),
 };
 
@@ -36,9 +35,10 @@ describe('DisputeResolveModal', () => {
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('renders the escrow amount', () => {
+  it('renders 3 decision options (refund, release, dismiss)', () => {
     render(<DisputeResolveModal {...defaultProps} />);
-    expect(screen.getByText('50,000원')).toBeInTheDocument();
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(3);
   });
 
   it('submit button disabled when no decision selected', () => {
@@ -46,29 +46,14 @@ describe('DisputeResolveModal', () => {
     expect(screen.getByRole('button', { name: '처리 확정' })).toBeDisabled();
   });
 
-  it('submit button enabled when a simple decision is selected', () => {
+  it('submit button enabled when refund is selected', () => {
     render(<DisputeResolveModal {...defaultProps} />);
     const radios = screen.getAllByRole('radio');
     fireEvent.click(radios[0]); // refund
     expect(screen.getByRole('button', { name: '처리 확정' })).not.toBeDisabled();
   });
 
-  it('shows partial amount input when partial is selected', () => {
-    render(<DisputeResolveModal {...defaultProps} />);
-    const radios = screen.getAllByRole('radio');
-    fireEvent.click(radios[2]); // partial
-    expect(screen.getByLabelText(/환불 금액/)).toBeInTheDocument();
-  });
-
-  it('submit disabled when partial amount exceeds total', () => {
-    render(<DisputeResolveModal {...defaultProps} />);
-    const radios = screen.getAllByRole('radio');
-    fireEvent.click(radios[2]); // partial
-    fireEvent.change(screen.getByLabelText(/환불 금액/), { target: { value: '99999' } });
-    expect(screen.getByRole('button', { name: '처리 확정' })).toBeDisabled();
-  });
-
-  it('calls mutate with correct decision on submit', () => {
+  it('calls mutate with correct decision on submit (release)', () => {
     const mutate = vi.fn();
     render(<DisputeResolveModal {...defaultProps} resolveDisputeMutation={makeMutation({ mutate })} />);
     const radios = screen.getAllByRole('radio');
@@ -80,16 +65,15 @@ describe('DisputeResolveModal', () => {
     );
   });
 
-  it('includes amount when decision is partial', () => {
+  it('calls mutate with decision=dismiss when dismiss is selected', () => {
     const mutate = vi.fn();
     render(<DisputeResolveModal {...defaultProps} resolveDisputeMutation={makeMutation({ mutate })} />);
     const radios = screen.getAllByRole('radio');
-    fireEvent.click(radios[2]); // partial
-    fireEvent.change(screen.getByLabelText(/환불 금액/), { target: { value: '20000' } });
+    fireEvent.click(radios[2]); // dismiss
     fireEvent.click(screen.getByRole('button', { name: '처리 확정' }));
     expect(mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ decision: 'partial', amount: 20000 }),
-      expect.any(Object),
+      expect.objectContaining({ id: 'dispute-1', decision: 'dismiss' }),
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });
 });

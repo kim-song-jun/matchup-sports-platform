@@ -600,6 +600,70 @@ export class MarketplaceService {
    * Transitions the held SettlementRecord for this order to completed (released).
    * Failure propagates to caller — callers that want fire-and-forget must wrap in try/catch.
    */
+  /**
+   * Returns a cursor-paginated list of orders for the authenticated user.
+   * role='buyer' (default) filters by buyerId; role='seller' filters by sellerId.
+   * Invalid role values are silently coerced to 'buyer' (query-string robustness).
+   */
+  async listMyOrders(
+    userId: string,
+    role: 'buyer' | 'seller' = 'buyer',
+    cursor?: string,
+    limit?: number,
+  ) {
+    const safeLimit = Math.min(limit ?? PAGINATION.DEFAULT_LIMIT, 100);
+    const safeRole = role === 'seller' ? 'seller' : 'buyer';
+    const where =
+      safeRole === 'seller' ? { sellerId: userId } : { buyerId: userId };
+
+    const items = await this.prisma.marketplaceOrder.findMany({
+      where,
+      include: {
+        listing: { select: { id: true, title: true, imageUrls: true, price: true } },
+        buyer: { select: { id: true, nickname: true, profileImageUrl: true } },
+        seller: { select: { id: true, nickname: true, profileImageUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: safeLimit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+    });
+
+    const hasNext = items.length > safeLimit;
+    const result = hasNext ? items.slice(0, safeLimit) : items;
+
+    return {
+      items: result,
+      nextCursor: hasNext ? result[result.length - 1].id : null,
+    };
+  }
+
+  /**
+   * Returns a single order by DB id, enforcing buyer-or-seller access.
+   * Throws 404 if not found, 403 if the caller is neither buyer nor seller.
+   */
+  async getOrderForUser(id: string, userId: string) {
+    const order = await this.prisma.marketplaceOrder.findUnique({
+      where: { id },
+      include: {
+        listing: { select: { id: true, title: true, imageUrls: true, price: true } },
+        buyer: { select: { id: true, nickname: true, profileImageUrl: true } },
+        seller: { select: { id: true, nickname: true, profileImageUrl: true } },
+        disputes: {
+          select: { id: true, status: true, type: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    if (!order) throw new NotFoundException('주문을 찾을 수 없습니다.');
+    if (order.buyerId !== userId && order.sellerId !== userId) {
+      throw new ForbiddenException('이 주문에 접근할 권한이 없습니다.');
+    }
+
+    const { disputes, ...rest } = order;
+    return { ...rest, dispute: disputes[0] ?? null };
+  }
+
   private async releaseSettlementForOrder(orderDbId: string, sellerId: string): Promise<void> {
     await this.settlementsService.releaseSettlement(orderDbId);
   }

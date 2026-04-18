@@ -18,7 +18,7 @@ import { useOrder, useConfirmReceipt, useFileDispute } from '@/hooks/use-api';
 // useConfirmReceipt()    → mutation.mutate(id: string)
 // useFileDispute()       → mutation.mutate({ id, data: FileDisputeInput })
 //
-// FileDisputeInput.type: 'not_as_described' | 'not_delivered' | 'damaged' | 'other'
+// FileDisputeInput.type: 'not_delivered' | 'not_as_described' | 'damaged' | 'other' (API enum, no mapping needed)
 // MarketplaceOrder: { id, status, amount, autoReleaseAt, listing, buyer, seller, dispute? }
 
 type OrderStatus =
@@ -74,8 +74,8 @@ function AutoReleaseCountdown({ autoReleaseAt }: { autoReleaseAt: string }) {
       <Clock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
       <p className="text-sm text-amber-800 dark:text-amber-300">
         {daysLeft > 0
-          ? <><span className="font-bold">{daysLeft}일 뒤</span> 자동으로 대금이 판매자에게 지급됩니다</>
-          : '곧 대금이 자동 지급됩니다'}
+          ? <><span className="font-bold">{daysLeft}일 뒤</span> 자동으로 대금이 판매자에게 지급돼요</>
+          : '곧 대금이 자동 지급돼요'}
       </p>
     </div>
   );
@@ -138,8 +138,9 @@ export default function OrderDetailPage() {
   const status = order.status as OrderStatus;
   const statusConfig = STATUS_LABELS[status] ?? STATUS_LABELS.pending;
   const hasDispute = !!order.dispute;
+  // paid is excluded: backend rejects dispute filing on escrow-not-yet-held orders
   const canFileDispute =
-    ['paid', 'shipped', 'delivered', 'escrow_held'].includes(status) && !hasDispute;
+    ['escrow_held', 'shipped', 'delivered'].includes(status) && !hasDispute;
 
   // Timeline step index
   const timelineOrder: OrderStatus[] = ['paid', 'shipped', 'delivered', 'completed'];
@@ -233,7 +234,7 @@ export default function OrderDetailPage() {
             <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-red-800 dark:text-red-300">분쟁 신청됨</p>
-              <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">운영팀이 검토 중입니다. 최대 3영업일 내 처리됩니다.</p>
+              <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">운영팀이 검토 중이에요. 최대 3영업일 내 처리돼요.</p>
             </div>
             <Link
               href={`/my/disputes/${order.dispute.id}`}
@@ -323,18 +324,12 @@ export default function OrderDetailPage() {
         orderId={orderId}
         fileDisputeMutation={{
           mutate: (vars, callbacks) => {
-            // FileDisputeInput.type mapping: our UI types → API types
-            const typeMap: Record<string, 'not_as_described' | 'not_delivered' | 'damaged' | 'other'> = {
-              item_not_received: 'not_delivered',
-              item_not_as_described: 'not_as_described',
-              payment_issue: 'other',
-              other: 'other',
-            };
+            // vars.type is already an API enum value (not_delivered / not_as_described / damaged / other)
             fileDisputeMutation.mutate(
               {
                 id: vars.orderId,
                 data: {
-                  type: typeMap[vars.type] ?? 'other',
+                  type: vars.type,
                   description: vars.description,
                 },
               },

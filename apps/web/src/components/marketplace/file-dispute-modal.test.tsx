@@ -48,6 +48,12 @@ describe('FileDisputeModal', () => {
     expect(screen.getByRole('heading', { name: '분쟁 신청' })).toBeInTheDocument();
   });
 
+  it('renders 4 dispute type options (API enum aligned)', () => {
+    render(<FileDisputeModal {...defaultProps} />);
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(4);
+  });
+
   it('submit button is disabled when no type selected', () => {
     render(<FileDisputeModal {...defaultProps} />);
     expect(screen.getByRole('button', { name: '분쟁 신청' })).toBeDisabled();
@@ -62,7 +68,6 @@ describe('FileDisputeModal', () => {
 
   it('submit button enabled when type and description are valid', () => {
     render(<FileDisputeModal {...defaultProps} />);
-    // Select type via radio label
     const radios = screen.getAllByRole('radio');
     fireEvent.click(radios[0]);
     fireEvent.change(screen.getByLabelText(/상세 내용/), {
@@ -71,7 +76,7 @@ describe('FileDisputeModal', () => {
     expect(screen.getByRole('button', { name: '분쟁 신청' })).not.toBeDisabled();
   });
 
-  it('calls mutate with correct args on submit', () => {
+  it('calls mutate with API enum type (not_delivered) on submit', () => {
     const mutate = vi.fn();
     render(
       <FileDisputeModal
@@ -80,13 +85,13 @@ describe('FileDisputeModal', () => {
       />,
     );
     const radios = screen.getAllByRole('radio');
-    fireEvent.click(radios[0]);
+    fireEvent.click(radios[0]); // not_delivered
     fireEvent.change(screen.getByLabelText(/상세 내용/), {
       target: { value: '배송이 7일이 지나도 오지 않아요 분쟁 신청합니다' },
     });
     fireEvent.click(screen.getByRole('button', { name: '분쟁 신청' }));
     expect(mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ orderId: 'order-abc', type: 'item_not_received' }),
+      expect.objectContaining({ orderId: 'order-abc', type: 'not_delivered' }),
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });

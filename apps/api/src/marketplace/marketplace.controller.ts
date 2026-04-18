@@ -92,6 +92,40 @@ export class MarketplaceController {
     return this.marketplaceService.createOrder(listingId, userId);
   }
 
+  @Get('orders/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '내 주문 목록 (커서 기반 페이지네이션)' })
+  @ApiResponse({ status: 200, description: '주문 목록 (items + nextCursor)' })
+  async listMyOrders(
+    @CurrentUser('id') userId: string,
+    @Query('role') role?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsed = limit ? parseInt(limit, 10) : undefined;
+    const safeLimit =
+      parsed !== undefined && !Number.isNaN(parsed)
+        ? Math.min(Math.max(1, parsed), 100)
+        : undefined;
+    const safeRole = role === 'seller' ? 'seller' : 'buyer';
+    return this.marketplaceService.listMyOrders(userId, safeRole, cursor, safeLimit);
+  }
+
+  @Get('orders/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '주문 상세 조회 — 구매자 또는 판매자만 접근 가능' })
+  @ApiResponse({ status: 200, description: '주문 상세' })
+  @ApiResponse({ status: 403, description: 'FORBIDDEN — 구매자 또는 판매자 본인만 가능' })
+  @ApiResponse({ status: 404, description: 'ORDER_NOT_FOUND' })
+  async getOrder(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.marketplaceService.getOrderForUser(id, userId);
+  }
+
   @Post('orders/:orderId/confirm')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

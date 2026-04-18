@@ -1,26 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { Scale, Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { extractErrorMessage, formatAmount } from '@/lib/utils';
+import { extractErrorMessage } from '@/lib/utils';
 
 // Expected hook contract (frontend-data-dev owns the implementation):
 // useResolveDispute(): UseMutationResult<void, Error, ResolveDisputeVars>
 // interface ResolveDisputeVars {
 //   id: string;
-//   decision: 'refund' | 'release' | 'partial' | 'dismiss';
-//   amount?: number;   // required when decision === 'partial'
+//   decision: 'refund' | 'release' | 'dismiss';
 //   note?: string;
 // }
 
-export type DisputeDecision = 'refund' | 'release' | 'partial' | 'dismiss';
+export type DisputeDecision = 'refund' | 'release' | 'dismiss';
 
 interface ResolveDisputeVars {
   id: string;
   decision: DisputeDecision;
-  amount?: number;
   note?: string;
 }
 
@@ -28,8 +26,6 @@ interface DisputeResolveModalProps {
   isOpen: boolean;
   onClose: () => void;
   disputeId: string;
-  /** Total payment amount — used to validate partial refund ceiling */
-  totalAmount: number;
   /** Injected mutation — allows vi.mock override in tests without touching hooks/ */
   resolveDisputeMutation: {
     mutate: (vars: ResolveDisputeVars, callbacks: { onSuccess: () => void; onError: (err: unknown) => void }) => void;
@@ -41,53 +37,35 @@ const decisionOptions: { value: DisputeDecision; label: string; description: str
   {
     value: 'refund',
     label: '전액 환불',
-    description: '에스크로 보유금을 구매자에게 전액 반환합니다',
+    description: '에스크로 보유금을 구매자에게 전액 반환해요',
     color: 'border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900',
   },
   {
     value: 'release',
     label: '대금 지급',
-    description: '에스크로 보유금을 판매자에게 전액 지급합니다',
+    description: '에스크로 보유금을 판매자에게 전액 지급해요',
     color: 'border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900',
-  },
-  {
-    value: 'partial',
-    label: '부분 환불',
-    description: '지정한 금액을 구매자에게 환불하고, 나머지는 판매자에게 지급합니다',
-    color: 'border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900',
   },
   {
     value: 'dismiss',
     label: '기각',
-    description: '분쟁을 기각합니다. 현재 상태가 유지됩니다',
+    description: '분쟁을 기각해요. 현재 상태가 유지돼요',
     color: 'border-gray-200 bg-gray-50 dark:bg-gray-800 dark:border-gray-700',
   },
 ];
 
-/**
- * Admin-only modal to resolve a marketplace dispute.
- * Supports 4 decisions: refund / release / partial / dismiss.
- * Note: task §3.3 specifies binary (refund/release) only — implementation includes all 4
- * per orchestrator brief; flagged for backend reconciliation.
- */
+/** Admin-only modal to resolve a marketplace dispute. Supports 3 decisions: refund / release / dismiss. */
 export function DisputeResolveModal({
   isOpen,
   onClose,
   disputeId,
-  totalAmount,
   resolveDisputeMutation,
 }: DisputeResolveModalProps) {
   const { toast } = useToast();
   const [decision, setDecision] = useState<DisputeDecision | ''>('');
-  const [partialAmount, setPartialAmount] = useState('');
   const [note, setNote] = useState('');
 
-  const partialAmountNum = parseFloat(partialAmount);
-  const isPartialValid =
-    decision !== 'partial' ||
-    (!isNaN(partialAmountNum) && partialAmountNum > 0 && partialAmountNum <= totalAmount);
-
-  const isValid = decision !== '' && isPartialValid;
+  const isValid = decision !== '';
 
   const handleSubmit = () => {
     if (!isValid || !decision) return;
@@ -96,13 +74,12 @@ export function DisputeResolveModal({
       {
         id: disputeId,
         decision,
-        amount: decision === 'partial' ? partialAmountNum : undefined,
         note: note.trim() || undefined,
       },
       {
         onSuccess: () => {
           const decisionLabel = decisionOptions.find((o) => o.value === decision)?.label ?? decision;
-          toast('success', `분쟁이 '${decisionLabel}'로 처리되었어요.`);
+          toast('success', `분쟁이 '${decisionLabel}'로 처리됐어요.`);
           handleClose();
         },
         onError: (err) => {
@@ -115,7 +92,6 @@ export function DisputeResolveModal({
   const handleClose = () => {
     if (resolveDisputeMutation.isPending) return;
     setDecision('');
-    setPartialAmount('');
     setNote('');
     onClose();
   };
@@ -123,14 +99,6 @@ export function DisputeResolveModal({
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="md" title="분쟁 처리">
       <div className="space-y-5">
-        <div className="flex items-start gap-3 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 p-4">
-          <Scale size={18} className="text-blue-500 shrink-0 mt-0.5" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">에스크로 보유금</p>
-            <p className="text-base font-bold text-blue-700 dark:text-blue-400 mt-0.5">{formatAmount(totalAmount)}</p>
-          </div>
-        </div>
-
         {/* Decision selection */}
         <div>
           <fieldset>
@@ -141,7 +109,7 @@ export function DisputeResolveModal({
               {decisionOptions.map((option) => (
                 <label
                   key={option.value}
-                  className={`flex items-start gap-3 rounded-xl p-3 cursor-pointer border transition-colors ${
+                  className={`flex items-start gap-3 rounded-xl p-3 cursor-pointer border transition-colors focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 ${
                     decision === option.value
                       ? option.color
                       : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-200'
@@ -164,34 +132,6 @@ export function DisputeResolveModal({
             </div>
           </fieldset>
         </div>
-
-        {/* Partial amount input */}
-        {decision === 'partial' && (
-          <div>
-            <label htmlFor="partial-amount" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-              환불 금액 <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <div className="relative">
-              <input
-                id="partial-amount"
-                type="number"
-                min={1}
-                max={totalAmount}
-                value={partialAmount}
-                onChange={(e) => setPartialAmount(e.target.value)}
-                placeholder="환불할 금액을 입력하세요"
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 pr-10 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">원</span>
-            </div>
-            {!isNaN(partialAmountNum) && partialAmountNum > totalAmount && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
-                <AlertTriangle size={12} aria-hidden="true" />
-                에스크로 보유금({formatAmount(totalAmount)})을 초과할 수 없어요
-              </p>
-            )}
-          </div>
-        )}
 
         {/* Admin note */}
         <div>

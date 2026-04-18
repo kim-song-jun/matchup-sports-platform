@@ -3,15 +3,19 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   MercenaryApplicationStatus,
+  NotificationType,
   Prisma,
   SportType,
   TeamRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from '../teams/team-membership.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ChatService } from '../chat/chat.service';
 import { CreateMercenaryPostDto } from './dto/create-mercenary-post.dto';
 import { UpdateMercenaryPostDto } from './dto/update-mercenary-post.dto';
 import { ApplyMercenaryDto } from './dto/apply-mercenary.dto';
@@ -22,6 +26,8 @@ export class MercenaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teamMembership: TeamMembershipService,
+    private readonly notificationsService: NotificationsService,
+    private readonly chatService: ChatService,
   ) {}
 
   /** Returns paginated list of mercenary posts with basic team and author info. */
@@ -232,8 +238,9 @@ export class MercenaryService {
       throw new ConflictException('이미 지원한 모집글입니다.');
     }
 
+    let application;
     try {
-      return await this.prisma.mercenaryApplication.create({
+      application = await this.prisma.mercenaryApplication.create({
         data: {
           postId,
           userId,
@@ -246,6 +253,18 @@ export class MercenaryService {
       }
       throw error;
     }
+
+    // Fire-and-forget: notify post author
+    void this.notificationsService.create({
+      userId: post.authorId,
+      type: NotificationType.mercenary_applied,
+      title: '용병 지원이 들어왔어요',
+      body: '새로운 용병 지원자가 있습니다.',
+      data: { postId, applicantUserId: userId },
+      fromUserId: userId,
+    });
+
+    return application;
   }
 
   /** Accepts an application. Requires manager+ role. Updates post status if count is filled. */
@@ -259,8 +278,9 @@ export class MercenaryService {
     }
 
     await this.teamMembership.assertRole(post.teamId, userId, 'manager');
+    let result;
     try {
-      return await this.prisma.$transaction(
+      result = await this.prisma.$transaction(
         async (tx) => {
           const currentPost = await tx.mercenaryPost.findUnique({
             where: { id: postId },
@@ -328,6 +348,22 @@ export class MercenaryService {
       }
       throw error;
     }
+
+    // After successful transaction commit: create direct chat room then fire-and-forget notification
+    // Await the room so we can include chatRoomId in the notification deep-link.
+    const room = await this.chatService.getOrCreateDirectRoom(post.authorId, result.userId, {
+      systemMessage: '용병 지원이 수락되었습니다',
+    });
+
+    void this.notificationsService.create({
+      userId: result.userId,
+      type: NotificationType.mercenary_accepted,
+      title: '용병 지원이 수락되었어요',
+      body: '용병 지원이 수락되었습니다. 호스트와 채팅을 시작해보세요.',
+      data: { postId, chatRoomId: room.id },
+    });
+
+    return result;
   }
 
   /** Rejects an application. Requires manager+ role. */
@@ -352,7 +388,7 @@ export class MercenaryService {
       throw new BadRequestException('대기 중인 신청만 거절할 수 있습니다.');
     }
 
-    return this.prisma.mercenaryApplication.update({
+    const rejected = await this.prisma.mercenaryApplication.update({
       where: { id: appId },
       data: {
         status: 'rejected',
@@ -360,6 +396,17 @@ export class MercenaryService {
         decidedBy: userId,
       },
     });
+
+    // Fire-and-forget: notify applicant of rejection
+    void this.notificationsService.create({
+      userId: app.userId,
+      type: NotificationType.mercenary_rejected,
+      title: '용병 지원이 거절되었어요',
+      body: '용병 지원이 거절되었습니다.',
+      data: { postId },
+    });
+
+    return rejected;
   }
 
   /** Withdraws the current user's own pending application. */
@@ -402,6 +449,105 @@ export class MercenaryService {
     const hasMore = items.length > take;
     if (hasMore) items.pop();
     return { items, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null };
+  }
+
+  /**
+   * Manually closes an open mercenary post (author or team manager+).
+   * Transitions status → closed; fans out mercenary_closed to pending+accepted applicants.
+   */
+  async closePost(postId: string, actorUserId: string) {
+    const post = await this.prisma.mercenaryPost.findUnique({
+      where: { id: postId },
+      select: { id: true, authorId: true, teamId: true, status: true },
+    });
+    if (!post) {
+      throw new NotFoundException('용병 모집글을 찾을 수 없습니다.');
+    }
+
+    const isAuthor = post.authorId === actorUserId;
+    if (!isAuthor) {
+      await this.teamMembership.assertRole(post.teamId, actorUserId, 'manager');
+    }
+
+    if (post.status === 'closed' || post.status === 'cancelled') {
+      throw new BadRequestException('이미 종료된 모집글입니다.');
+    }
+
+    // Snapshot affected applicants before state flip
+    const affectedApplicants = await this.prisma.mercenaryApplication.findMany({
+      where: { postId, status: { in: ['pending', 'accepted'] } },
+      select: { userId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.mercenaryPost.update({
+        where: { id: postId },
+        data: { status: 'closed' },
+      });
+    });
+
+    // Fan-out mercenary_closed notifications fire-and-forget
+    void Promise.all(
+      affectedApplicants.map((a) =>
+        this.notificationsService.create({
+          userId: a.userId,
+          type: NotificationType.mercenary_closed,
+          title: '용병 모집이 마감되었어요',
+          body: '모집글이 마감되었습니다.',
+          data: { postId },
+        }).catch(() => { /* non-critical */ }),
+      ),
+    );
+
+    return { closed: true };
+  }
+
+  /**
+   * Cancels an open mercenary post (author only).
+   * Transitions status → cancelled; fans out mercenary_cancelled to all applicants.
+   */
+  async cancelPost(postId: string, actorUserId: string) {
+    const post = await this.prisma.mercenaryPost.findUnique({
+      where: { id: postId },
+      select: { id: true, authorId: true, status: true },
+    });
+    if (!post) {
+      throw new NotFoundException('용병 모집글을 찾을 수 없습니다.');
+    }
+    if (post.authorId !== actorUserId) {
+      throw new ForbiddenException('작성자만 모집글을 취소할 수 있습니다.');
+    }
+    if (post.status === 'cancelled' || post.status === 'closed') {
+      throw new BadRequestException('이미 종료된 모집글입니다.');
+    }
+
+    // Snapshot all applicants before state flip
+    const allApplicants = await this.prisma.mercenaryApplication.findMany({
+      where: { postId },
+      select: { userId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.mercenaryPost.update({
+        where: { id: postId },
+        data: { status: 'cancelled' },
+      });
+    });
+
+    // Fan-out mercenary_cancelled notifications fire-and-forget
+    void Promise.all(
+      allApplicants.map((a) =>
+        this.notificationsService.create({
+          userId: a.userId,
+          type: NotificationType.mercenary_cancelled,
+          title: '용병 모집이 취소되었어요',
+          body: '모집글이 취소되었습니다.',
+          data: { postId },
+        }).catch(() => { /* non-critical */ }),
+      ),
+    );
+
+    return { cancelled: true };
   }
 
   private canManageWithRole(role?: TeamRole): boolean {

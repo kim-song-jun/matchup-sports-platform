@@ -213,6 +213,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `TeamMembershipService.assertRole(teamId, userId, 'manager')` 로 권한 검증
 - 팀 생성 시 시더/백필 SQL이 owner 멤버십 자동 생성
 - 관련 모델: `TeamMembership`, enums `TeamRole` / `TeamMembershipStatus`
+- **팀 가입 신청 수락·거부** (Task 69 추가): manager+ 는 초대(invitation) 외에 **외부 가입 신청(application)도 수락·거부**할 수 있다. `GET/PATCH /teams/:id/applications` 엔드포인트 사용. reject 후 status는 `left`(재신청 가능)로 처리하며 `removed`(영구 차단)는 사용하지 않는다.
 
 ## API 엔드포인트
 
@@ -236,6 +237,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 **팀 신청** (Task 27 추가):
 `POST :id/apply` (JwtAuthGuard, 비멤버 대상, idempotent — 중복 신청 시 409)
+
+**팀 신청 관리** (Task 69 추가):
+`GET :id/applications` (manager+ 전용, pending 신청자 목록, 각 행에 nickname/profileImageUrl/mannerScore 포함) | `PATCH :id/applications/:userId/accept` (manager+, pending→active, memberCount +1, 신청자에게 `team_application_accepted` 알림) | `PATCH :id/applications/:userId/reject` (manager+, pending→left, 신청자에게 `team_application_rejected` 알림)
 
 **팀 전용 하위 페이지** (Task 22 추가, 프론트엔드):
 - `/teams/:id/matches` — 해당 팀이 host 또는 applicant로 참여한 팀 매칭 목록 (`GET /team-matches?teamId=`)
@@ -276,6 +280,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 **신청 관리** (Phase 1-5 추가):
 `GET me/applications` (신청자 본인 뷰) | `PATCH :id/applications/:appId/accept|reject` (호스트 뷰) | `DELETE :id/applications/me` (신청 취소)
+
+**모집글 종료** (Task 69 추가):
+`POST :id/close` (작성자 전용, filled 외 수동 종료, pending/accepted 신청자에게 `mercenary_closed` 알림) | `POST :id/cancel` (작성자 전용, 전체 신청자에게 `mercenary_cancelled` 알림)
 
 ### 알림 (`/notifications`)
 `GET /` | `PATCH :id/read` | `POST push-subscribe` (body `{endpoint, keys}`) | `DELETE push-unsubscribe` (body `{endpoint}`) | `GET vapid-public-key`
@@ -331,6 +338,13 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useChatRoomSocket()` — Socket.IO `chat:message` 이벤트 구독, React Query 캐시 invalidate
 - `useNotificationSocket()` — `notification:new` 이벤트 구독, 인앱 알림 상태 반영
 - `usePushRegistration()` — Web Push 구독 (`POST /notifications/push-subscribe`), VAPID 기반, `sw-push.js` 서비스 워커 + Capacitor 분기 처리
+- `useTeamApplications(teamId)` — 팀 가입 신청자 목록 (`GET /teams/:id/applications`), manager+ 전제. 각 항목에 nickname/profileImageUrl/mannerScore 포함 (Task 69 추가)
+- `useAcceptTeamApplication()` — 신청 수락 mutation (`PATCH /teams/:id/applications/:userId/accept`), `['team-applications', teamId]` + `['team-members', teamId]` invalidate (Task 69 추가)
+- `useRejectTeamApplication()` — 신청 거부 mutation (`PATCH /teams/:id/applications/:userId/reject`), 동일 invalidate (Task 69 추가)
+- `useUserPublicProfile(userId)` — 공개 프로필 조회 (`GET /users/:id`), PII 제외 필드만 반환 (Task 69 추가)
+- `useStartDirectChat()` — 1:1 채팅방 생성 mutation (`POST /chat/rooms` type=direct), 생성 후 `/chat/:roomId` redirect (Task 69 추가)
+- `useCloseMercenaryPost()` — 용병 모집글 종료 mutation (`POST /mercenary/:id/close`) (Task 69 추가)
+- `useCancelMercenaryPost()` — 용병 모집글 취소 mutation (`POST /mercenary/:id/cancel`) (Task 69 추가)
 
 ### 에러 처리 규칙
 - **에러 메시지**: `catch (err)` 블록에서 직접 타입 단언 금지. `extractErrorMessage(err, 'fallback 메시지')` (`@/lib/utils`) 사용
@@ -378,6 +392,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `components/ui/toast.tsx` — 토스트 알림
 - `components/chat/chat-bubble.tsx` — 채팅 버블 시스템 (반드시 사용)
 - `components/teams/transfer-ownership-modal.tsx` — 소유권 이전 확인 모달 (owner 전용, `components/ui/modal.tsx` 기반)
+- `components/user/user-card.tsx` — 재사용 가능 사용자 신원 카드 (avatar + nickname + sport profile + manner score + CTA slots). applicant row / mercenary applicant / team-match opponent에서 동일 컴포넌트 사용. 44x44 터치 타겟 + `aria-label` 내장 (Task 69 추가)
 
 ### 프론트엔드 품질 기준
 - **Open Redirect 방지**: `/login?redirect=...` 파라미터는 반드시 `sanitizeRedirect()` (`apps/web/src/app/(auth)/login/page.tsx`)를 통과시켜 **상대 경로만** 허용한다. 절대 URL, `javascript:`, `//host/` 형태는 모두 차단하고 `/home`으로 fallback.

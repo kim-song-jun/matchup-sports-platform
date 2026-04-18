@@ -13,6 +13,7 @@ const mockPrisma = {
   chatRoom: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -26,6 +27,7 @@ const mockPrisma = {
   chatRoomParticipant: {
     findUnique: jest.fn(),
     findMany: jest.fn().mockResolvedValue([]),
+    createMany: jest.fn().mockResolvedValue({ count: 0 }),
     update: jest.fn(),
   },
   teamMatch: {
@@ -376,6 +378,155 @@ describe('ChatService', () => {
       const result = await service.getUnreadCount('u1');
 
       expect(result).toBe(7);
+    });
+  });
+
+  describe('getOrCreateTeamMatchRoom', () => {
+    it('returns existing room when teamMatchId already has a room', async () => {
+      const existing = { id: 'r-tm1', teamMatchId: 'tm-1', participants: [{ userId: 'u1' }] };
+      mockPrisma.chatRoom.findUnique.mockResolvedValue(existing);
+
+      const result = await service.getOrCreateTeamMatchRoom('tm-1', ['u1', 'u2']);
+
+      expect(mockPrisma.chatRoom.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { teamMatchId: 'tm-1' } }),
+      );
+      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
+      expect(result).toEqual(existing);
+    });
+
+    it('reconciles missing participants into existing room', async () => {
+      const existing = { id: 'r-tm1', teamMatchId: 'tm-1', participants: [{ userId: 'u1' }] };
+      mockPrisma.chatRoom.findUnique.mockResolvedValue(existing);
+      mockPrisma.chatRoomParticipant.createMany = jest.fn().mockResolvedValue({ count: 1 });
+
+      await service.getOrCreateTeamMatchRoom('tm-1', ['u1', 'u2']);
+
+      expect(mockPrisma.chatRoomParticipant.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [{ roomId: 'r-tm1', userId: 'u2' }],
+          skipDuplicates: true,
+        }),
+      );
+    });
+
+    it('creates a new team_match room with participants and system message when none exists', async () => {
+      mockPrisma.chatRoom.findUnique.mockResolvedValue(null);
+      const created = { id: 'r-new', teamMatchId: 'tm-1', participants: [] };
+      mockPrisma.chatRoom.create.mockResolvedValue(created);
+
+      const result = await service.getOrCreateTeamMatchRoom('tm-1', ['u1', 'u2']);
+
+      expect(mockPrisma.chatRoom.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'team_match',
+            teamMatchId: 'tm-1',
+            participants: {
+              create: expect.arrayContaining([{ userId: 'u1' }, { userId: 'u2' }]),
+            },
+            messages: {
+              create: expect.objectContaining({
+                type: 'system',
+                content: '매칭이 확정되었습니다',
+                senderId: null,
+              }),
+            },
+          }),
+        }),
+      );
+      expect(result).toEqual(created);
+    });
+
+    it('is idempotent — calling twice with same teamMatchId returns same room', async () => {
+      const room = { id: 'r-tm1', teamMatchId: 'tm-1', participants: [{ userId: 'u1' }, { userId: 'u2' }] };
+      mockPrisma.chatRoom.findUnique.mockResolvedValue(room);
+
+      const r1 = await service.getOrCreateTeamMatchRoom('tm-1', ['u1', 'u2']);
+      const r2 = await service.getOrCreateTeamMatchRoom('tm-1', ['u1', 'u2']);
+
+      expect(r1.id).toBe(r2.id);
+      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getOrCreateDirectRoom', () => {
+    it('returns existing direct room when one already exists for the user pair', async () => {
+      const existing = { id: 'r-direct', type: 'direct', participants: [{ userId: 'a' }, { userId: 'b' }] };
+      mockPrisma.chatRoom.findFirst = jest.fn().mockResolvedValue(existing);
+
+      const result = await service.getOrCreateDirectRoom('a', 'b');
+
+      expect(mockPrisma.chatRoom.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            type: 'direct',
+          }),
+        }),
+      );
+      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
+      expect(result).toEqual(existing);
+    });
+
+    it('is idempotent regardless of argument order', async () => {
+      const existing = { id: 'r-direct', type: 'direct', participants: [{ userId: 'a' }, { userId: 'b' }] };
+      mockPrisma.chatRoom.findFirst = jest.fn().mockResolvedValue(existing);
+
+      const r1 = await service.getOrCreateDirectRoom('a', 'b');
+      const r2 = await service.getOrCreateDirectRoom('b', 'a');
+
+      expect(r1.id).toBe(r2.id);
+      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a new direct room with two participants when none exists', async () => {
+      mockPrisma.chatRoom.findFirst = jest.fn().mockResolvedValue(null);
+      const created = { id: 'r-new', type: 'direct', participants: [] };
+      mockPrisma.chatRoom.create.mockResolvedValue(created);
+
+      await service.getOrCreateDirectRoom('a', 'b');
+
+      expect(mockPrisma.chatRoom.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'direct',
+            participants: {
+              create: [{ userId: 'a' }, { userId: 'b' }],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('injects a system message when systemMessage option is provided', async () => {
+      mockPrisma.chatRoom.findFirst = jest.fn().mockResolvedValue(null);
+      mockPrisma.chatRoom.create.mockResolvedValue({ id: 'r-new', participants: [] });
+
+      await service.getOrCreateDirectRoom('a', 'b', { systemMessage: '용병 지원이 수락되었습니다' });
+
+      expect(mockPrisma.chatRoom.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            messages: {
+              create: expect.objectContaining({
+                type: 'system',
+                content: '용병 지원이 수락되었습니다',
+                senderId: null,
+              }),
+            },
+          }),
+        }),
+      );
+    });
+
+    it('does not inject a system message when option is absent', async () => {
+      mockPrisma.chatRoom.findFirst = jest.fn().mockResolvedValue(null);
+      mockPrisma.chatRoom.create.mockResolvedValue({ id: 'r-new', participants: [] });
+
+      await service.getOrCreateDirectRoom('a', 'b');
+
+      const callArg = mockPrisma.chatRoom.create.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(callArg.data).not.toHaveProperty('messages');
     });
   });
 

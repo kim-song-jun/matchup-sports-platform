@@ -32,6 +32,7 @@ import { AddMemberDto, UpdateMemberRoleDto, TransferOwnershipDto, InviteMemberDt
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { TeamFilterDto } from './dto/team-filter.dto';
+import { TeamApplicationActionDto } from './dto/application.dto';
 import { TeamRole } from '@prisma/client';
 
 @ApiTags('팀/클럽')
@@ -204,6 +205,55 @@ export class TeamsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.teamsService.applyToTeam(teamId, userId);
+  }
+
+  @Get(':id/applications')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 가입 신청 목록 (manager+ 전용)' })
+  @ApiOkResponse({ description: '팀 가입 신청 목록 반환 (pending 상태)' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
+  @ApiNotFoundResponse({ description: '팀 없음' })
+  async listApplications(
+    @Param('id') teamId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.listApplications(teamId, userId);
+  }
+
+  @Patch(':id/applications/:userId/accept')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 가입 신청 수락 (manager+ 전용)' })
+  @ApiOkResponse({ description: '신청 수락 성공, 멤버로 전환' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
+  @ApiNotFoundResponse({ description: '팀 또는 신청 없음' })
+  async acceptApplication(
+    @Param('id') teamId: string,
+    @Param('userId') applicantUserId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() _dto?: TeamApplicationActionDto,
+  ) {
+    return this.teamsService.acceptApplication(teamId, applicantUserId, actorId);
+  }
+
+  @Patch(':id/applications/:userId/reject')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '팀 가입 신청 거절 (manager+ 전용)' })
+  @ApiOkResponse({ description: '신청 거절 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
+  @ApiNotFoundResponse({ description: '팀 또는 신청 없음' })
+  async rejectApplication(
+    @Param('id') teamId: string,
+    @Param('userId') applicantUserId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() _dto?: TeamApplicationActionDto,
+  ) {
+    return this.teamsService.rejectApplication(teamId, applicantUserId, actorId);
   }
 
   @Post(':id/leave')

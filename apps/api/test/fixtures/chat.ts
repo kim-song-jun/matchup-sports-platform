@@ -197,3 +197,29 @@ export async function createDirectChatRoomWithMessages(
 
   return { room, participants, messages };
 }
+
+// ---------------------------------------------------------------------------
+// Wave 1 aliases — shorter names used in integration test fixtures
+// ---------------------------------------------------------------------------
+
+/**
+ * Alias for createDirectChatRoom — shorter name used in Wave 1 integration tests.
+ */
+export async function directRoom(
+  prisma: PrismaClient,
+  userIdA: string,
+  userIdB: string,
+): Promise<ChatRoomWithParticipants> {
+  return createDirectChatRoom(prisma, userIdA, userIdB);
+}
+
+/**
+ * Alias for createTeamMatchChatRoom — shorter name used in Wave 1 integration tests.
+ */
+export async function teamMatchRoom(
+  prisma: PrismaClient,
+  teamMatchId: string,
+  participantUserIds: string[],
+): Promise<ChatRoomWithParticipants> {
+  return createTeamMatchChatRoom(prisma, teamMatchId, participantUserIds);
+}

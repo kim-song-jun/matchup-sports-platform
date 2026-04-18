@@ -8,6 +8,7 @@ import { MatchesService } from './matches.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MatchingEngineService } from './matching-engine.service';
+import { BadgesService } from '../badges/badges.service';
 import { SportType } from '@prisma/client';
 
 describe('MatchesService', () => {
@@ -46,6 +47,10 @@ describe('MatchesService', () => {
     ]),
   };
 
+  const mockBadgesService = {
+    awardIfEligible: jest.fn().mockResolvedValue(false),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -53,6 +58,7 @@ describe('MatchesService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: MatchingEngineService, useValue: mockMatchingEngineService },
+        { provide: BadgesService, useValue: mockBadgesService },
       ],
     }).compile();
 
@@ -61,6 +67,7 @@ describe('MatchesService', () => {
 
     jest.clearAllMocks();
     mockNotificationsService.create.mockResolvedValue({});
+    mockBadgesService.awardIfEligible.mockResolvedValue(false);
     mockPrismaService.matchParticipant.findMany.mockResolvedValue([]);
     mockMatchingEngineService.calculateMatchScore.mockReturnValue(80);
     mockMatchingEngineService.calculateReasons.mockReturnValue([
@@ -1169,6 +1176,41 @@ describe('MatchesService', () => {
           type: 'match_completed',
           title: '매치가 종료되었어요',
         }),
+      );
+    });
+
+    it('should also fan-out review_pending to all participants after completion', async () => {
+      mockPrismaService.match.findUnique.mockResolvedValue(hostMatch);
+      mockPrismaService.match.update.mockResolvedValue({ ...hostMatch, status: 'completed' });
+      mockPrismaService.matchParticipant.findMany.mockResolvedValue([
+        { userId: 'user-3' },
+        { userId: 'user-4' },
+      ]);
+
+      await service.complete('match-1', 'host-1');
+
+      // 2 participants × 2 notification types = 4 calls total
+      expect(mockNotificationsService.create).toHaveBeenCalledTimes(4);
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'review_pending' }),
+      );
+    });
+
+    it('should call awardIfEligible for each participant after completion', async () => {
+      mockPrismaService.match.findUnique.mockResolvedValue(hostMatch);
+      mockPrismaService.match.update.mockResolvedValue({ ...hostMatch, status: 'completed' });
+      mockPrismaService.matchParticipant.findMany.mockResolvedValue([
+        { userId: 'user-3' },
+      ]);
+
+      await service.complete('match-1', 'host-1');
+      // Allow fire-and-forget badge awards to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockBadgesService.awardIfEligible).toHaveBeenCalledWith(
+        'user-3',
+        'first_match_completed',
+        expect.any(Object),
       );
     });
 

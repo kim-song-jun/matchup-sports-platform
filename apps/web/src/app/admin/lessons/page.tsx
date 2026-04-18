@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Pencil } from 'lucide-react';
+import { GraduationCap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { useAdminLessons } from '@/hooks/use-api';
-import { useToast } from '@/components/ui/toast';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import type { Lesson } from '@/types/api';
 import { formatDateShort, formatCurrency } from '@/lib/utils';
@@ -19,8 +19,7 @@ export default function AdminLessonsPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const router = useRouter();
-  const { data, isLoading } = useAdminLessons();
-  const { toast } = useToast();
+  const { data, isLoading, isError, refetch } = useAdminLessons();
 
   const lessons = Array.isArray(data) ? data : [];
   const filtered = lessons
@@ -91,12 +90,17 @@ export default function AdminLessonsPage() {
               <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">수강료</th>
               <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">상태</th>
               <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">등록자</th>
-              <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-            {isLoading ? Array.from({length:3}).map((_,i) => (
-              <tr key={i}><td colSpan={8} className="px-5 py-4"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" /></td></tr>
+            {isError ? (
+              <tr>
+                <td colSpan={7}>
+                  <ErrorState message="강좌 목록을 불러오지 못했어요" onRetry={refetch} />
+                </td>
+              </tr>
+            ) : isLoading ? Array.from({length:3}).map((_,i) => (
+              <tr key={i}><td colSpan={7} className="px-5 py-4"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" /></td></tr>
             )) : filtered.map((l: Lesson) => (
               <tr key={l.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" role="link" tabIndex={0} onClick={() => router.push(`/admin/lessons/${l.id}`)} onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/admin/lessons/${l.id}`); }}>
                 <td className="px-5 py-3.5">
@@ -111,20 +115,11 @@ export default function AdminLessonsPage() {
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor[l.status] || 'bg-gray-100'}`}>{statusLabel[l.status] || l.status}</span>
                 </td>
                 <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">{l.host?.nickname}</td>
-                <td className="px-5 py-3.5">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toast('info', '강좌 수정 페이지 준비 중입니다'); }}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-blue-500 transition-colors"
-                  >
-                    <Pencil size={12} />
-                    수정
-                  </button>
-                </td>
               </tr>
             ))}
-            {!isLoading && filtered.length === 0 && (
+            {!isLoading && !isError && filtered.length === 0 && (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={7}>
                   <EmptyState
                     icon={GraduationCap}
                     title="아직 등록된 강좌가 없어요"

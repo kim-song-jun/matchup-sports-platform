@@ -3,6 +3,9 @@ import { NotFoundException, BadRequestException, ForbiddenException } from '@nes
 import { TeamMatchesService } from './team-matches.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from '../teams/team-membership.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ChatService } from '../chat/chat.service';
+import { BadgesService } from '../badges/badges.service';
 
 describe('TeamMatchesService', () => {
   let service: TeamMatchesService;
@@ -11,6 +14,20 @@ describe('TeamMatchesService', () => {
   // By default assertRole resolves (permission granted). Individual tests can override.
   const mockTeamMembershipService = {
     assertRole: jest.fn().mockResolvedValue({ role: 'manager' }),
+    listUserTeams: jest.fn().mockResolvedValue([]),
+  };
+
+  const mockNotificationsService = {
+    create: jest.fn().mockResolvedValue({}),
+  };
+
+  const mockChatService = {
+    getOrCreateTeamMatchRoom: jest.fn().mockResolvedValue({ id: 'chat-room-1' }),
+    getOrCreateDirectRoom: jest.fn().mockResolvedValue({ id: 'direct-room-1' }),
+  };
+
+  const mockBadgesService = {
+    awardIfEligible: jest.fn().mockResolvedValue(false),
   };
 
   const mockPrismaService = {
@@ -40,6 +57,9 @@ describe('TeamMatchesService', () => {
     sportTeam: {
       findUnique: jest.fn(),
     },
+    teamMembership: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     $transaction: jest.fn(),
   };
 
@@ -49,6 +69,9 @@ describe('TeamMatchesService', () => {
         TeamMatchesService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: TeamMembershipService, useValue: mockTeamMembershipService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: ChatService, useValue: mockChatService },
+        { provide: BadgesService, useValue: mockBadgesService },
       ],
     }).compile();
 
@@ -58,6 +81,10 @@ describe('TeamMatchesService', () => {
     jest.clearAllMocks();
     // Reset assertRole to default (permit) after each clear
     mockTeamMembershipService.assertRole.mockResolvedValue({ role: 'manager' });
+    mockNotificationsService.create.mockResolvedValue({});
+    mockChatService.getOrCreateTeamMatchRoom.mockResolvedValue({ id: 'chat-room-1' });
+    mockBadgesService.awardIfEligible.mockResolvedValue(false);
+    mockPrismaService.teamMembership.findMany.mockResolvedValue([]);
     mockPrismaService.$transaction.mockImplementation((callback: (client: typeof mockPrismaService) => Promise<unknown>) =>
       callback(mockPrismaService as typeof mockPrismaService));
   });
@@ -987,6 +1014,211 @@ describe('TeamMatchesService', () => {
 
       await expect(service.submitResult('tm-1', userId, validPayload)).rejects.toThrow(ForbiddenException);
       expect(prisma.teamMatch.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('apply — notification fan-out', () => {
+    it('should notify host team owner+managers after successful application', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        id: 'tm-1',
+        status: 'recruiting',
+        hostTeamId: 'team-host',
+        title: 'FC 매치',
+        hostTeam: { name: 'FC 서울' },
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-guest' });
+      mockPrismaService.teamMatchApplication.create.mockResolvedValue({ id: 'app-new', applicantTeamId: 'team-guest' });
+      mockPrismaService.teamMembership.findMany.mockResolvedValue([{ userId: 'owner-id' }]);
+
+      await service.apply('tm-1', 'user-2', { applicantTeamId: 'team-guest' });
+
+      // Allow fire-and-forget to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'team_match_applied',
+        }),
+      );
+    });
+  });
+
+  describe('approveApplication — notification + chat room creation', () => {
+    const setupApproveTest = (teamMembershipUsers: { userId: string }[]) => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'recruiting',
+        hostTeamId: 'team-host',
+        title: 'FC 매치',
+      });
+      const approvedApp = { id: 'app-1', applicantTeamId: 'team-guest', status: 'approved' };
+      mockPrismaService.$transaction.mockImplementation((cb: (tx: unknown) => Promise<unknown>) =>
+        cb({
+          teamMatchApplication: {
+            update: jest.fn().mockResolvedValue(approvedApp),
+            updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
+          teamMatch: { update: jest.fn().mockResolvedValue({}) },
+        }),
+      );
+      mockPrismaService.teamMembership.findMany.mockResolvedValue(teamMembershipUsers);
+    };
+
+    it('should notify applicant team owner+managers after approval', async () => {
+      setupApproveTest([{ userId: 'guest-owner' }]);
+
+      await service.approveApplication('tm-1', 'app-1', 'host-manager');
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'team_match_approved' }),
+      );
+    });
+
+    it('should trigger getOrCreateTeamMatchRoom after approval', async () => {
+      setupApproveTest([{ userId: 'host-owner' }]);
+
+      await service.approveApplication('tm-1', 'app-1', 'host-manager');
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockChatService.getOrCreateTeamMatchRoom).toHaveBeenCalledWith(
+        'tm-1',
+        expect.any(Array),
+      );
+    });
+
+    it('should include chatRoomId in team_match_approved notification data', async () => {
+      mockChatService.getOrCreateTeamMatchRoom.mockResolvedValue({ id: 'chat-room-x' });
+      setupApproveTest([{ userId: 'guest-owner' }]);
+
+      await service.approveApplication('tm-1', 'app-1', 'host-manager');
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'team_match_approved',
+          data: expect.objectContaining({ chatRoomId: 'chat-room-x' }),
+        }),
+      );
+    });
+
+    it('should omit chatRoomId when chat room creation fails', async () => {
+      mockChatService.getOrCreateTeamMatchRoom.mockRejectedValue(new Error('chat unavailable'));
+      setupApproveTest([{ userId: 'guest-owner' }]);
+
+      await service.approveApplication('tm-1', 'app-1', 'host-manager');
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'team_match_approved',
+          data: expect.not.objectContaining({ chatRoomId: expect.anything() }),
+        }),
+      );
+    });
+  });
+
+  describe('rejectApplication — notification', () => {
+    it('should notify applicant team owner+managers after rejection', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        hostTeamId: 'team-host',
+        title: 'FC 매치',
+      });
+      const rejectedApp = { id: 'app-1', applicantTeamId: 'team-guest', status: 'rejected' };
+      mockPrismaService.teamMatchApplication.update.mockResolvedValue(rejectedApp);
+      mockPrismaService.teamMembership.findMany.mockResolvedValue([{ userId: 'guest-owner' }]);
+
+      await service.rejectApplication('tm-1', 'app-1', 'host-manager');
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'team_match_rejected' }),
+      );
+    });
+  });
+
+  describe('submitResult — badge awards', () => {
+    const validPayload = {
+      scoreHome: { Q1: 1, Q2: 2, Q3: 0, Q4: 1 },
+      scoreAway: { Q1: 0, Q2: 1, Q3: 0, Q4: 1 },
+      resultHome: 'win' as const,
+      resultAway: 'lose' as const,
+    };
+
+    it('should call awardIfEligible for members of both teams after submitResult', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'checking_in',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        quarterCount: 4,
+        applications: [{ applicantTeamId: 'team-guest', status: 'approved' }],
+      });
+      mockPrismaService.teamMatch.update.mockResolvedValue({ id: 'tm-1', status: 'completed' });
+      mockPrismaService.teamMembership.findMany.mockResolvedValue([{ userId: 'u1' }, { userId: 'u2' }]);
+
+      await service.submitResult('tm-1', 'user-1', validPayload);
+
+      // Allow fire-and-forget to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockBadgesService.awardIfEligible).toHaveBeenCalledWith(
+        expect.any(String),
+        'first_team_match_completed',
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('checkIn — geo-fence', () => {
+    it('should reject check-in when user lat/lng is >200m from venueInfo coords', async () => {
+      // venueInfo contains lat/lng at one location, user is ~500m away
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'scheduled',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        venueInfo: { lat: 37.5665, lng: 126.9780 }, // ~Gwanghwamun
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+
+      await expect(
+        service.checkIn('tm-1', 'user-1', {
+          teamId: 'team-host',
+          lat: 37.5720, // ~500m north
+          lng: 126.9780,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow check-in when venue has no coords (skip fence)', async () => {
+      mockPrismaService.teamMatch.findUnique.mockResolvedValue({
+        status: 'scheduled',
+        hostTeamId: 'team-host',
+        guestTeamId: 'team-guest',
+        venueInfo: null,
+      });
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-host' });
+
+      type TxShape = { teamMatch: { update: ReturnType<typeof jest.fn> }; arrivalCheck: { findUnique: ReturnType<typeof jest.fn>; create: ReturnType<typeof jest.fn> } };
+      const tx: TxShape = {
+        teamMatch: { update: jest.fn().mockResolvedValue({}) },
+        arrivalCheck: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 'arrival-1' }),
+        },
+      };
+      mockPrismaService.$transaction.mockImplementation((cb: (tx: TxShape) => Promise<unknown>) => cb(tx));
+
+      const result = await service.checkIn('tm-1', 'user-1', {
+        teamId: 'team-host',
+        lat: 37.0,
+        lng: 127.0,
+      });
+
+      expect(result).toEqual({ id: 'arrival-1' });
     });
   });
 

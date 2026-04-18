@@ -1224,6 +1224,30 @@ export interface ArriveMatchInput {
   photoUrl: string;
 }
 
+// ── TeamApplication — pending membership application ──
+export interface TeamApplication {
+  id: string;
+  teamId: string;
+  userId: string;
+  user: {
+    id: string;
+    nickname: string;
+    profileImageUrl: string | null;
+    mannerScore: number;
+  };
+  createdAt: string;
+}
+
+// ── UserPublicProfile — PII-stripped public view of a user ──
+export interface UserPublicProfile {
+  id: string;
+  nickname: string;
+  profileImageUrl: string | null;
+  sportProfiles: SportProfile[];
+  mannerScore: number;
+  recentMatchCount?: number;
+}
+
 // ── MyTeamMatchApplication — applicant-side view of team match applications ──
 export interface MyTeamMatchApplication {
   id: string;

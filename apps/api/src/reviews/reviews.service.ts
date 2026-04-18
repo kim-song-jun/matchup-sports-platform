@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 
 @Injectable()
@@ -8,6 +10,7 @@ export class ReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scoring: ScoringService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(authorId: string, data: CreateReviewDto) {
@@ -34,6 +37,16 @@ export class ReviewsService {
         data: { mannerScore: avg._avg.mannerRating },
       });
     }
+
+    // Fire-and-forget: notify reviewed user
+    void this.notificationsService.create({
+      userId: data.targetId,
+      type: NotificationType.review_received,
+      title: '새 리뷰가 도착했어요',
+      body: '경기에서 함께한 상대방이 리뷰를 남겼습니다.',
+      data: { matchId: data.matchId, authorId },
+      fromUserId: authorId,
+    });
 
     // Fire-and-forget: update ELO ratings for all participants of this match
     void this.scoring.updateEloAfterMatch(data.matchId);

@@ -15,7 +15,7 @@ describe('TeamsService', () => {
   // $transaction mock: executes the callback with the same mock object
   const mockTx = {
     sportTeam: { create: jest.fn(), update: jest.fn() },
-    teamMembership: { create: jest.fn() },
+    teamMembership: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     teamInvitation: { update: jest.fn() },
   };
 
@@ -30,7 +30,9 @@ describe('TeamsService', () => {
     teamMembership: {
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       upsert: jest.fn(),
     },
     teamInvitation: {
@@ -572,7 +574,13 @@ describe('TeamsService', () => {
     beforeEach(() => {
       mockPrismaService.sportTeam.findUnique.mockResolvedValue(mockTeamRecruiting);
       mockPrismaService.teamMembership.findFirst.mockResolvedValue(null);
+      mockPrismaService.teamMembership.findMany.mockResolvedValue([
+        { userId: 'owner-1' },
+        { userId: 'manager-1' },
+      ]);
       mockPrismaService.teamMembership.create.mockResolvedValue(mockPendingMembership);
+      mockPrismaService.user.findFirst.mockResolvedValue({ id: 'user-1', nickname: '신청자' });
+      mockNotificationsService.create.mockResolvedValue({});
     });
 
     it('should create and return a pending membership on success', async () => {
@@ -582,6 +590,19 @@ describe('TeamsService', () => {
       expect(mockPrismaService.teamMembership.create).toHaveBeenCalledWith({
         data: { teamId: 'team-1', userId: 'user-1', role: 'member', status: 'pending' },
       });
+    });
+
+    it('should fan-out team_application_received notifications to owner+managers after create', async () => {
+      await service.applyToTeam('team-1', 'user-1');
+
+      // Allow the async fire-and-forget to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'team_application_received',
+        }),
+      );
     });
 
     it('should allow re-application after left/removed status via update', async () => {
@@ -643,6 +664,236 @@ describe('TeamsService', () => {
       await expect(service.applyToTeam('team-1', 'user-1')).rejects.toThrow(
         ConflictException,
       );
+    });
+  });
+
+  describe('listApplications', () => {
+    const mockApplications = [
+      {
+        id: 'mem-p1',
+        teamId: 'team-1',
+        userId: 'applicant-1',
+        role: 'member',
+        status: 'pending',
+        joinedAt: new Date(),
+        user: { id: 'applicant-1', nickname: '지원자1', profileImageUrl: null, mannerScore: 3.5 },
+      },
+    ];
+
+    beforeEach(() => {
+      mockMembershipService.assertRole.mockResolvedValue({});
+      mockPrismaService.teamMembership.findMany.mockResolvedValue(mockApplications);
+    });
+
+    it('should return pending applications with user details', async () => {
+      const result = await service.listApplications('team-1', 'manager-1');
+
+      expect(result).toEqual(mockApplications);
+      expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
+      expect(mockPrismaService.teamMembership.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { teamId: 'team-1', status: 'pending' },
+          include: expect.objectContaining({
+            user: expect.any(Object),
+          }),
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException when caller lacks manager role', async () => {
+      mockMembershipService.assertRole.mockRejectedValue(new ForbiddenException());
+
+      await expect(service.listApplications('team-1', 'regular-member')).rejects.toThrow(ForbiddenException);
+      expect(mockPrismaService.teamMembership.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('acceptApplication', () => {
+    const mockTeamDetail = {
+      id: 'team-1',
+      name: 'FC 서울',
+      sportTypes: [SportType.futsal],
+      owner: { id: 'owner-1', nickname: '팀장', profileImageUrl: null, mannerScore: 4.5 },
+    };
+
+    const mockPendingApplication = {
+      id: 'mem-p1',
+      teamId: 'team-1',
+      userId: 'applicant-1',
+      role: 'member',
+      status: 'pending',
+    };
+
+    beforeEach(() => {
+      mockMembershipService.assertRole.mockResolvedValue({});
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue(mockTeamDetail);
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue(mockPendingApplication);
+      // updateMany returns count:1 (race won) by default
+      mockTx.teamMembership.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.teamMembership.update.mockResolvedValue({ ...mockPendingApplication, status: 'active' });
+      mockTx.sportTeam.update.mockResolvedValue({});
+      mockNotificationsService.create.mockResolvedValue({});
+    });
+
+    it('should accept pending application, trigger transaction, and return accepted:true', async () => {
+      const result = await service.acceptApplication('team-1', 'applicant-1', 'manager-1');
+
+      expect(result).toEqual({ accepted: true });
+      expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+
+    it('should flip status pending → active within transaction using updateMany with status predicate', async () => {
+      await service.acceptApplication('team-1', 'applicant-1', 'manager-1');
+
+      expect(mockTx.teamMembership.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mem-p1', status: 'pending' },
+          data: { status: 'active' },
+        }),
+      );
+    });
+
+    it('should increment memberCount within transaction', async () => {
+      await service.acceptApplication('team-1', 'applicant-1', 'manager-1');
+
+      expect(mockTx.sportTeam.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { memberCount: { increment: 1 } },
+        }),
+      );
+    });
+
+    it('should throw ConflictException with TEAM_APPLICATION_ALREADY_PROCESSED when updateMany returns count:0', async () => {
+      mockTx.teamMembership.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.acceptApplication('team-1', 'applicant-1', 'manager-1'),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.acceptApplication('team-1', 'applicant-1', 'manager-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'TEAM_APPLICATION_ALREADY_PROCESSED' }),
+      });
+    });
+
+    it('should fire team_application_accepted notification to applicant', async () => {
+      await service.acceptApplication('team-1', 'applicant-1', 'manager-1');
+
+      // Notification is fire-and-forget — allow to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'applicant-1',
+          type: 'team_application_accepted',
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when no pending application exists', async () => {
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.acceptApplication('team-1', 'unknown-user', 'manager-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when caller lacks manager role', async () => {
+      mockMembershipService.assertRole.mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        service.acceptApplication('team-1', 'applicant-1', 'regular-member'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('rejectApplication', () => {
+    const mockTeamDetail = {
+      id: 'team-1',
+      name: 'FC 서울',
+      sportTypes: [SportType.futsal],
+      owner: { id: 'owner-1', nickname: '팀장', profileImageUrl: null, mannerScore: 4.5 },
+    };
+
+    const mockPendingApplication = {
+      id: 'mem-p1',
+      teamId: 'team-1',
+      userId: 'applicant-1',
+      role: 'member',
+      status: 'pending',
+    };
+
+    beforeEach(() => {
+      mockMembershipService.assertRole.mockResolvedValue({});
+      mockPrismaService.sportTeam.findUnique.mockResolvedValue(mockTeamDetail);
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue(mockPendingApplication);
+      // updateMany returns count:1 (race won) by default
+      mockPrismaService.teamMembership.updateMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.teamMembership.update.mockResolvedValue({ ...mockPendingApplication, status: 'left' });
+      mockNotificationsService.create.mockResolvedValue({});
+    });
+
+    it('should reject pending application and return rejected:true', async () => {
+      const result = await service.rejectApplication('team-1', 'applicant-1', 'manager-1');
+
+      expect(result).toEqual({ rejected: true });
+      expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
+    });
+
+    it('should flip status to left using updateMany with pending predicate to preserve re-apply path', async () => {
+      await service.rejectApplication('team-1', 'applicant-1', 'manager-1');
+
+      expect(mockPrismaService.teamMembership.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'mem-p1', status: 'pending' },
+          data: { status: 'left' },
+        }),
+      );
+    });
+
+    it('should throw ConflictException with TEAM_APPLICATION_ALREADY_PROCESSED when updateMany returns count:0', async () => {
+      mockPrismaService.teamMembership.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.rejectApplication('team-1', 'applicant-1', 'manager-1'),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.rejectApplication('team-1', 'applicant-1', 'manager-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'TEAM_APPLICATION_ALREADY_PROCESSED' }),
+      });
+    });
+
+    it('should fire team_application_rejected notification to applicant', async () => {
+      await service.rejectApplication('team-1', 'applicant-1', 'manager-1');
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'applicant-1',
+          type: 'team_application_rejected',
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when no pending application exists', async () => {
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.rejectApplication('team-1', 'unknown-user', 'manager-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException when caller lacks manager role', async () => {
+      mockMembershipService.assertRole.mockRejectedValue(new ForbiddenException());
+
+      await expect(
+        service.rejectApplication('team-1', 'applicant-1', 'regular-member'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

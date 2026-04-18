@@ -64,6 +64,9 @@ export const queryKeys = {
   teamMembers: {
     list: (teamId: string) => ['teams', teamId, 'members'] as const,
   },
+  teamApplications: {
+    byTeam: (teamId: string) => ['team-applications', teamId] as const,
+  },
   teamMatchApplications: {
     byMatch: (matchId: string) => ['team-matches', matchId, 'applications'] as const,
     mine: ['team-matches', 'me', 'applications'] as const,
@@ -90,6 +93,7 @@ export const queryKeys = {
     pending: ['reviews', 'pending'] as const,
   },
   user: (id: string) => ['user', id] as const,
+  userPublic: (id: string) => ['user', 'public', id] as const,
   admin: {
     users: (params?: Record<string, string>) => ['admin', 'users', params] as const,
     user: (id: string) => ['admin', 'user', id] as const,

@@ -166,6 +166,40 @@ export function useMyMercenaryApplications() {
   });
 }
 
+// ── Mercenary post lifecycle (author actions) ──
+
+export function useCloseMercenaryPost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/mercenary/${id}/close`);
+      return extractData<MercenaryPost>(res);
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
+    },
+  });
+}
+
+export function useCancelMercenaryPost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/mercenary/${id}/cancel`);
+      return extractData<MercenaryPost>(res);
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mercenary.all });
+    },
+  });
+}
+
+// Aliases matching task doc spec names — preferred names above include domain prefix
+export const useClosePost = useCloseMercenaryPost;
+export const useCancelPost = useCancelMercenaryPost;
+
 export function useWithdrawMercenaryApplication() {
   const queryClient = useQueryClient();
   return useMutation({

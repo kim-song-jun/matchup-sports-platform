@@ -3108,6 +3108,12 @@ export function buildDevMockCatalog(seedDateKey = getKstDateKey()) {
     'match_created', 'player_joined', 'match_cancelled', 'match_confirmed',
     'team_announced', 'match_updated', 'payment_confirmed', 'payment_refunded',
     'review_pending', 'badge_earned', 'team_invitation', 'marketplace_order',
+    // Task 69 — new types from Wave 0 enum expansion
+    'team_application_received', 'team_application_accepted', 'team_application_rejected',
+    'team_match_applied', 'team_match_approved', 'team_match_rejected',
+    'mercenary_applied', 'mercenary_accepted', 'mercenary_rejected',
+    'mercenary_closed', 'mercenary_cancelled',
+    'review_received', 'lesson_ticket_purchased',
   ];
   const notificationTitles: Record<string, string> = {
     match_created: '새 매치가 생성되었습니다',
@@ -3122,12 +3128,26 @@ export function buildDevMockCatalog(seedDateKey = getKstDateKey()) {
     badge_earned: '새 뱃지를 획득했습니다',
     team_invitation: '팀 초대장이 왔습니다',
     marketplace_order: '장터 주문이 접수되었습니다',
+    // Task 69 — new type titles
+    team_application_received: '팀 가입 신청이 왔습니다',
+    team_application_accepted: '팀 가입 신청이 수락됐습니다',
+    team_application_rejected: '팀 가입 신청이 거절됐습니다',
+    team_match_applied: '팀 매치 신청이 왔습니다',
+    team_match_approved: '팀 매치 신청이 승인됐습니다',
+    team_match_rejected: '팀 매치 신청이 거절됐습니다',
+    mercenary_applied: '용병 지원이 왔습니다',
+    mercenary_accepted: '용병 지원이 수락됐습니다',
+    mercenary_rejected: '용병 지원이 거절됐습니다',
+    mercenary_closed: '용병 모집이 마감됐습니다',
+    mercenary_cancelled: '용병 모집이 취소됐습니다',
+    review_received: '리뷰가 등록됐습니다',
+    lesson_ticket_purchased: '레슨 티켓이 구매됐습니다',
   };
   const notificationRecipients: MockUserKey[] = [
     'futsalLeader', 'basketballLeader', 'badmintonLeader', 'iceLeader', 'tennisLeader',
     'marketSeller', 'soccerCaptain', 'baseballCaptain', 'volleyballCaptain', 'swimmerCoach',
   ];
-  const notifications: MockNotificationRecord[] = Array.from({ length: 55 }, (_, i) => {
+  const notifications: MockNotificationRecord[] = Array.from({ length: 70 }, (_, i) => {
     const type = notificationTypes[i % notificationTypes.length];
     const recipient = notificationRecipients[i % notificationRecipients.length];
     return {

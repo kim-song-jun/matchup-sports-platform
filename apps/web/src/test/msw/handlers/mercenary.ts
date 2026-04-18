@@ -34,4 +34,12 @@ export const mercenaryHandlers = [
   http.delete('/api/v1/mercenary/:id/applications/me', ({ params }) => {
     return success({ postId: params.id as string, withdrawn: true });
   }),
+
+  http.post('/api/v1/mercenary/:id/close', ({ params }) => {
+    return success({ ...mockMercenaryPost, id: params.id as string, status: 'closed' });
+  }),
+
+  http.post('/api/v1/mercenary/:id/cancel', ({ params }) => {
+    return success({ ...mockMercenaryPost, id: params.id as string, status: 'cancelled' });
+  }),
 ];

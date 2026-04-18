@@ -225,6 +225,17 @@ Errors:
 - **충돌 방지 핵심**: `use-api.ts`, `types/api.ts`, `msw/handlers.ts` 같은 공유 파일은 반드시 3a에서 처리. 개별 `page.tsx`, `[id]/page.tsx`는 3b에서 병렬 가능.
 - **검증 시점**: 3b 완료 후 반드시 `pnpm --filter web build` 또는 `tsc --noEmit`으로 통합 손실 확인.
 
+### Wave 0 Serial-Schema + Wave 1 4-way Parallel (Task 69 파이프라인 검증)
+
+Prisma enum 확장처럼 모든 에이전트가 의존하는 스키마 변경이 선행될 때 효과적인 패턴:
+
+- **Wave 0 (serial, 단일 에이전트)**: `schema.prisma` enum 추가 + migration + `notification-presentation.ts` 매핑 + seed/fixture 업데이트를 backend-data-dev 단독으로 완료. 이 wave가 머지되기 전에 Wave 1 시작 금지.
+- **Wave 1 (4-way parallel)**: backend-data-dev / backend-api-dev / frontend-data-dev / frontend-ui-dev 가 각자의 수직 도메인(서비스 레이어 / 컨트롤러+DTO / 훅+타입+MSW / 페이지+컴포넌트)을 소유하고 동시 작업. 파일 도메인이 수직 분리되어 충돌 없음.
+- **리뷰-수정 반복**: backend+frontend 리뷰 동시 실행 → Critical 0 될 때까지 fix round 반복 (이 파이프라인은 3회 소요). 디자인 라운드는 frontend PASS 이후 진입.
+- **QA gate**: 리뷰 + 디자인 PASS 후 QA 진입. BLOCKING 발견 시 수정 후 관련 에이전트만 재실행.
+- **검증 기준**: `tsc --noEmit` green(양 패키지), API 전체 suite, Web 전체 suite 모두 통과 후 완료 처리.
+- **주의**: `matches.service.ts`처럼 Wave 1B와 Wave 2A가 같은 파일을 수정해야 할 경우, 두 wave를 하나의 에이전트(backend-integration-dev)가 순차 처리하도록 병합 (동시 수정 충돌 방지).
+
 ## 5) Validation Commands
 
 - Frontend unit: `pnpm --filter web test`

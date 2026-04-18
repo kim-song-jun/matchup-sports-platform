@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsService } from './reviews.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { buildReview } from '../../test/fixtures/reviews';
 
 describe('ReviewsService', () => {
@@ -10,6 +11,10 @@ describe('ReviewsService', () => {
 
   const mockScoringService = {
     updateEloAfterMatch: jest.fn(),
+  };
+
+  const mockNotificationsService = {
+    create: jest.fn().mockResolvedValue({}),
   };
 
   const mockPrismaService = {
@@ -32,6 +37,7 @@ describe('ReviewsService', () => {
         ReviewsService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ScoringService, useValue: mockScoringService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 
@@ -39,6 +45,7 @@ describe('ReviewsService', () => {
     prisma = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
+    mockNotificationsService.create.mockResolvedValue({});
   });
 
   it('should be defined', () => {
@@ -140,6 +147,37 @@ describe('ReviewsService', () => {
       await service.create('user-1', reviewData);
 
       expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('should notify reviewedUserId with review_received after create', async () => {
+      mockPrismaService.review.create.mockResolvedValue(createdReview);
+      mockPrismaService.review.aggregate.mockResolvedValue({
+        _avg: { mannerRating: 4.5 },
+      });
+      mockPrismaService.user.update.mockResolvedValue({});
+
+      await service.create('user-1', reviewData);
+
+      // Allow fire-and-forget to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-2',
+          type: 'review_received',
+        }),
+      );
+    });
+
+    it('should fire notification exactly once per create', async () => {
+      mockPrismaService.review.create.mockResolvedValue(createdReview);
+      mockPrismaService.review.aggregate.mockResolvedValue({ _avg: { mannerRating: 4.0 } });
+      mockPrismaService.user.update.mockResolvedValue({});
+
+      await service.create('user-1', reviewData);
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockNotificationsService.create).toHaveBeenCalledTimes(1);
     });
 
     it('should handle duplicate review (Prisma unique constraint error)', async () => {

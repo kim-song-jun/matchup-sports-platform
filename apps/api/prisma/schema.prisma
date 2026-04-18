@@ -114,6 +114,25 @@ enum NotificationType {
   elo_changed
   badge_earned
   no_show_penalty
+  // Team membership application lifecycle
+  team_application_received
+  team_application_accepted
+  team_application_rejected
+  // Team match application lifecycle
+  team_match_applied
+  team_match_approved
+  team_match_rejected
+  // Mercenary post application lifecycle
+  mercenary_applied
+  mercenary_accepted
+  mercenary_rejected
+  mercenary_closed
+  mercenary_cancelled
+  // Review and lesson events
+  review_received
+  lesson_ticket_purchased
+  // Chat events (future-proof; delivery not implemented in Task 69)
+  chat_message
 }
 
 enum ChatRoomType {
@@ -1165,7 +1184,7 @@ model ChatRoomParticipant {
 model ChatMessage {
   id        String          @id @default(uuid())
   roomId    String          @map("room_id")
-  senderId  String          @map("sender_id")
+  senderId  String?         @map("sender_id")
   content   String          @db.VarChar(2000)
   type      ChatMessageType @default(text)
   imageUrl  String?         @map("image_url")
@@ -1173,7 +1192,7 @@ model ChatMessage {
   createdAt DateTime        @default(now()) @map("created_at")
 
   room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  sender User     @relation("MessageSender", fields: [senderId], references: [id])
+  sender User?    @relation("MessageSender", fields: [senderId], references: [id])
 
   @@index([roomId, createdAt])
   @@map("chat_messages")

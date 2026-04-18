@@ -340,4 +340,112 @@ export class ChatService {
 
     return participant;
   }
+
+  /**
+   * Get-or-create a team_match chat room for a given teamMatchId.
+   * Idempotent: calling twice with the same teamMatchId returns the same room.
+   * Reconciles participants: any userId in participantUserIds that is not yet
+   * a ChatRoomParticipant will be added.
+   * On creation, injects a system message with senderId=null.
+   */
+  async getOrCreateTeamMatchRoom(
+    teamMatchId: string,
+    participantUserIds: string[],
+  ) {
+    const existing = await this.prisma.chatRoom.findUnique({
+      where: { teamMatchId },
+      include: {
+        participants: { select: { userId: true } },
+      },
+    });
+
+    if (existing) {
+      // Reconcile: add any missing participants
+      const existingUserIds = new Set(existing.participants.map((p) => p.userId));
+      const missing = participantUserIds.filter((uid) => !existingUserIds.has(uid));
+      if (missing.length > 0) {
+        await this.prisma.chatRoomParticipant.createMany({
+          data: missing.map((uid) => ({ roomId: existing.id, userId: uid })),
+          skipDuplicates: true,
+        });
+      }
+      return existing;
+    }
+
+    const uniqueIds = Array.from(new Set(participantUserIds));
+    return this.prisma.chatRoom.create({
+      data: {
+        type: 'team_match',
+        teamMatchId,
+        participants: {
+          create: uniqueIds.map((uid) => ({ userId: uid })),
+        },
+        messages: {
+          create: {
+            type: 'system',
+            content: '매칭이 확정되었습니다',
+            senderId: null,
+          },
+        },
+      },
+      include: {
+        participants: {
+          include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+        },
+      },
+    });
+  }
+
+  /**
+   * Get-or-create a direct chat room between two users.
+   * Idempotent: regardless of argument order, returns the same room if one exists.
+   * Optionally injects a system message on creation.
+   */
+  async getOrCreateDirectRoom(
+    userA: string,
+    userB: string,
+    opts?: { systemMessage?: string },
+  ) {
+    // Look for an existing direct room where both users are participants.
+    // No unique index exists on participant pairs, so query via AND.
+    const existing = await this.prisma.chatRoom.findFirst({
+      where: {
+        type: 'direct',
+        AND: [
+          { participants: { some: { userId: userA } } },
+          { participants: { some: { userId: userB } } },
+        ],
+      },
+      include: {
+        participants: { select: { userId: true } },
+      },
+    });
+
+    if (existing) return existing;
+
+    return this.prisma.chatRoom.create({
+      data: {
+        type: 'direct',
+        participants: {
+          create: [{ userId: userA }, { userId: userB }],
+        },
+        ...(opts?.systemMessage
+          ? {
+              messages: {
+                create: {
+                  type: 'system',
+                  content: opts.systemMessage,
+                  senderId: null,
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        participants: {
+          include: { user: { select: { id: true, nickname: true, profileImageUrl: true } } },
+        },
+      },
+    });
+  }
 }

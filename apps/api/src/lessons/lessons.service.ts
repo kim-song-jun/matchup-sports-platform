@@ -413,10 +413,10 @@ export class LessonsService {
       },
     });
 
-    // Notify instructor
+    // Notify instructor — type corrected from marketplace_order to lesson_ticket_purchased
     await this.notificationsService.create({
       userId: ticket.lesson.hostId,
-      type: NotificationType.marketplace_order,
+      type: NotificationType.lesson_ticket_purchased,
       title: '레슨 티켓이 구매되었어요',
       body: `"${ticket.lesson.title}" 레슨 티켓이 구매되었습니다.`,
       data: { ticketId: ticket.id, lessonId: ticket.lessonId },

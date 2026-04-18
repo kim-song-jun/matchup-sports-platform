@@ -1,4 +1,4 @@
-import { PrismaClient, SportTeam, TeamMembership, SportType } from '@prisma/client';
+import { PrismaClient, SportTeam, TeamMembership, SportType, TeamMembershipStatus } from '@prisma/client';
 
 export interface TeamWithOwnership {
   team: SportTeam;
@@ -98,4 +98,27 @@ export async function createTeamWithMembers(
     team,
     memberships: [ownerMembership, ...managerMemberships, ...memberMemberships],
   };
+}
+
+/**
+ * Creates a pending TeamMembership for the given applicant, enabling team application
+ * accept/reject tests without going through the full apply endpoint.
+ */
+export async function createPendingApplication(
+  prisma: PrismaClient,
+  teamId: string,
+  applicantUserId: string,
+): Promise<TeamMembership> {
+  return prisma.teamMembership.upsert({
+    where: { teamId_userId: { teamId, userId: applicantUserId } },
+    create: {
+      teamId,
+      userId: applicantUserId,
+      role: 'member',
+      status: TeamMembershipStatus.pending,
+    },
+    update: {
+      status: TeamMembershipStatus.pending,
+    },
+  });
 }

@@ -48,16 +48,17 @@ describe('PayoutBatchBuilder', () => {
 
   it('shows batch action bar after selecting a row', () => {
     render(<PayoutBatchBuilder settlements={settlements} createPayoutBatchMutation={makeMutation()} />);
-    const rows = screen.getAllByRole('row');
-    fireEvent.click(rows[1]); // first data row
+    const row1 = screen.getByText('홍길동').closest('tr')!;
+    fireEvent.click(row1);
     expect(screen.getByRole('button', { name: /지급 배치 생성/ })).toBeInTheDocument();
   });
 
   it('shows combined total when two recipients selected', () => {
     render(<PayoutBatchBuilder settlements={settlements} createPayoutBatchMutation={makeMutation()} />);
-    const rows = screen.getAllByRole('row');
-    fireEvent.click(rows[1]); // user-1
-    fireEvent.click(rows[2]); // user-2
+    const row1 = screen.getByText('홍길동').closest('tr')!;
+    const row2 = screen.getByText('김철수').closest('tr')!;
+    fireEvent.click(row1); // user-1
+    fireEvent.click(row2); // user-2
     // netAmount: 10800 + 20000 = 30800
     expect(screen.getByText(/30,800원/)).toBeInTheDocument();
   });
@@ -65,8 +66,8 @@ describe('PayoutBatchBuilder', () => {
   it('calls mutate with recipientIds on submit', () => {
     const mutate = vi.fn();
     render(<PayoutBatchBuilder settlements={settlements} createPayoutBatchMutation={makeMutation({ mutate })} />);
-    const rows = screen.getAllByRole('row');
-    fireEvent.click(rows[1]); // user-1
+    const row1 = screen.getByText('홍길동').closest('tr')!;
+    fireEvent.click(row1); // user-1
     fireEvent.click(screen.getByRole('button', { name: /지급 배치 생성/ }));
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({ recipientIds: ['user-1'] }),

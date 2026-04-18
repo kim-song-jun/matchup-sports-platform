@@ -87,8 +87,11 @@ export const mockPayout: Payout = {
   platformFee: 45000,
   netAmount: 405000,
   status: 'pending',
-  processedAt: null,
+  note: null,
   failureReason: null,
+  paidAt: null,
+  processedAt: null,
+  markedPaidByAdminId: null,
   createdAt: '2024-01-15T10:00:00.000Z',
   updatedAt: '2024-01-15T10:00:00.000Z',
 };

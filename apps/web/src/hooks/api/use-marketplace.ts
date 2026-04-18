@@ -84,7 +84,8 @@ export function useCreateMarketplaceOrder() {
   return useMutation({
     mutationFn: async (listingId: string) => {
       const res = await api.post(`/marketplace/listings/${listingId}/order`);
-      return extractData<{ orderId: string; amount: number }>(res);
+      // Service returns { order: MarketplaceOrder, payment: { orderId, amount } }.
+      return extractData<{ order: MarketplaceOrder; payment: { orderId: string; amount: number } }>(res);
     },
     onSuccess: (_, listingId) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.detail(listingId) });

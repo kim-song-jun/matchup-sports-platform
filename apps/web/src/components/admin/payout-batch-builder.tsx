@@ -177,7 +177,8 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
                       }
                     }}
                     tabIndex={0}
-                    aria-selected={isSelected}
+                    role="button"
+                    aria-pressed={isSelected}
                     className={`transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                       isSelected
                         ? 'bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-50/80'

@@ -10,7 +10,6 @@ export type DisputeStatus =
   | 'admin_reviewing'
   | 'resolved_refund'
   | 'resolved_release'
-  | 'resolved_partial'
   | 'dismissed'
   | 'withdrawn';
 
@@ -21,7 +20,7 @@ export type DisputeTargetType = 'marketplace_order' | 'team_match';
 export type DisputeActorRole = 'buyer' | 'seller' | 'admin' | 'system';
 
 /** Admin resolve action values (ResolveDisputeDto.action). */
-export type DisputeResolveAction = 'refund' | 'release' | 'partial' | 'dismiss';
+export type DisputeResolveAction = 'refund' | 'release' | 'dismiss';
 
 /** Chronological event on a dispute (audit trail). Maps to Prisma DisputeEvent. */
 export interface DisputeEvent {
@@ -81,8 +80,6 @@ export interface WithdrawDisputeInput {
 
 export interface ResolveDisputeInput {
   action: DisputeResolveAction;
-  /** Required when action = partial. Amount in KRW won (integer). */
-  amount?: number;
   note: string;
 }
 

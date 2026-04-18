@@ -14,8 +14,11 @@ export interface Payout {
   platformFee: number;
   netAmount: number;
   status: PayoutStatus;
-  processedAt: string | null;
+  note: string | null;
   failureReason: string | null;
+  paidAt: string | null;
+  processedAt: string | null;
+  markedPaidByAdminId: string | null;
   createdAt: string;
   updatedAt: string;
   recipient?: { id: string; nickname: string; email?: string | null; profileImageUrl: string | null };

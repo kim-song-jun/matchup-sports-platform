@@ -7,6 +7,7 @@ import type { CursorPage } from '@/types/api';
 import type {
   Dispute,
   DisputeEvent,
+  DisputeActorRole,
   RespondDisputeInput,
   AddDisputeMessageInput,
   WithdrawDisputeInput,
@@ -14,6 +15,7 @@ import type {
 import { extractData, extractCursorPage } from './shared';
 import { queryKeys } from './query-keys';
 import { extractErrorMessage } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
 
 // ── My disputes (buyer/seller) ──
 
@@ -65,6 +67,7 @@ export function useSellerRespond() {
 
 export function useAddDisputeMessage() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: AddDisputeMessageInput }) => {
       const res = await api.post(`/disputes/${id}/messages`, data);
@@ -74,11 +77,14 @@ export function useAddDisputeMessage() {
       await queryClient.cancelQueries({ queryKey: queryKeys.disputes.detail(id) });
       const previous = queryClient.getQueryData<Dispute>(queryKeys.disputes.detail(id));
       if (previous) {
+        // Derive role from dispute participants rather than hardcoding 'buyer'.
+        const actorRole: DisputeActorRole =
+          user?.id === previous.respondentUserId ? 'seller' : 'buyer';
         const optimisticEvent: DisputeEvent = {
           id: `optimistic-${Date.now()}`,
           disputeId: id,
-          actorUserId: null,
-          actorRole: 'buyer',
+          actorUserId: user?.id ?? null,
+          actorRole,
           message: data.message,
           attachmentUrls: data.attachmentUrls ?? [],
           createdAt: new Date().toISOString(),

@@ -25,15 +25,28 @@ export interface MarketplaceOrder {
   buyerId: string;
   sellerId: string;
   amount: number;
+  /** Platform commission amount (computed at order creation). */
+  commission: number;
+  /** Toss Payments order ID (MU-MKT-{uuid}) — distinct from the DB `id`. */
+  orderId: string;
   status: MarketplaceOrderStatus;
-  paymentId: string | null;
+  /** Toss Payments payment key — unique per successful payment. */
+  paymentKey: string | null;
+  /** ISO timestamp when payment was confirmed by Toss. */
+  paidAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
+  /** ISO timestamp when buyer confirmed receipt or escrow auto-released. */
+  completedAt: string | null;
   confirmedReceiptAt: string | null;
   /** ISO timestamp at which the escrow auto-releases (deliveredAt + 7d). Set when status -> delivered. */
   autoReleaseAt: string | null;
   /** ISO timestamp when escrow was released (buyer confirm OR cron auto-release). */
-  escrowReleasedAt: string | null;
+  releasedAt: string | null;
+  /** Rental period start (only set for rental listings). */
+  rentalStartDate: string | null;
+  /** Rental period end (only set for rental listings). */
+  rentalEndDate: string | null;
   createdAt: string;
   updatedAt: string;
   listing?: {

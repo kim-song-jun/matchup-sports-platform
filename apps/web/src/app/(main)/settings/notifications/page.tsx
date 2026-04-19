@@ -59,7 +59,7 @@ const SERVER_CATEGORIES: ServerCategoryConfig[] = [
   {
     key: 'chatEnabled',
     label: '채팅 알림',
-    desc: '새 메시지와 단체 채팅방 업데이트를 계정 전체에서 동기화합니다.',
+    desc: '앱 외부로 오는 채팅 푸시 알림이에요. 채팅방 안의 새 메시지는 계속 표시돼요.',
     icon: MessageCircle,
   },
   {
@@ -109,10 +109,6 @@ export default function NotificationsPage() {
     useState<BrowserPermissionState>('unsupported');
   const [savingKey, setSavingKey] = useState<ServerPreferenceKey | null>(null);
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -131,6 +127,10 @@ export default function NotificationsPage() {
       'Notification' in window ? window.Notification.permission : 'unsupported',
     );
   }, []);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleServerToggle = (key: ServerPreferenceKey, nextValue: boolean) => {
     setSavingKey(key);
@@ -206,7 +206,7 @@ export default function NotificationsPage() {
             <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
               <SectionHeading
                 title="계정 전체에 저장되는 알림"
-                description="서버에 저장되는 category preference입니다."
+                description="어떤 기기에서 로그인해도 같은 설정이 유지돼요."
               />
               <PreferenceSkeleton count={SERVER_CATEGORIES.length} />
             </section>
@@ -232,7 +232,7 @@ export default function NotificationsPage() {
             <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
               <SectionHeading
                 title="계정 전체에 저장되는 알림"
-                description="서버에 저장되는 category preference입니다."
+                description="어떤 기기에서 로그인해도 같은 설정이 유지돼요."
               />
               <div className="divide-y divide-gray-50 dark:divide-gray-700">
                 {SERVER_CATEGORIES.map((category) => (
@@ -334,7 +334,7 @@ function SectionHeading({
       <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         {title}
       </h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-300">{description}</p>
     </div>
   );
 }
@@ -401,7 +401,7 @@ function CategoryRow({
   saving?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3.5 py-4 first:pt-0 last:pb-0">
+    <div className="flex items-center gap-3.5 py-4 first:pt-0 last:pb-0 min-h-[44px]">
       <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 shrink-0">
         <Icon size={18} className="text-blue-500" />
       </div>

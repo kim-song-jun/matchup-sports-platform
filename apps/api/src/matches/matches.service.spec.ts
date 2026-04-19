@@ -3,8 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
-import { MatchesService } from './matches.service';
+import { MatchesService, computeParticipantHash } from './matches.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MatchingEngineService } from './matching-engine.service';
@@ -1255,6 +1256,238 @@ describe('MatchesService', () => {
       await expect(service.complete('non-existent', 'host-1')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  // ─── computeParticipantHash helper ────────────────────────────────────────
+
+  describe('computeParticipantHash', () => {
+    it('returns a 64-char lowercase hex string', () => {
+      const hash = computeParticipantHash([{ userId: 'user-a' }, { userId: 'user-b' }]);
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it('is deterministic for the same participant set', () => {
+      const participants = [{ userId: 'user-a' }, { userId: 'user-b' }, { userId: 'user-c' }];
+      expect(computeParticipantHash(participants)).toBe(computeParticipantHash(participants));
+    });
+
+    it('produces different hashes for different participant sets', () => {
+      const hashA = computeParticipantHash([{ userId: 'user-a' }, { userId: 'user-b' }]);
+      const hashB = computeParticipantHash([{ userId: 'user-a' }, { userId: 'user-x' }]);
+      expect(hashA).not.toBe(hashB);
+    });
+
+    it('is order-independent: same userId set in different order yields same hash', () => {
+      const hashAB = computeParticipantHash([{ userId: 'user-a' }, { userId: 'user-b' }]);
+      const hashBA = computeParticipantHash([{ userId: 'user-b' }, { userId: 'user-a' }]);
+      expect(hashAB).toBe(hashBA);
+    });
+  });
+
+  // ─── previewTeams ──────────────────────────────────────────────────────────
+
+  describe('previewTeams', () => {
+    const eligibleMatch = {
+      id: 'match-1',
+      hostId: 'host-1',
+      sportType: SportType.futsal,
+      status: 'recruiting',
+      teamConfig: null,
+    };
+
+    const mockParticipants = [
+      {
+        id: 'p1',
+        userId: 'user-a',
+        user: { id: 'user-a', nickname: 'A', profileImageUrl: null },
+      },
+      {
+        id: 'p2',
+        userId: 'user-b',
+        user: { id: 'user-b', nickname: 'B', profileImageUrl: null },
+      },
+    ];
+
+    const mockDistribution = {
+      teams: [
+        {
+          index: 0,
+          name: 'A팀',
+          color: '#FF0000',
+          avgElo: 1000,
+          members: [{ participantId: 'p1', userId: 'user-a', nickname: 'A', profileImageUrl: null, eloRating: 1000, hasProfile: false }],
+        },
+        {
+          index: 1,
+          name: 'B팀',
+          color: '#0000FF',
+          avgElo: 1000,
+          members: [{ participantId: 'p2', userId: 'user-b', nickname: 'B', profileImageUrl: null, eloRating: 1000, hasProfile: false }],
+        },
+      ],
+      metrics: { maxEloGap: 0, variance: 0, stdDev: 0, teamAvgElos: [1000, 1000], coldStartCount: 2 },
+      seed: 42,
+    };
+
+    beforeEach(() => {
+      mockPrismaService.match.findUnique.mockResolvedValue(eligibleMatch);
+      mockPrismaService.matchParticipant.findMany.mockResolvedValue(mockParticipants);
+      mockPrismaService.userSportProfile.findMany.mockResolvedValue([]);
+      mockTeamBalancingService.balance.mockReturnValue(mockDistribution);
+    });
+
+    it('returns participantHash as a 64-char hex string', async () => {
+      const result = await service.previewTeams('match-1', 'host-1', {});
+      expect(result).toHaveProperty('participantHash');
+      expect(result.participantHash).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it('returns the same participantHash for the same participant set on repeated calls', async () => {
+      const r1 = await service.previewTeams('match-1', 'host-1', {});
+      const r2 = await service.previewTeams('match-1', 'host-1', {});
+      expect(r1.participantHash).toBe(r2.participantHash);
+    });
+
+    it('returns a different participantHash when the participant set changes', async () => {
+      const r1 = await service.previewTeams('match-1', 'host-1', {});
+
+      // Simulate one participant leaving
+      mockPrismaService.matchParticipant.findMany.mockResolvedValue([mockParticipants[0]]);
+      const r2 = await service.previewTeams('match-1', 'host-1', {});
+
+      expect(r1.participantHash).not.toBe(r2.participantHash);
+    });
+
+    it('hash is order-independent: different findMany return order yields same hash', async () => {
+      const r1 = await service.previewTeams('match-1', 'host-1', {});
+
+      // Reverse participant order in the mock
+      mockPrismaService.matchParticipant.findMany.mockResolvedValue([...mockParticipants].reverse());
+      const r2 = await service.previewTeams('match-1', 'host-1', {});
+
+      expect(r1.participantHash).toBe(r2.participantHash);
+    });
+
+    it('includes teams and metrics from the balancing service alongside participantHash', async () => {
+      const result = await service.previewTeams('match-1', 'host-1', {});
+      expect(result.teams).toEqual(mockDistribution.teams);
+      expect(result.metrics).toEqual(mockDistribution.metrics);
+      expect(result.seed).toBe(mockDistribution.seed);
+    });
+  });
+
+  // ─── generateTeams ─────────────────────────────────────────────────────────
+
+  describe('generateTeams', () => {
+    const eligibleMatch = {
+      id: 'match-1',
+      hostId: 'host-1',
+      sportType: SportType.futsal,
+      status: 'recruiting',
+      teamConfig: null,
+    };
+
+    const mockParticipants = [
+      {
+        id: 'p1',
+        userId: 'user-a',
+        user: { id: 'user-a', nickname: 'A', profileImageUrl: null },
+      },
+      {
+        id: 'p2',
+        userId: 'user-b',
+        user: { id: 'user-b', nickname: 'B', profileImageUrl: null },
+      },
+    ];
+
+    const mockDistribution = {
+      teams: [
+        {
+          index: 0,
+          name: 'A팀',
+          color: '#FF0000',
+          avgElo: 1000,
+          members: [{ participantId: 'p1', userId: 'user-a', nickname: 'A', profileImageUrl: null, eloRating: 1000, hasProfile: false }],
+        },
+        {
+          index: 1,
+          name: 'B팀',
+          color: '#0000FF',
+          avgElo: 1000,
+          members: [{ participantId: 'p2', userId: 'user-b', nickname: 'B', profileImageUrl: null, eloRating: 1000, hasProfile: false }],
+        },
+      ],
+      metrics: { maxEloGap: 0, variance: 0, stdDev: 0, teamAvgElos: [1000, 1000], coldStartCount: 2 },
+      seed: 42,
+    };
+
+    const createdTeamA = { id: 'team-a' };
+    const createdTeamB = { id: 'team-b' };
+
+    // A txMock that simulates the transaction callbacks
+    const txMock = {
+      matchParticipant: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      team: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        create: jest.fn()
+          .mockResolvedValueOnce(createdTeamA)
+          .mockResolvedValueOnce(createdTeamB),
+      },
+    };
+
+    beforeEach(() => {
+      mockPrismaService.match.findUnique.mockResolvedValue(eligibleMatch);
+      mockPrismaService.matchParticipant.findMany.mockResolvedValue(mockParticipants);
+      mockPrismaService.userSportProfile.findMany.mockResolvedValue([]);
+      mockTeamBalancingService.balance.mockReturnValue(mockDistribution);
+      txMock.team.create
+        .mockResolvedValueOnce(createdTeamA)
+        .mockResolvedValueOnce(createdTeamB);
+      mockPrismaService.$transaction.mockImplementation(async (cb: (tx: typeof txMock) => Promise<unknown>) => cb(txMock));
+    });
+
+    it('succeeds when a matching participantHash is provided', async () => {
+      // Compute the hash that will match (user-a,user-b sorted)
+      const validHash = computeParticipantHash(mockParticipants);
+      await expect(service.generateTeams('match-1', 'host-1', { participantHash: validHash })).resolves.toBeDefined();
+      expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws ConflictException with PARTICIPANTS_CHANGED code when hash is stale', async () => {
+      const staleHash = 'a'.repeat(64); // valid format but wrong content
+      await expect(
+        service.generateTeams('match-1', 'host-1', { participantHash: staleHash }),
+      ).rejects.toThrow(ConflictException);
+
+      try {
+        await service.generateTeams('match-1', 'host-1', { participantHash: staleHash });
+      } catch (err) {
+        expect(err).toBeInstanceOf(ConflictException);
+        const body = (err as ConflictException).getResponse();
+        expect(body).toMatchObject({ code: 'PARTICIPANTS_CHANGED', message: '참가자가 변경되었어요' });
+      }
+
+      // Transaction must NOT be called when hash is stale
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('succeeds without participantHash and emits a legacy-client warn log', async () => {
+      const warnSpy = jest.spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn');
+      await expect(service.generateTeams('match-1', 'host-1', {})).resolves.toBeDefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        'generateTeams called without participantHash (legacy client)',
+        { matchId: 'match-1' },
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('does NOT call $transaction when hash check fails', async () => {
+      const staleHash = 'b'.repeat(64);
+      await expect(
+        service.generateTeams('match-1', 'host-1', { participantHash: staleHash }),
+      ).rejects.toThrow(ConflictException);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
     });
   });
 });

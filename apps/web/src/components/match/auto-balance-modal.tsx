@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Info, RefreshCw, Sparkles, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, RefreshCw, Sparkles, Users } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { ErrorState } from '@/components/ui/error-state';
 import { extractErrorMessage } from '@/lib/utils';
 import { sportCardAccent } from '@/lib/constants';
 import { usePreviewTeams, useComposeTeams } from '@/hooks/use-api';
+import { ConfirmReplaceModal } from './confirm-replace-modal';
 import type {
   ComposeTeamsInput,
   MatchTeamMember,
@@ -26,9 +27,18 @@ export interface AutoBalanceModalProps {
   sportType?: string;
   /** Number of confirmed participants — disables preview when < 2 */
   participantCount?: number;
+  /**
+   * Existing team assignments on the match. When non-empty, tapping "확정"
+   * shows ConfirmReplaceModal before the compose mutation fires.
+   * Caller must pass this prop for the replace-warning to trigger.
+   */
+  existingTeams?: { teamName: string; memberCount: number }[];
 }
 
 type Step = 'config' | 'preview' | 'confirming';
+
+/** A single preview result stored in session-scoped FIFO history (max 2). */
+type PreviewResult = PreviewTeamsResponse;
 
 // ── Balance badge thresholds ───────────────────────────────────────────────────
 
@@ -301,34 +311,114 @@ function ConfigStep({
 
 function PreviewStep({
   preview,
+  previewHistory,
   teamCount,
   sportType,
   onRetry,
   onConfirm,
   onBackToConfig,
+  onConfirmWithHistorySeed,
   isRetrying,
   isConfirming,
   retryButtonRef,
   confirmButtonRef,
+  retryCountdown,
 }: {
   preview: PreviewTeamsResponse;
+  previewHistory: PreviewResult[];
   teamCount: number;
   sportType?: string;
   onRetry: () => void;
   onConfirm: () => void;
   onBackToConfig: () => void;
+  onConfirmWithHistorySeed: (seed: number, participantHash?: string) => void;
   isRetrying: boolean;
   isConfirming: boolean;
   retryButtonRef: React.RefObject<HTMLButtonElement | null>;
   confirmButtonRef: React.RefObject<HTMLButtonElement | null>;
+  retryCountdown: number | null;
 }) {
-  const badge = getBalanceBadge(preview.metrics.maxEloGap);
-  const hasColdStart = preview.metrics.coldStartCount > 0;
+  // Toggle between current preview and a historical snapshot
+  const [showingHistoryIndex, setShowingHistoryIndex] = useState<number | null>(null);
+
+  // Reset history view when a new preview arrives (current preview changed)
+  useEffect(() => {
+    setShowingHistoryIndex(null);
+  }, [preview]);
+
+  const historyCount = previewHistory.length;
+  const isViewingHistory = showingHistoryIndex !== null;
+
+  // The data to display: either the active historical snapshot or the current preview
+  const displayedPreview =
+    showingHistoryIndex !== null ? previewHistory[showingHistoryIndex] : preview;
+
+  const badge = getBalanceBadge(displayedPreview.metrics.maxEloGap);
+  const hasColdStart = displayedPreview.metrics.coldStartCount > 0;
+
+  // Header label for history toggle bar
+  const historyLabel =
+    historyCount >= 1
+      ? `이전 결과 ${historyCount}건 · 현재 결과`
+      : null;
 
   return (
     <div className="flex flex-col gap-4">
+      {/* History toggle bar — only visible when there is at least 1 previous result */}
+      {historyLabel && (
+        <div className="flex items-center justify-between rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {historyLabel}
+          </span>
+          <div className="flex items-center gap-1">
+            {previewHistory.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() =>
+                  setShowingHistoryIndex(showingHistoryIndex === idx ? null : idx)
+                }
+                aria-pressed={showingHistoryIndex === idx}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${
+                  showingHistoryIndex === idx
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+                aria-label={`이전 결과 ${idx + 1} 보기`}
+              >
+                {showingHistoryIndex === idx ? (
+                  <ChevronLeft size={12} aria-hidden="true" />
+                ) : (
+                  <ChevronRight size={12} aria-hidden="true" />
+                )}
+                {`이전 ${idx + 1}`}
+              </button>
+            ))}
+            {isViewingHistory && (
+              <button
+                type="button"
+                onClick={() => setShowingHistoryIndex(null)}
+                className="ml-1 rounded-lg px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+              >
+                현재 보기
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* History view banner */}
+      {isViewingHistory && (
+        <div className="flex items-start gap-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 px-3 py-2.5">
+          <Info size={16} aria-hidden="true" className="shrink-0 mt-0.5 text-blue-500 dark:text-blue-400" />
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            이전 결과를 보고 있어요. 이 구성으로 확정하려면 아래 버튼을 누르세요.
+          </p>
+        </div>
+      )}
+
       {/* Status region: balance badge + cold-start banner */}
-      <div aria-live="polite" className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         {/* Balance badge */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -343,9 +433,9 @@ function PreviewStep({
 
         {/* ELO gap sub-info */}
         <div className="flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-          <span>최대 ELO 격차: {preview.metrics.maxEloGap}</span>
+          <span>최대 ELO 격차: {displayedPreview.metrics.maxEloGap}</span>
           <span aria-hidden="true">·</span>
-          <span>표준편차: {preview.metrics.stdDev.toFixed(1)}</span>
+          <span>표준편차: {displayedPreview.metrics.stdDev.toFixed(1)}</span>
         </div>
 
         {/* Cold-start banner */}
@@ -362,7 +452,7 @@ function PreviewStep({
             <p className="text-xs text-amber-700 dark:text-amber-400">
               ELO 미등록{' '}
               <span className="font-semibold">
-                {preview.metrics.coldStartCount}명
+                {displayedPreview.metrics.coldStartCount}명
               </span>
               은 1000으로 가정해요. 경기 후 정확도가 높아져요.
             </p>
@@ -370,9 +460,17 @@ function PreviewStep({
         )}
       </div>
 
-      {/* Team cards */}
-      <div className={`grid gap-3 ${teamCount >= 3 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-        {preview.teams.map((team) => (
+      {/* Team cards — C6: responsive grid; teamCount=4 stays 2-col even on xl
+          to avoid asymmetric 3+1 layout that QA flagged. teamCount=3 expands
+          to 3-col on xl for optimal side-by-side comparison. */}
+      <div
+        className={`grid gap-3 ${
+          teamCount === 3
+            ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
+            : 'grid-cols-1 sm:grid-cols-2'
+        }`}
+      >
+        {displayedPreview.teams.map((team) => (
           <TeamCard key={team.index} team={team} sportType={sportType} />
         ))}
       </div>
@@ -380,59 +478,75 @@ function PreviewStep({
       {/* Actions */}
       <div className="flex items-center gap-3 pt-1">
         {/* Back to config — tertiary text button, left-aligned */}
-        <button
-          type="button"
-          onClick={onBackToConfig}
-          disabled={isRetrying || isConfirming}
-          className="shrink-0 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors min-h-[44px] px-1 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-        >
-          ← 설정 변경
-        </button>
+        {!isViewingHistory && (
+          <button
+            type="button"
+            onClick={onBackToConfig}
+            disabled={isRetrying || isConfirming}
+            className="shrink-0 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors min-h-[44px] px-1 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          >
+            ← 설정 변경
+          </button>
+        )}
 
-        {/* Right-aligned retry + confirm */}
+        {/* Right-aligned CTA group */}
         <div className="flex-1 flex gap-3">
-          <button
-            ref={retryButtonRef}
-            type="button"
-            onClick={onRetry}
-            disabled={isRetrying || isConfirming}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          >
-            {isRetrying ? (
-              <>
-                <span
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent"
-                  aria-hidden="true"
-                />
-                <span>재추첨 중</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw size={16} aria-hidden="true" />
-                <span>재추첨</span>
-              </>
-            )}
-          </button>
+          {isViewingHistory ? (
+            // When viewing a historical result: "이 구성으로 확정" replaces retry+confirm
+            <button
+              type="button"
+              onClick={() => onConfirmWithHistorySeed(displayedPreview.seed, displayedPreview.participantHash)}
+              disabled={isConfirming}
+              className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              이 구성으로 확정
+            </button>
+          ) : (
+            <>
+              <button
+                ref={retryButtonRef}
+                type="button"
+                onClick={onRetry}
+                disabled={isRetrying || isConfirming || retryCountdown !== null}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                {isRetrying ? (
+                  <>
+                    <span
+                      className="h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent"
+                      aria-hidden="true"
+                    />
+                    <span>재추첨 중</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} aria-hidden="true" />
+                    <span>{retryCountdown !== null ? `재추첨 (${retryCountdown}초)` : '재추첨'}</span>
+                  </>
+                )}
+              </button>
 
-          <button
-            ref={confirmButtonRef}
-            type="button"
-            onClick={onConfirm}
-            disabled={isRetrying || isConfirming}
-            className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          >
-            {isConfirming ? (
-              <span className="flex items-center justify-center gap-2">
-                <span
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-                  aria-hidden="true"
-                />
-                확정 중...
-              </span>
-            ) : (
-              '확정'
-            )}
-          </button>
+              <button
+                ref={confirmButtonRef}
+                type="button"
+                onClick={onConfirm}
+                disabled={isRetrying || isConfirming}
+                className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                {isConfirming ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span
+                      className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                      aria-hidden="true"
+                    />
+                    확정 중...
+                  </span>
+                ) : (
+                  '확정'
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -449,6 +563,7 @@ export function AutoBalanceModal({
   defaultTeamCount = 2,
   sportType,
   participantCount,
+  existingTeams,
 }: AutoBalanceModalProps) {
   const [step, setStep] = useState<Step>('config');
   const [teamCount, setTeamCount] = useState<number>(
@@ -458,13 +573,38 @@ export function AutoBalanceModal({
   const [currentPreview, setCurrentPreview] =
     useState<PreviewTeamsResponse | null>(null);
 
+  // C4: FIFO history of the last 2 preview results (session-scoped).
+  // Reset to [] on modal close.
+  const [previewHistory, setPreviewHistory] = useState<PreviewResult[]>([]);
+
+  // C5: Controls whether ConfirmReplaceModal is visible
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+
+  // aria-live announcement for PARTICIPANTS_CHANGED auto-repreview (C2)
+  const [announcementText, setAnnouncementText] = useState('');
+
+  // C3: countdown seconds for 429 rate-limit (null = no limit active)
+  const [countdown, setCountdown] = useState<number | null>(null);
+
   // Refs for focus management on step change
   const previewButtonRef = useRef<HTMLButtonElement | null>(null);
   const retryButtonRef = useRef<HTMLButtonElement | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const previewMutation = usePreviewTeams(matchId);
-  const composeMutation = useComposeTeams(matchId);
+  const { retryAfterSeconds } = previewMutation;
+
+  const composeMutation = useComposeTeams(matchId, {
+    onParticipantsChanged: (input) => {
+      previewMutation.mutate(input, {
+        onSuccess: (d) => {
+          setCurrentPreview(d);
+          setStep('preview');
+          setAnnouncementText('참가자가 변경되어 다시 계산했어요');
+        },
+      });
+    },
+  });
 
   // Reset state when modal closes
   useEffect(() => {
@@ -473,6 +613,10 @@ export function AutoBalanceModal({
       setTeamCount(Math.max(2, Math.min(4, defaultTeamCount)));
       setStrategy('balanced');
       setCurrentPreview(null);
+      setPreviewHistory([]); // C4: session reset on close
+      setShowReplaceModal(false);
+      setAnnouncementText('');
+      setCountdown(null);
       previewMutation.reset();
       composeMutation.reset();
     }
@@ -492,6 +636,33 @@ export function AutoBalanceModal({
     return () => clearTimeout(timer);
   }, [step, open]);
 
+  // C3: Start 1-second countdown when server rate-limits the preview endpoint (429).
+  // Clear on successful preview (retryAfterSeconds resets to null) or when timer expires.
+  useEffect(() => {
+    if (retryAfterSeconds === null) {
+      setCountdown(null);
+      return;
+    }
+    setCountdown(retryAfterSeconds);
+    setAnnouncementText(`재추첨은 ${retryAfterSeconds}초 후 가능해요.`);
+    const id = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(id);
+          setAnnouncementText('');
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [retryAfterSeconds]);
+
+  /** Push a new preview result into the FIFO history (cap 2). */
+  function pushToHistory(prev: PreviewResult) {
+    setPreviewHistory((h) => [...h, prev].slice(-2));
+  }
+
   function handlePreview() {
     const input: ComposeTeamsInput = { teamCount, strategy };
     previewMutation.mutate(input, {
@@ -504,6 +675,10 @@ export function AutoBalanceModal({
   }
 
   function handleRetry() {
+    // Save current preview into history before replacing it
+    if (currentPreview) {
+      pushToHistory(currentPreview);
+    }
     // Clear stale compose error so its banner disappears during the new preview load
     composeMutation.reset();
     // No seed passed — server generates a new one
@@ -524,13 +699,18 @@ export function AutoBalanceModal({
     // teamCount and strategy are preserved (not reset here)
   }
 
-  function handleConfirm() {
-    if (!currentPreview) return;
+  /**
+   * Fires the actual compose mutation using the given seed and participantHash.
+   * Shared by both "확정" (current preview) and "이 구성으로 확정" (history snapshot).
+   * The participantHash enables server-side stale-detection (409 PARTICIPANTS_CHANGED).
+   */
+  function fireCompose(seed: number, participantHash?: string) {
     setStep('confirming');
     const input: ComposeTeamsInput = {
       teamCount,
       strategy,
-      seed: currentPreview.seed,
+      seed,
+      ...(participantHash !== undefined && { participantHash }),
     };
     composeMutation.mutate(input, {
       onSuccess: () => {
@@ -541,6 +721,49 @@ export function AutoBalanceModal({
         setStep('preview');
       },
     });
+  }
+
+  /** Called when the user taps "확정" on the current preview. */
+  function handleConfirm() {
+    if (!currentPreview) return;
+    const hasExistingTeams = existingTeams && existingTeams.length > 0;
+    if (hasExistingTeams) {
+      // C5: show replace warning before committing
+      setShowReplaceModal(true);
+    } else {
+      fireCompose(currentPreview.seed, currentPreview.participantHash);
+    }
+  }
+
+  /** Called when the user taps "이 구성으로 확정" from the history view. */
+  function handleConfirmWithHistorySeed(seed: number, participantHash?: string) {
+    const hasExistingTeams = existingTeams && existingTeams.length > 0;
+    if (hasExistingTeams) {
+      // Store the historical seed + hash temporarily, then open replace modal.
+      setShowReplaceModal(true);
+      _pendingHistoryRef.current = { seed, participantHash };
+    } else {
+      fireCompose(seed, participantHash);
+    }
+  }
+
+  // Holds a historical seed + hash when ConfirmReplaceModal is opened via history CTA
+  const _pendingHistoryRef = useRef<{ seed: number; participantHash?: string } | null>(null);
+
+  function handleReplaceConfirm() {
+    setShowReplaceModal(false);
+    const pending = _pendingHistoryRef.current;
+    _pendingHistoryRef.current = null;
+    if (pending !== null) {
+      fireCompose(pending.seed, pending.participantHash);
+    } else if (currentPreview) {
+      fireCompose(currentPreview.seed, currentPreview.participantHash);
+    }
+  }
+
+  function handleReplaceCancel() {
+    setShowReplaceModal(false);
+    _pendingHistoryRef.current = null;
   }
 
   // Determine modal title
@@ -555,88 +778,113 @@ export function AutoBalanceModal({
   const showComposeError = step === 'preview' && composeMutation.isError;
 
   return (
-    <Modal
-      isOpen={open}
-      onClose={onClose}
-      title={titleMap[step]}
-      size="md"
-    >
-      {/* Intro text */}
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 -mt-3 leading-relaxed">
-        {step === 'config'
-          ? '팀 수와 배정 방식을 선택하면 팀을 만들어 드릴게요.'
-          : step === 'preview'
-            ? '결과가 마음에 들지 않으면 재추첨하거나 확정해 주세요.'
-            : '잠시만요, 팀을 구성하고 있어요.'}
-      </p>
+    <>
+      {/* aria-live region for PARTICIPANTS_CHANGED re-preview announcements (C2) */}
+      <div
+        aria-live="polite"
+        role="status"
+        className="sr-only"
+      >
+        {announcementText}
+      </div>
 
-      {/* Preview error banner */}
-      {showPreviewError && (
-        <div className="mb-4">
-          <ErrorState
-            message={extractErrorMessage(previewMutation.error, '팀 미리보기를 가져오지 못했어요.')}
-            onRetry={() => {
-              previewMutation.reset();
-              handlePreview();
-            }}
+      <Modal
+        isOpen={open}
+        onClose={onClose}
+        title={titleMap[step]}
+        size="md"
+      >
+        {/* Intro text */}
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 -mt-3 leading-relaxed">
+          {step === 'config'
+            ? '팀 수와 배정 방식을 선택하면 팀을 만들어 드릴게요.'
+            : step === 'preview'
+              ? '결과가 마음에 들지 않으면 재추첨하거나 확정해 주세요.'
+              : '잠시만요, 팀을 구성하고 있어요.'}
+        </p>
+
+        {/* Preview error banner */}
+        {showPreviewError && (
+          <div className="mb-4">
+            <ErrorState
+              message={extractErrorMessage(previewMutation.error, '팀 미리보기를 가져오지 못했어요.')}
+              onRetry={() => {
+                previewMutation.reset();
+                handlePreview();
+              }}
+            />
+          </div>
+        )}
+
+        {/* Compose error banner (stays on preview step) */}
+        {showComposeError && (
+          <div className="mb-4">
+            <ErrorState
+              message={extractErrorMessage(composeMutation.error, '팀 구성을 확정하지 못했어요.')}
+              onRetry={() => {
+                composeMutation.reset();
+                handleConfirm();
+              }}
+            />
+          </div>
+        )}
+
+        {/* Step content */}
+        {step === 'config' && (
+          <ConfigStep
+            teamCount={teamCount}
+            strategy={strategy}
+            onTeamCountChange={setTeamCount}
+            onStrategyChange={setStrategy}
+            onPreview={handlePreview}
+            isPending={previewMutation.isPending}
+            participantCount={participantCount}
+            previewButtonRef={previewButtonRef}
           />
-        </div>
-      )}
+        )}
 
-      {/* Compose error banner (stays on preview step) */}
-      {showComposeError && (
-        <div className="mb-4">
-          <ErrorState
-            message={extractErrorMessage(composeMutation.error, '팀 구성을 확정하지 못했어요.')}
-            onRetry={() => {
-              composeMutation.reset();
-              handleConfirm();
-            }}
+        {(step === 'preview' || step === 'confirming') && currentPreview && (
+          <PreviewStep
+            preview={currentPreview}
+            previewHistory={previewHistory}
+            teamCount={teamCount}
+            sportType={sportType}
+            onRetry={handleRetry}
+            onConfirm={handleConfirm}
+            onBackToConfig={handleBackToConfig}
+            onConfirmWithHistorySeed={handleConfirmWithHistorySeed}
+            isRetrying={previewMutation.isPending}
+            isConfirming={step === 'confirming' || composeMutation.isPending}
+            retryButtonRef={retryButtonRef}
+            confirmButtonRef={confirmButtonRef}
+            retryCountdown={countdown}
           />
-        </div>
-      )}
+        )}
 
-      {/* Step content */}
-      {step === 'config' && (
-        <ConfigStep
-          teamCount={teamCount}
-          strategy={strategy}
-          onTeamCountChange={setTeamCount}
-          onStrategyChange={setStrategy}
-          onPreview={handlePreview}
-          isPending={previewMutation.isPending}
-          participantCount={participantCount}
-          previewButtonRef={previewButtonRef}
-        />
-      )}
+        {/* Confirming loading overlay (no preview data edge case) */}
+        {step === 'confirming' && !currentPreview && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <span
+              className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
+              aria-hidden="true"
+            />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              팀을 구성하고 있어요...
+            </p>
+          </div>
+        )}
+      </Modal>
 
-      {(step === 'preview' || step === 'confirming') && currentPreview && (
-        <PreviewStep
-          preview={currentPreview}
-          teamCount={teamCount}
-          sportType={sportType}
-          onRetry={handleRetry}
-          onConfirm={handleConfirm}
-          onBackToConfig={handleBackToConfig}
-          isRetrying={previewMutation.isPending}
-          isConfirming={step === 'confirming' || composeMutation.isPending}
-          retryButtonRef={retryButtonRef}
-          confirmButtonRef={confirmButtonRef}
-        />
-      )}
-
-      {/* Confirming loading overlay (no preview data edge case) */}
-      {step === 'confirming' && !currentPreview && (
-        <div className="flex flex-col items-center justify-center gap-3 py-12">
-          <span
-            className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
-            aria-hidden="true"
-          />
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            팀을 구성하고 있어요...
-          </p>
-        </div>
-      )}
-    </Modal>
+      {/* C5: Confirm replace modal — rendered outside the parent Modal to avoid
+          z-index stacking issues. Uses role="alertdialog" per task 72 A3. */}
+      <ConfirmReplaceModal
+        open={showReplaceModal}
+        onClose={handleReplaceCancel}
+        onConfirm={handleReplaceConfirm}
+        currentTeams={existingTeams ?? []}
+        loading={step === 'confirming' || composeMutation.isPending}
+      />
+    </>
   );
 }
+

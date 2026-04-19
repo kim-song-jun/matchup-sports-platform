@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { HostThrottlerGuard } from './common/guards/host-throttler.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -35,6 +38,11 @@ import { RedisModule } from './redis/redis.module';
       isGlobal: true,
       load: [configuration],
     }),
+    // Default global limit is intentionally loose (1000 req/min per task doc R1).
+    // Real throttling (e.g. 20/min on preview) is applied at the route level via @Throttle.
+    ThrottlerModule.forRoot({
+      throttlers: [{ limit: 1000, ttl: 60_000 }],
+    }),
     PrismaModule,
     RedisModule,
     AuthModule,
@@ -63,5 +71,6 @@ import { RedisModule } from './redis/redis.module';
     UserBlocksModule,
     TournamentsModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: HostThrottlerGuard }],
 })
 export class AppModule {}

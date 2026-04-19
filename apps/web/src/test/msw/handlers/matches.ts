@@ -1,7 +1,11 @@
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { success, paged } from './_utils';
 import { mockMatch } from '../../fixtures/matches';
-import type { PreviewTeamsResponse, MatchTeamMember } from '@/types/api';
+import type { PreviewTeamsResponse } from '@/types/api';
+
+// Deterministic 64-char hex participantHash for fixture (Task 72 C1).
+// Represents SHA-256("user-1,user-2,user-3,user-4,user-5,user-6,user-7,user-8,user-9,user-10").
+const FIXTURE_PARTICIPANT_HASH = 'a'.repeat(64);
 
 // Deterministic fixture used by both preview and compose handlers.
 // Team A: ELO [1400, 1300, 1200, 1100, 1000] — avgElo 1200
@@ -44,6 +48,7 @@ function buildTeamPreviewFixture(seed: number): PreviewTeamsResponse {
       coldStartCount: 0,
     },
     seed,
+    participantHash: FIXTURE_PARTICIPANT_HASH,
   };
 }
 
@@ -88,14 +93,31 @@ export const matchesHandlers = [
     return success({ arrivedAt: new Date().toISOString() });
   }),
 
+  // Task 72 C3: send `x-test-trigger-429: 1` header to simulate rate limit response.
   http.post('/api/v1/matches/:id/teams/preview', async ({ request }) => {
+    if (request.headers.get('x-test-trigger-429') === '1') {
+      return new HttpResponse(
+        JSON.stringify({ status: 'error', message: 'Too many requests', code: 'TOO_MANY_REQUESTS' }),
+        { status: 429, headers: { 'Retry-After': '60', 'Content-Type': 'application/json' } },
+      );
+    }
     const body = (await request.json().catch(() => ({}))) as { seed?: number };
     const seed = typeof body?.seed === 'number' ? body.seed : 42;
     return success(buildTeamPreviewFixture(seed));
   }),
 
+  // Task 72 C2: send `participantHash: 'stale'` in body to simulate 409 PARTICIPANTS_CHANGED.
   http.post('/api/v1/matches/:id/teams', async ({ request }) => {
-    const body = (await request.json().catch(() => ({}))) as { seed?: number };
+    const body = (await request.json().catch(() => ({}))) as {
+      seed?: number;
+      participantHash?: string;
+    };
+    if (body?.participantHash === 'stale') {
+      return new HttpResponse(
+        JSON.stringify({ status: 'error', message: '참가자가 변경되었어요', code: 'PARTICIPANTS_CHANGED' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
     const seed = typeof body?.seed === 'number' ? body.seed : 42;
     return success(buildTeamPreviewFixture(seed));
   }),

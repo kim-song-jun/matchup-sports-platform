@@ -21,7 +21,9 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiConflictResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { MatchesService } from './matches.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -137,6 +139,7 @@ export class MatchesController {
   @Post(':id/teams/preview')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: '팀 자동 구성 미리보기 (dry-run, DB 변경 없음)' })
   @ApiOkResponse({ description: '팀 배정 preview — DB를 변경하지 않음', type: PreviewTeamsResponseDto })
@@ -144,6 +147,7 @@ export class MatchesController {
   @ApiForbiddenResponse({ description: '호스트 전용 (MATCH_NOT_HOST)' })
   @ApiNotFoundResponse({ description: '매치 없음 (MATCH_NOT_FOUND)' })
   @ApiConflictResponse({ description: '팀 배정 불가 상태 (MATCH_NOT_OPEN_FOR_TEAM_ASSIGNMENT)' })
+  @ApiTooManyRequestsResponse({ description: '분당 20회 초과 (Too many requests)' })
   async previewTeams(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,

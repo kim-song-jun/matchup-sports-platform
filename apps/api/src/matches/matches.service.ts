@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   Injectable,
   NotFoundException,
@@ -14,6 +15,16 @@ import { NotificationData } from '../notifications/notification-presentation';
 import { MatchingEngineService, RecommendationReason } from './matching-engine.service';
 import { BadgesService } from '../badges/badges.service';
 import { TeamBalancingService, ParticipantWithElo, BalancedDistribution } from './team-balancing.service';
+
+/**
+ * Computes a deterministic SHA-256 hex digest of the confirmed participant list.
+ * Sorts userIds before hashing so insertion order does not affect the result.
+ * Used to detect participant churn between preview and compose (C1/C2).
+ */
+export function computeParticipantHash(participants: { userId: string }[]): string {
+  const sorted = participants.map((p) => p.userId).sort();
+  return createHash('sha256').update(sorted.join(',')).digest('hex');
+}
 
 const recommendedMatchSelect = {
   id: true,
@@ -752,7 +763,8 @@ export class MatchesService {
 
   /**
    * Preview team composition without persisting. Returns the same
-   * BalancedDistribution shape as generateTeams. No DB writes are performed.
+   * BalancedDistribution shape as generateTeams plus a participantHash.
+   * No DB writes are performed.
    */
   async previewTeams(matchId: string, userId: string, dto: ComposeTeamsDto) {
     const match = await this.assertTeamAssignmentEligible(matchId, userId);
@@ -763,13 +775,21 @@ export class MatchesService {
     // TeamBalancingService validates NO_PARTICIPANTS / TEAM_COUNT_INVALID / TEAM_COUNT_EXCEEDS_PARTICIPANTS
     const distribution = this.teamBalancing.balance(participants, teamCount, dto.seed);
 
-    return distribution;
+    return {
+      ...distribution,
+      participantHash: computeParticipantHash(participants),
+    };
   }
 
   /**
    * Composes teams with ELO-aware snake-draft and persists the result atomically.
    * Existing Team records for the match are deleted and re-created within a single
    * $transaction to prevent orphaned rows on re-roll.
+   *
+   * If dto.participantHash is provided and does not match the freshly computed hash,
+   * a 409 PARTICIPANTS_CHANGED is thrown so the client can re-preview with the current
+   * participant list. If dto.participantHash is absent (legacy client), the check is
+   * skipped with a warning log (back-compat per task doc R2).
    *
    * Strategy 'random' and 'balanced' both use the same snake-draft algorithm in v1.
    * The seed provides differentiated distributions for perceived re-roll behavior.
@@ -779,6 +799,19 @@ export class MatchesService {
 
     const teamCount = dto.teamCount ?? (match.teamConfig as TeamConfigDto | null)?.teamCount ?? 2;
     const participants = await this.buildParticipantsWithElo(matchId, match.sportType as SportType);
+
+    // Stale participant-hash check (C2)
+    if (dto.participantHash !== undefined) {
+      const currentHash = computeParticipantHash(participants);
+      if (dto.participantHash !== currentHash) {
+        throw new ConflictException({
+          code: 'PARTICIPANTS_CHANGED',
+          message: '참가자가 변경되었어요',
+        });
+      }
+    } else {
+      this.logger.warn('generateTeams called without participantHash (legacy client)', { matchId });
+    }
 
     // TeamBalancingService validates NO_PARTICIPANTS / TEAM_COUNT_INVALID / TEAM_COUNT_EXCEEDS_PARTICIPANTS
     const distribution: BalancedDistribution = this.teamBalancing.balance(

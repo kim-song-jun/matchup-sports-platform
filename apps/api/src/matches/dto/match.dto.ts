@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   Min,
   ValidateNested,
@@ -319,6 +320,12 @@ export class ComposeTeamsDto {
   @Max(2147483647)
   @IsOptional()
   seed?: number;
+
+  @ApiPropertyOptional({ description: 'SHA-256 hex of participant list at preview time (64-char). Missing = legacy client, stale check skipped.' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  participantHash?: string;
 }
 
 export class TeamMemberDto {
@@ -384,4 +391,7 @@ export class PreviewTeamsResponseDto {
 
   @ApiProperty({ description: '사용된 PRNG seed (재현성 보장용)' })
   seed!: number;
+
+  @ApiProperty({ description: 'SHA-256 hex of participant list at preview time (64-char). Pass back in ComposeTeamsDto to enable stale-participant check.' })
+  participantHash!: string;
 }

@@ -12,6 +12,11 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
+  // Trust the first proxy (Nginx) in production so req.ip reflects the real
+  // client IP. Required for HostThrottlerGuard to correctly fingerprint
+  // rate-limit buckets per-IP (fallback when request is unauthenticated).
+  app.set('trust proxy', 1);
+
   // Response compression
   app.use(compression());
 

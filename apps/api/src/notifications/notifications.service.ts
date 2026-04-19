@@ -115,7 +115,7 @@ export class NotificationsService {
     void this.webPushService.sendToUser(data.userId, {
       title: data.title,
       body: data.body,
-    });
+    }).catch(() => { /* best-effort push — failure must not affect notification creation */ });
 
     return payload;
   }
@@ -213,6 +213,8 @@ export class NotificationsService {
       // Return default all-enabled when no row exists yet
       return {
         id: null,
+        userId: null,
+        updatedAt: null,
         matchEnabled: true,
         teamEnabled: true,
         chatEnabled: true,
@@ -226,6 +228,8 @@ export class NotificationsService {
 
     return {
       id: preference.id,
+      userId: preference.userId,
+      updatedAt: preference.updatedAt,
       matchEnabled: preference.matchEnabled,
       teamEnabled: preference.teamEnabled,
       chatEnabled: preference.chatEnabled,
@@ -238,9 +242,6 @@ export class NotificationsService {
   }
 
   async updatePreferences(userId: string, dto: UpdateNotificationPreferenceDto) {
-    // Cast to allow granular fields that the DTO may or may not declare yet.
-    const d = dto as Record<string, boolean | undefined>;
-
     const preference = await this.prisma.notificationPreference.upsert({
       where: { userId },
       create: {
@@ -249,25 +250,27 @@ export class NotificationsService {
         teamEnabled: dto.teamEnabled ?? true,
         chatEnabled: dto.chatEnabled ?? true,
         paymentEnabled: dto.paymentEnabled ?? true,
-        teamApplicationEnabled: d.teamApplicationEnabled ?? true,
-        matchCompletedEnabled: d.matchCompletedEnabled ?? true,
-        eloChangedEnabled: d.eloChangedEnabled ?? true,
-        chatMessageEnabled: d.chatMessageEnabled ?? true,
+        teamApplicationEnabled: dto.teamApplicationEnabled ?? true,
+        matchCompletedEnabled: dto.matchCompletedEnabled ?? true,
+        eloChangedEnabled: dto.eloChangedEnabled ?? true,
+        chatMessageEnabled: dto.chatMessageEnabled ?? true,
       },
       update: {
         ...(dto.matchEnabled !== undefined && { matchEnabled: dto.matchEnabled }),
         ...(dto.teamEnabled !== undefined && { teamEnabled: dto.teamEnabled }),
         ...(dto.chatEnabled !== undefined && { chatEnabled: dto.chatEnabled }),
         ...(dto.paymentEnabled !== undefined && { paymentEnabled: dto.paymentEnabled }),
-        ...(d.teamApplicationEnabled !== undefined && { teamApplicationEnabled: d.teamApplicationEnabled }),
-        ...(d.matchCompletedEnabled !== undefined && { matchCompletedEnabled: d.matchCompletedEnabled }),
-        ...(d.eloChangedEnabled !== undefined && { eloChangedEnabled: d.eloChangedEnabled }),
-        ...(d.chatMessageEnabled !== undefined && { chatMessageEnabled: d.chatMessageEnabled }),
+        ...(dto.teamApplicationEnabled !== undefined && { teamApplicationEnabled: dto.teamApplicationEnabled }),
+        ...(dto.matchCompletedEnabled !== undefined && { matchCompletedEnabled: dto.matchCompletedEnabled }),
+        ...(dto.eloChangedEnabled !== undefined && { eloChangedEnabled: dto.eloChangedEnabled }),
+        ...(dto.chatMessageEnabled !== undefined && { chatMessageEnabled: dto.chatMessageEnabled }),
       },
     });
 
     return {
       id: preference.id,
+      userId: preference.userId,
+      updatedAt: preference.updatedAt,
       matchEnabled: preference.matchEnabled,
       teamEnabled: preference.teamEnabled,
       chatEnabled: preference.chatEnabled,

@@ -359,6 +359,8 @@ describe('NotificationsService', () => {
 
       expect(result).toEqual({
         id: null,
+        userId: null,
+        updatedAt: null,
         matchEnabled: true,
         teamEnabled: true,
         chatEnabled: true,
@@ -371,8 +373,11 @@ describe('NotificationsService', () => {
     });
 
     it('returns stored preference values', async () => {
+      const updatedAt = new Date('2025-01-01T00:00:00Z');
       mockPrisma.notificationPreference.findUnique.mockResolvedValue({
         id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
         matchEnabled: true,
         teamEnabled: false,
         chatEnabled: true,
@@ -387,6 +392,8 @@ describe('NotificationsService', () => {
 
       expect(result).toEqual({
         id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
         matchEnabled: true,
         teamEnabled: false,
         chatEnabled: true,
@@ -400,9 +407,12 @@ describe('NotificationsService', () => {
   });
 
   describe('updatePreferences', () => {
-    it('upserts preferences and returns updated values', async () => {
+    it('upserts preferences and returns updated values including userId and updatedAt', async () => {
+      const updatedAt = new Date('2025-06-01T12:00:00Z');
       const upserted = {
         id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
         matchEnabled: true,
         teamEnabled: false,
         chatEnabled: true,
@@ -418,6 +428,8 @@ describe('NotificationsService', () => {
 
       expect(mockPrisma.notificationPreference.upsert).toHaveBeenCalled();
       expect(result.teamEnabled).toBe(false);
+      expect(result.userId).toBe('u1');
+      expect(result.updatedAt).toBe(updatedAt);
     });
   });
 

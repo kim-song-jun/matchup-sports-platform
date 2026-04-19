@@ -206,6 +206,9 @@ jobs:
           sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
           sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
 
+          # Harden deploy/.env perms against EC2 umask 022 — contains VAPID_PRIVATE_KEY and other secrets
+          chmod 600 deploy/.env
+
           # Auto-set REALTIME_ALLOWED_ORIGINS if not already configured
           if ! grep -q '^REALTIME_ALLOWED_ORIGINS=.' deploy/.env 2>/dev/null; then
             _DEPLOY_PUBLIC_IP=$(curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")

@@ -67,16 +67,16 @@ Example output (base64url encoded):
 
 The deploy workflow writes environment variables to `/home/ubuntu/app/.env.production` on the EC2 host before starting the containers. `deploy/docker-compose.prod.yml` injects vars via the `environment:` block (explicit passthrough from host env). VAPID vars must be added to that block if not already present.
 
-Current status: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` are **not** in `deploy/docker-compose.prod.yml` `api.environment`. Add them alongside `JWT_SECRET`:
+Added in Task 74 — `deploy/docker-compose.prod.yml` api.environment (lines 62-64) now includes:
 
 ```yaml
-# deploy/docker-compose.prod.yml — api.environment section
+# deploy/docker-compose.prod.yml — api.environment section (Task 74)
 VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
 VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
 VAPID_SUBJECT: ${VAPID_SUBJECT:-}
 ```
 
-> Note: `docker-compose.prod.yml` is owned by **infra-devops-dev**. Request the above change as a follow-up in Task 74.
+No further action needed for `docker-compose.prod.yml`.
 
 ### GitHub Actions Secrets
 
@@ -158,3 +158,4 @@ curl -s https://api.teameet.kr/api/v1/notifications/vapid-public-key
 - The frontend obtains the public key dynamically via `GET /notifications/vapid-public-key` and never embeds it at build time. No VAPID values are included in Next.js bundles, APK, or IPA.
 - GitHub Actions secrets are masked automatically; do not `echo $VAPID_PRIVATE_KEY` in workflow steps.
 - `web-push` npm package version should be audited on each dependency update cycle (`pnpm audit`).
+- `deploy/.env` on the EC2 host contains `VAPID_PRIVATE_KEY` and other secrets. The EC2 default umask (022) can leave the file world-readable (0644). **Operators must run `chmod 600 ~/teameet/deploy/.env` on the EC2 host** after initial provisioning and after any manual file replacement. The CI workflow (`.github/workflows/deploy.yml`) does not currently set this permission automatically — `chmod 600 deploy/.env` should be added after the last `sync_env_from_github_secret` call (line ~207) when the workflow file is next edited by the authorized owner.

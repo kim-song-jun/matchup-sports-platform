@@ -50,6 +50,12 @@ export class NotificationPreferencesResponseDto {
   @ApiProperty({ description: 'Preference row id (null when using defaults)', nullable: true })
   id!: string | null;
 
+  @ApiProperty({ description: 'Owner user id (null when using defaults)', nullable: true })
+  userId!: string | null;
+
+  @ApiProperty({ description: 'Last updated timestamp (null when using defaults)', nullable: true, type: Date })
+  updatedAt!: Date | null;
+
   @ApiProperty({ description: 'Enable match notifications', default: true })
   matchEnabled!: boolean;
 

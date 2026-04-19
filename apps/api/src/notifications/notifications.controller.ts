@@ -61,8 +61,10 @@ export class NotificationsController {
   }
 
   @Get('vapid-public-key')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'VAPID 공개키 조회 (Web Push 구독 시 필요)' })
   @ApiOkResponse({ description: 'VAPID public key' })
+  @ApiTooManyRequestsResponse({ description: '분당 30회 초과 (Too many requests)' })
   getVapidPublicKey() {
     return { key: this.webPushService.getPublicKey() };
   }

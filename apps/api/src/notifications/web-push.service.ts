@@ -20,9 +20,9 @@ export class WebPushService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    const publicKey = this.config.get<string>('VAPID_PUBLIC_KEY');
-    const privateKey = this.config.get<string>('VAPID_PRIVATE_KEY');
-    const subject = this.config.get<string>('VAPID_SUBJECT');
+    const publicKey = this.config.get<string>('vapid.publicKey');
+    const privateKey = this.config.get<string>('vapid.privateKey');
+    const subject = this.config.get<string>('vapid.subject');
 
     if (!publicKey || !privateKey || !subject) {
       this.logger.warn('VAPID keys missing — Web Push notifications disabled');
@@ -102,7 +102,7 @@ export class WebPushService implements OnModuleInit {
 
   /** Return the configured VAPID public key (null if not configured). */
   getPublicKey(): string | null {
-    return this.config.get<string>('VAPID_PUBLIC_KEY') ?? null;
+    return this.config.get<string>('vapid.publicKey') ?? null;
   }
 
   /** Generate a new VAPID key pair (use once during initial setup). */

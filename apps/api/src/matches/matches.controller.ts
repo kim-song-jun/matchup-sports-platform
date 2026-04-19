@@ -89,6 +89,7 @@ export class MatchesController {
   }
 
   @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '매치 취소 (host 전용)' })
@@ -115,6 +116,7 @@ export class MatchesController {
   }
 
   @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '모집 마감 (host 전용, recruiting → confirmed)' })
@@ -196,6 +198,7 @@ export class MatchesController {
   }
 
   @Post(':id/complete')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '매치 완료' })

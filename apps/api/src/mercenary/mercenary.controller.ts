@@ -8,6 +8,8 @@ import {
   Body,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -178,6 +180,7 @@ export class MercenaryController {
   }
 
   @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 모집글 마감 (작성자 또는 팀 매니저+)' })
@@ -204,9 +207,10 @@ export class MercenaryController {
   }
 
   @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '용병 모집글 취소 (작성자 또는 팀 매니저+)' })
+  @ApiOperation({ summary: '용병 모집글 취소 (작성자 전용)' })
   @ApiOkResponse({
     description: '모집글 취소 성공 (이미 취소된 경우 alreadyCancelled=true로 멱등 반환)',
     schema: {
@@ -220,7 +224,7 @@ export class MercenaryController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
-  @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
+  @ApiForbiddenResponse({ description: '작성자 전용' })
   @ApiNotFoundResponse({ description: '모집글 없음' })
   async cancelPost(
     @Param('id') postId: string,

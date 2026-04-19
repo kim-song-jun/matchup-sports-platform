@@ -338,7 +338,7 @@ describe('Idempotency contract (e2e)', () => {
         .set('Authorization', `Bearer ${hostToken}`)
         .send(payload);
 
-      expect(first.status).toBe(201);
+      expect(first.status).toBe(200);
       expect((first.body.data as { alreadySubmitted: boolean }).alreadySubmitted).toBe(false);
       const firstReviewId = (first.body.data as { id: string }).id;
       expect(firstReviewId).toBeDefined();
@@ -348,9 +348,8 @@ describe('Idempotency contract (e2e)', () => {
         .set('Authorization', `Bearer ${hostToken}`)
         .send(payload);
 
-      // NestJS POST controllers return 201 by default; duplicate path also returns 201
-      // (backend-data-dev service returns { review, alreadySubmitted: true } on duplicate)
-      expect(second.status).toBe(201);
+      // POST /reviews uses @HttpCode(OK) for uniform idempotent semantics (C6).
+      expect(second.status).toBe(200);
       expect((second.body.data as { alreadySubmitted: boolean }).alreadySubmitted).toBe(true);
       const secondReviewId = (second.body.data as { id: string }).id;
 

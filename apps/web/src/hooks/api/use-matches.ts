@@ -17,6 +17,7 @@ import type {
   PreviewTeamsResponse,
 } from '@/types/api';
 import { extractData } from './shared';
+import { extractErrorMessage } from '@/lib/utils';
 import { queryKeys } from './query-keys';
 
 // ── Matches ──
@@ -233,7 +234,7 @@ export function usePreviewTeams(matchId: string) {
         const seconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 60;
         const parsed = Number.isFinite(seconds) ? seconds : 60;
         setRetryAfterSeconds(parsed);
-        toast('info', '잠시 후 다시 시도해 주세요 (분당 최대 20회)');
+        toast('info', extractErrorMessage(err, '잠시 후 다시 시도해 주세요 (분당 최대 20회)'));
       }
       // All other errors: surface via mutation.error for Track C to display.
     },
@@ -282,7 +283,7 @@ export function useComposeTeams(matchId: string, options?: UseComposeTeamsOption
 
       if (status === 409 && code === 'PARTICIPANTS_CHANGED') {
         // Suppress default error display; fire info toast and re-trigger preview.
-        toast('info', '참가자가 변경되어 다시 계산했어요');
+        toast('info', extractErrorMessage(err, '참가자가 변경되어 다시 계산했어요'));
         if (options?.onParticipantsChanged) {
           // Drop stale hash so preview re-runs against current participant set.
           const { participantHash: _dropped, ...inputWithoutHash } = variables;

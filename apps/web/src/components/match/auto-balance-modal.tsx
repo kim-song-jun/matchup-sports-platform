@@ -322,6 +322,7 @@ function PreviewStep({
   isConfirming,
   retryButtonRef,
   confirmButtonRef,
+  retryCountdown,
 }: {
   preview: PreviewTeamsResponse;
   previewHistory: PreviewResult[];
@@ -330,11 +331,12 @@ function PreviewStep({
   onRetry: () => void;
   onConfirm: () => void;
   onBackToConfig: () => void;
-  onConfirmWithHistorySeed: (seed: number) => void;
+  onConfirmWithHistorySeed: (seed: number, participantHash?: string) => void;
   isRetrying: boolean;
   isConfirming: boolean;
   retryButtonRef: React.RefObject<HTMLButtonElement | null>;
   confirmButtonRef: React.RefObject<HTMLButtonElement | null>;
+  retryCountdown: number | null;
 }) {
   // Toggle between current preview and a historical snapshot
   const [showingHistoryIndex, setShowingHistoryIndex] = useState<number | null>(null);
@@ -491,7 +493,7 @@ function PreviewStep({
             // When viewing a historical result: "이 구성으로 확정" replaces retry+confirm
             <button
               type="button"
-              onClick={() => onConfirmWithHistorySeed(displayedPreview.seed)}
+              onClick={() => onConfirmWithHistorySeed(displayedPreview.seed, displayedPreview.participantHash)}
               disabled={isConfirming}
               className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
@@ -503,7 +505,7 @@ function PreviewStep({
                 ref={retryButtonRef}
                 type="button"
                 onClick={onRetry}
-                disabled={isRetrying || isConfirming}
+                disabled={isRetrying || isConfirming || retryCountdown !== null}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
                 {isRetrying ? (
@@ -517,7 +519,7 @@ function PreviewStep({
                 ) : (
                   <>
                     <RefreshCw size={16} aria-hidden="true" />
-                    <span>재추첨</span>
+                    <span>{retryCountdown !== null ? `재추첨 (${retryCountdown}초)` : '재추첨'}</span>
                   </>
                 )}
               </button>
@@ -577,8 +579,10 @@ export function AutoBalanceModal({
   const [showReplaceModal, setShowReplaceModal] = useState(false);
 
   // aria-live announcement for PARTICIPANTS_CHANGED auto-repreview (C2)
-  // TODO(task-72): reconcile with Track D hook signal when that lands
   const [announcementText, setAnnouncementText] = useState('');
+
+  // C3: countdown seconds for 429 rate-limit (null = no limit active)
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   // Refs for focus management on step change
   const previewButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -586,7 +590,19 @@ export function AutoBalanceModal({
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const previewMutation = usePreviewTeams(matchId);
-  const composeMutation = useComposeTeams(matchId);
+  const { retryAfterSeconds } = previewMutation;
+
+  const composeMutation = useComposeTeams(matchId, {
+    onParticipantsChanged: (input) => {
+      previewMutation.mutate(input, {
+        onSuccess: (d) => {
+          setCurrentPreview(d);
+          setStep('preview');
+          setAnnouncementText('참가자가 변경되어 다시 계산했어요');
+        },
+      });
+    },
+  });
 
   // Reset state when modal closes
   useEffect(() => {
@@ -598,6 +614,7 @@ export function AutoBalanceModal({
       setPreviewHistory([]); // C4: session reset on close
       setShowReplaceModal(false);
       setAnnouncementText('');
+      setCountdown(null);
       previewMutation.reset();
       composeMutation.reset();
     }
@@ -617,16 +634,25 @@ export function AutoBalanceModal({
     return () => clearTimeout(timer);
   }, [step, open]);
 
-  // Wire aria-live announcement for PARTICIPANTS_CHANGED compose error (C2).
-  // TODO(task-72): reconcile with Track D hook signal when that lands; Track D
-  // may surface a dedicated boolean (e.g. isParticipantsChanged) so this cast
-  // can be removed.
+  // C3: Start 1-second countdown when server rate-limits the preview endpoint (429).
+  // Clear on successful preview (retryAfterSeconds resets to null) or when timer expires.
   useEffect(() => {
-    const err = composeMutation.error as { code?: string } | null;
-    if (err?.code === 'PARTICIPANTS_CHANGED') {
-      setAnnouncementText('참가자가 변경되어 다시 계산했어요');
+    if (retryAfterSeconds === null) {
+      setCountdown(null);
+      return;
     }
-  }, [composeMutation.error]);
+    setCountdown(retryAfterSeconds);
+    const id = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(id);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [retryAfterSeconds]);
 
   /** Push a new preview result into the FIFO history (cap 2). */
   function pushToHistory(prev: PreviewResult) {
@@ -670,15 +696,17 @@ export function AutoBalanceModal({
   }
 
   /**
-   * Fires the actual compose mutation using the given seed.
-   * Shared by both "확정" (current preview seed) and "이 구성으로 확정" (history seed).
+   * Fires the actual compose mutation using the given seed and participantHash.
+   * Shared by both "확정" (current preview) and "이 구성으로 확정" (history snapshot).
+   * The participantHash enables server-side stale-detection (409 PARTICIPANTS_CHANGED).
    */
-  function fireCompose(seed: number) {
+  function fireCompose(seed: number, participantHash?: string) {
     setStep('confirming');
     const input: ComposeTeamsInput = {
       teamCount,
       strategy,
       seed,
+      ...(participantHash !== undefined && { participantHash }),
     };
     composeMutation.mutate(input, {
       onSuccess: () => {
@@ -699,40 +727,39 @@ export function AutoBalanceModal({
       // C5: show replace warning before committing
       setShowReplaceModal(true);
     } else {
-      fireCompose(currentPreview.seed);
+      fireCompose(currentPreview.seed, currentPreview.participantHash);
     }
   }
 
   /** Called when the user taps "이 구성으로 확정" from the history view. */
-  function handleConfirmWithHistorySeed(seed: number) {
+  function handleConfirmWithHistorySeed(seed: number, participantHash?: string) {
     const hasExistingTeams = existingTeams && existingTeams.length > 0;
     if (hasExistingTeams) {
-      // Store the historical seed temporarily, then open replace modal.
-      // We repurpose currentPreview.seed here by finding the historical item
-      // and firing compose directly from ConfirmReplaceModal's onConfirm closure.
+      // Store the historical seed + hash temporarily, then open replace modal.
       setShowReplaceModal(true);
-      // Override internal pending seed for the replace-confirm path
-      _pendingHistorySeedRef.current = seed;
+      _pendingHistoryRef.current = { seed, participantHash };
     } else {
-      fireCompose(seed);
+      fireCompose(seed, participantHash);
     }
   }
 
-  // Holds a historical seed when ConfirmReplaceModal is opened via history CTA
-  const _pendingHistorySeedRef = useRef<number | null>(null);
+  // Holds a historical seed + hash when ConfirmReplaceModal is opened via history CTA
+  const _pendingHistoryRef = useRef<{ seed: number; participantHash?: string } | null>(null);
 
   function handleReplaceConfirm() {
     setShowReplaceModal(false);
-    const seed = _pendingHistorySeedRef.current ?? currentPreview?.seed;
-    _pendingHistorySeedRef.current = null;
-    if (seed !== undefined && seed !== null) {
-      fireCompose(seed);
+    const pending = _pendingHistoryRef.current;
+    _pendingHistoryRef.current = null;
+    if (pending !== null) {
+      fireCompose(pending.seed, pending.participantHash);
+    } else if (currentPreview) {
+      fireCompose(currentPreview.seed, currentPreview.participantHash);
     }
   }
 
   function handleReplaceCancel() {
     setShowReplaceModal(false);
-    _pendingHistorySeedRef.current = null;
+    _pendingHistoryRef.current = null;
   }
 
   // Determine modal title
@@ -826,6 +853,7 @@ export function AutoBalanceModal({
             isConfirming={step === 'confirming' || composeMutation.isPending}
             retryButtonRef={retryButtonRef}
             confirmButtonRef={confirmButtonRef}
+            retryCountdown={countdown}
           />
         )}
 

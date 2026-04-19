@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AutoBalanceModal } from '../auto-balance-modal';
-import type { PreviewTeamsResponse } from '@/types/api';
+import type { PreviewTeamsResponse, ComposeTeamsInput } from '@/types/api';
 
 // ── Hook mocks ────────────────────────────────────────────────────────────────
 
@@ -11,12 +11,16 @@ const mockPreviewReset = vi.fn();
 let mockPreviewIsPending = false;
 let mockPreviewIsError = false;
 let mockPreviewError: Error | null = null;
+let mockRetryAfterSeconds: number | null = null;
 
 const mockComposeMutate = vi.fn();
 const mockComposeReset = vi.fn();
 let mockComposeIsPending = false;
 let mockComposeIsError = false;
 let mockComposeError: Error | null = null;
+
+// Captured options from the most recent useComposeTeams call — used by W3 409 test
+let capturedComposeOptions: { onParticipantsChanged?: (input: ComposeTeamsInput) => void } = {};
 
 vi.mock('@/hooks/use-api', () => ({
   usePreviewTeams: () => ({
@@ -27,16 +31,20 @@ vi.mock('@/hooks/use-api', () => ({
     error: mockPreviewError,
     reset: mockPreviewReset,
     data: undefined,
+    retryAfterSeconds: mockRetryAfterSeconds,
   }),
-  useComposeTeams: () => ({
-    mutate: mockComposeMutate,
-    mutateAsync: vi.fn(),
-    isPending: mockComposeIsPending,
-    isError: mockComposeIsError,
-    error: mockComposeError,
-    reset: mockComposeReset,
-    data: undefined,
-  }),
+  useComposeTeams: (_matchId: string, options?: { onParticipantsChanged?: (input: ComposeTeamsInput) => void }) => {
+    capturedComposeOptions = options ?? {};
+    return {
+      mutate: mockComposeMutate,
+      mutateAsync: vi.fn(),
+      isPending: mockComposeIsPending,
+      isError: mockComposeIsError,
+      error: mockComposeError,
+      reset: mockComposeReset,
+      data: undefined,
+    };
+  },
 }));
 
 // Stub Modal — render children directly for testability
@@ -155,9 +163,11 @@ describe('AutoBalanceModal', () => {
     mockPreviewIsPending = false;
     mockPreviewIsError = false;
     mockPreviewError = null;
+    mockRetryAfterSeconds = null;
     mockComposeIsPending = false;
     mockComposeIsError = false;
     mockComposeError = null;
+    capturedComposeOptions = {};
   });
 
   it('renders_config_step_initially — shows teamCount buttons, strategy toggle, preview CTA', () => {
@@ -567,5 +577,155 @@ describe('AutoBalanceModal', () => {
       // Compose must NOT have been called yet
       expect(mockComposeMutate).not.toHaveBeenCalled();
     });
+  });
+
+  // ── W3: 429 countdown ─────────────────────────────────────────────────────────
+
+  it('retry_countdown_429 — retryAfterSeconds=60 disables retry button with countdown label; decrements each second', async () => {
+    // Reach preview step with retryAfterSeconds=60 from the start
+    // so the countdown useEffect fires on first render of the preview step.
+    mockRetryAfterSeconds = 60;
+
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        onSuccess(makePreviewResponse());
+      },
+    );
+
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+
+    try {
+      const { unmount } = render(<AutoBalanceModal {...defaultProps} />, { wrapper });
+
+      // Click preview to reach preview step — inside act so state updates flush
+      act(() => {
+        fireEvent.click(screen.getByRole('button', { name: /미리보기/ }));
+      });
+
+      // The component should now be on preview step with retryAfterSeconds=60
+      // All state updates from the synchronous mock are flushed by act
+      const retryBtn = screen.getByRole('button', { name: /재추첨/ });
+      expect(retryBtn).toBeDisabled();
+      expect(retryBtn).toHaveTextContent('재추첨 (60초)');
+
+      // Advance 1 second
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByRole('button', { name: /재추첨/ })).toHaveTextContent('재추첨 (59초)');
+
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // ── W3: 409 auto-repreview ────────────────────────────────────────────────────
+
+  it('participants_changed_409_auto_repreview — onParticipantsChanged triggers re-preview and announces to aria-live', () => {
+    // Reach preview step first
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        onSuccess(makePreviewResponse());
+      },
+    );
+
+    render(<AutoBalanceModal {...defaultProps} />, { wrapper });
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /미리보기/ }));
+    });
+
+    // Should be on preview step now
+    expect(screen.getByText('A팀')).toBeInTheDocument();
+
+    // Set up re-preview mock for the 409 re-run
+    let repreviewCalled = false;
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        repreviewCalled = true;
+        onSuccess(makePreviewResponse({ maxEloGap: 20 }));
+      },
+    );
+
+    // Invoke onParticipantsChanged synchronously (simulating 409 path in hook)
+    act(() => {
+      capturedComposeOptions.onParticipantsChanged?.({ teamCount: 2, strategy: 'balanced' });
+    });
+
+    // previewMutation.mutate should have been called for re-preview
+    expect(repreviewCalled).toBe(true);
+
+    // sr-only aria-live region should announce the change
+    // Find the sr-only div with the announcement (not the PreviewStep aria-live region)
+    const liveRegions = screen.getAllByRole('status');
+    const hasAnnouncement = liveRegions.some((el) =>
+      el.textContent?.includes('참가자가 변경되어 다시 계산했어요'),
+    );
+    expect(hasAnnouncement).toBe(true);
+  });
+
+  // ── W4: Focus trap in ConfirmReplaceModal ─────────────────────────────────────
+
+  it('focus_trap_confirm_replace_modal — alertdialog contains focusable buttons isolated from parent modal', () => {
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        onSuccess(makePreviewResponse());
+      },
+    );
+
+    const existingTeams = [
+      { teamName: 'A팀', memberCount: 5 },
+      { teamName: 'B팀', memberCount: 5 },
+    ];
+
+    render(
+      <AutoBalanceModal {...defaultProps} existingTeams={existingTeams} />,
+      { wrapper },
+    );
+
+    // Reach preview step
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /미리보기/ }));
+    });
+    expect(screen.getByText('A팀')).toBeInTheDocument();
+
+    // Open ConfirmReplaceModal by clicking 확정
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /^확정$/ }));
+    });
+
+    const alertDialog = screen.getByRole('alertdialog');
+    const focusableInDialog = within(alertDialog).getAllByRole('button');
+
+    // alertdialog must have its own focusable buttons (닫기, 취소, 교체)
+    expect(focusableInDialog.length).toBeGreaterThanOrEqual(2);
+
+    // Focus the first button in the alertdialog
+    act(() => {
+      focusableInDialog[0].focus();
+    });
+    expect(document.activeElement).toBe(focusableInDialog[0]);
+
+    // Shift-Tab on first element: the keydown handler should e.stopPropagation() + e.preventDefault()
+    // and move focus to last element (wrap). JSDOM does not natively move focus on Tab keydown,
+    // but it does execute the event listener we attached — which calls last.focus().
+    act(() => {
+      fireEvent.keyDown(focusableInDialog[0], { key: 'Tab', shiftKey: true, bubbles: true });
+    });
+
+    // After the wrap-around handler runs, active element should be the last focusable in dialog
+    const last = focusableInDialog[focusableInDialog.length - 1];
+    expect(document.activeElement).toBe(last);
+
+    // Tab on last element should wrap to first
+    act(() => {
+      fireEvent.keyDown(last, { key: 'Tab', shiftKey: false, bubbles: true });
+    });
+    expect(document.activeElement).toBe(focusableInDialog[0]);
+
+    // alertdialog must still be in the DOM (no crash from event handler)
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
   });
 });

@@ -54,10 +54,15 @@ export function ConfirmReplaceModal({
 
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
+        e.stopPropagation();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
         e.preventDefault();
+        e.stopPropagation();
         first.focus();
+      } else {
+        // Prevent Tab from escaping to parent modal
+        e.stopPropagation();
       }
     }
 
@@ -155,7 +160,7 @@ export function ConfirmReplaceModal({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 rounded-xl bg-red-500 py-3 text-base font-bold text-white hover:bg-red-600 active:bg-red-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+            className="flex-1 rounded-xl bg-blue-500 py-3 text-base font-bold text-white hover:bg-blue-600 active:bg-blue-700 transition-colors min-h-[44px] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">

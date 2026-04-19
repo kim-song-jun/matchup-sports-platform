@@ -568,8 +568,8 @@ describe('Matches Team Balancing (e2e)', () => {
         .send({ teamCount: 2, seed: 99 });
 
       expect(blockedRes.status).toBe(429);
-      // ThrottlerGuard sets Retry-After header on blocked requests
-      expect(blockedRes.headers['retry-after']).toBeDefined();
+      // ThrottlerGuard sets Retry-After to the configured ttl in seconds (60_000ms → '60')
+      expect(blockedRes.headers['retry-after']).toBe('60');
     });
   });
 

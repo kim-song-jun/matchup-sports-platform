@@ -3,8 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 // Mock socket.io-client before any imports
-const mockOn = vi.fn();
-const mockOff = vi.fn();
+const mockOn = vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>();
+const mockOff = vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>();
 const mockConnect = vi.fn();
 const mockDisconnect = vi.fn();
 const mockEmit = vi.fn();
@@ -82,7 +82,7 @@ describe('useRealtime', () => {
     mockToken = 'valid-token';
     renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
-    const registeredEvents = mockOn.mock.calls.map((c: [string]) => c[0]);
+    const registeredEvents = mockOn.mock.calls.map((c) => c[0]);
     expect(registeredEvents).toContain('connect');
     expect(registeredEvents).toContain('disconnect');
     expect(registeredEvents).toContain('connect_error');
@@ -93,7 +93,7 @@ describe('useRealtime', () => {
     const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
     // Simulate server sending 'connect'
-    const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
+    const connectHandler = mockOn.mock.calls.find((c) => c[0] === 'connect')?.[1] as (() => void) | undefined;
     act(() => {
       connectHandler?.();
     });
@@ -107,10 +107,10 @@ describe('useRealtime', () => {
     mockToken = 'valid-token';
     const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
-    const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
+    const connectHandler = mockOn.mock.calls.find((c) => c[0] === 'connect')?.[1] as (() => void) | undefined;
     act(() => connectHandler?.());
 
-    const disconnectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'disconnect')?.[1];
+    const disconnectHandler = mockOn.mock.calls.find((c) => c[0] === 'disconnect')?.[1] as (() => void) | undefined;
     act(() => disconnectHandler?.());
 
     expect(result.current.connected).toBe(false);
@@ -129,7 +129,7 @@ describe('useRealtime', () => {
 
     renderHook(() => useNotificationSync(), { wrapper: makeWrapper(queryClient) });
 
-    const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
+    const connectHandler = mockOn.mock.calls.find((c) => c[0] === 'connect')?.[1] as (() => void) | undefined;
     act(() => connectHandler?.());
 
     await waitFor(() => {
@@ -153,7 +153,7 @@ describe('useRealtime', () => {
 
     renderHook(() => useNotificationSync(), { wrapper: makeWrapper(queryClient) });
 
-    const connectHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect')?.[1];
+    const connectHandler = mockOn.mock.calls.find((c) => c[0] === 'connect')?.[1] as (() => void) | undefined;
     act(() => connectHandler?.());
     invalidateSpy.mockClear();
 
@@ -178,7 +178,7 @@ describe('useRealtime', () => {
     mockToken = 'valid-token';
     const { result } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
 
-    const errHandler = mockOn.mock.calls.find((c: [string]) => c[0] === 'connect_error')?.[1];
+    const errHandler = mockOn.mock.calls.find((c) => c[0] === 'connect_error')?.[1] as ((err: Error) => void) | undefined;
     const err = new Error('Auth failed');
     act(() => errHandler?.(err));
 
@@ -191,7 +191,7 @@ describe('useRealtime', () => {
     const { unmount } = renderHook(() => useRealtime(), { wrapper: makeWrapper() });
     unmount();
 
-    const offEvents = mockOff.mock.calls.map((c: [string]) => c[0]);
+    const offEvents = mockOff.mock.calls.map((c) => c[0]);
     expect(offEvents).toContain('connect');
     expect(offEvents).toContain('disconnect');
     expect(offEvents).toContain('connect_error');

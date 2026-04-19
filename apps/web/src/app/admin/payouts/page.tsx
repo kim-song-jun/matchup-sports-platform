@@ -275,7 +275,7 @@ export default function AdminPayoutsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">지급 관리</h1>
-          <p className="text-base text-gray-500 mt-1">처리 완료된 정산을 배치로 묶어 지급하세요</p>
+          <p className="text-base text-gray-500 dark:text-gray-400 mt-1">처리 완료된 정산을 배치로 묶어 지급하세요</p>
         </div>
         {pendingCount > 0 && (
           <span className="flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">

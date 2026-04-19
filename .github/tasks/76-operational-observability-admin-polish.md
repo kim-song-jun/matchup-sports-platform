@@ -229,6 +229,7 @@ pnpm prisma migrate resolve --rolled-back <timestamp>_add_web_push_failure_log
 | R6 | 분쟁 resolve modal 통합으로 기존 QA 시나리오 깨짐 | Low | QA 라운드에서 Task 70 dispute 시나리오 전량 재실행 |
 | R7 | `WebPushAlertService` cron 이 테스트 환경에서 자동 기동 → 노이즈 | Low | `DISABLE_OPS_ALERT_CRON=true` 플래그로 테스트 환경 비활성 (Task 70 cron 선례 재사용) |
 | R8 | Staging/Prod webhook URL 공용 시 환경 구분 불가 | Medium | Staging/Prod 전용 Slack 채널 또는 webhook URL 분리. prod 우선 설정, staging 은 logger-only fallback 허용 |
+| R9 | `WebPushAlertService` cron + Slack webhook 이 admin scale-out 시 중복 발송 위험 | Low | 현재 admin scale=1 전제이므로 risk 낮음. 향후 scale-out 시 Redis 분산 lock (`SET NX PX`) 으로 leader election 구현 필요 (Task 77+ 이후 고려) |
 
 ### Dependencies
 - **Task 73 (idempotency sweep, merged)** — admin 재처리 안전성 확보 (precondition satisfied)

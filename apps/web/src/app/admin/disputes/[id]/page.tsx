@@ -174,7 +174,7 @@ export default function AdminDisputeDetailPage() {
                 검토 시작
               </button>
             )}
-            {(dispute.status === 'filed' || dispute.status === 'seller_responded' || dispute.status === 'admin_reviewing') && (
+            {(dispute.status === 'seller_responded' || dispute.status === 'admin_reviewing') && (
               <button
                 type="button"
                 onClick={() => setShowResolveModal(true)}

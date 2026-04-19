@@ -85,7 +85,7 @@ export default function AdminOpsPage() {
             <KpiCard
               label="열린 분쟁"
               value={summary?.disputesOpen ?? 0}
-              href="/admin/disputes?status=admin_reviewing"
+              href="/admin/disputes"
               isLoading={summaryLoading}
             />
 

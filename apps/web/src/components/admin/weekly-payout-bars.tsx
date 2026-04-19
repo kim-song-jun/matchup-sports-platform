@@ -61,7 +61,7 @@ export function WeeklyPayoutBars({ weeks }: WeeklyPayoutBarsProps) {
             {/* Bar track */}
             <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-10 overflow-hidden relative">
               <div
-                className="bg-blue-500 h-full rounded-full transition-transform"
+                className="bg-blue-500 h-full rounded-full"
                 style={{ width: `${pct}%` }}
                 aria-hidden="true"
               />

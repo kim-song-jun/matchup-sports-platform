@@ -63,7 +63,6 @@ export function KpiCard({ label, value, href, tone, icon, isLoading }: KpiCardPr
     return (
       <Link
         href={href}
-        role="region"
         aria-label={ariaLabel}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-2xl"
       >
@@ -73,7 +72,7 @@ export function KpiCard({ label, value, href, tone, icon, isLoading }: KpiCardPr
   }
 
   return (
-    <div role="region" aria-label={ariaLabel}>
+    <div aria-label={ariaLabel}>
       <KpiCardInner label={label} value={value} tone={tone} icon={icon} isLoading={isLoading} />
     </div>
   );

@@ -65,6 +65,7 @@ vi.mock('@/components/ui/modal', () => ({
 function makePreviewResponse(opts?: {
   coldStartCount?: number;
   maxEloGap?: number;
+  seed?: number;
 }): PreviewTeamsResponse {
   const coldStart = opts?.coldStartCount ?? 0;
   const gap = opts?.maxEloGap ?? 30;
@@ -123,8 +124,11 @@ function makePreviewResponse(opts?: {
       teamAvgElos: [1050, 1020],
       coldStartCount: coldStart,
     },
-    seed: 12345,
-  };
+    seed: opts?.seed ?? 12345,
+    // TODO(task-72): participantHash will be typed when Track D lands;
+    // cast via `as` to avoid blocking Track C on Track A/D type changes.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
 }
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
@@ -424,5 +428,144 @@ describe('AutoBalanceModal', () => {
 
     // Compose error banner is visible
     expect(screen.getByText(/팀 구성을 확정하지 못했어요/)).toBeInTheDocument();
+  });
+
+  // ── Task 72 Track C new tests ─────────────────────────────────────────────────
+
+  it('previewHistory_fifo_cap — pushing 3 previews retains only 2 in history (FIFO cap)', async () => {
+    // Each call to the mock returns a new preview with a distinct seed.
+    // callCount trace:
+    //   1 → initial preview (seed=111), history=[], current=111
+    //   retry #1: push 111 → history=[111], current=222
+    //   retry #2: push 222 → history=[111,222], current=333
+    //   retry #3: push 333 → [111,222,333].slice(-2)=[222,333], current=444
+    // Final: history.length===2, oldest seed=111 is evicted.
+    let callCount = 0;
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        callCount++;
+        onSuccess(makePreviewResponse({ seed: callCount * 111 }));
+      },
+    );
+
+    render(<AutoBalanceModal {...defaultProps} />, { wrapper });
+
+    // Initial preview
+    fireEvent.click(screen.getByRole('button', { name: /미리보기/ }));
+    await waitFor(() => {
+      expect(screen.getByText('A팀')).toBeInTheDocument();
+    });
+
+    // Retry #1 — history=[111], current=222
+    fireEvent.click(screen.getByRole('button', { name: /재추첨/ }));
+    await waitFor(() => {
+      expect(mockPreviewMutate).toHaveBeenCalledTimes(2);
+    });
+
+    // Retry #2 — history=[111,222], current=333
+    fireEvent.click(screen.getByRole('button', { name: /재추첨/ }));
+    await waitFor(() => {
+      expect(mockPreviewMutate).toHaveBeenCalledTimes(3);
+    });
+
+    // Retry #3 — history=[222,333] (oldest evicted), current=444
+    fireEvent.click(screen.getByRole('button', { name: /재추첨/ }));
+    await waitFor(() => {
+      expect(mockPreviewMutate).toHaveBeenCalledTimes(4);
+    });
+
+    // History is capped at 2 — toggle bar label must say "2건", not "3건"
+    await waitFor(() => {
+      expect(screen.getByText(/이전 결과 2건/)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/이전 결과 3건/)).not.toBeInTheDocument();
+  });
+
+  it('history_seed_compose — "이 구성으로 확정" with historical seed calls compose with that seed', async () => {
+    let callCount = 0;
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        callCount++;
+        onSuccess(makePreviewResponse({ seed: callCount * 100 }));
+      },
+    );
+
+    render(<AutoBalanceModal {...defaultProps} />, { wrapper });
+
+    // First preview (seed=100)
+    fireEvent.click(screen.getByRole('button', { name: /미리보기/ }));
+    await waitFor(() => {
+      expect(screen.getByText('A팀')).toBeInTheDocument();
+    });
+
+    // Retry once (pushes seed=100 to history, current becomes seed=200)
+    fireEvent.click(screen.getByRole('button', { name: /재추첨/ }));
+    await waitFor(() => {
+      expect(mockPreviewMutate).toHaveBeenCalledTimes(2);
+    });
+
+    // History toggle should appear since we have 1 historical result
+    await waitFor(() => {
+      expect(screen.getByText(/이전 결과 1건/)).toBeInTheDocument();
+    });
+
+    // Click the "이전 1" button to view history snapshot
+    fireEvent.click(screen.getByRole('button', { name: /이전 결과 1 보기/ }));
+
+    // "이 구성으로 확정" should appear when viewing history
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /이 구성으로 확정/ })).toBeInTheDocument();
+    });
+
+    // Set up compose mock
+    mockComposeMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: () => void }) => {
+        onSuccess();
+      },
+    );
+
+    // Click "이 구성으로 확정" — should fire compose with historical seed=100
+    fireEvent.click(screen.getByRole('button', { name: /이 구성으로 확정/ }));
+
+    await waitFor(() => {
+      expect(mockComposeMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ seed: 100 }),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it('confirm_replace_modal_appears_with_existing_teams — shows modal when existingTeams present; skips when empty', async () => {
+    mockPreviewMutate.mockImplementation(
+      (_input: unknown, { onSuccess }: { onSuccess: (data: PreviewTeamsResponse) => void }) => {
+        onSuccess(makePreviewResponse());
+      },
+    );
+
+    const existingTeams = [
+      { teamName: 'A팀', memberCount: 5 },
+      { teamName: 'B팀', memberCount: 5 },
+    ];
+
+    // ── Case 1: existingTeams present → ConfirmReplaceModal should appear ──────
+    render(
+      <AutoBalanceModal {...defaultProps} existingTeams={existingTeams} />,
+      { wrapper },
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /미리보기/ }));
+    await waitFor(() => {
+      expect(screen.getByText('A팀')).toBeInTheDocument();
+    });
+
+    // Click 확정 — should open ConfirmReplaceModal instead of firing compose
+    fireEvent.click(screen.getByRole('button', { name: /^확정$/ }));
+
+    await waitFor(() => {
+      // ConfirmReplaceModal body text appears
+      expect(screen.getByText(/교체돼요/)).toBeInTheDocument();
+      // Compose must NOT have been called yet
+      expect(mockComposeMutate).not.toHaveBeenCalled();
+    });
   });
 });

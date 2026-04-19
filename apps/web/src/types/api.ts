@@ -1248,11 +1248,13 @@ export interface UserPublicProfile {
   recentMatchCount?: number;
 }
 
-// ── Team Balancing (Task 71) ──
+// ── Team Balancing (Task 71 / Task 72) ──
 export interface ComposeTeamsInput {
   strategy?: 'random' | 'balanced';
   teamCount?: number;
   seed?: number;
+  /** SHA-256 hex of sorted participant userId list from the most recent preview (Task 72 C2). */
+  participantHash?: string;
 }
 
 /** A single participant in a balanced-team preview/compose response. */
@@ -1284,6 +1286,8 @@ export interface PreviewTeamsResponse {
   teams: TeamAssignment[];
   metrics: BalanceMetrics;
   seed: number;
+  /** SHA-256 hex (64 chars) of sorted participant userId list — used for stale-detection (Task 72 C1). */
+  participantHash: string;
 }
 
 // ── MyTeamMatchApplication — applicant-side view of team match applications ──

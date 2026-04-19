@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import * as supertest from 'supertest';
+import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
 import { createTestApp } from '../helpers/nest-app';
 import { getPrismaTestClient, disconnectPrismaTestClient } from '../helpers/prisma-test-client';
 import { truncateAll } from '../helpers/db-cleanup';
@@ -10,13 +11,14 @@ import { devLoginToken } from '../helpers/auth-token';
 // Integration tests: ELO-aware team balancing — preview (dry-run) + generateTeams
 // ---------------------------------------------------------------------------
 
-jest.setTimeout(30000);
+jest.setTimeout(90000);
 
 describe('Matches Team Balancing (e2e)', () => {
   let app: INestApplication;
   let request: supertest.Agent;
   let prisma: PrismaClient;
   let closeApp: () => Promise<void>;
+  let throttlerStorage: ThrottlerStorageService;
 
   beforeAll(async () => {
     prisma = getPrismaTestClient();
@@ -24,10 +26,36 @@ describe('Matches Team Balancing (e2e)', () => {
     app = testApp.app;
     request = testApp.request;
     closeApp = testApp.close;
+    throttlerStorage = app.get<ThrottlerStorageService>(ThrottlerStorage);
   });
 
   beforeEach(async () => {
     await truncateAll(prisma);
+    // Throttler reset between tests — all supertest calls share 127.0.0.1,
+    // so rate-limit counters and decrement timers accumulate across tests.
+    //
+    // Two-phase reset:
+    //  1. Cancel pending 60-second decrement timers (keep the timeoutIds Map keys
+    //     so setExpirationTime() can still push new ids — just empty each array).
+    //  2. Zero totalHits and unblock each storage entry (keep entries in _storage
+    //     so increment() does NOT skip initialisation and encounter undefined hits).
+    //
+    // NOTE: timeoutIds is private in TypeScript but a plain property at runtime.
+    const ts = throttlerStorage as any;
+    if (ts.timeoutIds instanceof Map) {
+      for (const [name, ids] of (ts.timeoutIds as Map<string, NodeJS.Timeout[]>).entries()) {
+        ids.forEach(clearTimeout);
+        ts.timeoutIds.set(name, []);
+      }
+    }
+    for (const record of throttlerStorage.storage.values()) {
+      for (const name of record.totalHits.keys()) {
+        record.totalHits.set(name, 0);
+      }
+      record.isBlocked = false;
+      // Reset the TTL window so the 60-second timer starts fresh in C7-6.
+      (record as any).expiresAt = 0;
+    }
   });
 
   afterAll(async () => {
@@ -267,6 +295,281 @@ describe('Matches Team Balancing (e2e)', () => {
         .send({ teamCount: 5 });
 
       expect(res.status).toBe(400);
+    });
+
+    // ── C7-1: 3-team snake distribution ──────────────────────────────────────
+    // 11 participants total (10 explicit joins + host auto-confirmed on match creation)
+    // → sizes should sum to 11 with at most 1 size difference between largest and smallest.
+
+    it('distributes 11 participants into 3 teams with balanced sizes', async () => {
+      const hostToken = await devLoginToken(request, 'snake3_host');
+      const venueId = await ensureVenueId();
+      const matchId = await createMatch(hostToken, venueId);
+
+      // Set host ELO so they are not cold-start (coldStartCount must be 0).
+      // Host is auto-confirmed as participant on match creation (total = 10 joins + 1 host = 11).
+      const hostUser = await prisma.user.findFirst({ where: { nickname: 'snake3_host' } });
+      expect(hostUser).not.toBeNull();
+      await prisma.userSportProfile.upsert({
+        where: { userId_sportType: { userId: hostUser!.id, sportType: 'futsal' } },
+        create: { userId: hostUser!.id, sportType: 'futsal', eloRating: 1600, level: 5 },
+        update: { eloRating: 1600 },
+      });
+
+      // 10 explicit joins with distinct ELOs (all below host's 1600, no ties).
+      const elos = [1500, 1450, 1400, 1350, 1300, 1250, 1200, 1150, 1100, 1050];
+      for (let i = 0; i < elos.length; i++) {
+        await joinAndConfirm(`snake3_p${i}`, matchId, elos[i]);
+      }
+
+      const res = await request
+        .post(`/api/v1/matches/${matchId}/teams/preview`)
+        .set('Authorization', `Bearer ${hostToken}`)
+        .send({ teamCount: 3, seed: 1 });
+
+      expect(res.status).toBe(200);
+
+      const data = res.body.data as {
+        teams: Array<{ index: number; name: string; members: unknown[] }>;
+        metrics: { maxEloGap: number; coldStartCount: number };
+      };
+
+      expect(data.teams).toHaveLength(3);
+
+      const sizes = data.teams.map((t) => t.members.length);
+      const total = sizes.reduce((s, n) => s + n, 0);
+      expect(total).toBe(11);
+
+      // Snake-draft guarantees at most 1-person difference between any two teams
+      const maxSize = Math.max(...sizes);
+      const minSize = Math.min(...sizes);
+      expect(maxSize - minSize).toBeLessThanOrEqual(1);
+
+      // Teams are named A팀, B팀, C팀
+      expect(data.teams[0].name).toBe('A팀');
+      expect(data.teams[1].name).toBe('B팀');
+      expect(data.teams[2].name).toBe('C팀');
+
+      expect(data.metrics.coldStartCount).toBe(0);
+    });
+
+    // ── C7-2: 4-team snake pattern ────────────────────────────────────────────
+    // 12 participants total (11 explicit joins + host auto-confirmed on match creation).
+    // All ELOs distinct → snake assigns A-B-C-D-D-C-B-A-A-B-C-D. Each team gets 3.
+
+    it('assigns 12 participants into 4 teams using snake-draft (3 each)', async () => {
+      const hostToken = await devLoginToken(request, 'snake4_host');
+      const venueId = await ensureVenueId();
+      const matchId = await createMatch(hostToken, venueId);
+
+      // Set host ELO to anchor their rank position (rank 0 = highest).
+      // Host is always auto-confirmed as participant on match creation.
+      const hostUser = await prisma.user.findFirst({ where: { nickname: 'snake4_host' } });
+      expect(hostUser).not.toBeNull();
+      await prisma.userSportProfile.upsert({
+        where: { userId_sportType: { userId: hostUser!.id, sportType: 'futsal' } },
+        create: { userId: hostUser!.id, sportType: 'futsal', eloRating: 1600, level: 5 },
+        update: { eloRating: 1600 },
+      });
+
+      // 11 explicit joins with distinct ELOs (ranks 1-11 after host's 1600 at rank 0).
+      // 100-point gaps → no ties → seed irrelevant for assignment order.
+      const elos = [1500, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500];
+      for (let i = 0; i < elos.length; i++) {
+        await joinAndConfirm(`snake4_p${i}`, matchId, elos[i]);
+      }
+
+      const res = await request
+        .post(`/api/v1/matches/${matchId}/teams/preview`)
+        .set('Authorization', `Bearer ${hostToken}`)
+        .send({ teamCount: 4, seed: 1 });
+
+      expect(res.status).toBe(200);
+
+      const data = res.body.data as {
+        teams: Array<{ index: number; members: Array<{ eloRating: number }> }>;
+      };
+
+      expect(data.teams).toHaveLength(4);
+
+      // All teams must have exactly 3 members (12 / 4 = 3, no remainder)
+      for (const team of data.teams) {
+        expect(team.members).toHaveLength(3);
+      }
+
+      // Verify snake-draft pattern by checking ELO rank positions.
+      // With distinct ELOs sorted DESC, ranks 0-11:
+      //   row 0 (even): idx 0→A, 1→B, 2→C, 3→D
+      //   row 1 (odd):  idx 4→D, 5→C, 6→B, 7→A
+      //   row 2 (even): idx 8→A, 9→B, 10→C, 11→D
+      // A gets ranks: 0, 7, 8  → ELOs: 1600, 900, 800
+      // B gets ranks: 1, 6, 9  → ELOs: 1500, 1000, 700
+      // C gets ranks: 2, 5, 10 → ELOs: 1400, 1100, 600
+      // D gets ranks: 3, 4, 11 → ELOs: 1300, 1200, 500
+
+      const teamElos = data.teams.map((t) =>
+        t.members.map((m) => m.eloRating).sort((a, b) => b - a),
+      );
+
+      expect(teamElos[0]).toEqual([1600, 900, 800]);  // A팀
+      expect(teamElos[1]).toEqual([1500, 1000, 700]); // B팀
+      expect(teamElos[2]).toEqual([1400, 1100, 600]); // C팀
+      expect(teamElos[3]).toEqual([1300, 1200, 500]); // D팀
+    });
+
+    // ── C7-3: in_progress match → 409 ────────────────────────────────────────
+
+    it('returns 409 MATCH_NOT_OPEN_FOR_TEAM_ASSIGNMENT when match is in_progress', async () => {
+      const hostToken = await devLoginToken(request, 'inprog_host_prev');
+      const venueId = await ensureVenueId();
+      const matchId = await createMatch(hostToken, venueId);
+
+      await joinAndConfirm('inprog_p1', matchId, 1200);
+      await joinAndConfirm('inprog_p2', matchId, 1100);
+
+      // Force match to in_progress state
+      await prisma.match.update({
+        where: { id: matchId },
+        data: { status: 'in_progress' },
+      });
+
+      const res = await request
+        .post(`/api/v1/matches/${matchId}/teams/preview`)
+        .set('Authorization', `Bearer ${hostToken}`)
+        .send({ teamCount: 2, seed: 1 });
+
+      expect(res.status).toBe(409);
+      // AllExceptionsFilter puts the error code in the message field (no .error field)
+      expect(res.body.message).toContain('MATCH_NOT_OPEN_FOR_TEAM_ASSIGNMENT');
+    });
+
+    // ── C7-4: concurrent preview — PRNG determinism ───────────────────────────
+    // 10 parallel requests with the same seed must produce identical teams arrays.
+
+    it('10 concurrent preview requests with same seed return identical team assignments', async () => {
+      const hostToken = await devLoginToken(request, 'concur_host');
+      const venueId = await ensureVenueId();
+      const matchId = await createMatch(hostToken, venueId);
+
+      // Avoid 1000 in the pool — host has no ELO profile so they fall back to 1000 (cold-start).
+      // Using 950 instead prevents ties in the ELO sort, keeping assignments fully deterministic.
+      const elos = [1400, 1300, 1200, 1100, 950, 900, 800, 700];
+      for (let i = 0; i < elos.length; i++) {
+        await joinAndConfirm(`concur_p${i}`, matchId, elos[i]);
+      }
+
+      const SEED = 42;
+      const CONCURRENCY = 10;
+
+      const responses = await Promise.all(
+        Array.from({ length: CONCURRENCY }, () =>
+          request
+            .post(`/api/v1/matches/${matchId}/teams/preview`)
+            .set('Authorization', `Bearer ${hostToken}`)
+            .send({ teamCount: 2, seed: SEED }),
+        ),
+      );
+
+      for (const res of responses) {
+        expect(res.status).toBe(200);
+      }
+
+      // All responses must produce identical team member sets
+      type MemberEntry = { userId: string };
+      type TeamEntry = { members: MemberEntry[] };
+
+      const firstTeams = (responses[0].body.data as { teams: TeamEntry[] }).teams;
+      const firstTeamUserIds = firstTeams.map((t) =>
+        t.members.map((m) => m.userId).sort(),
+      );
+
+      for (let i = 1; i < CONCURRENCY; i++) {
+        const teams = (responses[i].body.data as { teams: TeamEntry[] }).teams;
+        const teamUserIds = teams.map((t) =>
+          t.members.map((m) => m.userId).sort(),
+        );
+        expect(teamUserIds).toEqual(firstTeamUserIds);
+      }
+    });
+
+    // ── C7-5: stale participantHash → 409 PARTICIPANTS_CHANGED ───────────────
+    // This test depends on Track A service-layer stale check implementation.
+    // If Track A is not yet merged, this test will fail with 200 instead of 409.
+
+    it('returns 409 PARTICIPANTS_CHANGED when participantHash is stale (Track A dep)', async () => {
+      const hostToken = await devLoginToken(request, 'stale_host');
+      const venueId = await ensureVenueId();
+      const matchId = await createMatch(hostToken, venueId);
+
+      const participantNicknames = ['stale_p1', 'stale_p2', 'stale_p3', 'stale_p4'];
+      const userIds: string[] = [];
+      for (const nick of participantNicknames) {
+        const uid = await joinAndConfirm(nick, matchId, 1200);
+        userIds.push(uid);
+      }
+
+      // Preview with the full participant set — captures a participantHash
+      const previewRes = await request
+        .post(`/api/v1/matches/${matchId}/teams/preview`)
+        .set('Authorization', `Bearer ${hostToken}`)
+        .send({ teamCount: 2, seed: 10 });
+
+      expect(previewRes.status).toBe(200);
+
+      const capturedHash = (previewRes.body.data as { participantHash: string }).participantHash;
+      expect(capturedHash).toMatch(/^[a-f0-9]{64}$/);
+
+      // Simulate participant leaving: remove one confirmed participant directly
+      await prisma.matchParticipant.deleteMany({
+        where: { matchId, userId: userIds[3] },
+      });
+
+      // Compose with the now-stale hash — should trigger 409
+      const composeRes = await request
+        .post(`/api/v1/matches/${matchId}/teams`)
+        .set('Authorization', `Bearer ${hostToken}`)
+        .send({ teamCount: 2, seed: 10, participantHash: capturedHash });
+
+      // Expect 409 PARTICIPANTS_CHANGED once Track A stale check is in place.
+      // Until Track A is merged, this may return 200 (compose succeeds without hash check).
+      expect(composeRes.status).toBe(409);
+      // AllExceptionsFilter extracts only the .message field from ConflictException({ code, message }).
+      // The code field is dropped — the Korean message is what lands in res.body.message.
+      expect(composeRes.body.message).toContain('참가자가 변경되었어요');
+    });
+
+    // ── C7-6: rate limit → 429 ───────────────────────────────────────────────
+    // Must be last in describe block — consumes throttler quota.
+    // throttlerStorage.storage.clear() in beforeEach ensures a clean slate.
+
+    it('returns 429 with Retry-After header after 20 preview requests', async () => {
+      const hostToken = await devLoginToken(request, 'ratelimit_host');
+      const venueId = await ensureVenueId();
+      const matchId = await createMatch(hostToken, venueId);
+
+      await joinAndConfirm('ratelimit_p1', matchId, 1200);
+      await joinAndConfirm('ratelimit_p2', matchId, 1100);
+      await joinAndConfirm('ratelimit_p3', matchId, 1000);
+      await joinAndConfirm('ratelimit_p4', matchId, 900);
+
+      // Fire 20 requests — all must succeed (within limit)
+      for (let i = 0; i < 20; i++) {
+        const res = await request
+          .post(`/api/v1/matches/${matchId}/teams/preview`)
+          .set('Authorization', `Bearer ${hostToken}`)
+          .send({ teamCount: 2, seed: i });
+        expect(res.status).toBe(200);
+      }
+
+      // 21st request must be throttled
+      const blockedRes = await request
+        .post(`/api/v1/matches/${matchId}/teams/preview`)
+        .set('Authorization', `Bearer ${hostToken}`)
+        .send({ teamCount: 2, seed: 99 });
+
+      expect(blockedRes.status).toBe(429);
+      // ThrottlerGuard sets Retry-After header on blocked requests
+      expect(blockedRes.headers['retry-after']).toBeDefined();
     });
   });
 

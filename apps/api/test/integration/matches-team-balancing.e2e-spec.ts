@@ -444,9 +444,10 @@ describe('Matches Team Balancing (e2e)', () => {
     });
 
     // ── C7-4: concurrent preview — PRNG determinism ───────────────────────────
-    // 10 parallel requests with the same seed must produce identical teams arrays.
+    // Parallel requests with the same seed must produce identical teams arrays.
+    // Concurrency kept at 5 to stay within Prisma default connection pool on CI runners.
 
-    it('10 concurrent preview requests with same seed return identical team assignments', async () => {
+    it('5 concurrent preview requests with same seed return identical team assignments', async () => {
       const hostToken = await devLoginToken(request, 'concur_host');
       const venueId = await ensureVenueId();
       const matchId = await createMatch(hostToken, venueId);
@@ -459,7 +460,7 @@ describe('Matches Team Balancing (e2e)', () => {
       }
 
       const SEED = 42;
-      const CONCURRENCY = 10;
+      const CONCURRENCY = 5;
 
       const responses = await Promise.all(
         Array.from({ length: CONCURRENCY }, () =>

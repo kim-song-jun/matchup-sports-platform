@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { PrismaClient, NotificationType } from '@prisma/client';
+import * as supertest from 'supertest';
 import { createTestApp } from '../helpers/nest-app';
 import { getPrismaTestClient, disconnectPrismaTestClient } from '../helpers/prisma-test-client';
 import { truncateAll } from '../helpers/db-cleanup';
@@ -58,9 +59,7 @@ describe('Notifications Push Integration (e2e)', () => {
       expect(webPushService.isEnabled).toBe(false);
 
       // Create a user via dev-login so a User row exists
-      const request = (await import('supertest')).default;
-      const httpServer = app.getHttpServer();
-      const agent = request.agent(httpServer);
+      const agent = supertest.agent(app.getHttpServer());
       const token = await devLoginToken(agent, 'push_test_user_a');
       expect(token).toBeTruthy();
 
@@ -104,9 +103,7 @@ describe('Notifications Push Integration (e2e)', () => {
     });
 
     it('returns null and does not call sendToUser when granular pref is disabled', async () => {
-      const request = (await import('supertest')).default;
-      const httpServer = app.getHttpServer();
-      const agent = request.agent(httpServer);
+      const agent = supertest.agent(app.getHttpServer());
       await devLoginToken(agent, 'push_test_user_b');
 
       const user = await prisma.user.findFirst({ where: { nickname: 'push_test_user_b' } });

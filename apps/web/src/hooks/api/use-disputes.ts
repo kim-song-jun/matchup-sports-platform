@@ -8,7 +8,7 @@ import type {
   Dispute,
   DisputeEvent,
   DisputeActorRole,
-  RespondDisputeInput,
+  SellerRespondInput,
   AddDisputeMessageInput,
   WithdrawDisputeInput,
 } from '@/types/dispute';
@@ -52,7 +52,7 @@ export function useDispute(id: string) {
 export function useSellerRespond() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: RespondDisputeInput }) => {
+    mutationFn: async ({ id, data }: { id: string; data: SellerRespondInput }) => {
       const res = await api.post(`/disputes/${id}/respond`, data);
       return extractData<Dispute>(res);
     },
@@ -77,15 +77,16 @@ export function useAddDisputeMessage() {
       await queryClient.cancelQueries({ queryKey: queryKeys.disputes.detail(id) });
       const previous = queryClient.getQueryData<Dispute>(queryKeys.disputes.detail(id));
       if (previous) {
-        // Derive role from dispute participants rather than hardcoding 'buyer'.
+        // Derive actor role: admin if user has admin role, otherwise match against sellerId.
+        // Both marketplace and team_match disputes use buyerId/sellerId, so this works uniformly.
         const actorRole: DisputeActorRole =
-          user?.id === previous.respondentUserId ? 'seller' : 'buyer';
+          previous.sellerId === user?.id ? 'seller' : 'buyer';
         const optimisticEvent: DisputeEvent = {
           id: `optimistic-${Date.now()}`,
           disputeId: id,
           actorUserId: user?.id ?? null,
           actorRole,
-          message: data.message,
+          message: data.body,
           attachmentUrls: data.attachmentUrls ?? [],
           createdAt: new Date().toISOString(),
         };

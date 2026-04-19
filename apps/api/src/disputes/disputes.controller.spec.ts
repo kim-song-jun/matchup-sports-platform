@@ -45,12 +45,13 @@ describe('DisputesController (user-facing)', () => {
 
   describe('findMine', () => {
     it('delegates to service.findMine with userId and parsed limit', () => {
-      const expected = { items: [], nextCursor: null };
+      const expected = { data: [], nextCursor: null };
       mockService.findMine.mockReturnValue(expected);
 
-      const result = controller.findMine(userId, undefined, undefined, '10');
+      const result = controller.findMine(userId, undefined, undefined, undefined, '10');
 
       expect(mockService.findMine).toHaveBeenCalledWith(userId, {
+        role: undefined,
         status: undefined,
         cursor: undefined,
         limit: 10,
@@ -59,11 +60,12 @@ describe('DisputesController (user-facing)', () => {
     });
 
     it('clamps limit to 50 maximum', () => {
-      mockService.findMine.mockReturnValue({ items: [], nextCursor: null });
+      mockService.findMine.mockReturnValue({ data: [], nextCursor: null });
 
-      controller.findMine(userId, undefined, undefined, '999');
+      controller.findMine(userId, undefined, undefined, undefined, '999');
 
       expect(mockService.findMine).toHaveBeenCalledWith(userId, {
+        role: undefined,
         status: undefined,
         cursor: undefined,
         limit: 50,
@@ -71,11 +73,51 @@ describe('DisputesController (user-facing)', () => {
     });
 
     it('passes undefined limit when limit query is absent', () => {
-      mockService.findMine.mockReturnValue({ items: [], nextCursor: null });
+      mockService.findMine.mockReturnValue({ data: [], nextCursor: null });
 
       controller.findMine(userId);
 
       expect(mockService.findMine).toHaveBeenCalledWith(userId, {
+        role: undefined,
+        status: undefined,
+        cursor: undefined,
+        limit: undefined,
+      });
+    });
+
+    it('passes role=buyer to service when role query is buyer', () => {
+      mockService.findMine.mockReturnValue({ data: [], nextCursor: null });
+
+      controller.findMine(userId, 'buyer', undefined, undefined, undefined);
+
+      expect(mockService.findMine).toHaveBeenCalledWith(userId, {
+        role: 'buyer',
+        status: undefined,
+        cursor: undefined,
+        limit: undefined,
+      });
+    });
+
+    it('passes role=seller to service when role query is seller', () => {
+      mockService.findMine.mockReturnValue({ data: [], nextCursor: null });
+
+      controller.findMine(userId, 'seller', undefined, undefined, undefined);
+
+      expect(mockService.findMine).toHaveBeenCalledWith(userId, {
+        role: 'seller',
+        status: undefined,
+        cursor: undefined,
+        limit: undefined,
+      });
+    });
+
+    it('sanitizes invalid role values to undefined', () => {
+      mockService.findMine.mockReturnValue({ data: [], nextCursor: null });
+
+      controller.findMine(userId, 'admin', undefined, undefined, undefined);
+
+      expect(mockService.findMine).toHaveBeenCalledWith(userId, {
+        role: undefined,
         status: undefined,
         cursor: undefined,
         limit: undefined,

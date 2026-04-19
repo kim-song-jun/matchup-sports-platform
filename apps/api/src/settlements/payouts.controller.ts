@@ -38,29 +38,26 @@ export class PayoutsController {
   }
 
   @Get('eligible')
-  @ApiOperation({ summary: '지급 대상 정산 목록 — 조건 충족 후 미지급 항목' })
-  @ApiResponse({ status: 200, description: '지급 대상 목록' })
+  @ApiOperation({ summary: '지급 대상 정산 목록 — 수신자별 집계 (미지급 completed 정산)' })
+  @ApiResponse({ status: 200, description: '지급 대상 목록 (수신자별 집계)' })
   findEligible(
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Query('recipientId') recipientId?: string,
   ) {
-    const parsedLimit = limit ? parseInt(limit, 10) : undefined;
-    const safeLimit =
-      parsedLimit !== undefined && !Number.isNaN(parsedLimit)
-        ? Math.min(Math.max(1, parsedLimit), 100)
-        : undefined;
-    return this.settlementsService.listReleasedSettlements({ cursor, limit: safeLimit });
+    return this.settlementsService.listReleasedSettlements({ recipientId });
   }
 
   @Post('batch')
   @ApiOperation({ summary: '지급 배치 처리 — eligible 항목을 일괄 Payout 레코드 생성' })
   @ApiResponse({ status: 201, description: '배치 지급 생성 완료' })
-  @ApiResponse({ status: 400, description: 'PAYOUT_BATCH_EMPTY — 지급 대상 없음' })
+  @ApiResponse({ status: 400, description: 'PAYOUT_BATCH_EMPTY — 지급 대상 없음 / PAYOUT_BATCH_NO_ELIGIBLE — 수신자에 대한 eligible 정산 없음' })
   createBatch(
     @Body() body: CreatePayoutBatchDto,
     @CurrentUser('id') _adminId: string,
   ) {
-    return this.settlementsService.createPayoutBatch(body.settlementIds ?? []);
+    return this.settlementsService.createPayoutBatch(
+      { settlementIds: body.settlementIds, recipientIds: body.recipientIds, cutoffDate: body.cutoffDate },
+      body.note,
+    );
   }
 
   @Patch(':id/mark-paid')

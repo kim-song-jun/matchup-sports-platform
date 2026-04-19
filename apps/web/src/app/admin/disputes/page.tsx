@@ -25,15 +25,17 @@ const disputeFilters = [
   { key: 'dismissed', label: '기각됨' },
 ];
 
-// Status label map — covers both legacy and new marketplace statuses
+// Status label map — covers all DisputeStatus enum values + legacy statuses
 const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: '대기중', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
+  filed: { label: '접수됨', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
   seller_responded: { label: '판매자 응답', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
   admin_reviewing: { label: '검토중', color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
   resolved_refund: { label: '환불 완료', color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
   resolved_release: { label: '지급 완료', color: 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' },
   dismissed: { label: '기각됨', color: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' },
-  // Legacy
+  withdrawn: { label: '취하됨', color: 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500' },
+  // Legacy statuses (pre-Task-70 team-match disputes)
+  pending: { label: '대기중', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
   investigating: { label: '조사중', color: 'bg-blue-50 text-blue-500 dark:bg-blue-950/30 dark:text-blue-300' },
   resolved: { label: '해결됨', color: 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' },
 };
@@ -75,9 +77,9 @@ export default function AdminDisputesPage() {
       if (!q) return true;
       return (
         dispute.id.toLowerCase().includes(q) ||
-        dispute.reporter?.nickname?.toLowerCase().includes(q) ||
-        dispute.respondent?.nickname?.toLowerCase().includes(q) ||
-        dispute.reason.toLowerCase().includes(q)
+        dispute.buyer?.nickname?.toLowerCase().includes(q) ||
+        dispute.seller?.nickname?.toLowerCase().includes(q) ||
+        dispute.description.toLowerCase().includes(q)
       );
     });
   }, [disputes, search, activeFilter]);
@@ -90,8 +92,8 @@ export default function AdminDisputesPage() {
       filtered.map((d) => ({
         ID: d.id,
         출처: d.orderId ? '장터' : '팀매치',
-        신고인: d.reporter?.nickname ?? '-',
-        피신고인: d.respondent?.nickname ?? '-',
+        신고인: d.buyer?.nickname ?? '-',
+        피신고인: d.seller?.nickname ?? '-',
         유형: typeConfig[d.type]?.label ?? d.type,
         상태: statusConfig[d.status]?.label ?? d.status,
         신고일: d.createdAt,
@@ -161,8 +163,8 @@ export default function AdminDisputesPage() {
                   const sc = statusConfig[dispute.status] ?? { label: dispute.status, color: 'bg-gray-100 text-gray-500' };
                   const tc = typeConfig[dispute.type] ?? { label: dispute.type, color: 'bg-gray-100 text-gray-500' };
                   const isMarketplace = !!dispute.orderId;
-                  const reporter = dispute.reporter?.nickname ?? '-';
-                  const reported = dispute.respondent?.nickname ?? '-';
+                  const reporter = dispute.buyer?.nickname ?? '-';
+                  const reported = dispute.seller?.nickname ?? '-';
 
                   return (
                     <tr key={dispute.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">

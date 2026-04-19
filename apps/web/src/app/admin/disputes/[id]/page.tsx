@@ -23,15 +23,16 @@ import { useToast } from '@/components/ui/toast';
 import { DisputeMessageThread } from '@/components/dispute/dispute-message-thread';
 import { DisputeResolveModal } from '@/components/dispute/dispute-resolve-modal';
 import { formatAmount, extractErrorMessage } from '@/lib/utils';
-import { useAdminDispute, useReviewDispute, useResolveDispute } from '@/hooks/use-api';
+import { useAdminDispute, useReviewDispute, useResolveDispute, useForceReleaseOrder } from '@/hooks/use-api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ADMIN_DISPUTE_STATUS_LABELS, DISPUTE_TYPE_LABELS, RESOLVED_DISPUTE_STATUSES } from '@/lib/dispute-labels';
 import type { DisputeMessage } from '@/components/dispute/dispute-message-thread';
 
 // useAdminDispute(id) → { data: Dispute; isLoading; isError; refetch }
 // Dispute from types/dispute.ts:
-//   { id, targetType, orderId, teamMatchId, type, status, reason, description,
-//     reporter?, respondent?, events?: DisputeEvent[], adminNotes?, resolvedAt?, resolutionAmount? }
+//   { id, targetType, orderId, teamMatchId, type, status, buyerId, sellerId,
+//     buyer?, seller?, description, resolution, resolvedByAdminId, resolvedAt,
+//     createdAt, updatedAt, events: DisputeEvent[] }
 //
 // useReviewDispute() → status transition (filed→admin_reviewing)
 // useResolveDispute() → final resolution (admin_reviewing→resolved_*|dismissed)
@@ -48,23 +49,44 @@ export default function AdminDisputeDetailPage() {
   const { data: dispute, isLoading, isError, refetch } = useAdminDispute(disputeId);
   const reviewDispute = useReviewDispute();
   const resolveDispute = useResolveDispute();
+  const forceRelease = useForceReleaseOrder();
 
   const [showResolveModal, setShowResolveModal] = useState(false);
+  const [showForceReleaseModal, setShowForceReleaseModal] = useState(false);
+  const [forceReleaseNote, setForceReleaseNote] = useState('');
   const [legacyActionMode, setLegacyActionMode] = useState<LegacyActionMode>(null);
   const [adminNote, setAdminNote] = useState('');
 
   const isMarketplace = !!(dispute?.orderId);
   const isResolved = dispute ? RESOLVED_DISPUTE_STATUSES.has(dispute.status) : false;
 
-  // Map DisputeEvent → DisputeMessage for thread component
+  // Map DisputeEvent → DisputeMessage for thread component.
+  // actor user object is not returned by the API; senderName is null (thread renders senderId fallback).
   const threadMessages: DisputeMessage[] = (dispute?.events ?? []).map((event) => ({
     id: event.id,
     senderId: event.actorUserId,
-    senderName: event.actor?.nickname ?? null,
+    senderName: null,
     senderRole: event.actorRole,
     content: event.message,
     createdAt: event.createdAt,
   }));
+
+  const handleForceRelease = async () => {
+    const note = forceReleaseNote.trim();
+    if (!note) {
+      toast('error', '메모를 입력해주세요');
+      return;
+    }
+    if (!dispute?.orderId) return;
+    try {
+      await forceRelease.mutateAsync({ id: dispute.orderId, note });
+      toast('success', '에스크로가 강제 해제됐어요');
+      setShowForceReleaseModal(false);
+      setForceReleaseNote('');
+    } catch (err) {
+      toast('error', extractErrorMessage(err, '강제 해제에 실패했어요.'));
+    }
+  };
 
   const handleReview = async () => {
     if (!adminNote.trim()) {
@@ -133,6 +155,15 @@ export default function AdminDisputeDetailPage() {
 
         {!isResolved && (
           <div className="flex items-center gap-2 shrink-0">
+            {isMarketplace && dispute.orderId && (
+              <button
+                type="button"
+                onClick={() => setShowForceReleaseModal(true)}
+                className="flex items-center gap-2 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                강제 해제
+              </button>
+            )}
             {dispute.status === 'filed' && (
               <button
                 type="button"
@@ -191,6 +222,52 @@ export default function AdminDisputeDetailPage() {
         </div>
       </Modal>
 
+      {/* Force-release modal — admin escrow override for marketplace disputes */}
+      <Modal
+        isOpen={showForceReleaseModal}
+        onClose={() => { setShowForceReleaseModal(false); setForceReleaseNote(''); }}
+        title="강제 해제"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+            관리자 권한으로 에스크로를 해제할까요? 이 작업은 되돌릴 수 없어요.
+          </p>
+          <div>
+            <label htmlFor="force-release-note" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+              메모 <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <textarea
+              id="force-release-note"
+              value={forceReleaseNote}
+              onChange={(e) => setForceReleaseNote(e.target.value)}
+              placeholder="강제 해제 사유를 입력하세요"
+              rows={4}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 resize-none transition-colors"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setShowForceReleaseModal(false); setForceReleaseNote(''); }}
+              disabled={forceRelease.isPending}
+              className="flex-1 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleForceRelease()}
+              disabled={!forceReleaseNote.trim() || forceRelease.isPending}
+              className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 dark:bg-gray-100 py-3 text-base font-semibold text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-white disabled:opacity-50 transition-colors"
+            >
+              {forceRelease.isPending ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
+              강제 해제
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Meta grid */}
       <div className="grid @3xl:grid-cols-2 gap-4">
         {/* Info */}
@@ -223,16 +300,18 @@ export default function AdminDisputeDetailPage() {
                 <dd className="text-sm text-gray-700 dark:text-gray-300">{new Date(dispute.resolvedAt).toLocaleDateString('ko-KR')}</dd>
               </div>
             )}
-            {dispute.resolutionAmount !== null && dispute.resolutionAmount !== undefined && (
+            {dispute.resolvedByAdminId && (
               <div className="flex justify-between items-start gap-4">
-                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">처리 금액</dt>
-                <dd className="text-sm font-bold text-blue-500">{formatAmount(dispute.resolutionAmount)}</dd>
+                <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">처리자</dt>
+                <dd className="text-sm font-mono text-gray-700 dark:text-gray-300 truncate max-w-[200px]">
+                  {dispute.resolvedByAdminId}
+                </dd>
               </div>
             )}
-            {dispute.adminNotes && (
+            {dispute.resolution && (
               <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
                 <p className="text-xs text-gray-400 mb-1">운영 메모</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.adminNotes}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.resolution}</p>
               </div>
             )}
           </dl>
@@ -242,23 +321,23 @@ export default function AdminDisputeDetailPage() {
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">당사자</h2>
           <dl className="space-y-3">
-            {dispute.reporter && (
+            {dispute.buyer && (
               <div className="flex justify-between items-center gap-4">
                 <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">신고인</dt>
                 <dd>
-                  <Link href={`/admin/users/${dispute.reporter.id}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1">
-                    {dispute.reporter.nickname}
+                  <Link href={`/admin/users/${dispute.buyer.id}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1">
+                    {dispute.buyer.nickname}
                     <ExternalLink size={12} aria-hidden="true" />
                   </Link>
                 </dd>
               </div>
             )}
-            {dispute.respondent && (
+            {dispute.seller && (
               <div className="flex justify-between items-center gap-4">
                 <dt className="text-sm text-gray-500 dark:text-gray-400 shrink-0">피신고인</dt>
                 <dd>
-                  <Link href={`/admin/users/${dispute.respondent.id}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1">
-                    {dispute.respondent.nickname}
+                  <Link href={`/admin/users/${dispute.seller.id}`} className="text-sm font-medium text-blue-500 hover:text-blue-600 flex items-center gap-1">
+                    {dispute.seller.nickname}
                     <ExternalLink size={12} aria-hidden="true" />
                   </Link>
                 </dd>
@@ -292,10 +371,7 @@ export default function AdminDisputeDetailPage() {
           {/* Dispute reason/description */}
           <div className="pt-3 border-t border-gray-50 dark:border-gray-700">
             <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mb-2 uppercase tracking-wide">신고 내용</p>
-            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{dispute.reason}</p>
-            {dispute.description && dispute.description !== dispute.reason && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">{dispute.description}</p>
-            )}
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{dispute.description}</p>
           </div>
         </div>
       </div>

@@ -231,7 +231,7 @@ describe('useAddDisputeMessage', () => {
     const { result } = renderHook(() => useAddDisputeMessage(), { wrapper });
 
     act(() => {
-      result.current.mutate({ id: 'dispute-1', data: { message: '추가 증거 사진 첨부합니다.' } });
+      result.current.mutate({ id: 'dispute-1', data: { body: '추가 증거 사진 첨부합니다.' } });
     });
 
     // Before server responds, optimistic event should be in cache
@@ -271,7 +271,7 @@ describe('useAddDisputeMessage', () => {
     const { result } = renderHook(() => useAddDisputeMessage(), { wrapper });
 
     act(() => {
-      result.current.mutate({ id: 'dispute-1', data: { message: '실패할 메시지' } });
+      result.current.mutate({ id: 'dispute-1', data: { body: '실패할 메시지' } });
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
@@ -424,7 +424,6 @@ describe('useSellerRespond', () => {
       data: {
         ...mockDispute,
         status: 'seller_responded',
-        sellerRespondedAt: '2024-01-11T10:00:00.000Z',
       },
     });
 
@@ -433,12 +432,12 @@ describe('useSellerRespond', () => {
 
     result.current.mutate({
       id: 'dispute-1',
-      data: { message: '상품은 설명대로입니다. 사진 첨부드립니다.', attachmentUrls: [] },
+      data: { response: '상품은 설명대로입니다. 사진 첨부드립니다.', attachmentUrls: [] },
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockApi.post).toHaveBeenCalledWith('/disputes/dispute-1/respond', {
-      message: '상품은 설명대로입니다. 사진 첨부드립니다.',
+      response: '상품은 설명대로입니다. 사진 첨부드립니다.',
       attachmentUrls: [],
     });
     expect(result.current.data?.status).toBe('seller_responded');

@@ -101,17 +101,22 @@ describe('PayoutsController', () => {
   // ── findEligible ─────────────────────────────────────────────────────────────
 
   describe('findEligible', () => {
-    it('delegates to service.listReleasedSettlements', () => {
-      const expected = { items: [], total: 0, nextCursor: null };
+    it('delegates to service.listReleasedSettlements with aggregated shape', () => {
+      const expected = [{ recipientId: 'u1', recipientName: 'Alice', settlementCount: 2, grossAmount: 80000, platformFee: 8000, netAmount: 72000, oldestReleasedAt: '2026-04-01T00:00:00.000Z' }];
       mockService.listReleasedSettlements.mockReturnValue(expected);
 
-      const result = controller.findEligible(undefined, '20');
+      const result = controller.findEligible(undefined);
 
-      expect(mockService.listReleasedSettlements).toHaveBeenCalledWith({
-        cursor: undefined,
-        limit: 20,
-      });
+      expect(mockService.listReleasedSettlements).toHaveBeenCalledWith({ recipientId: undefined });
       expect(result).toEqual(expected);
+    });
+
+    it('passes recipientId filter when provided', () => {
+      mockService.listReleasedSettlements.mockReturnValue([]);
+
+      controller.findEligible('seller-1');
+
+      expect(mockService.listReleasedSettlements).toHaveBeenCalledWith({ recipientId: 'seller-1' });
     });
   });
 
@@ -126,17 +131,35 @@ describe('PayoutsController', () => {
 
       const result = controller.createBatch(body, adminId);
 
-      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(ids);
+      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(
+        { settlementIds: ids, recipientIds: undefined, cutoffDate: undefined },
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
 
-    it('passes empty array when settlementIds is absent', () => {
-      const body: CreatePayoutBatchDto = {};
+    it('delegates recipientIds to service.createPayoutBatch', () => {
+      const body: CreatePayoutBatchDto = { recipientIds: ['user-1', 'user-2'] };
       mockService.createPayoutBatch.mockReturnValue([]);
 
       controller.createBatch(body, adminId);
 
-      expect(mockService.createPayoutBatch).toHaveBeenCalledWith([]);
+      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(
+        { settlementIds: undefined, recipientIds: ['user-1', 'user-2'], cutoffDate: undefined },
+        undefined,
+      );
+    });
+
+    it('passes cutoffDate when provided', () => {
+      const body: CreatePayoutBatchDto = { recipientIds: ['user-1'], cutoffDate: '2026-04-15' };
+      mockService.createPayoutBatch.mockReturnValue([]);
+
+      controller.createBatch(body, adminId);
+
+      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(
+        { settlementIds: undefined, recipientIds: ['user-1'], cutoffDate: '2026-04-15' },
+        undefined,
+      );
     });
   });
 

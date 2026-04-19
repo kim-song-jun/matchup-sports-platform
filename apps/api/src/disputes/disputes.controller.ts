@@ -18,6 +18,7 @@ export class DisputesController {
   @ApiResponse({ status: 200, description: '커서 기반 페이지네이션' })
   findMine(
     @CurrentUser('id') userId: string,
+    @Query('role') role?: string,
     @Query('status') status?: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
@@ -27,7 +28,9 @@ export class DisputesController {
       parsedLimit !== undefined && !Number.isNaN(parsedLimit)
         ? Math.min(Math.max(1, parsedLimit), 50)
         : undefined;
-    return this.disputesService.findMine(userId, { status, cursor, limit: safeLimit });
+    const safeRole: 'buyer' | 'seller' | undefined =
+      role === 'buyer' || role === 'seller' ? role : undefined;
+    return this.disputesService.findMine(userId, { role: safeRole, status, cursor, limit: safeLimit });
   }
 
   @Get(':id')

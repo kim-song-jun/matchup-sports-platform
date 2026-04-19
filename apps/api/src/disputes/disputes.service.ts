@@ -26,6 +26,31 @@ export class DisputesService {
   ) {}
 
   /**
+   * Fetches a dispute by id with messages included, then serializes `messages` → `events`
+   * for frontend contract alignment (B-5). Used by mutation responses.
+   */
+  private async fetchAndSerialize(disputeId: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.prisma;
+    const dispute = await db.dispute.findUniqueOrThrow({
+      where: { id: disputeId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    const { messages, ...rest } = dispute;
+    return {
+      ...rest,
+      events: messages.map((m) => ({
+        id: m.id,
+        disputeId: m.disputeId,
+        actorUserId: m.authorId,
+        actorRole: m.role,
+        message: m.body,
+        attachmentUrls: [] as string[],
+        createdAt: m.createdAt,
+      })),
+    };
+  }
+
+  /**
    * Seller responds to a filed dispute.
    * Status transitions: filed → seller_responded.
    *
@@ -63,9 +88,25 @@ export class DisputesService {
 
       return tx.dispute.findUniqueOrThrow({
         where: { id: disputeId },
-        include: { messages: true },
+        include: { messages: { orderBy: { createdAt: 'asc' } } },
       });
     });
+
+    // Map messages → events for frontend contract alignment (B-5).
+    // DisputeMessage fields: { authorId, role, body } → DisputeEvent: { actorUserId, actorRole, message, attachmentUrls }
+    const { messages: updatedMessages, ...updatedRest } = updated;
+    const serialized = {
+      ...updatedRest,
+      events: updatedMessages.map((m) => ({
+        id: m.id,
+        disputeId: m.disputeId,
+        actorUserId: m.authorId,
+        actorRole: m.role,
+        message: m.body,
+        attachmentUrls: [] as string[],
+        createdAt: m.createdAt,
+      })),
+    };
 
     // Notify buyer (fire-and-forget — notification failure must not fail this operation)
     this.notificationsService
@@ -79,7 +120,7 @@ export class DisputesService {
       })
       .catch(() => void 0);
 
-    return updated;
+    return serialized;
   }
 
   /**
@@ -137,7 +178,7 @@ export class DisputesService {
   }
 
   /**
-   * Returns a single dispute with messages.
+   * Returns a single dispute with messages (serialized under `events` key for frontend contract).
    * Access: buyer, seller, or admin.
    */
   async getDispute(disputeId: string, requesterId: string, isAdmin: boolean) {
@@ -164,45 +205,67 @@ export class DisputesService {
       throw new ForbiddenException('분쟁 당사자 또는 관리자만 조회할 수 있습니다.');
     }
 
-    return dispute;
+    // Map `messages` → `events` for frontend contract alignment (B-5).
+    // DisputeMessage fields: { authorId, role, body } → DisputeEvent: { actorUserId, actorRole, message, attachmentUrls }
+    const { messages, ...rest } = dispute;
+    return {
+      ...rest,
+      events: messages.map((m) => ({
+        id: m.id,
+        disputeId: m.disputeId,
+        actorUserId: m.authorId,
+        actorRole: m.role,
+        message: m.body,
+        attachmentUrls: [] as string[],
+        createdAt: m.createdAt,
+      })),
+    };
   }
 
   /**
    * Lists disputes involving the requester (as buyer or seller).
+   * Optional role filter: 'buyer' → only disputes where user is buyer;
+   * 'seller' → only where seller; default (undefined) → both.
    */
   async listMyDisputes(
     userId: string,
-    filter: { status?: DisputeStatus; cursor?: string; limit?: number },
+    filter: { role?: 'buyer' | 'seller'; status?: DisputeStatus; cursor?: string; limit?: number },
   ) {
     const take = Math.min(filter.limit ?? 20, 100);
+
+    let participantFilter: { buyerId: string } | { sellerId: string } | { OR: [{ buyerId: string }, { sellerId: string }] };
+    if (filter.role === 'buyer') {
+      participantFilter = { buyerId: userId };
+    } else if (filter.role === 'seller') {
+      participantFilter = { sellerId: userId };
+    } else {
+      participantFilter = { OR: [{ buyerId: userId }, { sellerId: userId }] };
+    }
+
     const where = {
-      OR: [{ buyerId: userId }, { sellerId: userId }],
+      ...participantFilter,
       ...(filter.status ? { status: filter.status } : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.dispute.findMany({
-        where,
-        include: {
-          order: {
-            include: { listing: { select: { id: true, title: true, imageUrls: true } } },
-          },
-          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+    const rows = await this.prisma.dispute.findMany({
+      where,
+      include: {
+        order: {
+          include: { listing: { select: { id: true, title: true, imageUrls: true } } },
         },
-        orderBy: { createdAt: 'desc' },
-        take: take + 1,
-        ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
-      }),
-      this.prisma.dispute.count({ where }),
-    ]);
+        messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
+    });
 
-    const hasMore = items.length > take;
-    if (hasMore) items.pop();
+    const hasMore = rows.length > take;
+    if (hasMore) rows.pop();
 
     return {
-      items,
-      total,
-      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+      data: rows,
+      nextCursor: hasMore ? (rows[rows.length - 1]?.id ?? null) : null,
     };
   }
 
@@ -411,16 +474,13 @@ export class DisputesService {
         .catch(() => void 0);
     }
 
-    return this.prisma.dispute.findUniqueOrThrow({
-      where: { id: disputeId },
-      include: { messages: true },
-    });
+    return this.fetchAndSerialize(disputeId);
   }
 
   // ── Controller-facing aliases ─────────────────────────────────────────────
 
   /** Alias for listMyDisputes — used by DisputesController. */
-  findMine(userId: string, filter: { status?: string; cursor?: string; limit?: number }) {
+  findMine(userId: string, filter: { role?: 'buyer' | 'seller'; status?: string; cursor?: string; limit?: number }) {
     const status = filter.status ? (filter.status as DisputeStatus) : undefined;
     return this.listMyDisputes(userId, { ...filter, status });
   }
@@ -489,7 +549,20 @@ export class DisputesService {
           payload: { orderId: dispute.orderId } as Prisma.JsonObject,
         },
       });
-      return tx.dispute.findUniqueOrThrow({ where: { id }, include: { messages: true } });
+      const raw = await tx.dispute.findUniqueOrThrow({ where: { id }, include: { messages: { orderBy: { createdAt: 'asc' } } } });
+      const { messages: msgs, ...rawRest } = raw;
+      return {
+        ...rawRest,
+        events: msgs.map((m) => ({
+          id: m.id,
+          disputeId: m.disputeId,
+          actorUserId: m.authorId,
+          actorRole: m.role,
+          message: m.body,
+          attachmentUrls: [] as string[],
+          createdAt: m.createdAt,
+        })),
+      };
     });
 
     return result;
@@ -529,10 +602,7 @@ export class DisputesService {
       throw new ConflictException('DISPUTE_CONCURRENT_UPDATE: 분쟁 상태가 동시에 변경되었습니다.');
     }
 
-    return this.prisma.dispute.findUniqueOrThrow({
-      where: { id },
-      include: { messages: true },
-    });
+    return this.fetchAndSerialize(id);
   }
 
   /** Admin resolves a dispute — wraps resolveDispute with DTO shape. */
@@ -546,6 +616,7 @@ export class DisputesService {
 
   /**
    * Admin list view with full filtering support.
+   * Returns { data, nextCursor } for CursorPage contract alignment.
    */
   async listForAdmin(filter: {
     status?: DisputeStatus;
@@ -559,31 +630,27 @@ export class DisputesService {
       ...(filter.targetType ? { targetType: filter.targetType } : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.dispute.findMany({
-        where,
-        include: {
-          buyer: { select: { id: true, nickname: true } },
-          seller: { select: { id: true, nickname: true } },
-          order: {
-            include: { listing: { select: { id: true, title: true } } },
-          },
-          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+    const rows = await this.prisma.dispute.findMany({
+      where,
+      include: {
+        buyer: { select: { id: true, nickname: true } },
+        seller: { select: { id: true, nickname: true } },
+        order: {
+          include: { listing: { select: { id: true, title: true } } },
         },
-        orderBy: { createdAt: 'desc' },
-        take: take + 1,
-        ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
-      }),
-      this.prisma.dispute.count({ where }),
-    ]);
+        messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
+    });
 
-    const hasMore = items.length > take;
-    if (hasMore) items.pop();
+    const hasMore = rows.length > take;
+    if (hasMore) rows.pop();
 
     return {
-      items,
-      total,
-      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+      data: rows,
+      nextCursor: hasMore ? (rows[rows.length - 1]?.id ?? null) : null,
     };
   }
 }

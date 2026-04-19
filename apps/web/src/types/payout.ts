@@ -37,9 +37,11 @@ export interface EligibleSettlement {
 }
 
 export interface CreatePayoutBatchInput {
-  /** If omitted, server groups ALL eligible settlements. */
+  /** Explicit settlement IDs — server uses this list directly when provided. */
+  settlementIds?: string[];
+  /** Recipient user IDs — server resolves all eligible settlements per recipient. */
   recipientIds?: string[];
-  /** ISO date string. Server includes only settlements released at or before this date. */
+  /** ISO date string. Server includes only settlements released at or before this date (used with recipientIds). */
   cutoffDate?: string;
 }
 

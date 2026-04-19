@@ -151,8 +151,7 @@ export default function MyDisputesPage() {
                       </span>
                     </div>
                     <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                      {/* reason serves as the short description until listing title is in the shape */}
-                      {dispute.reason || dispute.description}
+                      {dispute.description}
                     </p>
                     <div className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                       <Clock size={11} aria-hidden="true" />

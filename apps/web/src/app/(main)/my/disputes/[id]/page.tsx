@@ -52,7 +52,7 @@ export default function DisputeDetailPage() {
   const threadMessages: DisputeMessage[] = (dispute?.events ?? []).map((event) => ({
     id: event.id,
     senderId: event.actorUserId,
-    senderName: event.actor?.nickname ?? null,
+    senderName: null,
     senderRole: event.actorRole,
     content: event.message,
     createdAt: event.createdAt,
@@ -64,7 +64,7 @@ export default function DisputeDetailPage() {
 
     setMessageInput('');
     addMessage.mutate(
-      { id: disputeId, data: { message: content } },
+      { id: disputeId, data: { body: content } },
       {
         onError: (err) => {
           toast('error', extractErrorMessage(err, '메시지 전송에 실패했어요. 다시 시도해주세요.'));
@@ -79,7 +79,7 @@ export default function DisputeDetailPage() {
     if (!content || sellerRespond.isPending) return;
 
     sellerRespond.mutate(
-      { id: disputeId, data: { message: content } },
+      { id: disputeId, data: { response: content } },
       {
         onSuccess: () => {
           toast('success', '답변이 제출됐어요. 운영팀이 검토할 예정이에요.');
@@ -157,7 +157,7 @@ export default function DisputeDetailPage() {
             </span>
           </div>
 
-          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{dispute.reason}</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{dispute.description}</p>
 
           <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
             <span>신청일 {new Date(dispute.createdAt).toLocaleDateString('ko-KR')}</span>
@@ -166,15 +166,15 @@ export default function DisputeDetailPage() {
             )}
           </div>
 
-          {dispute.adminNotes && isResolved && (
+          {dispute.resolution && isResolved && (
             <div className="rounded-xl bg-gray-50 dark:bg-gray-700 px-3 py-2.5">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">운영팀 메모</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.adminNotes}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.resolution}</p>
             </div>
           )}
 
-          {/* Seller respond CTA — shown when dispute is filed and current user is the respondent */}
-          {dispute.status === 'filed' && dispute.respondentUserId === user.id && (
+          {/* Seller respond CTA — shown when dispute is filed and current user is the seller. */}
+          {dispute.status === 'filed' && dispute.sellerId === user?.id && (
             <button
               type="button"
               onClick={() => setShowRespondModal(true)}

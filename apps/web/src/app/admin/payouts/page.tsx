@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Wallet, CheckCircle, Clock, Ban, Loader2 } from 'lucide-react';
+import { Wallet, CheckCircle, Clock, Ban, Loader2, XCircle } from 'lucide-react';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { Modal } from '@/components/ui/modal';
 import { PayoutBatchBuilder } from '@/components/admin/payout-batch-builder';
 import { useToast } from '@/components/ui/toast';
 import { formatAmount, extractErrorMessage } from '@/lib/utils';
@@ -13,6 +14,7 @@ import {
   useAdminEligibleSettlements,
   useCreatePayoutBatch,
   useMarkPayoutPaid,
+  useMarkPayoutFailed,
 } from '@/hooks/use-api';
 
 // Hook shapes (actual — matches use-admin.ts + types/payout.ts):
@@ -42,6 +44,88 @@ const payoutFilters = [
   { key: 'paid', label: '지급 완료' },
   { key: 'failed', label: '실패' },
 ];
+
+function MarkFailedModal({
+  payoutId,
+  isOpen,
+  onClose,
+  refetch,
+}: {
+  payoutId: string;
+  isOpen: boolean;
+  onClose: () => void;
+  refetch: () => void;
+}) {
+  const { toast } = useToast();
+  const [reason, setReason] = useState('');
+  const markFailed = useMarkPayoutFailed();
+
+  const handleSubmit = () => {
+    if (reason.trim().length < 10 || markFailed.isPending) return;
+    markFailed.mutate(
+      { id: payoutId, data: { reason: reason.trim() } },
+      {
+        onSuccess: () => {
+          toast('success', '지급 실패로 처리됐어요.');
+          setReason('');
+          onClose();
+          refetch();
+        },
+        onError: (err) => {
+          toast('error', extractErrorMessage(err, '처리에 실패했어요. 다시 시도해주세요.'));
+        },
+      },
+    );
+  };
+
+  const handleClose = () => {
+    setReason('');
+    onClose();
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="지급 실패 처리" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          지급 실패 사유를 입력하세요. 최소 10자 이상이어야 해요.
+        </p>
+        <div>
+          <label htmlFor={`fail-reason-${payoutId}`} className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            실패 사유 <span className="text-red-500" aria-hidden="true">*</span>
+          </label>
+          <textarea
+            id={`fail-reason-${payoutId}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="예: 계좌번호 불일치로 이체 반송됨"
+            rows={4}
+            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 resize-none transition-colors"
+          />
+          <p className="mt-1 text-xs text-gray-400">{reason.length}/10자 이상</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={markFailed.isPending}
+            className="flex-1 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={reason.trim().length < 10 || markFailed.isPending}
+            className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+          >
+            {markFailed.isPending ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
+            실패 처리
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 function MarkPaidRow({ payoutId, refetch }: { payoutId: string; refetch: () => void }) {
   const { toast } = useToast();
@@ -116,6 +200,7 @@ export default function AdminPayoutsPage() {
   const [activeTab, setActiveTab] = useState<PayoutTab>('eligible');
   const [payoutFilter, setPayoutFilter] = useState('all');
   const [payoutSearch, setPayoutSearch] = useState('');
+  const [failingPayoutId, setFailingPayoutId] = useState<string | null>(null);
 
   const { data: eligibleData, isLoading: eligibleLoading, isError: eligibleError, refetch: refetchEligible } = useAdminEligibleSettlements();
   const { data: payoutsData, isLoading: payoutsLoading, isError: payoutsError, refetch: refetchPayouts } = useAdminPayouts();
@@ -264,10 +349,18 @@ export default function AdminPayoutsPage() {
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                     {filteredPayouts.map((payout) => {
                       const sc = payoutStatusConfig[payout.status] ?? { label: payout.status, color: 'bg-gray-100 text-gray-500' };
+                      const canAct = payout.status === 'pending' || payout.status === 'processing';
                       return (
                         <tr key={payout.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                          <td className="px-5 py-3.5 text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                            {payout.recipient?.nickname ?? payout.recipientId}
+                          <td className="px-5 py-3.5">
+                            <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                              {payout.recipient?.nickname ?? payout.recipientId}
+                            </p>
+                            {payout.markedPaidByAdminId && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">
+                                처리자: {payout.markedPaidByAdminId}
+                              </p>
+                            )}
                           </td>
                           <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap text-right">
                             {formatAmount(payout.grossAmount)}
@@ -287,8 +380,19 @@ export default function AdminPayoutsPage() {
                             {new Date(payout.createdAt).toLocaleDateString('ko-KR')}
                           </td>
                           <td className="px-5 py-3.5">
-                            {payout.status === 'pending' && (
-                              <MarkPaidRow payoutId={payout.id} refetch={() => void refetchPayouts()} />
+                            {canAct && (
+                              <div className="flex items-center gap-2">
+                                <MarkPaidRow payoutId={payout.id} refetch={() => void refetchPayouts()} />
+                                <button
+                                  type="button"
+                                  onClick={() => setFailingPayoutId(payout.id)}
+                                  className="flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-600 min-h-[44px] transition-colors"
+                                  aria-label={`${payout.recipient?.nickname ?? payout.recipientId} 지급 실패 처리`}
+                                >
+                                  <XCircle size={14} aria-hidden="true" />
+                                  지급 실패
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -312,6 +416,16 @@ export default function AdminPayoutsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Mark-failed modal — shown when user clicks 지급 실패 on a payout row */}
+      {failingPayoutId && (
+        <MarkFailedModal
+          payoutId={failingPayoutId}
+          isOpen={failingPayoutId !== null}
+          onClose={() => setFailingPayoutId(null)}
+          refetch={() => void refetchPayouts()}
+        />
       )}
     </div>
   );

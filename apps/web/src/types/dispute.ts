@@ -1,28 +1,31 @@
-// Unified Dispute types for Task 70.
-// Replaces the team-match-only Dispute interface in types/api.ts.
-// Admin pages that still reference the old Dispute shape will be migrated to this type
-// as part of the admin UI update (separate wave).
+// Unified Dispute types — aligned to Prisma schema (disputes table) and DisputesService.
+// Source of truth: apps/api/prisma/schema.prisma model Dispute + DisputeMessage + DisputeEvent.
 
-/** Maps to Prisma DisputeStatus enum (migration 20260418070000). */
+/** Maps to Prisma DisputeStatus enum. */
 export type DisputeStatus =
   | 'filed'
   | 'seller_responded'
   | 'admin_reviewing'
   | 'resolved_refund'
   | 'resolved_release'
-  | 'dismissed'
-  | 'withdrawn';
+  | 'withdrawn'
+  | 'dismissed';
 
 /** Maps to Prisma DisputeTargetType enum. */
 export type DisputeTargetType = 'marketplace_order' | 'team_match';
 
 /** Maps to Prisma DisputeActorRole enum. */
-export type DisputeActorRole = 'buyer' | 'seller' | 'admin' | 'system';
+export type DisputeActorRole = 'buyer' | 'seller' | 'admin';
 
-/** Admin resolve action values (ResolveDisputeDto.action). */
+/** Admin resolve action tokens (ResolveDisputeDto.action). */
 export type DisputeResolveAction = 'refund' | 'release' | 'dismiss';
 
-/** Chronological event on a dispute (audit trail). Maps to Prisma DisputeEvent. */
+/**
+ * Chronological audit event on a dispute.
+ * Serialized from DisputeMessage by DisputesService (messages → events alias).
+ * Field mapping: authorId → actorUserId, role → actorRole, body → message.
+ * Note: actor user object is NOT returned by the API; senderName must be derived client-side.
+ */
 export interface DisputeEvent {
   id: string;
   disputeId: string;
@@ -31,10 +34,13 @@ export interface DisputeEvent {
   message: string;
   attachmentUrls: string[];
   createdAt: string;
-  actor?: { id: string; nickname: string; profileImageUrl: string | null } | null;
 }
 
-/** Unified dispute — covers both marketplace_order and team_match target types. */
+/**
+ * Unified dispute — covers both marketplace_order and team_match target types.
+ * Both target types use buyerId (disputing party / host) and sellerId (responding party).
+ * buyer / seller are joined User objects returned by getDispute.
+ */
 export interface Dispute {
   id: string;
   targetType: DisputeTargetType;
@@ -42,47 +48,55 @@ export interface Dispute {
   orderId: string | null;
   /** FK to TeamMatch. Present when targetType = team_match. */
   teamMatchId: string | null;
-  reporterUserId: string;
-  respondentUserId: string | null;
-  /** Only set for team_match disputes. */
-  reporterTeamId: string | null;
-  reportedTeamId: string | null;
+  /** Reason code string (e.g. "not_as_described", "no_show"). */
   type: string;
-  reason: string;
-  description: string;
   status: DisputeStatus;
+  /** Disputing party (buyer for marketplace, host team rep for team_match). */
+  buyerId: string;
+  /** Responding party (seller for marketplace, opponent team rep for team_match). */
+  sellerId: string;
+  buyer?: { id: string; nickname: string; profileImageUrl: string | null } | null;
+  seller?: { id: string; nickname: string; profileImageUrl: string | null } | null;
+  description: string;
   resolution: string | null;
-  resolutionAmount: number | null;
-  adminNotes: string | null;
-  sellerRespondedAt: string | null;
-  adminReviewingAt: string | null;
+  resolvedByAdminId: string | null;
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  reporter?: { id: string; nickname: string; profileImageUrl: string | null };
-  respondent?: { id: string; nickname: string; profileImageUrl: string | null } | null;
-  events?: DisputeEvent[];
+  events: DisputeEvent[];
 }
 
-export interface RespondDisputeInput {
-  message: string;
+/** POST /marketplace/orders/:id/dispute */
+export interface FileDisputeInput {
+  type: 'not_delivered' | 'not_as_described' | 'damaged' | 'other';
+  description: string;
   attachmentUrls?: string[];
 }
 
+/** POST /disputes/:id/respond — seller submits rebuttal. Maps to RespondDisputeDto.response. */
+export interface SellerRespondInput {
+  response: string;
+  attachmentUrls?: string[];
+}
+
+/** POST /disputes/:id/messages — buyer or seller adds a thread message. Maps to DisputeMessageDto.body. */
 export interface AddDisputeMessageInput {
-  message: string;
+  body: string;
   attachmentUrls?: string[];
 }
 
-export interface WithdrawDisputeInput {
-  reason?: string;
-}
-
+/** PATCH /admin/disputes/:id/resolve */
 export interface ResolveDisputeInput {
   action: DisputeResolveAction;
-  note: string;
+  note?: string;
 }
 
+/** POST /admin/disputes/:id/review */
 export interface ReviewDisputeInput {
   note?: string;
+}
+
+/** POST /disputes/:id/withdraw */
+export interface WithdrawDisputeInput {
+  reason?: string;
 }

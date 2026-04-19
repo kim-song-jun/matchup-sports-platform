@@ -37,6 +37,9 @@ const prismaMock = {
     updateMany: jest.fn(),
     findUniqueOrThrow: jest.fn(),
   },
+  user: {
+    findMany: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 
@@ -435,38 +438,71 @@ describe('SettlementsService', () => {
   // ── listReleasedSettlements ─────────────────────────────────────────────────
 
   describe('listReleasedSettlements', () => {
-    it('returns completed settlements without payout', async () => {
-      const records = [
-        makeRecord({ status: SettlementStatus.completed, payoutId: null }),
-        makeRecord({ id: 'settle-2', status: SettlementStatus.completed, payoutId: null }),
-      ];
-      prismaMock.$transaction.mockResolvedValue([records, 2]);
+    it('returns aggregated EligibleSettlement rows grouped by recipient', async () => {
+      prismaMock.settlementRecord.groupBy.mockResolvedValue([
+        {
+          recipientId: 'seller-1',
+          _count: { id: 2 },
+          _sum: { amount: 80000, commission: 8000, netAmount: 72000 },
+          _min: { releasedAt: new Date('2026-04-01T00:00:00Z') },
+        },
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: 'seller-1', nickname: 'Alice' },
+      ]);
 
       const result = await service.listReleasedSettlements({});
 
-      expect(result.items).toHaveLength(2);
-      expect(result.total).toBe(2);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        recipientId: 'seller-1',
+        recipientName: 'Alice',
+        settlementCount: 2,
+        grossAmount: 80000,
+        platformFee: 8000,
+        netAmount: 72000,
+      });
+    });
+
+    it('returns empty array when no eligible settlements exist', async () => {
+      prismaMock.settlementRecord.groupBy.mockResolvedValue([]);
+
+      const result = await service.listReleasedSettlements({});
+
+      expect(result).toHaveLength(0);
     });
 
     it('filters by recipientId when provided', async () => {
-      prismaMock.$transaction.mockResolvedValue([[], 0]);
+      prismaMock.settlementRecord.groupBy.mockResolvedValue([
+        {
+          recipientId: 'seller-1',
+          _count: { id: 1 },
+          _sum: { amount: 50000, commission: 5000, netAmount: 45000 },
+          _min: { releasedAt: new Date() },
+        },
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([{ id: 'seller-1', nickname: 'Alice' }]);
 
       await service.listReleasedSettlements({ recipientId: 'seller-1' });
 
-      const txCall = prismaMock.$transaction.mock.calls[0][0];
-      expect(txCall).toBeDefined();
+      expect(prismaMock.settlementRecord.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ recipientId: 'seller-1' }),
+        }),
+      );
     });
   });
 
   // ── createPayoutBatch ───────────────────────────────────────────────────────
 
   describe('createPayoutBatch', () => {
-    it('throws BadRequestException for empty input', async () => {
-      await expect(service.createPayoutBatch([])).rejects.toThrow(BadRequestException);
+    it('throws BadRequestException when neither recipientIds nor settlementIds provided', async () => {
+      await expect(service.createPayoutBatch({})).rejects.toThrow(BadRequestException);
       expect(prismaMock.settlementRecord.findMany).not.toHaveBeenCalled();
     });
 
-    it('creates one payout per unique recipientId', async () => {
+    it('creates one payout per unique recipientId (settlementIds path)', async () => {
       const records = [
         makeRecord({ id: 's1', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
         makeRecord({ id: 's2', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
@@ -482,7 +518,6 @@ describe('SettlementsService', () => {
         const txMock = {
           payout: { create: jest.fn() },
           settlementRecord: {
-            // No inner findMany race guard — replaced by atomic updateMany claim
             updateMany: jest.fn()
               .mockResolvedValueOnce({ count: 2 }) // seller-1: both records linked
               .mockResolvedValueOnce({ count: 1 }), // seller-2: one record linked
@@ -494,9 +529,55 @@ describe('SettlementsService', () => {
         return cb(txMock as unknown as typeof prismaMock);
       });
 
-      const result = await service.createPayoutBatch(['s1', 's2', 's3']);
+      const result = await service.createPayoutBatch({ settlementIds: ['s1', 's2', 's3'] });
 
       expect(result).toHaveLength(2);
+    });
+
+    it('creates payouts from recipientIds by resolving eligible settlements server-side', async () => {
+      // First findMany: eligible settlements for recipients (used in recipientIds path)
+      const eligible = [
+        makeRecord({ id: 's1', recipientId: 'seller-1', status: SettlementStatus.completed, payoutId: null }),
+        makeRecord({ id: 's2', recipientId: 'seller-2', status: SettlementStatus.completed, payoutId: null }),
+      ];
+      // Second findMany: load resolved records for validation
+      const full = [
+        makeRecord({ id: 's1', recipientId: 'seller-1', amount: 50000, commission: 5000, status: SettlementStatus.completed, payoutId: null, netAmount: 45000 }),
+        makeRecord({ id: 's2', recipientId: 'seller-2', amount: 30000, commission: 3000, status: SettlementStatus.completed, payoutId: null, netAmount: 27000 }),
+      ];
+      prismaMock.settlementRecord.findMany
+        .mockResolvedValueOnce(eligible) // eligibility lookup by recipientId
+        .mockResolvedValueOnce(full);    // full record load for validation
+
+      const payout1 = buildPayout({ recipientId: 'seller-1' });
+      const payout2 = buildPayout({ recipientId: 'seller-2' });
+
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: { create: jest.fn() },
+          settlementRecord: {
+            updateMany: jest.fn()
+              .mockResolvedValueOnce({ count: 1 })
+              .mockResolvedValueOnce({ count: 1 }),
+          },
+        };
+        txMock.payout.create
+          .mockResolvedValueOnce(payout1)
+          .mockResolvedValueOnce(payout2);
+        return cb(txMock as unknown as typeof prismaMock);
+      });
+
+      const result = await service.createPayoutBatch({ recipientIds: ['seller-1', 'seller-2'] });
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('throws BadRequestException when recipientIds have no eligible settlements', async () => {
+      prismaMock.settlementRecord.findMany.mockResolvedValueOnce([]); // no eligible
+
+      await expect(
+        service.createPayoutBatch({ recipientIds: ['seller-x'] }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws ConflictException when concurrent batch claims records first', async () => {
@@ -517,7 +598,7 @@ describe('SettlementsService', () => {
         return cb(txMock as unknown as typeof prismaMock);
       });
 
-      await expect(service.createPayoutBatch(['s1', 's2'])).rejects.toThrow(ConflictException);
+      await expect(service.createPayoutBatch({ settlementIds: ['s1', 's2'] })).rejects.toThrow(ConflictException);
     });
 
     it('throws when records are not in completed status', async () => {
@@ -526,7 +607,7 @@ describe('SettlementsService', () => {
       ];
       prismaMock.settlementRecord.findMany.mockResolvedValue(records);
 
-      await expect(service.createPayoutBatch(['s1'])).rejects.toThrow();
+      await expect(service.createPayoutBatch({ settlementIds: ['s1'] })).rejects.toThrow();
     });
 
     it('throws when records already have a payoutId', async () => {
@@ -535,7 +616,7 @@ describe('SettlementsService', () => {
       ];
       prismaMock.settlementRecord.findMany.mockResolvedValue(records);
 
-      await expect(service.createPayoutBatch(['s1'])).rejects.toThrow();
+      await expect(service.createPayoutBatch({ settlementIds: ['s1'] })).rejects.toThrow();
     });
   });
 

@@ -86,12 +86,11 @@ describe('DisputesService', () => {
   describe('listMyDisputes', () => {
     it('returns paginated disputes for the requesting user', async () => {
       const disputes = [buildDispute({ buyerId: 'u1' })];
-      mockPrisma.$transaction.mockResolvedValueOnce([disputes, 1]);
+      mockPrisma.dispute.findMany.mockResolvedValueOnce(disputes);
 
       const result = await service.listMyDisputes('u1', {});
 
-      expect(result.items).toHaveLength(1);
-      expect(result.total).toBe(1);
+      expect(result.data).toHaveLength(1);
       expect(result.nextCursor).toBeNull();
     });
 
@@ -99,12 +98,40 @@ describe('DisputesService', () => {
       const disputes = Array.from({ length: 21 }, (_, i) =>
         buildDispute({ buyerId: 'u1', id: `d-${i}` }),
       );
-      mockPrisma.$transaction.mockResolvedValueOnce([disputes, 25]);
+      mockPrisma.dispute.findMany.mockResolvedValueOnce(disputes);
 
       const result = await service.listMyDisputes('u1', { limit: 20 });
 
-      expect(result.items).toHaveLength(20);
+      expect(result.data).toHaveLength(20);
       expect(result.nextCursor).toBe('d-19');
+    });
+
+    it('filters to only buyer disputes when role=buyer', async () => {
+      const buyerDispute = buildDispute({ buyerId: 'u1' });
+      mockPrisma.dispute.findMany.mockResolvedValueOnce([buyerDispute]);
+
+      const result = await service.listMyDisputes('u1', { role: 'buyer' });
+
+      expect(result.data).toHaveLength(1);
+      expect(mockPrisma.dispute.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ buyerId: 'u1' }),
+        }),
+      );
+    });
+
+    it('filters to only seller disputes when role=seller', async () => {
+      const sellerDispute = buildDispute({ sellerId: 'u1' });
+      mockPrisma.dispute.findMany.mockResolvedValueOnce([sellerDispute]);
+
+      const result = await service.listMyDisputes('u1', { role: 'seller' });
+
+      expect(result.data).toHaveLength(1);
+      expect(mockPrisma.dispute.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ sellerId: 'u1' }),
+        }),
+      );
     });
   });
 
@@ -124,6 +151,32 @@ describe('DisputesService', () => {
       const result = await service.getDispute(dispute.id, 'buyer1', false);
 
       expect(result.id).toBe(dispute.id);
+      // B-5: messages renamed to events
+      expect('events' in result).toBe(true);
+      expect('messages' in result).toBe(false);
+    });
+
+    it('maps DisputeMessage fields to frontend DisputeEvent shape (B-5 field mapping)', async () => {
+      const dispute = buildDispute({ buyerId: 'buyer1', sellerId: 'seller1' });
+      const msg = buildDisputeMessage({ disputeId: dispute.id, authorId: 'buyer1', role: DisputeActorRole.buyer, body: 'Item arrived damaged.' });
+      mockPrisma.dispute.findUnique.mockResolvedValueOnce({
+        ...dispute,
+        buyer: { id: 'buyer1', nickname: 'Buyer' },
+        seller: { id: 'seller1', nickname: 'Seller' },
+        messages: [msg],
+        order: null,
+      });
+
+      const result = await service.getDispute(dispute.id, 'buyer1', false);
+
+      expect(result.events).toHaveLength(1);
+      const event = result.events[0];
+      expect(event.actorUserId).toBe('buyer1');
+      expect(event.actorRole).toBe(DisputeActorRole.buyer);
+      expect(event.message).toBe('Item arrived damaged.');
+      expect(event.attachmentUrls).toEqual([]);
+      expect('authorId' in event).toBe(false);
+      expect('body' in event).toBe(false);
     });
 
     it('throws ForbiddenException when requester is not a party', async () => {
@@ -355,14 +408,15 @@ describe('DisputesService', () => {
   // ── listForAdmin ─────────────────────────────────────────────────────────────
 
   describe('listForAdmin', () => {
-    it('returns paginated disputes for admin', async () => {
+    it('returns paginated disputes for admin with data/nextCursor shape', async () => {
       const disputes = [buildDispute(), buildDispute()];
-      mockPrisma.$transaction.mockResolvedValueOnce([disputes, 2]);
+      mockPrisma.dispute.findMany.mockResolvedValueOnce(disputes);
 
       const result = await service.listForAdmin({});
 
-      expect(result.items).toHaveLength(2);
-      expect(result.total).toBe(2);
+      expect(result.data).toHaveLength(2);
+      expect(result.nextCursor).toBeNull();
+      expect('total' in result).toBe(false);
     });
   });
 
@@ -382,6 +436,9 @@ describe('DisputesService', () => {
       const result = await service.startReview(dispute.id, 'admin1');
 
       expect(result.status).toBe(DisputeStatus.admin_reviewing);
+      // B-5: messages renamed to events in response
+      expect('events' in result).toBe(true);
+      expect('messages' in result).toBe(false);
     });
 
     it('throws BadRequestException from a resolved state', async () => {

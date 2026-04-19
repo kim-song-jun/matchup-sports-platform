@@ -2,13 +2,14 @@ import { http } from 'msw';
 import { success, cursorPaged } from './_utils';
 import { mockDispute, mockTeamMatchDispute } from '../../fixtures/admin';
 
+// Inline event mock — shape matches DisputeEvent (DisputeMessage serialized with body→message alias).
 const mockDisputeEvent = {
   id: 'event-1',
   disputeId: mockDispute.id,
   actorUserId: 'user-2',
   actorRole: 'buyer' as const,
   message: '상품 상태가 설명과 다릅니다.',
-  attachmentUrls: [],
+  attachmentUrls: [] as string[],
   createdAt: '2024-01-10T11:00:00.000Z',
 };
 
@@ -18,7 +19,7 @@ export const disputesHandlers = [
     return cursorPaged([mockDispute, mockTeamMatchDispute]);
   }),
 
-  // Dispute detail
+  // Dispute detail — includes buyer/seller relations + events
   http.get('/api/v1/disputes/:id', ({ params }) => {
     return success({
       ...mockDispute,
@@ -27,17 +28,17 @@ export const disputesHandlers = [
     });
   }),
 
-  // Seller responds
+  // Seller responds — status transitions filed → seller_responded
   http.post('/api/v1/disputes/:id/respond', ({ params }) => {
     return success({
       ...mockDispute,
       id: params.id as string,
       status: 'seller_responded',
-      sellerRespondedAt: new Date().toISOString(),
+      events: [mockDisputeEvent],
     });
   }),
 
-  // Add message (buyer or seller)
+  // Add message (buyer or seller) — returns the new DisputeEvent
   http.post('/api/v1/disputes/:id/messages', ({ params }) => {
     return success({
       ...mockDisputeEvent,
@@ -52,6 +53,9 @@ export const disputesHandlers = [
       ...mockDispute,
       id: params.id as string,
       status: 'withdrawn',
+      resolution: '구매자 자발 철회',
+      resolvedAt: new Date().toISOString(),
+      events: [],
     });
   }),
 
@@ -69,13 +73,13 @@ export const disputesHandlers = [
     });
   }),
 
-  // Admin — mark reviewing
+  // Admin — mark reviewing (filed → admin_reviewing)
   http.post('/api/v1/admin/disputes/:id/review', ({ params }) => {
     return success({
       ...mockDispute,
       id: params.id as string,
       status: 'admin_reviewing',
-      adminReviewingAt: new Date().toISOString(),
+      events: [],
     });
   }),
 
@@ -85,7 +89,10 @@ export const disputesHandlers = [
       ...mockDispute,
       id: params.id as string,
       status: 'resolved_release',
+      resolution: '판매자 주장 인정',
       resolvedAt: new Date().toISOString(),
+      resolvedByAdminId: 'admin-1',
+      events: [],
     });
   }),
 ];

@@ -233,39 +233,48 @@ export class SettlementsService {
   }
 
   /**
-   * Lists SettlementRecords in `completed` status that have not been included in a payout yet.
-   * Admin-only operation for constructing payout batches.
+   * Lists eligible SettlementRecords (completed, not yet paid out) grouped by recipientId.
+   * Returns aggregated EligibleSettlement rows — admin payout batch UI reads this as a flat array.
+   * Uses two queries: groupBy for aggregates + user join for recipientName.
    */
-  async listReleasedSettlements(filter: { recipientId?: string; cursor?: string; limit?: number }) {
-    const take = Math.min(filter.limit ?? 20, 100);
-    const where = {
-      status: SettlementStatus.completed,
-      payoutId: null,
-      ...(filter.recipientId ? { recipientId: filter.recipientId } : {}),
-    };
+  async listReleasedSettlements(filter: { recipientId?: string }) {
+    // Aggregate by recipient
+    const grouped = await this.prisma.settlementRecord.groupBy({
+      by: ['recipientId'],
+      where: {
+        status: SettlementStatus.completed,
+        payoutId: null,
+        ...(filter.recipientId ? { recipientId: filter.recipientId } : { recipientId: { not: null } }),
+      },
+      _sum: { amount: true, commission: true, netAmount: true },
+      _count: { id: true },
+      _min: { releasedAt: true },
+    });
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.settlementRecord.findMany({
-        where,
-        orderBy: { releasedAt: 'asc' },
-        take: take + 1,
-        ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
-      }),
-      this.prisma.settlementRecord.count({ where }),
-    ]);
+    if (grouped.length === 0) return [];
 
-    const hasMore = items.length > take;
-    if (hasMore) items.pop();
+    // Fetch recipient names in one query
+    const recipientIds = grouped.map((g) => g.recipientId as string);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: recipientIds } },
+      select: { id: true, nickname: true },
+    });
+    const nameMap = new Map(users.map((u) => [u.id, u.nickname]));
 
-    return {
-      items,
-      total,
-      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
-    };
+    return grouped.map((g) => ({
+      recipientId: g.recipientId as string,
+      recipientName: nameMap.get(g.recipientId as string) ?? 'Unknown',
+      settlementCount: g._count.id,
+      grossAmount: g._sum.amount ?? 0,
+      platformFee: g._sum.commission ?? 0,
+      netAmount: g._sum.netAmount ?? 0,
+      oldestReleasedAt: g._min.releasedAt?.toISOString() ?? new Date().toISOString(),
+    }));
   }
 
   /**
    * Lists all Payout records with optional filtering.
+   * Returns { data, nextCursor } for CursorPage contract alignment.
    */
   async findAllPayouts(filter: {
     status?: PayoutStatus;
@@ -281,49 +290,74 @@ export class SettlementsService {
       ...(filter.batchId ? { batchId: filter.batchId } : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.payout.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: take + 1,
-        include: {
-          recipient: { select: { id: true, nickname: true } },
-        },
-        ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
-      }),
-      this.prisma.payout.count({ where }),
-    ]);
+    const rows = await this.prisma.payout.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      include: {
+        recipient: { select: { id: true, nickname: true } },
+      },
+      ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
+    });
 
-    const hasMore = items.length > take;
-    if (hasMore) items.pop();
+    const hasMore = rows.length > take;
+    if (hasMore) rows.pop();
 
     return {
-      items,
-      total,
-      nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+      data: rows,
+      nextCursor: hasMore ? (rows[rows.length - 1]?.id ?? null) : null,
     };
   }
 
   /**
-   * Groups the given SettlementRecord IDs by recipientId and creates one Payout per seller.
-   * All records are locked to their respective payout inside a single transaction.
-   * A shared batchId is generated for the entire batch run.
+   * Groups SettlementRecords by recipientId and creates one Payout per seller.
+   * Accepts either:
+   *   - recipientIds: server queries all eligible settlements for those recipients (up to cutoffDate)
+   *   - settlementIds: explicit list of settlement IDs to batch
+   * At least one must be provided.
    *
    * Race safety: updateMany with `payoutId: null` filter is the atomic claim.
    * If another batch linked any record before us, count < group.length → ConflictException.
    *
-   * @param settlementIds - IDs of SettlementRecords to include in payouts
+   * @param params.settlementIds - Explicit settlement IDs to batch
+   * @param params.recipientIds - Recipient user IDs; server resolves eligible settlements
+   * @param params.cutoffDate - ISO date string; only include settlements released at or before this date
    * @param adminNote - Optional note to attach to each payout
    * @returns Array of created Payout records
    */
-  async createPayoutBatch(settlementIds: string[], adminNote?: string) {
-    if (settlementIds.length === 0) {
-      throw new BadRequestException('PAYOUT_BATCH_EMPTY: 최소 1개 이상의 정산 ID를 지정해야 합니다.');
+  async createPayoutBatch(
+    params: { settlementIds?: string[]; recipientIds?: string[]; cutoffDate?: string },
+    adminNote?: string,
+  ): Promise<unknown[]> {
+    const { settlementIds: explicitIds, recipientIds, cutoffDate } = params;
+
+    let resolvedIds: string[];
+
+    if (recipientIds && recipientIds.length > 0) {
+      // Server-side resolution: find all eligible settlements for given recipients
+      const cutoff = cutoffDate ? new Date(cutoffDate) : undefined;
+      const eligible = await this.prisma.settlementRecord.findMany({
+        where: {
+          recipientId: { in: recipientIds },
+          status: SettlementStatus.completed,
+          payoutId: null,
+          ...(cutoff ? { releasedAt: { lte: cutoff } } : {}),
+        },
+        select: { id: true, recipientId: true },
+      });
+      if (eligible.length === 0) {
+        throw new BadRequestException('PAYOUT_BATCH_NO_ELIGIBLE: 지정된 수신자에게 지급 가능한 정산 내역이 없습니다.');
+      }
+      resolvedIds = eligible.map((r) => r.id);
+    } else if (explicitIds && explicitIds.length > 0) {
+      resolvedIds = explicitIds;
+    } else {
+      throw new BadRequestException('PAYOUT_BATCH_EMPTY: recipientIds 또는 settlementIds 중 하나를 지정해야 합니다.');
     }
 
     // Load all records; verify they are releasable (completed + no existing payout) for early UX error
     const records = await this.prisma.settlementRecord.findMany({
-      where: { id: { in: settlementIds } },
+      where: { id: { in: resolvedIds } },
     });
 
     const invalid = records.filter(

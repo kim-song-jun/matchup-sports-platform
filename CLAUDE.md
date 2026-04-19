@@ -214,6 +214,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **팀 신뢰 점수**: 6항목 상호평가 → TeamTrustScore 누적
 - **채팅**: Prisma `ChatRoom`/`ChatMessage`/`ChatParticipant` 모델로 영속화. cursor 기반 페이지네이션, `teamMatchId` 연동, get-or-create. in-memory stub 완전 제거. `ChatService`가 persist → broadcast 단일 경로 (REST + WS 공통)
 - **팀 자동 구성 (Task 71)**: ELO snake-draft 기반 균등 팀 배정 — `TeamBalancingService`가 `UserSportProfile.eloRating`을 ELO 내림차순 정렬 후 snake-draft (A-B-B-A-A-B-... 또는 A-B-C-C-B-A-... 다팀 snake)로 배분. Preview API로 dry-run 확인 후 확정 시 `$transaction`으로 원자 교체. Cold-start(`UserSportProfile` 없음) 참가자는 eloRating=1000 fallback. 알고리즘 설계 문서: `docs/design/task-71-team-balancing.md`
+- **팀 자동 구성 v2 hardening (Task 72)**: preview→compose 간 **participant churn 감지** 추가. `computeParticipantHash()`(SHA-256 of sorted userIds, `apps/api/src/matches/matches.service.ts`)가 preview 응답에 `participantHash` 필드를 포함하고, compose 호출 시 stale hash 감지 → **409 `PARTICIPANTS_CHANGED`**. 프론트는 자동 재-preview + "참가자가 변경되어 다시 계산했어요" 토스트. Preview 엔드포인트에 **호스트 단위 rate limit** 적용(`@Throttle limit=20/60s`, `HostThrottlerGuard`가 `req.user.id`로 트래킹, 초과 시 429 + `Retry-After`). Modal은 `previewHistory` FIFO cap=2로 직전 preview 비교·재사용 지원. 기존 팀 배정이 있는 매치의 재확정은 `ConfirmReplaceModal`(alertdialog role)로 명시적 "교체" 확인. 4팀 그리드는 `sm:grid-cols-2 xl:grid-cols-3` responsive.
 
 ### 팀 역할 기반 권한 (Phase 1-5 추가)
 
@@ -241,9 +242,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 ### 매치 (`/matches`)
 `GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` | `POST :id/close` | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete`
 
-**팀 자동 구성** (Task 71 추가):
-`POST :id/teams/preview` (호스트 전용, 팀 자동 구성 dry-run preview — body: `ComposeTeamsDto { strategy?, teamCount?, seed? }`, response: `PreviewTeamsResponseDto { teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed }`. DB 변경 없음)
-`POST :id/teams` — Task 71로 확장: `ComposeTeamsDto` body 수락, ELO snake-draft(`TeamBalancingService`) 경유, `$transaction` 원자 교체. body 없는 기존 클라이언트는 `autoBalance` 플래그 기반 default 동작 유지 (back-compat).
+**팀 자동 구성** (Task 71 추가, Task 72에서 hardening):
+`POST :id/teams/preview` (호스트 전용, 팀 자동 구성 dry-run preview — body: `ComposeTeamsDto { strategy?, teamCount?, seed?, participantHash? }`, response: `PreviewTeamsResponseDto { teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed, participantHash }`. DB 변경 없음. **Task 72**: 응답에 `participantHash`(SHA-256 hex 64-char) 포함, `@Throttle limit=20/60s` + `HostThrottlerGuard`(req.user.id 트래킹) 적용. 초과 시 429 + `Retry-After: 60`)
+`POST :id/teams` — Task 71로 확장: `ComposeTeamsDto` body 수락, ELO snake-draft(`TeamBalancingService`) 경유, `$transaction` 원자 교체. body 없는 기존 클라이언트는 `autoBalance` 플래그 기반 default 동작 유지 (back-compat). **Task 72**: optional `participantHash` 수락 — preview 시점 hash와 현재 참가자 해시 불일치 시 **409 `PARTICIPANTS_CHANGED`** 반환(프론트에서 자동 재-preview). hash 미전달 시 legacy client로 간주하여 stale check skip.
 
 ### 팀 (`/teams`)
 `GET /` | `GET me` (소유 팀 목록, JwtAuthGuard) | `GET :id` | `POST /` | `PATCH :id` | `DELETE :id` | `POST :id/apply`
@@ -378,8 +379,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useStartDirectChat()` — 1:1 채팅방 생성 mutation (`POST /chat/rooms` type=direct), 생성 후 `/chat/:roomId` redirect (Task 69 추가)
 - `useCloseMercenaryPost()` — 용병 모집글 종료 mutation (`POST /mercenary/:id/close`) (Task 69 추가)
 - `useCancelMercenaryPost()` — 용병 모집글 취소 mutation (`POST /mercenary/:id/cancel`) (Task 69 추가)
-- `usePreviewTeams(matchId)` — 팀 자동 구성 preview (dry-run) (`POST /matches/:id/teams/preview`), 호스트 전용. 응답: `{ teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed }` (Task 71 추가)
-- `useComposeTeams(matchId)` — 팀 배정 확정 (`POST /matches/:id/teams`), 성공 시 `['match', matchId]` + `['match-participants', matchId]` invalidate (Task 71 추가)
+- `usePreviewTeams(matchId)` — 팀 자동 구성 preview (dry-run) (`POST /matches/:id/teams/preview`), 호스트 전용. 응답: `{ teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed, participantHash }` (Task 71 추가, **Task 72**: `participantHash` 필드 추가로 stale preview 감지 지원). 429 수신 시 `retryAfterSeconds` 상태 노출 + info 토스트 표시(Track C에서 재추첨 버튼 60초 disable)
+- `useComposeTeams(matchId, options?)` — 팀 배정 확정 (`POST /matches/:id/teams`), 성공 시 `['match', matchId]` + `['match-participants', matchId]` invalidate (Task 71 추가, **Task 72**: `options.onParticipantsChanged` 콜백 — 서버가 409 `PARTICIPANTS_CHANGED` 반환 시 stale hash 제거 후 호출자에게 재-preview 지시. info 토스트 "참가자가 변경되어 다시 계산했어요" 자동 표시)
 - `useMyOrders(params?)` — buyer 주문 목록 (`GET /marketplace/orders/me`, cursor 페이지네이션) (Task 70 추가)
 - `useOrder(id)` — 주문 상세 (`GET /marketplace/orders/:id`, buyer 또는 seller) (Task 70 추가)
 - `useShipOrder()` — 판매자 배송 시작 mutation (`POST /marketplace/orders/:id/ship`) (Task 70 추가)
@@ -456,6 +457,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `components/dispute/dispute-resolve-modal.tsx` — 어드민 분쟁 해결 모달 (action: refund | release | dismiss, note 입력, `components/ui/modal.tsx` 기반) (Task 70 추가)
 - `components/admin/payout-batch-builder.tsx` — 어드민 payout 배치 생성 UI (eligible settlement 선택 → batch 생성 → mark-paid 흐름) (Task 70 추가)
 - `lib/dispute-labels.ts` — 분쟁 status/type 레이블 단일 소스. 어드민 목록·상세·필터 전체에서 공유 (Task 70 추가)
+- `components/match/auto-balance-modal.tsx` — 팀 자동 구성 모달 (preview → 재추첨 → 확정). **Task 72**에서 `previewHistory`(FIFO cap=2) 비교 토글, 재추첨 rate-limit 카운트다운 disable, aria-live dedup 공지 추가
+- `components/match/confirm-replace-modal.tsx` — 기존 팀 배정이 있는 매치 재확정 경고 alertdialog. current teams 요약 + "교체"/"취소" CTA (Task 72 추가)
 
 ### 프론트엔드 품질 기준
 - **Open Redirect 방지**: `/login?redirect=...` 파라미터는 반드시 `sanitizeRedirect()` (`apps/web/src/app/(auth)/login/page.tsx`)를 통과시켜 **상대 경로만** 허용한다. 절대 URL, `javascript:`, `//host/` 형태는 모두 차단하고 `/home`으로 fallback.

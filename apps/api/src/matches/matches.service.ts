@@ -942,12 +942,12 @@ export class MatchesService {
       },
     });
 
-    // Fire-and-forget: award badges for all participants after match completion
+    // Award badges synchronously to make completion side-effects observable and idempotent
     const participants = await this.prisma.matchParticipant.findMany({
       where: { matchId },
       select: { userId: true },
     });
-    void Promise.all(
+    await Promise.all(
       participants.map((p) =>
         this.badgesService.awardIfEligible(p.userId, 'first_match_completed', {
           name: '첫 매치 완료',

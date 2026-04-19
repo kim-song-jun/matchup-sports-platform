@@ -30,9 +30,12 @@ const config: Config = {
       testMatch: ['<rootDir>/test/integration/**/*.e2e-spec.ts'],
       globalSetup: '<rootDir>/test/jest-global-setup.ts',
       globalTeardown: '<rootDir>/test/jest-global-teardown.ts',
-      testTimeout: 15000,
     },
   ],
+
+  // Top-level config (project-level testTimeout is ignored by jest)
+  // Integration suites do real DB work and can exceed the 5s default under CI load.
+  testTimeout: 15000,
 
   // Coverage collected from all source files
   collectCoverageFrom: ['src/**/*.(t|j)s'],

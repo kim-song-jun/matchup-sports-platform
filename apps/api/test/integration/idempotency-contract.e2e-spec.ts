@@ -397,7 +397,7 @@ describe('Idempotency contract (e2e)', () => {
 
       const teamAfterFirst = await prisma.sportTeam.findUniqueOrThrow({ where: { id: team.id } });
       const memberCountAfterFirst = teamAfterFirst.memberCount;
-      const updatedAtAfterFirst = membershipAfterFirst.updatedAt;
+      const membershipIdAfterFirst = membershipAfterFirst.id;
 
       const second = await request
         .patch(`/api/v1/teams/${team.id}/applications/${applicantUser.id}/accept`)
@@ -410,11 +410,13 @@ describe('Idempotency contract (e2e)', () => {
       const teamAfterSecond = await prisma.sportTeam.findUniqueOrThrow({ where: { id: team.id } });
       expect(teamAfterSecond.memberCount).toBe(memberCountAfterFirst);
 
-      // membership.updatedAt MUST NOT change on second call
+      // Membership row identity + terminal status MUST be preserved on replay
+      // (TeamMembership has no updatedAt; rely on id + status invariance)
       const membershipAfterSecond = await prisma.teamMembership.findFirstOrThrow({
         where: { teamId: team.id, userId: applicantUser.id },
       });
-      expect(membershipAfterSecond.updatedAt.getTime()).toBe(updatedAtAfterFirst.getTime());
+      expect(membershipAfterSecond.id).toBe(membershipIdAfterFirst);
+      expect(membershipAfterSecond.status).toBe('active');
     });
 
     it('returns 401 without token', async () => {

@@ -418,7 +418,7 @@ function PreviewStep({
       )}
 
       {/* Status region: balance badge + cold-start banner */}
-      <div aria-live="polite" className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
         {/* Balance badge */}
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -464,7 +464,7 @@ function PreviewStep({
       <div
         className={`grid gap-3 ${
           teamCount >= 3
-            ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3'
+            ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
             : 'grid-cols-1 sm:grid-cols-2'
         }`}
       >
@@ -642,10 +642,12 @@ export function AutoBalanceModal({
       return;
     }
     setCountdown(retryAfterSeconds);
+    setAnnouncementText(`재추첨은 ${retryAfterSeconds}초 후 가능해요.`);
     const id = setInterval(() => {
       setCountdown((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(id);
+          setAnnouncementText('');
           return null;
         }
         return prev - 1;

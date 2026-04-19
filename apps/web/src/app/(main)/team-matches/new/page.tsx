@@ -13,6 +13,7 @@ import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 import type { CreateTeamMatchInput } from '@/types/api';
 import { formatCurrency } from '@/lib/utils';
 import { sportLabel } from '@/lib/constants';
+import { Toggle } from '@/components/ui/toggle';
 
 const STEPS = ['종목', '장소/일시', '경기조건', '비용/규정', '확인'];
 
@@ -638,18 +639,16 @@ export default function NewTeamMatchPage() {
 
 function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3.5 cursor-pointer" onClick={() => onChange(!checked)}>
+    <div
+      className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3.5"
+      onClick={() => onChange(!checked)}
+    >
       <span className="text-base font-medium text-gray-800 dark:text-gray-200">{label}</span>
-      <button
-        type="button"
-        aria-label={label}
-        onClick={(e) => { e.stopPropagation(); onChange(!checked); }}
-        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-gray-800 shadow transition-transform ${checked ? 'translate-x-5' : ''}`}
-        />
-      </button>
+      <Toggle
+        label={label}
+        enabled={checked}
+        onToggle={() => onChange(!checked)}
+      />
     </div>
   );
 }

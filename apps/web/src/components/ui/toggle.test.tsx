@@ -38,11 +38,22 @@ describe('Toggle', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
+  // Class assertion only — actual layout size requires e2e (jsdom has no layout)
   it('meets 44x44px touch target — has min-h-[44px] and min-w-[44px] classes', () => {
     render(<Toggle enabled={true} onToggle={vi.fn()} label="터치 타겟" />);
     const btn = screen.getByRole('switch');
     expect(btn.className).toContain('min-h-[44px]');
     expect(btn.className).toContain('min-w-[44px]');
+  });
+
+  it('has focus-visible ring classes for WCAG 2.4.7 keyboard focus', () => {
+    render(<Toggle enabled={false} onToggle={vi.fn()} label="포커스 링" />);
+    const btn = screen.getByRole('switch');
+    btn.focus();
+    expect(document.activeElement).toBe(btn);
+    expect(btn.className).toContain('focus-visible:ring-2');
+    expect(btn.className).toContain('focus-visible:ring-blue-500');
+    expect(btn.className).toContain('focus-visible:ring-offset-2');
   });
 
   it('thumb span has aria-hidden="true" to avoid duplicate announcements', () => {

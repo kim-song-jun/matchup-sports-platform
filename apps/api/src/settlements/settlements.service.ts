@@ -467,8 +467,7 @@ export class SettlementsService {
       });
     });
 
-    // Fire-and-forget: notify recipient after transaction commits.
-    // Notification failure must not affect payout status.
+    // Notify recipient; awaited for deterministic test ordering (Task 73 pattern). Failures are swallowed so payout status is not rolled back.
     await this.notificationsService
       .create({
         userId: payout.recipientId,
@@ -476,9 +475,8 @@ export class SettlementsService {
         title: '정산 지급이 완료되었어요',
         body: `${paid.netAmount.toLocaleString()}원이 지급 처리되었어요.`,
         data: {
-          payoutId,
+          payoutId: paid.id,
           amount: paid.netAmount,
-          ...(note !== undefined ? { externalRef: note } : {}),
         },
       })
       .catch(() => {

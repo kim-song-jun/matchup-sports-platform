@@ -27,6 +27,8 @@ export function Toggle({ enabled, onToggle, disabled, label }: ToggleProps) {
         // Touch target: pad to 44x44 while keeping visual track size (Option B)
         'flex items-center justify-center shrink-0',
         'min-h-[44px] min-w-[44px]',
+        // WCAG 2.4.7: keyboard focus ring (blue-500, 2px offset)
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900',
         disabled ? 'cursor-not-allowed' : 'cursor-pointer',
       ].join(' ')}
     >

@@ -111,6 +111,79 @@ describe('WebPushService', () => {
       });
     });
 
+    // C7 regression tests — push-subscribe upsert semantics (Task 73)
+    // Rationale: Task 69 fixed the race by switching to endpoint-keyed upsert.
+    // These tests lock that contract so a revert (e.g. back to findFirst+create)
+    // would be caught immediately.
+
+    it('second subscribe call with same endpoint uses same unique key — no duplicate row possible', async () => {
+      mockPrisma.pushSubscription.upsert.mockResolvedValue({});
+
+      const endpoint = 'https://push.example.com/sub/same-endpoint';
+      const sub = { endpoint, keys: { p256dh: 'p256dh-first', auth: 'auth-first' } };
+
+      await service.subscribe('u1', sub);
+      await service.subscribe('u1', sub);
+
+      // Both calls must target the same unique key (endpoint), not a user-scoped key
+      expect(mockPrisma.pushSubscription.upsert).toHaveBeenCalledTimes(2);
+      const calls = mockPrisma.pushSubscription.upsert.mock.calls;
+      expect(calls[0][0].where).toEqual({ endpoint });
+      expect(calls[1][0].where).toEqual({ endpoint });
+    });
+
+    it('second subscribe with same endpoint but updated keys overrides p256dh and auth', async () => {
+      mockPrisma.pushSubscription.upsert.mockResolvedValue({});
+
+      const endpoint = 'https://push.example.com/sub/rekey';
+
+      await service.subscribe('u1', { endpoint, keys: { p256dh: 'old-p256dh', auth: 'old-auth' } });
+      await service.subscribe('u1', { endpoint, keys: { p256dh: 'new-p256dh', auth: 'new-auth' } });
+
+      const secondCall = mockPrisma.pushSubscription.upsert.mock.calls[1][0];
+      expect(secondCall.update).toMatchObject({ p256dh: 'new-p256dh', auth: 'new-auth' });
+      // update branch must also refresh lastUsedAt
+      expect(secondCall.update).toHaveProperty('lastUsedAt');
+    });
+
+    it('device hand-off: same endpoint re-subscribed by a different user updates userId in update branch', async () => {
+      mockPrisma.pushSubscription.upsert.mockResolvedValue({});
+
+      const endpoint = 'https://push.example.com/sub/shared-device';
+
+      await service.subscribe('user-A', { endpoint, keys: { p256dh: 'p1', auth: 'a1' } });
+      await service.subscribe('user-B', { endpoint, keys: { p256dh: 'p2', auth: 'a2' } });
+
+      const firstCreate = mockPrisma.pushSubscription.upsert.mock.calls[0][0];
+      const secondUpdate = mockPrisma.pushSubscription.upsert.mock.calls[1][0];
+
+      expect(firstCreate.create).toMatchObject({ userId: 'user-A', endpoint });
+      // The update branch carries the new userId so ownership transfers atomically
+      expect(secondUpdate.update).toMatchObject({ userId: 'user-B' });
+    });
+
+    it('rapid sequential calls with same endpoint each go through upsert (not create-then-fail)', async () => {
+      mockPrisma.pushSubscription.upsert.mockResolvedValue({});
+
+      const endpoint = 'https://push.example.com/sub/rapid';
+      const sub = { endpoint, keys: { p256dh: 'p', auth: 'a' } };
+
+      // Simulate rapid sequential calls (e.g. background tab retry)
+      await Promise.all([
+        service.subscribe('u1', sub),
+        service.subscribe('u1', sub),
+        service.subscribe('u1', sub),
+      ]);
+
+      // All three must use upsert — never a separate findFirst+create path
+      expect(mockPrisma.pushSubscription.upsert).toHaveBeenCalledTimes(3);
+      const uniqueWhereKeys = new Set(
+        mockPrisma.pushSubscription.upsert.mock.calls.map((c: [{ where: { endpoint: string } }]) => c[0].where.endpoint),
+      );
+      expect(uniqueWhereKeys.size).toBe(1);
+      expect(uniqueWhereKeys.has(endpoint)).toBe(true);
+    });
+
     it('sendToUser calls webpush.sendNotification for each subscription', async () => {
       mockPrisma.pushSubscription.findMany.mockResolvedValue([
         { id: 's1', endpoint: 'https://push.example.com/1', p256dh: 'p1', auth: 'a1' },

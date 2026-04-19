@@ -245,6 +245,12 @@ curl http://localhost:8100/api/v1/notifications/vapid-public-key
 - **프로덕션 secret store** (GitHub Actions / EC2 SSM)
 - Task 69 의 NotificationsService fan-out 12건 — 이미 완료, 본 task 는 전달 경로만 강화
 - 기존 `PushSubscription` 테이블과 `web-push` 패키지 (마이그레이션 `20260406020000_replace_fcm_with_web_push` 로 이미 정착)
+- **iOS scope 시 서버측 APNs 패키지 미설치 확인됨 (2026-04-19 감사)** — `apps/api/package.json` 에 `node-apn` / `@parse/node-apn` 없음. iOS track 착수 시:
+  ```bash
+  cd apps/api && pnpm add @parse/node-apn
+  cd apps/api && pnpm add -D @types/apn   # 타입 지원
+  ```
+  신규 서비스 `apps/api/src/notifications/apn.service.ts` 에서 `.p8` key 로드 후 `provider.send(notification, deviceToken)` 호출. `NotificationsService.create` → (iOS 플랫폼 디바이스 토큰 있으면) `ApnService.sendToUser` 로 fire-and-forget. Firebase Admin SDK 는 절대 추가하지 않는다 (프로젝트 정책)
 
 ---
 

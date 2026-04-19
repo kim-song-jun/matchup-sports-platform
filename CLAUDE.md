@@ -126,17 +126,29 @@ infra/
 - **배포**: Docker (deploy/Dockerfile.api, deploy/Dockerfile.web)
 
 ### 포트 맵
+
+**Dev 환경** (로컬 + `docker-compose.yml`)
 | 서비스 | 포트 | 용도 |
 |--------|------|------|
 | Next.js | 3003 | 프론트엔드 개발 서버 |
-| NestJS | 8100 | 백엔드 API 서버 |
-| PostgreSQL | 5432 | 데이터베이스 |
-| Redis | 6379 | 캐시/세션 |
+| NestJS | **8111** | 백엔드 API 서버 (dev) |
+| PostgreSQL | 5433 | 데이터베이스 (호스트 노출) |
+| Redis | 6380 | 캐시/세션 (호스트 노출) |
+
+**Prod 환경** (`deploy/docker-compose.prod.yml`)
+| 서비스 | 포트 | 비고 |
+|--------|------|------|
+| Next.js | 3000 | Nginx 리버스 프록시 뒷단 (`deploy/Dockerfile.web` EXPOSE 3000) |
+| NestJS | **8100** | Nginx 리버스 프록시 뒷단 (`deploy/Dockerfile.api` EXPOSE 8100) |
+| PostgreSQL | 5432 | 컨테이너 내부만 |
+| Redis | 6379 | 컨테이너 내부만 |
+
+> **주의**: dev 와 prod 의 API 포트(8111 vs 8100) · Web 포트(3003 vs 3000) 가 다릅니다. 주요 설정 위치: `apps/api/src/config/configuration.ts` (`API_PORT || 8111`), `apps/web/next.config.ts` (`http://localhost:8111` dev / `http://api:8100` prod), `docker-compose.yml` (dev), `deploy/docker-compose.prod.yml` (prod).
 
 ## 개발 명령어
 
 ```bash
-pnpm dev              # 전체 개발 서버 (프론트 3003 + 백엔드 8100)
+pnpm dev              # 전체 개발 서버 (프론트 3003 + 백엔드 8111)
 pnpm build            # 전체 빌드
 pnpm lint             # 전체 린트
 pnpm db:push          # Prisma 스키마 DB 반영

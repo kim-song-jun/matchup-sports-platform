@@ -171,6 +171,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 **Fixture 팩토리**: `apps/api/test/fixtures/`
 - `personas.ts` — 8개 테스트 페르소나 (sinaro/teamOwner/teamManager/teamMember/mercenaryHost/admin/instructor/seller)
 - `teams.ts`, `matches.ts`, `team-matches.ts`, `mercenary.ts`, `marketplace.ts`, `payments.ts`, `lessons.ts`
+- `disputes.ts` — `createDispute`, `createDisputeEvent` (Task 70 추가)
+- `payouts.ts` — `createPayout`, `createPayoutBatch` (Task 70 추가)
 
 **프론트엔드 모킹**: MSW (`apps/web/src/test/msw/`) — 네트워크 레이어 모킹. `vitest.setup.ts`에서 lifecycle 관리.
 
@@ -195,7 +197,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **개인 매칭**: 종목별 매치 생성 → 참가 신청 → 결제 → 팀 편성 → 경기 → 리뷰
 - **팀 매칭**: 팀 생성 → 경기 공고 → 상대팀 신청 → 2단계 상호확인 → 도착인증 → 경기 → 상호평가
 - **용병 시스템**: 팀 경기에 개인 용병 참가 (Prisma 기반, 더 이상 in-memory mock 없음)
-- **장터**: 중고 장비 판매/대여/공동구매 + 에스크로 결제
+- **장터**: 중고 장비 판매/대여/공동구매 + 에스크로 결제 — Toss 일반 결제 + in-house 에스크로 원장. `MarketplaceOrder` 상태 머신(`pending → paid → shipped → delivered → completed | auto_released`), 에스크로 자동 해제 cron (10분 주기, `DISABLE_MARKETPLACE_CRON=true` 비활성화), 분쟁 도메인(`Dispute` + `DisputeEvent` Prisma 모델, in-memory mock 완전 제거), 정산 payout 배치 워크플로우(admin 수동 배치 → mark-paid), 커미션 10% 단일 상수(`MARKETPLACE_COMMISSION_RATE`, `apps/api/src/common/constants/commission.ts`)
 - **강좌**: 그룹레슨/연습경기/자유연습/클리닉 + 티켓(1회권/다회권/기간권) + 출석 관리
 - **팀 신뢰 점수**: 6항목 상호평가 → TeamTrustScore 누적
 - **채팅**: Prisma `ChatRoom`/`ChatMessage`/`ChatParticipant` 모델로 영속화. cursor 기반 페이지네이션, `teamMatchId` 연동, get-or-create. in-memory stub 완전 제거. `ChatService`가 persist → broadcast 단일 경로 (REST + WS 공통)
@@ -259,6 +261,23 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 ### 장터 (`/marketplace`)
 `GET listings` | `POST listings` | `GET listings/:id` | `POST listings/:id/order`
 
+**주문 상태 전환** (Task 70 추가):
+`GET orders/me` (buyer 전용, cursor 페이지네이션) | `GET orders/:id` (buyer 또는 seller) | `POST orders/:id/ship` (seller 전용, `ShipOrderDto { carrier?, trackingNumber? }`) | `POST orders/:id/deliver` (seller 전용) | `POST orders/:id/confirm-receipt` (buyer 전용, `completed` 전환 + SettlementRecord 생성) | `POST orders/:id/dispute` (buyer 전용, `escrow_held | shipped | delivered` 상태에서만, `FileDisputeDto { type, description, attachmentUrls? }`)
+
+**어드민 주문 강제 해제** (Task 70 추가):
+`POST /admin/orders/:id/force-release` (AdminGuard, `{ note: string }` — cron과 동일 서비스 메서드, 운영 재처리 + 통합테스트 결정론용)
+
+### 분쟁 (`/disputes`)
+**구매자·판매자 뷰** (Task 70 추가 — 기존 `/admin/disputes` 완전 재작성):
+`GET me` (query `?role=buyer|seller|all`, cursor 페이지네이션) | `GET :id` (participant 또는 admin) | `POST :id/respond` (seller 전용, state=filed일 때, `RespondDisputeDto`) | `POST :id/messages` (buyer/seller participant, `DisputeMessageDto`) | `POST :id/withdraw` (buyer 전용, filed/seller_responded 상태에서만)
+
+**어드민 분쟁 관리** (Task 70 재작성 — 기존 `POST /` + `PATCH :id/status` 제거):
+`GET /admin/disputes` (status / targetType / cursor 필터) | `GET /admin/disputes/:id` (Dispute + events[] + order/teamMatch snapshot) | `POST /admin/disputes/:id/review` (→ `admin_reviewing`) | `PATCH /admin/disputes/:id/resolve` (`ResolveDisputeDto { action: refund|release|dismiss, note }` — refund 시 Toss cancel 연동, release 시 SettlementRecord 생성)
+
+### 정산 (`/admin/payouts`)
+**(Task 70 신규 — 기존 `/admin/settlements` 에 payout 배치 계층 추가)**
+`GET /admin/payouts` (status / recipientId / batchId / cursor 필터) | `GET /admin/payouts/eligible` (배치 대상 released settlements, recipient별 집계) | `POST /admin/payouts/batch` (`CreateBatchDto { recipientIds?, cutoffDate? }` — 서버에서 금액 계산, client 금액 신뢰 안 함) | `PATCH /admin/payouts/:id/mark-paid` (`{ externalRef?, note? }` — payout `paid`, 수령자 `payout_paid` 알림) | `PATCH /admin/payouts/:id/mark-failed` (`{ reason }` — settlements `payoutId=null` 복원, 재대기열)
+
 ### 결제 (`/payments`)
 `POST prepare` (PreparePaymentDto) | `POST confirm` (ConfirmPaymentDto) | `POST :id/refund` (RefundPaymentDto) | `GET me` | `POST webhook`
 
@@ -275,10 +294,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET stats/users/matches/lessons/teams/venues/payments` | `POST lessons/teams/venues` | `PATCH matches/:id/status` | `PATCH lessons/:id/status` | `PATCH venues/:id`
 
 ### 정산 (`/admin/settlements`)
-`GET /` | `GET summary` | `PATCH :id/process`
-
-### 분쟁 (`/admin/disputes`)
-`GET /` | `GET :id` | `POST /` | `PATCH :id/status`
+`GET /` | `GET summary` | `PATCH :id/process` (status 컬럼: `pending | held | processing | completed | failed | refunded` — Task 70에서 `held`/`refunded` 추가)
 
 ### 용병 (`/mercenary`)
 `GET /` (모든 11 종목 필터링 지원, Task 27 수정) | `POST /` | `GET :id` (Task 27 추가, detail page 지원) | `POST :id/apply`
@@ -335,7 +351,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - 클라이언트 상태: Zustand stores (`stores/` 디렉토리)
 - 로컬 포맷터 정의 금지 — 반드시 `lib/utils.ts` 유틸 사용
 
-### 주요 커스텀 훅 (`hooks/use-api.ts`)
+### 주요 커스텀 훅 (`hooks/use-api.ts` → `hooks/api/<domain>.ts` 도메인별 분리, `hooks/use-api.ts` 는 re-export barrel)
 - `useMyTeams()` — 로그인 유저 소속 팀 목록 (`GET /teams/me`). 백엔드 `TeamMembership[]` 응답을 `{ id, name, role, sportType, description, city, district, memberCount, level, isRecruiting, logoUrl, joinedAt }[]` 평탄화 형태로 정규화하여 반환. 팀 선택 UI·팀 매칭 생성 시 사용
 - `useMyTeamMatchApplications()` — 신청자 본인이 보낸 팀 매칭 신청 목록 (`GET /team-matches/me/applications`). `/my/team-match-applications` 페이지에서 사용
 - `useRequireAuth()` — 비로그인 접근 시 로그인 페이지로 redirect. **인증이 필요한 모든 페이지에 반드시 적용** (`/(main)/my/*`, `/(main)/profile`, `/(main)/matches/new`, `/(main)/lessons/new`, `/(main)/reviews`, `/teams/new`, `/team-matches/new`, `/mercenary/new` 등)
@@ -352,6 +368,27 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useCancelMercenaryPost()` — 용병 모집글 취소 mutation (`POST /mercenary/:id/cancel`) (Task 69 추가)
 - `usePreviewTeams(matchId)` — 팀 자동 구성 preview (dry-run) (`POST /matches/:id/teams/preview`), 호스트 전용. 응답: `{ teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed }` (Task 71 추가)
 - `useComposeTeams(matchId)` — 팀 배정 확정 (`POST /matches/:id/teams`), 성공 시 `['match', matchId]` + `['match-participants', matchId]` invalidate (Task 71 추가)
+- `useMyOrders(params?)` — buyer 주문 목록 (`GET /marketplace/orders/me`, cursor 페이지네이션) (Task 70 추가)
+- `useOrder(id)` — 주문 상세 (`GET /marketplace/orders/:id`, buyer 또는 seller) (Task 70 추가)
+- `useShipOrder()` — 판매자 배송 시작 mutation (`POST /marketplace/orders/:id/ship`) (Task 70 추가)
+- `useDeliverOrder()` — 판매자 배송 완료 mutation (`POST /marketplace/orders/:id/deliver`) (Task 70 추가)
+- `useConfirmReceipt()` — 구매자 수령 확인 mutation (`POST /marketplace/orders/:id/confirm-receipt`), `['order', id]` + `['my-orders']` invalidate (Task 70 추가)
+- `useFileDispute()` — 분쟁 신청 mutation (`POST /marketplace/orders/:id/dispute`) (Task 70 추가)
+- `useMyDisputes(role?)` — 내 분쟁 목록 (`GET /disputes/me?role=buyer|seller|all`) (Task 70 추가)
+- `useDispute(id)` — 분쟁 상세 (`GET /disputes/:id`) (Task 70 추가)
+- `useSellerRespond()` — 판매자 분쟁 답변 mutation (`POST /disputes/:id/respond`) (Task 70 추가)
+- `useAddDisputeMessage()` — 분쟁 메시지 추가 mutation (`POST /disputes/:id/messages`) (Task 70 추가)
+- `useWithdrawDispute()` — 분쟁 철회 mutation (`POST /disputes/:id/withdraw`) (Task 70 추가)
+- `useAdminDisputes(params?)` — 어드민 분쟁 목록 (`GET /admin/disputes`) — Task 70에서 실제 Prisma 데이터로 재연결 (in-memory mock 제거) (Task 70 업데이트)
+- `useAdminDispute(id)` — 어드민 분쟁 상세 (`GET /admin/disputes/:id`) (Task 70 추가)
+- `useReviewDispute()` — 어드민 검토 시작 mutation (`POST /admin/disputes/:id/review`) (Task 70 추가)
+- `useResolveDispute()` — 어드민 분쟁 해결 mutation (`PATCH /admin/disputes/:id/resolve`) (Task 70 추가)
+- `useForceReleaseOrder()` — 어드민 에스크로 강제 해제 mutation (`POST /admin/orders/:id/force-release`) (Task 70 추가)
+- `useAdminPayouts(params?)` — 어드민 payout 목록 (`GET /admin/payouts`, status/recipientId/batchId 필터) (Task 70 추가)
+- `useAdminEligibleSettlements()` — 배치 가능 settlement 목록 (`GET /admin/payouts/eligible`) (Task 70 추가)
+- `useCreatePayoutBatch()` — payout 배치 생성 mutation (`POST /admin/payouts/batch`) (Task 70 추가)
+- `useMarkPayoutPaid()` — payout paid 처리 mutation (`PATCH /admin/payouts/:id/mark-paid`) (Task 70 추가)
+- `useMarkPayoutFailed()` — payout failed 처리 mutation (`PATCH /admin/payouts/:id/mark-failed`) (Task 70 추가)
 
 ### 에러 처리 규칙
 - **에러 메시지**: `catch (err)` 블록에서 직접 타입 단언 금지. `extractErrorMessage(err, 'fallback 메시지')` (`@/lib/utils`) 사용
@@ -400,6 +437,13 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `components/chat/chat-bubble.tsx` — 채팅 버블 시스템 (반드시 사용)
 - `components/teams/transfer-ownership-modal.tsx` — 소유권 이전 확인 모달 (owner 전용, `components/ui/modal.tsx` 기반)
 - `components/user/user-card.tsx` — 재사용 가능 사용자 신원 카드 (avatar + nickname + sport profile + manner score + CTA slots). applicant row / mercenary applicant / team-match opponent에서 동일 컴포넌트 사용. 44x44 터치 타겟 + `aria-label` 내장 (Task 69 추가)
+- `components/marketplace/confirm-receipt-button.tsx` — 구매자 수령 확인 CTA. T-7d 카운트다운 + 상태 aware (Task 70 추가)
+- `components/marketplace/file-dispute-modal.tsx` — 분쟁 신청 모달 (`components/ui/modal.tsx` 기반, `FileDisputeDto` 폼) (Task 70 추가)
+- `components/marketplace/seller-actions.tsx` — 판매자용 ship/deliver 액션 버튼 그룹, 주문 상태에 따라 노출 CTA 전환 (Task 70 추가)
+- `components/dispute/dispute-message-thread.tsx` — 분쟁 메시지 스레드 (`components/chat/chat-bubble.tsx` 재사용, actorRole별 정렬) (Task 70 추가)
+- `components/dispute/dispute-resolve-modal.tsx` — 어드민 분쟁 해결 모달 (action: refund | release | dismiss, note 입력, `components/ui/modal.tsx` 기반) (Task 70 추가)
+- `components/admin/payout-batch-builder.tsx` — 어드민 payout 배치 생성 UI (eligible settlement 선택 → batch 생성 → mark-paid 흐름) (Task 70 추가)
+- `lib/dispute-labels.ts` — 분쟁 status/type 레이블 단일 소스. 어드민 목록·상세·필터 전체에서 공유 (Task 70 추가)
 
 ### 프론트엔드 품질 기준
 - **Open Redirect 방지**: `/login?redirect=...` 파라미터는 반드시 `sanitizeRedirect()` (`apps/web/src/app/(auth)/login/page.tsx`)를 통과시켜 **상대 경로만** 허용한다. 절대 URL, `javascript:`, `//host/` 형태는 모두 차단하고 `/home`으로 fallback.
@@ -443,4 +487,6 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
    VAPID_PRIVATE_KEY=
    VAPID_SUBJECT=mailto:admin@teameet.kr
    ```
-   Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요.
+   Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요. → Task 74에서 해소 예정.
+
+2. **마켓플레이스 cron**: `DISABLE_MARKETPLACE_CRON` 환경변수가 설정되지 않으면 cron이 10분 주기로 자동 실행됨. 테스트 환경에서는 `DISABLE_MARKETPLACE_CRON=true` 로 비활성화 필요 (신규, Task 70 추가).

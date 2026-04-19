@@ -14,7 +14,18 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '동료 평가 작성' })
-  @ApiCreatedResponse({ description: 'Review created' })
+  @ApiCreatedResponse({
+    description: '평가 생성 성공 (최초 제출: alreadySubmitted=false, 중복 제출: alreadySubmitted=true). 두 경우 모두 201 반환.',
+    schema: {
+      properties: {
+        review: { type: 'object', description: '기존 또는 신규 생성된 리뷰 객체' },
+        alreadySubmitted: {
+          type: 'boolean',
+          description: '동일 matchId+authorId+targetId 조합으로 이미 제출된 평가면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async create(@CurrentUser('id') userId: string, @Body() body: CreateReviewDto) {
     return this.reviewsService.create(userId, body);

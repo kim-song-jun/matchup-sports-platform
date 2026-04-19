@@ -181,7 +181,18 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 모집글 마감 (작성자 또는 팀 매니저+)' })
-  @ApiOkResponse({ description: '모집글 마감 성공, 신청자 전원에게 알림 전송' })
+  @ApiOkResponse({
+    description: '모집글 마감 성공 (이미 마감된 경우 alreadyClosed=true로 멱등 반환)',
+    schema: {
+      properties: {
+        post: { type: 'object', description: '마감 처리된 모집글 객체' },
+        alreadyClosed: {
+          type: 'boolean',
+          description: '이미 마감/취소 상태였으면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
   @ApiNotFoundResponse({ description: '모집글 없음' })
@@ -196,7 +207,18 @@ export class MercenaryController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '용병 모집글 취소 (작성자 또는 팀 매니저+)' })
-  @ApiOkResponse({ description: '모집글 취소 성공, 신청자 전원에게 알림 전송' })
+  @ApiOkResponse({
+    description: '모집글 취소 성공 (이미 취소된 경우 alreadyCancelled=true로 멱등 반환)',
+    schema: {
+      properties: {
+        post: { type: 'object', description: '취소 처리된 모집글 객체' },
+        alreadyCancelled: {
+          type: 'boolean',
+          description: '이미 취소/마감 상태였으면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '작성자 또는 팀 매니저+ 권한 필요' })
   @ApiNotFoundResponse({ description: '모집글 없음' })

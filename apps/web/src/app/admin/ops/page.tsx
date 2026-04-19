@@ -15,6 +15,19 @@ import {
 // Task doc C7: threshold is 10 — warn when count >= 10 (inclusive)
 const PUSH_WARN_THRESHOLD = 10;
 
+function PushKpiCard({ value, isLoading }: { value: number; isLoading: boolean }) {
+  const isWarning = value >= PUSH_WARN_THRESHOLD;
+  return (
+    <KpiCard
+      label="최근 5분 푸시 실패"
+      value={value}
+      isLoading={isLoading}
+      tone={isWarning ? 'warning' : 'default'}
+      icon={isWarning ? <AlertTriangle size={18} aria-label="임계치 초과 경고" /> : undefined}
+    />
+  );
+}
+
 export default function AdminOpsPage() {
   const { toast } = useToast();
 
@@ -60,42 +73,39 @@ export default function AdminOpsPage() {
             {/* Row 1 */}
             <KpiCard
               label="진행 중 매치"
-              value={summaryLoading ? 0 : (summary?.matchesInProgress ?? 0)}
+              value={summary?.matchesInProgress ?? 0}
               href="/admin/matches?status=ongoing"
+              isLoading={summaryLoading}
             />
             <KpiCard
               label="대기 결제 (24h)"
-              value={summaryLoading ? 0 : (summary?.paymentsPending ?? 0)}
+              value={summary?.paymentsPending ?? 0}
+              isLoading={summaryLoading}
             />
             <KpiCard
               label="열린 분쟁"
-              value={summaryLoading ? 0 : (summary?.disputesOpen ?? 0)}
+              value={summary?.disputesOpen ?? 0}
               href="/admin/disputes?status=admin_reviewing"
+              isLoading={summaryLoading}
             />
 
             {/* Row 2 */}
             <KpiCard
               label="정산 대기"
-              value={summaryLoading ? 0 : (summary?.settlementsPending ?? 0)}
+              value={summary?.settlementsPending ?? 0}
               href="/admin/payouts?status=held"
+              isLoading={summaryLoading}
             />
             <KpiCard
               label="실패 payout"
-              value={summaryLoading ? 0 : (summary?.payoutsFailed ?? 0)}
+              value={summary?.payoutsFailed ?? 0}
               href="/admin/payouts?status=failed"
+              isLoading={summaryLoading}
             />
-            {(() => {
-              const pushVal = summaryLoading ? 0 : (summary?.pushFailures5m ?? 0);
-              const isWarning = pushVal >= PUSH_WARN_THRESHOLD;
-              return (
-                <KpiCard
-                  label="최근 5분 푸시 실패"
-                  value={pushVal}
-                  tone={isWarning ? 'warning' : 'default'}
-                  icon={isWarning ? <AlertTriangle size={18} aria-label="임계치 초과 경고" /> : undefined}
-                />
-              );
-            })()}
+            <PushKpiCard
+              value={summary?.pushFailures5m ?? 0}
+              isLoading={summaryLoading}
+            />
           </div>
         </section>
       )}

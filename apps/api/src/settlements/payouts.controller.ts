@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { PayoutStatus } from '@prisma/client';
 import { SettlementsService } from './settlements.service';
@@ -87,6 +87,7 @@ export class PayoutsController {
   }
 
   @Post(':id/retry')
+  @HttpCode(200)
   @ApiOperation({
     summary: '실패 지급 재시도 — 연결된 정산을 재대기열로 복원하고 Payout을 cancelled 처리',
   })

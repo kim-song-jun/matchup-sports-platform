@@ -65,7 +65,7 @@ export function PushFailureTable({ rows, isLoading, onAck, isAcking }: PushFailu
             onClick={onAck}
             disabled={isAcking}
             aria-label="모든 푸시 실패 로그 일괄 확인 처리"
-            className="flex items-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900"
           >
             {isAcking ? (
               <Loader2 size={14} className="animate-spin" aria-hidden="true" />

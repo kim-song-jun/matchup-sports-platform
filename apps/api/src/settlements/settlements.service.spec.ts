@@ -753,4 +753,45 @@ describe('SettlementsService', () => {
       await expect(service.markPayoutPaid('payout-1', 'admin-1')).resolves.toBeDefined();
     });
   });
+
+  // ── retryPayout ─────────────────────────────────────────────────────────────
+
+  describe('retryPayout', () => {
+    it('cancels a failed payout and restores linked settlements atomically', async () => {
+      prismaMock.payout.findUnique.mockResolvedValue({ id: 'payout-1' });
+
+      prismaMock.$transaction.mockImplementationOnce(async (ops: unknown[]) => {
+        // updateMany returns { count: 1 } (status guard matched)
+        return [{ count: 1 }, { count: 2 }];
+      });
+
+      const result = await service.retryPayout('payout-1');
+
+      expect(result).toEqual({ cancelled: 'payout-1', settlementsRestored: 2 });
+    });
+
+    it('throws NotFoundException for unknown payout', async () => {
+      prismaMock.payout.findUnique.mockResolvedValue(null);
+
+      await expect(service.retryPayout('ghost-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException PAYOUT_NOT_RETRIABLE when status is not failed (race guard)', async () => {
+      prismaMock.payout.findUnique.mockResolvedValue({ id: 'payout-1' });
+
+      // updateMany returns count=0 — concurrent caller already transitioned status
+      prismaMock.$transaction.mockImplementationOnce(async () => [{ count: 0 }, { count: 0 }]);
+
+      await expect(service.retryPayout('payout-1')).rejects.toThrow(ConflictException);
+    });
+
+    it('uses $transaction so payout + settlements update are atomic', async () => {
+      prismaMock.payout.findUnique.mockResolvedValue({ id: 'payout-1' });
+      prismaMock.$transaction.mockImplementationOnce(async () => [{ count: 1 }, { count: 3 }]);
+
+      await service.retryPayout('payout-1');
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    });
+  });
 });

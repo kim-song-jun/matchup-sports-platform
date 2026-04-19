@@ -150,6 +150,66 @@ curl -s https://api.teameet.kr/api/v1/notifications/vapid-public-key
 
 ---
 
+## Ops Alert Webhook Setup
+
+`WebPushAlertService` sends a Slack (or any HTTP webhook-compatible) notification when the 5-minute rolling push failure count exceeds threshold (10 failures OR 5% failure rate). If the env var is absent the service falls back to logger-only mode — no exception is raised.
+
+### Key generation / provisioning
+
+No generation step required. The URL is issued directly by your Slack workspace (or equivalent service):
+
+1. Create an incoming webhook integration in your Slack workspace.
+2. Copy the generated URL (`https://hooks.slack.com/services/...`).
+
+### Local dev
+
+Add to `deploy/.env` (dev):
+
+```
+OPS_ALERT_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../...
+DISABLE_OPS_ALERT_CRON=true
+```
+
+`DISABLE_OPS_ALERT_CRON=true` prevents the cron from firing during local development and CI (same pattern as `DISABLE_MARKETPLACE_CRON`).
+
+### Staging / Production — GitHub Actions secret
+
+Add the following repository secret in GitHub Settings > Secrets and variables > Actions:
+
+| Secret name              | Value                                        |
+|--------------------------|----------------------------------------------|
+| `OPS_ALERT_WEBHOOK_URL`  | Full Slack webhook URL                       |
+
+`DISABLE_OPS_ALERT_CRON` is a boolean toggle, not a secret. Leave it **unset** in production (empty = cron active). For staging, set it in `deploy/.env` on the staging host if you want cron disabled.
+
+The deploy workflow (`.github/workflows/deploy.yml`) encodes `OPS_ALERT_WEBHOOK_URL` as base64, passes it over SSH, and calls `sync_env_from_github_secret "OPS_ALERT_WEBHOOK_URL"` — identical pattern to `VAPID_*` injection.
+
+`deploy/docker-compose.prod.yml` passes through both vars in the `api.environment` block:
+
+```yaml
+OPS_ALERT_WEBHOOK_URL: ${OPS_ALERT_WEBHOOK_URL:-}
+DISABLE_OPS_ALERT_CRON: ${DISABLE_OPS_ALERT_CRON:-}
+```
+
+### Staging vs Production separation (Warning I3)
+
+Using a single webhook URL for both staging and production makes it impossible to distinguish the environment in alert messages. Recommended separation:
+
+- Create two Slack channels: `#teameet-ops-staging` and `#teameet-ops-prod`.
+- Register two separate webhook URLs and store them in environment-specific secret stores.
+- Production: set `OPS_ALERT_WEBHOOK_URL` in GitHub Actions secret (injected by CI pipeline).
+- Staging: set `OPS_ALERT_WEBHOOK_URL` directly in `deploy/.env` on the staging host (logger-only is acceptable as a fallback if not configured).
+
+### Rotation
+
+Replace the webhook URL in the GitHub Actions secret and update `deploy/.env` on the EC2 host. No container restart is needed — `WebPushAlertService` reads the env var at module initialization, so a rolling restart via `docker compose -f deploy/docker-compose.prod.yml restart api` is sufficient.
+
+### Rollback / Disable
+
+Remove or blank `OPS_ALERT_WEBHOOK_URL` from `deploy/.env` and restart the API container. `WebPushAlertService` will log failures at `Logger.warn` level only — no external HTTP calls.
+
+---
+
 ## Security Checklist
 
 - `.env` is in `.gitignore` (verified: line 39 `.env`, line 40 `.env.local`, line 41 `.env.*.local`).

@@ -9,9 +9,10 @@ interface KpiCardProps {
   href?: string;
   tone?: 'default' | 'warning';
   icon?: ReactNode;
+  isLoading?: boolean;
 }
 
-function KpiCardInner({ label, value, tone, icon }: Omit<KpiCardProps, 'href'>) {
+function KpiCardInner({ label, value, tone, icon, isLoading }: Omit<KpiCardProps, 'href'>) {
   const isWarning = tone === 'warning';
   return (
     <div
@@ -31,13 +32,20 @@ function KpiCardInner({ label, value, tone, icon }: Omit<KpiCardProps, 'href'>) 
           </span>
         )}
       </div>
-      <p
-        className={`text-4xl font-bold tabular-nums ${
-          isWarning ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
-        }`}
-      >
-        {value.toLocaleString('ko-KR')}
-      </p>
+      {isLoading ? (
+        <div
+          className="h-10 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+          aria-hidden="true"
+        />
+      ) : (
+        <p
+          className={`text-4xl font-bold tabular-nums ${
+            isWarning ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
+          }`}
+        >
+          {value.toLocaleString('ko-KR')}
+        </p>
+      )}
       <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{label}</p>
     </div>
   );
@@ -48,23 +56,25 @@ function KpiCardInner({ label, value, tone, icon }: Omit<KpiCardProps, 'href'>) 
  * Wraps in a Link when href is provided; falls back to a div.
  * tone='warning' applies red background and red value text.
  */
-export function KpiCard({ label, value, href, tone, icon }: KpiCardProps) {
+export function KpiCard({ label, value, href, tone, icon, isLoading }: KpiCardProps) {
+  const ariaLabel = isLoading ? `${label}: 로딩 중` : `${label}: ${value.toLocaleString('ko-KR')}`;
+
   if (href) {
     return (
       <Link
         href={href}
         role="region"
-        aria-label={`${label}: ${value.toLocaleString('ko-KR')}`}
+        aria-label={ariaLabel}
         className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-2xl"
       >
-        <KpiCardInner label={label} value={value} tone={tone} icon={icon} />
+        <KpiCardInner label={label} value={value} tone={tone} icon={icon} isLoading={isLoading} />
       </Link>
     );
   }
 
   return (
-    <div role="region" aria-label={`${label}: ${value.toLocaleString('ko-KR')}`}>
-      <KpiCardInner label={label} value={value} tone={tone} icon={icon} />
+    <div role="region" aria-label={ariaLabel}>
+      <KpiCardInner label={label} value={value} tone={tone} icon={icon} isLoading={isLoading} />
     </div>
   );
 }

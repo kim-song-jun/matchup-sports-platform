@@ -529,16 +529,14 @@ export class SettlementsService {
    * Only allowed when Payout.status = failed. Throws 409 PAYOUT_NOT_RETRIABLE otherwise.
    */
   async retryPayout(payoutId: string): Promise<{ cancelled: string; settlementsRestored: number }> {
-    const payout = await this.prisma.payout.findUnique({ where: { id: payoutId } });
-    if (!payout) throw new NotFoundException(`PAYOUT_NOT_FOUND: ${payoutId}`);
+    // Race-safe: use updateMany with status guard so only one concurrent caller wins.
+    // findUnique → update (TOCTOU) would allow two simultaneous admins to both pass the guard.
+    const exists = await this.prisma.payout.findUnique({ where: { id: payoutId }, select: { id: true } });
+    if (!exists) throw new NotFoundException(`PAYOUT_NOT_FOUND: ${payoutId}`);
 
-    if (payout.status !== PayoutStatus.failed) {
-      throw new ConflictException('PAYOUT_NOT_RETRIABLE');
-    }
-
-    const [, restoreResult] = await this.prisma.$transaction([
-      this.prisma.payout.update({
-        where: { id: payoutId },
+    const [updateResult, restoreResult] = await this.prisma.$transaction([
+      this.prisma.payout.updateMany({
+        where: { id: payoutId, status: PayoutStatus.failed },
         data: { status: PayoutStatus.cancelled },
       }),
       this.prisma.settlementRecord.updateMany({
@@ -546,6 +544,10 @@ export class SettlementsService {
         data: { payoutId: null },
       }),
     ]);
+
+    if (updateResult.count === 0) {
+      throw new ConflictException('PAYOUT_NOT_RETRIABLE');
+    }
 
     return { cancelled: payoutId, settlementsRestored: restoreResult.count };
   }

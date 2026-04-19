@@ -59,7 +59,7 @@ export function WeeklyPayoutBars({ weeks }: WeeklyPayoutBarsProps) {
             </span>
 
             {/* Bar track */}
-            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-[40px] overflow-hidden relative">
+            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-10 overflow-hidden relative">
               <div
                 className="bg-blue-500 h-full rounded-full transition-transform"
                 style={{ width: `${pct}%` }}

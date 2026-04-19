@@ -28,16 +28,22 @@ vi.mock('@/components/admin/kpi-card', () => ({
     label,
     value,
     tone,
+    isLoading,
   }: {
     label: string;
     value: number;
     tone?: string;
     href?: string;
     icon?: React.ReactNode;
+    isLoading?: boolean;
   }) => (
-    <div data-testid="kpi-card" data-tone={tone ?? 'default'} aria-label={label}>
+    <div data-testid="kpi-card" data-tone={tone ?? 'default'} data-loading={isLoading ? 'true' : 'false'} aria-label={label}>
       <span data-testid="kpi-label">{label}</span>
-      <span data-testid="kpi-value">{value}</span>
+      {isLoading ? (
+        <span data-testid="kpi-skeleton" />
+      ) : (
+        <span data-testid="kpi-value">{value}</span>
+      )}
     </div>
   ),
 }));
@@ -268,12 +274,13 @@ describe('AdminOpsPage', () => {
     expect(screen.queryByTestId('kpi-card')).not.toBeInTheDocument();
   });
 
-  it('shows 0 values for all KPI cards while summary is loading', () => {
+  it('shows skeleton placeholders for all KPI cards while summary is loading', () => {
     setDefaultMocks({ summaryLoading: true, summaryData: undefined });
 
     render(<AdminOpsPage />);
 
-    const values = screen.getAllByTestId('kpi-value').map((el) => Number(el.textContent));
-    expect(values.every((v) => v === 0)).toBe(true);
+    const skeletons = screen.getAllByTestId('kpi-skeleton');
+    expect(skeletons).toHaveLength(6);
+    expect(screen.queryByTestId('kpi-value')).not.toBeInTheDocument();
   });
 });

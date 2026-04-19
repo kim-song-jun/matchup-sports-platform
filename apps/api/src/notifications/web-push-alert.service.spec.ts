@@ -134,5 +134,29 @@ describe('WebPushAlertService', () => {
       const svc = await buildService('https://hooks.slack.com/services/test');
       await expect(svc.checkAndAlert()).resolves.toBeUndefined();
     });
+
+    it('does not throw when fetch times out (AbortError)', async () => {
+      mockPrisma.webPushFailureLog.count
+        .mockResolvedValueOnce(PUSH_ALERT_COUNT_THRESHOLD)
+        .mockResolvedValueOnce(0);
+
+      const abortError = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+      mockFetch.mockRejectedValue(abortError);
+
+      const svc = await buildService('https://hooks.slack.com/services/test');
+      await expect(svc.checkAndAlert()).resolves.toBeUndefined();
+    });
+
+    it('does not throw when Slack returns non-2xx status', async () => {
+      mockPrisma.webPushFailureLog.count
+        .mockResolvedValueOnce(PUSH_ALERT_COUNT_THRESHOLD)
+        .mockResolvedValueOnce(0);
+
+      // fetch resolves but with a non-ok response
+      mockFetch.mockResolvedValue({ ok: false, status: 500 });
+
+      const svc = await buildService('https://hooks.slack.com/services/test');
+      await expect(svc.checkAndAlert()).resolves.toBeUndefined();
+    });
   });
 });

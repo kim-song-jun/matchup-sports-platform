@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  ParseIntPipe,
   Post,
   Query,
   UseGuards,
@@ -46,11 +48,9 @@ export class AdminOpsController {
   @ApiResponse({ status: 200, description: 'List of recent failures', type: [RecentPushFailureDto] })
   @ApiResponse({ status: 403, description: 'Forbidden — admin role required' })
   async getRecentPushFailures(
-    @Query('limit') limit?: string,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ): Promise<RecentPushFailureDto[]> {
-    const parsed = limit ? parseInt(limit, 10) : 20;
-    const safeLimit = Number.isNaN(parsed) ? 20 : parsed;
-    return this.adminOpsService.getRecentPushFailures(safeLimit);
+    return this.adminOpsService.getRecentPushFailures(limit);
   }
 
   @Post('push-failures/ack')

@@ -42,12 +42,10 @@ function MarkFailedModal({
   payoutId,
   isOpen,
   onClose,
-  refetch,
 }: {
   payoutId: string;
   isOpen: boolean;
   onClose: () => void;
-  refetch: () => void;
 }) {
   const { toast } = useToast();
   const [reason, setReason] = useState('');
@@ -62,7 +60,6 @@ function MarkFailedModal({
           toast('success', '지급 실패로 처리됐어요.');
           setReason('');
           onClose();
-          refetch();
         },
         onError: (err) => {
           toast('error', extractErrorMessage(err, '처리에 실패했어요. 다시 시도해주세요.'));
@@ -120,7 +117,7 @@ function MarkFailedModal({
   );
 }
 
-function MarkPaidRow({ payoutId, refetch }: { payoutId: string; refetch: () => void }) {
+function MarkPaidRow({ payoutId }: { payoutId: string }) {
   const { toast } = useToast();
   const [externalRef, setExternalRef] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -135,7 +132,6 @@ function MarkPaidRow({ payoutId, refetch }: { payoutId: string; refetch: () => v
           toast('success', '지급 완료로 처리됐어요.');
           setExpanded(false);
           setExternalRef('');
-          refetch();
         },
         onError: (err) => {
           toast('error', extractErrorMessage(err, '처리에 실패했어요. 다시 시도해주세요.'));
@@ -220,7 +216,7 @@ export default function AdminPayoutsPage() {
 
   const { data: eligibleData, isLoading: eligibleLoading, isError: eligibleError, refetch: refetchEligible } = useAdminEligibleSettlements();
   const { data: payoutsData, isLoading: payoutsLoading, isError: payoutsError, refetch: refetchPayouts } = useAdminPayouts();
-  const { data: failedPayoutsData, isLoading: failedPayoutsLoading, refetch: refetchFailed } = useAdminPayouts({ status: 'failed' });
+  const { data: failedPayoutsData, isLoading: failedPayoutsLoading } = useAdminPayouts({ status: 'failed' });
   const createPayoutBatch = useCreatePayoutBatch();
   const retryPayout = useRetryPayout();
 
@@ -267,8 +263,6 @@ export default function AdminPayoutsPage() {
     retryPayout.mutate(payoutId, {
       onSuccess: () => {
         toast('success', '재대기열로 복원됐어요');
-        void refetchFailed();
-        void refetchPayouts();
       },
       onError: (err) => {
         toast('error', extractErrorMessage(err, '재시도에 실패했어요. 다시 시도해주세요.'));
@@ -322,7 +316,7 @@ export default function AdminPayoutsPage() {
                   onClick={() => handleRetryPayout(payout.id)}
                   disabled={retryPayout.isPending}
                   aria-label={`${payout.recipient?.nickname ?? payout.recipientId} 지급 재대기열 복원`}
-                  className="flex items-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900"
                 >
                   {retryPayout.isPending ? (
                     <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -469,7 +463,7 @@ export default function AdminPayoutsPage() {
                           <td className="px-5 py-3.5">
                             {canAct && (
                               <div className="flex items-center gap-2">
-                                <MarkPaidRow payoutId={payout.id} refetch={() => void refetchPayouts()} />
+                                <MarkPaidRow payoutId={payout.id} />
                                 <button
                                   type="button"
                                   onClick={() => setFailingPayoutId(payout.id)}
@@ -511,7 +505,6 @@ export default function AdminPayoutsPage() {
           payoutId={failingPayoutId}
           isOpen={failingPayoutId !== null}
           onClose={() => setFailingPayoutId(null)}
-          refetch={() => void refetchPayouts()}
         />
       )}
     </div>

@@ -72,28 +72,23 @@ describe('AdminOpsController', () => {
   // ── getRecentPushFailures ──────────────────────────────────────────────────
 
   describe('GET /admin/ops/recent-push-failures', () => {
-    it('passes limit=20 by default', async () => {
+    // DefaultValuePipe + ParseIntPipe handle coercion before the controller method.
+    // Unit tests pass already-coerced numbers directly to verify the service delegation.
+
+    it('passes default limit 20 to the service', async () => {
       mockAdminOpsService.getRecentPushFailures.mockResolvedValue([]);
 
-      await controller.getRecentPushFailures(undefined);
+      await controller.getRecentPushFailures(20);
 
       expect(mockAdminOpsService.getRecentPushFailures).toHaveBeenCalledWith(20);
     });
 
-    it('passes parsed limit when provided', async () => {
+    it('passes caller-supplied limit to the service', async () => {
       mockAdminOpsService.getRecentPushFailures.mockResolvedValue([]);
 
-      await controller.getRecentPushFailures('50');
+      await controller.getRecentPushFailures(50);
 
       expect(mockAdminOpsService.getRecentPushFailures).toHaveBeenCalledWith(50);
-    });
-
-    it('falls back to 20 on non-numeric limit', async () => {
-      mockAdminOpsService.getRecentPushFailures.mockResolvedValue([]);
-
-      await controller.getRecentPushFailures('banana');
-
-      expect(mockAdminOpsService.getRecentPushFailures).toHaveBeenCalledWith(20);
     });
   });
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -28,7 +28,7 @@ export class WebPushAlertService implements OnModuleInit {
    *
    * Disable by setting env var: DISABLE_OPS_ALERT_CRON=true
    */
-  @Cron('0 * * * * *')
+  @Cron(CronExpression.EVERY_MINUTE)
   async checkAndAlert(): Promise<void> {
     if (process.env[PUSH_ALERT_CRON_DISABLED_ENV] === 'true') {
       return;
@@ -65,11 +65,15 @@ export class WebPushAlertService implements OnModuleInit {
 
     if (this.webhookUrl) {
       try {
-        await fetch(this.webhookUrl, {
+        const response = await fetch(this.webhookUrl, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ text: message }),
+          signal: AbortSignal.timeout(5000),
         });
+        if (!response.ok) {
+          this.logger.error(`Slack webhook returned non-2xx status: ${response.status}`);
+        }
       } catch (err) {
         // Webhook delivery failure must not throw — log and fall back to logger
         this.logger.error(`Slack webhook delivery failed: ${err instanceof Error ? err.message : String(err)}`);

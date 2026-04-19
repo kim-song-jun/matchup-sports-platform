@@ -358,6 +358,7 @@ export function useMarkPayoutPaid() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payouts() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.settlements });
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-summary'] });
     },
   });
 }
@@ -372,6 +373,7 @@ export function useMarkPayoutFailed() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payouts() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payoutsEligible });
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-summary'] });
     },
   });
 }

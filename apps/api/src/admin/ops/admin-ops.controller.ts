@@ -3,6 +3,7 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Post,
@@ -54,6 +55,7 @@ export class AdminOpsController {
   }
 
   @Post('push-failures/ack')
+  @HttpCode(200)
   @ApiOperation({
     summary: 'Acknowledge push failure log entries',
     description: 'Supply ids to ack specific records, or omit ids to ack all within the current 5-minute alert window.',

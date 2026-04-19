@@ -10,6 +10,36 @@ import { RedisCacheService } from '../redis/redis-cache.service';
 
 const UNREAD_COUNT_TTL = 30; // 30 seconds
 
+/**
+ * Returns true  → granular field matched AND is disabled (suppress).
+ * Returns false → granular field matched AND is enabled (allow; skip category gate).
+ * Returns null  → no granular override for this type; caller should apply category gate.
+ */
+function isGranularBlocked(
+  type: NotificationType,
+  pref: {
+    teamApplicationEnabled: boolean;
+    matchCompletedEnabled: boolean;
+    eloChangedEnabled: boolean;
+    chatMessageEnabled: boolean;
+  },
+): boolean | null {
+  switch (type) {
+    case NotificationType.team_application_received:
+    case NotificationType.team_application_accepted:
+    case NotificationType.team_application_rejected:
+      return !pref.teamApplicationEnabled;
+    case NotificationType.match_completed:
+      return !pref.matchCompletedEnabled;
+    case NotificationType.elo_changed:
+      return !pref.eloChangedEnabled;
+    case NotificationType.chat_message:
+      return !pref.chatMessageEnabled;
+    default:
+      return null;
+  }
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -42,15 +72,26 @@ export class NotificationsService {
     });
 
     if (preference) {
-      const category = notificationCategory(data.type);
-      const blocked =
-        (category === 'match' && !preference.matchEnabled) ||
-        (category === 'team' && !preference.teamEnabled) ||
-        (category === 'chat' && !preference.chatEnabled) ||
-        (category === 'payment' && !preference.paymentEnabled);
-
-      if (blocked) {
+      // Granular override check — evaluated before category-level gate.
+      // If a granular field is false the notification is suppressed regardless of the
+      // parent category setting. Unknown types fall through to the category gate.
+      const granularBlocked = isGranularBlocked(data.type, preference);
+      if (granularBlocked === true) {
         return null;
+      }
+
+      // Category-level gate (fallback when no granular override matched).
+      if (granularBlocked === null) {
+        const category = notificationCategory(data.type);
+        const categoryBlocked =
+          (category === 'match' && !preference.matchEnabled) ||
+          (category === 'team' && !preference.teamEnabled) ||
+          (category === 'chat' && !preference.chatEnabled) ||
+          (category === 'payment' && !preference.paymentEnabled);
+
+        if (categoryBlocked) {
+          return null;
+        }
       }
     }
 
@@ -176,6 +217,10 @@ export class NotificationsService {
         teamEnabled: true,
         chatEnabled: true,
         paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
       };
     }
 
@@ -185,10 +230,17 @@ export class NotificationsService {
       teamEnabled: preference.teamEnabled,
       chatEnabled: preference.chatEnabled,
       paymentEnabled: preference.paymentEnabled,
+      teamApplicationEnabled: preference.teamApplicationEnabled,
+      matchCompletedEnabled: preference.matchCompletedEnabled,
+      eloChangedEnabled: preference.eloChangedEnabled,
+      chatMessageEnabled: preference.chatMessageEnabled,
     };
   }
 
   async updatePreferences(userId: string, dto: UpdateNotificationPreferenceDto) {
+    // Cast to allow granular fields that the DTO may or may not declare yet.
+    const d = dto as Record<string, boolean | undefined>;
+
     const preference = await this.prisma.notificationPreference.upsert({
       where: { userId },
       create: {
@@ -197,12 +249,20 @@ export class NotificationsService {
         teamEnabled: dto.teamEnabled ?? true,
         chatEnabled: dto.chatEnabled ?? true,
         paymentEnabled: dto.paymentEnabled ?? true,
+        teamApplicationEnabled: d.teamApplicationEnabled ?? true,
+        matchCompletedEnabled: d.matchCompletedEnabled ?? true,
+        eloChangedEnabled: d.eloChangedEnabled ?? true,
+        chatMessageEnabled: d.chatMessageEnabled ?? true,
       },
       update: {
         ...(dto.matchEnabled !== undefined && { matchEnabled: dto.matchEnabled }),
         ...(dto.teamEnabled !== undefined && { teamEnabled: dto.teamEnabled }),
         ...(dto.chatEnabled !== undefined && { chatEnabled: dto.chatEnabled }),
         ...(dto.paymentEnabled !== undefined && { paymentEnabled: dto.paymentEnabled }),
+        ...(d.teamApplicationEnabled !== undefined && { teamApplicationEnabled: d.teamApplicationEnabled }),
+        ...(d.matchCompletedEnabled !== undefined && { matchCompletedEnabled: d.matchCompletedEnabled }),
+        ...(d.eloChangedEnabled !== undefined && { eloChangedEnabled: d.eloChangedEnabled }),
+        ...(d.chatMessageEnabled !== undefined && { chatMessageEnabled: d.chatMessageEnabled }),
       },
     });
 
@@ -212,6 +272,10 @@ export class NotificationsService {
       teamEnabled: preference.teamEnabled,
       chatEnabled: preference.chatEnabled,
       paymentEnabled: preference.paymentEnabled,
+      teamApplicationEnabled: preference.teamApplicationEnabled,
+      matchCompletedEnabled: preference.matchCompletedEnabled,
+      eloChangedEnabled: preference.eloChangedEnabled,
+      chatMessageEnabled: preference.chatMessageEnabled,
     };
   }
 

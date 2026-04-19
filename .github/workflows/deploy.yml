@@ -140,12 +140,18 @@ jobs:
           TOSS_CLIENT_KEY_SECRET: ${{ secrets.TOSS_CLIENT_KEY }}
           TOSS_SECRET_KEY_SECRET: ${{ secrets.TOSS_SECRET_KEY }}
           TOSS_WEBHOOK_SECRET_SECRET: ${{ secrets.TOSS_WEBHOOK_SECRET }}
+          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
         run: |
           TOSS_CLIENT_KEY_B64="$(printf '%s' "${TOSS_CLIENT_KEY_SECRET:-}" | base64 | tr -d '\n')"
           TOSS_SECRET_KEY_B64="$(printf '%s' "${TOSS_SECRET_KEY_SECRET:-}" | base64 | tr -d '\n')"
           TOSS_WEBHOOK_SECRET_B64="$(printf '%s' "${TOSS_WEBHOOK_SECRET_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
 
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' bash -se" <<'EOF'
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' VAPID_PUBLIC_KEY_B64='${VAPID_PUBLIC_KEY_B64}' VAPID_PRIVATE_KEY_B64='${VAPID_PRIVATE_KEY_B64}' VAPID_SUBJECT_B64='${VAPID_SUBJECT_B64}' bash -se" <<'EOF'
           set -euo pipefail
 
           RESET_DB="${RESET_DB:-false}"
@@ -196,6 +202,9 @@ jobs:
           sync_env_from_github_secret "TOSS_CLIENT_KEY" "${TOSS_CLIENT_KEY_B64:-}"
           sync_env_from_github_secret "TOSS_SECRET_KEY" "${TOSS_SECRET_KEY_B64:-}"
           sync_env_from_github_secret "TOSS_WEBHOOK_SECRET" "${TOSS_WEBHOOK_SECRET_B64:-}"
+          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
 
           # Auto-set REALTIME_ALLOWED_ORIGINS if not already configured
           if ! grep -q '^REALTIME_ALLOWED_ORIGINS=.' deploy/.env 2>/dev/null; then

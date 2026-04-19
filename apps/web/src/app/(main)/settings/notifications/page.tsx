@@ -11,6 +11,10 @@ import {
   Smartphone,
   Trophy,
   Users,
+  UserCheck,
+  CheckCircle,
+  TrendingUp,
+  MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
@@ -24,7 +28,7 @@ import {
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import type { NotificationPreference } from '@/types/api';
 
-type ServerPreferenceKey = keyof Omit<NotificationPreference, 'id'>;
+type ServerPreferenceKey = keyof Omit<NotificationPreference, 'id' | 'userId' | 'updatedAt'>;
 type BrowserPermissionState = NotificationPermission | 'unsupported';
 
 interface ServerCategoryConfig {
@@ -63,6 +67,33 @@ const SERVER_CATEGORIES: ServerCategoryConfig[] = [
     label: '결제 알림',
     desc: '결제 완료, 환불, 주문 상태 변경을 계정 전체에서 동기화합니다.',
     icon: CreditCard,
+  },
+];
+
+const DETAIL_CATEGORIES: ServerCategoryConfig[] = [
+  {
+    key: 'teamApplicationEnabled',
+    label: '팀 가입 신청',
+    desc: '팀 가입 요청/승인/거절 알림',
+    icon: UserCheck,
+  },
+  {
+    key: 'matchCompletedEnabled',
+    label: '매치 종료',
+    desc: '내가 참가한 매치가 종료될 때',
+    icon: CheckCircle,
+  },
+  {
+    key: 'eloChangedEnabled',
+    label: 'ELO 변동',
+    desc: '경기 결과에 따른 실력 점수 변화',
+    icon: TrendingUp,
+  },
+  {
+    key: 'chatMessageEnabled',
+    label: '채팅 메시지',
+    desc: '새 채팅 메시지 도착 알림',
+    icon: MessageSquare,
   },
 ];
 
@@ -163,7 +194,7 @@ export default function NotificationsPage() {
                 서버와 동기화되는 범위
               </p>
               <p className="text-sm leading-6 text-blue-800/90 dark:text-blue-100/80">
-                아래 4개 카테고리는 Teameet 계정에 저장되어 새로고침, 재로그인,
+                아래 8개 항목은 Teameet 계정에 저장되어 새로고침, 재로그인,
                 다른 탭 진입 후에도 같은 상태로 유지됩니다.
               </p>
             </div>
@@ -188,6 +219,44 @@ export default function NotificationsPage() {
           ) : (
             <div className="divide-y divide-gray-50 dark:divide-gray-700">
               {SERVER_CATEGORIES.map((category) => (
+                <CategoryRow
+                  key={category.key}
+                  icon={category.icon}
+                  label={category.label}
+                  desc={category.desc}
+                  enabled={preferencesQuery.data[category.key]}
+                  onToggle={() =>
+                    handleServerToggle(
+                      category.key,
+                      !preferencesQuery.data![category.key],
+                    )
+                  }
+                  disabled={updatePreferences.isPending}
+                  saving={savingKey === category.key}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+          <SectionHeading
+            title="세부 알림 타입"
+            description="카테고리 내에서 특정 이벤트만 선택적으로 켜고 끌 수 있습니다."
+          />
+
+          {preferencesQuery.isLoading ? (
+            <PreferenceSkeleton count={DETAIL_CATEGORIES.length} />
+          ) : preferencesQuery.isError || !preferencesQuery.data ? (
+            <ErrorState
+              message="알림 설정을 불러오지 못했어요"
+              onRetry={() => {
+                void preferencesQuery.refetch();
+              }}
+            />
+          ) : (
+            <div className="divide-y divide-gray-50 dark:divide-gray-700">
+              {DETAIL_CATEGORIES.map((category) => (
                 <CategoryRow
                   key={category.key}
                   icon={category.icon}

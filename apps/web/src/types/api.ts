@@ -594,11 +594,32 @@ export interface Notification {
 
 export interface NotificationPreference {
   id: string | null;
+  userId?: string;
   matchEnabled: boolean;
   teamEnabled: boolean;
   chatEnabled: boolean;
   paymentEnabled: boolean;
+  teamApplicationEnabled: boolean;
+  matchCompletedEnabled: boolean;
+  eloChangedEnabled: boolean;
+  chatMessageEnabled: boolean;
+  updatedAt?: string;
 }
+
+/** Partial input accepted by PATCH /notifications/preferences */
+export type UpdateNotificationPreferencesInput = Partial<
+  Pick<
+    NotificationPreference,
+    | 'matchEnabled'
+    | 'teamEnabled'
+    | 'chatEnabled'
+    | 'paymentEnabled'
+    | 'teamApplicationEnabled'
+    | 'matchCompletedEnabled'
+    | 'eloChangedEnabled'
+    | 'chatMessageEnabled'
+  >
+>;
 
 // InvitationStatus re-exported from enums.generated
 

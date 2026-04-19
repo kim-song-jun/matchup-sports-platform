@@ -38,4 +38,9 @@ export default () => ({
     region: process.env.AWS_REGION || 'ap-northeast-2',
     s3Bucket: process.env.AWS_S3_BUCKET,
   },
+  vapid: {
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY,
+    subject: process.env.VAPID_SUBJECT,
+  },
 });

@@ -8,14 +8,17 @@ import {
   Body,
   Query,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiOkResponse, ApiCreatedResponse, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiOkResponse, ApiCreatedResponse, ApiUnauthorizedResponse, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { WebPushService } from './web-push.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PushSubscribeDto, PushUnsubscribeDto } from './dto/push-subscribe.dto';
-import { UpdateNotificationPreferenceDto } from './dto/notification-preference.dto';
+import { UpdateNotificationPreferencesDto, NotificationPreferencesResponseDto } from './dto/notification-preference.dto';
 
 @ApiTags('알림')
 @Controller('notifications')
@@ -89,10 +92,12 @@ export class NotificationsController {
 
   @Post('push-subscribe')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Web Push 구독 등록' })
+  @ApiOperation({ summary: 'Web Push 구독 등록 (endpoint 기준 upsert, 분당 10회 제한)' })
   @ApiCreatedResponse({ description: 'Push subscription registered' })
   @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
+  @ApiTooManyRequestsResponse({ description: '분당 10회 초과 (Too many requests)' })
   async pushSubscribe(
     @CurrentUser('id') userId: string,
     @Body() dto: PushSubscribeDto,
@@ -116,23 +121,24 @@ export class NotificationsController {
   @Get('preferences')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '알림 설정 조회 (없으면 기본값 반환)' })
-  @ApiOkResponse({ description: 'Notification preferences' })
+  @ApiOperation({ summary: '알림 설정 조회 (행 없으면 기본값 all=true 반환)' })
+  @ApiOkResponse({ description: 'Notification preferences', type: NotificationPreferencesResponseDto })
   @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
-  async getPreferences(@CurrentUser('id') userId: string) {
+  async getPreferences(@CurrentUser('id') userId: string): Promise<NotificationPreferencesResponseDto> {
     return this.notificationsService.getPreferences(userId);
   }
 
   @Patch('preferences')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '알림 설정 업데이트 (upsert)' })
-  @ApiOkResponse({ description: 'Notification preferences updated' })
+  @ApiOperation({ summary: '알림 설정 업데이트 (upsert, 변경 필드만 전달)' })
+  @ApiOkResponse({ description: 'Notification preferences updated', type: NotificationPreferencesResponseDto })
   @ApiUnauthorizedResponse({ description: 'JWT token missing or invalid' })
   async updatePreferences(
     @CurrentUser('id') userId: string,
-    @Body() dto: UpdateNotificationPreferenceDto,
-  ) {
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ): Promise<NotificationPreferencesResponseDto> {
     return this.notificationsService.updatePreferences(userId, dto);
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -14,16 +14,38 @@ export class ReviewsService {
   ) {}
 
   async create(authorId: string, data: CreateReviewDto) {
-    const review = await this.prisma.review.create({
-      data: {
-        matchId: data.matchId,
-        authorId,
-        targetId: data.targetId,
-        skillRating: data.skillRating,
-        mannerRating: data.mannerRating,
-        comment: data.comment,
-      },
-    });
+    let review: Awaited<ReturnType<typeof this.prisma.review.create>>;
+
+    try {
+      review = await this.prisma.review.create({
+        data: {
+          matchId: data.matchId,
+          authorId,
+          targetId: data.targetId,
+          skillRating: data.skillRating,
+          mannerRating: data.mannerRating,
+          comment: data.comment,
+        },
+      });
+    } catch (err) {
+      // P2002: unique constraint violation — duplicate review for same (match, author, target)
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await this.prisma.review.findUnique({
+          where: {
+            matchId_authorId_targetId: {
+              matchId: data.matchId,
+              authorId,
+              targetId: data.targetId,
+            },
+          },
+        });
+        return { ...existing!, alreadySubmitted: true };
+      }
+      throw err;
+    }
 
     // 대상 사용자 매너 점수 업데이트
     const avg = await this.prisma.review.aggregate({
@@ -51,7 +73,7 @@ export class ReviewsService {
     // Fire-and-forget: update ELO ratings for all participants of this match
     void this.scoring.updateEloAfterMatch(data.matchId);
 
-    return review;
+    return { ...review, alreadySubmitted: false };
   }
 
   async getPending(userId: string) {

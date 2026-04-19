@@ -362,13 +362,26 @@ export class TeamsService {
 
     const team = await this.findById(teamId);
 
+    // Query without status filter so we can distinguish "not found" from "already processed"
     const application = await this.prisma.teamMembership.findFirst({
-      where: { teamId, userId: applicantUserId, status: 'pending' },
+      where: { teamId, userId: applicantUserId },
     });
     if (!application) {
       throw new NotFoundException({
         code: 'TEAM_APPLICATION_NOT_FOUND',
-        message: '대기 중인 신청을 찾을 수 없습니다.',
+        message: '신청 내역을 찾을 수 없습니다.',
+      });
+    }
+
+    // Idempotency guard: already accepted → return 200 with flag
+    if (application.status === 'active') {
+      return { ...application, alreadyProcessed: true };
+    }
+
+    if (application.status !== 'pending') {
+      throw new BadRequestException({
+        code: 'APPLICATION_NOT_PENDING',
+        message: '대기 중인 신청이 아닙니다.',
       });
     }
 
@@ -396,7 +409,8 @@ export class TeamsService {
     } catch (error) {
       if (
         error instanceof ConflictException ||
-        error instanceof NotFoundException
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
       ) {
         throw error;
       }
@@ -424,7 +438,7 @@ export class TeamsService {
       data: { teamId, teamName: team.name },
     });
 
-    return { accepted: true };
+    return { ...application, status: 'active' as const, alreadyProcessed: false };
   }
 
   /**
@@ -437,13 +451,26 @@ export class TeamsService {
 
     const team = await this.findById(teamId);
 
+    // Query without status filter so we can distinguish "not found" from "already processed"
     const application = await this.prisma.teamMembership.findFirst({
-      where: { teamId, userId: applicantUserId, status: 'pending' },
+      where: { teamId, userId: applicantUserId },
     });
     if (!application) {
       throw new NotFoundException({
         code: 'TEAM_APPLICATION_NOT_FOUND',
-        message: '대기 중인 신청을 찾을 수 없습니다.',
+        message: '신청 내역을 찾을 수 없습니다.',
+      });
+    }
+
+    // Idempotency guard: already rejected (left) → return 200 with flag
+    if (application.status === 'left') {
+      return { ...application, alreadyProcessed: true };
+    }
+
+    if (application.status !== 'pending') {
+      throw new BadRequestException({
+        code: 'APPLICATION_NOT_PENDING',
+        message: '대기 중인 신청이 아닙니다.',
       });
     }
 
@@ -468,7 +495,7 @@ export class TeamsService {
       data: { teamId, teamName: team.name },
     });
 
-    return { rejected: true };
+    return { ...application, status: 'left' as const, alreadyProcessed: false };
   }
 
   /**

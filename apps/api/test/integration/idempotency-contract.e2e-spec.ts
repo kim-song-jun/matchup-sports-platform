@@ -340,7 +340,7 @@ describe('Idempotency contract (e2e)', () => {
 
       expect(first.status).toBe(201);
       expect((first.body.data as { alreadySubmitted: boolean }).alreadySubmitted).toBe(false);
-      const firstReviewId = (first.body.data as { review: { id: string } }).review.id;
+      const firstReviewId = (first.body.data as { id: string }).id;
       expect(firstReviewId).toBeDefined();
 
       const second = await request
@@ -352,7 +352,7 @@ describe('Idempotency contract (e2e)', () => {
       // (backend-data-dev service returns { review, alreadySubmitted: true } on duplicate)
       expect(second.status).toBe(201);
       expect((second.body.data as { alreadySubmitted: boolean }).alreadySubmitted).toBe(true);
-      const secondReviewId = (second.body.data as { review: { id: string } }).review.id;
+      const secondReviewId = (second.body.data as { id: string }).id;
 
       // Same review is returned
       expect(secondReviewId).toBe(firstReviewId);

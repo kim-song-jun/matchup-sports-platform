@@ -612,6 +612,9 @@ describe('MercenaryService', () => {
     });
 
     it('transitions post status to closed', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open' }))
+        .mockResolvedValueOnce(mockPost({ status: 'closed' }));
       await service.closePost('post-1', 'user-1');
       await new Promise((r) => setImmediate(r));
       expect(prismaMock.mercenaryPost.update).toHaveBeenCalledWith(
@@ -619,12 +622,20 @@ describe('MercenaryService', () => {
       );
     });
 
-    it('returns { closed: true }', async () => {
+    it('returns { post, alreadyClosed: false } on first close', async () => {
+      // findOne (second findUnique call) returns full post
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open' }))
+        .mockResolvedValueOnce(mockPost({ status: 'closed' }));
       const result = await service.closePost('post-1', 'user-1');
-      expect(result).toEqual({ closed: true });
+      expect(result).toMatchObject({ alreadyClosed: false });
+      expect(result.id).toBeDefined();
     });
 
     it('fans out mercenary_closed notifications to pending+accepted applicants', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open' }))
+        .mockResolvedValueOnce(mockPost({ status: 'closed' }));
       await service.closePost('post-1', 'user-1');
       await new Promise((r) => setImmediate(r));
       expect(notificationsServiceMock.create).toHaveBeenCalledWith(
@@ -632,14 +643,30 @@ describe('MercenaryService', () => {
       );
     });
 
-    it('throws BadRequestException when post is already closed', async () => {
-      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'closed' }));
+    it('returns { post, alreadyClosed: true } when post is already closed (idempotent)', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'closed' }))
+        .mockResolvedValueOnce(mockPost({ status: 'closed' }));
+      const result = await service.closePost('post-1', 'user-1');
+      expect(result).toMatchObject({ alreadyClosed: true });
+      expect(result.id).toBeDefined();
+      // No DB update or notification fan-out should happen on replay
+      expect(prismaMock.mercenaryPost.update).not.toHaveBeenCalled();
+      await new Promise((r) => setImmediate(r));
+      expect(notificationsServiceMock.create).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException when post is already cancelled (different terminal state)', async () => {
+      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'cancelled' }));
       await expect(service.closePost('post-1', 'user-1')).rejects.toThrow(BadRequestException);
     });
 
     it('allows team manager to close post (non-author)', async () => {
-      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'open', authorId: 'other' }));
-      await expect(service.closePost('post-1', 'manager-user')).resolves.toEqual({ closed: true });
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open', authorId: 'other' }))
+        .mockResolvedValueOnce(mockPost({ status: 'closed', authorId: 'other' }));
+      const result = await service.closePost('post-1', 'manager-user');
+      expect(result).toMatchObject({ alreadyClosed: false });
       expect(teamMembershipMock.assertRole).toHaveBeenCalled();
     });
 
@@ -662,18 +689,28 @@ describe('MercenaryService', () => {
     });
 
     it('transitions post status to cancelled', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open', authorId: 'user-1' }))
+        .mockResolvedValueOnce(mockPost({ status: 'cancelled', authorId: 'user-1' }));
       await service.cancelPost('post-1', 'user-1');
       expect(prismaMock.mercenaryPost.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'cancelled' } }),
       );
     });
 
-    it('returns { cancelled: true }', async () => {
+    it('returns { post, alreadyCancelled: false } on first cancel', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open', authorId: 'user-1' }))
+        .mockResolvedValueOnce(mockPost({ status: 'cancelled', authorId: 'user-1' }));
       const result = await service.cancelPost('post-1', 'user-1');
-      expect(result).toEqual({ cancelled: true });
+      expect(result).toMatchObject({ alreadyCancelled: false });
+      expect(result.id).toBeDefined();
     });
 
     it('fans out mercenary_cancelled notifications to all applicants', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'open', authorId: 'user-1' }))
+        .mockResolvedValueOnce(mockPost({ status: 'cancelled', authorId: 'user-1' }));
       await service.cancelPost('post-1', 'user-1');
       await new Promise((r) => setImmediate(r));
       expect(notificationsServiceMock.create).toHaveBeenCalledWith(
@@ -685,9 +722,28 @@ describe('MercenaryService', () => {
       await expect(service.cancelPost('post-1', 'other-user')).rejects.toThrow(ForbiddenException);
     });
 
-    it('throws BadRequestException when post is already cancelled', async () => {
-      prismaMock.mercenaryPost.findUnique.mockResolvedValue(mockPost({ status: 'cancelled', authorId: 'user-1' }));
-      await expect(service.cancelPost('post-1', 'user-1')).rejects.toThrow(BadRequestException);
+    it('returns { post, alreadyCancelled: true } when post is already cancelled (idempotent)', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'cancelled', authorId: 'user-1' }))
+        .mockResolvedValueOnce(mockPost({ status: 'cancelled', authorId: 'user-1' }));
+      const result = await service.cancelPost('post-1', 'user-1');
+      expect(result).toMatchObject({ alreadyCancelled: true });
+      expect(result.id).toBeDefined();
+      expect(prismaMock.mercenaryPost.update).not.toHaveBeenCalled();
+      // Side effects must be skipped on idempotent replay
+      await new Promise((r) => setImmediate(r));
+      expect(notificationsServiceMock.create).not.toHaveBeenCalled();
+    });
+
+    it('returns { post, alreadyCancelled: true } when post is already closed (idempotent)', async () => {
+      prismaMock.mercenaryPost.findUnique
+        .mockResolvedValueOnce(mockPost({ status: 'closed', authorId: 'user-1' }))
+        .mockResolvedValueOnce(mockPost({ status: 'closed', authorId: 'user-1' }));
+      const result = await service.cancelPost('post-1', 'user-1');
+      expect(result).toMatchObject({ alreadyCancelled: true });
+      expect(prismaMock.mercenaryPost.update).not.toHaveBeenCalled();
+      await new Promise((r) => setImmediate(r));
+      expect(notificationsServiceMock.create).not.toHaveBeenCalled();
     });
   });
 

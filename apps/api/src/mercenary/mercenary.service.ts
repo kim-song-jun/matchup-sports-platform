@@ -469,8 +469,13 @@ export class MercenaryService {
       await this.teamMembership.assertRole(post.teamId, actorUserId, 'manager');
     }
 
-    if (post.status === 'closed' || post.status === 'cancelled') {
-      throw new BadRequestException('이미 종료된 모집글입니다.');
+    // Idempotency guard: already closed → return 200 with flag, no re-notify
+    if (post.status === 'closed') {
+      const current = await this.findOne(postId);
+      return { ...current, alreadyClosed: true };
+    }
+    if (post.status === 'cancelled') {
+      throw new BadRequestException('이미 취소된 모집글입니다.');
     }
 
     // Snapshot affected applicants before state flip
@@ -499,7 +504,8 @@ export class MercenaryService {
       ),
     );
 
-    return { closed: true };
+    const updated = await this.findOne(postId);
+    return { ...updated, alreadyClosed: false };
   }
 
   /**
@@ -517,8 +523,11 @@ export class MercenaryService {
     if (post.authorId !== actorUserId) {
       throw new ForbiddenException('작성자만 모집글을 취소할 수 있습니다.');
     }
+
+    // Idempotency guard: already cancelled or closed → return 200 with flag, no re-notify
     if (post.status === 'cancelled' || post.status === 'closed') {
-      throw new BadRequestException('이미 종료된 모집글입니다.');
+      const current = await this.findOne(postId);
+      return { ...current, alreadyCancelled: true };
     }
 
     // Snapshot all applicants before state flip
@@ -547,7 +556,8 @@ export class MercenaryService {
       ),
     );
 
-    return { cancelled: true };
+    const updated = await this.findOne(postId);
+    return { ...updated, alreadyCancelled: false };
   }
 
   private canManageWithRole(role?: TeamRole): boolean {

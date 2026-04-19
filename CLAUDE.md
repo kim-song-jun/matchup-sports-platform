@@ -291,6 +291,15 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 **(Task 70 신규 — 기존 `/admin/settlements` 에 payout 배치 계층 추가)**
 `GET /admin/payouts` (status / recipientId / batchId / cursor 필터) | `GET /admin/payouts/eligible` (배치 대상 released settlements, recipient별 집계) | `POST /admin/payouts/batch` (`CreateBatchDto { recipientIds?, cutoffDate? }` — 서버에서 금액 계산, client 금액 신뢰 안 함) | `PATCH /admin/payouts/:id/mark-paid` (`{ externalRef?, note? }` — payout `paid`, 수령자 `payout_paid` 알림) | `PATCH /admin/payouts/:id/mark-failed` (`{ reason }` — settlements `payoutId=null` 복원, 재대기열)
 
+**실패 payout 재시도** (Task 76 추가):
+`POST /admin/payouts/:id/retry` [AdminGuard, `@HttpCode(200)`] (status=failed guard로 race-safe `updateMany`, 연결 settlements `payoutId=null` 복원, `Payout.status=cancelled` 기록. 이미 `paid`인 경우 409 `PAYOUT_NOT_RETRIABLE`)
+
+### 운영 대시보드 (`/admin/ops`)
+**(Task 76 신규 — `AdminOpsModule`)**
+`GET /admin/ops/summary` [AdminGuard, `@Throttle 120/60s`] — `{ matchesInProgress, paymentsPending, disputesOpen, settlementsPending, payoutsFailed, pushFailures5m }` 6개 KPI `Promise.all` 병렬 집계. `AdminOpsSummaryDto` (Swagger `ApiProperty`, plain interface)
+`GET /admin/ops/recent-push-failures?limit=20` [AdminGuard] — `WebPushFailureLog` 테이블 기반. PII 제거: endpoint 마지막 6자 + userId sha256 8자
+`POST /admin/ops/push-failures/ack` [AdminGuard] — `acknowledgedAt` 타임스탬프 기록, 알람 재트리거 방지
+
 ### 결제 (`/payments`)
 `POST prepare` (PreparePaymentDto) | `POST confirm` (ConfirmPaymentDto) | `POST :id/refund` (RefundPaymentDto) | `GET me` | `POST webhook`
 
@@ -403,13 +412,17 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useAdminDisputes(params?)` — 어드민 분쟁 목록 (`GET /admin/disputes`) — Task 70에서 실제 Prisma 데이터로 재연결 (in-memory mock 제거) (Task 70 업데이트)
 - `useAdminDispute(id)` — 어드민 분쟁 상세 (`GET /admin/disputes/:id`) (Task 70 추가)
 - `useReviewDispute()` — 어드민 검토 시작 mutation (`POST /admin/disputes/:id/review`) (Task 70 추가)
-- `useResolveDispute()` — 어드민 분쟁 해결 mutation (`PATCH /admin/disputes/:id/resolve`) (Task 70 추가)
+- `useResolveDispute()` — 어드민 분쟁 해결 mutation (`PATCH /admin/disputes/:id/resolve`). `['admin-dispute', id]` + `['admin-disputes']` + `['admin-ops-summary']` invalidate (Task 70 추가, **Task 76**: `['admin-ops-summary']` invalidate 추가)
 - `useForceReleaseOrder()` — 어드민 에스크로 강제 해제 mutation (`POST /admin/orders/:id/force-release`) (Task 70 추가)
 - `useAdminPayouts(params?)` — 어드민 payout 목록 (`GET /admin/payouts`, status/recipientId/batchId 필터) (Task 70 추가)
 - `useAdminEligibleSettlements()` — 배치 가능 settlement 목록 (`GET /admin/payouts/eligible`) (Task 70 추가)
 - `useCreatePayoutBatch()` — payout 배치 생성 mutation (`POST /admin/payouts/batch`) (Task 70 추가)
-- `useMarkPayoutPaid()` — payout paid 처리 mutation (`PATCH /admin/payouts/:id/mark-paid`) (Task 70 추가)
-- `useMarkPayoutFailed()` — payout failed 처리 mutation (`PATCH /admin/payouts/:id/mark-failed`) (Task 70 추가)
+- `useMarkPayoutPaid()` — payout paid 처리 mutation (`PATCH /admin/payouts/:id/mark-paid`). `['admin-payouts']` + `['admin-ops-summary']` invalidate (Task 70 추가, **Task 76**: `['admin-ops-summary']` invalidate 추가)
+- `useMarkPayoutFailed()` — payout failed 처리 mutation (`PATCH /admin/payouts/:id/mark-failed`). `['admin-payouts']` + `['admin-ops-summary']` invalidate (Task 70 추가, **Task 76**: `['admin-ops-summary']` invalidate 추가)
+- `useAdminOpsSummary()` — ops KPI 조회 (`GET /admin/ops/summary`). `refetchInterval: 30_000`. 6개 지표: `matchesInProgress`, `paymentsPending`, `disputesOpen`, `settlementsPending`, `payoutsFailed`, `pushFailures5m` (Task 76 추가)
+- `useRecentPushFailures(limit?)` — 최근 푸시 실패 목록 (`GET /admin/ops/recent-push-failures?limit=20`). PII 마스킹 적용 (Task 76 추가)
+- `useAckPushFailures()` — 실패 알람 확인 mutation (`POST /admin/ops/push-failures/ack`). `['admin-ops-summary']` + `['recent-push-failures']` invalidate (Task 76 추가)
+- `useRetryPayout()` — 실패 payout 재시도 mutation (`POST /admin/payouts/:id/retry`). `['admin-payouts']` + `['admin-ops-summary']` invalidate. 409 `PAYOUT_NOT_RETRIABLE` 시 에러 toast (Task 76 추가)
 
 ### 에러 처리 규칙
 - **에러 메시지**: `catch (err)` 블록에서 직접 타입 단언 금지. `extractErrorMessage(err, 'fallback 메시지')` (`@/lib/utils`) 사용
@@ -464,6 +477,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `components/dispute/dispute-message-thread.tsx` — 분쟁 메시지 스레드 (`components/chat/chat-bubble.tsx` 재사용, actorRole별 정렬) (Task 70 추가)
 - `components/dispute/dispute-resolve-modal.tsx` — 어드민 분쟁 해결 모달 (action: refund | release | dismiss, note 입력, `components/ui/modal.tsx` 기반) (Task 70 추가)
 - `components/admin/payout-batch-builder.tsx` — 어드민 payout 배치 생성 UI (eligible settlement 선택 → batch 생성 → mark-paid 흐름) (Task 70 추가)
+- `components/admin/kpi-card.tsx` — 운영 KPI 단일 카드 (숫자 + 레이블 + deep-link). 다크모드 + 44px 터치 + `aria-label` 내장. 숫자 0은 `EmptyState` 대체 없이 0 그대로 표시 (Task 76 추가)
+- `components/admin/push-failure-table.tsx` — 최근 웹 푸시 실패 목록 테이블 (PII 마스킹: endpoint 6자 + userId hash 8자). ack 버튼 포함 (Task 76 추가)
+- `components/admin/weekly-payout-bars.tsx` — 최근 4주 payout 합계 CSS 막대 차트 (Tailwind `bg-blue-500` + `h-[40px]` 인라인 bar + 숫자 병기, chart 라이브러리 추가 없음). 0건 주에 `h-[2px]` 최솟값 처리 (Task 76 추가)
 - `lib/dispute-labels.ts` — 분쟁 status/type 레이블 단일 소스. 어드민 목록·상세·필터 전체에서 공유 (Task 70 추가)
 - `components/match/auto-balance-modal.tsx` — 팀 자동 구성 모달 (preview → 재추첨 → 확정). **Task 72**에서 `previewHistory`(FIFO cap=2) 비교 토글, 재추첨 rate-limit 카운트다운 disable, aria-live dedup 공지 추가
 - `components/match/confirm-replace-modal.tsx` — 기존 팀 배정이 있는 매치 재확정 경고 alertdialog. current teams 요약 + "교체"/"취소" CTA (Task 72 추가)
@@ -508,3 +524,11 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
    - **Capacitor iOS APNs** 네이티브 통합은 Apple Developer 계정 확정 후 **Task 75에서 활성화 예정**. Android는 VAPID 공유 경로(ChromeWebView) 재사용으로 추가 작업 없음.
 
 2. **마켓플레이스 cron**: `DISABLE_MARKETPLACE_CRON` 환경변수가 설정되지 않으면 cron이 10분 주기로 자동 실행됨. 테스트 환경에서는 `DISABLE_MARKETPLACE_CRON=true` 로 비활성화 필요 (신규, Task 70 추가).
+
+3. **운영 알람 Slack webhook 미등록** (Task 76 추가): `WebPushAlertService`는 `OPS_ALERT_WEBHOOK_URL` 없을 시 logger-only fallback으로 안전하게 동작하므로 배포는 가능. 실제 Slack 알람 수신을 위해서는 아래 수동 작업 필요:
+   - Slack 워크스페이스에서 "Incoming Webhooks" App 생성 → 채널 지정 → URL 복사
+   - GitHub Actions secrets에 `OPS_ALERT_WEBHOOK_URL` 등록
+   - Staging/Prod 채널 분리 권장 (R8: 환경 혼선 방지)
+   - 테스트 환경에서는 `DISABLE_OPS_ALERT_CRON=true` 로 비활성화 가능 (Task 70 cron 선례 재사용)
+
+4. **`WebPushFailureLog` 보관 기간 무제한** (Task 76 추가): 현재 별도 cleanup cron 없음. 장기 운영 시 테이블 row 증가 가능. 30일 이상 cleanup cron은 별도 후속 task에서 처리 예정.

@@ -18,9 +18,9 @@
     "gen:enums": "node scripts/gen-enums.mjs"
   },
   "dependencies": {
-    "@swc/helpers": "^0.5.17",
     "@capacitor/core": "^6.0.0",
     "@capacitor/push-notifications": "^6.0.5",
+    "@swc/helpers": "^0.5.17",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.7.0",
     "class-variance-authority": "^0.7.1",
@@ -44,12 +44,12 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "4.3.0",
-    "jsdom": "24.1.0",
+    "@vitejs/plugin-react": "4.7.0",
+    "jsdom": "26.1.0",
     "msw": "^2.12.14",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
-    "vitest": "1.6.0"
+    "vitest": "3.2.4"
   }
 }

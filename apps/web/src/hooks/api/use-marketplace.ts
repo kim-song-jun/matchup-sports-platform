@@ -6,11 +6,14 @@ import type {
   MarketplaceListing,
   Tournament,
   PaginatedResponse,
+  CursorPage,
   CreateListingInput,
   UpdateListingInput,
   CreateTournamentInput,
 } from '@/types/api';
-import { extractData } from './shared';
+import type { MarketplaceOrder, ShipOrderInput, FileDisputeInput } from '@/types/marketplace';
+import type { Dispute } from '@/types/dispute';
+import { extractData, extractCursorPage } from './shared';
 import { queryKeys } from './query-keys';
 
 // ── Marketplace ──
@@ -81,7 +84,8 @@ export function useCreateMarketplaceOrder() {
   return useMutation({
     mutationFn: async (listingId: string) => {
       const res = await api.post(`/marketplace/listings/${listingId}/order`);
-      return extractData<{ orderId: string; amount: number }>(res);
+      // Service returns { order: MarketplaceOrder, payment: { orderId, amount } }.
+      return extractData<{ order: MarketplaceOrder; payment: { orderId: string; amount: number } }>(res);
     },
     onSuccess: (_, listingId) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.detail(listingId) });
@@ -98,6 +102,86 @@ export function useConfirmMarketplaceOrder() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.all });
+    },
+  });
+}
+
+// ── Order lifecycle (buyer flow) ──
+
+/** Returns cursor-paginated order list. UI consumers should read `.data[]` (CursorPage shape). */
+export function useMyOrders(params?: Record<string, string>) {
+  return useQuery<CursorPage<MarketplaceOrder>>({
+    queryKey: queryKeys.orders.mine,
+    queryFn: async () => {
+      const res = await api.get('/marketplace/orders/me', { params });
+      return extractCursorPage<MarketplaceOrder>(res);
+    },
+  });
+}
+
+export function useOrder(id: string) {
+  return useQuery<MarketplaceOrder>({
+    queryKey: queryKeys.orders.detail(id),
+    queryFn: async () => {
+      const res = await api.get(`/marketplace/orders/${id}`);
+      return extractData<MarketplaceOrder>(res);
+    },
+    enabled: !!id,
+  });
+}
+
+export function useShipOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data?: ShipOrderInput }) => {
+      const res = await api.post(`/marketplace/orders/${id}/ship`, data ?? {});
+      return extractData<MarketplaceOrder>(res);
+    },
+    onSuccess: (_, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.mine });
+    },
+  });
+}
+
+export function useDeliverOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/marketplace/orders/${id}/deliver`);
+      return extractData<MarketplaceOrder>(res);
+    },
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.mine });
+    },
+  });
+}
+
+export function useConfirmReceipt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/marketplace/orders/${id}/confirm-receipt`);
+      return extractData<MarketplaceOrder>(res);
+    },
+    onSuccess: (_, id) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.mine });
+    },
+  });
+}
+
+export function useFileDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: FileDisputeInput }) => {
+      const res = await api.post(`/marketplace/orders/${id}/dispute`, data);
+      return extractData<Dispute>(res);
+    },
+    onSuccess: (_, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.disputes.all });
     },
   });
 }

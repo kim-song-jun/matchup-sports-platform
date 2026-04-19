@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { MercenaryPostStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -198,5 +198,17 @@ export class AdminController {
       cursor,
       parsedLimit !== undefined && !Number.isNaN(parsedLimit) ? parsedLimit : undefined,
     );
+  }
+
+  @Post('orders/:id/force-release')
+  @ApiOperation({ summary: '에스크로 강제 지급 — 분쟁 없이 관리자가 직접 판매자 지급 해제' })
+  @ApiResponse({ status: 200, description: '강제 지급 완료' })
+  @ApiResponse({ status: 400, description: 'ORDER_STATUS_INVALID — 강제 지급 불가 상태' })
+  @ApiResponse({ status: 404, description: 'ORDER_NOT_FOUND' })
+  async forceReleaseOrder(
+    @Param('id') orderId: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.adminService.forceReleaseOrder(orderId, adminId);
   }
 }

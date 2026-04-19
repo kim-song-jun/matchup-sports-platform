@@ -133,6 +133,15 @@ enum NotificationType {
   lesson_ticket_purchased
   // Chat events (future-proof; delivery not implemented in Task 69)
   chat_message
+  // Marketplace payment lifecycle (Task 70)
+  marketplace_order_shipped
+  marketplace_order_delivered
+  marketplace_order_completed
+  marketplace_order_disputed
+  marketplace_order_refunded
+  marketplace_dispute_message
+  marketplace_dispute_resolved
+  marketplace_payout_paid
 }
 
 enum ChatRoomType {
@@ -205,6 +214,7 @@ enum OrderStatus {
   disputed
   refunded
   cancelled
+  auto_released // distinguishes cron-triggered release from buyer-confirmed completion for admin audit
 }
 
 enum TournamentStatus {
@@ -282,6 +292,10 @@ model User {
   blocksTo               UserBlock[]             @relation("BlocksTo")
   receivedAdminAuditLogs AdminUserAuditLog[]     @relation("AdminAuditTarget")
   actedAdminAuditLogs    AdminUserAuditLog[]     @relation("AdminAuditActor")
+  payouts                Payout[]                @relation("UserPayouts")
+  buyerDisputes          Dispute[]               @relation("BuyerDisputes")
+  sellerDisputes         Dispute[]               @relation("SellerDisputes")
+  disputeMessages        DisputeMessage[]        @relation("DisputeMessages")
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -588,19 +602,27 @@ model MarketplaceOrder {
   rentalStartDate DateTime? @map("rental_start_date")
   rentalEndDate   DateTime? @map("rental_end_date")
 
-  paidAt      DateTime? @map("paid_at")
-  shippedAt   DateTime? @map("shipped_at")
-  deliveredAt DateTime? @map("delivered_at")
-  completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  paidAt             DateTime? @map("paid_at")
+  shippedAt          DateTime? @map("shipped_at")
+  deliveredAt        DateTime? @map("delivered_at")
+  completedAt        DateTime? @map("completed_at")
+  autoReleaseAt      DateTime? @map("auto_release_at")         // when escrow auto-releases (T+7 after delivered)
+  releasedAt         DateTime? @map("released_at")             // actual release timestamp
+  confirmedReceiptAt DateTime? @map("confirmed_receipt_at")    // buyer explicitly confirmed receipt
+  forceReleasedByAdminId String? @map("force_released_by_admin_id") // admin who force-released the escrow
+  forceReleasedAt    DateTime? @map("force_released_at")       // timestamp of admin force-release
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  listing MarketplaceListing @relation(fields: [listingId], references: [id])
-  buyer   User               @relation("OrderBuyer", fields: [buyerId], references: [id])
-  seller  User               @relation("OrderSeller", fields: [sellerId], references: [id])
+  listing     MarketplaceListing @relation(fields: [listingId], references: [id])
+  buyer       User               @relation("OrderBuyer", fields: [buyerId], references: [id])
+  seller      User               @relation("OrderSeller", fields: [sellerId], references: [id])
+  disputes    Dispute[]
+  settlements SettlementRecord[] @relation("OrderSettlements")
 
   @@index([buyerId])
   @@index([sellerId])
+  @@index([status, autoReleaseAt])
   @@map("marketplace_orders")
 }
 
@@ -1017,6 +1039,7 @@ model TeamMatch {
   arrivalChecks ArrivalCheck[]
   evaluations   MatchEvaluation[]
   chatRoom      ChatRoom?
+  disputes      Dispute[]              @relation("TeamMatchDisputes")
 
   @@index([sportType, status])
   @@index([matchDate])
@@ -1292,22 +1315,63 @@ enum SettlementStatus {
   processing
   completed
   failed
+  refunded // funds returned to buyer after dispute resolution
+  held     // settlement created but payout not yet triggered
+}
+
+// ─── Marketplace Dispute & Payout ───────────────────────
+
+enum DisputeStatus {
+  filed
+  seller_responded
+  admin_reviewing
+  resolved_refund
+  resolved_release
+  withdrawn
+  dismissed
+}
+
+enum DisputeActorRole {
+  buyer
+  seller
+  admin
+}
+
+enum DisputeTargetType {
+  marketplace_order
+  team_match
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  paid
+  failed
+  cancelled
 }
 
 model SettlementRecord {
   id          String           @id @default(cuid())
   type        SettlementType
   sourceId    String           @map("source_id") // orderId / paymentId / ticketId
+  orderId     String?          @map("order_id")  // FK to marketplace_orders for marketplace type
   amount      Int // gross amount
   commission  Int // platform commission (10%)
   netAmount   Int              @map("net_amount") // amount - commission
   recipientId String?          @map("recipient_id") // seller or instructor
   status      SettlementStatus @default(pending)
   processedAt DateTime?        @map("processed_at")
+  releasedAt  DateTime?        @map("released_at") // when escrow was released
+  payoutId    String?          @map("payout_id")   // FK to payouts batch
   createdAt   DateTime         @default(now()) @map("created_at")
 
+  order  MarketplaceOrder? @relation("OrderSettlements", fields: [orderId], references: [id], onDelete: SetNull)
+  payout Payout?           @relation("PayoutSettlements", fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, type])
   @@index([type, status])
   @@index([recipientId])
+  @@index([payoutId])
   @@map("settlement_records")
 }
 
@@ -1375,4 +1439,94 @@ model UserBlock {
   @@index([blockerId])
   @@index([blockedId])
   @@map("user_blocks")
+}
+
+// ─── Payout (admin-triggered seller bank transfers) ─────
+
+model Payout {
+  id                  String       @id @default(cuid())
+  batchId             String       @map("batch_id")          // shared across all payouts in one admin batch run
+  recipientId         String       @map("recipient_id")      // seller user id
+  grossAmount         Int          @map("gross_amount")      // sum of settlement gross amounts
+  platformFee         Int          @map("platform_fee")      // sum of settlement commissions
+  netAmount           Int          @map("net_amount")        // grossAmount - platformFee; transferred to seller
+  status              PayoutStatus @default(pending)
+  note                String?
+  failureReason       String?      @map("failure_reason")
+  paidAt              DateTime?    @map("paid_at")
+  processedAt         DateTime?    @map("processed_at")
+  markedPaidByAdminId String?      @map("marked_paid_by_admin_id")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  recipient    User               @relation("UserPayouts", fields: [recipientId], references: [id])
+  settlements  SettlementRecord[] @relation("PayoutSettlements")
+
+  @@index([batchId])
+  @@index([recipientId, status])
+  @@index([status])
+  @@map("payouts")
+}
+
+// ─── Dispute (marketplace order & team-match disputes) ──
+
+model Dispute {
+  id                String            @id @default(cuid())
+  targetType        DisputeTargetType @map("target_type")
+  orderId           String?           @unique @map("order_id")         // FK when targetType = marketplace_order
+  teamMatchId       String?           @map("team_match_id")            // FK when targetType = team_match
+  type              String            @map("type")                     // reason code e.g. "item_not_received", "item_not_as_described"
+  status            DisputeStatus     @default(filed)
+  buyerId           String            @map("buyer_id")                 // disputing party (or host for team-match)
+  sellerId          String            @map("seller_id")                // responding party
+  description       String
+  evidence          String[]          @default([])                     // URLs to uploaded evidence files
+  priorOrderStatus  OrderStatus       @map("prior_order_status")       // order status at time of dispute filing; used to restore on withdraw/dismiss
+  resolvedByAdminId String?           @map("resolved_by_admin_id")     // admin who resolved the dispute
+  resolvedAt        DateTime?         @map("resolved_at")
+  resolution        String?                                            // admin resolution note
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  order     MarketplaceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  teamMatch TeamMatch?        @relation("TeamMatchDisputes", fields: [teamMatchId], references: [id], onDelete: SetNull)
+  buyer     User              @relation("BuyerDisputes", fields: [buyerId], references: [id])
+  seller    User              @relation("SellerDisputes", fields: [sellerId], references: [id])
+  messages  DisputeMessage[]
+  events    DisputeEvent[]
+
+  @@index([status])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("disputes")
+}
+
+model DisputeMessage {
+  id        String           @id @default(cuid())
+  disputeId String           @map("dispute_id")
+  authorId  String           @map("author_id")
+  role      DisputeActorRole
+  body      String
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  author  User    @relation("DisputeMessages", fields: [authorId], references: [id])
+
+  @@index([disputeId, createdAt])
+  @@map("dispute_messages")
+}
+
+model DisputeEvent {
+  id          String            @id @default(cuid())
+  disputeId   String            @map("dispute_id")
+  actorRole   DisputeActorRole? @map("actor_role")
+  actorUserId String?           @map("actor_user_id")
+  eventType   String            @map("event_type")   // e.g. 'refund', 'release', 'dismiss', 'withdraw', 'force_release'
+  payload     Json?                                   // additional context (adminId, note, etc.)
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+  @@map("dispute_events")
 }

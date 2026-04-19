@@ -9,3 +9,8 @@ export function success<T>(data: T) {
 export function paged<T>(items: T[], nextCursor: string | null = null) {
   return success({ items, nextCursor });
 }
+
+/** CursorPage shape — used by endpoints that return { data, nextCursor, hasMore }. */
+export function cursorPaged<T>(data: T[], nextCursor: string | null = null) {
+  return success({ data, nextCursor, hasMore: nextCursor !== null });
+}

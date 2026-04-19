@@ -239,9 +239,9 @@ export default function ListingDetailPage() {
 
           {/* Rental info */}
           {listing.listingType === 'rent' && (
-            <div className="rounded-xl bg-blue-50 border border-blue-100 p-5 mb-4">
-              <h3 className="text-md font-semibold text-blue-800 mb-2">대여 정보</h3>
-              <div className="space-y-2 text-base text-blue-700">
+            <div className="rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 p-5 mb-4">
+              <h3 className="text-md font-semibold text-blue-800 dark:text-blue-300 mb-2">대여 정보</h3>
+              <div className="space-y-2 text-base text-blue-700 dark:text-blue-400">
                 <p>일일 대여비: {formatAmount(listing.rentalPricePerDay || 0)}</p>
                 <p>보증금: {formatAmount(listing.rentalDeposit || 0)}</p>
               </div>
@@ -256,7 +256,7 @@ export default function ListingDetailPage() {
           <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">판매자</h3>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-500">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-sm font-bold text-gray-500 dark:text-gray-300">
                 {listing.seller?.nickname?.charAt(0)}
               </div>
               <div className="flex-1">
@@ -267,10 +267,10 @@ export default function ListingDetailPage() {
                 </div>
               </div>
             </div>
-            <div className="mt-3 pt-3 border-t border-gray-50 text-right">
+            <div className="mt-3 pt-3 border-t border-gray-50 dark:border-gray-700 text-right">
               <button
                 onClick={() => toast('info', '신고가 접수되었어요. 운영팀이 검토할게요')}
-                className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
               >
                 신고하기
               </button>
@@ -283,7 +283,7 @@ export default function ListingDetailPage() {
               <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">안전거래 안내</p>
-                <p className="text-xs text-gray-500 mt-0.5">실제 안전결제는 아직 준비 중이며, 현재는 채팅 기반 거래만 지원합니다.</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">실제 안전결제는 아직 준비 중이에요. 현재는 채팅 기반 거래만 지원해요.</p>
               </div>
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function ListingDetailPage() {
                     toast('success', '판매자와 채팅을 시작했어요');
                     router.push('/chat');
                   }}
-                  className="w-full rounded-xl border border-gray-200 py-3.5 text-md font-semibold text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 py-3.5 text-md font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
                 >
                   <MessageCircle size={18} />
                   채팅하기
@@ -316,10 +316,10 @@ export default function ListingDetailPage() {
                 )}
                 {user?.id === listing?.sellerId && (
                   <div className="flex gap-2 mt-2">
-                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600">
+                    <Link href={`/marketplace/${listingId}/edit`} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <Pencil size={14} /> 수정
                     </Link>
-                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 py-2.5 text-sm font-medium text-red-500">
+                    <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 dark:border-red-900 py-2.5 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
                       <Trash2 size={14} /> 삭제
                     </button>
                   </div>
@@ -337,11 +337,11 @@ export default function ListingDetailPage() {
           <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
         </div>
         <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">매물을 삭제하시겠어요?</h3>
-        <p className="text-base text-gray-500 text-center mt-2">삭제된 매물은 복구할 수 없습니다.</p>
+        <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">삭제된 매물은 복구할 수 없어요.</p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => setShowDeleteConfirm(false)}
-            className="flex-1 rounded-xl bg-gray-100 py-3 text-base font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
+            className="flex-1 rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             돌아가기
           </button>

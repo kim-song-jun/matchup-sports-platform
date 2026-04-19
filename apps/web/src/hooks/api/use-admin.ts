@@ -15,13 +15,24 @@ import type {
   AdminReview,
   AdminStatisticsOverview,
   MercenaryPost,
-  Dispute,
   Settlement,
   SettlementSummary,
   PaginatedResponse,
+  CursorPage,
   UpdateStatusInput,
 } from '@/types/api';
-import { extractData, extractCollection } from './shared';
+import type { Dispute, ResolveDisputeInput, ReviewDisputeInput } from '@/types/dispute';
+import type {
+  Payout,
+  PayoutStatus,
+  EligibleSettlement,
+  CreatePayoutBatchInput,
+  CreatePayoutBatchResponse,
+  MarkPayoutPaidInput,
+  MarkPayoutFailedInput,
+} from '@/types/payout';
+import type { MarketplaceOrder } from '@/types/marketplace';
+import { extractData, extractCollection, extractCursorPage } from './shared';
 import { queryKeys } from './query-keys';
 
 // ── Admin Users ──
@@ -222,12 +233,13 @@ export function useDeleteAdminMercenaryPost() {
 }
 
 // ── Admin Disputes ──
-export function useAdminDisputes() {
-  return useQuery<Dispute[]>({
+/** Returns cursor-paginated dispute list. UI consumers read `query.data.data[]` (CursorPage — axios unwraps outer envelope). */
+export function useAdminDisputes(params?: Record<string, string>) {
+  return useQuery<CursorPage<Dispute>>({
     queryKey: queryKeys.admin.disputes,
     queryFn: async () => {
-      const res = await api.get('/admin/disputes');
-      return extractCollection<Dispute>(res);
+      const res = await api.get('/admin/disputes', { params });
+      return extractCursorPage<Dispute>(res);
     },
   });
 }
@@ -243,16 +255,121 @@ export function useAdminDispute(id: string) {
   });
 }
 
-export function useUpdateDisputeStatus() {
+/**
+ * @deprecated REMOVED endpoint (PATCH /admin/disputes/:id/status).
+ * Use useReviewDispute + useResolveDispute instead (Task 70 tech-design §2.2).
+ */
+export function useUpdateDisputeStatus(): never {
+  throw new Error(
+    'useUpdateDisputeStatus is retired. Use useReviewDispute or useResolveDispute (Task 70).'
+  );
+}
+
+export function useReviewDispute() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateStatusInput & Record<string, unknown> }) => {
-      const res = await api.patch(`/admin/disputes/${id}/status`, data);
+    mutationFn: async ({ id, data }: { id: string; data?: ReviewDisputeInput }) => {
+      const res = await api.post(`/admin/disputes/${id}/review`, data ?? {});
       return extractData<Dispute>(res);
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.disputes });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.dispute(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.disputes });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.dispute(id) });
+    },
+  });
+}
+
+export function useResolveDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ResolveDisputeInput }) => {
+      const res = await api.patch(`/admin/disputes/${id}/resolve`, data);
+      return extractData<Dispute>(res);
+    },
+    onSuccess: (_, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.disputes });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.dispute(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+  });
+}
+
+export function useForceReleaseOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, note }: { id: string; note: string }) => {
+      const res = await api.post(`/admin/orders/${id}/force-release`, { note });
+      return extractData<MarketplaceOrder>(res);
+    },
+    onSuccess: (_, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.mine });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.settlements });
+    },
+  });
+}
+
+// ── Admin Payouts ──
+
+/** Returns cursor-paginated payout list. UI consumers should read `.data[]` (CursorPage shape). */
+export function useAdminPayouts(params?: Record<string, string | PayoutStatus>) {
+  return useQuery<CursorPage<Payout>>({
+    queryKey: queryKeys.admin.payouts(params as Record<string, string> | undefined),
+    queryFn: async () => {
+      const res = await api.get('/admin/payouts', { params });
+      return extractCursorPage<Payout>(res);
+    },
+  });
+}
+
+export function useAdminEligibleSettlements() {
+  return useQuery<EligibleSettlement[]>({
+    queryKey: queryKeys.admin.payoutsEligible,
+    queryFn: async () => {
+      const res = await api.get('/admin/payouts/eligible');
+      return extractCollection<EligibleSettlement>(res);
+    },
+  });
+}
+
+export function useCreatePayoutBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data?: CreatePayoutBatchInput) => {
+      const res = await api.post('/admin/payouts/batch', data ?? {});
+      return extractData<CreatePayoutBatchResponse>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payoutsEligible });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payouts() });
+    },
+  });
+}
+
+export function useMarkPayoutPaid() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data?: MarkPayoutPaidInput }) => {
+      const res = await api.patch(`/admin/payouts/${id}/mark-paid`, data ?? {});
+      return extractData<Payout>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payouts() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.settlements });
+    },
+  });
+}
+
+export function useMarkPayoutFailed() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: MarkPayoutFailedInput }) => {
+      const res = await api.patch(`/admin/payouts/${id}/mark-failed`, data);
+      return extractData<Payout>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payouts() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.payoutsEligible });
     },
   });
 }

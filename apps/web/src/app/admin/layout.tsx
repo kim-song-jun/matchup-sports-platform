@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Trophy, GraduationCap, Building2, ShieldCheck, ArrowLeft, Zap, CreditCard, Wallet, AlertTriangle, BarChart3, Swords, UserPlus, Star, Menu, X, Ticket } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, GraduationCap, Building2, ShieldCheck, ArrowLeft, Zap, CreditCard, Wallet, AlertTriangle, BarChart3, Swords, UserPlus, Star, Menu, X, Ticket, Banknote } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 
 const adminNav = [
@@ -19,6 +19,7 @@ const adminNav = [
   { href: '/admin/venues', icon: Building2, label: '시설 관리' },
   { href: '/admin/payments', icon: CreditCard, label: '결제 관리' },
   { href: '/admin/settlements', icon: Wallet, label: '정산 관리' },
+  { href: '/admin/payouts', icon: Banknote, label: '지급 관리' },
   { href: '/admin/disputes', icon: AlertTriangle, label: '신고/분쟁' },
   { href: '/admin/statistics', icon: BarChart3, label: '통계' },
 ];

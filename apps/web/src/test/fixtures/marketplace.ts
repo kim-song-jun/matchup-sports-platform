@@ -1,4 +1,5 @@
 import type { MarketplaceListing } from '@/types/api';
+import type { MarketplaceOrder } from '@/types/marketplace';
 
 export const mockListing: MarketplaceListing = {
   id: 'listing-1',
@@ -18,12 +19,41 @@ export const mockListing: MarketplaceListing = {
   likeCount: 0,
 };
 
-export const mockOrder = {
+export const mockOrder: MarketplaceOrder = {
   id: 'order-1',
   listingId: 'listing-1',
   buyerId: 'user-2',
   sellerId: 'user-1',
   amount: 50000,
-  status: 'pending' as const,
+  commission: 5000,
+  orderId: 'MU-MKT-test-order-1',
+  status: 'pending',
+  paymentKey: null,
+  paidAt: null,
+  shippedAt: null,
+  deliveredAt: null,
+  completedAt: null,
+  confirmedReceiptAt: null,
+  autoReleaseAt: null,
+  releasedAt: null,
+  rentalStartDate: null,
+  rentalEndDate: null,
   createdAt: '2024-01-05T10:00:00.000Z',
+  updatedAt: '2024-01-05T10:00:00.000Z',
+};
+
+export const mockOrderShipped: MarketplaceOrder = {
+  ...mockOrder,
+  id: 'order-2',
+  status: 'shipped',
+  shippedAt: '2024-01-06T10:00:00.000Z',
+};
+
+export const mockOrderDelivered: MarketplaceOrder = {
+  ...mockOrder,
+  id: 'order-3',
+  status: 'delivered',
+  shippedAt: '2024-01-06T10:00:00.000Z',
+  deliveredAt: '2024-01-07T10:00:00.000Z',
+  autoReleaseAt: '2024-01-14T10:00:00.000Z',
 };

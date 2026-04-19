@@ -1,0 +1,221 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { PayoutsController } from './payouts.controller';
+import { SettlementsService } from './settlements.service';
+import { CreatePayoutBatchDto } from './dto/create-payout-batch.dto';
+import { MarkPayoutPaidDto } from './dto/mark-payout-paid.dto';
+import { MarkPayoutFailedDto } from './dto/mark-payout-failed.dto';
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+const mockService = {
+  findAllPayouts: jest.fn(),
+  listReleasedSettlements: jest.fn(),
+  createPayoutBatch: jest.fn(),
+  markPayoutPaid: jest.fn(),
+  markPayoutFailed: jest.fn(),
+};
+
+const adminId = 'admin-001';
+const payoutId = 'payout-001';
+
+// ---------------------------------------------------------------------------
+// Suite
+// ---------------------------------------------------------------------------
+
+describe('PayoutsController', () => {
+  let controller: PayoutsController;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [PayoutsController],
+      providers: [{ provide: SettlementsService, useValue: mockService }],
+    }).compile();
+
+    controller = module.get<PayoutsController>(PayoutsController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
+  // ── findAll ─────────────────────────────────────────────────────────────────
+
+  describe('findAll', () => {
+    it('delegates with parsed and clamped limit', () => {
+      const expected = { items: [], nextCursor: null };
+      mockService.findAllPayouts.mockReturnValue(expected);
+
+      const result = controller.findAll('pending', undefined, '50');
+
+      expect(mockService.findAllPayouts).toHaveBeenCalledWith({
+        status: 'pending',
+        cursor: undefined,
+        limit: 50,
+      });
+      expect(result).toEqual(expected);
+    });
+
+    it('clamps limit to 100 maximum', () => {
+      mockService.findAllPayouts.mockReturnValue({ items: [], nextCursor: null });
+
+      controller.findAll(undefined, undefined, '999');
+
+      expect(mockService.findAllPayouts).toHaveBeenCalledWith({
+        status: undefined,
+        cursor: undefined,
+        limit: 100,
+      });
+    });
+
+    it('rejects invalid status values — passes undefined to service', () => {
+      mockService.findAllPayouts.mockReturnValue({ items: [], nextCursor: null });
+
+      controller.findAll('invalid_status', undefined, undefined);
+
+      expect(mockService.findAllPayouts).toHaveBeenCalledWith({
+        status: undefined,
+        cursor: undefined,
+        limit: undefined,
+      });
+    });
+
+    it('accepts all valid PayoutStatus enum values', () => {
+      mockService.findAllPayouts.mockReturnValue({ items: [], nextCursor: null });
+      const validStatuses = ['pending', 'processing', 'paid', 'failed'] as const;
+
+      for (const status of validStatuses) {
+        controller.findAll(status, undefined, undefined);
+        expect(mockService.findAllPayouts).toHaveBeenCalledWith({
+          status,
+          cursor: undefined,
+          limit: undefined,
+        });
+      }
+    });
+  });
+
+  // ── findEligible ─────────────────────────────────────────────────────────────
+
+  describe('findEligible', () => {
+    it('delegates to service.listReleasedSettlements with aggregated shape', () => {
+      const expected = [{ recipientId: 'u1', recipientName: 'Alice', settlementCount: 2, grossAmount: 80000, platformFee: 8000, netAmount: 72000, oldestReleasedAt: '2026-04-01T00:00:00.000Z' }];
+      mockService.listReleasedSettlements.mockReturnValue(expected);
+
+      const result = controller.findEligible(undefined);
+
+      expect(mockService.listReleasedSettlements).toHaveBeenCalledWith({ recipientId: undefined });
+      expect(result).toEqual(expected);
+    });
+
+    it('passes recipientId filter when provided', () => {
+      mockService.listReleasedSettlements.mockReturnValue([]);
+
+      controller.findEligible('seller-1');
+
+      expect(mockService.listReleasedSettlements).toHaveBeenCalledWith({ recipientId: 'seller-1' });
+    });
+  });
+
+  // ── createBatch ──────────────────────────────────────────────────────────────
+
+  describe('createBatch', () => {
+    it('delegates explicit settlementIds to service.createPayoutBatch', () => {
+      const ids = ['settlement-001', 'settlement-002'];
+      const body: CreatePayoutBatchDto = { settlementIds: ids };
+      const expected = [{ id: payoutId, amount: 50000, status: 'pending' }];
+      mockService.createPayoutBatch.mockReturnValue(expected);
+
+      const result = controller.createBatch(body, adminId);
+
+      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(
+        { settlementIds: ids, recipientIds: undefined, cutoffDate: undefined },
+        undefined,
+      );
+      expect(result).toEqual(expected);
+    });
+
+    it('delegates recipientIds to service.createPayoutBatch', () => {
+      const body: CreatePayoutBatchDto = { recipientIds: ['user-1', 'user-2'] };
+      mockService.createPayoutBatch.mockReturnValue([]);
+
+      controller.createBatch(body, adminId);
+
+      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(
+        { settlementIds: undefined, recipientIds: ['user-1', 'user-2'], cutoffDate: undefined },
+        undefined,
+      );
+    });
+
+    it('passes cutoffDate when provided', () => {
+      const body: CreatePayoutBatchDto = { recipientIds: ['user-1'], cutoffDate: '2026-04-15' };
+      mockService.createPayoutBatch.mockReturnValue([]);
+
+      controller.createBatch(body, adminId);
+
+      expect(mockService.createPayoutBatch).toHaveBeenCalledWith(
+        { settlementIds: undefined, recipientIds: ['user-1'], cutoffDate: '2026-04-15' },
+        undefined,
+      );
+    });
+  });
+
+  // ── markPaid ─────────────────────────────────────────────────────────────────
+
+  describe('markPaid', () => {
+    it('delegates to service.markPayoutPaid with id, adminId, and note', () => {
+      const body: MarkPayoutPaidDto = { note: 'KB ref#9912' };
+      const expected = { id: payoutId, status: 'paid' };
+      mockService.markPayoutPaid.mockReturnValue(expected);
+
+      const result = controller.markPaid(payoutId, body, adminId);
+
+      expect(mockService.markPayoutPaid).toHaveBeenCalledWith(payoutId, adminId, 'KB ref#9912');
+      expect(result).toEqual(expected);
+    });
+
+    it('passes undefined note when body.note is absent', () => {
+      const body: MarkPayoutPaidDto = {};
+      mockService.markPayoutPaid.mockReturnValue({ id: payoutId, status: 'paid' });
+
+      controller.markPaid(payoutId, body, adminId);
+
+      expect(mockService.markPayoutPaid).toHaveBeenCalledWith(payoutId, adminId, undefined);
+    });
+  });
+
+  // ── markFailed ────────────────────────────────────────────────────────────────
+
+  describe('markFailed', () => {
+    it('delegates to service.markPayoutFailed with id, reason, note, and adminId', () => {
+      const body: MarkPayoutFailedDto = { reason: '계좌번호 오류', note: '재시도 예정' };
+      mockService.markPayoutFailed.mockReturnValue({ id: payoutId, status: 'failed' });
+
+      controller.markFailed(payoutId, body, adminId);
+
+      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '계좌번호 오류', '재시도 예정', adminId);
+    });
+
+    it('passes undefined note when body.note is absent', () => {
+      const body: MarkPayoutFailedDto = { reason: '수취인 정보 불일치' };
+      mockService.markPayoutFailed.mockReturnValue({ id: payoutId, status: 'failed' });
+
+      controller.markFailed(payoutId, body, adminId);
+
+      expect(mockService.markPayoutFailed).toHaveBeenCalledWith(payoutId, '수취인 정보 불일치', undefined, adminId);
+    });
+
+    it('returns service result', () => {
+      const body: MarkPayoutFailedDto = { reason: '은행 점검' };
+      const expected = { id: payoutId, status: 'failed', failureReason: '은행 점검' };
+      mockService.markPayoutFailed.mockReturnValue(expected);
+
+      const result = controller.markFailed(payoutId, body, adminId);
+
+      expect(result).toEqual(expected);
+    });
+  });
+});

@@ -508,6 +508,19 @@ export class PaymentsService {
     return response.json() as Promise<TossPaymentConfirmResponse>;
   }
 
+  /**
+   * Cancels a payment via Toss API using a raw paymentKey.
+   * Use this for marketplace/dispute refund paths where no match-participant context exists.
+   * Throws InternalServerErrorException on Toss API failure.
+   */
+  async cancelByPaymentKey(paymentKey: string, cancelReason: string): Promise<void> {
+    if (!this.tossEnabled) {
+      this.logger.warn(`Toss disabled — skipping cancel for paymentKey ${paymentKey}`);
+      return;
+    }
+    await this.callTossCancel(paymentKey, cancelReason);
+  }
+
   private async callTossCancel(paymentKey: string, cancelReason: string): Promise<void> {
     const response = await fetch(`https://api.tosspayments.com/v1/payments/${paymentKey}/cancel`, {
       method: 'POST',

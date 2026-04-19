@@ -1,10 +1,11 @@
 import { http } from 'msw';
-import { success, paged } from './_utils';
+import { success, paged, cursorPaged } from './_utils';
 import { mockLesson } from '../../fixtures/lessons';
 import { mockTeam1 } from '../../fixtures/teams';
 import { mockVenue } from '../../fixtures/venues';
 import { mockPayment } from '../../fixtures/payments';
-import { mockAdminStats, mockSettlement, mockDispute } from '../../fixtures/admin';
+import { mockAdminStats, mockSettlement, mockDispute, mockPayout, mockEligibleSettlement } from '../../fixtures/admin';
+import { mockOrder } from '../../fixtures/marketplace';
 
 export const adminHandlers = [
   http.get('/api/v1/admin/stats', () => {
@@ -129,20 +130,33 @@ export const adminHandlers = [
     return success({ ...mockSettlement, id: params.id as string, status: 'completed' });
   }),
 
-  // Disputes
-  http.get('/api/v1/admin/disputes', () => {
-    return paged([mockDispute]);
+  // Disputes — NOTE: POST /admin/disputes and PATCH /admin/disputes/:id/status REMOVED (Task 70 §2.2).
+  // These endpoints are handled by disputesHandlers in disputes.ts.
+  // admin.ts only owns the force-release and payout handlers below.
+
+  // Admin force-release order (ops tool for auto-release retry)
+  http.post('/api/v1/admin/orders/:id/force-release', ({ params }) => {
+    return success({ ...mockOrder, id: params.id as string, status: 'auto_released' });
   }),
 
-  http.get('/api/v1/admin/disputes/:id', ({ params }) => {
-    return success({ ...mockDispute, id: params.id as string });
+  // Payouts
+  http.get('/api/v1/admin/payouts', () => {
+    return cursorPaged([mockPayout]);
   }),
 
-  http.post('/api/v1/admin/disputes', () => {
-    return success(mockDispute);
+  http.get('/api/v1/admin/payouts/eligible', () => {
+    return success([mockEligibleSettlement]);
   }),
 
-  http.patch('/api/v1/admin/disputes/:id/status', ({ params }) => {
-    return success({ ...mockDispute, id: params.id as string, status: 'resolved' });
+  http.post('/api/v1/admin/payouts/batch', () => {
+    return success({ batchId: 'batch-uuid-001', payouts: [mockPayout], totalNet: mockPayout.netAmount });
+  }),
+
+  http.patch('/api/v1/admin/payouts/:id/mark-paid', ({ params }) => {
+    return success({ ...mockPayout, id: params.id as string, status: 'paid', processedAt: new Date().toISOString() });
+  }),
+
+  http.patch('/api/v1/admin/payouts/:id/mark-failed', ({ params }) => {
+    return success({ ...mockPayout, id: params.id as string, status: 'failed', failureReason: '은행 거절' });
   }),
 ];

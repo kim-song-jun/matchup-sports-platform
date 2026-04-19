@@ -10,8 +10,10 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { ConfirmReceiptButton } from '@/components/marketplace/confirm-receipt-button';
 import { FileDisputeModal } from '@/components/marketplace/file-dispute-modal';
+import { SellerActions } from '@/components/marketplace/seller-actions';
 import { formatAmount } from '@/lib/utils';
-import { useOrder, useConfirmReceipt, useFileDispute } from '@/hooks/use-api';
+import { useAuthStore } from '@/stores/auth-store';
+import { useOrder, useConfirmReceipt, useFileDispute, useShipOrder, useDeliverOrder } from '@/hooks/use-api';
 
 // hook shapes (actual — matches use-marketplace.ts):
 // useOrder(id)           → { data: MarketplaceOrder | undefined; isLoading; isError; refetch }
@@ -89,9 +91,12 @@ export default function OrderDetailPage() {
 
   useRequireAuth();
 
+  const { user } = useAuthStore();
   const { data: order, isLoading, isError, refetch } = useOrder(orderId);
   const confirmReceiptMutation = useConfirmReceipt();
   const fileDisputeMutation = useFileDispute();
+  const shipOrderMutation = useShipOrder();
+  const deliverOrderMutation = useDeliverOrder();
 
   const [showDisputeModal, setShowDisputeModal] = useState(false);
 
@@ -138,9 +143,14 @@ export default function OrderDetailPage() {
   const status = order.status as OrderStatus;
   const statusConfig = STATUS_LABELS[status] ?? STATUS_LABELS.pending;
   const hasDispute = !!order.dispute;
+
+  // Role derivation — compare string ids from auth store vs order fields
+  const isBuyer = !!user && user.id === order.buyerId;
+  const isSeller = !!user && user.id === order.sellerId;
+
   // paid is excluded: backend rejects dispute filing on escrow-not-yet-held orders
   const canFileDispute =
-    ['escrow_held', 'shipped', 'delivered'].includes(status) && !hasDispute;
+    isBuyer && ['escrow_held', 'shipped', 'delivered'].includes(status) && !hasDispute;
 
   // Timeline step index
   const timelineOrder: OrderStatus[] = ['paid', 'shipped', 'delivered', 'completed'];
@@ -176,7 +186,7 @@ export default function OrderDetailPage() {
               주문 {new Date(order.createdAt).toLocaleDateString('ko-KR')}
             </span>
           </div>
-          {order.autoReleaseAt && ['shipped', 'delivered', 'escrow_held'].includes(status) && (
+          {order.autoReleaseAt && status === 'delivered' && (
             <AutoReleaseCountdown autoReleaseAt={order.autoReleaseAt} />
           )}
         </div>
@@ -249,7 +259,7 @@ export default function OrderDetailPage() {
         {/* Listing summary */}
         {order.listing && (
           <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">상품 정보</h3>
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 tracking-wide">상품 정보</h3>
             <div className="flex items-start gap-3">
               <div className="h-16 w-16 shrink-0 rounded-xl bg-gray-100 dark:bg-gray-700 overflow-hidden flex items-center justify-center">
                 {order.listing.imageUrls?.[0] ? (
@@ -280,40 +290,66 @@ export default function OrderDetailPage() {
 
         {/* Payment summary */}
         <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">결제 정보</h3>
+          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 tracking-wide">결제 정보</h3>
           <div className="flex items-center justify-between">
             <span className="text-base text-gray-700 dark:text-gray-300">결제 금액</span>
             <span className="text-xl font-bold text-gray-900 dark:text-white">{formatAmount(order.amount)}</span>
           </div>
         </div>
 
-        {/* CTAs */}
+        {/* CTAs — gated by role (buyer vs seller, mutually exclusive) */}
         <div className="space-y-3">
-          <ConfirmReceiptButton
-            orderId={orderId}
-            status={status}
-            confirmReceiptMutation={{
-              mutate: (_vars, callbacks) => {
-                // useConfirmReceipt mutate takes orderId string directly
-                confirmReceiptMutation.mutate(orderId, {
-                  onSuccess: () => callbacks.onSuccess(),
-                  onError: (err) => callbacks.onError(err),
-                });
-              },
-              isPending: confirmReceiptMutation.isPending,
-            }}
-          />
+          {isBuyer && (
+            <>
+              <ConfirmReceiptButton
+                orderId={orderId}
+                status={status}
+                confirmReceiptMutation={{
+                  mutate: (_vars, callbacks) => {
+                    // useConfirmReceipt mutate takes orderId string directly
+                    confirmReceiptMutation.mutate(orderId, {
+                      onSuccess: () => callbacks.onSuccess(),
+                      onError: (err) => callbacks.onError(err),
+                    });
+                  },
+                  isPending: confirmReceiptMutation.isPending,
+                }}
+              />
 
-          {canFileDispute && (
-            <button
-              type="button"
-              onClick={() => setShowDisputeModal(true)}
-              className="w-full min-h-[44px] rounded-xl border border-red-200 dark:border-red-800 py-3 text-base font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 active:scale-[0.98] transition-[colors,transform] flex items-center justify-center gap-2"
-              aria-label="분쟁 신청하기"
-            >
-              <AlertTriangle size={16} aria-hidden="true" />
-              분쟁 신청
-            </button>
+              {canFileDispute && (
+                <button
+                  type="button"
+                  onClick={() => setShowDisputeModal(true)}
+                  className="w-full min-h-[44px] rounded-xl border border-red-200 dark:border-red-800 py-3 text-base font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 active:scale-[0.98] transition-[colors,transform] flex items-center justify-center gap-2"
+                  aria-label="분쟁 신청하기"
+                >
+                  <AlertTriangle size={16} aria-hidden="true" />
+                  분쟁 신청
+                </button>
+              )}
+            </>
+          )}
+
+          {isSeller && (
+            <SellerActions
+              orderId={orderId}
+              status={status}
+              shipOrderMutation={{
+                mutate: (vars, callbacks) => {
+                  shipOrderMutation.mutate(
+                    { id: vars.orderId, data: { carrier: vars.carrier, trackingNumber: vars.trackingNumber } },
+                    callbacks,
+                  );
+                },
+                isPending: shipOrderMutation.isPending,
+              }}
+              deliverOrderMutation={{
+                mutate: (vars, callbacks) => {
+                  deliverOrderMutation.mutate(vars.orderId, callbacks);
+                },
+                isPending: deliverOrderMutation.isPending,
+              }}
+            />
           )}
         </div>
       </div>
@@ -335,8 +371,8 @@ export default function OrderDetailPage() {
               },
               {
                 onSuccess: () => {
+                  toast('success', '분쟁 신청이 접수됐어요. 운영팀이 검토 후 연락드릴게요.');
                   callbacks.onSuccess();
-                  toast('success', '분쟁 신청이 접수됐어요');
                 },
                 onError: (err) => callbacks.onError(err),
               },

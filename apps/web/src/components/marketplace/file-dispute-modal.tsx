@@ -59,7 +59,7 @@ export function FileDisputeModal({ isOpen, onClose, orderId, fileDisputeMutation
       { orderId, type: selectedType, description: description.trim() },
       {
         onSuccess: () => {
-          toast('success', '분쟁 신청이 접수됐어요. 운영팀이 검토 후 연락드릴게요.');
+          // Toast is fired by the parent page; modal only resets state and closes.
           setSelectedType('');
           setDescription('');
           onClose();

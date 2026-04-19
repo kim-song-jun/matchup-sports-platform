@@ -18,14 +18,16 @@ import {
 // Dispute.status: DisputeStatus union from types/dispute.ts
 
 type DisputeTab = 'active' | 'resolved';
+type RoleTab = 'buyer' | 'seller';
 
 export default function MyDisputesPage() {
   const router = useRouter();
   useRequireAuth();
   const [activeTab, setActiveTab] = useState<DisputeTab>('active');
+  const [roleTab, setRoleTab] = useState<RoleTab>('buyer');
 
   // useMyDisputes returns an infinite query — we access all pages flat
-  const { data, isLoading, isError, refetch } = useMyDisputes('all');
+  const { data, isLoading, isError, refetch } = useMyDisputes(roleTab);
 
   // Flatten all pages — CursorPage<T> stores the array in `.data`
   const allDisputes = data?.pages?.flatMap((page) => page.data ?? []) ?? [];
@@ -54,11 +56,35 @@ export default function MyDisputesPage() {
       {/* Desktop title */}
       <div className="hidden @3xl:block mb-2 px-5 @3xl:px-0 pt-4">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">분쟁 내역</h2>
-        <p className="text-base text-gray-500 mt-1">신청한 분쟁의 처리 현황을 확인하세요</p>
+        <p className="text-base text-gray-500 mt-1">분쟁 처리 현황을 확인하세요</p>
       </div>
 
-      {/* Tabs */}
-      <div className="px-5 @3xl:px-0 mt-4 mb-4">
+      {/* Role tab: buyer vs seller */}
+      <div className="px-5 @3xl:px-0 mt-4 mb-2">
+        <div role="tablist" className="flex gap-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
+          {([
+            { key: 'buyer', label: '신고한 분쟁' },
+            { key: 'seller', label: '응답 중인 분쟁' },
+          ] as { key: RoleTab; label: string }[]).map((tab) => (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={roleTab === tab.key}
+              onClick={() => setRoleTab(tab.key)}
+              className={`flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors ${
+                roleTab === tab.key
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Status tab: active vs resolved */}
+      <div className="px-5 @3xl:px-0 mb-4">
         <div role="tablist" className="flex gap-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1">
           {([
             { key: 'active', label: '진행중' },
@@ -69,7 +95,7 @@ export default function MyDisputesPage() {
               role="tab"
               aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 min-h-[40px] rounded-lg text-sm font-semibold transition-colors ${
+              className={`flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors ${
                 activeTab === tab.key
                   ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'

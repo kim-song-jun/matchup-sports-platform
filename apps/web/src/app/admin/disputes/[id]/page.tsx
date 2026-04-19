@@ -230,7 +230,7 @@ export default function AdminDisputeDetailPage() {
               </div>
             )}
             {dispute.adminNotes && (
-              <div className="pt-2 border-t border-gray-50 dark:border-gray-700">
+              <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
                 <p className="text-xs text-gray-400 mb-1">운영 메모</p>
                 <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.adminNotes}</p>
               </div>

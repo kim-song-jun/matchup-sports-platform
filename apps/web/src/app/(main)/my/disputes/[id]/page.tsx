@@ -2,15 +2,16 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, AlertTriangle, Loader2, Send } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Loader2, Send, MessageSquare } from 'lucide-react';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { DisputeMessageThread } from '@/components/dispute/dispute-message-thread';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { extractErrorMessage } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
-import { useDispute, useAddDisputeMessage } from '@/hooks/use-api';
+import { useDispute, useAddDisputeMessage, useSellerRespond } from '@/hooks/use-api';
 import { USER_DISPUTE_STATUS_LABELS, DISPUTE_TYPE_LABELS, RESOLVED_DISPUTE_STATUSES } from '@/lib/dispute-labels';
 import type { DisputeMessage } from '@/components/dispute/dispute-message-thread';
 
@@ -33,6 +34,9 @@ export default function DisputeDetailPage() {
 
   const { data: dispute, isLoading, isError, refetch } = useDispute(disputeId);
   const addMessage = useAddDisputeMessage();
+  const sellerRespond = useSellerRespond();
+  const [showRespondModal, setShowRespondModal] = useState(false);
+  const [respondMessage, setRespondMessage] = useState('');
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -65,6 +69,25 @@ export default function DisputeDetailPage() {
         onError: (err) => {
           toast('error', extractErrorMessage(err, '메시지 전송에 실패했어요. 다시 시도해주세요.'));
           setMessageInput(content); // restore on failure
+        },
+      },
+    );
+  };
+
+  const handleSellerRespond = () => {
+    const content = respondMessage.trim();
+    if (!content || sellerRespond.isPending) return;
+
+    sellerRespond.mutate(
+      { id: disputeId, data: { message: content } },
+      {
+        onSuccess: () => {
+          toast('success', '답변이 제출됐어요. 운영팀이 검토할 예정이에요.');
+          setRespondMessage('');
+          setShowRespondModal(false);
+        },
+        onError: (err) => {
+          toast('error', extractErrorMessage(err, '답변 제출에 실패했어요. 다시 시도해주세요.'));
         },
       },
     );
@@ -149,6 +172,18 @@ export default function DisputeDetailPage() {
               <p className="text-sm text-gray-700 dark:text-gray-300">{dispute.adminNotes}</p>
             </div>
           )}
+
+          {/* Seller respond CTA — shown when dispute is filed and current user is the respondent */}
+          {dispute.status === 'filed' && dispute.respondentUserId === user.id && (
+            <button
+              type="button"
+              onClick={() => setShowRespondModal(true)}
+              className="w-full min-h-[44px] rounded-xl border border-blue-200 dark:border-blue-800 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors flex items-center justify-center gap-2"
+            >
+              <MessageSquare size={16} aria-hidden="true" />
+              답변 작성
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,6 +231,54 @@ export default function DisputeDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Seller respond modal */}
+      <Modal
+        isOpen={showRespondModal}
+        onClose={() => { setShowRespondModal(false); setRespondMessage(''); }}
+        size="md"
+        title="분쟁 답변 작성"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+            분쟁에 대한 입장을 작성해주세요. 운영팀이 양측 답변을 검토해 결정해요.
+          </p>
+          <div>
+            <label htmlFor="seller-respond-input" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+              답변 내용 <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <textarea
+              id="seller-respond-input"
+              value={respondMessage}
+              onChange={(e) => setRespondMessage(e.target.value)}
+              placeholder="구체적인 상황을 설명해주세요"
+              rows={5}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 resize-none transition-colors"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setShowRespondModal(false); setRespondMessage(''); }}
+              disabled={sellerRespond.isPending}
+              className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleSellerRespond}
+              disabled={!respondMessage.trim() || sellerRespond.isPending}
+              className="flex-1 min-h-[44px] rounded-xl bg-blue-500 py-3 text-base font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              {sellerRespond.isPending ? (
+                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+              ) : null}
+              답변 제출
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

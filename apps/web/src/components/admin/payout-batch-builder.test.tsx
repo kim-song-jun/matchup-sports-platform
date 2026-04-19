@@ -6,6 +6,16 @@ vi.mock('@/components/ui/toast', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
+vi.mock('@/components/ui/modal', () => ({
+  Modal: ({ isOpen, children, title }: { isOpen: boolean; children: React.ReactNode; title?: string }) =>
+    isOpen ? (
+      <div role="dialog" aria-modal="true">
+        {title && <h2>{title}</h2>}
+        {children}
+      </div>
+    ) : null,
+}));
+
 function makeSettlement(overrides: Partial<PayoutEligibleSettlement> & Pick<PayoutEligibleSettlement, 'recipientId'>): PayoutEligibleSettlement {
   return {
     recipientName: '홍길동',
@@ -63,12 +73,24 @@ describe('PayoutBatchBuilder', () => {
     expect(screen.getByText(/30,800원/)).toBeInTheDocument();
   });
 
-  it('calls mutate with recipientIds on submit', () => {
+  it('opens confirmation modal when batch button clicked', () => {
+    render(<PayoutBatchBuilder settlements={settlements} createPayoutBatchMutation={makeMutation()} />);
+    const row1 = screen.getByText('홍길동').closest('tr')!;
+    fireEvent.click(row1); // user-1
+    fireEvent.click(screen.getByRole('button', { name: /지급 배치 생성/ }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '지급 배치 생성' })).toBeInTheDocument();
+  });
+
+  it('calls mutate with recipientIds after confirming in modal', () => {
     const mutate = vi.fn();
     render(<PayoutBatchBuilder settlements={settlements} createPayoutBatchMutation={makeMutation({ mutate })} />);
     const row1 = screen.getByText('홍길동').closest('tr')!;
     fireEvent.click(row1); // user-1
+    // Step 1: open confirmation modal
     fireEvent.click(screen.getByRole('button', { name: /지급 배치 생성/ }));
+    // Step 2: confirm inside modal
+    fireEvent.click(screen.getByRole('button', { name: /^확인$/ }));
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({ recipientIds: ['user-1'] }),
       expect.objectContaining({ onSuccess: expect.any(Function) }),
@@ -86,11 +108,14 @@ describe('PayoutBatchBuilder', () => {
     expect(screen.queryByRole('button', { name: /지급 배치 생성/ })).toBeNull();
   });
 
-  it('select all picks all recipients', () => {
+  it('select all picks all recipients after modal confirm', () => {
     const mutate = vi.fn();
     render(<PayoutBatchBuilder settlements={settlements} createPayoutBatchMutation={makeMutation({ mutate })} />);
     fireEvent.click(screen.getByLabelText('전체 선택'));
+    // Step 1: open confirmation modal
     fireEvent.click(screen.getByRole('button', { name: /지급 배치 생성/ }));
+    // Step 2: confirm inside modal
+    fireEvent.click(screen.getByRole('button', { name: /^확인$/ }));
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({ recipientIds: expect.arrayContaining(['user-1', 'user-2']) }),
       expect.any(Object),

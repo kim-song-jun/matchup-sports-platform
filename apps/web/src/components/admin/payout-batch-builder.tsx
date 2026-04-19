@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Wallet, Loader2, Info, CheckCircle } from 'lucide-react';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { extractErrorMessage, formatAmount } from '@/lib/utils';
 
@@ -47,6 +48,7 @@ interface PayoutBatchBuilderProps {
 export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onSuccess }: PayoutBatchBuilderProps) {
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const selectedSettlements = useMemo(
     () => settlements.filter((s) => selectedIds.includes(s.recipientId)),
@@ -71,19 +73,26 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
     setSelectedIds(allSelected ? [] : allIds);
   };
 
+  // Step 1: open confirmation modal
   const handleCreateBatch = () => {
     if (selectedIds.length === 0 || createPayoutBatchMutation.isPending) return;
+    setShowConfirm(true);
+  };
 
+  // Step 2: confirmed — fire mutation
+  const handleConfirmBatch = () => {
     createPayoutBatchMutation.mutate(
       { recipientIds: selectedIds },
       {
         onSuccess: () => {
           toast('success', `${selectedIds.length}명 수취인, ${totalCountSelected}건의 정산이 지급 배치로 묶였어요.`);
           setSelectedIds([]);
+          setShowConfirm(false);
           onSuccess?.();
         },
         onError: (err) => {
           toast('error', extractErrorMessage(err, '배치 생성에 실패했어요. 다시 시도해주세요.'));
+          setShowConfirm(false);
         },
       },
     );
@@ -207,7 +216,7 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
                     <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap text-right">
                       {formatAmount(settlement.grossAmount)}
                     </td>
-                    <td className="px-4 py-3.5 text-sm text-red-500 whitespace-nowrap text-right">
+                    <td className="px-4 py-3.5 text-sm text-red-500 dark:text-red-400 whitespace-nowrap text-right">
                       -{formatAmount(settlement.platformFee)}
                     </td>
                     <td className="px-4 py-3.5 text-base font-semibold text-blue-500 whitespace-nowrap text-right">
@@ -223,6 +232,46 @@ export function PayoutBatchBuilder({ settlements, createPayoutBatchMutation, onS
           </table>
         </div>
       </div>
+
+      {/* Batch create confirmation modal — irreversible action requires 2-step confirm */}
+      <Modal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        size="sm"
+        title="지급 배치 생성"
+      >
+        <div className="space-y-5">
+          <p className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
+            <span className="font-bold">{selectedIds.length}명</span>에게{' '}
+            총 <span className="font-bold text-blue-500">{formatAmount(totalSelected)}</span>{' '}
+            지급 배치를 생성할까요?
+          </p>
+          <p className="text-sm text-amber-700 dark:text-amber-400 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900 px-4 py-3">
+            비가역 작업이에요. 생성 후에는 수정하거나 취소할 수 없어요.
+          </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowConfirm(false)}
+              disabled={createPayoutBatchMutation.isPending}
+              className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmBatch}
+              disabled={createPayoutBatchMutation.isPending}
+              className="flex-1 min-h-[44px] rounded-xl bg-blue-500 py-3 text-base font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              {createPayoutBatchMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+              ) : null}
+              확인
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

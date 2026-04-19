@@ -186,7 +186,7 @@ export default function AdminPayoutsPage() {
             role="tab"
             aria-selected={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 min-h-[40px] rounded-lg text-sm font-semibold transition-colors ${
+            className={`flex-1 min-h-[44px] rounded-lg text-sm font-semibold transition-colors ${
               activeTab === tab.key
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -272,7 +272,7 @@ export default function AdminPayoutsPage() {
                           <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap text-right">
                             {formatAmount(payout.grossAmount)}
                           </td>
-                          <td className="px-5 py-3.5 text-sm text-red-500 whitespace-nowrap text-right">
+                          <td className="px-5 py-3.5 text-sm text-red-500 dark:text-red-400 whitespace-nowrap text-right">
                             -{formatAmount(payout.platformFee)}
                           </td>
                           <td className="px-5 py-3.5 text-right text-base font-semibold text-blue-500">

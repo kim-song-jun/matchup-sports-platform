@@ -20,6 +20,7 @@ import type { LucideIcon } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Toggle } from '@/components/ui/toggle';
 import { useToast } from '@/components/ui/toast';
 import {
   useNotificationPreferences,
@@ -456,38 +457,6 @@ function ToggleRow({
       </div>
       <Toggle enabled={enabled} onToggle={onToggle} disabled={disabled} label={label} />
     </div>
-  );
-}
-
-function Toggle({
-  enabled,
-  onToggle,
-  disabled,
-  label,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={disabled}
-      aria-label={`${label} ${enabled ? '켜짐' : '꺼짐'}`}
-      role="switch"
-      aria-checked={enabled}
-      className={`relative shrink-0 h-[30px] w-[52px] rounded-full transition-colors duration-200 ${
-        enabled ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-600'
-      } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      <span
-        className={`absolute top-[3px] left-[3px] h-[24px] w-[24px] rounded-full bg-white dark:bg-gray-800 shadow-sm transition-transform duration-200 ${
-          enabled ? 'translate-x-[22px]' : 'translate-x-0'
-        }`}
-      />
-    </button>
   );
 }
 

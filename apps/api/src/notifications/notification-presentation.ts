@@ -84,9 +84,15 @@ export function notificationCategory(type: NotificationType): NotificationCatego
     case NotificationType.payment_refunded:
     case NotificationType.marketplace_order:
     case NotificationType.lesson_ticket_purchased:
+    case NotificationType.marketplace_payout_paid:
       return 'payment';
+    case NotificationType.badge_earned:
+    case NotificationType.no_show_penalty:
+      return 'team';
     case NotificationType.level_changed:
     default:
+      // NOTE: any new NotificationType must be explicitly mapped here;
+      // default falls to 'system' which has no user-controllable preference gate.
       return 'system';
   }
 }

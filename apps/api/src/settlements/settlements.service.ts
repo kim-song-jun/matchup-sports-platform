@@ -1,12 +1,16 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
+import { Prisma, PayoutStatus, SettlementStatus, SettlementType, NotificationType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeCommission } from '../common/constants/commission';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SettlementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async findAll(filter: { status?: string; type?: string; cursor?: string; limit?: number }) {
     const where: {
@@ -436,7 +440,7 @@ export class SettlementsService {
 
     if (payout.status === PayoutStatus.paid) return payout;
 
-    return this.prisma.$transaction(async (tx) => {
+    const paid = await this.prisma.$transaction(async (tx) => {
       const result = await tx.payout.updateMany({
         where: { id: payoutId, status: { in: [PayoutStatus.pending, PayoutStatus.processing] } },
         data: {
@@ -462,6 +466,26 @@ export class SettlementsService {
         include: { recipient: { select: { id: true, nickname: true } } },
       });
     });
+
+    // Fire-and-forget: notify recipient after transaction commits.
+    // Notification failure must not affect payout status.
+    await this.notificationsService
+      .create({
+        userId: payout.recipientId,
+        type: NotificationType.marketplace_payout_paid,
+        title: '정산 지급이 완료되었어요',
+        body: `${paid.netAmount.toLocaleString()}원이 지급 처리되었어요.`,
+        data: {
+          payoutId,
+          amount: paid.netAmount,
+          ...(note !== undefined ? { externalRef: note } : {}),
+        },
+      })
+      .catch(() => {
+        /* best-effort — notification failure must not affect payout status */
+      });
+
+    return paid;
   }
 
   /**

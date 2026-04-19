@@ -200,6 +200,10 @@ describe('NotificationsService', () => {
         teamEnabled: true,
         chatEnabled: true,
         paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
       });
 
       const result = await service.create({
@@ -213,6 +217,138 @@ describe('NotificationsService', () => {
       expect(mockPrisma.notification.create).not.toHaveBeenCalled();
       expect(mockRealtime.emitToUser).not.toHaveBeenCalled();
     });
+
+    it('skips notification when teamApplicationEnabled=false for team_application_received', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: false,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
+      });
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.team_application_received,
+        title: '새 팀 신청',
+        body: '누군가 가입 신청했어요',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('skips notification when matchCompletedEnabled=false for match_completed', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: false,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
+      });
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.match_completed,
+        title: '매치 완료',
+        body: '매치가 종료됐어요',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('skips notification when eloChangedEnabled=false for elo_changed', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: false,
+        chatMessageEnabled: true,
+      });
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.elo_changed,
+        title: 'ELO 변경',
+        body: 'ELO 점수가 바뀌었어요',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('skips notification when chatMessageEnabled=false for chat_message', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: false,
+      });
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.chat_message,
+        title: '새 메시지',
+        body: '채팅 메시지가 도착했어요',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('creates notification when granular field is enabled even if category fallback would also pass', async () => {
+      const notification = buildNotification({
+        id: 'n1',
+        userId: 'u1',
+        title: '새 팀 신청',
+        body: '누군가 가입 신청했어요',
+      });
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
+      });
+      mockPrisma.notification.create.mockResolvedValue(notification);
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.team_application_received,
+        title: '새 팀 신청',
+        body: '누군가 가입 신청했어요',
+      });
+
+      expect(result).not.toBeNull();
+      expect(mockPrisma.notification.create).toHaveBeenCalled();
+    });
   });
 
   describe('getPreferences', () => {
@@ -223,42 +359,68 @@ describe('NotificationsService', () => {
 
       expect(result).toEqual({
         id: null,
+        userId: null,
+        updatedAt: null,
         matchEnabled: true,
         teamEnabled: true,
         chatEnabled: true,
         paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
       });
     });
 
     it('returns stored preference values', async () => {
+      const updatedAt = new Date('2025-01-01T00:00:00Z');
       mockPrisma.notificationPreference.findUnique.mockResolvedValue({
         id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
         matchEnabled: true,
         teamEnabled: false,
         chatEnabled: true,
         paymentEnabled: false,
+        teamApplicationEnabled: false,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: false,
+        chatMessageEnabled: true,
       });
 
       const result = await service.getPreferences('u1');
 
       expect(result).toEqual({
         id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
         matchEnabled: true,
         teamEnabled: false,
         chatEnabled: true,
         paymentEnabled: false,
+        teamApplicationEnabled: false,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: false,
+        chatMessageEnabled: true,
       });
     });
   });
 
   describe('updatePreferences', () => {
-    it('upserts preferences and returns updated values', async () => {
+    it('upserts preferences and returns updated values including userId and updatedAt', async () => {
+      const updatedAt = new Date('2025-06-01T12:00:00Z');
       const upserted = {
         id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
         matchEnabled: true,
         teamEnabled: false,
         chatEnabled: true,
         paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
       };
       mockPrisma.notificationPreference.upsert.mockResolvedValue(upserted);
 
@@ -266,6 +428,8 @@ describe('NotificationsService', () => {
 
       expect(mockPrisma.notificationPreference.upsert).toHaveBeenCalled();
       expect(result.teamEnabled).toBe(false);
+      expect(result.userId).toBe('u1');
+      expect(result.updatedAt).toBe(updatedAt);
     });
   });
 

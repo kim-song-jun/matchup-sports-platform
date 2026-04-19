@@ -8,7 +8,7 @@ import {
   markNotificationReadInList,
   unreadNotificationCount,
 } from '@/lib/notification-center';
-import type { Notification, NotificationPreference } from '@/types/api';
+import type { Notification, NotificationPreference, UpdateNotificationPreferencesInput } from '@/types/api';
 import { extractData, extractCollection } from './shared';
 import { queryKeys } from './query-keys';
 
@@ -147,16 +147,15 @@ export function useNotificationPreferences() {
       return extractData<NotificationPreference>(res);
     },
     enabled: isAuthenticated,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: 'always',
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 }
 
 export function useUpdateNotificationPreferences() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: Partial<Pick<NotificationPreference, 'matchEnabled' | 'teamEnabled' | 'chatEnabled' | 'paymentEnabled'>>) => {
+    mutationFn: async (data: UpdateNotificationPreferencesInput) => {
       const res = await api.patch('/notifications/preferences', data);
       return extractData<NotificationPreference>(res);
     },

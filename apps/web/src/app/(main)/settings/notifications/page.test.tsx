@@ -41,6 +41,10 @@ const basePreference: NotificationPreference = {
   teamEnabled: true,
   chatEnabled: true,
   paymentEnabled: true,
+  teamApplicationEnabled: true,
+  matchCompletedEnabled: true,
+  eloChangedEnabled: true,
+  chatMessageEnabled: true,
 };
 
 describe('NotificationsPage', () => {
@@ -65,11 +69,60 @@ describe('NotificationsPage', () => {
     render(<NotificationsPage />);
 
     expect(screen.getByText('계정 전체에 저장되는 알림')).toBeInTheDocument();
+    expect(screen.getByText('세부 알림 타입')).toBeInTheDocument();
     expect(screen.getByText('이 기기에서만 적용되는 항목')).toBeInTheDocument();
     expect(screen.getByText('현재 지원하지 않는 범위')).toBeInTheDocument();
     expect(
       screen.getByText(/이메일 알림, 마케팅 수신, 전체 마스터 토글은 아직 서버 저장 계약이 없습니다/),
     ).toBeInTheDocument();
+  });
+
+  it('renders all 8 server-synced toggles', () => {
+    render(<NotificationsPage />);
+
+    // Category toggles (4)
+    expect(screen.getByRole('switch', { name: '매치 알림 켜짐' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '팀 알림 켜짐' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '채팅 알림 켜짐' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '결제 알림 켜짐' })).toBeInTheDocument();
+    // Detail toggles (4)
+    expect(screen.getByRole('switch', { name: '팀 가입 신청 켜짐' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '매치 종료 켜짐' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'ELO 변동 켜짐' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '채팅 메시지 켜짐' })).toBeInTheDocument();
+  });
+
+  it('calls mutate with eloChangedEnabled: false when ELO 변동 toggle is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(<NotificationsPage />);
+
+    await user.click(screen.getByRole('switch', { name: 'ELO 변동 켜짐' }));
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      { eloChangedEnabled: false },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+        onSettled: expect.any(Function),
+      }),
+    );
+  });
+
+  it('shows success toast after successful toggle save', async () => {
+    const user = userEvent.setup();
+    mockUseUpdateNotificationPreferences.mockReturnValue({
+      isPending: false,
+      mutate: vi.fn((_payload, callbacks) => {
+        callbacks?.onSuccess?.();
+      }),
+    });
+
+    render(<NotificationsPage />);
+
+    await user.click(screen.getByRole('switch', { name: 'ELO 변동 켜짐' }));
+
+    expect(mockToast).toHaveBeenCalledWith('success', '알림 설정이 계정에 저장되었어요');
   });
 
   it('returns null while redirecting unauthenticated users instead of showing an error state', () => {

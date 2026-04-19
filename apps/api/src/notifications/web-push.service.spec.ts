@@ -23,9 +23,9 @@ const mockPrisma = {
 const mockConfigEnabled = {
   get: jest.fn((key: string) => {
     const values: Record<string, string> = {
-      VAPID_PUBLIC_KEY: 'BFake_public_key',
-      VAPID_PRIVATE_KEY: 'fake_private_key',
-      VAPID_SUBJECT: 'mailto:admin@teameet.kr',
+      'vapid.publicKey': 'BFake_public_key',
+      'vapid.privateKey': 'fake_private_key',
+      'vapid.subject': 'mailto:admin@teameet.kr',
     };
     return values[key];
   }),

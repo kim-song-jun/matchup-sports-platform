@@ -52,10 +52,16 @@ function makeWrapper() {
 
 const basePreference: NotificationPreference = {
   id: 'pref-1',
+  userId: 'user-1',
   matchEnabled: true,
   teamEnabled: true,
   chatEnabled: true,
   paymentEnabled: true,
+  teamApplicationEnabled: true,
+  matchCompletedEnabled: true,
+  eloChangedEnabled: true,
+  chatMessageEnabled: true,
+  updatedAt: '2024-01-01T00:00:00.000Z',
 };
 
 describe('notification preference hooks', () => {
@@ -116,6 +122,32 @@ describe('notification preference hooks', () => {
       queryKeys.notifications.preferences,
     );
     expect(cached?.chatEnabled).toBe(false);
+  });
+
+  it('updates chatMessageEnabled (new Task 74 field) and keeps cache in sync', async () => {
+    const { Wrapper, queryClient } = makeWrapper();
+
+    queryClient.setQueryData(queryKeys.notifications.preferences, basePreference);
+    mockApi.patch.mockResolvedValueOnce({
+      status: 'success',
+      data: { ...basePreference, chatMessageEnabled: false },
+    });
+
+    const { result } = renderHook(() => useUpdateNotificationPreferences(), {
+      wrapper: Wrapper,
+    });
+
+    result.current.mutate({ chatMessageEnabled: false });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockApi.patch).toHaveBeenCalledWith('/notifications/preferences', {
+      chatMessageEnabled: false,
+    });
+
+    const cached = queryClient.getQueryData<NotificationPreference>(
+      queryKeys.notifications.preferences,
+    );
+    expect(cached?.chatMessageEnabled).toBe(false);
   });
 
   it('rolls back cached preferences when update fails', async () => {

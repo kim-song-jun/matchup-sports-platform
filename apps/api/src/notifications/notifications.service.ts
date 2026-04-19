@@ -10,6 +10,36 @@ import { RedisCacheService } from '../redis/redis-cache.service';
 
 const UNREAD_COUNT_TTL = 30; // 30 seconds
 
+/**
+ * Returns true  → granular field matched AND is disabled (suppress).
+ * Returns false → granular field matched AND is enabled (allow; skip category gate).
+ * Returns null  → no granular override for this type; caller should apply category gate.
+ */
+function isGranularBlocked(
+  type: NotificationType,
+  pref: {
+    teamApplicationEnabled: boolean;
+    matchCompletedEnabled: boolean;
+    eloChangedEnabled: boolean;
+    chatMessageEnabled: boolean;
+  },
+): boolean | null {
+  switch (type) {
+    case NotificationType.team_application_received:
+    case NotificationType.team_application_accepted:
+    case NotificationType.team_application_rejected:
+      return !pref.teamApplicationEnabled;
+    case NotificationType.match_completed:
+      return !pref.matchCompletedEnabled;
+    case NotificationType.elo_changed:
+      return !pref.eloChangedEnabled;
+    case NotificationType.chat_message:
+      return !pref.chatMessageEnabled;
+    default:
+      return null;
+  }
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -42,15 +72,26 @@ export class NotificationsService {
     });
 
     if (preference) {
-      const category = notificationCategory(data.type);
-      const blocked =
-        (category === 'match' && !preference.matchEnabled) ||
-        (category === 'team' && !preference.teamEnabled) ||
-        (category === 'chat' && !preference.chatEnabled) ||
-        (category === 'payment' && !preference.paymentEnabled);
-
-      if (blocked) {
+      // Granular override check — evaluated before category-level gate.
+      // If a granular field is false the notification is suppressed regardless of the
+      // parent category setting. Unknown types fall through to the category gate.
+      const granularBlocked = isGranularBlocked(data.type, preference);
+      if (granularBlocked === true) {
         return null;
+      }
+
+      // Category-level gate (fallback when no granular override matched).
+      if (granularBlocked === null) {
+        const category = notificationCategory(data.type);
+        const categoryBlocked =
+          (category === 'match' && !preference.matchEnabled) ||
+          (category === 'team' && !preference.teamEnabled) ||
+          (category === 'chat' && !preference.chatEnabled) ||
+          (category === 'payment' && !preference.paymentEnabled);
+
+        if (categoryBlocked) {
+          return null;
+        }
       }
     }
 
@@ -74,7 +115,7 @@ export class NotificationsService {
     void this.webPushService.sendToUser(data.userId, {
       title: data.title,
       body: data.body,
-    });
+    }).catch(() => { /* best-effort push — failure must not affect notification creation */ });
 
     return payload;
   }
@@ -172,19 +213,31 @@ export class NotificationsService {
       // Return default all-enabled when no row exists yet
       return {
         id: null,
+        userId: null,
+        updatedAt: null,
         matchEnabled: true,
         teamEnabled: true,
         chatEnabled: true,
         paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
       };
     }
 
     return {
       id: preference.id,
+      userId: preference.userId,
+      updatedAt: preference.updatedAt,
       matchEnabled: preference.matchEnabled,
       teamEnabled: preference.teamEnabled,
       chatEnabled: preference.chatEnabled,
       paymentEnabled: preference.paymentEnabled,
+      teamApplicationEnabled: preference.teamApplicationEnabled,
+      matchCompletedEnabled: preference.matchCompletedEnabled,
+      eloChangedEnabled: preference.eloChangedEnabled,
+      chatMessageEnabled: preference.chatMessageEnabled,
     };
   }
 
@@ -197,21 +250,35 @@ export class NotificationsService {
         teamEnabled: dto.teamEnabled ?? true,
         chatEnabled: dto.chatEnabled ?? true,
         paymentEnabled: dto.paymentEnabled ?? true,
+        teamApplicationEnabled: dto.teamApplicationEnabled ?? true,
+        matchCompletedEnabled: dto.matchCompletedEnabled ?? true,
+        eloChangedEnabled: dto.eloChangedEnabled ?? true,
+        chatMessageEnabled: dto.chatMessageEnabled ?? true,
       },
       update: {
         ...(dto.matchEnabled !== undefined && { matchEnabled: dto.matchEnabled }),
         ...(dto.teamEnabled !== undefined && { teamEnabled: dto.teamEnabled }),
         ...(dto.chatEnabled !== undefined && { chatEnabled: dto.chatEnabled }),
         ...(dto.paymentEnabled !== undefined && { paymentEnabled: dto.paymentEnabled }),
+        ...(dto.teamApplicationEnabled !== undefined && { teamApplicationEnabled: dto.teamApplicationEnabled }),
+        ...(dto.matchCompletedEnabled !== undefined && { matchCompletedEnabled: dto.matchCompletedEnabled }),
+        ...(dto.eloChangedEnabled !== undefined && { eloChangedEnabled: dto.eloChangedEnabled }),
+        ...(dto.chatMessageEnabled !== undefined && { chatMessageEnabled: dto.chatMessageEnabled }),
       },
     });
 
     return {
       id: preference.id,
+      userId: preference.userId,
+      updatedAt: preference.updatedAt,
       matchEnabled: preference.matchEnabled,
       teamEnabled: preference.teamEnabled,
       chatEnabled: preference.chatEnabled,
       paymentEnabled: preference.paymentEnabled,
+      teamApplicationEnabled: preference.teamApplicationEnabled,
+      matchCompletedEnabled: preference.matchCompletedEnabled,
+      eloChangedEnabled: preference.eloChangedEnabled,
+      chatMessageEnabled: preference.chatMessageEnabled,
     };
   }
 

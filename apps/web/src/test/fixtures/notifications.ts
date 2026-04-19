@@ -21,8 +21,14 @@ export const mockNotificationRead: Notification = {
 
 export const mockNotificationPreference: NotificationPreference = {
   id: 'pref-1',
+  userId: 'user-1',
   matchEnabled: true,
   teamEnabled: true,
   chatEnabled: true,
   paymentEnabled: true,
+  teamApplicationEnabled: true,
+  matchCompletedEnabled: true,
+  eloChangedEnabled: true,
+  chatMessageEnabled: true,
+  updatedAt: '2024-01-01T00:00:00.000Z',
 };

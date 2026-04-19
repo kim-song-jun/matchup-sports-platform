@@ -11,6 +11,10 @@ import {
   Smartphone,
   Trophy,
   Users,
+  UserCheck,
+  CheckCircle,
+  TrendingUp,
+  MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { MobileGlassHeader } from '@/components/layout/mobile-glass-header';
@@ -24,7 +28,7 @@ import {
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import type { NotificationPreference } from '@/types/api';
 
-type ServerPreferenceKey = keyof Omit<NotificationPreference, 'id'>;
+type ServerPreferenceKey = keyof Omit<NotificationPreference, 'id' | 'userId' | 'updatedAt'>;
 type BrowserPermissionState = NotificationPermission | 'unsupported';
 
 interface ServerCategoryConfig {
@@ -55,7 +59,7 @@ const SERVER_CATEGORIES: ServerCategoryConfig[] = [
   {
     key: 'chatEnabled',
     label: '채팅 알림',
-    desc: '새 메시지와 단체 채팅방 업데이트를 계정 전체에서 동기화합니다.',
+    desc: '앱 외부로 오는 채팅 푸시 알림이에요. 채팅방 안의 새 메시지는 계속 표시돼요.',
     icon: MessageCircle,
   },
   {
@@ -63,6 +67,33 @@ const SERVER_CATEGORIES: ServerCategoryConfig[] = [
     label: '결제 알림',
     desc: '결제 완료, 환불, 주문 상태 변경을 계정 전체에서 동기화합니다.',
     icon: CreditCard,
+  },
+];
+
+const DETAIL_CATEGORIES: ServerCategoryConfig[] = [
+  {
+    key: 'teamApplicationEnabled',
+    label: '팀 가입 신청',
+    desc: '팀 가입 요청/승인/거절 알림을 받아요.',
+    icon: UserCheck,
+  },
+  {
+    key: 'matchCompletedEnabled',
+    label: '매치 종료',
+    desc: '내가 참가한 매치가 종료될 때 알림을 받아요.',
+    icon: CheckCircle,
+  },
+  {
+    key: 'eloChangedEnabled',
+    label: 'ELO 변동',
+    desc: '경기 결과에 따른 실력 점수 변화를 알려드려요.',
+    icon: TrendingUp,
+  },
+  {
+    key: 'chatMessageEnabled',
+    label: '채팅 메시지',
+    desc: '새 채팅 메시지가 도착하면 알림을 받아요.',
+    icon: MessageSquare,
   },
 ];
 
@@ -77,10 +108,6 @@ export default function NotificationsPage() {
   const [browserPermission, setBrowserPermission] =
     useState<BrowserPermissionState>('unsupported');
   const [savingKey, setSavingKey] = useState<ServerPreferenceKey | null>(null);
-
-  if (!isAuthenticated) {
-    return null;
-  }
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -100,6 +127,10 @@ export default function NotificationsPage() {
       'Notification' in window ? window.Notification.permission : 'unsupported',
     );
   }, []);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleServerToggle = (key: ServerPreferenceKey, nextValue: boolean) => {
     setSavingKey(key);
@@ -163,50 +194,93 @@ export default function NotificationsPage() {
                 서버와 동기화되는 범위
               </p>
               <p className="text-sm leading-6 text-blue-800/90 dark:text-blue-100/80">
-                아래 4개 카테고리는 Teameet 계정에 저장되어 새로고침, 재로그인,
+                아래 8개 항목은 Teameet 계정에 저장되어 새로고침, 재로그인,
                 다른 탭 진입 후에도 같은 상태로 유지됩니다.
               </p>
             </div>
           </div>
         </section>
 
-        <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
-          <SectionHeading
-            title="계정 전체에 저장되는 알림"
-            description="서버에 저장되는 category preference입니다."
-          />
-
-          {preferencesQuery.isLoading ? (
-            <PreferenceSkeleton count={SERVER_CATEGORIES.length} />
-          ) : preferencesQuery.isError || !preferencesQuery.data ? (
+        {preferencesQuery.isLoading ? (
+          <>
+            <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+              <SectionHeading
+                title="계정 전체에 저장되는 알림"
+                description="어떤 기기에서 로그인해도 같은 설정이 유지돼요."
+              />
+              <PreferenceSkeleton count={SERVER_CATEGORIES.length} />
+            </section>
+            <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+              <SectionHeading
+                title="세부 알림 타입"
+                description="카테고리 내에서 특정 이벤트만 선택적으로 켜고 끌 수 있어요."
+              />
+              <PreferenceSkeleton count={DETAIL_CATEGORIES.length} />
+            </section>
+          </>
+        ) : preferencesQuery.isError || !preferencesQuery.data ? (
+          <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)]">
             <ErrorState
               message="알림 설정을 불러오지 못했어요"
               onRetry={() => {
                 void preferencesQuery.refetch();
               }}
             />
-          ) : (
-            <div className="divide-y divide-gray-50 dark:divide-gray-700">
-              {SERVER_CATEGORIES.map((category) => (
-                <CategoryRow
-                  key={category.key}
-                  icon={category.icon}
-                  label={category.label}
-                  desc={category.desc}
-                  enabled={preferencesQuery.data[category.key]}
-                  onToggle={() =>
-                    handleServerToggle(
-                      category.key,
-                      !preferencesQuery.data![category.key],
-                    )
-                  }
-                  disabled={updatePreferences.isPending}
-                  saving={savingKey === category.key}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+          </section>
+        ) : (
+          <>
+            <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+              <SectionHeading
+                title="계정 전체에 저장되는 알림"
+                description="어떤 기기에서 로그인해도 같은 설정이 유지돼요."
+              />
+              <div className="divide-y divide-gray-50 dark:divide-gray-700">
+                {SERVER_CATEGORIES.map((category) => (
+                  <CategoryRow
+                    key={category.key}
+                    icon={category.icon}
+                    label={category.label}
+                    desc={category.desc}
+                    enabled={preferencesQuery.data[category.key]}
+                    onToggle={() =>
+                      handleServerToggle(
+                        category.key,
+                        !preferencesQuery.data![category.key],
+                      )
+                    }
+                    disabled={updatePreferences.isPending}
+                    saving={savingKey === category.key}
+                  />
+                ))}
+              </div>
+            </section>
+            <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
+              <SectionHeading
+                title="세부 알림 타입"
+                description="카테고리 내에서 특정 이벤트만 선택적으로 켜고 끌 수 있어요."
+              />
+              <div className="divide-y divide-gray-50 dark:divide-gray-700">
+                {DETAIL_CATEGORIES.map((category) => (
+                  <CategoryRow
+                    key={category.key}
+                    icon={category.icon}
+                    label={category.label}
+                    desc={category.desc}
+                    enabled={preferencesQuery.data[category.key]}
+                    onToggle={() =>
+                      handleServerToggle(
+                        category.key,
+                        !preferencesQuery.data![category.key],
+                      )
+                    }
+                    disabled={updatePreferences.isPending}
+                    saving={savingKey === category.key}
+                  />
+                ))}
+              </div>
+            </section>
+          </>
+        )}
 
         <section className="rounded-[24px] bg-white/92 dark:bg-gray-800 border border-white/80 dark:border-white/10 p-5 shadow-[0_16px_30px_rgba(15,23,42,0.05)] space-y-4">
           <SectionHeading
@@ -260,7 +334,7 @@ function SectionHeading({
       <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         {title}
       </h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-300">{description}</p>
     </div>
   );
 }
@@ -327,7 +401,7 @@ function CategoryRow({
   saving?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3.5 py-4 first:pt-0 last:pb-0">
+    <div className="flex items-center gap-3.5 py-4 first:pt-0 last:pb-0 min-h-[44px]">
       <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 shrink-0">
         <Icon size={18} className="text-blue-500" />
       </div>

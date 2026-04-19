@@ -319,7 +319,10 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `POST :id/close` [idempotent] (작성자 또는 팀 manager+, filled 외 수동 종료, pending/accepted 신청자에게 `mercenary_closed` 알림. 이미 closed면 `alreadyClosed: true` 반환) | `POST :id/cancel` [idempotent] (작성자 전용, 전체 신청자에게 `mercenary_cancelled` 알림. 이미 cancelled/closed면 `alreadyCancelled: true` 반환)
 
 ### 알림 (`/notifications`)
-`GET /` | `PATCH :id/read` | `POST push-subscribe` [idempotent] (body `{endpoint, keys}`, endpoint 기준 upsert — 중복 구독 시 동일 row에 keys 갱신) | `DELETE push-unsubscribe` (body `{endpoint}`) | `GET vapid-public-key`
+`GET /` | `PATCH :id/read` | `POST push-subscribe` [idempotent] (body `{endpoint, keys}`, endpoint 기준 upsert — 중복 구독 시 동일 row에 keys 갱신, `@Throttle 10/60s`) | `DELETE push-unsubscribe` (body `{endpoint}`) | `GET vapid-public-key` (`@Throttle 30/60s`)
+
+**알림 선호도** (Task 74 신규):
+`GET /notifications/preferences` (JwtAuthGuard, row 없으면 default all-enabled 반환) | `PATCH /notifications/preferences` (`UpdateNotificationPreferencesDto` — 8개 boolean 필드: `teamApplication`, `matchCompleted`, `eloChanged`, `chatMessage`, `mercenaryPost`, `teamMatch`, `payment`, `system`. `@IsBoolean()` 검증 필수)
 
 ### 리뷰 (`/reviews`) — Task 73에서 멱등
 `POST /` [idempotent] (body `{ matchId, targetId, skillRating, mannerRating, comment? }`. 200 + flattened review + `alreadySubmitted: boolean`. `(matchId, authorId, targetId)` unique constraint — 중복 시 기존 리뷰 반환 + `alreadySubmitted: true` + 알림/ELO/매너 업데이트 skip) | `GET pending`
@@ -375,6 +378,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - `useChatRoomSocket()` — Socket.IO `chat:message` 이벤트 구독, React Query 캐시 invalidate
 - `useNotificationSocket()` — `notification:new` 이벤트 구독, 인앱 알림 상태 반영
 - `usePushRegistration()` — Web Push 구독 (`POST /notifications/push-subscribe`), VAPID 기반, `sw-push.js` 서비스 워커 + Capacitor 분기 처리
+- `useNotificationPreferences()` — 알림 선호도 조회 (`GET /notifications/preferences`). row 없는 신규 사용자는 default all-enabled 반환. Task 74 추가
+- `useUpdateNotificationPreferences()` — 알림 선호도 저장 mutation (`PATCH /notifications/preferences`). `['notification-preferences']` invalidate. 8개 boolean 필드 `(teamApplicationEnabled, matchCompletedEnabled, eloChangedEnabled, chatMessageEnabled, mercenaryPostEnabled, teamMatchEnabled, paymentEnabled, systemEnabled)`. Task 74 추가
 - `useTeamApplications(teamId)` — 팀 가입 신청자 목록 (`GET /teams/:id/applications`), manager+ 전제. 각 항목에 nickname/profileImageUrl/mannerScore 포함 (Task 69 추가)
 - `useAcceptTeamApplication()` — 신청 수락 mutation (`PATCH /teams/:id/applications/:userId/accept`), `['team-applications', teamId]` + `['team-members', teamId]` invalidate (Task 69 추가)
 - `useRejectTeamApplication()` — 신청 거부 mutation (`PATCH /teams/:id/applications/:userId/reject`), 동일 invalidate (Task 69 추가)
@@ -498,13 +503,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 ## Known Blockers
 
-1. **VAPID 키 미생성**: `WebPushService`는 크레덴셜 없을 때 graceful disable(`enabled=false`)로 동작하므로 빌드/머지는 가능. 실제 디바이스 푸시 수신은 아래 환경변수가 필요:
-   ```bash
-   # 키 생성: node -e "const wp = require('web-push'); console.log(wp.generateVAPIDKeys())"
-   VAPID_PUBLIC_KEY=
-   VAPID_PRIVATE_KEY=
-   VAPID_SUBJECT=mailto:admin@teameet.kr
-   ```
-   Capacitor 모바일 푸시는 `@capacitor/push-notifications` + 네이티브 프로젝트 설정 추가 필요. → Task 74에서 해소 예정.
+1. ~~**VAPID 키 미생성**~~ **Resolved in Task 74** — `WebPushService` 실제 `webpush.sendNotification()` 연결 완료. VAPID 3종 환경변수 주입 경로(`.env.example`, `configuration.ts`, `deploy/docker-compose.prod.yml`, GitHub Actions secrets) 정비 완료. 키 생성·갱신·롤백 절차: `docs/ops/vapid-setup.md` 참조.
+   - **운영자 수동 필요**: GitHub Actions secrets(`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) 실제 등록 — `docs/ops/vapid-setup.md` 1단계 참조.
+   - **Capacitor iOS APNs** 네이티브 통합은 Apple Developer 계정 확정 후 **Task 75에서 활성화 예정**. Android는 VAPID 공유 경로(ChromeWebView) 재사용으로 추가 작업 없음.
 
 2. **마켓플레이스 cron**: `DISABLE_MARKETPLACE_CRON` 환경변수가 설정되지 않으면 cron이 10분 주기로 자동 실행됨. 테스트 환경에서는 `DISABLE_MARKETPLACE_CRON=true` 로 비활성화 필요 (신규, Task 70 추가).

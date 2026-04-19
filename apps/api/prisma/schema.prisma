@@ -1295,6 +1295,11 @@ model NotificationPreference {
   teamEnabled    Boolean  @default(true) @map("team_enabled")
   chatEnabled    Boolean  @default(true) @map("chat_enabled")
   paymentEnabled Boolean  @default(true) @map("payment_enabled")
+  // Granular overrides — opt-out model (all true by default)
+  teamApplicationEnabled Boolean @default(true) @map("team_application_enabled")
+  matchCompletedEnabled  Boolean @default(true) @map("match_completed_enabled")
+  eloChangedEnabled      Boolean @default(true) @map("elo_changed_enabled")
+  chatMessageEnabled     Boolean @default(true) @map("chat_message_enabled")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

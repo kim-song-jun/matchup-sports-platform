@@ -218,7 +218,12 @@ pnpm test                      # 352+ tests 기대
 
 ### Dependencies
 - Task 71 main merged ✅
-- `@nestjs/throttler` 패키지 설치 여부 확인 (이미 있으면 skip, 없으면 `pnpm add -F @teameet/api @nestjs/throttler`)
+- **⚠️ `@nestjs/throttler` 미설치 확인됨 (2026-04-19 감사)** — `apps/api/package.json` 에 없음. Wave 0 첫 단계로 설치 필수:
+  ```bash
+  cd apps/api && pnpm add @nestjs/throttler
+  # pnpm-lock.yaml, package.json 변경 commit 후 Wave 1 착수
+  ```
+  설치 후 `AppModule` 에 `ThrottlerModule.forRoot({ throttlers: [{ limit: 1000, ttl: 60_000 }] })` 등록 (전역 default 는 사실상 무제한, route-level `@Throttle` 로만 실제 제한 적용)
 - Task 70 작업 중이므로 `matches.service.ts` 병합 충돌 가능 → Task 70 merge 후 착수 권장
 
 ---

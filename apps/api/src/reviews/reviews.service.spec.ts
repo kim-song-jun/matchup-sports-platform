@@ -11,7 +11,7 @@ describe('ReviewsService', () => {
   let prisma: PrismaService;
 
   const mockScoringService = {
-    updateEloAfterMatch: jest.fn(),
+    updateEloAfterMatch: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockNotificationsService = {
@@ -48,6 +48,7 @@ describe('ReviewsService', () => {
 
     jest.clearAllMocks();
     mockNotificationsService.create.mockResolvedValue({});
+    mockScoringService.updateEloAfterMatch.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {

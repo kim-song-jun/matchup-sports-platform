@@ -254,15 +254,17 @@ export class MercenaryService {
       throw error;
     }
 
-    // Fire-and-forget: notify post author
-    void this.notificationsService.create({
-      userId: post.authorId,
-      type: NotificationType.mercenary_applied,
-      title: '용병 지원이 들어왔어요',
-      body: '새로운 용병 지원자가 있습니다.',
-      data: { postId, applicantUserId: userId },
-      fromUserId: userId,
-    });
+    // Notify post author; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: post.authorId,
+        type: NotificationType.mercenary_applied,
+        title: '용병 지원이 들어왔어요',
+        body: '새로운 용병 지원자가 있습니다.',
+        data: { postId, applicantUserId: userId },
+        fromUserId: userId,
+      })
+      .catch(() => { /* non-critical */ });
 
     return application;
   }
@@ -355,13 +357,15 @@ export class MercenaryService {
       systemMessage: '용병 지원이 수락되었습니다',
     });
 
-    void this.notificationsService.create({
-      userId: result.userId,
-      type: NotificationType.mercenary_accepted,
-      title: '용병 지원이 수락되었어요',
-      body: '용병 지원이 수락되었습니다. 호스트와 채팅을 시작해보세요.',
-      data: { postId, chatRoomId: room.id },
-    });
+    await this.notificationsService
+      .create({
+        userId: result.userId,
+        type: NotificationType.mercenary_accepted,
+        title: '용병 지원이 수락되었어요',
+        body: '용병 지원이 수락되었습니다. 호스트와 채팅을 시작해보세요.',
+        data: { postId, chatRoomId: room.id },
+      })
+      .catch(() => { /* non-critical */ });
 
     return result;
   }
@@ -397,14 +401,16 @@ export class MercenaryService {
       },
     });
 
-    // Fire-and-forget: notify applicant of rejection
-    void this.notificationsService.create({
-      userId: app.userId,
-      type: NotificationType.mercenary_rejected,
-      title: '용병 지원이 거절되었어요',
-      body: '용병 지원이 거절되었습니다.',
-      data: { postId },
-    });
+    // Notify applicant of rejection; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: app.userId,
+        type: NotificationType.mercenary_rejected,
+        title: '용병 지원이 거절되었어요',
+        body: '용병 지원이 거절되었습니다.',
+        data: { postId },
+      })
+      .catch(() => { /* non-critical */ });
 
     return rejected;
   }
@@ -491,8 +497,8 @@ export class MercenaryService {
       });
     });
 
-    // Fan-out mercenary_closed notifications fire-and-forget
-    void Promise.all(
+    // Fan-out mercenary_closed notifications; awaited for deterministic side-effect ordering
+    await Promise.all(
       affectedApplicants.map((a) =>
         this.notificationsService.create({
           userId: a.userId,
@@ -543,8 +549,8 @@ export class MercenaryService {
       });
     });
 
-    // Fan-out mercenary_cancelled notifications fire-and-forget
-    void Promise.all(
+    // Fan-out mercenary_cancelled notifications; awaited for deterministic side-effect ordering
+    await Promise.all(
       allApplicants.map((a) =>
         this.notificationsService.create({
           userId: a.userId,

@@ -429,14 +429,16 @@ export class TeamsService {
       throw error;
     }
 
-    // Fire-and-forget notification to applicant
-    void this.notificationsService.create({
-      userId: applicantUserId,
-      type: 'team_application_accepted',
-      title: '팀 가입 신청이 수락되었어요',
-      body: `${team.name} 팀에 가입되었습니다.`,
-      data: { teamId, teamName: team.name },
-    });
+    // Notify applicant; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: applicantUserId,
+        type: 'team_application_accepted',
+        title: '팀 가입 신청이 수락되었어요',
+        body: `${team.name} 팀에 가입되었습니다.`,
+        data: { teamId, teamName: team.name },
+      })
+      .catch(() => { /* non-critical */ });
 
     return { ...application, status: 'active' as const, alreadyProcessed: false };
   }
@@ -486,14 +488,16 @@ export class TeamsService {
       });
     }
 
-    // Fire-and-forget notification to applicant
-    void this.notificationsService.create({
-      userId: applicantUserId,
-      type: 'team_application_rejected',
-      title: '팀 가입 신청이 거절되었어요',
-      body: `${team.name} 팀 가입 신청이 거절되었습니다.`,
-      data: { teamId, teamName: team.name },
-    });
+    // Notify applicant; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: applicantUserId,
+        type: 'team_application_rejected',
+        title: '팀 가입 신청이 거절되었어요',
+        body: `${team.name} 팀 가입 신청이 거절되었습니다.`,
+        data: { teamId, teamName: team.name },
+      })
+      .catch(() => { /* non-critical */ });
 
     return { ...application, status: 'left' as const, alreadyProcessed: false };
   }
@@ -627,14 +631,16 @@ export class TeamsService {
       },
     });
 
-    // Fire-and-forget notification
-    void this.notificationsService.create({
-      userId: inviteeId,
-      type: 'team_invitation',
-      title: '팀 초대',
-      body: `${team.name} 팀에서 초대장이 도착했습니다.`,
-      data: { teamId, invitationId: invitation.id },
-    });
+    // Notify invitee; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: inviteeId,
+        type: 'team_invitation',
+        title: '팀 초대',
+        body: `${team.name} 팀에서 초대장이 도착했습니다.`,
+        data: { teamId, invitationId: invitation.id },
+      })
+      .catch(() => { /* non-critical */ });
 
     return invitation;
   }

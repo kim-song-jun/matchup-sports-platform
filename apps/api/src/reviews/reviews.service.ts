@@ -60,18 +60,22 @@ export class ReviewsService {
       });
     }
 
-    // Fire-and-forget: notify reviewed user
-    void this.notificationsService.create({
-      userId: data.targetId,
-      type: NotificationType.review_received,
-      title: '새 리뷰가 도착했어요',
-      body: '경기에서 함께한 상대방이 리뷰를 남겼습니다.',
-      data: { matchId: data.matchId, authorId },
-      fromUserId: authorId,
-    });
+    // Notify reviewed user; awaited so side-effects settle before response
+    await this.notificationsService
+      .create({
+        userId: data.targetId,
+        type: NotificationType.review_received,
+        title: '새 리뷰가 도착했어요',
+        body: '경기에서 함께한 상대방이 리뷰를 남겼습니다.',
+        data: { matchId: data.matchId, authorId },
+        fromUserId: authorId,
+      })
+      .catch(() => { /* notification failure must not break review submission */ });
 
-    // Fire-and-forget: update ELO ratings for all participants of this match
-    void this.scoring.updateEloAfterMatch(data.matchId);
+    // Update ELO ratings; awaited so downstream tests observe stable state
+    await this.scoring
+      .updateEloAfterMatch(data.matchId)
+      .catch(() => { /* ELO update failure is non-critical */ });
 
     return { ...review, alreadySubmitted: false };
   }

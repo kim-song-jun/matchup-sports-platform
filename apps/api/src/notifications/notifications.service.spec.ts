@@ -318,6 +318,63 @@ describe('NotificationsService', () => {
       expect(mockPrisma.notification.create).not.toHaveBeenCalled();
     });
 
+    it('skips marketplace_payout_paid when paymentEnabled=false (category: payment)', async () => {
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: false,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
+      });
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.marketplace_payout_paid,
+        title: '정산 지급 완료',
+        body: '45,000원이 지급 처리되었어요.',
+      });
+
+      expect(result).toBeNull();
+      expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+    });
+
+    it('delivers marketplace_payout_paid when paymentEnabled=true', async () => {
+      const notification = buildNotification({
+        id: 'n1',
+        userId: 'u1',
+        title: '정산 지급 완료',
+        body: '45,000원이 지급 처리되었어요.',
+      });
+      mockPrisma.notificationPreference.findUnique.mockResolvedValue({
+        id: 'pref-1',
+        userId: 'u1',
+        matchEnabled: true,
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
+      });
+      mockPrisma.notification.create.mockResolvedValue(notification);
+
+      const result = await service.create({
+        userId: 'u1',
+        type: NotificationType.marketplace_payout_paid,
+        title: '정산 지급 완료',
+        body: '45,000원이 지급 처리되었어요.',
+      });
+
+      expect(result).not.toBeNull();
+      expect(mockPrisma.notification.create).toHaveBeenCalled();
+    });
+
     it('creates notification when granular field is enabled even if category fallback would also pass', async () => {
       const notification = buildNotification({
         id: 'n1',
@@ -430,6 +487,32 @@ describe('NotificationsService', () => {
       expect(result.teamEnabled).toBe(false);
       expect(result.userId).toBe('u1');
       expect(result.updatedAt).toBe(updatedAt);
+    });
+
+    it('partial PATCH does not overwrite omitted fields — update block excludes undefined keys', async () => {
+      const updatedAt = new Date('2025-06-01T12:00:00Z');
+      const upserted = {
+        id: 'pref-1',
+        userId: 'u1',
+        updatedAt,
+        matchEnabled: false, // was false, not supplied in dto → should remain unchanged
+        teamEnabled: true,
+        chatEnabled: true,
+        paymentEnabled: true,
+        teamApplicationEnabled: true,
+        matchCompletedEnabled: true,
+        eloChangedEnabled: true,
+        chatMessageEnabled: true,
+      };
+      mockPrisma.notificationPreference.upsert.mockResolvedValue(upserted);
+
+      await service.updatePreferences('u1', { teamEnabled: true }); // only teamEnabled supplied
+
+      const call = mockPrisma.notificationPreference.upsert.mock.calls[0][0];
+      // update block must NOT contain matchEnabled (omitted from dto)
+      expect(call.update).not.toHaveProperty('matchEnabled');
+      // update block must contain teamEnabled
+      expect(call.update).toMatchObject({ teamEnabled: true });
     });
   });
 

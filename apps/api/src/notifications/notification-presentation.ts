@@ -84,9 +84,15 @@ export function notificationCategory(type: NotificationType): NotificationCatego
     case NotificationType.payment_refunded:
     case NotificationType.marketplace_order:
     case NotificationType.lesson_ticket_purchased:
+    case NotificationType.marketplace_payout_paid:
       return 'payment';
+    case NotificationType.badge_earned:
+    case NotificationType.no_show_penalty:
+      return 'team';
     case NotificationType.level_changed:
     default:
+      // NOTE: any new NotificationType must be explicitly mapped here;
+      // default falls to 'system' which has no user-controllable preference gate.
       return 'system';
   }
 }
@@ -154,6 +160,8 @@ export function notificationLink(type: NotificationType, data: NotificationData 
     case NotificationType.marketplace_order:
     case NotificationType.marketplace_message:
       return listingId ? `/marketplace/${listingId}` : '/marketplace';
+    case NotificationType.marketplace_payout_paid:
+      return '/my/orders';
     case NotificationType.level_changed:
       return '/profile';
     default:
@@ -191,6 +199,8 @@ export function notificationCtaLabel(type: NotificationType) {
     case NotificationType.marketplace_order:
     case NotificationType.marketplace_message:
       return '상세 보기';
+    case NotificationType.marketplace_payout_paid:
+      return '정산 내역 보기';
     case NotificationType.level_changed:
       return '프로필 보기';
     case NotificationType.match_created:

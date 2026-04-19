@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
+import { NotificationType, PayoutStatus, SettlementStatus, SettlementType } from '@prisma/client';
 import { SettlementsService } from './settlements.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { buildSettlementRecord } from '../../test/fixtures/settlements';
 import { buildPayout } from '../../test/fixtures/marketplace';
 
@@ -16,6 +17,10 @@ const makeRecord = (overrides: Parameters<typeof buildSettlementRecord>[0] = {})
 // ---------------------------------------------------------------------------
 // Mock
 // ---------------------------------------------------------------------------
+
+const notificationsMock = {
+  create: jest.fn().mockResolvedValue(null),
+};
 
 const prismaMock = {
   settlementRecord: {
@@ -57,6 +62,7 @@ describe('SettlementsService', () => {
       providers: [
         SettlementsService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: NotificationsService, useValue: notificationsMock },
       ],
     }).compile();
 
@@ -687,6 +693,64 @@ describe('SettlementsService', () => {
           data: expect.objectContaining({ note: 'Transfer ref: TXN-9999' }),
         }),
       );
+    });
+
+    it('sends marketplace_payout_paid notification to recipient after transaction', async () => {
+      const payout = buildPayout({ id: 'payout-1', status: PayoutStatus.pending, recipientId: 'seller-1', netAmount: 45000 });
+      const paid = { ...payout, status: PayoutStatus.paid, paidAt: new Date() };
+      prismaMock.payout.findUnique.mockResolvedValue(payout);
+
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(paid),
+          },
+          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        };
+        return cb(txMock as unknown as typeof prismaMock);
+      });
+
+      await service.markPayoutPaid('payout-1', 'admin-1');
+
+      expect(notificationsMock.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'seller-1',
+          type: NotificationType.marketplace_payout_paid,
+          title: '정산 지급이 완료되었어요',
+          data: expect.objectContaining({ payoutId: 'payout-1' }),
+        }),
+      );
+    });
+
+    it('does not call NotificationsService.create when payout is already paid (idempotent path)', async () => {
+      const paid = buildPayout({ id: 'payout-1', status: PayoutStatus.paid, paidAt: new Date() });
+      prismaMock.payout.findUnique.mockResolvedValue(paid);
+
+      await service.markPayoutPaid('payout-1');
+
+      expect(notificationsMock.create).not.toHaveBeenCalled();
+    });
+
+    it('succeeds even when NotificationsService.create rejects', async () => {
+      const payout = buildPayout({ id: 'payout-1', status: PayoutStatus.pending, recipientId: 'seller-1', netAmount: 45000 });
+      const paid = { ...payout, status: PayoutStatus.paid, paidAt: new Date() };
+      prismaMock.payout.findUnique.mockResolvedValue(payout);
+
+      prismaMock.$transaction.mockImplementationOnce(async (cb: (tx: typeof prismaMock) => unknown) => {
+        const txMock = {
+          payout: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue(paid),
+          },
+          settlementRecord: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        };
+        return cb(txMock as unknown as typeof prismaMock);
+      });
+      notificationsMock.create.mockRejectedValueOnce(new Error('push failed'));
+
+      // Should not throw despite notification failure
+      await expect(service.markPayoutPaid('payout-1', 'admin-1')).resolves.toBeDefined();
     });
   });
 });

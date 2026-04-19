@@ -11,6 +11,7 @@ import { useTeamMatch } from '@/hooks/use-api';
 import { SKILL_GRADES, MATCH_TYPES } from '@/lib/skill-grades';
 import type { SkillGrade, MatchType } from '@/lib/skill-grades';
 import { api } from '@/lib/api';
+import { Toggle } from '@/components/ui/toggle';
 
 const sportOptions = [
   { value: 'soccer', label: '축구' },
@@ -572,17 +573,15 @@ export default function EditTeamMatchPage() {
 
 function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3.5 cursor-pointer">
+    <div
+      className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3.5"
+    >
       <span className="text-base font-medium text-gray-800 dark:text-gray-200">{label}</span>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-gray-800 shadow transition-transform ${checked ? 'translate-x-5' : ''}`}
-        />
-      </button>
-    </label>
+      <Toggle
+        label={label}
+        enabled={checked}
+        onToggle={() => onChange(!checked)}
+      />
+    </div>
   );
 }

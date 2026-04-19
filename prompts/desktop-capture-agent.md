@@ -18,7 +18,7 @@ You are the **Capture Agent** for TeamMeet UI/UX visual audit. Your only job is:
 
 ## Prerequisites
 
-- Dev server running: `http://localhost:3003` (frontend) + `http://localhost:8100` (API)
+- Dev server running: `http://localhost:3003` (frontend) + `http://localhost:8111` (API — dev port)
 - Chrome MCP extension connected
 - DB seeded with test data
 

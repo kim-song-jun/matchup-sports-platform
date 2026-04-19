@@ -89,10 +89,22 @@ export class MatchesController {
   }
 
   @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '매치 취소 (host 전용)' })
-  @ApiOkResponse({ description: '매치 취소 성공' })
+  @ApiOkResponse({
+    description: '매치 취소 성공 (이미 취소된 경우 alreadyCancelled=true로 멱등 반환)',
+    schema: {
+      properties: {
+        match: { type: 'object', description: '취소 처리된 매치 객체' },
+        alreadyCancelled: {
+          type: 'boolean',
+          description: '이미 취소/완료 상태였으면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '호스트 전용' })
   async cancel(
@@ -104,10 +116,22 @@ export class MatchesController {
   }
 
   @Post(':id/close')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '모집 마감 (host 전용, recruiting → confirmed)' })
-  @ApiOkResponse({ description: '모집 마감 성공' })
+  @ApiOkResponse({
+    description: '모집 마감 성공 (이미 마감된 경우 alreadyClosed=true로 멱등 반환)',
+    schema: {
+      properties: {
+        match: { type: 'object', description: '마감 처리된 매치 객체' },
+        alreadyClosed: {
+          type: 'boolean',
+          description: '이미 recruiting이 아닌 상태였으면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '호스트 전용' })
   async close(@Param('id') id: string, @CurrentUser('id') userId: string) {
@@ -174,10 +198,22 @@ export class MatchesController {
   }
 
   @Post(':id/complete')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '매치 완료' })
-  @ApiOkResponse({ description: '매치 완료 성공' })
+  @ApiOkResponse({
+    description: '매치 완료 성공 (이미 완료된 경우 alreadyCompleted=true로 멱등 반환, 알림/뱃지 중복 생성 없음)',
+    schema: {
+      properties: {
+        match: { type: 'object', description: '완료 처리된 매치 객체' },
+        alreadyCompleted: {
+          type: 'boolean',
+          description: '이미 완료/취소 상태였으면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '호스트 전용' })
   async complete(

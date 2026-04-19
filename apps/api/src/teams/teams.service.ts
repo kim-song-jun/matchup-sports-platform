@@ -362,13 +362,26 @@ export class TeamsService {
 
     const team = await this.findById(teamId);
 
+    // Query without status filter so we can distinguish "not found" from "already processed"
     const application = await this.prisma.teamMembership.findFirst({
-      where: { teamId, userId: applicantUserId, status: 'pending' },
+      where: { teamId, userId: applicantUserId },
     });
     if (!application) {
       throw new NotFoundException({
         code: 'TEAM_APPLICATION_NOT_FOUND',
-        message: '대기 중인 신청을 찾을 수 없습니다.',
+        message: '신청 내역을 찾을 수 없습니다.',
+      });
+    }
+
+    // Idempotency guard: already accepted → return 200 with flag
+    if (application.status === 'active') {
+      return { ...application, alreadyProcessed: true };
+    }
+
+    if (application.status !== 'pending') {
+      throw new BadRequestException({
+        code: 'APPLICATION_NOT_PENDING',
+        message: '대기 중인 신청이 아닙니다.',
       });
     }
 
@@ -396,7 +409,8 @@ export class TeamsService {
     } catch (error) {
       if (
         error instanceof ConflictException ||
-        error instanceof NotFoundException
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
       ) {
         throw error;
       }
@@ -415,16 +429,18 @@ export class TeamsService {
       throw error;
     }
 
-    // Fire-and-forget notification to applicant
-    void this.notificationsService.create({
-      userId: applicantUserId,
-      type: 'team_application_accepted',
-      title: '팀 가입 신청이 수락되었어요',
-      body: `${team.name} 팀에 가입되었습니다.`,
-      data: { teamId, teamName: team.name },
-    });
+    // Notify applicant; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: applicantUserId,
+        type: 'team_application_accepted',
+        title: '팀 가입 신청이 수락되었어요',
+        body: `${team.name} 팀에 가입되었습니다.`,
+        data: { teamId, teamName: team.name },
+      })
+      .catch(() => { /* non-critical */ });
 
-    return { accepted: true };
+    return { ...application, status: 'active' as const, alreadyProcessed: false };
   }
 
   /**
@@ -437,13 +453,26 @@ export class TeamsService {
 
     const team = await this.findById(teamId);
 
+    // Query without status filter so we can distinguish "not found" from "already processed"
     const application = await this.prisma.teamMembership.findFirst({
-      where: { teamId, userId: applicantUserId, status: 'pending' },
+      where: { teamId, userId: applicantUserId },
     });
     if (!application) {
       throw new NotFoundException({
         code: 'TEAM_APPLICATION_NOT_FOUND',
-        message: '대기 중인 신청을 찾을 수 없습니다.',
+        message: '신청 내역을 찾을 수 없습니다.',
+      });
+    }
+
+    // Idempotency guard: already rejected (left) → return 200 with flag
+    if (application.status === 'left') {
+      return { ...application, alreadyProcessed: true };
+    }
+
+    if (application.status !== 'pending') {
+      throw new BadRequestException({
+        code: 'APPLICATION_NOT_PENDING',
+        message: '대기 중인 신청이 아닙니다.',
       });
     }
 
@@ -459,16 +488,18 @@ export class TeamsService {
       });
     }
 
-    // Fire-and-forget notification to applicant
-    void this.notificationsService.create({
-      userId: applicantUserId,
-      type: 'team_application_rejected',
-      title: '팀 가입 신청이 거절되었어요',
-      body: `${team.name} 팀 가입 신청이 거절되었습니다.`,
-      data: { teamId, teamName: team.name },
-    });
+    // Notify applicant; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: applicantUserId,
+        type: 'team_application_rejected',
+        title: '팀 가입 신청이 거절되었어요',
+        body: `${team.name} 팀 가입 신청이 거절되었습니다.`,
+        data: { teamId, teamName: team.name },
+      })
+      .catch(() => { /* non-critical */ });
 
-    return { rejected: true };
+    return { ...application, status: 'left' as const, alreadyProcessed: false };
   }
 
   /**
@@ -600,14 +631,16 @@ export class TeamsService {
       },
     });
 
-    // Fire-and-forget notification
-    void this.notificationsService.create({
-      userId: inviteeId,
-      type: 'team_invitation',
-      title: '팀 초대',
-      body: `${team.name} 팀에서 초대장이 도착했습니다.`,
-      data: { teamId, invitationId: invitation.id },
-    });
+    // Notify invitee; awaited so downstream tests observe stable state
+    await this.notificationsService
+      .create({
+        userId: inviteeId,
+        type: 'team_invitation',
+        title: '팀 초대',
+        body: `${team.name} 팀에서 초대장이 도착했습니다.`,
+        data: { teamId, invitationId: invitation.id },
+      })
+      .catch(() => { /* non-critical */ });
 
     return invitation;
   }

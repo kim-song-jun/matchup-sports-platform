@@ -167,13 +167,15 @@ export class ScoringService {
       `;
     });
 
-    void this.notifications.create({
-      userId,
-      type: NotificationType.no_show_penalty,
-      title: '노쇼 패널티가 적용되었어요',
-      body: 'ELO -30, 매너 점수 -0.5가 적용되었습니다.',
-      data: { participantId },
-    });
+    await this.notifications
+      .create({
+        userId,
+        type: NotificationType.no_show_penalty,
+        title: '노쇼 패널티가 적용되었어요',
+        body: 'ELO -30, 매너 점수 -0.5가 적용되었습니다.',
+        data: { participantId },
+      })
+      .catch(() => { /* non-critical */ });
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
@@ -224,17 +226,21 @@ export class ScoringService {
       ),
     );
 
-    // Fire-and-forget ELO notifications for all updated users
-    for (const { userId, newRating, isWinner } of updates) {
-      const current = profileMap.get(userId) ?? newRating;
-      const delta = newRating - current;
-      void this.notifications.create({
-        userId,
-        type: NotificationType.elo_changed,
-        title: isWinner ? 'ELO가 올랐어요!' : 'ELO가 내려갔어요',
-        body: `ELO ${delta > 0 ? '+' : ''}${delta} (현재: ${newRating})`,
-        data: { matchId, delta, newRating },
-      });
-    }
+    // ELO notifications; awaited so downstream tests observe stable state
+    await Promise.all(
+      updates.map(({ userId, newRating, isWinner }) => {
+        const current = profileMap.get(userId) ?? newRating;
+        const delta = newRating - current;
+        return this.notifications
+          .create({
+            userId,
+            type: NotificationType.elo_changed,
+            title: isWinner ? 'ELO가 올랐어요!' : 'ELO가 내려갔어요',
+            body: `ELO ${delta > 0 ? '+' : ''}${delta} (현재: ${newRating})`,
+            data: { matchId, delta, newRating },
+          })
+          .catch(() => { /* non-critical */ });
+      }),
+    );
   }
 }

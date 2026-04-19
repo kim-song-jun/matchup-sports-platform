@@ -494,8 +494,17 @@ export class MatchesService {
     if (match.hostId !== userId) {
       throw new ForbiddenException('호스트만 매치를 취소할 수 있습니다.');
     }
-    if (match.status === 'cancelled' || match.status === 'completed') {
-      throw new BadRequestException('이미 종료된 매치입니다.');
+
+    // Idempotency guard: already cancelled → return 200 with flag, no re-notify
+    if (match.status === 'cancelled') {
+      const current = await this.prisma.match.findUnique({
+        where: { id: matchId },
+        select: matchMutationSelect,
+      });
+      return { ...current!, alreadyCancelled: true };
+    }
+    if (match.status === 'completed') {
+      throw new BadRequestException('이미 완료된 매치는 취소할 수 없습니다.');
     }
 
     const cancelled = await this.prisma.match.update({
@@ -517,7 +526,7 @@ export class MatchesService {
       },
     });
 
-    return cancelled;
+    return { ...cancelled, alreadyCancelled: false };
   }
 
   async closeMatch(matchId: string, userId: string) {
@@ -535,15 +544,25 @@ export class MatchesService {
     if (match.hostId !== userId) {
       throw new ForbiddenException('호스트만 모집을 마감할 수 있습니다.');
     }
+
+    // Idempotency guard: already closed (confirmed or full) → return 200 with flag
+    if (match.status === 'confirmed' || match.status === 'full') {
+      const current = await this.prisma.match.findUnique({
+        where: { id: matchId },
+        select: matchMutationSelect,
+      });
+      return { ...current!, alreadyClosed: true };
+    }
     if (match.status !== 'recruiting') {
       throw new BadRequestException('모집 중인 매치만 마감할 수 있습니다.');
     }
 
-    return this.prisma.match.update({
+    const closed = await this.prisma.match.update({
       where: { id: matchId },
       select: matchMutationSelect,
       data: { status: 'confirmed' },
     });
+    return { ...closed, alreadyClosed: false };
   }
 
   async join(matchId: string, userId: string) {
@@ -883,8 +902,17 @@ export class MatchesService {
     if (match.hostId !== userId) {
       throw new ForbiddenException('호스트만 매치를 완료 처리할 수 있습니다.');
     }
-    if (match.status === 'cancelled' || match.status === 'completed') {
-      throw new BadRequestException('이미 종료된 매치입니다.');
+
+    // Idempotency guard: already completed → return 200 with flag, skip notifications + badges
+    if (match.status === 'completed') {
+      const current = await this.prisma.match.findUnique({
+        where: { id: matchId },
+        select: matchMutationSelect,
+      });
+      return { ...current!, alreadyCompleted: true };
+    }
+    if (match.status === 'cancelled') {
+      throw new BadRequestException('취소된 매치는 완료 처리할 수 없습니다.');
     }
 
     const completed = await this.prisma.match.update({
@@ -914,12 +942,12 @@ export class MatchesService {
       },
     });
 
-    // Fire-and-forget: award badges for all participants after match completion
+    // Award badges synchronously to make completion side-effects observable and idempotent
     const participants = await this.prisma.matchParticipant.findMany({
       where: { matchId },
       select: { userId: true },
     });
-    void Promise.all(
+    await Promise.all(
       participants.map((p) =>
         this.badgesService.awardIfEligible(p.userId, 'first_match_completed', {
           name: '첫 매치 완료',
@@ -928,7 +956,7 @@ export class MatchesService {
       ),
     );
 
-    return completed;
+    return { ...completed, alreadyCompleted: false };
   }
 
   async arrive(

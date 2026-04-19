@@ -735,12 +735,37 @@ describe('TeamsService', () => {
       mockNotificationsService.create.mockResolvedValue({});
     });
 
-    it('should accept pending application, trigger transaction, and return accepted:true', async () => {
+    it('should accept pending application, trigger transaction, and return { application, alreadyProcessed: false }', async () => {
       const result = await service.acceptApplication('team-1', 'applicant-1', 'manager-1');
 
-      expect(result).toEqual({ accepted: true });
+      expect(result).toMatchObject({ alreadyProcessed: false });
+      expect(result.id).toBeDefined();
       expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
       expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+
+    it('should return { application, alreadyProcessed: true } when application is already active (idempotent)', async () => {
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue({
+        ...mockPendingApplication,
+        status: 'active',
+      });
+      const result = await service.acceptApplication('team-1', 'applicant-1', 'manager-1');
+      expect(result).toMatchObject({ alreadyProcessed: true });
+      expect(result).toMatchObject({ status: 'active' });
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      // Notification must be skipped on idempotent replay
+      await new Promise((r) => setImmediate(r));
+      expect(mockNotificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when application status is left (not pending)', async () => {
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue({
+        ...mockPendingApplication,
+        status: 'left',
+      });
+      await expect(
+        service.acceptApplication('team-1', 'applicant-1', 'manager-1'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should flip status pending → active within transaction using updateMany with status predicate', async () => {
@@ -835,11 +860,36 @@ describe('TeamsService', () => {
       mockNotificationsService.create.mockResolvedValue({});
     });
 
-    it('should reject pending application and return rejected:true', async () => {
+    it('should reject pending application and return { application, alreadyProcessed: false }', async () => {
       const result = await service.rejectApplication('team-1', 'applicant-1', 'manager-1');
 
-      expect(result).toEqual({ rejected: true });
+      expect(result).toMatchObject({ alreadyProcessed: false });
+      expect(result.id).toBeDefined();
       expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'manager-1', TeamRole.manager);
+    });
+
+    it('should return { application, alreadyProcessed: true } when application is already left (idempotent)', async () => {
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue({
+        ...mockPendingApplication,
+        status: 'left',
+      });
+      const result = await service.rejectApplication('team-1', 'applicant-1', 'manager-1');
+      expect(result).toMatchObject({ alreadyProcessed: true });
+      expect(result).toMatchObject({ status: 'left' });
+      expect(mockPrismaService.teamMembership.updateMany).not.toHaveBeenCalled();
+      // Notification must be skipped on idempotent replay
+      await new Promise((r) => setImmediate(r));
+      expect(mockNotificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when application status is active (not pending)', async () => {
+      mockPrismaService.teamMembership.findFirst.mockResolvedValue({
+        ...mockPendingApplication,
+        status: 'active',
+      });
+      await expect(
+        service.rejectApplication('team-1', 'applicant-1', 'manager-1'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should flip status to left using updateMany with pending predicate to preserve re-apply path', async () => {

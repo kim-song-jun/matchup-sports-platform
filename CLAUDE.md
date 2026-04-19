@@ -240,7 +240,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 `GET me` | `PATCH me` | `GET me/matches` | `GET :id`
 
 ### 매치 (`/matches`)
-`GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` | `POST :id/close` | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete`
+`GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` [idempotent] | `POST :id/close` [idempotent] | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete` [idempotent]
 
 **팀 자동 구성** (Task 71 추가, Task 72에서 hardening):
 `POST :id/teams/preview` (호스트 전용, 팀 자동 구성 dry-run preview — body: `ComposeTeamsDto { strategy?, teamCount?, seed?, participantHash? }`, response: `PreviewTeamsResponseDto { teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed, participantHash }`. DB 변경 없음. **Task 72**: 응답에 `participantHash`(SHA-256 hex 64-char) 포함, `@Throttle limit=20/60s` + `HostThrottlerGuard`(req.user.id 트래킹) 적용. 초과 시 429 + `Retry-After: 60`)
@@ -258,8 +258,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 **팀 신청** (Task 27 추가):
 `POST :id/apply` (JwtAuthGuard, 비멤버 대상, idempotent — 중복 신청 시 409)
 
-**팀 신청 관리** (Task 69 추가):
-`GET :id/applications` (manager+ 전용, pending 신청자 목록, 각 행에 nickname/profileImageUrl/mannerScore 포함) | `PATCH :id/applications/:userId/accept` (manager+, pending→active, memberCount +1, 신청자에게 `team_application_accepted` 알림) | `PATCH :id/applications/:userId/reject` (manager+, pending→left, 신청자에게 `team_application_rejected` 알림)
+**팀 신청 관리** (Task 69 추가, **Task 73에서 멱등**):
+`GET :id/applications` (manager+ 전용, pending 신청자 목록, 각 행에 nickname/profileImageUrl/mannerScore 포함) | `PATCH :id/applications/:userId/accept` [idempotent] (manager+, pending→active, memberCount +1, 신청자에게 `team_application_accepted` 알림. 이미 active면 `alreadyProcessed: true` 반환, 트랜잭션/알림 skip) | `PATCH :id/applications/:userId/reject` [idempotent] (manager+, pending→left, 신청자에게 `team_application_rejected` 알림. 이미 left면 `alreadyProcessed: true` 반환)
 
 **팀 전용 하위 페이지** (Task 22 추가, 프론트엔드):
 - `/teams/:id/matches` — 해당 팀이 host 또는 applicant로 참여한 팀 매칭 목록 (`GET /team-matches?teamId=`)
@@ -315,11 +315,14 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 **신청 관리** (Phase 1-5 추가):
 `GET me/applications` (신청자 본인 뷰) | `PATCH :id/applications/:appId/accept|reject` (호스트 뷰) | `DELETE :id/applications/me` (신청 취소)
 
-**모집글 종료** (Task 69 추가):
-`POST :id/close` (작성자 전용, filled 외 수동 종료, pending/accepted 신청자에게 `mercenary_closed` 알림) | `POST :id/cancel` (작성자 전용, 전체 신청자에게 `mercenary_cancelled` 알림)
+**모집글 종료** (Task 69 추가, **Task 73에서 멱등**):
+`POST :id/close` [idempotent] (작성자 또는 팀 manager+, filled 외 수동 종료, pending/accepted 신청자에게 `mercenary_closed` 알림. 이미 closed면 `alreadyClosed: true` 반환) | `POST :id/cancel` [idempotent] (작성자 전용, 전체 신청자에게 `mercenary_cancelled` 알림. 이미 cancelled/closed면 `alreadyCancelled: true` 반환)
 
 ### 알림 (`/notifications`)
-`GET /` | `PATCH :id/read` | `POST push-subscribe` (body `{endpoint, keys}`) | `DELETE push-unsubscribe` (body `{endpoint}`) | `GET vapid-public-key`
+`GET /` | `PATCH :id/read` | `POST push-subscribe` [idempotent] (body `{endpoint, keys}`, endpoint 기준 upsert — 중복 구독 시 동일 row에 keys 갱신) | `DELETE push-unsubscribe` (body `{endpoint}`) | `GET vapid-public-key`
+
+### 리뷰 (`/reviews`) — Task 73에서 멱등
+`POST /` [idempotent] (body `{ matchId, targetId, skillRating, mannerRating, comment? }`. 200 + flattened review + `alreadySubmitted: boolean`. `(matchId, authorId, targetId)` unique constraint — 중복 시 기존 리뷰 반환 + `alreadySubmitted: true` + 알림/ELO/매너 업데이트 skip) | `GET pending`
 
 ### 기타
 `GET /health` — 헬스체크

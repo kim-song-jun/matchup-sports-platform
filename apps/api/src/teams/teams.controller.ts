@@ -226,7 +226,18 @@ export class TeamsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '팀 가입 신청 수락 (manager+ 전용)' })
-  @ApiOkResponse({ description: '신청 수락 성공, 멤버로 전환' })
+  @ApiOkResponse({
+    description: '신청 수락 성공 (이미 처리된 경우 alreadyProcessed=true로 멱등 반환)',
+    schema: {
+      properties: {
+        application: { type: 'object', description: '처리된 TeamMembership 객체' },
+        alreadyProcessed: {
+          type: 'boolean',
+          description: '신청이 이미 active 상태였으면 true (멱등 재호출 감지용). 상태 머신 위반(left 상태에서 accept)은 400 APPLICATION_NOT_PENDING.',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
   @ApiNotFoundResponse({ description: '팀 또는 신청 없음' })
@@ -243,7 +254,18 @@ export class TeamsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '팀 가입 신청 거절 (manager+ 전용)' })
-  @ApiOkResponse({ description: '신청 거절 성공' })
+  @ApiOkResponse({
+    description: '신청 거절 성공 (이미 처리된 경우 alreadyProcessed=true로 멱등 반환)',
+    schema: {
+      properties: {
+        application: { type: 'object', description: '처리된 TeamMembership 객체' },
+        alreadyProcessed: {
+          type: 'boolean',
+          description: '신청이 이미 left 상태였으면 true (멱등 재호출 감지용)',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'JWT required' })
   @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
   @ApiNotFoundResponse({ description: '팀 또는 신청 없음' })

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { ReviewsService } from './reviews.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScoringService } from '../scoring/scoring.service';
@@ -10,7 +11,7 @@ describe('ReviewsService', () => {
   let prisma: PrismaService;
 
   const mockScoringService = {
-    updateEloAfterMatch: jest.fn(),
+    updateEloAfterMatch: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockNotificationsService = {
@@ -22,6 +23,7 @@ describe('ReviewsService', () => {
       create: jest.fn(),
       aggregate: jest.fn(),
       findMany: jest.fn(),
+      findUnique: jest.fn(),
     },
     user: {
       update: jest.fn(),
@@ -46,6 +48,7 @@ describe('ReviewsService', () => {
 
     jest.clearAllMocks();
     mockNotificationsService.create.mockResolvedValue({});
+    mockScoringService.updateEloAfterMatch.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -80,7 +83,7 @@ describe('ReviewsService', () => {
 
       const result = await service.create('user-1', reviewData);
 
-      expect(result).toEqual(createdReview);
+      expect(result).toEqual({ ...createdReview, alreadySubmitted: false });
 
       expect(prisma.review.create).toHaveBeenCalledWith({
         data: {
@@ -130,7 +133,7 @@ describe('ReviewsService', () => {
 
       const result = await service.create('user-1', dataWithoutComment);
 
-      expect(result).toEqual(reviewNoComment);
+      expect(result).toEqual({ ...reviewNoComment, alreadySubmitted: false });
       expect(prisma.review.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           comment: undefined,
@@ -180,17 +183,21 @@ describe('ReviewsService', () => {
       expect(mockNotificationsService.create).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle duplicate review (Prisma unique constraint error)', async () => {
+    it('should return { review, alreadySubmitted: true } on duplicate review (idempotent)', async () => {
       const prismaUniqueError = Object.assign(
-        new Error(
-          'Unique constraint failed on the fields: (`matchId`,`authorId`,`targetId`)',
-        ),
-        { code: 'P2002' },
+        Object.create(Prisma.PrismaClientKnownRequestError.prototype),
+        { code: 'P2002', message: 'Unique constraint failed on the fields: (`matchId`,`authorId`,`targetId`)' },
       );
 
       mockPrismaService.review.create.mockRejectedValue(prismaUniqueError);
+      mockPrismaService.review.findUnique.mockResolvedValue(createdReview);
 
-      await expect(service.create('user-1', reviewData)).rejects.toThrow();
+      const result = await service.create('user-1', reviewData);
+      expect(result).toEqual({ ...createdReview, alreadySubmitted: true });
+      // Side effects must be skipped on replay
+      await new Promise((r) => setImmediate(r));
+      expect(mockNotificationsService.create).not.toHaveBeenCalled();
+      expect(mockScoringService.updateEloAfterMatch).not.toHaveBeenCalled();
     });
   });
 

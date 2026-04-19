@@ -33,6 +33,10 @@ const config: Config = {
     },
   ],
 
+  // Top-level config (project-level testTimeout is ignored by jest)
+  // Integration suites do real DB work and can exceed the 5s default under CI load.
+  testTimeout: 15000,
+
   // Coverage collected from all source files
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage',

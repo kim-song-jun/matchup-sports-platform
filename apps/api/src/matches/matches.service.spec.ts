@@ -942,18 +942,19 @@ describe('MatchesService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should throw BadRequestException when match is already cancelled', async () => {
-      mockPrismaService.match.findUnique.mockResolvedValue({
-        ...hostMatch,
-        status: 'cancelled',
-      });
+    it('should return { match, alreadyCancelled: true } when match is already cancelled (idempotent)', async () => {
+      const cancelledMatch = { ...hostMatch, status: 'cancelled' };
+      mockPrismaService.match.findUnique
+        .mockResolvedValueOnce(cancelledMatch)
+        .mockResolvedValueOnce(cancelledMatch);
 
-      await expect(
-        service.cancelMatch('match-1', 'host-1'),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        service.cancelMatch('match-1', 'host-1'),
-      ).rejects.toThrow('이미 종료된 매치입니다.');
+      const result = await service.cancelMatch('match-1', 'host-1');
+      expect(result).toMatchObject({ alreadyCancelled: true });
+      expect(result).toMatchObject({ status: 'cancelled' });
+      expect(prisma.match.update).not.toHaveBeenCalled();
+      // Side effects must be skipped on idempotent replay
+      await new Promise((r) => setImmediate(r));
+      expect(mockNotificationsService.create).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when match is already completed', async () => {
@@ -999,7 +1000,7 @@ describe('MatchesService', () => {
           data: { status: 'confirmed' },
         }),
       );
-      expect(result).toEqual(expect.objectContaining({ status: 'confirmed' }));
+      expect(result).toEqual(expect.objectContaining({ status: 'confirmed', alreadyClosed: false }));
     });
 
     it('should throw ForbiddenException when non-host closes', async () => {
@@ -1010,10 +1011,32 @@ describe('MatchesService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should throw BadRequestException when match is not recruiting', async () => {
+    it('should return { match, alreadyClosed: true } when status is already confirmed (idempotent)', async () => {
+      const confirmedMatch = { ...hostMatch, status: 'confirmed' };
+      mockPrismaService.match.findUnique
+        .mockResolvedValueOnce(confirmedMatch)
+        .mockResolvedValueOnce(confirmedMatch);
+
+      const result = await service.closeMatch('match-1', 'host-1');
+      expect(result).toMatchObject({ alreadyClosed: true });
+      expect(result).toMatchObject({ status: 'confirmed' });
+      expect(prisma.match.update).not.toHaveBeenCalled();
+    });
+
+    it('should return { match, alreadyClosed: true } when status is already full (idempotent)', async () => {
+      const fullMatch = { ...hostMatch, status: 'full' };
+      mockPrismaService.match.findUnique
+        .mockResolvedValueOnce(fullMatch)
+        .mockResolvedValueOnce(fullMatch);
+
+      const result = await service.closeMatch('match-1', 'host-1');
+      expect(result).toMatchObject({ alreadyClosed: true });
+    });
+
+    it('should throw BadRequestException when match is in other non-closeable state', async () => {
       mockPrismaService.match.findUnique.mockResolvedValue({
         ...hostMatch,
-        status: 'full',
+        status: 'in_progress',
       });
 
       await expect(
@@ -1239,15 +1262,20 @@ describe('MatchesService', () => {
       );
     });
 
-    it('should throw BadRequestException when match is already completed', async () => {
-      mockPrismaService.match.findUnique.mockResolvedValue({
-        ...hostMatch,
-        status: 'completed',
-      });
+    it('should return { match, alreadyCompleted: true } when match is already completed (idempotent)', async () => {
+      const completedMatch = { ...hostMatch, status: 'completed' };
+      mockPrismaService.match.findUnique
+        .mockResolvedValueOnce(completedMatch)
+        .mockResolvedValueOnce(completedMatch);
 
-      await expect(service.complete('match-1', 'host-1')).rejects.toThrow(
-        BadRequestException,
-      );
+      const result = await service.complete('match-1', 'host-1');
+      expect(result).toMatchObject({ alreadyCompleted: true });
+      expect(result).toMatchObject({ status: 'completed' });
+      expect(prisma.match.update).not.toHaveBeenCalled();
+      // Side effects (notifications + badges) must be skipped on idempotent replay
+      await new Promise((r) => setImmediate(r));
+      expect(mockNotificationsService.create).not.toHaveBeenCalled();
+      expect(mockBadgesService.awardIfEligible).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when match does not exist', async () => {

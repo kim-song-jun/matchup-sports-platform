@@ -160,6 +160,8 @@ export function notificationLink(type: NotificationType, data: NotificationData 
     case NotificationType.marketplace_order:
     case NotificationType.marketplace_message:
       return listingId ? `/marketplace/${listingId}` : '/marketplace';
+    case NotificationType.marketplace_payout_paid:
+      return '/my/orders';
     case NotificationType.level_changed:
       return '/profile';
     default:
@@ -197,6 +199,8 @@ export function notificationCtaLabel(type: NotificationType) {
     case NotificationType.marketplace_order:
     case NotificationType.marketplace_message:
       return '상세 보기';
+    case NotificationType.marketplace_payout_paid:
+      return '정산 내역 보기';
     case NotificationType.level_changed:
       return '프로필 보기';
     case NotificationType.match_created:

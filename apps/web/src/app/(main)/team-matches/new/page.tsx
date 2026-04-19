@@ -641,7 +641,6 @@ function ToggleField({ label, checked, onChange }: { label: string; checked: boo
   return (
     <div
       className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-gray-700 px-4 py-3.5"
-      onClick={() => onChange(!checked)}
     >
       <span className="text-base font-medium text-gray-800 dark:text-gray-200">{label}</span>
       <Toggle

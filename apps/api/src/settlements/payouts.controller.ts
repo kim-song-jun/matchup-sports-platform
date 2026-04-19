@@ -85,4 +85,15 @@ export class PayoutsController {
   ) {
     return this.settlementsService.markPayoutFailed(id, body.reason, body.note, adminId);
   }
+
+  @Post(':id/retry')
+  @ApiOperation({
+    summary: '실패 지급 재시도 — 연결된 정산을 재대기열로 복원하고 Payout을 cancelled 처리',
+  })
+  @ApiResponse({ status: 200, description: '재시도 완료 — { cancelled, settlementsRestored }' })
+  @ApiResponse({ status: 404, description: 'PAYOUT_NOT_FOUND' })
+  @ApiResponse({ status: 409, description: 'PAYOUT_NOT_RETRIABLE — 이미 paid 또는 cancelled 상태' })
+  retryPayout(@Param('id') id: string) {
+    return this.settlementsService.retryPayout(id);
+  }
 }

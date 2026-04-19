@@ -522,4 +522,31 @@ export class SettlementsService {
       include: { recipient: { select: { id: true, nickname: true } } },
     });
   }
+
+  /**
+   * Retries a failed payout by restoring linked SettlementRecords to payoutId=null
+   * and marking the Payout as cancelled, making settlements eligible for a new batch.
+   * Only allowed when Payout.status = failed. Throws 409 PAYOUT_NOT_RETRIABLE otherwise.
+   */
+  async retryPayout(payoutId: string): Promise<{ cancelled: string; settlementsRestored: number }> {
+    const payout = await this.prisma.payout.findUnique({ where: { id: payoutId } });
+    if (!payout) throw new NotFoundException(`PAYOUT_NOT_FOUND: ${payoutId}`);
+
+    if (payout.status !== PayoutStatus.failed) {
+      throw new ConflictException('PAYOUT_NOT_RETRIABLE');
+    }
+
+    const [, restoreResult] = await this.prisma.$transaction([
+      this.prisma.payout.update({
+        where: { id: payoutId },
+        data: { status: PayoutStatus.cancelled },
+      }),
+      this.prisma.settlementRecord.updateMany({
+        where: { payoutId },
+        data: { payoutId: null },
+      }),
+    ]);
+
+    return { cancelled: payoutId, settlementsRestored: restoreResult.count };
+  }
 }

@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Wallet, CheckCircle, Clock, Ban, Loader2, XCircle } from 'lucide-react';
+import { Wallet, CheckCircle, Clock, Ban, Loader2, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 import { AdminToolbar, downloadCSV } from '@/components/admin/admin-toolbar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Modal } from '@/components/ui/modal';
 import { PayoutBatchBuilder } from '@/components/admin/payout-batch-builder';
+import { WeeklyPayoutBars } from '@/components/admin/weekly-payout-bars';
 import { useToast } from '@/components/ui/toast';
 import { formatAmount, extractErrorMessage } from '@/lib/utils';
 import {
@@ -16,15 +17,7 @@ import {
   useMarkPayoutPaid,
   useMarkPayoutFailed,
 } from '@/hooks/use-api';
-
-// Hook shapes (actual — matches use-admin.ts + types/payout.ts):
-// useAdminPayouts(params?) → { data: CursorPage<Payout>; isLoading; isError; refetch }
-// useAdminEligibleSettlements() → { data: EligibleSettlement[]; isLoading; isError; refetch }
-// useCreatePayoutBatch() → mutation.mutate({ recipientIds?, cutoffDate? })
-// useMarkPayoutPaid() → mutation.mutate({ id, data?: MarkPayoutPaidInput })
-//
-// Payout: { id, batchId, recipientId, grossAmount, platformFee, netAmount, status, processedAt, createdAt, recipient? }
-// EligibleSettlement: { recipientId, recipientName, settlementCount, grossAmount, platformFee, netAmount, oldestReleasedAt }
+import { useRetryPayout } from '@/hooks/use-api';
 
 import type { PayoutEligibleSettlement } from '@/components/admin/payout-batch-builder';
 
@@ -195,6 +188,29 @@ function MarkPaidRow({ payoutId, refetch }: { payoutId: string; refetch: () => v
   );
 }
 
+function aggregateWeeklyPayouts(payouts: { status: string; netAmount: number; createdAt: string }[]): { weekStart: string; total: number }[] {
+  const paidPayouts = payouts.filter((p) => p.status === 'paid');
+  const buckets: Record<string, number> = {};
+  const fourWeeksAgo = new Date();
+  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+
+  for (const p of paidPayouts) {
+    const d = new Date(p.createdAt);
+    if (d < fourWeeksAgo) continue;
+    // Normalize to Monday of the week
+    const day = d.getDay();
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - ((day + 6) % 7));
+    const key = monday.toISOString().slice(0, 10);
+    buckets[key] = (buckets[key] ?? 0) + p.netAmount;
+  }
+
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-4)
+    .map(([weekStart, total]) => ({ weekStart, total }));
+}
+
 export default function AdminPayoutsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<PayoutTab>('eligible');
@@ -204,16 +220,18 @@ export default function AdminPayoutsPage() {
 
   const { data: eligibleData, isLoading: eligibleLoading, isError: eligibleError, refetch: refetchEligible } = useAdminEligibleSettlements();
   const { data: payoutsData, isLoading: payoutsLoading, isError: payoutsError, refetch: refetchPayouts } = useAdminPayouts();
+  const { data: failedPayoutsData, isLoading: failedPayoutsLoading, refetch: refetchFailed } = useAdminPayouts({ status: 'failed' });
   const createPayoutBatch = useCreatePayoutBatch();
+  const retryPayout = useRetryPayout();
 
-  // EligibleSettlement from types/payout.ts
   const eligibleSettlements: PayoutEligibleSettlement[] = useMemo(
     () => eligibleData ?? [],
     [eligibleData],
   );
 
-  // Payout[] from CursorPage<Payout> — `.data` is the array field
   const allPayouts = payoutsData?.data ?? [];
+  const failedPayouts = failedPayoutsData?.data ?? [];
+  const weeklyBars = useMemo(() => aggregateWeeklyPayouts(allPayouts), [allPayouts]);
 
   const filteredPayouts = useMemo(() => {
     return allPayouts.filter((p) => {
@@ -245,9 +263,22 @@ export default function AdminPayoutsPage() {
     );
   };
 
+  const handleRetryPayout = (payoutId: string) => {
+    retryPayout.mutate(payoutId, {
+      onSuccess: () => {
+        toast('success', '재대기열로 복원됐어요');
+        void refetchFailed();
+        void refetchPayouts();
+      },
+      onError: (err) => {
+        toast('error', extractErrorMessage(err, '재시도에 실패했어요. 다시 시도해주세요.'));
+      },
+    });
+  };
+
   return (
-    <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
+    <div className="animate-fade-in space-y-8">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">지급 관리</h1>
           <p className="text-base text-gray-500 mt-1">처리 완료된 정산을 배치로 묶어 지급하세요</p>
@@ -260,8 +291,64 @@ export default function AdminPayoutsPage() {
         )}
       </div>
 
+      {/* Failed payouts — pinned top section */}
+      {!failedPayoutsLoading && failedPayouts.length > 0 && (
+        <section
+          aria-label="실패한 지급 목록"
+          className="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-5 space-y-4"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} className="text-red-500 shrink-0" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-red-700 dark:text-red-400">
+              실패 payout ({failedPayouts.length}건)
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {failedPayouts.map((payout) => (
+              <div
+                key={payout.id}
+                className="flex items-center justify-between gap-4 rounded-xl bg-white dark:bg-gray-800 border border-red-100 dark:border-red-900/40 px-4 py-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {payout.recipient?.nickname ?? payout.recipientId}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {formatAmount(payout.netAmount)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRetryPayout(payout.id)}
+                  disabled={retryPayout.isPending}
+                  aria-label={`${payout.recipient?.nickname ?? payout.recipientId} 지급 재대기열 복원`}
+                  className="flex items-center gap-1.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                >
+                  {retryPayout.isPending ? (
+                    <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <RefreshCw size={14} aria-hidden="true" />
+                  )}
+                  재대기열 복원
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Weekly payout bars */}
+      {weeklyBars.length > 0 && (
+        <section aria-label="주간 지급 합계">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">주간 지급 현황</h2>
+          <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5">
+            <WeeklyPayoutBars weeks={weeklyBars} />
+          </div>
+        </section>
+      )}
+
       {/* Tab switcher */}
-      <div role="tablist" className="flex gap-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 mb-6 max-w-xs">
+      <div role="tablist" className="flex gap-0 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 max-w-xs">
         {([
           { key: 'eligible', label: '지급 대기 정산' },
           { key: 'payouts', label: '지급 목록' },
@@ -337,13 +424,13 @@ export default function AdminPayoutsPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
-                      <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">수취인</th>
-                      <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap text-right">총액</th>
-                      <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap text-right">수수료</th>
-                      <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap text-right">정산액</th>
-                      <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">상태</th>
-                      <th className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">생성일</th>
-                      <th className="px-5 py-3" />
+                      <th scope="col" className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">수취인</th>
+                      <th scope="col" className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap text-right">총액</th>
+                      <th scope="col" className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap text-right">수수료</th>
+                      <th scope="col" className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap text-right">정산액</th>
+                      <th scope="col" className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">상태</th>
+                      <th scope="col" className="px-5 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase whitespace-nowrap">생성일</th>
+                      <th scope="col" className="px-5 py-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-700">

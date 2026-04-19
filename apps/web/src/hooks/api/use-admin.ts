@@ -290,6 +290,8 @@ export function useResolveDispute() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.disputes });
       void queryClient.invalidateQueries({ queryKey: queryKeys.admin.dispute(id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      // Task 76: keep ops summary in sync after dispute resolution
+      void queryClient.invalidateQueries({ queryKey: ['admin-ops-summary'] });
     },
   });
 }

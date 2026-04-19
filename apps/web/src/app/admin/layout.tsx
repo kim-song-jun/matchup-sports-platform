@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Trophy, GraduationCap, Building2, ShieldCheck, ArrowLeft, Zap, CreditCard, Wallet, AlertTriangle, BarChart3, Swords, UserPlus, Star, Menu, X, Ticket, Banknote } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, GraduationCap, Building2, ShieldCheck, ArrowLeft, Zap, CreditCard, Wallet, AlertTriangle, BarChart3, Swords, UserPlus, Star, Menu, X, Ticket, Banknote, Activity } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 
 const adminNav = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: '대시보드' },
+  { href: '/admin/ops', icon: Activity, label: '운영 모니터링' },
   { href: '/admin/matches', icon: Trophy, label: '매치 관리' },
   { href: '/admin/users', icon: Users, label: '사용자 관리' },
   { href: '/admin/lessons', icon: GraduationCap, label: '강좌 관리' },

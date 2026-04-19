@@ -296,6 +296,7 @@ model User {
   buyerDisputes          Dispute[]               @relation("BuyerDisputes")
   sellerDisputes         Dispute[]               @relation("SellerDisputes")
   disputeMessages        DisputeMessage[]        @relation("DisputeMessages")
+  webPushFailureLogs     WebPushFailureLog[]
 
   @@unique([oauthProvider, oauthId])
   @@index([locationCity, locationDistrict])
@@ -1534,4 +1535,23 @@ model DisputeEvent {
 
   @@index([disputeId, createdAt])
   @@map("dispute_events")
+}
+
+model WebPushFailureLog {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  subscriptionId String?   @map("subscription_id")
+  statusCode     Int?      @map("status_code")
+  errorCode      String?   @map("error_code")
+  endpointSuffix String    @map("endpoint_suffix")
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String?   @map("acknowledged_by")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([occurredAt])
+  @@index([acknowledgedAt])
+  @@index([userId])
+  @@map("web_push_failure_logs")
 }

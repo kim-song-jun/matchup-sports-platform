@@ -17,6 +17,7 @@ import { notificationsHandlers } from './handlers/notifications';
 import { adminHandlers } from './handlers/admin';
 import { disputesHandlers } from './handlers/disputes';
 import { miscHandlers } from './handlers/misc';
+import { adminOpsHandlers } from './handlers/admin-ops';
 
 export const handlers = [
   ...authHandlers,
@@ -35,4 +36,5 @@ export const handlers = [
   ...adminHandlers,
   ...disputesHandlers,
   ...miscHandlers,
+  ...adminOpsHandlers,
 ];

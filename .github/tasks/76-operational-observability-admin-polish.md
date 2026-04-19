@@ -25,7 +25,7 @@ Task 76 은 이 네 개 공백을 "신규 chart lib 도입 없이" 기존 API + 
 
 1. `/admin/ops` 단일 화면에서 실시간 매치, 대기 결제, 분쟁 open, 정산 대기, 알림 발송 실패 지표를 한눈에 확인
 2. 분쟁 상세 페이지에서 resolve 워크플로우(review → resolve) 가 단일 선형 흐름으로 정리됨
-3. 웹 푸시 전송 실패가 임계치(5분 Rolling 10건 또는 5% 초과)를 넘으면 외부 알람 채널로 자동 통지
+3. 웹 푸시 전송 실패가 임계치(5분 Rolling 10건 초과)를 넘으면 외부 알람 채널로 자동 통지 (rate 조건은 success counter 인프라 필요로 미포함 — count 10 단일 기준)
 4. `/admin/payouts` 에 실패 payout 재시도 UI + 주간 집계 CSS 막대 차트 추가
 5. 기존 chart 라이브러리 없음 → **Tailwind + SVG 인라인 바** 로만 시각화 (A1 결정)
 
@@ -45,7 +45,7 @@ Task 76 은 이 네 개 공백을 "신규 chart lib 도입 없이" 기존 API + 
 - [ ] **C3** `GET /admin/ops/recent-push-failures?limit=20` — 최근 실패 목록. WebPushFailureLog 테이블 기반 (C5 스키마). PII 제거 — endpoint 마지막 6자만 + userId hash (sha256 8자).
 - [ ] **C4** `POST /admin/ops/push-failures/ack` — 운영자가 현재 윈도 실패를 "확인" 처리 (`acknowledgedAt` 타임스탬프 기록). 알람 재트리거 방지용. `AdminGuard` 필수.
 - [ ] **C5** Prisma schema 추가 — `WebPushFailureLog { id, userId, subscriptionId, statusCode, errorCode, occurredAt, acknowledgedAt?, endpointSuffix String(6) }` + migration `YYYYMMDD_add_web_push_failure_log`. `WebPushService.sendToUser` 에서 410/404 이외 실패 시 `occurredAt=now()` 로 row 삽입 (fire-and-forget, create 실패 해도 원 flow 중단 금지).
-- [ ] **C6** `WebPushAlertService` (`apps/api/src/notifications/web-push-alert.service.ts` 신규) — 5분 Rolling 윈도로 실패 건수·비율 계산. 임계치(10건 OR 5%) 초과 시 외부 채널 (A2 결정 — Slack webhook 또는 logger-only fallback) 통지. `acknowledgedAt` 이 최근 5분 내 존재하면 중복 알람 skip. Cron `@Cron(CronExpression.EVERY_MINUTE)` 또는 on-write-threshold 훅 중 택1 (tech-planner 권장: 매 분 cron, load 낮음).
+- [ ] **C6** `WebPushAlertService` (`apps/api/src/notifications/web-push-alert.service.ts` 신규) — 5분 Rolling 윈도로 실패 건수 계산. 임계치(count 10 단일 기준 — rate 조건은 success counter 인프라 필요로 미포함) 초과 시 외부 채널 (A2 결정 — Slack webhook 또는 logger-only fallback) 통지. `acknowledgedAt` 이 최근 5분 내 존재하면 중복 알람 skip. Cron `@Cron(CronExpression.EVERY_MINUTE)`.
 - [ ] **C7** 프론트엔드 `/admin/ops/page.tsx` 신규 — 5개 KPI 카드 (Matches / Payments / Disputes / Settlements / Pushes) 2x3 그리드 + 최근 푸시 실패 테이블 + 분쟁·정산으로 가는 deep-link. 실시간 갱신은 React Query `refetchInterval: 30_000` (A3 결정, 30초) — 웹소켓 불필요.
 - [ ] **C8** `/admin/disputes/[id]/page.tsx` 재배치 — 기존 `dispute-resolve-modal.tsx` 를 상세 페이지 우측 상단 "해결 처리" 버튼으로 통합. status=`filed|seller_responded|admin_reviewing` 에서만 노출. resolve 완료 후 `['admin-dispute', id]` + `['admin-disputes']` + `['admin-ops-summary']` invalidate.
 - [ ] **C9** `/admin/payouts/page.tsx` 확장:
@@ -228,6 +228,8 @@ pnpm prisma migrate resolve --rolled-back <timestamp>_add_web_push_failure_log
 | R5 | `/admin/ops` 실시간 요구 과도 (C11 realtime) → Socket.IO 부하 | Medium | Wave 2 옵션으로 배치, refetchInterval 가 충분하면 생략 |
 | R6 | 분쟁 resolve modal 통합으로 기존 QA 시나리오 깨짐 | Low | QA 라운드에서 Task 70 dispute 시나리오 전량 재실행 |
 | R7 | `WebPushAlertService` cron 이 테스트 환경에서 자동 기동 → 노이즈 | Low | `DISABLE_OPS_ALERT_CRON=true` 플래그로 테스트 환경 비활성 (Task 70 cron 선례 재사용) |
+| R8 | Staging/Prod webhook URL 공용 시 환경 구분 불가 | Medium | Staging/Prod 전용 Slack 채널 또는 webhook URL 분리. prod 우선 설정, staging 은 logger-only fallback 허용 |
+| R9 | `WebPushAlertService` cron + Slack webhook 이 admin scale-out 시 중복 발송 위험 | Low | 현재 admin scale=1 전제이므로 risk 낮음. 향후 scale-out 시 Redis 분산 lock (`SET NX PX`) 으로 leader election 구현 필요 (Task 77+ 이후 고려) |
 
 ### Dependencies
 - **Task 73 (idempotency sweep, merged)** — admin 재처리 안전성 확보 (precondition satisfied)
@@ -244,7 +246,7 @@ pnpm prisma migrate resolve --rolled-back <timestamp>_add_web_push_failure_log
 | A1 | Chart 라이브러리 선택 — recharts/chart.js 도입 vs 기존 Tailwind+SVG 인라인 | **Tailwind + 인라인 SVG bar** (package.json 에 chart lib 0건, 번들 크기 보호) | project-director 승인 |
 | A2 | 푸시 실패 알람 외부 채널 — Slack webhook / Sentry / Discord / 이메일 / logger-only | **Slack webhook 1순위, 미설정 시 logger-only fallback** (env `OPS_ALERT_WEBHOOK_URL` 없으면 자동 fallback) | 사용자 (운영팀 채널 확정) |
 | A3 | `/admin/ops` 실시간 갱신 주기 — 10s / 30s / 60s / Socket.IO | **30초 React Query refetchInterval**. 부하 이슈 시 60초로 완화. Socket.IO (C11) 은 Wave 2 옵션 | tech-planner |
-| A4 | 푸시 실패 임계치 수치 — 5분 10건(count) + 5%(rate) | **count OR rate 둘 중 하나 초과 시 알람** (OR 조건) | 운영팀 초기 값, 배포 후 튜닝 |
+| A4 | 푸시 실패 임계치 수치 — 5분 10건(count) + 5%(rate) | **count 10 단일 기준 (rate 조건은 success counter 인프라 필요로 미포함). `PUSH_ALERT_RATE_THRESHOLD` 상수 제거. 향후 rate 지원 시 성공 카운터 별도 구축 필요.** | 확정 (2026-04-19) |
 | A5 | 주간 payout bar — 4주 / 8주 / 12주 | **4주** (스크린 폭 제약, 모바일 admin 대응) | 재무팀 |
 | A6 | `WebPushFailureLog` 보관 기간 | **무제한 (Task 76 범위)** → cleanup cron 은 별도 후속 | tech-planner (Task 77 이후) |
 | A7 | realtime admin room (C11) 구현 여부 | **Wave 2 옵션, 필수 아님** | 리뷰 후 결정 |

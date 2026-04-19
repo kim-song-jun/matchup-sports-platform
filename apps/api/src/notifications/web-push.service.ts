@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { ENDPOINT_SUFFIX_LENGTH } from '../common/constants/ops';
 import * as webpush from 'web-push';
 
 interface PushNotification {
@@ -84,11 +85,26 @@ export class WebPushService implements OnModuleInit {
           await webpush.sendNotification({ endpoint, keys: { p256dh, auth } }, payload);
         } catch (err: unknown) {
           const statusCode = (err as { statusCode?: number })?.statusCode;
-          if (statusCode === 410) {
-            // 410 Gone — subscription is no longer valid
+          if (statusCode === 410 || statusCode === 404) {
+            // 410 Gone / 404 Not Found — subscription is expired; clean up silently
             expiredIds.push(id);
           } else {
+            const errorCode = this.resolveErrorCode(statusCode);
             this.logger.warn(`Web Push send failed for subscription ${id}: ${statusCode ?? err}`);
+            // Fire-and-forget: failure log write must never interrupt the push flow
+            this.prisma.webPushFailureLog
+              .create({
+                data: {
+                  userId,
+                  subscriptionId: id,
+                  statusCode: typeof statusCode === 'number' ? statusCode : null,
+                  errorCode,
+                  endpointSuffix: endpoint.slice(-ENDPOINT_SUFFIX_LENGTH),
+                },
+              })
+              .catch(() => {
+                // swallow — log persistence failure must not affect caller
+              });
           }
         }
       }),
@@ -98,6 +114,14 @@ export class WebPushService implements OnModuleInit {
       await this.prisma.pushSubscription.deleteMany({ where: { id: { in: expiredIds } } });
       this.logger.log(`Removed ${expiredIds.length} expired push subscription(s) for userId=${userId}`);
     }
+  }
+
+  /** Map a raw HTTP status code (or absence thereof) to a short error code string. */
+  private resolveErrorCode(statusCode: number | undefined): string {
+    if (statusCode === undefined || statusCode === null) return 'NETWORK';
+    if (statusCode >= 500) return 'HTTP_5XX';
+    if (statusCode === 429) return 'RATE_LIMITED';
+    return `HTTP_${statusCode}`;
   }
 
   /** Return the configured VAPID public key (null if not configured). */

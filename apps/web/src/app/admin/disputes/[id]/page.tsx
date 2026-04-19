@@ -174,14 +174,14 @@ export default function AdminDisputeDetailPage() {
                 검토 시작
               </button>
             )}
-            {(dispute.status === 'admin_reviewing' || dispute.status === 'seller_responded') && (
+            {(dispute.status === 'seller_responded' || dispute.status === 'admin_reviewing') && (
               <button
                 type="button"
                 onClick={() => setShowResolveModal(true)}
                 className="flex items-center gap-2 min-h-[44px] rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-600 transition-colors"
               >
                 <Scale size={16} aria-hidden="true" />
-                분쟁 처리
+                해결 처리
               </button>
             )}
           </div>

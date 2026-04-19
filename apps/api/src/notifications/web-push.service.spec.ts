@@ -18,6 +18,9 @@ const mockPrisma = {
     deleteMany: jest.fn(),
     findMany: jest.fn(),
   },
+  webPushFailureLog: {
+    create: jest.fn(),
+  },
 };
 
 const mockConfigEnabled = {
@@ -210,6 +213,81 @@ describe('WebPushService', () => {
       expect(mockPrisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
         where: { id: { in: ['s2'] } },
       });
+    });
+
+    it('sendToUser removes subscriptions that return 404 Not Found', async () => {
+      mockPrisma.pushSubscription.findMany.mockResolvedValue([
+        { id: 's3', endpoint: 'https://push.example.com/notfound', p256dh: 'p3', auth: 'a3' },
+      ]);
+      (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 404 });
+      mockPrisma.pushSubscription.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.sendToUser('u1', { title: 'NotFound', body: 'Test' });
+
+      // 404 is treated same as 410 — expired subscription cleanup, no failure log
+      expect(mockPrisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['s3'] } },
+      });
+      expect(mockPrisma.webPushFailureLog.create).not.toHaveBeenCalled();
+    });
+
+    it('sendToUser writes a WebPushFailureLog row for 5xx errors', async () => {
+      const endpoint = 'https://push.example.com/abcdef';
+      mockPrisma.pushSubscription.findMany.mockResolvedValue([
+        { id: 'sfail', endpoint, p256dh: 'pf', auth: 'af' },
+      ]);
+      (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500 });
+      mockPrisma.webPushFailureLog.create.mockResolvedValue({});
+
+      await service.sendToUser('u1', { title: 'Error', body: 'Test' });
+
+      expect(mockPrisma.webPushFailureLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'u1',
+            subscriptionId: 'sfail',
+            statusCode: 500,
+            errorCode: 'HTTP_5XX',
+            endpointSuffix: 'abcdef',
+          }),
+        }),
+      );
+      // endpointSuffix must be exactly 6 characters (C12 PII guard)
+      const callData = mockPrisma.webPushFailureLog.create.mock.calls[0][0].data;
+      expect(callData.endpointSuffix).toHaveLength(6);
+    });
+
+    it('sendToUser writes a failure log for network errors (no statusCode) with NETWORK errorCode', async () => {
+      const endpoint = 'https://push.example.com/net123';
+      mockPrisma.pushSubscription.findMany.mockResolvedValue([
+        { id: 'snet', endpoint, p256dh: 'pn', auth: 'an' },
+      ]);
+      (webpush.sendNotification as jest.Mock).mockRejectedValue(new Error('ECONNREFUSED'));
+      mockPrisma.webPushFailureLog.create.mockResolvedValue({});
+
+      await service.sendToUser('u1', { title: 'NetError', body: 'Test' });
+
+      expect(mockPrisma.webPushFailureLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'u1',
+            errorCode: 'NETWORK',
+          }),
+        }),
+      );
+    });
+
+    it('sendToUser continues normally if WebPushFailureLog.create rejects (fire-and-forget)', async () => {
+      const endpoint = 'https://push.example.com/zzfail';
+      mockPrisma.pushSubscription.findMany.mockResolvedValue([
+        { id: 'sff', endpoint, p256dh: 'pff', auth: 'aff' },
+      ]);
+      (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 503 });
+      // Simulate DB failure on log write
+      mockPrisma.webPushFailureLog.create.mockRejectedValue(new Error('DB down'));
+
+      // Must not throw even if log write fails
+      await expect(service.sendToUser('u1', { title: 'FF', body: 'Test' })).resolves.toBeUndefined();
     });
   });
 

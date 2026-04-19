@@ -530,11 +530,11 @@ describe('Matches Team Balancing (e2e)', () => {
         .set('Authorization', `Bearer ${hostToken}`)
         .send({ teamCount: 2, seed: 10, participantHash: capturedHash });
 
-      // Expect 409 PARTICIPANTS_CHANGED once Track A stale check is in place.
-      // Until Track A is merged, this may return 200 (compose succeeds without hash check).
       expect(composeRes.status).toBe(409);
-      // AllExceptionsFilter extracts only the .message field from ConflictException({ code, message }).
-      // The code field is dropped — the Korean message is what lands in res.body.message.
+      // AllExceptionsFilter preserves the `code` field from the ConflictException
+      // object response so frontend can route on it (auto re-preview path in
+      // auto-balance-modal). Test both the code and the Korean message.
+      expect(composeRes.body.code).toBe('PARTICIPANTS_CHANGED');
       expect(composeRes.body.message).toContain('참가자가 변경되었어요');
     });
 

@@ -32,15 +32,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
+    // When an HttpException is thrown with an object response shape like
+    // `{ code: 'DOMAIN_CODE', message: '...' }`, preserve the `code` field so
+    // frontend consumers can route on it (e.g. PARTICIPANTS_CHANGED for
+    // automatic re-preview in auto-balance-modal).
+    const messageObj =
+      typeof message === 'object' && message !== null ? (message as Record<string, unknown>) : null;
+    const code =
+      messageObj && typeof messageObj.code === 'string' ? (messageObj.code as string) : undefined;
+
     response.status(status).json({
       status: 'error',
       statusCode: status,
       message:
         typeof message === 'string'
           ? message
-          // NestJS HttpException.getResponse() returns string | object; cast is safe here.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- NestJS exception response is untyped
-          : (message as any).message || message,
+          : messageObj && typeof messageObj.message === 'string'
+            ? (messageObj.message as string)
+            : message,
+      ...(code ? { code } : {}),
       timestamp: new Date().toISOString(),
     });
   }

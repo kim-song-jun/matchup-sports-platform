@@ -10,13 +10,7 @@ import { useTeam, useTeamMatches } from '@/hooks/use-api';
 import { formatMatchDate } from '@/lib/utils';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import type { TeamMatch } from '@/types/api';
-
-const statusLabel: Record<string, { text: string; style: string }> = {
-  recruiting: { text: '모집중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300' },
-  scheduled: { text: '확정', style: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300' },
-  completed: { text: '완료', style: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
-  cancelled: { text: '취소', style: 'bg-red-50 text-red-500 dark:bg-red-950/30 dark:text-red-300' },
-};
+import { getTeamMatchStatusMeta, TEAM_MATCH_HISTORY_STATUS_FILTER } from '@/lib/team-match-operations';
 
 export default function TeamMatchesPage() {
   const params = useParams();
@@ -24,29 +18,31 @@ export default function TeamMatchesPage() {
   const teamId = params.id as string;
 
   const { data: team } = useTeam(teamId);
-  const { data, isLoading, error, refetch } = useTeamMatches({ teamId });
+  const { data, isLoading, error, refetch } = useTeamMatches({
+    teamId,
+    status: TEAM_MATCH_HISTORY_STATUS_FILTER,
+  });
 
   const matches = data?.items ?? [];
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      {/* Mobile header */}
+    <div className="animate-fade-in pt-[var(--safe-area-top)] @3xl:pt-0">
       <MobileGlassHeader className="gap-3">
         <button
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="glass-mobile-icon-button flex items-center justify-center min-h-[44px] min-w-11 rounded-xl"
+          className="glass-mobile-icon-button flex min-h-[44px] min-w-11 items-center justify-center rounded-xl"
         >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate flex-1">
+        <h1 className="flex-1 truncate text-lg font-semibold text-gray-900 dark:text-white">
           {team ? `${team.name} 경기` : '팀 경기'}
         </h1>
       </MobileGlassHeader>
 
-      <div className="hidden @3xl:block px-5 @3xl:px-0 pt-4 mb-4">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/teams" className="hover:text-gray-600">팀&middot;클럽</Link>
+      <div className="hidden @3xl:block px-5 pt-4 mb-4 @3xl:px-0">
+        <div className="mb-2 flex items-center gap-2 text-sm text-gray-500">
+          <Link href="/teams" className="hover:text-gray-600">팀·클럽</Link>
           <span>/</span>
           <Link href={`/teams/${teamId}`} className="hover:text-gray-600">{team?.name}</Link>
           <span>/</span>
@@ -55,11 +51,11 @@ export default function TeamMatchesPage() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">경기 기록</h2>
       </div>
 
-      <div className="px-5 @3xl:px-0 pb-8">
+      <div className="px-5 pb-8 @3xl:px-0">
         {isLoading ? (
-          <div className="space-y-3 mt-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 rounded-xl bg-gray-50 dark:bg-gray-800 animate-pulse" />
+          <div className="mt-3 space-y-3">
+            {[1, 2, 3].map((index) => (
+              <div key={index} className="h-24 animate-pulse rounded-xl bg-gray-50 dark:bg-gray-800" />
             ))}
           </div>
         ) : error ? (
@@ -72,23 +68,24 @@ export default function TeamMatchesPage() {
             action={{ label: '팀 매칭 찾기', href: '/team-matches' }}
           />
         ) : (
-          <div className="space-y-3 mt-3 stagger-children">
+          <div className="stagger-children mt-3 space-y-3">
             {matches.map((match: TeamMatch) => {
-              const st = statusLabel[match.status] ?? statusLabel.recruiting;
+              const statusMeta = getTeamMatchStatusMeta(match.status);
+
               return (
                 <Link key={match.id} href={`/team-matches/${match.id}`} className="block">
-                  <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors active:scale-[0.99]">
-                    <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="rounded-xl border border-gray-100 bg-white p-4 transition-colors hover:bg-gray-50 active:scale-[0.99] dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700">
+                    <div className="mb-2 flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[match.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300'}`}>
                           {sportLabel[match.sportType] || match.sportType}
                         </span>
-                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
-                          {st.text}
+                        <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusMeta.className}`}>
+                          {statusMeta.label}
                         </span>
                       </div>
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">{match.title}</h3>
+                    <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">{match.title}</h3>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                         <Calendar size={12} aria-hidden="true" />

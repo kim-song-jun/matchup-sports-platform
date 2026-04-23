@@ -14,6 +14,7 @@ import type {
   TeamMatchEvaluationInput,
   SubmitTeamMatchResultInput,
   TeamMatchCheckInInput,
+  UpdateTeamMatchInput,
 } from '@/types/api';
 import { extractData } from './shared';
 import { queryKeys } from './query-keys';
@@ -60,6 +61,20 @@ export function useCreateTeamMatch() {
       return extractData<TeamMatch>(res);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
+    },
+  });
+}
+
+export function useUpdateTeamMatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateTeamMatchInput }) => {
+      const res = await api.patch(`/team-matches/${id}`, data);
+      return extractData<TeamMatch>(res);
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
     },
   });

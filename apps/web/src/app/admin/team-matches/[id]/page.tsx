@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { useTeamMatch } from '@/hooks/use-api';
 import { sportLabel } from '@/lib/constants';
 import { formatAmount, formatDateDot } from '@/lib/utils';
+import { getTeamMatchStatusMeta } from '@/lib/team-match-operations';
 
 export default function AdminTeamMatchDetailPage() {
   const params = useParams();
@@ -38,6 +39,8 @@ export default function AdminTeamMatchDetailPage() {
     );
   }
 
+  const statusMeta = getTeamMatchStatusMeta(match.status);
+
   return (
     <div className="animate-fade-in">
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -55,8 +58,8 @@ export default function AdminTeamMatchDetailPage() {
                   <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-500">
                     {sportLabel[match.sportType] || match.sportType}
                   </span>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                    {match.status}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusMeta.className}`}>
+                    {statusMeta.label}
                   </span>
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{match.title}</h1>

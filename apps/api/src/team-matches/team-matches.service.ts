@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { NotificationType, Prisma } from '@prisma/client';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { NotificationType, Prisma, TeamMatchStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeamMembershipService } from '../teams/team-membership.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -11,6 +11,7 @@ import { CheckInTeamMatchDto } from './dto/check-in-team-match.dto';
 import { SubmitResultDto } from './dto/submit-result.dto';
 import { EvaluateTeamMatchDto } from './dto/evaluate-team-match.dto';
 import { TeamMatchQueryDto } from './dto/team-match-query.dto';
+import { UpdateTeamMatchDto } from './dto/update-team-match.dto';
 
 @Injectable()
 export class TeamMatchesService {
@@ -26,6 +27,7 @@ export class TeamMatchesService {
 
   async findAll(filter: TeamMatchQueryDto) {
     const limit = filter.limit ?? 20;
+    const statuses = this.parseStatusFilter(filter.status);
 
     // Build AND conditions separately so that city and teamId OR do not cross-contaminate.
     // Without AND wrapping, Prisma merges { hostTeam: { city } } and { OR: [...] } at the same
@@ -42,7 +44,7 @@ export class TeamMatchesService {
     }
 
     const where: Prisma.TeamMatchWhereInput = {
-      status: (filter.status || 'recruiting') as Prisma.EnumTeamMatchStatusFilter,
+      status: statuses.length === 1 ? statuses[0] : { in: statuses },
       ...(filter.sportType && { sportType: filter.sportType as Prisma.EnumSportTypeFilter }),
       ...(andConditions.length > 0 && { AND: andConditions }),
     };
@@ -122,17 +124,14 @@ export class TeamMatchesService {
   async create(userId: string, data: CreateTeamMatchDto) {
     const team = await this.prisma.sportTeam.findUnique({ where: { id: data.hostTeamId } });
     if (!team) throw new NotFoundException('팀을 찾을 수 없습니다');
+    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 팀 매칭을 생성할 수 없습니다');
 
     // Require manager+ to create a team match
-    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 팀 매칭을 생성할 수 없습니다');
     await this.teamMembershipService.assertRole(data.hostTeamId, userId, 'manager');
 
     const quarterCount = data.quarterCount ?? 4;
     const hasExternalReferee = Boolean(data.hasReferee);
-    const refereeSchedule: Record<string, string> = {};
-    for (let i = 1; i <= quarterCount; i++) {
-      refereeSchedule[`Q${i}`] = i % 2 === 1 ? 'home' : 'away';
-    }
+    const refereeSchedule = this.buildRefereeSchedule(quarterCount);
 
     return this.prisma.teamMatch.create({
       data: {
@@ -169,6 +168,90 @@ export class TeamMatchesService {
     });
   }
 
+  async update(matchId: string, userId: string, data: UpdateTeamMatchDto) {
+    const match = await this.prisma.teamMatch.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        hostTeamId: true,
+        status: true,
+        quarterCount: true,
+        hasReferee: true,
+      },
+    });
+    if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
+
+    await this.teamMembershipService.assertRole(match.hostTeamId, userId, 'manager');
+
+    const providedEntries = Object.entries(data).filter(([, value]) => value !== undefined);
+    if (providedEntries.length === 0) {
+      throw new BadRequestException('수정할 내용이 없습니다');
+    }
+
+    const isCancelRequest = providedEntries.length === 1 && data.status === 'cancelled';
+    if (isCancelRequest) {
+      if (!['recruiting', 'scheduled'].includes(match.status)) {
+        throw new ConflictException('현재 상태에서는 모집글을 취소할 수 없습니다');
+      }
+
+      return this.prisma.teamMatch.update({
+        where: { id: matchId },
+        data: { status: 'cancelled' },
+      });
+    }
+
+    if (data.status) {
+      throw new BadRequestException('지원하지 않는 상태 변경입니다');
+    }
+
+    if (match.status !== 'recruiting') {
+      throw new ConflictException('모집 중인 경기만 수정할 수 있습니다');
+    }
+
+    const quarterCount = data.quarterCount ?? match.quarterCount;
+    const hasReferee = data.hasReferee ?? match.hasReferee;
+    const updateData: Prisma.TeamMatchUpdateInput = {
+      ...(data.sportType !== undefined && { sportType: data.sportType }),
+      ...(data.title !== undefined && { title: data.title }),
+      ...(data.description !== undefined && { description: data.description }),
+      ...(data.matchDate !== undefined && { matchDate: new Date(data.matchDate) }),
+      ...(data.startTime !== undefined && { startTime: data.startTime }),
+      ...(data.endTime !== undefined && { endTime: data.endTime }),
+      ...(data.totalMinutes !== undefined && { totalMinutes: data.totalMinutes }),
+      ...(data.quarterCount !== undefined && { quarterCount: data.quarterCount }),
+      ...(data.venueName !== undefined && { venueName: data.venueName }),
+      ...(data.venueAddress !== undefined && { venueAddress: data.venueAddress }),
+      ...(data.venueInfo !== undefined && { venueInfo: (data.venueInfo as never) ?? Prisma.JsonNull }),
+      ...(data.totalFee !== undefined && { totalFee: data.totalFee }),
+      ...(data.opponentFee !== undefined && { opponentFee: data.opponentFee }),
+      ...(data.paymentDeadline !== undefined && { paymentDeadline: data.paymentDeadline }),
+      ...(data.cancellationPolicy !== undefined && { cancellationPolicy: data.cancellationPolicy }),
+      ...(data.requiredLevel !== undefined && { requiredLevel: data.requiredLevel }),
+      ...(data.hasProPlayers !== undefined && { hasProPlayers: data.hasProPlayers }),
+      ...(data.allowMercenary !== undefined && { allowMercenary: data.allowMercenary }),
+      ...(data.matchStyle !== undefined && { matchStyle: data.matchStyle }),
+      ...(data.hasReferee !== undefined && { hasReferee: data.hasReferee }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+      ...(data.skillGrade !== undefined && { skillGrade: data.skillGrade }),
+      ...(data.gameFormat !== undefined && { gameFormat: data.gameFormat }),
+      ...(data.matchType !== undefined && { matchType: data.matchType }),
+      ...(data.proPlayerCount !== undefined && { proPlayerCount: data.proPlayerCount }),
+      ...(data.uniformColor !== undefined && { uniformColor: data.uniformColor }),
+      ...(data.isFreeInvitation !== undefined && { isFreeInvitation: data.isFreeInvitation }),
+    };
+
+    if (hasReferee) {
+      updateData.refereeSchedule = Prisma.JsonNull;
+    } else if (data.quarterCount !== undefined || data.hasReferee !== undefined) {
+      updateData.refereeSchedule = this.buildRefereeSchedule(quarterCount) as never;
+    }
+
+    return this.prisma.teamMatch.update({
+      where: { id: matchId },
+      data: updateData,
+    });
+  }
+
   async apply(matchId: string, userId: string, data: ApplyTeamMatchDto) {
     const match = await this.prisma.teamMatch.findUnique({
       where: { id: matchId },
@@ -182,23 +265,31 @@ export class TeamMatchesService {
 
     const team = await this.prisma.sportTeam.findUnique({ where: { id: applicantTeamId } });
     if (!team) throw new NotFoundException('팀을 찾을 수 없습니다');
-
     if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 팀 매칭에 신청할 수 없습니다');
+
     // Require manager+ to apply on behalf of a team
     await this.teamMembershipService.assertRole(applicantTeamId, userId, 'manager');
 
-    const application = await this.prisma.teamMatchApplication.create({
-      data: {
-        teamMatchId: matchId,
-        applicantTeamId,
-        confirmedInfo: data.confirmedInfo ?? false,
-        confirmedLevel: data.confirmedLevel ?? false,
-        proPlayerCheck: data.proPlayerCheck,
-        mercenaryCheck: data.mercenaryCheck,
-        message: data.message,
-        participationType: 'team',
-      },
-    });
+    let application;
+    try {
+      application = await this.prisma.teamMatchApplication.create({
+        data: {
+          teamMatchId: matchId,
+          applicantTeamId,
+          confirmedInfo: data.confirmedInfo ?? false,
+          confirmedLevel: data.confirmedLevel ?? false,
+          proPlayerCheck: data.proPlayerCheck,
+          mercenaryCheck: data.mercenaryCheck,
+          message: data.message,
+          participationType: 'team',
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('이미 신청한 팀입니다');
+      }
+      throw error;
+    }
 
     // Fire-and-forget: notify host team's owner+managers
     void this.fanOutTeamMatchNotification(match.hostTeamId, {
@@ -352,8 +443,8 @@ export class TeamMatchesService {
     if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
 
     const team = await this.prisma.sportTeam.findUnique({ where: { id: data.teamId }, select: { id: true, deletedAt: true } });
-    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 도착 인증을 진행할 수 없습니다');
     if (!team) throw new NotFoundException('팀을 찾을 수 없습니다');
+    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 도착 인증을 진행할 수 없습니다');
     const guestTeamId = this.resolveGuestTeamId(match);
     if (!guestTeamId) throw new BadRequestException('상대 팀이 확정된 경기만 도착 인증할 수 있습니다');
 
@@ -656,6 +747,28 @@ export class TeamMatchesService {
     return match.guestTeamId
       ?? match.applications?.find((application) => application.status === 'approved')?.applicantTeamId
       ?? null;
+  }
+
+  private parseStatusFilter(status?: string): TeamMatchStatus[] {
+    if (!status) return ['recruiting'];
+
+    const statuses = status
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value): value is TeamMatchStatus => Object.values(TeamMatchStatus).includes(value as TeamMatchStatus));
+
+    if (statuses.length === 0) return ['recruiting'];
+
+    return statuses;
+  }
+
+  private buildRefereeSchedule(quarterCount: number): Record<string, string> {
+    const refereeSchedule: Record<string, string> = {};
+    for (let i = 1; i <= quarterCount; i += 1) {
+      refereeSchedule[`Q${i}`] = i % 2 === 1 ? 'home' : 'away';
+    }
+
+    return refereeSchedule;
   }
 
   /**

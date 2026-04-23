@@ -18,6 +18,7 @@ import { CheckInTeamMatchDto } from './dto/check-in-team-match.dto';
 import { SubmitResultDto } from './dto/submit-result.dto';
 import { EvaluateTeamMatchDto } from './dto/evaluate-team-match.dto';
 import { TeamMatchQueryDto } from './dto/team-match-query.dto';
+import { UpdateTeamMatchDto } from './dto/update-team-match.dto';
 
 @ApiTags('팀 매칭')
 @Controller('team-matches')
@@ -59,6 +60,17 @@ export class TeamMatchesController {
   @ApiForbiddenResponse({ description: '팀 매니저+ 권한 필요' })
   async create(@CurrentUser('id') userId: string, @Body() body: CreateTeamMatchDto) {
     return this.service.create(userId, body);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '경기 모집글 수정 또는 취소' })
+  @ApiOkResponse({ description: '경기 모집글 수정/취소 성공' })
+  @ApiUnauthorizedResponse({ description: 'JWT required' })
+  @ApiForbiddenResponse({ description: '호스트 팀 manager+ 권한 필요' })
+  async update(@Param('id') id: string, @CurrentUser('id') userId: string, @Body() body: UpdateTeamMatchDto) {
+    return this.service.update(id, userId, body);
   }
 
   // ── 신청/승인/거절 ──

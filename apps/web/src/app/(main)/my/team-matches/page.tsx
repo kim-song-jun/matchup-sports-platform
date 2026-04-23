@@ -13,12 +13,7 @@ import { useTeamMatches, useMyTeams, useMyTeamMatchApplications, queryKeys } fro
 import { useQueryClient } from '@tanstack/react-query';
 import { sportLabel, sportCardAccent } from '@/lib/constants';
 import { formatDateDot } from '@/lib/utils';
-
-const statusLabel: Record<string, { text: string; style: string }> = {
-  recruiting: { text: '모집중', style: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
-  matched: { text: '매칭완료', style: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
-  cancelled: { text: '취소됨', style: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
-};
+import { getTeamMatchStatusMeta, TEAM_MATCH_HISTORY_STATUS_FILTER } from '@/lib/team-match-operations';
 
 const appStatusConfig: Record<string, { label: string; style: string }> = {
   pending: { label: '대기중', style: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
@@ -42,32 +37,34 @@ export default function MyTeamMatchesPage() {
 
   const { data: myTeams = [] } = useMyTeams();
   const myManagedTeamIds = new Set(
-    myTeams.filter(t => t.role === 'owner' || t.role === 'manager').map(t => t.id)
+    myTeams.filter((team) => team.role === 'owner' || team.role === 'manager').map((team) => team.id),
   );
 
-  const { data: apiData, isLoading: postsLoading } = useTeamMatches();
+  const { data: apiData, isLoading: postsLoading } = useTeamMatches({ status: TEAM_MATCH_HISTORY_STATUS_FILTER });
   const { data: myApplications = [], isLoading: appsLoading } = useMyTeamMatchApplications();
 
-  const posts = (apiData?.items ?? []).filter((tm) => myManagedTeamIds.has(tm.hostTeamId)).map((tm) => ({
-    id: tm.id,
-    title: tm.title,
-    sportType: tm.sportType,
-    matchDate: tm.matchDate,
-    startTime: tm.startTime,
-    endTime: tm.endTime,
-    venue: tm.venueName || '',
-    teamName: tm.hostTeam?.name || '',
-    status: tm.status,
-    applicants: tm.applicationCount ?? 0,
-  }));
+  const posts = (apiData?.items ?? [])
+    .filter((teamMatch) => myManagedTeamIds.has(teamMatch.hostTeamId))
+    .map((teamMatch) => ({
+      id: teamMatch.id,
+      title: teamMatch.title,
+      sportType: teamMatch.sportType,
+      matchDate: teamMatch.matchDate,
+      startTime: teamMatch.startTime,
+      endTime: teamMatch.endTime,
+      venue: teamMatch.venueName || '',
+      teamName: teamMatch.hostTeam?.name || '',
+      status: teamMatch.status,
+      applicants: teamMatch.applicationCount ?? 0,
+    }));
 
   const handleDelete = async (id: string) => {
     try {
       await api.patch(`/team-matches/${id}`, { status: 'cancelled' });
       queryClient.invalidateQueries({ queryKey: queryKeys.teamMatches.all });
-      toast('success', '모집글이 취소되었어요');
+      toast('success', '모집글을 취소했어요');
     } catch {
-      toast('error', '취소하지 못했어요. 다시 시도해주세요');
+      toast('error', '취소하지 못했어요. 다시 시도해 주세요');
     }
     setDeleteTarget(null);
   };
@@ -78,22 +75,27 @@ export default function MyTeamMatchesPage() {
   ];
 
   return (
-    <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
-      <header className="@3xl:hidden flex items-center gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-800">
-        <button aria-label="뒤로 가기" onClick={() => router.back()} className="rounded-xl p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-[0.98] transition-[colors,transform] min-w-11 min-h-[44px] flex items-center justify-center">
+    <div className="animate-fade-in pt-[var(--safe-area-top)] @3xl:pt-0">
+      <header className="@3xl:hidden flex items-center gap-3 border-b border-gray-50 px-5 py-3 dark:border-gray-800">
+        <button
+          aria-label="뒤로 가기"
+          onClick={() => router.back()}
+          className="-ml-2 flex min-h-[44px] min-w-11 items-center justify-center rounded-xl p-2 transition-[colors,transform] hover:bg-gray-100 active:scale-[0.98] dark:hover:bg-gray-700"
+        >
           <ArrowLeft size={20} className="text-gray-700 dark:text-gray-200" />
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h1>
       </header>
-      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 @3xl:px-0 pt-4">
+
+      <div className="hidden @3xl:flex @3xl:items-center @3xl:justify-between mb-6 px-5 pt-4 @3xl:px-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">내 팀 매칭</h2>
-          <p className="text-base text-gray-500 dark:text-gray-400 mt-1">팀 매칭 모집 및 신청 현황을 관리하세요</p>
+          <p className="mt-1 text-base text-gray-500 dark:text-gray-400">팀 매칭 모집과 신청 현황을 관리해요</p>
         </div>
         {activeTab === 'hosted' && (
           <Link
             href="/team-matches/new"
-            className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-base font-bold text-white hover:bg-blue-600 active:scale-[0.98] transition-[colors,transform]"
+            className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-base font-bold text-white transition-[colors,transform] hover:bg-blue-600 active:scale-[0.98]"
           >
             <Plus size={16} />
             모집글 작성
@@ -101,19 +103,18 @@ export default function MyTeamMatchesPage() {
         )}
       </div>
 
-      {/* Tab navigation */}
-      <div className="px-5 @3xl:px-0 pt-3 pb-1">
-        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1" role="tablist">
+      <div className="px-5 pb-1 pt-3 @3xl:px-0">
+        <div className="flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-700" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               role="tab"
               aria-selected={activeTab === tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 rounded-lg py-2.5 text-base font-semibold transition-colors min-h-[44px] ${
+              className={`min-h-[44px] flex-1 rounded-lg py-2.5 text-base font-semibold transition-colors ${
                 activeTab === tab.key
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                  : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
               }`}
             >
               {tab.label}
@@ -122,76 +123,83 @@ export default function MyTeamMatchesPage() {
         </div>
       </div>
 
-      {/* Tab: 내가 만든 매치 */}
       {activeTab === 'hosted' && (
-        <>
-          <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
-            {postsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-40 animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
-                ))}
-              </div>
-            ) : posts.length === 0 ? (
-              <EmptyState
-                icon={Swords}
-                title="팀 매칭 모집글이 없어요"
-                description="새로운 모집글을 작성해보세요"
-                action={{ label: '모집글 작성', href: '/team-matches/new' }}
-              />
-            ) : posts.map((post) => {
-              const st = statusLabel[post.status] || statusLabel.recruiting;
+        <div className="mt-3 space-y-3 px-5 pb-8 @3xl:px-0">
+          {postsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((index) => (
+                <div key={index} className="h-40 animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
+              ))}
+            </div>
+          ) : posts.length === 0 ? (
+            <EmptyState
+              icon={Swords}
+              title="팀 매칭 모집글이 없어요"
+              description="새로운 모집글을 작성해 보세요"
+              action={{ label: '모집글 작성', href: '/team-matches/new' }}
+            />
+          ) : (
+            posts.map((post) => {
+              const statusMeta = getTeamMatchStatusMeta(post.status);
+
               return (
-                <div key={post.id} className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                <div key={post.id} className="rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${sportCardAccent[post.sportType]?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-700'}`}>
                       {sportLabel[post.sportType]}
                     </span>
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.style}`}>
-                      {st.text}
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusMeta.className}`}>
+                      {statusMeta.label}
                     </span>
-                    <span className="text-xs text-gray-500 ml-auto">{post.teamName}</span>
+                    <span className="ml-auto text-xs text-gray-500">{post.teamName}</span>
                   </div>
 
                   <Link href={`/team-matches/${post.id}`}>
-                    <h3 className="text-md font-semibold text-gray-900 dark:text-white hover:text-blue-500 transition-colors truncate">{post.title}</h3>
+                    <h3 className="truncate text-md font-semibold text-gray-900 transition-colors hover:text-blue-500 dark:text-white">
+                      {post.title}
+                    </h3>
                   </Link>
 
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Calendar size={12} aria-hidden="true" /><span>{formatDateDot(post.matchDate)}</span>
+                      <Calendar size={12} aria-hidden="true" />
+                      <span>{formatDateDot(post.matchDate)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <Clock size={12} aria-hidden="true" /><span>{post.startTime} ~ {post.endTime}</span>
+                      <Clock size={12} aria-hidden="true" />
+                      <span>{post.startTime} ~ {post.endTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                      <MapPin size={12} aria-hidden="true" /><span>{post.venue}</span>
+                      <MapPin size={12} aria-hidden="true" />
+                      <span>{post.venue}</span>
                     </div>
                   </div>
 
-                  {post.status !== 'cancelled' && (
+                  {['recruiting', 'scheduled'].includes(post.status) && (
                     <div className="mt-3 flex gap-2">
                       <Link
                         href={`/team-matches/${post.id}`}
-                        aria-label={`${post.title || ''} 신청현황 보기`}
-                        className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                        aria-label={`${post.title} 신청현황 보기`}
+                        className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
                       >
                         <Eye size={14} aria-hidden="true" />
                         신청현황
-                        <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">{post.applicants}</span>
+                        <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+                          {post.applicants}
+                        </span>
                       </Link>
                       <Link
                         href={`/team-matches/${post.id}/edit`}
-                        aria-label={`${post.title || ''} 수정`}
-                        className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 dark:bg-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                        aria-label={`${post.title} 수정`}
+                        className="flex items-center justify-center gap-1.5 rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                       >
                         <Pencil size={14} aria-hidden="true" />
                         수정
                       </Link>
                       <button
                         onClick={() => setDeleteTarget(post.id)}
-                        aria-label={`${post.title || ''} 취소`}
-                        className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 dark:bg-red-900/30 px-4 py-2.5 text-sm font-semibold text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                        aria-label={`${post.title} 취소`}
+                        className="flex items-center justify-center gap-1.5 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-500 transition-colors hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
                       >
                         <Trash2 size={14} aria-hidden="true" />
                         취소
@@ -200,60 +208,64 @@ export default function MyTeamMatchesPage() {
                   )}
                 </div>
               );
-            })}
-          </div>
-        </>
+            })
+          )}
+        </div>
       )}
 
-      {/* Tab: 내가 신청한 매치 */}
       {activeTab === 'applied' && (
-        <div className="px-5 @3xl:px-0 space-y-3 pb-8 mt-3">
+        <div className="mt-3 space-y-3 px-5 pb-8 @3xl:px-0">
           {appsLoading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
+              {[1, 2, 3].map((index) => (
+                <div key={index} className="h-32 animate-pulse rounded-2xl bg-gray-50 dark:bg-gray-700" />
               ))}
             </div>
           ) : myApplications.length === 0 ? (
             <EmptyState
               icon={Swords}
-              title="신청한 팀 매치가 없어요"
-              description="팀 매치 목록에서 마음에 드는 상대팀을 찾아보세요"
+              title="신청한 팀 매칭이 없어요"
+              description="팀 매칭 목록에서 마음에 드는 상대를 찾아보세요"
               action={{ label: '팀 매칭 찾기', href: '/team-matches' }}
             />
           ) : (
-            myApplications.map((app) => {
-              const statusConf = appStatusConfig[app.status] ?? appStatusConfig.pending;
-              const tm = app.teamMatch;
+            myApplications.map((application) => {
+              const applicationStatus = appStatusConfig[application.status] ?? appStatusConfig.pending;
+              const teamMatchStatus = getTeamMatchStatusMeta(application.teamMatch.status);
+              const teamMatch = application.teamMatch;
+
               return (
-                <Link key={app.id} href={`/team-matches/${tm.id}`} className="block">
-                  <div className="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 hover:border-gray-200 dark:hover:border-gray-600 transition-colors active:scale-[0.995]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${statusConf.style}`}>
-                        {statusConf.label}
+                <Link key={application.id} href={`/team-matches/${teamMatch.id}`} className="block">
+                  <div className="rounded-2xl border border-gray-100 bg-white p-4 transition-colors hover:border-gray-200 active:scale-[0.995] dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${applicationStatus.style}`}>
+                        {applicationStatus.label}
                       </span>
-                      {tm.hostTeam && (
-                        <span className="text-xs text-gray-500 ml-auto flex items-center gap-1">
+                      <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${teamMatchStatus.className}`}>
+                        {teamMatchStatus.label}
+                      </span>
+                      {teamMatch.hostTeam && (
+                        <span className="ml-auto flex items-center gap-1 text-xs text-gray-500">
                           <Users size={11} aria-hidden="true" />
-                          {tm.hostTeam.name}
+                          {teamMatch.hostTeam.name}
                         </span>
                       )}
                     </div>
 
-                    <h3 className="text-md font-semibold text-gray-900 dark:text-white truncate">{tm.title}</h3>
+                    <h3 className="truncate text-md font-semibold text-gray-900 dark:text-white">{teamMatch.title}</h3>
 
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-1.5 text-sm text-gray-500">
                         <Calendar size={12} aria-hidden="true" />
-                        <span>{formatDateDot(tm.matchDate)}</span>
+                        <span>{formatDateDot(teamMatch.matchDate)}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm text-gray-500">
                         <Clock size={12} aria-hidden="true" />
-                        <span>{tm.startTime} ~ {tm.endTime}</span>
+                        <span>{teamMatch.startTime} ~ {teamMatch.endTime}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-sm text-gray-500">
                         <MapPin size={12} aria-hidden="true" />
-                        <span>{tm.venueName}</span>
+                        <span>{teamMatch.venueName}</span>
                       </div>
                     </div>
                   </div>
@@ -264,33 +276,34 @@ export default function MyTeamMatchesPage() {
         </div>
       )}
 
-      {/* Mobile FAB (hosted tab only) */}
       {activeTab === 'hosted' && (
         <Link
           href="/team-matches/new"
           aria-label="모집글 작성"
-          className="@3xl:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 active:scale-95 transition-colors"
+          className="@3xl:hidden fixed bottom-[calc(var(--safe-area-bottom)+80px)] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white transition-colors hover:bg-blue-600 active:scale-95"
         >
           <Plus size={24} />
         </Link>
       )}
 
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="모집글 취소">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 mx-auto mb-4">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/30">
           <AlertTriangle size={24} className="text-red-500 dark:text-red-400" aria-hidden="true" />
         </div>
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">모집글을 취소하시겠어요?</h3>
-        <p className="text-base text-gray-500 dark:text-gray-400 text-center mt-2">취소하면 신청한 팀들에게 알림이 발송돼요.</p>
+        <h3 className="text-center text-lg font-bold text-gray-900 dark:text-white">모집글을 취소하시겠어요?</h3>
+        <p className="mt-2 text-center text-base text-gray-500 dark:text-gray-400">
+          취소하면 더 이상 상대 팀을 받을 수 없어요.
+        </p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={() => setDeleteTarget(null)}
-            className="flex-1 min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-700 py-3 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="min-h-[44px] flex-1 rounded-xl bg-gray-100 py-3 text-base font-semibold text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           >
             돌아가기
           </button>
           <button
             onClick={() => deleteTarget && handleDelete(deleteTarget)}
-            className="flex-1 min-h-[44px] rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 transition-colors"
+            className="min-h-[44px] flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white transition-colors hover:bg-red-600"
           >
             취소하기
           </button>

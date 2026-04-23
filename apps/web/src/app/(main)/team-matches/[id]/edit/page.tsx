@@ -186,6 +186,8 @@ export default function EditTeamMatchPage() {
   }
 
   const inputClass = 'w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 px-4 py-3.5 text-base text-gray-900 dark:text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 focus:bg-white dark:focus:bg-gray-800 transition-colors';
+  const canEdit = match.status === 'recruiting';
+  const canCancel = ['recruiting', 'scheduled'].includes(match.status);
 
   return (
     <div className="pt-[var(--safe-area-top)] @3xl:pt-0 animate-fade-in">
@@ -520,10 +522,19 @@ export default function EditTeamMatchPage() {
           />
         </section>
 
+        {(!canEdit || !canCancel) && (
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+            {canEdit
+              ? '이 모집글은 현재 상태에서 취소만 가능해요.'
+              : '모집 중인 경기만 수정할 수 있고, 취소는 경기예정 상태까지만 가능해요.'}
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex gap-3 mb-8">
           <button
             onClick={() => setShowCancelModal(true)}
+            disabled={!canCancel}
             className="flex items-center justify-center gap-2 rounded-xl border border-red-200 px-5 py-3.5 text-base font-semibold text-red-500 hover:bg-red-50 transition-colors"
           >
             <XCircle size={16} />
@@ -531,7 +542,7 @@ export default function EditTeamMatchPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !canEdit}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
           >
             <Save size={16} />
@@ -558,7 +569,7 @@ export default function EditTeamMatchPage() {
               </button>
               <button
                 onClick={handleCancel}
-                disabled={isCancelling}
+                disabled={isCancelling || !canCancel}
                 className="flex-1 rounded-xl bg-red-500 py-3 text-base font-semibold text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 {isCancelling ? '취소 중...' : '취소하기'}

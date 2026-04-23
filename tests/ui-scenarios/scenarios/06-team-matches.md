@@ -1006,3 +1006,4 @@
 | V3 | "경기 평가하기" blue-500 min-h-[48px] (참여자만) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | V4 | "매치 상세로 돌아가기" green border 스타일 | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | V5 | 다크모드 녹색 변형 (dark:bg-green-950/20) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+> 2026-04-23 note: user-facing status vocabulary is `recruiting`, `scheduled`, `checking_in`, `in_progress`, `completed`, `cancelled`. Legacy `matched` badge checks are stale and should be replaced during the next scenario refresh.

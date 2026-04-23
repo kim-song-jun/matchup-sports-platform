@@ -10,6 +10,7 @@ import {
   getTeamMatchStatusMeta,
   isArrivalOpen,
   isScoreEditable,
+  TEAM_MATCH_HISTORY_STATUS_FILTER,
 } from '../team-match-operations';
 
 function createTeam(id: string, name: string): SportTeam {
@@ -35,7 +36,7 @@ function createMatch(): TeamMatch {
     id: 'tm-1',
     hostTeamId: hostTeam.id,
     sportType: 'futsal',
-    title: '주말 팀 매치',
+    title: '주말 팀 매칭',
     matchDate: '2026-04-11',
     startTime: '18:00',
     endTime: '20:00',
@@ -81,6 +82,7 @@ describe('team-match-operations helpers', () => {
         id: 'team-host',
         name: '호스트',
         sportType: 'futsal',
+        sportTypes: ['futsal'],
         description: null,
         city: '서울',
         district: null,
@@ -93,6 +95,7 @@ describe('team-match-operations helpers', () => {
         id: 'team-other',
         name: '기타',
         sportType: 'futsal',
+        sportTypes: ['futsal'],
         description: null,
         city: '서울',
         district: null,
@@ -128,5 +131,11 @@ describe('team-match-operations helpers', () => {
     expect(getOutcome(6, 3)).toEqual({ home: 'win', away: 'lose' });
     expect(getOutcome(1, 4)).toEqual({ home: 'lose', away: 'win' });
     expect(getOutcome(2, 2)).toEqual({ home: 'draw', away: 'draw' });
+  });
+
+  it('exposes the canonical history status filter for management pages', () => {
+    expect(TEAM_MATCH_HISTORY_STATUS_FILTER).toBe(
+      'recruiting,scheduled,checking_in,in_progress,completed,cancelled,late,no_show,disputed',
+    );
   });
 });

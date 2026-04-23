@@ -16,14 +16,28 @@ export interface TeamMatchParticipant {
   team: SportTeam;
 }
 
+export const TEAM_MATCH_HISTORY_STATUS_FILTER = [
+  'recruiting',
+  'scheduled',
+  'checking_in',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'late',
+  'no_show',
+  'disputed',
+].join(',');
+
 const TEAM_MATCH_STATUS_META: Record<string, { label: string; className: string }> = {
-  recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-  matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
+  recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
   scheduled: { label: '경기예정', className: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300' },
   checking_in: { label: '도착확인중', className: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300' },
-  in_progress: { label: '경기중', className: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
-  completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-  cancelled: { label: '취소됨', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
+  in_progress: { label: '경기중', className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  completed: { label: '경기종료', className: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200' },
+  cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
+  late: { label: '지각', className: 'bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300' },
+  no_show: { label: '노쇼', className: 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300' },
+  disputed: { label: '분쟁중', className: 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300' },
 };
 
 export function getTeamMatchStatusMeta(status: string): { label: string; className: string } {

@@ -88,3 +88,4 @@
 - 2026-04-07: `/teams/new`, `/my/teams`, `/team-matches`, `/team-matches/new` step 0 Desktop Chrome 스모크는 통과했다. 실제 신청/승인/거절/알림/경기 후 평가 흐름은 다음 자동화 묶음으로 남아 있다.
 - 2026-04-07: `e2e/tests/team-owner-flow.spec.ts` Desktop Chrome smoke는 통과했다. 현재 자동화 범위는 팀 생성/my teams/team-matches step-0 진입까지이며, 신청/승인/알림/평가 시나리오는 후속 범위다.
 - 2026-04-11: `TM-004` 운영 화면 계약은 실제 `team-match` detail 기반으로 정렬되었고, arrival 재제출도 backend에서 차단되도록 닫았다. 전용 Playwright spec(`e2e/tests/team-match-operations.spec.ts`)은 `/team-matches` warmup으로 조정했고, live API `health`/`dev-login`도 다시 통과했다. 다만 현재 host Next dev runtime에서 `/team-matches` 계열이 간헐적으로 `ERR_CONNECTION_RESET` 또는 generic `Internal Server Error`를 반환해 browser green은 아직 별도 런타임 정리 후 다시 확인해야 한다.
+- 2026-04-23: team-match 관리 follow-up으로 `PATCH /team-matches/:id` 수정/취소와 history 조회 status list 계약을 추가했다. `/my/team-matches`, `/teams/:id/matches`는 기본 `recruiting`만 보지 않고 history status를 명시적으로 조회해야 한다.

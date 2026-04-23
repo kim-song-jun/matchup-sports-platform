@@ -1,68 +1,101 @@
-# Domain Contract — Team Matches
+# Domain Contract - Team Matches
 
 ## Endpoint Matrix
 
-| Method | Path | Auth | 설명 |
+| Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/team-matches` | No | 모집글 목록 |
-| GET | `/team-matches/me/applications` | Yes | 내가 속한 팀의 신청 내역 |
+| GET | `/team-matches/me/applications` | Yes | 내가 신청한 팀매칭 목록 |
 | GET | `/team-matches/:id` | No | 모집글 상세 |
 | POST | `/team-matches` | Yes | 모집글 생성 |
-| GET | `/team-matches/:id/applications` | Yes | 신청 목록(호스트팀 manager+) |
-| POST | `/team-matches/:id/apply` | Yes | 신청 |
+| PATCH | `/team-matches/:id` | Yes | 모집글 수정 또는 취소 |
+| GET | `/team-matches/:id/applications` | Yes | 신청 목록 조회 (호스트 team manager+) |
+| POST | `/team-matches/:id/apply` | Yes | 다른 팀이 모집글에 신청 |
 | PATCH | `/team-matches/:id/applications/:appId/approve` | Yes | 신청 승인 |
 | PATCH | `/team-matches/:id/applications/:appId/reject` | Yes | 신청 거절 |
 | POST | `/team-matches/:id/check-in` | Yes | 도착 인증 |
-| POST | `/team-matches/:id/result` | Yes | 결과 제출 |
-| POST | `/team-matches/:id/evaluate` | Yes | 평가 제출 |
-| GET | `/team-matches/:id/referee-schedule` | No | 심판 배정 조회 |
+| POST | `/team-matches/:id/result` | Yes | 결과 입력 |
+| POST | `/team-matches/:id/evaluate` | Yes | 상대 팀 평가 |
+| GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
 
-## GET /team-matches (TeamMatchQueryDto)
+## GET /team-matches
 
 Query:
 
-| 필드 | 타입 | 필수 | 비고 |
+| Field | Type | Required | Notes |
 |---|---|---|---|
-| `sportType` | enum | No | |
-| `city` | string | No | hostTeam.city 필터 |
-| `status` | string | No | 기본값 recruiting |
-| `teamId` | uuid | No | host 또는 applicant 매치 |
-| `cursor` | string | No | |
-| `limit` | int(1~100) | No | 기본 20 |
+| `sportType` | enum | No | 종목 필터 |
+| `city` | string | No | `hostTeam.city` 기준 |
+| `status` | string | No | 단일 status 또는 comma-separated status list |
+| `teamId` | uuid | No | host 또는 applicant team 기준 |
+| `cursor` | string | No | cursor pagination |
+| `limit` | int(1~100) | No | default 20 |
 
-핵심 구현 포인트:
+Rules:
 
-- `city`와 `teamId` 조건은 `AND`로 묶여 OR 오염 방지 처리됨
+- `status`를 생략하면 기본값은 `recruiting`
+- `status=scheduled,completed,cancelled`처럼 다중 조회 가능
+- `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
 
-## POST /team-matches (CreateTeamMatchDto)
+## POST /team-matches
 
-필수:
+Body: `CreateTeamMatchDto`
 
-| 필드 | 타입 |
-|---|---|
-| `hostTeamId` | uuid |
-| `sportType` | enum |
-| `title` | string |
-| `matchDate` | `YYYY-MM-DD` |
-| `startTime`, `endTime` | `HH:mm` |
-| `venueName`, `venueAddress` | string |
+Required:
 
-주요 optional:
+- `hostTeamId`
+- `sportType`
+- `title`
+- `matchDate`
+- `startTime`
+- `endTime`
+- `venueName`
+- `venueAddress`
 
-- `totalMinutes`, `quarterCount`, `totalFee`, `opponentFee`
-- `requiredLevel`, `hasProPlayers`, `allowMercenary`, `hasReferee`, `notes`
-- `skillGrade`, `gameFormat`, `matchType`, `proPlayerCount`, `uniformColor`, `isFreeInvitation`
-- `venueInfo` (object)
+Rules:
 
-권한:
+- `hostTeamId`에 대해 요청자는 `manager+`여야 한다
+- 심판이 없는 경우 `quarterCount` 기준 기본 referee schedule을 생성한다
 
-- `hostTeamId` 팀의 `manager+` 멤버만 생성 가능
+## PATCH /team-matches/:id
+
+Body: `UpdateTeamMatchDto`
+
+Supported behaviors:
+
+### 1. 모집글 수정
+
+- 모집글 성격의 필드만 부분 수정 가능
+- 요청자는 host team `manager+`
+- match status가 `recruiting`일 때만 수정 가능
+
+대표 수정 필드:
+
+- `title`, `description`
+- `matchDate`, `startTime`, `endTime`, `quarterCount`
+- `venueName`, `venueAddress`, `venueInfo`
+- `totalFee`, `opponentFee`
+- `requiredLevel`, `matchStyle`, `allowMercenary`, `hasReferee`
+- `skillGrade`, `gameFormat`, `matchType`, `proPlayerCount`, `uniformColor`, `notes`
+
+### 2. 모집글 취소
+
+- body는 `{ "status": "cancelled" }`
+- 요청자는 host team `manager+`
+- `recruiting`, `scheduled` 상태에서만 취소 가능
+- `checking_in`, `in_progress`, `completed` 이후는 취소 불가
+
+Errors:
+
+- `403`: host team 권한 없음
+- `404`: team-match 없음
+- `409`: 현재 상태에서는 수정/취소 불가
 
 ## POST /team-matches/:id/apply
 
-- Body (`ApplyTeamMatchDto`)
+Body: `ApplyTeamMatchDto`
 
-| 필드 | 타입 | 필수 |
+| Field | Type | Required |
 |---|---|---|
 | `applicantTeamId` | uuid | Yes |
 | `message` | string | No |
@@ -71,114 +104,95 @@ Query:
 | `proPlayerCheck` | boolean | No |
 | `mercenaryCheck` | boolean | No |
 
-조건:
+Rules:
 
-- match status가 `recruiting` 이어야 함
-- applicantTeam의 `manager+` 권한 필요
+- match status가 `recruiting`이어야 한다
+- applicant team에 대해 요청자는 `manager+`
 
-CAUTION:
+Errors:
 
-- 현재 service는 중복 신청 unique 처리(명시적 에러 변환)가 없다. DB unique 제약에 따라 실패 형태가 달라질 수 있다.
+- `409`: 같은 팀이 같은 모집글에 중복 신청
 
-## 승인/거절
+## Approve / Reject
 
 ### PATCH /team-matches/:id/applications/:appId/approve
 
-- hostTeam의 `manager+`만 가능
-- match status가 `recruiting`이어야 함
-- 승인 시:
-  - 해당 신청 `approved`
-  - match status `scheduled`
-  - `guestTeamId` 설정
+- host team `manager+`만 가능
+- match status가 `recruiting`이어야 한다
+- 승인 시
+  - 해당 신청은 `approved`
+  - match status는 `scheduled`
+  - `guestTeamId` 확정
   - 나머지 pending 신청은 자동 `rejected`
+  - team-match chat room 생성
 
 ### PATCH /team-matches/:id/applications/:appId/reject
 
-- hostTeam의 `manager+`만 가능
+- host team `manager+`만 가능
 - 해당 신청만 `rejected`
 
 ## POST /team-matches/:id/check-in
 
-- Body
+Body:
 
-| 필드 | 타입 | 필수 |
+| Field | Type | Required |
 |---|---|---|
 | `teamId` | uuid | Yes |
-| `lat`, `lng` | number | No |
+| `lat` | number | No |
+| `lng` | number | No |
 | `photoUrl` | string | No |
 
-조건:
+Rules:
 
-- status가 `scheduled`, `checking_in`, `in_progress` 중 하나
-- 참여 팀만 가능 (host/guest)
-- 팀의 `member+` 권한 필요
-- 같은 팀 중복 check-in 불가
+- status는 `scheduled`, `checking_in`, `in_progress` 중 하나
+- host 또는 guest team만 가능
+- 해당 team `member+`
+- 같은 team 중복 check-in 불가
+- venue 좌표가 있으면 200m geo-fence 검사
 
 ## POST /team-matches/:id/result
 
-- 참여 팀 `manager+`만 가능
-- status가 `scheduled`, `checking_in`, `in_progress` 중 하나
-- `guestTeamId` 확정된 매치만 가능
-- Body
+- 참가 team `manager+`만 가능
+- status는 `scheduled`, `checking_in`, `in_progress` 중 하나
+- `guestTeamId`가 확정된 경기만 가능
 
-| 필드 | 타입 | 필수 |
+Body:
+
+| Field | Type | Required |
 |---|---|---|
-| `scoreHome` | object (`Q1..Qn`: int>=0) | Yes |
-| `scoreAway` | object (`Q1..Qn`: int>=0) | Yes |
+| `scoreHome` | object (`Q1..Qn`) | Yes |
+| `scoreAway` | object (`Q1..Qn`) | Yes |
 | `resultHome` | `win/draw/lose` | Yes |
 | `resultAway` | `win/draw/lose` | Yes |
 
-검증:
+Validation:
 
-- quarter 수 일치
-- 점수와 승무패 결과 일치
+- quarter 수와 점수 map 길이 일치
+- 점수와 승/무/패 결과 일치
 
-성공 시 status는 `completed`로 전이.
+Success:
+
+- match status -> `completed`
+- badge 지급 트리거
 
 ## POST /team-matches/:id/evaluate
 
-- match status `completed`에서만 가능
-- evaluator팀 `member+` 권한 필요
-- evaluator와 evaluated가 동일하면 실패
-- evaluator팀 기준 중복 평가 불가
-
-## GET /team-matches/:id/referee-schedule
-
-응답 data:
-
-```json
-{
-  "hasReferee": false,
-  "quarterCount": 4,
-  "schedule": {
-    "Q1": "home",
-    "Q2": "away"
-  }
-}
-```
+- match status가 `completed`일 때만 가능
+- evaluator team `member+`
+- evaluator / evaluated가 같은 team이면 불가
+- evaluator team 기준 중복 평가 불가
 
 ## Frontend Mapping Notes
 
-- `useRespondTeamMatchApplication`는 내부적으로 `/approve`, `/reject` suffix route를 호출한다.
-- `CreateTeamMatchInput`는 `hostTeamId`를 필수로 가진다.
-- `ApplyTeamMatchInput`는 backend canonical field인 `applicantTeamId`를 사용한다.
-- `useTeamMatchRefereeSchedule`는 backend object shape(`{ hasReferee, quarterCount, schedule }`)를 그대로 반환하고, 화면에서 행으로 변환한다.
-
-## State Gate 요약
-
-- 모집글 생성: host manager+
-- 신청: applicant manager+
-- 승인/거절: host manager+
-- 체크인: 참여 팀 member+
-- 결과 입력: 참여 팀 manager+
-- 평가: evaluator 팀 member+
+- user-facing status vocabulary는 `recruiting`, `scheduled`, `checking_in`, `in_progress`, `completed`, `cancelled` 기준으로 맞춘다
+- `/my/team-matches`, `/teams/:id/matches`는 history 조회 시 다중 `status` query를 명시적으로 넘겨야 한다
+- edit/cancel UI는 `PATCH /team-matches/:id`를 사용한다
 
 ## Source References
 
 - `apps/api/src/team-matches/team-matches.controller.ts`
-- `apps/api/src/team-matches/dto/*.ts`
 - `apps/api/src/team-matches/team-matches.service.ts`
+- `apps/api/src/team-matches/dto/*.ts`
 - `apps/api/test/integration/team-matches.e2e-spec.ts`
-- `apps/api/src/team-matches/team-matches.service.spec.ts`
-- `apps/web/src/hooks/use-api.ts`
+- `apps/web/src/hooks/api/use-team-matches.ts`
 - `apps/web/src/types/api.ts`

@@ -8,13 +8,7 @@ import { formatCurrency, formatMatchDate } from '@/lib/utils';
 import { getGradeInfo } from '@/lib/skill-grades';
 import type { TeamMatch } from '@/types/api';
 import { cn } from '@/lib/utils';
-
-const statusMap: Record<string, { label: string; className: string }> = {
-  recruiting: { label: '모집중', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-  matched: { label: '매칭완료', className: 'bg-blue-50 text-blue-500 dark:bg-blue-900/30 dark:text-blue-300' },
-  completed: { label: '경기종료', className: 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-300' },
-  cancelled: { label: '취소', className: 'bg-red-50 text-red-500 dark:bg-red-900/30 dark:text-red-400' },
-};
+import { getTeamMatchStatusMeta } from '@/lib/team-match-operations';
 
 const matchStyleLabel: Record<string, string> = {
   friendly: '친선',
@@ -36,7 +30,7 @@ export interface TeamMatchCardProps {
 }
 
 export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
-  const status = statusMap[match.status] ?? statusMap.recruiting;
+  const status = getTeamMatchStatusMeta(match.status);
 
   return (
     <Link href={`/team-matches/${match.id}`}>
@@ -69,7 +63,7 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
                 </>
               )}
               {match.isFreeInvitation && (
-                <span className="ml-1 rounded-full bg-green-50 text-green-600 dark:bg-green-950/30 dark:text-green-300 px-2 py-0.5 text-xs font-medium">
+                <span className="ml-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600 dark:bg-green-950/30 dark:text-green-300">
                   무료초청
                 </span>
               )}
@@ -105,9 +99,9 @@ export function TeamMatchCard({ match, className }: TeamMatchCardProps) {
           </span>
         </p>
 
-        <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-700 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between border-t border-gray-50 pt-2.5 dark:border-gray-700">
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            신청 {String(match.applicationCount ?? 0)}팀
+            신청 {String(match.applicationCount ?? 0)}건
           </span>
           {match.hostTeam && (
             <span className="text-xs text-gray-500 dark:text-gray-400">

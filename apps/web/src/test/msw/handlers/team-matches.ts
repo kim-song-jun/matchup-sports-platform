@@ -3,12 +3,36 @@ import { success, paged } from './_utils';
 import { mockTeamMatch, mockTeamMatchApplication, mockMyTeamMatchApplications } from '../../fixtures/team-matches';
 
 export const teamMatchesHandlers = [
-  http.get('/api/v1/team-matches', () => {
-    return paged([mockTeamMatch]);
+  http.get('/api/v1/team-matches', ({ request }) => {
+    const url = new URL(request.url);
+    const teamId = url.searchParams.get('teamId');
+    const status = url.searchParams.get('status');
+
+    const baseMatches = [
+      mockTeamMatch,
+      { ...mockTeamMatch, id: 'tm-2', status: 'scheduled', title: '수요일 팀 매치', hostTeamId: teamId ?? mockTeamMatch.hostTeamId },
+      { ...mockTeamMatch, id: 'tm-3', status: 'completed', title: '지난 경기 기록', hostTeamId: teamId ?? mockTeamMatch.hostTeamId },
+      { ...mockTeamMatch, id: 'tm-4', status: 'cancelled', title: '취소된 매치', hostTeamId: teamId ?? mockTeamMatch.hostTeamId },
+    ];
+
+    const filtered = status
+      ? baseMatches.filter((match) => status.split(',').includes(match.status))
+      : [mockTeamMatch];
+
+    return paged(filtered.map((match) => (teamId ? { ...match, hostTeamId: teamId } : match)));
   }),
 
   http.post('/api/v1/team-matches', () => {
     return success(mockTeamMatch);
+  }),
+
+  http.patch('/api/v1/team-matches/:id', async ({ params, request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return success({
+      ...mockTeamMatch,
+      id: params.id as string,
+      ...body,
+    });
   }),
 
   http.get('/api/v1/team-matches/me/applications', () => {

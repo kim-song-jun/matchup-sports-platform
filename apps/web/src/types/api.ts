@@ -1200,6 +1200,10 @@ export interface TeamMatchCheckInInput {
   photoUrl?: string;
 }
 
+export interface UpdateTeamMatchInput extends Partial<CreateTeamMatchInput> {
+  status?: TeamMatchStatus;
+}
+
 export interface SendMessageInput {
   content: string;
 }
@@ -1324,6 +1328,7 @@ export interface MyTeamMatchApplication {
     startTime: string;
     endTime: string;
     venueName: string;
+    status: TeamMatchStatus;
     hostTeam?: { id: string; name: string };
   };
   applicantTeam?: { id: string; name: string };

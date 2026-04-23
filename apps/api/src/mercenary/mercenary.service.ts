@@ -573,10 +573,13 @@ export class MercenaryService {
   private async assertTeamSportType(teamId: string, sportType: SportType) {
     const team = await this.prisma.sportTeam.findUnique({
       where: { id: teamId },
-      select: { sportTypes: true },
+      select: { sportTypes: true, deletedAt: true },
     });
     if (!team) {
       throw new NotFoundException('팀을 찾을 수 없습니다.');
+    }
+    if (team.deletedAt) {
+      throw new BadRequestException('비활성화된 팀은 용병 모집을 사용할 수 없습니다.');
     }
     if (!team.sportTypes.includes(sportType)) {
       throw new BadRequestException('팀 종목과 모집글 종목은 일치해야 합니다.');

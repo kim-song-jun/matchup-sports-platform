@@ -124,6 +124,7 @@ export class TeamMatchesService {
     if (!team) throw new NotFoundException('팀을 찾을 수 없습니다');
 
     // Require manager+ to create a team match
+    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 팀 매칭을 생성할 수 없습니다');
     await this.teamMembershipService.assertRole(data.hostTeamId, userId, 'manager');
 
     const quarterCount = data.quarterCount ?? 4;
@@ -182,6 +183,7 @@ export class TeamMatchesService {
     const team = await this.prisma.sportTeam.findUnique({ where: { id: applicantTeamId } });
     if (!team) throw new NotFoundException('팀을 찾을 수 없습니다');
 
+    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 팀 매칭에 신청할 수 없습니다');
     // Require manager+ to apply on behalf of a team
     await this.teamMembershipService.assertRole(applicantTeamId, userId, 'manager');
 
@@ -349,7 +351,8 @@ export class TeamMatchesService {
     });
     if (!match) throw new NotFoundException('경기를 찾을 수 없습니다');
 
-    const team = await this.prisma.sportTeam.findUnique({ where: { id: data.teamId }, select: { id: true } });
+    const team = await this.prisma.sportTeam.findUnique({ where: { id: data.teamId }, select: { id: true, deletedAt: true } });
+    if (team.deletedAt) throw new BadRequestException('비활성화된 팀은 도착 인증을 진행할 수 없습니다');
     if (!team) throw new NotFoundException('팀을 찾을 수 없습니다');
     const guestTeamId = this.resolveGuestTeamId(match);
     if (!guestTeamId) throw new BadRequestException('상대 팀이 확정된 경기만 도착 인증할 수 있습니다');

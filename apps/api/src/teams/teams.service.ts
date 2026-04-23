@@ -15,6 +15,7 @@ import { UpdateTeamDto } from './dto/update-team.dto';
 
 // Expiration duration for team invitations in days
 const INVITATION_EXPIRY_DAYS = 7;
+const ACTIVE_HOSTED_TEAM_MATCH_STATUSES = ['recruiting', 'applied', 'approved', 'scheduled', 'checking_in'] as const;
 
 @Injectable()
 export class TeamsService {
@@ -34,9 +35,43 @@ export class TeamsService {
     return { ...team, sportType: team.sportTypes[0] };
   }
 
+  private async findActiveTeamOrThrow(id: string) {
+    const team = await this.prisma.sportTeam.findUnique({
+      where: { id },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            nickname: true,
+            profileImageUrl: true,
+            mannerScore: true,
+          },
+        },
+      },
+    });
+    if (!team || team.deletedAt) {
+      throw new NotFoundException('???李얠쓣 ???놁뒿?덈떎.');
+    }
+    return team;
+  }
+
+  private async assertActiveTeam(teamId: string) {
+    const team = await this.prisma.sportTeam.findUnique({
+      where: { id: teamId },
+      select: { id: true, deletedAt: true },
+    });
+    if (!team) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: 'Team not found' });
+    }
+    if (team.deletedAt) {
+      throw new BadRequestException({ code: 'TEAM_DELETED', message: 'Deleted team cannot be used for this action' });
+    }
+    return team;
+  }
+
   async findByOwner(ownerId: string) {
     const teams = await this.prisma.sportTeam.findMany({
-      where: { ownerId },
+      where: { ownerId, deletedAt: null },
       include: {
         owner: {
           select: { id: true, nickname: true, profileImageUrl: true },
@@ -49,7 +84,7 @@ export class TeamsService {
 
   async findAll(filter: { sportType?: string; city?: string; recruiting?: string; cursor?: string; ownerId?: string; limit?: number; search?: string }) {
     const limit = Math.min(Math.max(1, filter.limit ?? 20), 100);
-    const where: Prisma.SportTeamWhereInput = {};
+    const where: Prisma.SportTeamWhereInput = { deletedAt: null };
     if (filter.sportType) where.sportTypes = { has: filter.sportType as SportType };
     if (filter.city) where.city = filter.city;
     if (filter.recruiting === 'true') where.isRecruiting = true;
@@ -93,6 +128,9 @@ export class TeamsService {
     });
     if (!team) {
       throw new NotFoundException('팀을 찾을 수 없습니다.');
+    }
+    if (team.deletedAt) {
+      throw new NotFoundException('Team not found');
     }
     return this.withBackwardCompat(team);
   }
@@ -174,8 +212,40 @@ export class TeamsService {
 
   async remove(teamId: string, userId: string) {
     await this.membershipService.assertRole(teamId, userId, TeamRole.owner);
-    await this.findById(teamId);
-    await this.prisma.sportTeam.delete({ where: { id: teamId } });
+    await this.findActiveTeamOrThrow(teamId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sportTeam.update({
+        where: { id: teamId },
+        data: {
+          deletedAt: new Date(),
+          isRecruiting: false,
+        },
+      });
+
+      await tx.teamMatch.updateMany({
+        where: {
+          hostTeamId: teamId,
+          status: { in: [...ACTIVE_HOSTED_TEAM_MATCH_STATUSES] },
+        },
+        data: { status: 'cancelled' },
+      });
+
+      await tx.teamMatchApplication.updateMany({
+        where: {
+          applicantTeamId: teamId,
+          status: 'pending',
+        },
+        data: { status: 'withdrawn' },
+      });
+
+      await tx.mercenaryPost.updateMany({
+        where: {
+          teamId,
+          status: 'open',
+        },
+        data: { status: 'cancelled' },
+      });
+    });
   }
 
   async findHub(teamId: string, viewerId?: string) {
@@ -290,6 +360,9 @@ export class TeamsService {
     if (!team) {
       throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: 'Team not found' });
     }
+    if (team.deletedAt) {
+      throw new BadRequestException({ code: 'TEAM_DELETED', message: 'Deleted team cannot be used for this action' });
+    }
     if (!team.isRecruiting) {
       throw new BadRequestException({ code: 'TEAM_NOT_RECRUITING', message: 'This team is not recruiting' });
     }
@@ -334,6 +407,7 @@ export class TeamsService {
    * Lists pending team membership applications. Requires manager+ role.
    */
   async listApplications(teamId: string, actorUserId: string) {
+    await this.assertActiveTeam(teamId);
     await this.membershipService.assertRole(teamId, actorUserId, TeamRole.manager);
 
     return this.prisma.teamMembership.findMany({
@@ -649,6 +723,7 @@ export class TeamsService {
    * Returns all invitations for a team. Caller must have manager+ role.
    */
   async getTeamInvitations(teamId: string, userId: string) {
+    await this.assertActiveTeam(teamId);
     await this.membershipService.assertRole(teamId, userId, TeamRole.manager);
 
     return this.prisma.teamInvitation.findMany({
@@ -670,6 +745,7 @@ export class TeamsService {
         inviteeId: userId,
         status: InvitationStatus.pending,
         expiresAt: { gt: new Date() },
+        team: { deletedAt: null },
       },
       include: {
         team: { select: { id: true, name: true, logoUrl: true, sportTypes: true } },
@@ -688,6 +764,7 @@ export class TeamsService {
    * Only the invitee can accept.
    */
   async acceptInvitation(teamId: string, invitationId: string, userId: string) {
+    await this.assertActiveTeam(teamId);
     const invitation = await this.prisma.teamInvitation.findFirst({
       where: { id: invitationId, teamId },
     });
@@ -751,6 +828,7 @@ export class TeamsService {
    * Declines a pending invitation. Only the invitee can decline.
    */
   async declineInvitation(teamId: string, invitationId: string, userId: string) {
+    await this.assertActiveTeam(teamId);
     const invitation = await this.prisma.teamInvitation.findFirst({
       where: { id: invitationId, teamId },
     });

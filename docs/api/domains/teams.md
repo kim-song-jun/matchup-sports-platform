@@ -104,6 +104,21 @@ CAUTION:
 - `ApplyTeamDto`가 비어 있어 문서상 DTO 추론이 어렵다. 실제 계약은 service 로직 기준으로 봐야 한다.
 - `/teams/:id/hub`는 optional auth endpoint다. 로그인 여부에 따라 `capabilities` 계산 컨텍스트가 달라진다.
 
+## DELETE /teams/:id
+
+- owner only
+- physical delete가 아니라 soft delete로 처리한다
+- success response: `204 No Content`
+- side effects:
+  - `SportTeam.deletedAt` 설정
+  - `isRecruiting=false`
+  - active hosted `TeamMatch` -> `cancelled`
+  - pending `TeamMatchApplication` where this team is applicant -> `withdrawn`
+  - active `MercenaryPost` -> `cancelled`
+- deleted team은 active team list/detail surfaces에서 기본적으로 제외된다
+- deleted team detail/hub read는 `404`로 취급한다
+- deleted team에 대한 mutation은 `TEAM_DELETED` 계약으로 거절될 수 있다
+
 ## Source References
 
 - `apps/api/src/teams/teams.controller.ts`

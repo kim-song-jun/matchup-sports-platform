@@ -25,6 +25,14 @@ export class TeamMembershipService {
    * Throws ForbiddenException if not a member or role is insufficient.
    */
   async assertRole(teamId: string, userId: string, minRole: TeamRole): Promise<TeamMembership> {
+    const team = await this.prisma.sportTeam.findUnique({
+      where: { id: teamId },
+      select: { id: true, deletedAt: true },
+    });
+    if (!team || team.deletedAt) {
+      throw new NotFoundException('Team not found');
+    }
+
     const membership = await this.getMembership(teamId, userId);
     if (!membership || !this.roleMeetsMin(membership.role, minRole)) {
       throw new ForbiddenException('팀 권한이 부족합니다');
@@ -35,7 +43,7 @@ export class TeamMembershipService {
   /** Returns all teams the user is an active member of, including team data. */
   async listUserTeams(userId: string): Promise<Array<TeamMembership & { team: SportTeam }>> {
     return this.prisma.teamMembership.findMany({
-      where: { userId, status: 'active' },
+      where: { userId, status: 'active', team: { deletedAt: null } },
       include: { team: true },
       orderBy: { joinedAt: 'desc' },
     }) as Promise<Array<TeamMembership & { team: SportTeam }>>;

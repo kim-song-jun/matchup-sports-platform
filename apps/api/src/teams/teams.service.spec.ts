@@ -16,6 +16,9 @@ describe('TeamsService', () => {
   const mockTx = {
     sportTeam: { create: jest.fn(), update: jest.fn() },
     teamMembership: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    teamMatch: { updateMany: jest.fn() },
+    teamMatchApplication: { updateMany: jest.fn() },
+    mercenaryPost: { updateMany: jest.fn() },
     teamInvitation: { update: jest.fn() },
   };
 
@@ -56,6 +59,15 @@ describe('TeamsService', () => {
     tournament: {
       findMany: jest.fn(),
       count: jest.fn(),
+    },
+    teamMatch: {
+      updateMany: jest.fn(),
+    },
+    teamMatchApplication: {
+      updateMany: jest.fn(),
+    },
+    mercenaryPost: {
+      updateMany: jest.fn(),
     },
     $transaction: jest.fn((cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx)),
   };
@@ -126,6 +138,7 @@ describe('TeamsService', () => {
         expect.objectContaining({
           take: 21,
           orderBy: { createdAt: 'desc' },
+          where: expect.objectContaining({ deletedAt: null }),
         }),
       );
     });
@@ -974,6 +987,7 @@ describe('TeamsService', () => {
           where: expect.objectContaining({
             inviteeId: 'user-1',
             status: InvitationStatus.pending,
+            team: { deletedAt: null },
           }),
         }),
       );
@@ -1005,14 +1019,44 @@ describe('TeamsService', () => {
       );
     });
 
-    it('deletes team when owner role is verified', async () => {
+    it('soft-deletes team and deactivates active team-owned flows when owner role is verified', async () => {
       mockMembershipService.assertRole.mockResolvedValue({ role: TeamRole.owner });
-      mockPrismaService.sportTeam.delete.mockResolvedValue({ id: 'team-1' });
+      mockTx.sportTeam.update.mockResolvedValue({ id: 'team-1' });
+      mockTx.teamMatch.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.teamMatchApplication.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.mercenaryPost.updateMany.mockResolvedValue({ count: 1 });
 
       await service.remove('team-1', 'owner-1');
 
       expect(mockMembershipService.assertRole).toHaveBeenCalledWith('team-1', 'owner-1', TeamRole.owner);
-      expect(mockPrismaService.sportTeam.delete).toHaveBeenCalledWith({ where: { id: 'team-1' } });
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+      expect(mockTx.sportTeam.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'team-1' },
+          data: expect.objectContaining({
+            deletedAt: expect.any(Date),
+            isRecruiting: false,
+          }),
+        }),
+      );
+      expect(mockTx.teamMatch.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ hostTeamId: 'team-1' }),
+          data: { status: 'cancelled' },
+        }),
+      );
+      expect(mockTx.teamMatchApplication.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ applicantTeamId: 'team-1', status: 'pending' }),
+          data: { status: 'withdrawn' },
+        }),
+      );
+      expect(mockTx.mercenaryPost.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ teamId: 'team-1', status: 'open' }),
+          data: { status: 'cancelled' },
+        }),
+      );
     });
 
     it('returns team hub aggregate payload', async () => {

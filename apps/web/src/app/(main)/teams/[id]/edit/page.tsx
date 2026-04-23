@@ -180,11 +180,11 @@ export default function EditTeamPage() {
   async function handleDelete() {
     try {
       await deleteTeam.mutateAsync(teamId);
-      toast('success', '팀이 삭제되었습니다.');
+      toast('success', '팀이 비활성화되었습니다.');
       router.push('/my/teams');
     } catch (error) {
       const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast('error', message || '팀을 삭제하지 못했습니다.');
+      toast('error', message || '팀을 비활성화하지 못했습니다.');
     }
   }
 
@@ -509,7 +509,7 @@ export default function EditTeamPage() {
               className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 disabled:opacity-50"
             >
               <Trash2 size={15} />
-              팀 삭제
+              팀 비활성화
             </button>
           )}
         </div>
@@ -521,8 +521,10 @@ export default function EditTeamPage() {
             <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
               <AlertTriangle size={20} className="text-red-500" aria-hidden="true" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center">팀을 삭제할까요?</h3>
-            <p className="mt-2 text-sm text-gray-500 text-center">삭제하면 되돌릴 수 없습니다.</p>
+            <h3 className="text-center text-lg font-bold text-gray-900 dark:text-white">팀을 비활성화할까요?</h3>
+            <p className="mt-2 text-center text-sm text-gray-500">
+              비활성화된 팀은 활성 목록에서 숨겨지고 수정이나 신청에 사용할 수 없지만, 기존 매칭 이력은 유지됩니다.
+            </p>
             <div className="mt-5 flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
@@ -535,7 +537,7 @@ export default function EditTeamPage() {
                 disabled={deleteDisabled}
                 className="flex-1 rounded-xl bg-red-500 py-3 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {deleteTeam.isPending ? '삭제 중...' : '삭제'}
+                {deleteTeam.isPending ? '비활성화 중...' : '비활성화'}
               </button>
             </div>
           </div>

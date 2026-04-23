@@ -829,6 +829,7 @@ model SportTeam {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
   owner User @relation("TeamOwner", fields: [ownerId], references: [id])
 
@@ -842,6 +843,7 @@ model SportTeam {
   invitations      TeamInvitation[]
 
   @@index([city, isRecruiting])
+  @@index([deletedAt])
   @@map("sport_teams")
 }
 

@@ -219,7 +219,10 @@ describe('TeamMembershipService', () => {
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             update: jest.fn().mockResolvedValue({}),
           },
-          sportTeam: { update: jest.fn().mockResolvedValue({}) },
+          sportTeam: {
+            findUnique: jest.fn().mockResolvedValue({ id: teamId, deletedAt: null }),
+            update: jest.fn().mockResolvedValue({}),
+          },
         });
       });
 
@@ -246,7 +249,10 @@ describe('TeamMembershipService', () => {
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             update: jest.fn(),
           },
-          sportTeam: { update: jest.fn() },
+          sportTeam: {
+            findUnique: jest.fn().mockResolvedValue({ id: teamId, deletedAt: null }),
+            update: jest.fn(),
+          },
         });
       });
 

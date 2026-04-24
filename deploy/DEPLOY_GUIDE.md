@@ -242,7 +242,7 @@ docker stats --no-stream
 
 # 헬스체크
 curl http://localhost:8100/api/v1/health
-curl http://localhost/api/v1/health
+curl -I http://localhost/api/v1/health
 ```
 
 ### 재시작
@@ -296,6 +296,7 @@ ssh -i teameet-key.pem ec2-user@<EC2_IP> '
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
   curl -fsS http://localhost:8100/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null
   curl -fsS http://localhost/landing > /dev/null
+  curl -fsSI http://localhost/api/v1/health | grep -qE "^HTTP/[0-9.]+ 301"
   sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
   sudo docker exec teameet_api npx ts-node prisma/seed-images.ts
 '

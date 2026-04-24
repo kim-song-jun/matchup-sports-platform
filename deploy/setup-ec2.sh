@@ -187,7 +187,7 @@ echo ""
 echo "🏥 헬스체크..."
 sleep 3
 if curl -fsS http://localhost:8100/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' > /dev/null 2>&1 && \
-   curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' > /dev/null 2>&1; then
+   curl -fsSI http://localhost/api/v1/health | grep -qE '^HTTP/[0-9.]+ 301'; then
   echo "✅ API 서버 정상"
 else
   echo "⚠️ API 서버 응답 대기 중 (1분 후 다시 확인해주세요)"

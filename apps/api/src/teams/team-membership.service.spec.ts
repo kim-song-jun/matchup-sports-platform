@@ -17,6 +17,7 @@ describe('TeamMembershipService', () => {
       updateMany: jest.fn(),
     },
     sportTeam: {
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -34,6 +35,7 @@ describe('TeamMembershipService', () => {
     prisma = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
+    mockPrismaService.sportTeam.findUnique.mockResolvedValue({ id: 'team-1', deletedAt: null });
   });
 
   it('should be defined', () => {
@@ -127,7 +129,11 @@ describe('TeamMembershipService', () => {
 
       expect(prisma.teamMembership.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: 'u1', status: 'active' },
+          where: expect.objectContaining({
+            userId: 'u1',
+            status: 'active',
+            team: { deletedAt: null },
+          }),
         }),
       );
     });

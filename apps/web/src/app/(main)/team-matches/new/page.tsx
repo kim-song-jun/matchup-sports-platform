@@ -108,6 +108,14 @@ export default function NewTeamMatchPage() {
     }
   }
 
+  function handleBack() {
+    if (step > 0) {
+      setStep(step - 1);
+      return;
+    }
+    router.back();
+  }
+
   function handleSubmit() {
     const hostTeamId = selectedHostTeamId || (eligibleTeams.length > 0 ? eligibleTeams[0].id : undefined);
     if (!hostTeamId) {
@@ -201,7 +209,7 @@ export default function NewTeamMatchPage() {
     <div className="pt-[var(--safe-area-top)] animate-fade-in">
       {/* Header */}
       <header className="@3xl:hidden px-5 pt-4 pb-3 flex items-center gap-3">
-        <button onClick={() => (step > 0 ? setStep(step - 1) : router.back())} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+        <button onClick={handleBack} aria-label="뒤로 가기" className="flex items-center justify-center min-h-11 min-w-11 rounded-xl text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">모집글 작성</h1>
@@ -613,25 +621,37 @@ export default function NewTeamMatchPage() {
 
       {/* Bottom CTA */}
       <div className="px-5 @3xl:px-0 @3xl:max-w-[700px] mt-6 mb-8">
-        {step < STEPS.length - 1 ? (
+        <div className="flex gap-3">
           <button
-            onClick={() => setStep(step + 1)}
-            disabled={!canProceed()}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            type="button"
+            onClick={handleBack}
+            className="flex min-h-[52px] shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-md font-semibold text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-gray-600"
           >
-            다음
-            <ArrowRight size={16} />
+            <ArrowLeft size={16} />
+            {step === 0 ? '목록으로' : '이전'}
           </button>
-        ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={createMutation.isPending}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white hover:bg-blue-600 disabled:opacity-50 transition-colors"
-          >
-            <Check size={16} />
-            {createMutation.isPending ? '등록 중...' : '모집글 등록'}
-          </button>
-        )}
+          {step < STEPS.length - 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep(step + 1)}
+              disabled={!canProceed()}
+              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              다음
+              <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={createMutation.isPending}
+              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-md font-bold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+            >
+              <Check size={16} />
+              {createMutation.isPending ? '등록 중...' : '모집글 등록'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

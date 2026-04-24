@@ -176,7 +176,7 @@ DEPLOY_SYNC_MOCK_DATA=true
 
 `HOSTNAME`은 운영 compose에서 `0.0.0.0`으로 고정한다. Next standalone가 container IP에만 bind하면 앱은 떠 있어도 `localhost` healthcheck가 실패해 `web`/`nginx` dependency gate가 깨질 수 있다.
 
-`prisma/bootstrap-deploy-db.ts`는 public schema가 비어 있는 운영 DB에서 현재 migration chain을 처음부터 재생하지 않는다. 비어 있는 DB에 `_prisma_migrations`만 남아 있어도 먼저 history를 재설정한 뒤 `prisma db push --skip-generate`로 현재 schema를 만들고, 저장소에 있는 migration 디렉터리를 `resolve --applied`로 기록한 다음 `migrate deploy`를 검증한다. 반대로 public table이 이미 있는데 migration history만 없으면 drift 가능성이 크므로 자동 복구하지 않고 배포를 실패시킨다.
+`prisma/bootstrap-deploy-db.ts`는 public schema가 비어 있는 운영 DB에서 현재 migration chain을 처음부터 재생하지 않는다. 비어 있는 DB에 `_prisma_migrations`만 남아 있어도 먼저 history를 재설정한 뒤 `prisma db push --skip-generate`로 현재 schema를 만들고, 저장소에 있는 migration 디렉터리를 `resolve --applied`로 기록한 다음 `migrate deploy`를 검증한다. 반대로 public table이 이미 있는데 migration history만 없으면 drift 가능성이 크므로 자동 복구하지 않고 배포를 실패시킨다. GitHub Actions deploy도 이 bootstrap 실패를 더 이상 무시하지 않고 즉시 실패해야 한다.
 
 ---
 

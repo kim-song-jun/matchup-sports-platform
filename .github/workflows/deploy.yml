@@ -293,7 +293,7 @@ jobs:
           # closed instead of auto-resolving unknown drift.
           echo "[INFO] Bootstrapping deploy database..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/bootstrap-deploy-db.ts" || true
+            run --rm --no-deps -T api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/bootstrap-deploy-db.ts"
           echo "[INFO] Build phase complete."
           EOF
 

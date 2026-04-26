@@ -63,6 +63,36 @@
   --font-size-4xl: 2.25rem;    /* 36px — landing hero */
   --font-size-5xl: 2.75rem;    /* 44px — landing display */
   --font-size-6xl: 3.5rem;     /* 56px — landing jumbo */
+
+  /* Blue scale: missing accents */
+  --color-blue-200: #A8CDFF;
+  --color-blue-400: #4792F7;
+  --color-blue-alpha-08: rgba(49,130,246,0.08);
+  --color-blue-alpha-10: rgba(49,130,246,0.10);
+
+  /* Gray: subtle hover step */
+  --color-gray-150: #EAEDF0;
+
+  /* Border strong */
+  --color-border-strong: #D1D6DB;
+
+  /* Semantic light tints */
+  --color-success-50: #E3F8EF;
+  --color-warning-50: #FFF3E0;
+  --color-error-50: #FEEBEC;
+
+  /* Control heights */
+  --control-sm: 40px;
+  --control-md: 48px;
+  --control-lg: 56px;
+  --control-xl: 64px;
+  --control-icon: 44px;
+  --control-radius: 12px;
+
+  /* Easing */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Entrance ── */

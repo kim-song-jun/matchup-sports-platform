@@ -1,0 +1,1772 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1200"/>
+<title>Teameet — Design Review</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%233182f6'/%3E%3Cpath d='M20 18h24v8H36v20h-8V26h-8z' fill='white'/%3E%3C/svg%3E"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"/>
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+<rect width="200" height="200" fill="#3182f6"/>
+<text x="100" y="118" text-anchor="middle" font-family="system-ui" font-weight="800" font-size="64" fill="#fff">T</text>
+</svg>
+</template>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+html, body { background: #f4f5f7; font-family: 'Pretendard', sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="lib/tokens.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/signatures.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/data.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-match.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-team.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-other.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-more.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-sport.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-deep.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-variants.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-variants2.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-desktop.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-desktop2.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-upgrade.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-my.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-forms.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-ops.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-extras.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-hero.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-refresh1.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-refresh2.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-refresh3.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-v2main.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-v2main2.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-parity.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-case-matrix.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-readiness.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-readiness-wave21a.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-readiness-wave21b.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-readiness-wave21c.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-readiness-wave21d.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-readiness-wave21e.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-catalog.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-system-foundation.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-dev-handoff.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-dev-handoff2.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-audit.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m01.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m02.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m03.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m04.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m05.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m06.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m08.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m09.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m12.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m14.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m15.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m16.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m17.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m18.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m07.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m10.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m11.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m13.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-grid-m19.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/design-canvas.jsx?v=20260425-fix32"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+/* read Tweaks defaults from EDITMODE block */
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "homeVariant": "A"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [variant, setVariant] = useState(TWEAKS.homeVariant);
+  const [tweaks, setTweaks]   = useState(false);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (e.data?.type === '__activate_edit_mode')   setTweaks(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaks(false);
+    };
+    window.addEventListener('message', h);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', h);
+  }, []);
+
+  const persist = (edits) => {
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+  };
+
+  const nav = () => {}; // nav is local to each screen demo; canvas shows statically
+
+  return (
+    <>
+      <TokensCSS/>
+      <SignatureCSS/>
+      <DesignCanvas title="Teameet — Toss-based Design Refresh" subtitle="모바일 우선 · 실제 데이터로 렌더링된 인터랙티브 프로토타입">
+
+        <DCSection id="toss-dna" title="00 · Toss DNA — 시그니처 패턴" subtitle="이 프로젝트의 핵심 컴포넌트(NumberDisplay · MoneyRow · KPIStat · StackedAvatars · WeatherStrip · Skeleton)가 실제로 어떻게 모이는지 — 새 화면들의 레퍼런스">
+          <DCArtboard id="toss-home" label="Home · Toss canonical" width={375} height={812}>
+            <HomeToss/>
+          </DCArtboard>
+          <DCArtboard id="toss-detail" label="매치 상세 · 시그니처 적용" width={375} height={812}>
+            <MatchDetailToss/>
+          </DCArtboard>
+          <DCArtboard id="toss-wallet" label="결제·정산 · MoneyRow 풀활용" width={375} height={812}>
+            <WalletToss/>
+          </DCArtboard>
+          <DCArtboard id="toss-activity" label="내 활동 · KPI + StatBar" width={375} height={812}>
+            <ActivityToss/>
+          </DCArtboard>
+          <DCArtboard id="toss-empty" label="EmptyState + Skeleton" width={375} height={812}>
+            <EmptyShowcase/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-onboarding" title="00b · 리프레시 — Onboarding 3-step" subtitle="기존 1단계만 있던 온보딩 → 종목 / 레벨 / 지역 + 환영 화면 4컷">
+          <DCArtboard id="ob-1" label="Step 1 · 종목 선택" width={375} height={812} data-canonical-id="m01-mb-main-step1">
+            <OnboardingV2_Step1/>
+          </DCArtboard>
+          <DCArtboard id="ob-2" label="Step 2 · 레벨" width={375} height={812} data-canonical-id="m01-mb-main-step2">
+            <OnboardingV2_Step2/>
+          </DCArtboard>
+          <DCArtboard id="ob-3" label="Step 3 · 지역" width={375} height={812} data-canonical-id="m01-mb-main-step3">
+            <OnboardingV2_Step3/>
+          </DCArtboard>
+          <DCArtboard id="ob-w" label="Welcome" width={375} height={812} data-canonical-id="m01-mb-main-w">
+            <OnboardingV2_Welcome/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-merc" title="00c · 리프레시 — 용병" subtitle="KPI 스트립 + 페이 NumberDisplay + 호스트 카드">
+          <DCArtboard id="merc-list" label="용병 목록" width={375} height={812} data-canonical-id="m08-mb-list">
+            <MercenaryV2/>
+          </DCArtboard>
+          <DCArtboard id="merc-detail" label="용병 상세" width={375} height={812} data-canonical-id="m08-mb-detail">
+            <MercenaryDetailV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-tourn" title="00d · 리프레시 — 대회" subtitle="대진표 · 순위표 · 상금 분개 (MoneyRow)">
+          <DCArtboard id="tourn-list" label="대회 목록" width={375} height={812} data-canonical-id="m09-mb-list">
+            <TournamentsV2/>
+          </DCArtboard>
+          <DCArtboard id="tourn-detail-refresh" label="대회 상세 + 대진표" width={375} height={812} data-canonical-id="m09-mb-flow-bracket">
+            <TournamentDetailV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-pay" title="00e · 리프레시 — 결제 풀 플로우" subtitle="체크아웃 → 성공 → 내역 — MoneyRow 풀 활용">
+          <DCArtboard id="pay-checkout" label="체크아웃" width={375} height={812} data-canonical-id="m14-mb-flow-checkout">
+            <PaymentCheckoutV2/>
+          </DCArtboard>
+          <DCArtboard id="pay-success-refresh" label="결제 성공" width={375} height={812} data-canonical-id="m14-mb-state-success">
+            <PaymentSuccessV2/>
+          </DCArtboard>
+          <DCArtboard id="pay-history-refresh" label="결제 내역 (월별)" width={375} height={812} data-canonical-id="m14-mb-main">
+            <PaymentHistoryV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-chat" title="00f · 리프레시 — 채팅 / 알림" subtitle="고정 메시지 + 매치 카드 임베드 + 알림 그룹핑">
+          <DCArtboard id="chat-list" label="채팅 목록" width={375} height={812} data-canonical-id="m12-mb-list">
+            <ChatListV2/>
+          </DCArtboard>
+          <DCArtboard id="chat-room-refresh" label="채팅방 (팀)" width={375} height={812} data-canonical-id="m12-mb-detail">
+            <ChatRoomV2/>
+          </DCArtboard>
+          <DCArtboard id="notif" label="알림" width={375} height={812} data-canonical-id="m12-mb-flow-notif">
+            <NotificationsV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-desktop" title="00g · 리프레시 — 데스크탑 웹" subtitle="Toss 톤의 랜딩 + 매치 검색 페이지">
+          <DCArtboard id="dt-landing" label="랜딩" width={1280} height={1500} data-canonical-id="m17-dt-main">
+            <DesktopLandingV2/>
+          </DCArtboard>
+          <DCArtboard id="dt-matches" label="매치 검색" width={1280} height={1100} data-canonical-id="m17-dt-flow-search">
+            <DesktopMatchesV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="refresh-admin" title="00h · 리프레시 — Admin" subtitle="KPI 카드 + 스파크라인 + 차트 + 테이블">
+          <DCArtboard id="adm-dash" label="Admin · 대시보드" width={1280} height={900} data-canonical-id="m18-dt-main">
+            <AdminDashboardV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="global-shell" title="00i · 글로벌 셸 — Navigation / Menu / Light shell" subtitle="하단 nav, 전체 메뉴, light-only 토큰을 먼저 고정해 이후 모든 화면의 global language를 통일">
+          <DCArtboard id="global-nav" label="Mobile bottom nav · 5 tabs" width={375} height={812} data-canonical-id="m19-mb-main">
+            <GlobalNavigationSystem/>
+          </DCArtboard>
+          <DCArtboard id="global-menu" label="Global menu · topic grouped" width={375} height={812} data-canonical-id="m19-mb-main-menu">
+            <GlobalMenuSystem/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="screen-catalog" title="00j · 화면 카탈로그 — Actual screens / Concepts / Docs" subtitle="실제 화면은 각 모듈에 유지하고, 설명·디자인 컨셉·핸드오프 계약은 이 카탈로그와 문서 허브로 모아 읽는 구조">
+          <DCArtboard id="catalog-overview" label="카탈로그 · 읽는 구조" width={1280} height={820}>
+            <ScreenCatalogOverview/>
+          </DCArtboard>
+          <DCArtboard id="actual-screen-index" label="실제 화면 인덱스" width={1280} height={820}>
+            <ActualScreenIndexBoard/>
+          </DCArtboard>
+          <DCArtboard id="concept-contract-index" label="설명/컨셉/계약 인덱스" width={1280} height={820}>
+            <ConceptContractIndexBoard/>
+          </DCArtboard>
+          <DCArtboard id="tailwind-token-system" label="Tailwind 토큰 시스템" width={1280} height={820}>
+            <TailwindTokenSystemBoard/>
+          </DCArtboard>
+          <DCArtboard id="responsive-copyfit-audit" label="반응형 · 문구 맞춤 기준" width={1280} height={820}>
+            <ResponsiveCopyFitAuditBoard/>
+          </DCArtboard>
+          <DCArtboard id="documentation-hub" label="문서 허브 · 운영 원칙" width={1280} height={820}>
+            <DocumentationHubBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="design-system-foundation" title="00k · 디자인 시스템 Foundation — Typography / Actions / Motion" subtitle="개발팀이 착수하기 전 반드시 고정해야 하는 타이포, 버튼 크기, hover/pressed, input/chip, motion, Tailwind class 계약">
+          <DCArtboard id="system-typography" label="Typography scale · 9 levels" width={1280} height={820} data-canonical-id="m19-dt-main">
+            <TypographyFoundationBoard/>
+          </DCArtboard>
+          <DCArtboard id="system-buttons" label="Button size/state matrix" width={1280} height={820} data-canonical-id="m19-dt-main-matrix">
+            <ButtonActionSystemBoard/>
+          </DCArtboard>
+          <DCArtboard id="system-controls" label="Controls · chip/input/list/card" width={1280} height={820} data-canonical-id="m19-dt-list">
+            <ControlFoundationBoard/>
+          </DCArtboard>
+          <DCArtboard id="system-motion" label="Motion · interaction storyboard" width={1280} height={820} data-canonical-id="m19-dt-motion">
+            <MotionInteractionSystemBoard/>
+          </DCArtboard>
+          <DCArtboard id="system-layout" label="Responsive layout storyboard" width={1280} height={820} data-canonical-id="m19-dt-main-responsive">
+            <LayoutSpacingSystemBoard/>
+          </DCArtboard>
+          <DCArtboard id="system-handoff" label="Tailwind implementation contract" width={1280} height={820} data-canonical-id="m19-dt-main-handoff">
+            <TailwindImplementationContractBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="dev-handoff" title="00l · 개발 핸드오프 — Tokens / Components / Pages / QA" subtitle="실제 앱 구현에 필요한 token migration, component extraction, page wave, acceptance gate를 한곳에 고정">
+          <DCArtboard id="dev-token-map" label="Token migration map" width={1280} height={820}>
+            <TokenMigrationHandoffBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-component-map" label="Component extraction map" width={1280} height={820}>
+            <ComponentExtractionHandoffBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-page-waves" label="Page implementation waves" width={1280} height={820}>
+            <PageImplementationWaveBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-qa-gates" label="QA acceptance gates" width={1280} height={820}>
+            <QAGateHandoffBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="dev-handoff-2" title="00m · 개발 핸드오프 II — Routes / Nav / Tokens / Components" subtitle="fix27에서 추가. 101개 source route 매핑, bottom nav canonical 결정, prototype↔globals.css 토큰 정렬, 5개 primitive 추출 순서 + page migration priority를 한곳에 고정">
+          <DCArtboard id="dev-route-manifest" label="Route ownership manifest" width={1280} height={820}>
+            <RouteOwnershipManifestBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-bottom-nav" label="Bottom nav canonical contract" width={1280} height={820}>
+            <BottomNavContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-token-alignment" label="Token alignment map" width={1280} height={820}>
+            <TokenAlignmentMapBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-component-extraction" label="Component extraction plan" width={1280} height={820}>
+            <ComponentExtractionPlanBoard/>
+          </DCArtboard>
+          <DCArtboard id="dev-page-priority" label="Page migration priority" width={1280} height={820}>
+            <PageMigrationPriorityBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="prototype-audit" title="00n · Prototype Audit Summary — fix28" subtitle="fix28에서 추가. 사용자의 4가지 검수 질문에 정량 + 정성 답. token compliance score, viewport coverage matrix, module heatmap, readiness checklist를 한곳에 고정.">
+          <DCArtboard id="audit-summary" label="Audit summary — 4 questions" width={1280} height={820}>
+            <AuditSummaryBoard/>
+          </DCArtboard>
+          <DCArtboard id="audit-token-score" label="Token compliance score" width={1280} height={820}>
+            <TokenScoreBoard/>
+          </DCArtboard>
+          <DCArtboard id="audit-viewport-matrix" label="Viewport coverage matrix" width={1280} height={820}>
+            <ViewportMatrixBoard/>
+          </DCArtboard>
+          <DCArtboard id="audit-module-heatmap" label="Module compliance heatmap" width={1280} height={820}>
+            <ModuleHeatmapBoard/>
+          </DCArtboard>
+          <DCArtboard id="audit-readiness" label="Developer readiness checklist" width={1280} height={820}>
+            <ReadinessChecklistBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m01-grid" title="M01 · 인증 · 온보딩 (viewport grid POC)" subtitle="fix29에서 추가. ID schema m01-{mb|tb|dt}-{main|state|components|assets|motion}. 모듈별 viewport × kind × state 결정적 식별자 시범.">
+          <DCArtboard id="m01-mb-main" label="m01-mb-main — 모바일 메인" width={375} height={812}>
+            <M01MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m01-tb-main" label="m01-tb-main — 태블릿 메인" width={768} height={1024}>
+            <M01TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m01-dt-main" label="m01-dt-main — 데스크탑 split" width={1280} height={820}>
+            <M01DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m01-mb-state-loading" label="m01-mb-state-loading" width={375} height={812}>
+            <M01MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m01-mb-state-error" label="m01-mb-state-error" width={375} height={812}>
+            <M01MobileStateError/>
+          </DCArtboard>
+          <DCArtboard id="m01-mb-state-permission" label="m01-mb-state-permission" width={375} height={812}>
+            <M01MobileStatePermission/>
+          </DCArtboard>
+          <DCArtboard id="m01-mb-components" label="m01-mb-components" width={375} height={812}>
+            <M01ComponentsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m01-tb-components" label="m01-tb-components" width={768} height={1024}>
+            <M01ComponentsBoard viewport="tb"/>
+          </DCArtboard>
+          <DCArtboard id="m01-dt-components" label="m01-dt-components" width={1280} height={820}>
+            <M01ComponentsBoard viewport="dt"/>
+          </DCArtboard>
+          <DCArtboard id="m01-mb-assets" label="m01-mb-assets" width={375} height={812}>
+            <M01AssetsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m01-tb-assets" label="m01-tb-assets" width={768} height={1024}>
+            <M01AssetsBoard viewport="tb"/>
+          </DCArtboard>
+          <DCArtboard id="m01-dt-assets" label="m01-dt-assets" width={1280} height={820}>
+            <M01AssetsBoard viewport="dt"/>
+          </DCArtboard>
+          <DCArtboard id="m01-mb-motion" label="m01-mb-motion" width={375} height={812}>
+            <M01MotionBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m02-grid" title="M02 · 홈 · 추천 (viewport grid POC)" subtitle="fix29에서 추가. m02-{mb|tb|dt}-{main|state-{loading/empty/error/permission/pending}|components|assets|motion}. 결정적 ID로 모든 화면을 식별.">
+          <DCArtboard id="m02-mb-main" label="m02-mb-main — 모바일 메인" width={375} height={812}>
+            <M02MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m02-tb-main" label="m02-tb-main — 태블릿 2-col" width={768} height={1024}>
+            <M02TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m02-dt-main" label="m02-dt-main — 데스크탑 3-col workspace" width={1280} height={820}>
+            <M02DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-state-loading" label="m02-mb-state-loading" width={375} height={812}>
+            <M02MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-state-empty" label="m02-mb-state-empty" width={375} height={812}>
+            <M02MobileStateEmpty/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-state-error" label="m02-mb-state-error" width={375} height={812}>
+            <M02MobileStateError/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-state-permission" label="m02-mb-state-permission" width={375} height={812}>
+            <M02MobileStatePermission/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-state-pending" label="m02-mb-state-pending" width={375} height={812}>
+            <M02MobileStatePending/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-components" label="m02-mb-components" width={375} height={812}>
+            <M02ComponentsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m02-tb-components" label="m02-tb-components" width={768} height={1024}>
+            <M02ComponentsBoard viewport="tb"/>
+          </DCArtboard>
+          <DCArtboard id="m02-dt-components" label="m02-dt-components" width={1280} height={820}>
+            <M02ComponentsBoard viewport="dt"/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-assets" label="m02-mb-assets" width={375} height={812}>
+            <M02AssetsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m02-tb-assets" label="m02-tb-assets" width={768} height={1024}>
+            <M02AssetsBoard viewport="tb"/>
+          </DCArtboard>
+          <DCArtboard id="m02-dt-assets" label="m02-dt-assets" width={1280} height={820}>
+            <M02AssetsBoard viewport="dt"/>
+          </DCArtboard>
+          <DCArtboard id="m02-mb-motion" label="m02-mb-motion" width={375} height={812}>
+            <M02MotionBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m03-grid" title="M03 · 개인 매치 (viewport grid)" subtitle="fix30. ID schema m03-{mb|tb|dt}-{main|detail|create|state|components|assets|motion}. Routes: /matches /matches/[id] /matches/new /matches/[id]/edit.">
+          <DCArtboard id="m03-mb-main" label="m03-mb-main" width={375} height={812}><M03MobileMain/></DCArtboard>
+          <DCArtboard id="m03-tb-main" label="m03-tb-main" width={768} height={1024}><M03TabletMain/></DCArtboard>
+          <DCArtboard id="m03-dt-main" label="m03-dt-main" width={1280} height={820}><M03DesktopMain/></DCArtboard>
+          <DCArtboard id="m03-mb-detail" label="m03-mb-detail" width={375} height={812}><M03MobileDetail/></DCArtboard>
+          <DCArtboard id="m03-mb-create" label="m03-mb-create" width={375} height={812}><M03MobileCreate/></DCArtboard>
+          <DCArtboard id="m03-mb-state-loading" label="m03-mb-state-loading" width={375} height={812}><M03MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m03-mb-state-empty" label="m03-mb-state-empty" width={375} height={812}><M03MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m03-mb-state-deadline" label="m03-mb-state-deadline" width={375} height={812}><M03MobileStateDeadline/></DCArtboard>
+          <DCArtboard id="m03-mb-state-sold-out" label="m03-mb-state-sold-out" width={375} height={812}><M03MobileStateSoldOut/></DCArtboard>
+          <DCArtboard id="m03-mb-state-error" label="m03-mb-state-error" width={375} height={812}><M03MobileStateError/></DCArtboard>
+          <DCArtboard id="m03-mb-components" label="m03-mb-components" width={375} height={812}><M03MobileComponents/></DCArtboard>
+          <DCArtboard id="m03-tb-components" label="m03-tb-components" width={768} height={1024}><M03TabletComponents/></DCArtboard>
+          <DCArtboard id="m03-dt-components" label="m03-dt-components" width={1280} height={820}><M03DesktopComponents/></DCArtboard>
+          <DCArtboard id="m03-mb-assets" label="m03-mb-assets" width={375} height={812}><M03MobileAssets/></DCArtboard>
+          <DCArtboard id="m03-mb-motion" label="m03-mb-motion" width={375} height={812}><M03MobileMotion/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m04-grid" title="M04 · 팀 · 팀매칭 (viewport grid)" subtitle="fix30. ID schema m04-{mb|tb|dt}-{main|detail|create|flow-evaluate|flow-checkin|state|components|assets|motion}. Routes: /teams /teams/[id] /team-matches/*.">
+          <DCArtboard id="m04-mb-main" label="m04-mb-main" width={375} height={812}><M04MobileMain/></DCArtboard>
+          <DCArtboard id="m04-tb-main" label="m04-tb-main" width={768} height={1024}><M04TabletMain/></DCArtboard>
+          <DCArtboard id="m04-dt-main" label="m04-dt-main" width={1280} height={820}><M04DesktopMain/></DCArtboard>
+          <DCArtboard id="m04-mb-detail" label="m04-mb-detail" width={375} height={812}><M04MobileDetail/></DCArtboard>
+          <DCArtboard id="m04-mb-create" label="m04-mb-create" width={375} height={812}><M04MobileCreate/></DCArtboard>
+          <DCArtboard id="m04-mb-flow-evaluate" label="m04-mb-flow-evaluate" width={375} height={812}><M04MobileFlowEvaluate/></DCArtboard>
+          <DCArtboard id="m04-mb-flow-checkin" label="m04-mb-flow-checkin" width={375} height={812}><M04MobileFlowCheckin/></DCArtboard>
+          <DCArtboard id="m04-mb-state-loading" label="m04-mb-state-loading" width={375} height={812}><M04MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m04-mb-state-empty" label="m04-mb-state-empty" width={375} height={812}><M04MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m04-mb-state-permission" label="m04-mb-state-permission" width={375} height={812}><M04MobileStatePermission/></DCArtboard>
+          <DCArtboard id="m04-mb-state-pending" label="m04-mb-state-pending" width={375} height={812}><M04MobileStatePending/></DCArtboard>
+          <DCArtboard id="m04-mb-components" label="m04-mb-components" width={375} height={812}><M04MobileComponents/></DCArtboard>
+          <DCArtboard id="m04-tb-components" label="m04-tb-components" width={768} height={1024}><M04TabletComponents/></DCArtboard>
+          <DCArtboard id="m04-dt-components" label="m04-dt-components" width={1280} height={820}><M04DesktopComponents/></DCArtboard>
+          <DCArtboard id="m04-mb-assets" label="m04-mb-assets" width={375} height={812}><M04MobileAssets/></DCArtboard>
+          <DCArtboard id="m04-mb-motion" label="m04-mb-motion" width={375} height={812}><M04MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m05-grid" title="M05 · 레슨 Academy (viewport grid)" subtitle="fix30. ID schema m05-{mb|tb|dt}-{main|detail|create|flow-ticket|state|components|assets|motion}. Routes: /lessons /lessons/[id] /my/lesson-tickets.">
+          <DCArtboard id="m05-mb-main" label="m05-mb-main" width={375} height={812}><M05MobileMain/></DCArtboard>
+          <DCArtboard id="m05-tb-main" label="m05-tb-main" width={768} height={1024}><M05TabletMain/></DCArtboard>
+          <DCArtboard id="m05-dt-main" label="m05-dt-main" width={1280} height={820}><M05DesktopMain/></DCArtboard>
+          <DCArtboard id="m05-mb-detail" label="m05-mb-detail" width={375} height={812}><M05MobileDetail/></DCArtboard>
+          <DCArtboard id="m05-mb-create" label="m05-mb-create" width={375} height={812}><M05MobileCreate/></DCArtboard>
+          <DCArtboard id="m05-mb-flow-ticket" label="m05-mb-flow-ticket" width={375} height={812}><M05MobileFlowTicket/></DCArtboard>
+          <DCArtboard id="m05-mb-state-loading" label="m05-mb-state-loading" width={375} height={812}><M05MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m05-mb-state-empty" label="m05-mb-state-empty" width={375} height={812}><M05MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m05-mb-state-deadline" label="m05-mb-state-deadline" width={375} height={812}><M05MobileStateDeadline/></DCArtboard>
+          <DCArtboard id="m05-mb-state-sold-out" label="m05-mb-state-sold-out" width={375} height={812}><M05MobileStateSoldOut/></DCArtboard>
+          <DCArtboard id="m05-mb-components" label="m05-mb-components" width={375} height={812}><M05ComponentsBoard viewport="mb"/></DCArtboard>
+          <DCArtboard id="m05-tb-components" label="m05-tb-components" width={768} height={1024}><M05ComponentsBoard viewport="tb"/></DCArtboard>
+          <DCArtboard id="m05-dt-components" label="m05-dt-components" width={1280} height={820}><M05ComponentsBoard viewport="dt"/></DCArtboard>
+          <DCArtboard id="m05-mb-assets" label="m05-mb-assets" width={375} height={812}><M05AssetsBoard viewport="mb"/></DCArtboard>
+          <DCArtboard id="m05-mb-motion" label="m05-mb-motion" width={375} height={812}><M05MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m06-grid" title="M06 · 장터 Marketplace (viewport grid)" subtitle="fix30. ID schema m06-{mb|tb|dt}-{main|detail|create|flow-order|flow-dispute|state|components|assets|motion}. Routes: /marketplace /marketplace/[id] /marketplace/orders/[id].">
+          <DCArtboard id="m06-mb-main" label="m06-mb-main" width={375} height={812}><M06MobileMain/></DCArtboard>
+          <DCArtboard id="m06-tb-main" label="m06-tb-main" width={768} height={1024}><M06TabletMain/></DCArtboard>
+          <DCArtboard id="m06-dt-main" label="m06-dt-main" width={1280} height={820}><M06DesktopMain/></DCArtboard>
+          <DCArtboard id="m06-mb-detail" label="m06-mb-detail" width={375} height={812}><M06MobileDetail/></DCArtboard>
+          <DCArtboard id="m06-mb-create" label="m06-mb-create" width={375} height={812}><M06MobileCreate/></DCArtboard>
+          <DCArtboard id="m06-mb-flow-order" label="m06-mb-flow-order" width={375} height={812}><M06MobileFlowOrder/></DCArtboard>
+          <DCArtboard id="m06-mb-flow-dispute" label="m06-mb-flow-dispute" width={375} height={812}><M06MobileFlowDispute/></DCArtboard>
+          <DCArtboard id="m06-mb-state-loading" label="m06-mb-state-loading" width={375} height={812}><M06MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m06-mb-state-empty" label="m06-mb-state-empty" width={375} height={812}><M06MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m06-mb-state-sold-out" label="m06-mb-state-sold-out" width={375} height={812}><M06MobileStateSoldOut/></DCArtboard>
+          <DCArtboard id="m06-mb-state-error" label="m06-mb-state-error" width={375} height={812}><M06MobileStateError/></DCArtboard>
+          <DCArtboard id="m06-mb-components" label="m06-mb-components" width={375} height={812}><M06ComponentsBoard viewport="mb"/></DCArtboard>
+          <DCArtboard id="m06-tb-components" label="m06-tb-components" width={768} height={1024}><M06ComponentsBoard viewport="tb"/></DCArtboard>
+          <DCArtboard id="m06-dt-components" label="m06-dt-components" width={1280} height={820}><M06ComponentsBoard viewport="dt"/></DCArtboard>
+          <DCArtboard id="m06-mb-assets" label="m06-mb-assets" width={375} height={812}><M06AssetsBoard/></DCArtboard>
+          <DCArtboard id="m06-mb-motion" label="m06-mb-motion" width={375} height={812}><M06MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m08-grid" title="M08 · 용병 Mercenary (viewport grid)" subtitle="fix30. ID schema m08-{mb|tb|dt}-{main|detail|create|state|components|assets|motion}. Routes: /mercenary /mercenary/[id] /teams/[id]/mercenary.">
+          <DCArtboard id="m08-mb-main" label="m08-mb-main" width={375} height={812}><M08MobileMain/></DCArtboard>
+          <DCArtboard id="m08-tb-main" label="m08-tb-main" width={768} height={1024}><M08TabletMain/></DCArtboard>
+          <DCArtboard id="m08-dt-main" label="m08-dt-main" width={1280} height={820}><M08DesktopMain/></DCArtboard>
+          <DCArtboard id="m08-mb-detail" label="m08-mb-detail" width={375} height={812}><M08MobileDetail/></DCArtboard>
+          <DCArtboard id="m08-mb-create" label="m08-mb-create" width={375} height={812}><M08MobileCreate/></DCArtboard>
+          <DCArtboard id="m08-mb-state-loading" label="m08-mb-state-loading" width={375} height={812}><M08MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m08-mb-state-empty" label="m08-mb-state-empty" width={375} height={812}><M08MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m08-mb-state-deadline" label="m08-mb-state-deadline" width={375} height={812}><M08MobileStateDeadline/></DCArtboard>
+          <DCArtboard id="m08-mb-state-sold-out" label="m08-mb-state-sold-out" width={375} height={812}><M08MobileStateSoldOut/></DCArtboard>
+          <DCArtboard id="m08-mb-state-pending" label="m08-mb-state-pending" width={375} height={812}><M08MobileStatePending/></DCArtboard>
+          <DCArtboard id="m08-mb-components" label="m08-mb-components" width={375} height={812}><M08ComponentsBoard/></DCArtboard>
+          <DCArtboard id="m08-mb-assets" label="m08-mb-assets" width={375} height={812}><M08AssetsBoard/></DCArtboard>
+          <DCArtboard id="m08-mb-motion" label="m08-mb-motion" width={375} height={812}><M08MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m09-grid" title="M09 · 대회 Tournaments (viewport grid)" subtitle="fix30. ID schema m09-{mb|tb|dt}-{main|detail|create|flow-bracket|state|components|assets|motion}. Routes: /tournaments /tournaments/[id] /tournaments/new.">
+          <DCArtboard id="m09-mb-main" label="m09-mb-main" width={375} height={812}><M09MobileMain/></DCArtboard>
+          <DCArtboard id="m09-tb-main" label="m09-tb-main" width={768} height={1024}><M09TabletMain/></DCArtboard>
+          <DCArtboard id="m09-dt-main" label="m09-dt-main" width={1280} height={820}><M09DesktopMain/></DCArtboard>
+          <DCArtboard id="m09-mb-detail" label="m09-mb-detail" width={375} height={812}><M09MobileDetail/></DCArtboard>
+          <DCArtboard id="m09-mb-create" label="m09-mb-create" width={375} height={812}><M09MobileCreate/></DCArtboard>
+          <DCArtboard id="m09-mb-flow-bracket" label="m09-mb-flow-bracket" width={375} height={812}><M09MobileFlowBracket/></DCArtboard>
+          <DCArtboard id="m09-mb-state-loading" label="m09-mb-state-loading" width={375} height={812}><M09MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m09-mb-state-empty" label="m09-mb-state-empty" width={375} height={812}><M09MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m09-mb-state-deadline" label="m09-mb-state-deadline" width={375} height={812}><M09MobileStateDeadline/></DCArtboard>
+          <DCArtboard id="m09-mb-state-sold-out" label="m09-mb-state-sold-out" width={375} height={812}><M09MobileStateSoldOut/></DCArtboard>
+          <DCArtboard id="m09-mb-components" label="m09-mb-components" width={375} height={812}><M09MobileComponents/></DCArtboard>
+          <DCArtboard id="m09-mb-assets" label="m09-mb-assets" width={375} height={812}><M09MobileAssets/></DCArtboard>
+          <DCArtboard id="m09-mb-motion" label="m09-mb-motion" width={375} height={812}><M09MobileMotion/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m12-grid" title="M12 · 커뮤니티 · 채팅 · 알림 (viewport grid)" subtitle="fix30. ID schema m12-{mb|tb|dt}-{main|detail|flow-notif|flow-feed|state|components|assets|motion}. Routes: /chat /chat/[id] /notifications /feed.">
+          <DCArtboard id="m12-mb-main" label="m12-mb-main" width={375} height={812}><M12MobileMain/></DCArtboard>
+          <DCArtboard id="m12-tb-main" label="m12-tb-main" width={768} height={1024}><M12TabletMain/></DCArtboard>
+          <DCArtboard id="m12-dt-main" label="m12-dt-main" width={1280} height={820}><M12DesktopMain/></DCArtboard>
+          <DCArtboard id="m12-mb-detail" label="m12-mb-detail" width={375} height={812}><M12MobileDetail/></DCArtboard>
+          <DCArtboard id="m12-mb-flow-notif" label="m12-mb-flow-notif" width={375} height={812}><M12MobileFlowNotif/></DCArtboard>
+          <DCArtboard id="m12-mb-flow-feed" label="m12-mb-flow-feed" width={375} height={812}><M12MobileFlowFeed/></DCArtboard>
+          <DCArtboard id="m12-mb-state-loading" label="m12-mb-state-loading" width={375} height={812}><M12MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m12-mb-state-empty" label="m12-mb-state-empty" width={375} height={812}><M12MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m12-mb-state-error" label="m12-mb-state-error" width={375} height={812}><M12MobileStateError/></DCArtboard>
+          <DCArtboard id="m12-mb-state-pending" label="m12-mb-state-pending" width={375} height={812}><M12MobileStatePending/></DCArtboard>
+          <DCArtboard id="m12-mb-components" label="m12-mb-components" width={375} height={812}><M12ComponentsBoard/></DCArtboard>
+          <DCArtboard id="m12-mb-assets" label="m12-mb-assets" width={375} height={812}><M12AssetsBoard/></DCArtboard>
+          <DCArtboard id="m12-tb-components" label="m12-tb-components" width={768} height={1024}><M12TabletComponents/></DCArtboard>
+          <DCArtboard id="m12-mb-motion" label="m12-mb-motion" width={375} height={812}><M12MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m14-grid" title="M14 · 결제 · 환불 · 분쟁 (viewport grid)" subtitle="fix30. ID schema m14-{mb|tb|dt}-{main|detail|flow-checkout|flow-refund|flow-dispute|state|components|assets|motion}. Routes: /payments /payments/checkout /payments/[id]/refund /my/disputes.">
+          <DCArtboard id="m14-mb-main" label="m14-mb-main" width={375} height={812}><M14MobileMain/></DCArtboard>
+          <DCArtboard id="m14-tb-main" label="m14-tb-main" width={768} height={1024}><M14TabletMain/></DCArtboard>
+          <DCArtboard id="m14-dt-main" label="m14-dt-main" width={1280} height={820}><M14DesktopMain/></DCArtboard>
+          <DCArtboard id="m14-mb-detail" label="m14-mb-detail" width={375} height={812}><M14MobileDetail/></DCArtboard>
+          <DCArtboard id="m14-mb-flow-checkout" label="m14-mb-flow-checkout" width={375} height={812}><M14MobileFlowCheckout/></DCArtboard>
+          <DCArtboard id="m14-mb-flow-refund" label="m14-mb-flow-refund" width={375} height={812}><M14MobileFlowRefund/></DCArtboard>
+          <DCArtboard id="m14-mb-flow-dispute" label="m14-mb-flow-dispute" width={375} height={812}><M14MobileFlowDispute/></DCArtboard>
+          <DCArtboard id="m14-mb-state-loading" label="m14-mb-state-loading" width={375} height={812}><M14MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m14-mb-state-pending" label="m14-mb-state-pending" width={375} height={812}><M14MobileStatePending/></DCArtboard>
+          <DCArtboard id="m14-mb-state-error" label="m14-mb-state-error" width={375} height={812}><M14MobileStateError/></DCArtboard>
+          <DCArtboard id="m14-mb-state-success" label="m14-mb-state-success" width={375} height={812}><M14MobileStateSuccess/></DCArtboard>
+          <DCArtboard id="m14-mb-components" label="m14-mb-components" width={375} height={812}><M14MobileComponents/></DCArtboard>
+          <DCArtboard id="m14-mb-assets" label="m14-mb-assets" width={375} height={812}><M14MobileAssets/></DCArtboard>
+          <DCArtboard id="m14-tb-components" label="m14-tb-components" width={768} height={1024}><M14TabletComponents/></DCArtboard>
+          <DCArtboard id="m14-mb-motion" label="m14-mb-motion" width={375} height={812}><M14MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m15-grid" title="M15 · 설정 · 약관 · 상태 (viewport grid)" subtitle="fix30. ID schema m15-{mb|tb|dt}-{main|detail|flow-account|flow-terms|state|components|assets|motion}. Routes: /settings /settings/account /settings/notifications /settings/privacy /settings/terms.">
+          <DCArtboard id="m15-mb-main" label="m15-mb-main" width={375} height={812}><M15MobileMain/></DCArtboard>
+          <DCArtboard id="m15-tb-main" label="m15-tb-main" width={768} height={1024}><M15TabletMain/></DCArtboard>
+          <DCArtboard id="m15-dt-main" label="m15-dt-main" width={1280} height={820}><M15DesktopMain/></DCArtboard>
+          <DCArtboard id="m15-mb-detail" label="m15-mb-detail" width={375} height={812}><M15MobileDetail/></DCArtboard>
+          <DCArtboard id="m15-mb-flow-account" label="m15-mb-flow-account" width={375} height={812}><M15MobileFlowAccount/></DCArtboard>
+          <DCArtboard id="m15-mb-flow-terms" label="m15-mb-flow-terms" width={375} height={812}><M15MobileFlowTerms/></DCArtboard>
+          <DCArtboard id="m15-mb-state-loading" label="m15-mb-state-loading" width={375} height={812}><M15MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m15-mb-state-success" label="m15-mb-state-success" width={375} height={812}><M15MobileStateSuccess/></DCArtboard>
+          <DCArtboard id="m15-mb-state-permission" label="m15-mb-state-permission" width={375} height={812}><M15MobileStatePermission/></DCArtboard>
+          <DCArtboard id="m15-mb-state-error" label="m15-mb-state-error" width={375} height={812}><M15MobileStateError/></DCArtboard>
+          <DCArtboard id="m15-mb-components" label="m15-mb-components" width={375} height={812}><M15MobileComponentsBoard/></DCArtboard>
+          <DCArtboard id="m15-mb-assets" label="m15-mb-assets" width={375} height={812}><M15MobileAssetsBoard/></DCArtboard>
+          <DCArtboard id="m15-tb-components" label="m15-tb-components" width={768} height={1024}><M15TabletComponentsBoard/></DCArtboard>
+          <DCArtboard id="m15-mb-motion" label="m15-mb-motion" width={375} height={812}><M15MotionBoard/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m16-grid" title="M16 · 공개 · 마케팅 (viewport grid)" subtitle="fix30. ID schema m16-{mb|tb|dt}-{main|detail|flow-pricing|flow-faq|flow-guide|state|components|assets|motion}. Routes: / /landing /about /faq /guide /pricing.">
+          <DCArtboard id="m16-mb-main" label="m16-mb-main" width={375} height={812}><M16MobileMain/></DCArtboard>
+          <DCArtboard id="m16-tb-main" label="m16-tb-main" width={768} height={1024}><M16TabletMain/></DCArtboard>
+          <DCArtboard id="m16-dt-main" label="m16-dt-main" width={1280} height={820}><M16DesktopMain/></DCArtboard>
+          <DCArtboard id="m16-mb-detail" label="m16-mb-detail" width={375} height={812}><M16MobileDetail/></DCArtboard>
+          <DCArtboard id="m16-mb-flow-pricing" label="m16-mb-flow-pricing" width={375} height={812}><M16MobileFlowPricing/></DCArtboard>
+          <DCArtboard id="m16-mb-flow-faq" label="m16-mb-flow-faq" width={375} height={812}><M16MobileFlowFaq/></DCArtboard>
+          <DCArtboard id="m16-mb-flow-guide" label="m16-mb-flow-guide" width={375} height={812}><M16MobileFlowGuide/></DCArtboard>
+          <DCArtboard id="m16-mb-state-loading" label="m16-mb-state-loading" width={375} height={812}><M16MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m16-mb-state-empty" label="m16-mb-state-empty" width={375} height={812}><M16MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m16-mb-state-error" label="m16-mb-state-error" width={375} height={812}><M16MobileStateError/></DCArtboard>
+          <DCArtboard id="m16-mb-components" label="m16-mb-components" width={375} height={812}><M16MobileComponents/></DCArtboard>
+          <DCArtboard id="m16-mb-assets" label="m16-mb-assets" width={375} height={812}><M16MobileAssets/></DCArtboard>
+          <DCArtboard id="m16-tb-components" label="m16-tb-components" width={768} height={1024}><M16TabletComponents/></DCArtboard>
+          <DCArtboard id="m16-mb-motion" label="m16-mb-motion" width={375} height={812}><M16MobileMotion/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m17-grid" title="M17 · 데스크탑 웹 (viewport grid)" subtitle="fix30. ID schema m17-{tb|dt}-{main|detail|list|flow-search|state|components|assets|motion}. Desktop dominant — mobile 의도적 0. 17 모듈은 desktop workspace + tablet narrow.">
+          <DCArtboard id="m17-tb-main" label="m17-tb-main" width={768} height={1024}><M17TabletMain/></DCArtboard>
+          <DCArtboard id="m17-dt-main" label="m17-dt-main" width={1280} height={820}><M17DesktopMain/></DCArtboard>
+          <DCArtboard id="m17-dt-detail" label="m17-dt-detail" width={1280} height={820}><M17DesktopDetail/></DCArtboard>
+          <DCArtboard id="m17-dt-list" label="m17-dt-list" width={1280} height={820}><M17DesktopList/></DCArtboard>
+          <DCArtboard id="m17-dt-flow-search" label="m17-dt-flow-search" width={1280} height={820}><M17DesktopFlowSearch/></DCArtboard>
+          <DCArtboard id="m17-dt-state-loading" label="m17-dt-state-loading" width={1280} height={820}><M17DesktopStateLoading/></DCArtboard>
+          <DCArtboard id="m17-dt-state-empty" label="m17-dt-state-empty" width={1280} height={820}><M17DesktopStateEmpty/></DCArtboard>
+          <DCArtboard id="m17-dt-state-error" label="m17-dt-state-error" width={1280} height={820}><M17DesktopStateError/></DCArtboard>
+          <DCArtboard id="m17-dt-components" label="m17-dt-components" width={1280} height={820}><M17DesktopComponents/></DCArtboard>
+          <DCArtboard id="m17-tb-components" label="m17-tb-components" width={768} height={1024}><M17TabletComponents/></DCArtboard>
+          <DCArtboard id="m17-dt-assets" label="m17-dt-assets" width={1280} height={820}><M17DesktopAssets/></DCArtboard>
+          <DCArtboard id="m17-dt-motion" label="m17-dt-motion" width={1280} height={820}><M17DesktopMotion/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m18-grid" title="M18 · 관리자 · 운영 (viewport grid)" subtitle="fix30. ID schema m18-{tb|dt}-{main|detail|list|flow-payout|flow-ops|flow-stats|state|components|assets|motion}. Admin sidebar 단독 dark exception (tm-admin-sidebar). Routes: /admin/dashboard /admin/disputes /admin/ops /admin/payouts.">
+          <DCArtboard id="m18-tb-main" label="m18-tb-main" width={768} height={1024}><M18TabletMain/></DCArtboard>
+          <DCArtboard id="m18-dt-main" label="m18-dt-main" width={1280} height={820}><M18DesktopMain/></DCArtboard>
+          <DCArtboard id="m18-dt-detail" label="m18-dt-detail" width={1280} height={820}><M18DesktopDetail/></DCArtboard>
+          <DCArtboard id="m18-dt-list" label="m18-dt-list" width={1280} height={820}><M18DesktopList/></DCArtboard>
+          <DCArtboard id="m18-dt-flow-payout" label="m18-dt-flow-payout" width={1280} height={820}><M18DesktopFlowPayout/></DCArtboard>
+          <DCArtboard id="m18-dt-flow-ops" label="m18-dt-flow-ops" width={1280} height={820}><M18DesktopFlowOps/></DCArtboard>
+          <DCArtboard id="m18-dt-flow-stats" label="m18-dt-flow-stats" width={1280} height={820}><M18DesktopFlowStats/></DCArtboard>
+          <DCArtboard id="m18-dt-state-loading" label="m18-dt-state-loading" width={1280} height={820}><M18DesktopStateLoading/></DCArtboard>
+          <DCArtboard id="m18-dt-state-empty" label="m18-dt-state-empty" width={1280} height={820}><M18DesktopStateEmpty/></DCArtboard>
+          <DCArtboard id="m18-dt-state-error" label="m18-dt-state-error" width={1280} height={820}><M18DesktopStateError/></DCArtboard>
+          <DCArtboard id="m18-dt-state-permission" label="m18-dt-state-permission" width={1280} height={820}><M18DesktopStatePermission/></DCArtboard>
+          <DCArtboard id="m18-dt-components" label="m18-dt-components" width={1280} height={820}><M18DesktopComponents/></DCArtboard>
+          <DCArtboard id="m18-tb-components" label="m18-tb-components" width={768} height={1024}><M18TabletComponents/></DCArtboard>
+          <DCArtboard id="m18-dt-assets" label="m18-dt-assets" width={1280} height={820}><M18DesktopAssets/></DCArtboard>
+          <DCArtboard id="m18-dt-motion" label="m18-dt-motion" width={1280} height={820}><M18DesktopMotion/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="m10-grid" title="M10 · 장비 대여 (viewport grid POC)" subtitle="fix29에서 추가. ID schema m10-{mb|tb|dt}-{main|detail|flow-pickup|state-*|components|assets|motion}. Future scope: /rentals, /rentals/[id], /rentals/orders/[id].">
+          <DCArtboard id="m10-mb-main" label="m10-mb-main — 장비 리스트 + 카테고리" width={375} height={812}>
+            <M10MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m10-tb-main" label="m10-tb-main — 태블릿 2-col" width={768} height={1024}>
+            <M10TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m10-dt-main" label="m10-dt-main — 데스크탑 3-col workspace" width={1280} height={820}>
+            <M10DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-detail" label="m10-mb-detail — 장비 상세 + 예약 캘린더 + 보증금" width={375} height={812}>
+            <M10MobileDetail/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-flow-pickup" label="m10-mb-flow-pickup — 픽업/반납 step" width={375} height={812}>
+            <M10MobileFlowPickup/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-state-loading" label="m10-mb-state-loading" width={375} height={812}>
+            <M10MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-state-empty" label="m10-mb-state-empty" width={375} height={812}>
+            <M10MobileStateEmpty/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-state-deadline" label="m10-mb-state-deadline — 반납 임박" width={375} height={812}>
+            <M10MobileStateDeadline/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-state-sold-out" label="m10-mb-state-sold-out" width={375} height={812}>
+            <M10MobileStateSoldOut/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-state-error" label="m10-mb-state-error — 보증금 결제 실패" width={375} height={812}>
+            <M10MobileStateError/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-components" label="m10-mb-components" width={375} height={812}>
+            <M10ComponentsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-assets" label="m10-mb-assets" width={375} height={812}>
+            <M10AssetsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m10-mb-motion" label="m10-mb-motion" width={375} height={812}>
+            <M10MotionBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m11-grid" title="M11 · 종목 · 실력 · 안전 (viewport grid POC)" subtitle="fix29에서 추가. ID schema m11-{mb|tb|dt}-{main|detail|flow-verify|state-*|components|assets|motion}. Future scope: /sports, /sports/[type], /safety/*, /level/verification. sportCardAccent 11종 전체 표현.">
+          <DCArtboard id="m11-mb-main" label="m11-mb-main — 11종목 hub" width={375} height={812}>
+            <M11MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m11-tb-main" label="m11-tb-main — 태블릿 2-panel" width={768} height={1024}>
+            <M11TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m11-dt-main" label="m11-dt-main — 데스크탑 3-col workspace" width={1280} height={820}>
+            <M11DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-detail" label="m11-mb-detail — 종목별 가이드 (실력 단계 + 안전 수칙)" width={375} height={812}>
+            <M11MobileDetail/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-flow-verify" label="m11-mb-flow-verify — 실력 인증 form (영상 업로드)" width={375} height={812}>
+            <M11MobileFlowVerify/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-state-loading" label="m11-mb-state-loading" width={375} height={812}>
+            <M11MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-state-empty" label="m11-mb-state-empty" width={375} height={812}>
+            <M11MobileStateEmpty/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-state-error" label="m11-mb-state-error — 인증 거부" width={375} height={812}>
+            <M11MobileStateError/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-state-permission" label="m11-mb-state-permission — 카메라 권한" width={375} height={812}>
+            <M11MobileStatePermission/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-state-pending" label="m11-mb-state-pending — 인증 검토 중" width={375} height={812}>
+            <M11MobileStatePending/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-components" label="m11-mb-components" width={375} height={812}>
+            <M11ComponentsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-assets" label="m11-mb-assets — sportCardAccent 11종 swatch 포함" width={375} height={812}>
+            <M11AssetsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m11-mb-motion" label="m11-mb-motion" width={375} height={812}>
+            <M11MotionBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m07-grid" title="M07 · 시설 Venues (viewport grid)" subtitle="fix29. ID schema m07-{mb|tb|dt}-{main|detail|flow|state|components|assets|motion}. Routes: /venues  /venues/[id]  /venues/[id]/edit">
+          <DCArtboard id="m07-mb-main" label="m07-mb-main" width={375} height={812}>
+            <M07MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m07-tb-main" label="m07-tb-main" width={768} height={1024}>
+            <M07TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m07-dt-main" label="m07-dt-main" width={1280} height={820}>
+            <M07DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-detail" label="m07-mb-detail" width={375} height={812}>
+            <M07MobileDetail/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-flow-booking" label="m07-mb-flow-booking" width={375} height={812}>
+            <M07MobileFlowBooking/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-state-loading" label="m07-mb-state-loading" width={375} height={812}>
+            <M07MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-state-empty" label="m07-mb-state-empty" width={375} height={812}>
+            <M07MobileStateEmpty/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-state-permission" label="m07-mb-state-permission" width={375} height={812}>
+            <M07MobileStatePermission/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-state-deadline" label="m07-mb-state-deadline" width={375} height={812}>
+            <M07MobileStateDeadline/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-state-sold-out" label="m07-mb-state-sold-out" width={375} height={812}>
+            <M07MobileStateSoldOut/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-components" label="m07-mb-components" width={375} height={812}>
+            <M07MobileComponents/>
+          </DCArtboard>
+          <DCArtboard id="m07-tb-components" label="m07-tb-components" width={768} height={600}>
+            <M07TabletComponents/>
+          </DCArtboard>
+          <DCArtboard id="m07-dt-components" label="m07-dt-components" width={1280} height={600}>
+            <M07DesktopComponents/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-assets" label="m07-mb-assets" width={375} height={812}>
+            <M07MobileAssets/>
+          </DCArtboard>
+          <DCArtboard id="m07-mb-motion" label="m07-mb-motion" width={375} height={812}>
+            <M07MobileMotion/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="auth-onboarding" title="01 · 인증 · 온보딩" subtitle="로그인, OAuth callback, 온보딩 3-step, 환영 화면을 시작 흐름으로 통합">
+          <DCArtboard id="login" label="로그인" width={375} height={812} data-canonical-id="m01-mb-main">
+            <Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-callback-states" label="/callback/kakao · /callback/naver" width={375} height={812} data-canonical-id="m01-mb-main-callback-states">
+            <AuthCallbackStates/>
+          </DCArtboard>
+          <DCArtboard id="ob-intro" label="온보딩 · 종목 선택" width={375} height={812} data-canonical-id="m01-mb-main-intro">
+            <OnboardingV2_Step1/>
+          </DCArtboard>
+          <DCArtboard id="ob-level" label="온보딩 · 레벨 선택" width={375} height={812} data-canonical-id="m01-mb-main-level">
+            <OnboardingV2_Step2/>
+          </DCArtboard>
+          <DCArtboard id="ob-region" label="온보딩 · 지역 선택" width={375} height={812} data-canonical-id="m01-mb-main-region">
+            <OnboardingV2_Step3/>
+          </DCArtboard>
+          <DCArtboard id="ob-welcome-main" label="온보딩 · 환영 화면" width={375} height={812} data-canonical-id="m01-mb-main-welcome">
+            <OnboardingV2_Welcome/>
+          </DCArtboard>
+          <DCArtboard id="auth-case-matrix" label="인증 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m01-mb-main-matrix">
+            <ModuleCaseMatrix module="auth"/>
+          </DCArtboard>
+          <DCArtboard id="auth-state-edge" label="인증 · 예외 상태 UI" width={375} height={812} data-canonical-id="m01-mb-main-state-edge">
+            <AuthStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="auth-validation-permission" label="온보딩 · 검증/권한 거부" width={375} height={812} data-canonical-id="m01-mb-state-permission">
+            <AuthValidationAndPermissionBoard/>
+          </DCArtboard>
+          <DCArtboard id="auth-control-states" label="인증 · 버튼/입력 상태" width={375} height={812} data-canonical-id="m01-mb-components">
+            <AuthControlStatesBoard/>
+          </DCArtboard>
+          <DCArtboard id="auth-motion-contract" label="인증 · 모션 계약" width={840} height={812} data-canonical-id="m01-tb-motion">
+            <AuthMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="auth-responsive" label="인증 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m01-dt-main-responsive">
+            <AuthResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="home-discovery" title="02 · 홈 · 추천" subtitle="Toss canonical home, quick action, editorial, dashboard, story/feed, widget/FAB, 추천 이유를 한 홈 모듈로 통합">
+          <DCArtboard id="home-a" label="홈 · Toss canonical" width={375} height={812} data-canonical-id="m02-mb-main-a">
+            <HomeToss/>
+          </DCArtboard>
+          <DCArtboard id="home-b" label="홈 · Quick action" width={375} height={812} data-canonical-id="m02-mb-main-b">
+            <HomeB_V2/>
+          </DCArtboard>
+          <DCArtboard id="home-c" label="홈 · 미니멀 인사말" width={375} height={812} data-canonical-id="m02-mb-main-c">
+            <HomeC_V2/>
+          </DCArtboard>
+          <DCArtboard id="home-d" label="홈 · Editorial" width={375} height={812} data-canonical-id="m02-mb-edit-d">
+            <HomeEditorialV2/>
+          </DCArtboard>
+          <DCArtboard id="home-f" label="홈 · Story / Feed" width={375} height={812} data-canonical-id="m02-mb-flow-feed-f">
+            <HomeStoriesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-plus" label="홈 · 위젯 + FAB" width={375} height={812} data-canonical-id="m02-mb-main-widget">
+            <HomePlusV2/>
+          </DCArtboard>
+          <DCArtboard id="growth-experiments" label="추천 · 초대 실험" width={375} height={812} data-canonical-id="m02-mb-main-recommended">
+            <GrowthExperiments/>
+          </DCArtboard>
+          <DCArtboard id="home-case-matrix" label="홈 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m02-mb-main-matrix">
+            <ModuleCaseMatrix module="home"/>
+          </DCArtboard>
+          <DCArtboard id="home-state-edge" label="홈 · 상태/예외 UI" width={375} height={812} data-canonical-id="m02-mb-main">
+            <HomeStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="home-recommendation-edge" label="홈 · 추천 엣지케이스" width={375} height={812} data-canonical-id="m02-mb-main-recommended-recommendation-edge">
+            <HomeRecommendationEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="home-control-interactions" label="홈 · 버튼/FAB/필터 상태" width={375} height={812} data-canonical-id="m02-mb-main-fab">
+            <HomeControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="home-motion-contract" label="홈 · 모션 계약" width={840} height={812} data-canonical-id="m02-tb-main">
+            <HomeMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="home-responsive" label="홈 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m02-dt-main-responsive">
+            <HomeResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core" title="03 · 개인 매치" subtitle="개인 매치 탐색, 지도, 타임라인, 스와이프, 상세, 참가, 생성 화면을 매치 모듈로 통합">
+          <DCArtboard id="m-list" label="매치 목록 · 카드 리스트" width={375} height={812} data-canonical-id="m03-mb-list">
+            <MatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="m-map" label="매치 목록 · 지도 기반" width={375} height={812} data-canonical-id="m03-mb-list-map">
+            <MatchesMapV2/>
+          </DCArtboard>
+          <DCArtboard id="m-timeline" label="매치 목록 · 시간대별 타임라인" width={375} height={812} data-canonical-id="m03-mb-list-timeline">
+            <MatchesTimelineV2/>
+          </DCArtboard>
+          <DCArtboard id="m-swipe" label="매치 목록 · 스와이프 매칭" width={375} height={812} data-canonical-id="m03-mb-list-swipe">
+            <MatchesSwipeV2/>
+          </DCArtboard>
+          <DCArtboard id="m-dense" label="매치 목록 · 콤팩트 피드" width={375} height={812} data-canonical-id="m03-mb-flow-feed">
+            <MatchesDenseV2/>
+          </DCArtboard>
+          <DCArtboard id="m-detail" label="매치 상세" width={375} height={812} data-canonical-id="m03-mb-detail">
+            <MatchDetail/>
+          </DCArtboard>
+          <DCArtboard id="m-join" label="매치 참가 바텀시트" width={375} height={812} data-canonical-id="m03-mb-main-bottomsheet">
+            <div style={{ position: 'relative', width: 375, height: 812 }}>
+              <MatchDetail/>
+              <JoinSheet open m={MATCHES[0]}/>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-new" label="매치 만들기" width={375} height={812} data-canonical-id="m03-mb-create">
+            <MatchCreate/>
+          </DCArtboard>
+          <DCArtboard id="my-matches" label="내 매치" width={375} height={812} data-canonical-id="m03-mb-main">
+            <MyMatches/>
+          </DCArtboard>
+          <DCArtboard id="matches-case-matrix" label="개인 매치 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m03-mb-main-matrix">
+            <ModuleCaseMatrix module="matches"/>
+          </DCArtboard>
+          <DCArtboard id="matches-state-edge" label="개인 매치 · 상태/예외 UI" width={375} height={812} data-canonical-id="m03-mb-main-state-edge">
+            <MatchesStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-join-sheet-states" label="개인 매치 · 참가 바텀시트 상태" width={375} height={812} data-canonical-id="m03-mb-main-bottomsheet-join-sheet-states">
+            <MatchesJoinSheetStatesBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-map-permission-edge" label="개인 매치 · 지도/권한 엣지케이스" width={375} height={812} data-canonical-id="m03-mb-state-permission-map">
+            <MatchesMapPermissionBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-control-interactions" label="개인 매치 · 버튼/필터/CTA 상태" width={375} height={812} data-canonical-id="m03-mb-components-filter">
+            <MatchesControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-motion-contract" label="개인 매치 · 모션 계약" width={840} height={812} data-canonical-id="m03-tb-motion">
+            <MatchesMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-responsive" label="개인 매치 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m03-dt-main-responsive">
+            <MatchesResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="teams-team-matches" title="04 · 팀 · 팀매칭" subtitle="팀 매칭, 팀 프로필, 가입 신청, 예약, 출석, 스코어, 평가, 팀장 도구를 팀 모듈로 통합">
+          <DCArtboard id="tm-list" label="팀 매칭 목록" width={375} height={812} data-canonical-id="m04-mb-list">
+            <TeamMatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="tm-detail" label="팀 매칭 상세" width={375} height={812} data-canonical-id="m04-mb-detail">
+            <TeamMatchDetailV2/>
+          </DCArtboard>
+          <DCArtboard id="team-profile" label="팀 프로필" width={375} height={812} data-canonical-id="m04-mb-detail-profile">
+            <TeamDetailV2/>
+          </DCArtboard>
+          <DCArtboard id="tmatch-new" label="팀 매칭 만들기" width={375} height={812} data-canonical-id="m04-mb-create">
+            <TeamMatchCreate/>
+          </DCArtboard>
+          <DCArtboard id="team-new" label="팀 만들기" width={375} height={812} data-canonical-id="m04-mb-create-new">
+            <TeamCreate/>
+          </DCArtboard>
+          <DCArtboard id="team-join" label="팀 가입 신청" width={375} height={812} data-canonical-id="m04-mb-main">
+            <TeamJoinRequest/>
+          </DCArtboard>
+          <DCArtboard id="team-match-book" label="팀 매치 예약" width={375} height={812} data-canonical-id="m04-mb-main-book">
+            <TeamMatchBook/>
+          </DCArtboard>
+          <DCArtboard id="tm-arrival" label="팀 매치 출석 체크" width={375} height={812} data-canonical-id="m04-mb-flow-checkin">
+            <TMArrival/>
+          </DCArtboard>
+          <DCArtboard id="tm-score" label="팀 매치 스코어 입력" width={375} height={812} data-canonical-id="m04-mb-flow-score">
+            <TMScore/>
+          </DCArtboard>
+          <DCArtboard id="tm-evaluate" label="팀 매치 경기 평가" width={375} height={812} data-canonical-id="m04-mb-flow-evaluate">
+            <TMEvaluate/>
+          </DCArtboard>
+          <DCArtboard id="team-members" label="팀원 관리" width={375} height={812} data-canonical-id="m04-mb-main-members">
+            <TeamMembers/>
+          </DCArtboard>
+          <DCArtboard id="team-history" label="팀 경기 기록" width={375} height={812} data-canonical-id="m04-mb-main-history">
+            <TeamMatchHistory/>
+          </DCArtboard>
+          <DCArtboard id="team-merc" label="팀 용병 모집" width={375} height={812} data-canonical-id="m04-mb-main-merc">
+            <TeamMercenary/>
+          </DCArtboard>
+          <DCArtboard id="my-tm-apps" label="내 팀매치 신청" width={375} height={812} data-canonical-id="m04-mb-main-apps">
+            <MyTeamMatchApplications/>
+          </DCArtboard>
+          <DCArtboard id="my-teams" label="내 팀" width={375} height={812} data-canonical-id="m04-mb-main-teams">
+            <MyTeams/>
+          </DCArtboard>
+          <DCArtboard id="team-captain-tools" label="팀장 도구" width={375} height={812} data-canonical-id="m04-mb-main-captain-tools">
+            <TeamCaptainTools/>
+          </DCArtboard>
+          <DCArtboard id="teams-case-matrix" label="팀 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m04-mb-main-matrix">
+            <ModuleCaseMatrix module="teams"/>
+          </DCArtboard>
+          <DCArtboard id="teams-state-edge" label="팀 · 상태/예외 UI" width={375} height={812} data-canonical-id="m04-mb-main-state-edge">
+            <TeamsStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="teams-role-permission" label="팀 · 역할/권한 매트릭스" width={960} height={812} data-canonical-id="m04-tb-state-permission-matrix">
+            <TeamsRolePermissionBoard/>
+          </DCArtboard>
+          <DCArtboard id="teams-join-approval" label="팀 · 가입 승인/거절 상태" width={375} height={812} data-canonical-id="m04-mb-main-join-approval">
+            <TeamsJoinApprovalBoard/>
+          </DCArtboard>
+          <DCArtboard id="teams-ops-conflict" label="팀매칭 · 출석/스코어 충돌" width={375} height={812} data-canonical-id="m04-mb-flow-score-ops-conflict">
+            <TeamsMatchOpsConflictBoard/>
+          </DCArtboard>
+          <DCArtboard id="teams-control-interactions" label="팀 · 버튼/역할/운영 컨트롤" width={375} height={812} data-canonical-id="m04-mb-components">
+            <TeamsControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="teams-motion-contract" label="팀 · 모션 계약" width={840} height={812} data-canonical-id="m04-tb-motion">
+            <TeamsMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="teams-responsive" label="팀 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m04-dt-main-responsive">
+            <TeamsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="lessons" title="05 · 레슨 Academy" subtitle="Academy Hub를 레슨 메인으로 고정하고 코스, 코치, 상세, 등록, 수강권, 코치 운영, 데스크탑 레슨까지 통합">
+          <DCArtboard id="lesson-academy-main" label="레슨 메인 · Academy Hub" width={375} height={812} data-canonical-id="m05-mb-list-hub">
+            <LessonAcademyHub/>
+          </DCArtboard>
+          <DCArtboard id="lessons-list" label="레슨 목록 · 코스 탐색" width={375} height={812} data-canonical-id="m05-mb-flow-search">
+            <LessonsListV2/>
+          </DCArtboard>
+          <DCArtboard id="lessons-coaches" label="코치 탐색" width={375} height={812} data-canonical-id="m05-mb-flow-search-coaches">
+            <LessonsCoaches/>
+          </DCArtboard>
+          <DCArtboard id="lesson-detail-v2" label="레슨 상세 · 고도화" width={375} height={812} data-canonical-id="m05-mb-detail">
+            <M_LessonDetail/>
+          </DCArtboard>
+          <DCArtboard id="lesson-new" label="/lessons/new · 레슨 등록" width={375} height={812} data-canonical-id="m05-mb-create">
+            <LessonCreate/>
+          </DCArtboard>
+          <DCArtboard id="lesson-pass-list" label="수강권 보관함" width={375} height={812} data-canonical-id="m05-mb-flow-ticket">
+            <LessonPass/>
+          </DCArtboard>
+          <DCArtboard id="lesson-pass-buy" label="수강권 구매" width={375} height={812} data-canonical-id="m05-mb-flow-ticket-pass-buy">
+            <LessonPassBuy/>
+          </DCArtboard>
+          <DCArtboard id="my-tickets" label="내 수강권" width={375} height={812} data-canonical-id="m05-mb-flow-ticket-tickets">
+            <MyLessonTickets/>
+          </DCArtboard>
+          <DCArtboard id="coach-workspace" label="코치 워크스페이스" width={375} height={812} data-canonical-id="m05-mb-main">
+            <CoachWorkspace/>
+          </DCArtboard>
+          <DCArtboard id="desktop-lessons" label="Desktop · 레슨 탐색" width={1280} height={800} data-canonical-id="m05-dt-flow-search">
+            <DesktopLessons/>
+          </DCArtboard>
+          <DCArtboard id="desktop-lesson-detail" label="Desktop · 레슨 상세" width={1280} height={800} data-canonical-id="m05-dt-detail">
+            <DesktopLessonDetail/>
+          </DCArtboard>
+          <DCArtboard id="lessons-case-matrix" label="레슨 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m05-mb-main-matrix">
+            <ModuleCaseMatrix module="lessons"/>
+          </DCArtboard>
+          <DCArtboard id="lessons-academy-hierarchy" label="레슨 · 아카데미 허브 IA" width={960} height={812} data-canonical-id="m05-tb-main">
+            <LessonsAcademyHierarchyBoard/>
+          </DCArtboard>
+          <DCArtboard id="lessons-state-edge" label="레슨 · 상태/예외 UI" width={375} height={812} data-canonical-id="m05-mb-main-state-edge">
+            <LessonsStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="lessons-ticket-lifecycle" label="수강권 · 만료/잔여/환불 상태" width={375} height={812} data-canonical-id="m05-mb-flow-refund">
+            <LessonsTicketLifecycleBoard/>
+          </DCArtboard>
+          <DCArtboard id="lessons-schedule-exceptions" label="레슨 · 일정 변경/휴강/대기" width={375} height={812} data-canonical-id="m05-mb-main-schedule-exceptions">
+            <LessonsScheduleExceptionsBoard/>
+          </DCArtboard>
+          <DCArtboard id="lessons-control-interactions" label="레슨 · 버튼/예약/구매 컨트롤" width={375} height={812} data-canonical-id="m05-mb-components">
+            <LessonsControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="lessons-motion-contract" label="레슨 · 모션 계약" width={840} height={812} data-canonical-id="m05-tb-motion">
+            <LessonsMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="lessons-responsive" label="레슨 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m05-dt-main-responsive">
+            <LessonsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="marketplace" title="06 · 장터 Marketplace" subtitle="장터 목록, 트렌딩, 카탈로그, 상세, 등록, 주문 상태, 내 판매글, 데스크탑 장터를 통합">
+          <DCArtboard id="market" label="장터 메인" width={375} height={812} data-canonical-id="m06-mb-main">
+            <MarketplaceV2/>
+          </DCArtboard>
+          <DCArtboard id="market-hot" label="장터 · hot/trending" width={375} height={812} data-canonical-id="m06-mb-list">
+            <MarketHot/>
+          </DCArtboard>
+          <DCArtboard id="market-catalog" label="장터 · catalog" width={375} height={812} data-canonical-id="m06-mb-list-catalog">
+            <MarketCatalog/>
+          </DCArtboard>
+          <DCArtboard id="listing-detail-v2" label="장터 상세 · 고도화" width={375} height={812} data-canonical-id="m06-mb-detail">
+            <M_ListingDetail/>
+          </DCArtboard>
+          <DCArtboard id="listing-new" label="/marketplace/new · 판매글 등록" width={375} height={812} data-canonical-id="m06-mb-create">
+            <ListingCreate/>
+          </DCArtboard>
+          <DCArtboard id="market-order-status" label="장터 주문 · 거래 상태" width={375} height={812} data-canonical-id="m06-mb-flow-order">
+            <MarketplaceOrderStatus/>
+          </DCArtboard>
+          <DCArtboard id="my-listings" label="내 판매글" width={375} height={812} data-canonical-id="m06-mb-list-listings">
+            <MyListings/>
+          </DCArtboard>
+          <DCArtboard id="desktop-market" label="Desktop · 장터" width={1280} height={800} data-canonical-id="m06-dt-main">
+            <DesktopMarket/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-case-matrix" label="장터 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m06-mb-main-matrix">
+            <ModuleCaseMatrix module="marketplace"/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-state-edge" label="장터 · 상태/예외 UI" width={375} height={812} data-canonical-id="m06-mb-main-state-edge">
+            <MarketplaceStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-order-lifecycle" label="장터 · 주문/거래 라이프사이클" width={375} height={812} data-canonical-id="m06-mb-flow-order-order-lifecycle">
+            <MarketplaceOrderLifecycleBoard/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-upload-price-edge" label="장터 · 사진/가격 변경 예외" width={375} height={812} data-canonical-id="m06-mb-flow-pricing">
+            <MarketplaceUploadPriceEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-dispute-safety" label="장터 · 분쟁/신고/안전거래" width={375} height={812} data-canonical-id="m06-mb-flow-dispute">
+            <MarketplaceDisputeSafetyBoard/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-control-interactions" label="장터 · 버튼/필터/제안 컨트롤" width={375} height={812} data-canonical-id="m06-mb-components-filter">
+            <MarketplaceControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-motion-contract" label="장터 · 모션 계약" width={840} height={812} data-canonical-id="m06-tb-motion">
+            <MarketplaceMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="marketplace-responsive" label="장터 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m06-dt-main-responsive">
+            <MarketplaceResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="venues" title="07 · 시설 Venues" subtitle="시설 목록, 지도, 예약, 상세, 시설 운영, 데스크탑 지도/상세를 시설 모듈로 통합">
+          <DCArtboard id="venues-list" label="시설 목록" width={375} height={812} data-canonical-id="m07-mb-list">
+            <M_VenueList/>
+          </DCArtboard>
+          <DCArtboard id="venues-map" label="시설 · 지도뷰" width={375} height={812} data-canonical-id="m07-mb-main-map">
+            <M_VenueMap/>
+          </DCArtboard>
+          <DCArtboard id="venues-week" label="시설 · weekly availability" width={375} height={812} data-canonical-id="m07-mb-main-weekly">
+            <VenuesWeek/>
+          </DCArtboard>
+          <DCArtboard id="venue-detail-v2" label="시설 상세 · 고도화" width={375} height={812} data-canonical-id="m07-mb-detail">
+            <M_VenueDetail/>
+          </DCArtboard>
+          <DCArtboard id="venue-book" label="시설 시간대 예약" width={375} height={812} data-canonical-id="m07-mb-main">
+            <VenueBooking/>
+          </DCArtboard>
+          <DCArtboard id="venue-owner-console" label="시설 운영 콘솔" width={375} height={812} data-canonical-id="m07-mb-main-owner-console">
+            <VenueOwnerConsole/>
+          </DCArtboard>
+          <DCArtboard id="desktop-venues" label="Desktop · 시설 (지도+리스트)" width={1280} height={800} data-canonical-id="m07-dt-main-map">
+            <DesktopVenues/>
+          </DCArtboard>
+          <DCArtboard id="desktop-venue-detail" label="Desktop · 시설 상세" width={1280} height={800} data-canonical-id="m07-dt-detail">
+            <DesktopVenueDetail/>
+          </DCArtboard>
+          <DCArtboard id="venues-case-matrix" label="시설 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m07-mb-main-matrix">
+            <ModuleCaseMatrix module="venues"/>
+          </DCArtboard>
+          <DCArtboard id="venues-state-edge" label="시설 · 상태/예외 UI" width={375} height={812} data-canonical-id="m07-mb-main-state-edge">
+            <VenuesStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="venues-booking-slot-conflict" label="시설 · 예약 슬롯 충돌" width={375} height={812} data-canonical-id="m07-mb-main-booking-slot-conflict">
+            <VenuesBookingSlotConflictBoard/>
+          </DCArtboard>
+          <DCArtboard id="venues-map-permission" label="시설 · 지도/위치 권한" width={375} height={812} data-canonical-id="m07-mb-state-permission-map">
+            <VenuesMapPermissionBoard/>
+          </DCArtboard>
+          <DCArtboard id="venues-closure-price-edge" label="시설 · 휴관/가격 예외" width={375} height={812} data-canonical-id="m07-mb-flow-pricing">
+            <VenuesClosurePriceEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="venues-control-interactions" label="시설 · 버튼/필터/예약 컨트롤" width={375} height={812} data-canonical-id="m07-mb-components-filter">
+            <VenuesControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="venues-motion-contract" label="시설 · 모션 계약" width={840} height={812} data-canonical-id="m07-tb-motion">
+            <VenuesMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="venues-responsive" label="시설 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m07-dt-main-responsive">
+            <VenuesResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="mercenary" title="08 · 용병 Mercenary" subtitle="용병 목록, 상세, 등록을 용병 기능으로 통합">
+          <DCArtboard id="mercenary" label="용병 목록" width={375} height={812} data-canonical-id="m08-mb-list-mercenary">
+            <MercenaryV2/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-detail" label="용병 상세" width={375} height={812} data-canonical-id="m08-mb-detail-detail">
+            <MercenaryDetailV2/>
+          </DCArtboard>
+          <DCArtboard id="merc-new" label="용병 공고 등록" width={375} height={812} data-canonical-id="m08-mb-create">
+            <MercCreate/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-case-matrix" label="용병 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m08-mb-main-matrix">
+            <ModuleCaseMatrix module="mercenary"/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-state-edge" label="용병 · 상태/예외 UI" width={375} height={812} data-canonical-id="m08-mb-main">
+            <MercenaryStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-position-filled" label="용병 · 포지션 충원/대기" width={375} height={812} data-canonical-id="m08-mb-main-position-filled">
+            <MercenaryPositionFilledBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-reward-change" label="용병 · 보상 변경/동의" width={375} height={812} data-canonical-id="m08-mb-main-reward-change">
+            <MercenaryRewardChangeBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-host-trust" label="용병 · 호스트 신뢰/안전" width={375} height={812} data-canonical-id="m08-mb-main-host-trust">
+            <MercenaryHostTrustBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-control-interactions" label="용병 · 버튼/지원/취소 컨트롤" width={375} height={812} data-canonical-id="m08-mb-components">
+            <MercenaryControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-motion-contract" label="용병 · 모션 계약" width={840} height={812} data-canonical-id="m08-tb-motion">
+            <MercenaryMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-responsive" label="용병 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m08-dt-main-responsive">
+            <MercenaryResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="tournaments" title="09 · 대회 Tournaments" subtitle="대회 목록, 상세, 대진표, 운영 도구를 대회 모듈로 통합">
+          <DCArtboard id="tourn" label="대회 목록" width={375} height={812} data-canonical-id="m09-mb-list-tourn">
+            <TournamentsV2/>
+          </DCArtboard>
+          <DCArtboard id="tourn-detail-domain-refresh" label="대회 상세 · 대진표" width={375} height={812} data-canonical-id="m09-mb-flow-bracket-detail-domain-refresh">
+            <TournamentDetailV2/>
+          </DCArtboard>
+          <DCArtboard id="tourn-detail" label="대회 상세 · 상세 페이지" width={375} height={812} data-canonical-id="m09-mb-detail">
+            <TournamentDetail/>
+          </DCArtboard>
+          <DCArtboard id="tournament-ops" label="대회 운영 도구" width={1180} height={760} data-canonical-id="m09-dt-flow-ops">
+            <TournamentOps/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-case-matrix" label="대회 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m09-mb-main-matrix">
+            <ModuleCaseMatrix module="tournaments"/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-state-edge" label="대회 · 상태/예외 UI" width={375} height={812} data-canonical-id="m09-mb-main">
+            <TournamentsStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-bracket-conflict" label="대회 · 대진표 충돌" width={375} height={812} data-canonical-id="m09-mb-flow-bracket-bracket-conflict">
+            <TournamentsBracketConflictBoard/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-result-dispute" label="대회 · 결과 이의/순위 보류" width={375} height={812} data-canonical-id="m09-mb-flow-dispute">
+            <TournamentsResultDisputeBoard/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-payout-account" label="대회 · 상금/계좌 누락" width={375} height={812} data-canonical-id="m09-mb-flow-payout">
+            <TournamentsPayoutAccountBoard/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-control-interactions" label="대회 · 버튼/접수/운영 컨트롤" width={375} height={812} data-canonical-id="m09-mb-components">
+            <TournamentsControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-motion-contract" label="대회 · 모션 계약" width={840} height={812} data-canonical-id="m09-tb-motion">
+            <TournamentsMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="tournaments-responsive" label="대회 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m09-dt-main-responsive">
+            <TournamentsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="equipment-rental" title="10 · 장비 대여" subtitle="장비 대여 목록, 상세, 픽업/반납 운영을 장비 대여 모듈로 통합">
+          <DCArtboard id="rental" label="장비 대여 목록" width={375} height={812} data-canonical-id="m10-mb-list">
+            <EquipmentRental/>
+          </DCArtboard>
+          <DCArtboard id="rental-detail" label="장비 대여 상세" width={375} height={812} data-canonical-id="m10-mb-detail">
+            <RentalDetail/>
+          </DCArtboard>
+          <DCArtboard id="rental-operations" label="장비 대여 운영" width={375} height={812} data-canonical-id="m10-mb-flow-ops">
+            <RentalOperations/>
+          </DCArtboard>
+          <DCArtboard id="rental-case-matrix" label="장비 대여 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m10-mb-main-matrix">
+            <ModuleCaseMatrix module="rental"/>
+          </DCArtboard>
+          <DCArtboard id="rental-state-edge" label="장비 대여 · 상태/예외 UI" width={375} height={812} data-canonical-id="m10-mb-main">
+            <RentalStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="rental-pickup-return" label="장비 대여 · 픽업/반납 QR" width={375} height={812} data-canonical-id="m10-mb-flow-pickup">
+            <RentalPickupReturnBoard/>
+          </DCArtboard>
+          <DCArtboard id="rental-deposit-damage" label="장비 대여 · 보증금/파손" width={375} height={812} data-canonical-id="m10-mb-main-deposit-damage">
+            <RentalDepositDamageBoard/>
+          </DCArtboard>
+          <DCArtboard id="rental-inventory-conflict" label="장비 대여 · 재고/예약 충돌" width={375} height={812} data-canonical-id="m10-mb-main-inventory-conflict">
+            <RentalInventoryConflictBoard/>
+          </DCArtboard>
+          <DCArtboard id="rental-control-interactions" label="장비 대여 · 버튼/기간/업로드 컨트롤" width={375} height={812} data-canonical-id="m10-mb-components">
+            <RentalControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="rental-motion-contract" label="장비 대여 · 모션 계약" width={840} height={812} data-canonical-id="m10-tb-motion">
+            <RentalMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="rental-responsive" label="장비 대여 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m10-dt-main-responsive">
+            <RentalResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="sports-level-safety" title="11 · 종목 · 실력 · 안전" subtitle="종목별 UX, 실력 인증, 안전 체크를 플레이 조건 모듈로 통합">
+          <DCArtboard id="sport-hub" label="종목 허브" width={375} height={812} data-canonical-id="m11-mb-list-hub">
+            <SportHub/>
+          </DCArtboard>
+          <DCArtboard id="soccer-pos" label="⚽ 축구 · 포지션 선택" width={375} height={812} data-canonical-id="m11-mb-main">
+            <SoccerMatchDetail/>
+          </DCArtboard>
+          <DCArtboard id="futsal" label="풋살 · 시간대 선택" width={375} height={812} data-canonical-id="m11-mb-main-futsal">
+            <FutsalMatch/>
+          </DCArtboard>
+          <DCArtboard id="basketball" label="🏀 농구 · 3on3 팀 구성" width={375} height={812} data-canonical-id="m11-mb-main-basketball">
+            <BasketballMatch/>
+          </DCArtboard>
+          <DCArtboard id="tennis" label="🎾 테니스 · 단/복식 & NTRP" width={375} height={812} data-canonical-id="m11-mb-main-tennis">
+            <TennisMatch/>
+          </DCArtboard>
+          <DCArtboard id="badminton" label="🏸 배드민턴 · 복식 파트너" width={375} height={812} data-canonical-id="m11-mb-main-badminton">
+            <BadmintonMatch/>
+          </DCArtboard>
+          <DCArtboard id="hockey" label="🏒 아이스하키 · 장비 체크" width={375} height={812} data-canonical-id="m11-mb-main-hockey">
+            <IceHockeyMatch/>
+          </DCArtboard>
+          <DCArtboard id="lv-soccer" label="⚽ 축구 · 선출 인증" width={375} height={812} data-canonical-id="m11-mb-main-soccer">
+            <SoccerLevelCert/>
+          </DCArtboard>
+          <DCArtboard id="lv-hockey" label="🏒 아이스·피겨 · 등급" width={375} height={812} data-canonical-id="m11-mb-main-lv-hockey">
+            <HockeyLevelCert/>
+          </DCArtboard>
+          <DCArtboard id="lv-tennis" label="🎾 테니스 · NTRP" width={375} height={812} data-canonical-id="m11-mb-main-lv-tennis">
+            <TennisLevelCert/>
+          </DCArtboard>
+          <DCArtboard id="lv-badminton" label="🏸 배드민턴 · 군부" width={375} height={812} data-canonical-id="m11-mb-main-lv-badminton">
+            <BadmintonLevelCert/>
+          </DCArtboard>
+          <DCArtboard id="lv-basket" label="🏀 농구 · 신장·특기" width={375} height={812} data-canonical-id="m11-mb-main-basket">
+            <BasketLevelCert/>
+          </DCArtboard>
+          <DCArtboard id="safety-checks" label="종목별 안전 체크" width={375} height={812} data-canonical-id="m11-mb-flow-verify">
+            <SafetyChecks/>
+          </DCArtboard>
+          <DCArtboard id="sports-case-matrix" label="종목 · 안전 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m11-mb-main-matrix">
+            <ModuleCaseMatrix module="sports"/>
+          </DCArtboard>
+          <DCArtboard id="sports-capability-state" label="종목 · 상태/예외 UI" width={375} height={812} data-canonical-id="m11-mb-main-capability-state">
+            <SportsCapabilityStateBoard/>
+          </DCArtboard>
+          <DCArtboard id="sports-verification-rejected" label="종목 · 인증 반려/재제출" width={375} height={812} data-canonical-id="m11-mb-main-verification-rejected">
+            <SportsVerificationRejectedBoard/>
+          </DCArtboard>
+          <DCArtboard id="sports-equipment-safety" label="종목 · 장비/안전 CTA 차단" width={375} height={812} data-canonical-id="m11-mb-flow-verify-equipment-safety">
+            <SportsEquipmentSafetyBoard/>
+          </DCArtboard>
+          <DCArtboard id="sports-privacy-display" label="종목 · 공개 범위/개인정보" width={375} height={812} data-canonical-id="m11-mb-flow-terms">
+            <SportsPrivacyDisplayBoard/>
+          </DCArtboard>
+          <DCArtboard id="sports-control-interactions" label="종목 · 버튼/칩/체크 컨트롤" width={375} height={812} data-canonical-id="m11-mb-components">
+            <SportsControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="sports-motion-contract" label="종목 · 모션 계약" width={840} height={812} data-canonical-id="m11-tb-motion">
+            <SportsMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="sports-responsive" label="종목 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m11-dt-main-responsive">
+            <SportsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="community" title="12 · 커뮤니티 · 채팅 · 알림" subtitle="채팅, 알림, 피드, 매치 내 채팅 임베드를 커뮤니티 모듈로 통합">
+          <DCArtboard id="community-chat-list" label="채팅 목록" width={375} height={812} data-canonical-id="m12-mb-list-list">
+            <ChatListV2/>
+          </DCArtboard>
+          <DCArtboard id="chat-room" label="채팅방" width={375} height={812} data-canonical-id="m12-mb-detail-room">
+            <ChatRoomV2/>
+          </DCArtboard>
+          <DCArtboard id="notifs" label="알림 그룹핑" width={375} height={812} data-canonical-id="m12-mb-flow-notif-notifs">
+            <NotificationsV2/>
+          </DCArtboard>
+          <DCArtboard id="feed" label="커뮤니티 피드" width={375} height={812} data-canonical-id="m12-mb-flow-feed">
+            <Feed/>
+          </DCArtboard>
+          <DCArtboard id="chat-embed" label="매치 내 채팅 탭" width={375} height={812} data-canonical-id="m12-mb-main">
+            <ChatEmbed/>
+          </DCArtboard>
+          <DCArtboard id="community-case-matrix" label="커뮤니티 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m12-mb-main-matrix">
+            <ModuleCaseMatrix module="community"/>
+          </DCArtboard>
+          <DCArtboard id="community-state-edge" label="커뮤니티 · 상태/예외 UI" width={375} height={812} data-canonical-id="m12-mb-main-state-edge">
+            <CommunityStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="community-message-failure" label="커뮤니티 · 메시지 전송 실패" width={375} height={812} data-canonical-id="m12-mb-main-message-failure">
+            <CommunityMessageFailureBoard/>
+          </DCArtboard>
+          <DCArtboard id="community-blocked-user" label="커뮤니티 · 차단/만료 채팅방" width={375} height={812} data-canonical-id="m12-mb-detail-blocked-user">
+            <CommunityBlockedUserBoard/>
+          </DCArtboard>
+          <DCArtboard id="community-notification-race" label="커뮤니티 · 알림 읽음/딥링크 경합" width={375} height={812} data-canonical-id="m12-mb-flow-notif-notification-race">
+            <CommunityNotificationRaceBoard/>
+          </DCArtboard>
+          <DCArtboard id="community-control-interactions" label="커뮤니티 · 버튼/스와이프/입력 컨트롤" width={375} height={812} data-canonical-id="m12-mb-components-swipe">
+            <CommunityControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="community-motion-contract" label="커뮤니티 · 모션 계약" width={840} height={812} data-canonical-id="m12-tb-motion">
+            <CommunityMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="community-responsive" label="커뮤니티 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m12-dt-main-responsive">
+            <CommunityResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="my-profile-trust" title="13 · 마이 · 프로필 · 평판" subtitle="마이 홈, 내 활동, 프로필, 리뷰, 뱃지, 내 활동 확장 커버리지를 통합">
+          <DCArtboard id="my" label="마이 홈" width={375} height={812} data-canonical-id="m13-mb-main">
+            <MyPageV2/>
+          </DCArtboard>
+          <DCArtboard id="my-activity" label="내 활동 요약" width={375} height={812} data-canonical-id="m13-mb-main-activity">
+            <MyActivityV2/>
+          </DCArtboard>
+          <DCArtboard id="profile-edit" label="프로필 수정" width={375} height={812} data-canonical-id="m13-mb-edit">
+            <ProfileEdit/>
+          </DCArtboard>
+          <DCArtboard id="reviews" label="받은 리뷰" width={375} height={812} data-canonical-id="m13-mb-main-reviews">
+            <ReviewsReceived/>
+          </DCArtboard>
+          <DCArtboard id="review-write" label="리뷰 작성" width={375} height={812} data-canonical-id="m13-mb-create">
+            <ReviewWrite/>
+          </DCArtboard>
+          <DCArtboard id="badges" label="뱃지" width={375} height={812} data-canonical-id="m13-mb-main-badges">
+            <Badges/>
+          </DCArtboard>
+          <DCArtboard id="my-expanded" label="내 활동 추가 커버리지" width={375} height={812} data-canonical-id="m13-mb-main-expanded">
+            <MyExpandedCoverage/>
+          </DCArtboard>
+          <DCArtboard id="my-case-matrix" label="마이 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m13-mb-main-matrix">
+            <ModuleCaseMatrix module="my"/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-state-edge" label="마이 · 상태/예외 UI" width={375} height={812} data-canonical-id="m13-mb-detail">
+            <MyProfileStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-upload-error" label="마이 · 사진 업로드 오류" width={375} height={812} data-canonical-id="m13-mb-state-error">
+            <MyProfileUploadErrorBoard/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-privacy-trust" label="마이 · 비공개/신뢰 라벨" width={375} height={812} data-canonical-id="m13-mb-flow-terms">
+            <MyProfilePrivacyTrustBoard/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-badge-review" label="마이 · 뱃지/리뷰 상태" width={375} height={812} data-canonical-id="m13-mb-detail-profile-badge-review">
+            <MyProfileBadgeReviewBoard/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-control-interactions" label="마이 · 버튼/탭/저장 컨트롤" width={375} height={812} data-canonical-id="m13-mb-detail-profile-control-interact">
+            <MyProfileControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-motion-contract" label="마이 · 모션 계약" width={840} height={812} data-canonical-id="m13-tb-detail">
+            <MyProfileMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="my-profile-responsive" label="마이 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m13-dt-detail-responsive">
+            <MyProfileResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m13-grid" title="M13 · 마이 · 프로필 · 평판 (viewport grid POC)" subtitle="fix29. ID schema m13-{mb|tb|dt}-{main|detail|flow|state|components|assets|motion}[-{sub}]. Routes: /profile, /users/[id], /badges, /reviews, /my/matches, /my/teams, /my/lesson-tickets, /my/listings, /my/mercenary, /my/team-matches, /my/team-match-applications, /my/reviews-received, /my/disputes, /my/disputes/[id]">
+          <DCArtboard id="m13-mb-main" label="m13-mb-main — 모바일 마이 허브" width={375} height={812}>
+            <M13MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m13-tb-main" label="m13-tb-main — 태블릿 2-col 마이" width={768} height={1024}>
+            <M13TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m13-dt-main" label="m13-dt-main — 데스크탑 3-col workspace" width={1280} height={820}>
+            <M13DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-detail" label="m13-mb-detail — 프로필 상세 (매너+신뢰+뱃지)" width={375} height={812}>
+            <M13MobileDetail/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-flow-mymatches" label="m13-mb-flow-mymatches" width={375} height={812}>
+            <M13MobileFlowMyMatches/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-flow-myteams" label="m13-mb-flow-myteams" width={375} height={812}>
+            <M13MobileFlowMyTeams/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-flow-tickets" label="m13-mb-flow-tickets — 수강권" width={375} height={812}>
+            <M13MobileFlowTickets/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-flow-reviews-received" label="m13-mb-flow-reviews-received" width={375} height={812}>
+            <M13MobileFlowReviewsReceived/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-state-loading" label="m13-mb-state-loading" width={375} height={812}>
+            <M13MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-state-empty" label="m13-mb-state-empty — 신규 사용자 활동 없음" width={375} height={812}>
+            <M13MobileStateEmpty/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-state-error" label="m13-mb-state-error" width={375} height={812}>
+            <M13MobileStateError/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-components" label="m13-mb-components" width={375} height={812}>
+            <M13ComponentsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-assets" label="m13-mb-assets" width={375} height={812}>
+            <M13AssetsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m13-tb-components" label="m13-tb-components" width={768} height={1024}>
+            <M13TabletComponents/>
+          </DCArtboard>
+          <DCArtboard id="m13-mb-motion" label="m13-mb-motion" width={375} height={812}>
+            <M13MotionBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="payments-support" title="14 · 결제 · 환불 · 분쟁" subtitle="체크아웃, 결제 성공/내역/상세, 환불, 분쟁, 신뢰 센터를 거래 지원 모듈로 통합">
+          <DCArtboard id="checkout" label="체크아웃" width={375} height={812} data-canonical-id="m14-mb-flow-checkout-checkout">
+            <PaymentCheckoutV2/>
+          </DCArtboard>
+          <DCArtboard id="pay-success-v2" label="결제 완료" width={375} height={812} data-canonical-id="m14-mb-state-success-success-v2">
+            <PaymentSuccessV2/>
+          </DCArtboard>
+          <DCArtboard id="pay-history-v2" label="결제 내역" width={375} height={812} data-canonical-id="m14-mb-main-history-v2">
+            <PaymentHistoryV2/>
+          </DCArtboard>
+          <DCArtboard id="pay-detail" label="/payments/[id] · 결제 상세" width={375} height={812} data-canonical-id="m14-mb-detail">
+            <PaymentDetail/>
+          </DCArtboard>
+          <DCArtboard id="pay-refund" label="/payments/[id]/refund" width={375} height={812} data-canonical-id="m14-mb-flow-refund">
+            <PaymentRefund/>
+          </DCArtboard>
+          <DCArtboard id="my-disputes" label="내 분쟁/문의" width={375} height={812} data-canonical-id="m14-mb-flow-dispute">
+            <MyDisputes/>
+          </DCArtboard>
+          <DCArtboard id="trust-center" label="신뢰 센터" width={1180} height={760} data-canonical-id="m14-dt-main">
+            <TrustCenter/>
+          </DCArtboard>
+          <DCArtboard id="payments-case-matrix" label="결제 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m14-mb-main-matrix">
+            <ModuleCaseMatrix module="payments"/>
+          </DCArtboard>
+          <DCArtboard id="payments-state-edge" label="결제 · 상태/예외 UI" width={375} height={812} data-canonical-id="m14-mb-main-state-edge">
+            <PaymentsStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="payments-pending-failed" label="결제 · 승인 대기/실패" width={375} height={812} data-canonical-id="m14-mb-state-error">
+            <PaymentsPendingFailedBoard/>
+          </DCArtboard>
+          <DCArtboard id="payments-refund-edge" label="결제 · 부분/거절 환불" width={375} height={812} data-canonical-id="m14-mb-flow-refund-refund-edge">
+            <PaymentsRefundEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="payments-receipt-settlement" label="결제 · 영수증/정산 정보" width={375} height={812} data-canonical-id="m14-mb-main-receipt-settlement">
+            <PaymentsReceiptSettlementBoard/>
+          </DCArtboard>
+          <DCArtboard id="payments-control-interactions" label="결제 · 버튼/사유/영수증 컨트롤" width={375} height={812} data-canonical-id="m14-mb-components">
+            <PaymentsControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="payments-motion-contract" label="결제 · 모션 계약" width={840} height={812} data-canonical-id="m14-tb-motion">
+            <PaymentsMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="payments-responsive" label="결제 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m14-dt-main-responsive">
+            <PaymentsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="settings-states" title="15 · 설정 · 약관 · 상태" subtitle="계정/알림/약관 설정과 404, Empty, Loading, Error 상태를 한 시스템 모듈로 통합">
+          <DCArtboard id="settings" label="설정" width={375} height={812} data-canonical-id="m15-mb-main">
+            <Settings/>
+          </DCArtboard>
+          <DCArtboard id="set-acc" label="/settings/account" width={375} height={812} data-canonical-id="m15-mb-flow-account">
+            <SettingsAccount/>
+          </DCArtboard>
+          <DCArtboard id="set-notif" label="/settings/notifications" width={375} height={812} data-canonical-id="m15-mb-flow-notif">
+            <SettingsNotifs/>
+          </DCArtboard>
+          <DCArtboard id="settings-legal" label="개인정보 · 약관" width={375} height={812} data-canonical-id="m15-mb-flow-terms">
+            <SettingsLegalPages/>
+          </DCArtboard>
+          <DCArtboard id="state-404" label="/not-found · /error" width={375} height={812} data-canonical-id="m15-mb-state-error">
+            <StatePages/>
+          </DCArtboard>
+          <DCArtboard id="states" label="Empty · Loading · Error" width={375} height={812} data-canonical-id="m15-mb-state-loading">
+            <StatesBundle/>
+          </DCArtboard>
+          <DCArtboard id="settings-case-matrix" label="설정 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m15-mb-main-matrix">
+            <ModuleCaseMatrix module="settings"/>
+          </DCArtboard>
+          <DCArtboard id="settings-state-edge" label="설정 · 상태/예외 UI" width={375} height={812} data-canonical-id="m15-mb-main-state-edge">
+            <SettingsStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="settings-notification-permission" label="설정 · 알림 권한/OS 차단" width={375} height={812} data-canonical-id="m15-mb-flow-notif-notification-permission">
+            <SettingsNotificationPermissionBoard/>
+          </DCArtboard>
+          <DCArtboard id="settings-destructive-confirm" label="설정 · 위험 작업 확인" width={375} height={812} data-canonical-id="m15-mb-main-destructive-confirm">
+            <SettingsDestructiveConfirmBoard/>
+          </DCArtboard>
+          <DCArtboard id="settings-legal-version" label="설정 · 약관 버전 업데이트" width={375} height={812} data-canonical-id="m15-mb-flow-terms-legal-version">
+            <SettingsLegalVersionBoard/>
+          </DCArtboard>
+          <DCArtboard id="settings-control-interactions" label="설정 · 토글/아코디언 컨트롤" width={375} height={812} data-canonical-id="m15-mb-motion">
+            <SettingsControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="settings-motion-contract" label="설정 · 모션 계약" width={840} height={812} data-canonical-id="m15-tb-motion">
+            <SettingsMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="settings-responsive" label="설정 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m15-dt-main-responsive">
+            <SettingsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="public-marketing" title="16 · 공개 · 마케팅" subtitle="모바일 랜딩, 가격, FAQ, 가이드, 공개 프로필을 public surface로 통합">
+          <DCArtboard id="landing-m" label="/landing (모바일)" width={375} height={812} data-canonical-id="m16-mb-main-m">
+            <MobileLanding/>
+          </DCArtboard>
+          <DCArtboard id="pricing" label="/pricing" width={375} height={812} data-canonical-id="m16-mb-flow-pricing">
+            <Pricing/>
+          </DCArtboard>
+          <DCArtboard id="faq" label="/faq" width={375} height={812} data-canonical-id="m16-mb-flow-faq">
+            <FAQ/>
+          </DCArtboard>
+          <DCArtboard id="guide" label="/guide" width={375} height={812} data-canonical-id="m16-mb-flow-guide">
+            <Guide/>
+          </DCArtboard>
+          <DCArtboard id="user-public" label="공개 유저 프로필" width={375} height={812} data-canonical-id="m16-mb-detail">
+            <PublicUserProfile/>
+          </DCArtboard>
+          <DCArtboard id="public-case-matrix" label="공개 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m16-mb-main-matrix">
+            <ModuleCaseMatrix module="public"/>
+          </DCArtboard>
+          <DCArtboard id="public-state-edge" label="공개 · 상태/예외 UI" width={375} height={812} data-canonical-id="m16-mb-main">
+            <PublicStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="public-logged-out-limits" label="공개 · 비로그인 CTA 제한" width={375} height={812} data-canonical-id="m16-mb-main-logged-out-limits">
+            <PublicLoggedOutLimitsBoard/>
+          </DCArtboard>
+          <DCArtboard id="public-faq-pricing-edge" label="공개 · FAQ/가격 예외" width={375} height={812} data-canonical-id="m16-mb-flow-pricing-faq-pricing-edge">
+            <PublicFaqPricingEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="public-profile-privacy" label="공개 · 프로필 비공개/마스킹" width={375} height={812} data-canonical-id="m16-mb-flow-terms">
+            <PublicProfilePrivacyBoard/>
+          </DCArtboard>
+          <DCArtboard id="public-control-interactions" label="공개 · CTA/토글/검색 컨트롤" width={375} height={812} data-canonical-id="m16-mb-assets">
+            <PublicControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="public-motion-contract" label="공개 · 모션 계약" width={840} height={812} data-canonical-id="m16-tb-motion">
+            <PublicMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="public-responsive" label="공개 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m16-dt-main-responsive">
+            <PublicResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="desktop-web" title="17 · 데스크탑 웹" subtitle="PC 사용성에 맞춘 랜딩, 로그인 후 홈, 매치 탐색의 공통 데스크탑 패턴">
+          <DCArtboard id="web-landing" label="Desktop · 랜딩" width={1280} height={1500} data-canonical-id="m17-dt-main-web-landing">
+            <DesktopLandingV2/>
+          </DCArtboard>
+          <DCArtboard id="web-home" label="Desktop · 홈 (로그인 후)" width={1280} height={800} data-canonical-id="m17-dt-main-web-home">
+            <DesktopHome/>
+          </DCArtboard>
+          <DCArtboard id="web-matches" label="Desktop · 매치 탐색" width={1280} height={800} data-canonical-id="m17-dt-flow-search-web-matches">
+            <DesktopMatches/>
+          </DCArtboard>
+          <DCArtboard id="web-matches-v2" label="Desktop · 매치 탐색 확장" width={1280} height={1100} data-canonical-id="m17-dt-flow-search-expanded">
+            <DesktopMatchesV2/>
+          </DCArtboard>
+          <DCArtboard id="desktop-case-matrix" label="Desktop · 케이스 매트릭스" width={1280} height={800} data-canonical-id="m17-dt-main-matrix">
+            <WideCaseMatrix module="desktop"/>
+          </DCArtboard>
+          <DCArtboard id="desktop-state-edge" label="Desktop · 상태/예외 UI" width={1280} height={800} data-canonical-id="m17-dt-main-desktop-state-edge">
+            <DesktopStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="desktop-keyboard-focus" label="Desktop · 키보드/포커스" width={1280} height={800} data-canonical-id="m17-dt-main-desktop-keyboard-focus">
+            <DesktopKeyboardFocusBoard/>
+          </DCArtboard>
+          <DCArtboard id="desktop-side-panel" label="Desktop · 사이드 패널 상태" width={1280} height={800} data-canonical-id="m17-dt-main-desktop-side-panel">
+            <DesktopSidePanelBoard/>
+          </DCArtboard>
+          <DCArtboard id="desktop-table-overflow" label="Desktop · 테이블/오버플로" width={1280} height={800} data-canonical-id="m17-dt-main-desktop-table-overflow">
+            <DesktopTableOverflowBoard/>
+          </DCArtboard>
+          <DCArtboard id="desktop-control-interactions" label="Desktop · 필터/행/패널 컨트롤" width={1280} height={800} data-canonical-id="m17-dt-motion-filter">
+            <DesktopControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="desktop-motion-contract" label="Desktop · 모션 계약" width={840} height={812} data-canonical-id="m17-tb-motion">
+            <DesktopMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="desktop-responsive" label="Desktop · 반응형 Tablet/Desktop/Wide" width={1280} height={820} data-canonical-id="m17-dt-main-responsive">
+            <DesktopResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-ops" title="18 · 관리자 · 운영" subtitle="Admin dashboard, 관리 테이블, 신고, 정산, 분쟁, 통계, 운영 도구, 상세 조치 shell 통합">
+          <DCArtboard id="admin-dash" label="Admin · 대시보드" width={1280} height={900} data-canonical-id="m18-dt-main-dash">
+            <AdminDashboardV2/>
+          </DCArtboard>
+          <DCArtboard id="admin-matches" label="Admin · 매치 관리" width={1280} height={800} data-canonical-id="m18-dt-main-matches">
+            <AdminMatches/>
+          </DCArtboard>
+          <DCArtboard id="admin-user" label="Admin · 유저 상세" width={1280} height={800} data-canonical-id="m18-dt-detail">
+            <AdminUserDetail/>
+          </DCArtboard>
+          <DCArtboard id="admin-reports" label="Admin · 신고 처리" width={1280} height={800} data-canonical-id="m18-dt-main-reports">
+            <AdminReports/>
+          </DCArtboard>
+          <DCArtboard id="admin-payouts" label="Admin · 정산" width={1280} height={800} data-canonical-id="m18-dt-flow-payout">
+            <AdminPayouts/>
+          </DCArtboard>
+          <DCArtboard id="adm-disputes" label="/admin/disputes" width={1280} height={800} data-canonical-id="m18-dt-flow-dispute">
+            <AdminDisputes/>
+          </DCArtboard>
+          <DCArtboard id="adm-lessons" label="/admin/lessons" width={1280} height={800} data-canonical-id="m18-dt-main-lessons">
+            <AdminLessons/>
+          </DCArtboard>
+          <DCArtboard id="adm-reviews" label="/admin/reviews" width={1280} height={800} data-canonical-id="m18-dt-main-reviews">
+            <AdminReviews/>
+          </DCArtboard>
+          <DCArtboard id="adm-stats" label="/admin/statistics" width={1280} height={800} data-canonical-id="m18-dt-flow-stats">
+            <AdminStats/>
+          </DCArtboard>
+          <DCArtboard id="adm-settle" label="/admin/settlements" width={1280} height={800} data-canonical-id="m18-dt-main-settle">
+            <AdminSettlements/>
+          </DCArtboard>
+          <DCArtboard id="adm-ops" label="/admin/ops" width={1280} height={800} data-canonical-id="m18-dt-flow-ops">
+            <AdminOps/>
+          </DCArtboard>
+          <DCArtboard id="adm-venue-new" label="/admin/venues/new" width={1280} height={800} data-canonical-id="m18-dt-create">
+            <AdminVenueNew/>
+          </DCArtboard>
+          <DCArtboard id="admin-detail-toolkit" label="Admin · 상세 조치 Shell" width={1180} height={760} data-canonical-id="m18-dt-detail-detail-toolkit">
+            <AdminDetailToolkit/>
+          </DCArtboard>
+          <DCArtboard id="admin-case-matrix" label="Admin · 케이스 매트릭스" width={1280} height={800} data-canonical-id="m18-dt-main-matrix">
+            <WideCaseMatrix module="admin"/>
+          </DCArtboard>
+          <DCArtboard id="admin-state-edge" label="Admin · 상태/예외 UI" width={1280} height={800} data-canonical-id="m18-dt-main-state-edge">
+            <AdminStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="admin-bulk-partial-failure" label="Admin · 일괄 작업 부분 실패" width={1280} height={800} data-canonical-id="m18-dt-main-bulk-partial-failure">
+            <AdminBulkPartialFailureBoard/>
+          </DCArtboard>
+          <DCArtboard id="admin-concurrent-processing" label="Admin · 동시 처리 충돌" width={1280} height={800} data-canonical-id="m18-dt-main-concurrent-processing">
+            <AdminConcurrentProcessingBoard/>
+          </DCArtboard>
+          <DCArtboard id="admin-audit-recovery" label="Admin · 감사 로그/복구" width={1280} height={800} data-canonical-id="m18-dt-main-audit-recovery">
+            <AdminAuditRecoveryBoard/>
+          </DCArtboard>
+          <DCArtboard id="admin-control-interactions" label="Admin · 테이블/권한/액션 컨트롤" width={1280} height={800} data-canonical-id="m18-dt-motion">
+            <AdminControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="admin-motion-contract" label="Admin · 모션 계약" width={840} height={812} data-canonical-id="m18-tb-motion">
+            <AdminMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="admin-responsive" label="Admin · 반응형 Tablet/Desktop/Wide" width={1280} height={820} data-canonical-id="m18-dt-main-responsive">
+            <AdminResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m19-grid" title="M19 · 공통 플로우 · 인터랙션 (viewport grid)" subtitle="fix29에서 추가. ID schema m19-{mb|tb|dt}-{main|flow|state|components|assets|motion}. FormStepShell · StickyCTA · BottomSheet · Toast · Skeleton · edit-flow parity · reduced-motion.">
+          <DCArtboard id="m19-mb-main" label="m19-mb-main — 공통 플로우 atlas" width={375} height={812}>
+            <M19MobileMain/>
+          </DCArtboard>
+          <DCArtboard id="m19-tb-main" label="m19-tb-main — 태블릿 atlas" width={768} height={1024}>
+            <M19TabletMain/>
+          </DCArtboard>
+          <DCArtboard id="m19-dt-main" label="m19-dt-main — 데스크탑 atlas" width={1280} height={820}>
+            <M19DesktopMain/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-flow-form" label="m19-mb-flow-form — Form Step Shell (2/3)" width={375} height={812}>
+            <M19MobileFlowForm/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-flow-edit" label="m19-mb-flow-edit — Edit-Flow Parity (prefill)" width={375} height={812}>
+            <M19MobileFlowEdit/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-flow-sheet" label="m19-mb-flow-sheet — Bottom Sheet (full)" width={375} height={812}>
+            <M19MobileFlowSheet/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-flow-confirm" label="m19-mb-flow-confirm — Destructive Confirm" width={375} height={812}>
+            <M19MobileFlowConfirm/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-state-loading" label="m19-mb-state-loading — Skeleton 6종" width={375} height={812}>
+            <M19MobileStateLoading/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-state-success" label="m19-mb-state-success — Toast 4 variants" width={375} height={812}>
+            <M19MobileStateSuccess/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-state-pending" label="m19-mb-state-pending — Pending (처리 중)" width={375} height={812}>
+            <M19MobileStatePending/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-components" label="m19-mb-components — 컴포넌트 인벤토리" width={375} height={812}>
+            <M19ComponentsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-assets" label="m19-mb-assets — 토큰 · easing · 시맨틱 색" width={375} height={812}>
+            <M19AssetsBoard viewport="mb"/>
+          </DCArtboard>
+          <DCArtboard id="m19-mb-motion" label="m19-mb-motion — reduced-motion 명시" width={375} height={812}>
+            <M19MotionBoard/>
+          </DCArtboard>
+          <DCArtboard id="m19-tb-components" label="m19-tb-components — 태블릿 컴포넌트" width={768} height={1024}>
+            <M19TabletComponents/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="common-flows-motion" title="19 · 공통 플로우 · 인터랙션" subtitle="등록/수정 공통 shell과 tap, skeleton, toast, bottom sheet, sticky CTA 같은 마이크로 인터랙션 검수 모듈">
+          <DCArtboard id="page-readiness-audit" label="페이지별 준비도 Audit" width={1280} height={820} data-canonical-id="m19-dt-main-readiness">
+            <ReadinessAuditDashboard/>
+          </DCArtboard>
+          <DCArtboard id="edit-flow-parity" label="등록 · 수정 공통 Shell" width={375} height={812} data-canonical-id="m19-mb-create">
+            <EditFlowParity/>
+          </DCArtboard>
+          <DCArtboard id="micro-demo" label="마이크로 인터랙션 데모" width={375} height={812} data-canonical-id="m19-mb-motion">
+            <MicroInteractionsDemo/>
+          </DCArtboard>
+          <DCArtboard id="state-coverage-atlas" label="상태별 UI 패밀리" width={375} height={812} data-canonical-id="m19-mb-main-atlas">
+            <StateCoverageAtlas/>
+          </DCArtboard>
+          <DCArtboard id="edge-case-gallery" label="엣지케이스 묶음" width={375} height={812} data-canonical-id="m19-mb-main-edge-case-gallery">
+            <EdgeCaseGallery/>
+          </DCArtboard>
+          <DCArtboard id="interaction-flow-atlas" label="인터랙션 전이표" width={840} height={812} data-canonical-id="m19-tb-motion-atlas">
+            <InteractionFlowAtlas/>
+          </DCArtboard>
+          <DCArtboard id="handoff-readiness-matrix" label="개발 핸드오프 준비도" width={1280} height={800} data-canonical-id="m19-dt-main-matrix-handoff-readiness-matrix">
+            <HandoffReadinessMatrix/>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      {tweaks && (
+        <div style={{
+          position: 'fixed', bottom: 20, right: 20, zIndex: 1000,
+          width: 280, padding: 18, borderRadius: 14,
+          background: 'var(--bg)', border: '1px solid var(--border)',
+          boxShadow: 'var(--sh-2)',
+          fontFamily: 'var(--font)',
+          color: 'var(--text-strong)',
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>Tweaks</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 8 }}>홈 Variant</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+            {['A', 'B', 'C'].map(v => (
+              <button key={v} onClick={() => { setVariant(v); persist({ homeVariant: v }); }}
+                style={{
+                  flex: 1, height: 36, borderRadius: 8,
+                  background: variant === v ? 'var(--blue500)' : 'var(--grey100)',
+                  color: variant === v ? 'var(--static-white)' : 'var(--grey700)',
+                  fontSize: 13, fontWeight: 700,
+                }}>{v}</button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-caption)', marginTop: 12, lineHeight: 1.5 }}>
+            Home 섹션에서 선택한 variant가 강조됩니다. 프로토타입은 light-only 기준입니다.
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

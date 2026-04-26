@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --tm-blue-500: theme(colors.blue.500);
+    --tm-radius-control: theme(borderRadius.md);
+    --tm-control-sm: 40px;
+    --tm-control-md: 48px;
+    --tm-control-lg: 56px;
+    --tm-control-xl: 64px;
+  }
+
+  html {
+    font-family: theme(fontFamily.sans);
+    color: theme(colors.grey.900);
+    background: theme(colors.white);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .tm-btn {
+    @apply inline-flex min-w-0 items-center justify-center gap-2 rounded-md text-center font-semibold tracking-normal transition-[transform,background-color,border-color,color,opacity,box-shadow] duration-fast ease-out-quart active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100;
+    touch-action: manipulation;
+    white-space: normal;
+  }
+
+  .tm-btn-sm {
+    @apply min-h-10 px-4 text-14 leading-[18px];
+  }
+
+  .tm-btn-md {
+    @apply min-h-12 px-5 text-15 leading-5;
+  }
+
+  .tm-btn-lg {
+    @apply min-h-14 px-[22px] text-16 leading-[22px];
+  }
+
+  .tm-btn-xl {
+    @apply min-h-16 px-6 text-17 leading-6;
+  }
+
+  .tm-btn-block {
+    @apply w-full;
+  }
+
+  .tm-btn-icon {
+    @apply h-11 min-h-11 w-11 min-w-11 rounded-lg p-0;
+  }
+
+  .tm-btn-primary {
+    @apply bg-blue-500 text-white hover:bg-blue-600;
+  }
+
+  .tm-btn-secondary {
+    @apply bg-blue-50 text-blue-600 hover:bg-blue-100;
+  }
+
+  .tm-btn-neutral {
+    @apply bg-grey-100 text-grey-900 hover:bg-grey-150;
+  }
+
+  .tm-btn-dark {
+    @apply bg-grey-900 text-white hover:bg-grey-800;
+  }
+
+  .tm-btn-danger {
+    @apply bg-red-500 text-white;
+  }
+
+  .tm-btn-ghost {
+    @apply bg-transparent text-grey-900 hover:bg-grey-50;
+  }
+
+  .tm-btn-outline {
+    @apply border border-grey-200 bg-white text-grey-900 hover:border-grey-300 hover:bg-grey-50;
+  }
+
+  .tm-chip {
+    @apply inline-flex min-h-9 min-w-0 shrink-0 items-center justify-center rounded-full bg-grey-100 px-[14px] text-13 font-semibold leading-[18px] text-grey-700 transition-[transform,background-color,color] duration-fast ease-out-quart active:scale-[.97];
+    white-space: nowrap;
+  }
+
+  .tm-chip-sm {
+    @apply min-h-[30px] px-3;
+  }
+
+  .tm-chip-active {
+    @apply bg-blue-500 text-white;
+  }
+
+  .tm-badge {
+    @apply inline-flex h-6 min-w-0 shrink-0 items-center justify-center gap-1 rounded-full px-[9px] text-12 font-semibold leading-none tracking-normal;
+    white-space: nowrap;
+  }
+
+  .tm-badge-sm {
+    @apply h-5 px-[7px] text-11;
+  }
+
+  .tm-card {
+    @apply min-w-0 rounded-xl border border-grey-200 bg-white break-keep transition-[transform,border-color,box-shadow] duration-base ease-out-quart;
+    overflow-wrap: break-word;
+  }
+
+  .tm-card-interactive {
+    @apply cursor-pointer hover:border-grey-300 hover:shadow-md;
+  }
+
+  .tm-list-row {
+    @apply flex min-w-0 items-center gap-[14px] bg-white px-5 py-[14px];
+  }
+
+  .tm-input {
+    @apply min-h-12 w-full rounded-md border border-grey-200 bg-white px-[14px] text-15 leading-[22px] text-grey-900 placeholder:text-grey-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+
+  .tm-admin-sidebar {
+    @apply bg-admin-sidebar text-admin-sidebarText;
+  }
+}
+
+@layer utilities {
+  .tm-tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .tm-break-keep {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+}

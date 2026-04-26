@@ -1,0 +1,10 @@
+active_task: autoqa cron installation
+done:
+- refreshed cron-friendly wrapper script
+- refreshed crontab example
+- installed host cron schedule */30 * * * *
+remaining:
+- wait for cron tick or run foreground cycle immediately if faster feedback is needed
+blocker: null
+next_action: monitor autoqa status or inspect cron log
+updated_at: 2026-04-20T18:03:27.296Z

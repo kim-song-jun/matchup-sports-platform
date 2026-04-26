@@ -81,7 +81,40 @@ Errors:
 6. 새 규칙, gotcha, 워크플로 변경이 생기면 `AGENTS.md`와 `.claude/agents/*.md`를 같이 업데이트한다.
 7. 사용자가 `@전체` / `agent-all`을 명시한 경우, plan → build → review → design → QA → docs 전체를 같은 실행에서 끝까지 진행한다. 중간 단계 보고 후 멈추지 말고, 검증이 런타임 이슈로 막히면 정확한 blocker를 기록한 뒤 남은 문서화와 최종 리포트까지 완료한다.
 
-## 1.1) Dev Runtime
+## 1.1) Session Operation Pattern
+
+큰 작업은 `runtime task list + committed task doc + git history` 3축을 resume cursor로 유지한다.
+
+- Runtime task list: Codex에서는 `update_plan`을 TaskCreate/TaskUpdate/TaskList에 대응하는 진행판으로 사용한다. Phase/Wave가 2개 이상이면 각 Phase를 명시적 task로 등록하고 `pending -> in_progress -> completed` 상태를 갱신한다.
+- Committed task doc: 작업의 SSOT는 `.github/tasks/{NN}-{slug}.md`다. 체크박스, 병렬 분해, Owned/Forbidden file scope, Acceptance Criteria, Ambiguity Log, Progress Snapshot은 별도 프롬프트 파일이 아니라 해당 task doc에 남긴다.
+- Scenario / QA status: 시나리오 기반 검증은 `docs/scenarios/index.md`와 `docs/scenarios/*.md`를 상태 허브로 사용한다. `autoqa` 작업은 `.autoqa/status.md` 또는 해당 operator status 문서가 있으면 우선 확인한다.
+- Git cursor: 세션 재개나 handoff 때는 `git log --oneline -15`로 최근 커밋 경계를 확인하고, task doc의 Progress Snapshot과 맞지 않으면 먼저 drift를 정리한다.
+
+### Resume 3-File Routine
+
+세션이 끊기거나 새 에이전트가 이어받을 때는 넓은 재탐색 전에 아래 3가지만 먼저 읽고 현재 위치를 복원한다.
+
+1. Active task/status hub: `.github/tasks/{NN}-{slug}.md`, 없으면 `.github/tasks/`의 관련 task, scenario 작업이면 `docs/scenarios/index.md`, autoqa 작업이면 `.autoqa/status.md`
+2. Recent git cursor: `git log --oneline -15`
+3. Active task doc의 `Progress Snapshot`, 체크박스, Acceptance Criteria, Ambiguity Log
+
+Active task가 불명확하면 새 작업을 시작하기 전에 관련 task doc, `docs/scenarios/index.md`, 현재 구현 증거를 교차 검증해 canonical task를 먼저 고정한다.
+
+### Async Agent Dispatch
+
+- 사용자가 `@전체`, `agent-all`, 병렬 에이전트, 서브에이전트를 명시한 경우에만 에이전트 병렬화를 사용한다.
+- 에이전트 프롬프트에는 긴 요구사항을 복붙하지 말고 task doc 경로, 담당 Phase/Wave, Owned files, Forbidden files, Acceptance Criteria만 지정한다.
+- 독립 작업은 비동기로 dispatch하고 메인 세션은 다른 non-overlapping 작업을 계속 진행한다. Codex에서는 `spawn_agent` 후 즉시 로컬 작업을 이어가고, 다른 런타임에서 지원되면 `run_in_background: true`를 사용한다.
+- `wait_agent`나 polling은 다음 critical path가 해당 결과에 막힐 때만 사용한다. background agent는 완료 알림/요약을 기다리고, 전문 transcript 파일을 읽어 컨텍스트를 소모하지 않는다.
+- `/private/tmp/claude-*/tasks/*.output` 같은 서브에이전트 transcript는 사용자가 명시적으로 허용하지 않는 한 읽지 않는다.
+- 병렬 구현 시 공유 파일과 route/page 소유권을 분리한다. `use-api.ts`, 타입, MSW handler 같은 shared contract는 선행 Wave에서 한 에이전트가 맡고, page/component 변경은 이후 Wave에서 병렬화한다.
+
+### Schedule / Wakeup Tools
+
+- ScheduleWakeup류 도구는 장기 loop/polling 자동화에만 사용한다.
+- background agent 완료 대기 용도로 ScheduleWakeup을 호출하지 않는다. 완료 notification이 없는 런타임이면 foreground check 또는 cron fallback처럼 명시된 operator contract로 degrade한다.
+
+## 1.2) Dev Runtime
 
 - 권장 시작 명령: `make dev` (Docker attached), `make up` (Docker detached), `make dev-local` (host에서 api + web 실행)
 - Frontend: `http://localhost:3003`

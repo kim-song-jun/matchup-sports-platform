@@ -218,6 +218,46 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
+## AutoQA
+
+`.autoqa/` oracle과 ledgers를 기준으로 실제 브라우저/DB 시나리오를 돌리는 repo-local operator가 포함돼 있습니다.
+
+기본 흐름:
+
+```bash
+pnpm autoqa
+```
+
+이 커맨드는 다음 순서로 동작합니다.
+
+1. `.autoqa` scaffold / preflight 확인
+2. scenario docs + scope-freeze refresh
+3. heartbeat/background 가능 여부 판단
+4. 현재 Codex host에서 automation이 없으면 즉시 foreground cycle로 fallback
+5. cron-friendly wrapper / crontab example도 함께 갱신
+
+주요 명령:
+
+```bash
+pnpm autoqa
+pnpm autoqa:status
+pnpm autoqa:scenarios
+pnpm autoqa:cycle
+pnpm autoqa:cron
+pnpm autoqa:cron:install
+pnpm autoqa:cron:status
+
+make autoqa
+make autoqa-status
+make autoqa-scenarios
+make autoqa-cycle
+make autoqa-cron
+make autoqa-cron-install
+make autoqa-cron-status
+```
+
+foreground fallback이 중요한 저장소라서, background unavailable일 때는 fake dispatch로 멈추지 않고 `.autoqa/status.md`에 fallback reason을 기록한 뒤 현재 세션에서 cycle을 계속 진행합니다. 장기 반복 실행이 필요하면 `pnpm autoqa:cron:install` 또는 `make autoqa-cron-install` 로 managed cron entry를 바로 설치할 수 있고, 기본 cadence는 30분마다 한 번입니다.
+
 #### Backend (`apps/api/.env`)
 
 | Variable | Description | Required |

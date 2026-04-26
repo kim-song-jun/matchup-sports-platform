@@ -74,3 +74,10 @@ screenshots/scenarios/**/*.jpeg
 screenshots/scenarios/**/*.webp
 ultraplan/runs/e2e-analyzer*/
 .claude/worktrees/
+
+# autoqa runtime artifacts
+.autoqa/runs/
+.autoqa/cookies/
+.autoqa/cron/*.log
+.autoqa/cron/autoqa.installed.crontab
+.autoqa/.lock.nnn

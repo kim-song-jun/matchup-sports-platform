@@ -1,0 +1,2 @@
+# Example: run the repo-local autoqa operator every 30 minutes
+*/30 * * * * cd "/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform" && bash "/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/.autoqa/cron/autoqa-cycle.sh" >/dev/null 2>&1

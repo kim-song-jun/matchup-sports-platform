@@ -1,0 +1,714 @@
+version: 2
+
+app:
+  base_url: http://localhost:3003
+  health_path: /landing
+  personas:
+    - id: guest
+      login_scenario: null
+      storage_state_file: null
+      expected_access: public-only
+    - id: sinaro
+      login_scenario: SC-LOGIN-SINARO
+      storage_state_file: .autoqa/cookies/sinaro.json
+      expected_access: authenticated
+    - id: team-owner
+      login_scenario: SC-LOGIN-TEAM-OWNER
+      storage_state_file: .autoqa/cookies/team-owner.json
+      expected_access: authenticated
+    - id: team-manager
+      login_scenario: SC-LOGIN-TEAM-MANAGER
+      storage_state_file: .autoqa/cookies/team-manager.json
+      expected_access: authenticated
+    - id: team-member
+      login_scenario: SC-LOGIN-TEAM-MEMBER
+      storage_state_file: .autoqa/cookies/team-member.json
+      expected_access: authenticated
+    - id: mercenary-host
+      login_scenario: SC-LOGIN-MERCENARY-HOST
+      storage_state_file: .autoqa/cookies/mercenary-host.json
+      expected_access: authenticated
+    - id: seller
+      login_scenario: SC-LOGIN-SELLER
+      storage_state_file: .autoqa/cookies/seller.json
+      expected_access: authenticated
+    - id: instructor
+      login_scenario: SC-LOGIN-INSTRUCTOR
+      storage_state_file: .autoqa/cookies/instructor.json
+      expected_access: authenticated
+    - id: admin
+      login_scenario: SC-LOGIN-ADMIN
+      storage_state_file: .autoqa/cookies/admin.json
+      expected_access: authenticated-plus-db-role-promotion-for-admin-routes
+
+viewport_matrix:
+  mobile:
+    sm: { width: 375, height: 667 }
+    lg: { width: 430, height: 932 }
+  tablet:
+    portrait: { width: 768, height: 1024 }
+    landscape: { width: 1024, height: 1366 }
+  desktop:
+    md: { width: 1280, height: 800 }
+    lg: { width: 1440, height: 900 }
+    xl: { width: 1920, height: 1080 }
+    "2xl": { width: 2560, height: 1440 }
+    "3xl": { width: 3440, height: 1440 }
+
+themes: [light, dark]
+
+scope_profiles:
+  minimal: { viewports: [desktop.lg], themes: [light], personas: [guest] }
+  core: { viewports: [mobile.lg, tablet.portrait, desktop.lg, desktop.xl], themes: [light, dark], personas: [guest, sinaro, team-owner, team-member, seller, instructor, admin] }
+  all: { viewports: "*", themes: "*", personas: "*" }
+
+area_map:
+  "/": DASH
+  "/landing": LANDING
+  "/about": ABOUT
+  "/guide": GUIDE
+  "/pricing": PRICING
+  "/faq": FAQ
+  "/login": LOGIN
+  "/callback/": CALLBACK
+  "/home": HOME
+  "/feed": FEED
+  "/onboarding": ONBOARD
+  "/matches": MATCH
+  "/matches/": MATCH-DETAIL
+  "/team-matches": TEAMMATCH
+  "/team-matches/": TEAMMATCH-DETAIL
+  "/teams": TEAM
+  "/teams/": TEAM-DETAIL
+  "/mercenary": MERC
+  "/mercenary/": MERC-DETAIL
+  "/marketplace/orders/": MARKET-ORDER
+  "/marketplace": MARKET
+  "/marketplace/": MARKET-DETAIL
+  "/lessons": LESSON
+  "/lessons/": LESSON-DETAIL
+  "/chat": COMMS
+  "/chat/": CHAT-ROOM
+  "/notifications": COMMS
+  "/profile": ACCOUNT
+  "/settings": ACCOUNT
+  "/payments/checkout": PAY
+  "/payments/": PAY-DETAIL
+  "/payments": PAY
+  "/reviews": TRUST
+  "/badges": TRUST
+  "/my/": MY
+  "/user/": USER
+  "/users/": USER-PUBLIC
+  "/venues": HUB
+  "/venues/": HUB-DETAIL
+  "/tournaments": HUB
+  "/tournaments/": HUB-DETAIL
+  "/admin": ADMIN
+  "/admin/": ADMIN-DETAIL
+
+scenarios:
+  - id: SC-LOGIN-SINARO
+    description: "Bootstrap sinaro Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_SINARO_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/sinaro.json" }
+
+  - id: SC-LOGIN-TEAM-OWNER
+    description: "Bootstrap team-owner Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_TEAM_OWNER_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/team-owner.json" }
+
+  - id: SC-LOGIN-TEAM-MANAGER
+    description: "Bootstrap team-manager Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_TEAM_MANAGER_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/team-manager.json" }
+
+  - id: SC-LOGIN-TEAM-MEMBER
+    description: "Bootstrap team-member Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_TEAM_MEMBER_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/team-member.json" }
+
+  - id: SC-LOGIN-MERCENARY-HOST
+    description: "Bootstrap mercenary-host Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_MERCENARY_HOST_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/mercenary-host.json" }
+
+  - id: SC-LOGIN-SELLER
+    description: "Bootstrap seller Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_SELLER_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/seller.json" }
+
+  - id: SC-LOGIN-INSTRUCTOR
+    description: "Bootstrap instructor Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_INSTRUCTOR_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/instructor.json" }
+
+  - id: SC-LOGIN-ADMIN
+    description: "Bootstrap admin Playwright storage state via dev-login persona label"
+    scope: minimal
+    personas: [__bootstrap__]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - { id: STEP-02, action: type, selector: "[data-testid='dev-login-input']", value: "${AUTOQA_ADMIN_LABEL}" }
+      - { id: STEP-03, action: click, selector: "[data-testid='dev-login-submit']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 15000 }
+      - { id: STEP-05, action: export_storage_state, to: ".autoqa/cookies/admin.json" }
+
+  - id: SC-SMOKE-001
+    description: "Smoke — landing shell resolves without critical console errors"
+    scope: minimal
+    personas: [guest]
+    source_ref: "apps/web/src/app/landing/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /landing }
+      - { id: STEP-02, action: wait_url, pattern: "/landing(?:\\?|$)", timeout_ms: 8000 }
+      - { id: STEP-03, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "body", aria_role: "*" }
+          - { selector: "nav", aria_role: "*" }
+      - { id: STEP-05, action: assert_no_console_errors }
+
+  - id: SC-SMOKE-002
+    description: "Smoke — authenticated matches route renders"
+    scope: core
+    personas: [team-owner]
+    source_ref: "apps/web/src/app/(main)/matches/matches-client.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /matches }
+      - { id: STEP-02, action: wait, ms: 500 }
+      - { id: STEP-03, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid='match-results']", aria_role: "*" }
+      - { id: STEP-05, action: assert_no_console_errors }
+
+  - id: SC-SMOKE-003
+    description: "Smoke — root route redirects guest to landing"
+    scope: minimal
+    personas: [guest]
+    source_ref: "apps/web/src/app/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: / }
+      - { id: STEP-02, action: wait_url, pattern: "/landing(?:\\?|$)", timeout_ms: 8000 }
+      - { id: STEP-03, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-04, action: assert_no_console_errors }
+
+  - id: SC-AUTH-001
+    description: "Login shell and guest protection redirects"
+    scope: core
+    personas: [guest]
+    source_ref: "apps/web/src/app/(auth)/login/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /login }
+      - id: STEP-02
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid='login-page']", aria_role: "*" }
+          - { selector: "[data-testid='browse-without-login']", aria_role: "*" }
+      - { id: STEP-03, action: navigate, target: /profile }
+      - { id: STEP-04, action: wait_url, pattern: "/login(?:\\?|$)", timeout_ms: 8000 }
+      - { id: STEP-05, action: navigate, target: /admin/dashboard }
+      - { id: STEP-06, action: wait_url, pattern: "/login(?:\\?|$)", timeout_ms: 8000 }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-HOME-001
+    description: "Authenticated home feed and discovery deep-link shell"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/home/home-client.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /home }
+      - { id: STEP-02, action: wait, ms: 600 }
+      - { id: STEP-03, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "header", contains_text: ["오늘의 매치"] }
+      - { id: STEP-05, action: navigate, target: "/matches?sport=futsal" }
+      - id: STEP-06
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid='match-results']", aria_role: "*" }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-MATCH-001
+    description: "Create a match and verify list-detail persistence"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/matches/new/page.tsx"
+    landing_route: /matches/${scenario.variables.new_match_id}
+    variables:
+      new_match_id: null
+    steps:
+      - { id: STEP-01, action: navigate, target: /matches/new }
+      - { id: STEP-02, action: click, selector: "[data-testid='match-sport-futsal']" }
+      - { id: STEP-03, action: click, selector: "[data-testid='match-create-next-sport']" }
+      - { id: STEP-04, action: type, selector: "#match-title", value: "AUTOQA Match Core" }
+      - { id: STEP-05, action: type, selector: "#match-description", value: "Autoqa generated match scenario." }
+      - { id: STEP-06, action: type, selector: "#match-maxPlayers", value: "10" }
+      - { id: STEP-07, action: type, selector: "#match-fee", value: "0" }
+      - { id: STEP-08, action: click, selector: "[data-testid='match-create-next-info']" }
+      - { id: STEP-09, action: click, selector: "[data-testid^='match-venue-']" }
+      - { id: STEP-10, action: type, selector: "#match-date", value: "2099-12-31" }
+      - { id: STEP-11, action: type, selector: "#match-startTime", value: "18:00" }
+      - { id: STEP-12, action: type, selector: "#match-endTime", value: "20:00" }
+      - { id: STEP-13, action: click, selector: "[data-testid='match-create-next-schedule']" }
+      - { id: STEP-14, action: click, selector: "[data-testid='match-create-submit']" }
+      - { id: STEP-15, action: wait_url, pattern: "/matches\\?created=true", timeout_ms: 15000 }
+      - id: STEP-16
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            matches: ">=+1"
+          target:
+            query: |
+              SELECT id, title, status
+              FROM matches
+              WHERE title = $1
+              ORDER BY created_at DESC
+              LIMIT 1;
+            params: ["AUTOQA Match Core"]
+            expect_rows: 1
+            expect_columns:
+              title: "AUTOQA Match Core"
+            capture:
+              new_match_id: id
+          landing_screen:
+            after_ms: 800
+            navigate: /matches/${scenario.variables.new_match_id}
+            assert_contains_text: "AUTOQA Match Core"
+
+  - id: SC-MATCH-002
+    description: "Match discovery filters and detail shell"
+    scope: core
+    personas: [team-owner]
+    source_ref: "apps/web/src/app/(main)/matches/matches-client.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /matches }
+      - { id: STEP-02, action: type, selector: "[data-testid='match-search-input']", value: "풋살" }
+      - { id: STEP-03, action: click, selector: "[data-testid='match-filter-toggle']" }
+      - { id: STEP-04, action: click, selector: "[data-testid='match-quick-free']" }
+      - { id: STEP-05, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-06, action: click, selector: "a[href^='/matches/']" }
+      - { id: STEP-07, action: wait_url, pattern: "/matches/[^/]+$", timeout_ms: 10000 }
+      - id: STEP-08
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid='match-detail-title']", aria_role: "*" }
+      - { id: STEP-09, action: assert_no_console_errors }
+
+  - id: SC-TEAM-001
+    description: "Team creation shell and my-team management surface"
+    scope: core
+    personas: [team-owner]
+    source_ref: "apps/web/src/app/(main)/teams/new/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /teams/new }
+      - id: STEP-02
+        action: assert_dom
+        assertions:
+          - { selector: "#team-name", aria_role: "*" }
+          - { selector: "#team-description", aria_role: "*" }
+          - { selector: "#team-city", aria_role: "*" }
+      - { id: STEP-03, action: navigate, target: /my/teams }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid^='my-team-card-']", aria_role: "*" }
+      - { id: STEP-05, action: assert_no_console_errors }
+
+  - id: SC-TEAM-002
+    description: "Member self-leave flow and members surface sync"
+    scope: core
+    personas: [team-member]
+    source_ref: "apps/web/src/app/(main)/teams/[id]/members/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /my/teams }
+      - { id: STEP-02, action: click, selector: "[data-testid^='my-team-members-']" }
+      - { id: STEP-03, action: wait_url, pattern: "/teams/[^/]+/members(?:\\?.*)?$", timeout_ms: 10000 }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid='team-members-heading']", aria_role: "*" }
+      - { id: STEP-05, action: click, selector: "[data-testid='team-member-leave-self']" }
+      - { id: STEP-06, action: click, selector: "button.bg-red-500" }
+      - { id: STEP-07, action: wait_url, pattern: "/my/teams(?:\\?.*)?$", timeout_ms: 10000 }
+      - id: STEP-08
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            team_memberships: "+0"
+          target:
+            query: |
+              SELECT (left_at IS NOT NULL) AS left_team
+              FROM team_memberships tm
+              JOIN users u ON u.id = tm.user_id
+              WHERE u.nickname = $1
+              ORDER BY tm.joined_at DESC
+              LIMIT 1;
+            params: ["${AUTOQA_TEAM_MEMBER_LABEL}"]
+            expect_rows: 1
+            expect_columns:
+              left_team: true
+          landing_screen:
+            after_ms: 500
+            navigate: /my/teams
+            assert_contains_text: "내 팀"
+
+  - id: SC-TEAMMATCH-001
+    description: "Team-match list shell and new-post form surface"
+    scope: core
+    personas: [team-owner]
+    source_ref: "apps/web/src/app/(main)/team-matches/new/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /team-matches }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /team-matches/new }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "#match-title", aria_role: "*" }
+          - { selector: "#match-date", aria_role: "*" }
+          - { selector: "#venue-name", aria_role: "*" }
+      - { id: STEP-05, action: navigate, target: /my/team-matches }
+      - id: STEP-06
+        action: assert_dom
+        assertions:
+          - { selector: "[role='tab']", min_rows: 2 }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-MERC-001
+    description: "Mercenary board shell and create-post form surface"
+    scope: core
+    personas: [mercenary-host]
+    source_ref: "apps/web/src/app/(main)/mercenary/new/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /mercenary }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /mercenary/new }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "#merc-team", aria_role: "*" }
+          - { selector: "#merc-match-date", aria_role: "*" }
+          - { selector: "#merc-venue", aria_role: "*" }
+      - { id: STEP-05, action: assert_no_console_errors }
+
+  - id: SC-COMMS-001
+    description: "Notification center, mark-all-read, and feed grouping"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/notifications/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /notifications }
+      - id: STEP-02
+        action: assert_dom
+        assertions:
+          - { selector: "[data-testid^='notification-card-']", aria_role: "*" }
+      - { id: STEP-03, action: click, selector: "button[aria-label='모든 알림 읽음 처리']" }
+      - id: STEP-04
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            notifications: "+0"
+          target:
+            query: |
+              SELECT COUNT(*)::int AS unread_count
+              FROM notifications n
+              JOIN users u ON u.id = n.user_id
+              WHERE u.nickname = $1 AND n.is_read = false;
+            params: ["${AUTOQA_SINARO_LABEL}"]
+            expect_rows: 1
+            expect_columns:
+              unread_count: 0
+      - { id: STEP-05, action: navigate, target: /feed }
+      - { id: STEP-06, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-MARKET-001
+    description: "Marketplace browse shell, create form, and my listings"
+    scope: core
+    personas: [seller]
+    source_ref: "apps/web/src/app/(main)/marketplace/new/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /marketplace }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /marketplace/new }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "#mkt-title", aria_role: "*" }
+          - { selector: "#mkt-price", aria_role: "*" }
+          - { selector: "#mkt-description", aria_role: "*" }
+      - { id: STEP-05, action: navigate, target: /my/listings }
+      - { id: STEP-06, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-LESSON-001
+    description: "Lesson browse shell, create form, and ticket ownership surface"
+    scope: core
+    personas: [instructor]
+    source_ref: "apps/web/src/app/(main)/lessons/new/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /lessons }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /lessons/new }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "#lesson-title", aria_role: "*" }
+          - { selector: "#lesson-coach-name", aria_role: "*" }
+          - { selector: "#lesson-date", aria_role: "*" }
+      - { id: STEP-05, action: navigate, target: /my/lesson-tickets }
+      - { id: STEP-06, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-TRUST-001
+    description: "Payments, reviews, and badge surfaces stay coherent"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/payments/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /payments }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /reviews }
+      - { id: STEP-04, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-05, action: navigate, target: /badges }
+      - { id: STEP-06, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-ACCOUNT-001
+    description: "Profile shell, settings navigation, and notification preference persistence"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/settings/notifications/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /profile }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /settings/notifications }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "button[role='switch'][aria-label^='매치 알림']", aria_role: "*" }
+      - { id: STEP-05, action: click, selector: "button[role='switch'][aria-label^='매치 알림']" }
+      - id: STEP-06
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            notification_preferences: "+0"
+          target:
+            query: |
+              SELECT match_enabled
+              FROM notification_preferences np
+              JOIN users u ON u.id = np.user_id
+              WHERE u.nickname = $1;
+            params: ["${AUTOQA_SINARO_LABEL}"]
+            expect_rows: 1
+            expect_columns:
+              match_enabled: false
+      - { id: STEP-07, action: assert_no_console_errors }
+
+  - id: SC-ADMIN-001
+    description: "Admin dashboard, honest-data pages, and venue create shell"
+    scope: core
+    personas: [admin]
+    source_ref: "apps/web/src/app/admin/dashboard/page.tsx"
+    landing_route: /admin/venues
+    steps:
+      - { id: STEP-01, action: navigate, target: /admin/dashboard }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /admin/users }
+      - { id: STEP-04, action: navigate, target: /admin/disputes }
+      - { id: STEP-05, action: navigate, target: /admin/venues/new }
+      - { id: STEP-06, action: type, selector: "#admin-venue-new-name", value: "AUTOQA Venue Core" }
+      - { id: STEP-07, action: type, selector: "#admin-venue-new-address", value: "서울시 마포구 테스트로 1" }
+      - { id: STEP-08, action: type, selector: "#admin-venue-new-city", value: "서울" }
+      - { id: STEP-09, action: type, selector: "#admin-venue-new-district", value: "마포구" }
+      - { id: STEP-10, action: type, selector: "#admin-venue-new-price", value: "50000" }
+      - { id: STEP-11, action: click, selector: "button.bg-blue-500" }
+      - id: STEP-12
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            venues: ">=+1"
+          target:
+            query: |
+              SELECT name, city, district
+              FROM venues
+              WHERE name = $1
+              ORDER BY created_at DESC
+              LIMIT 1;
+            params: ["AUTOQA Venue Core"]
+            expect_rows: 1
+            expect_columns:
+              name: "AUTOQA Venue Core"
+              city: "서울"
+              district: "마포구"
+          landing_screen:
+            after_ms: 800
+            navigate: /admin/venues
+            assert_contains_text: "시설"
+
+  - id: SC-HUB-001
+    description: "Venue-team hub shell and tournament create flow"
+    scope: core
+    personas: [team-owner]
+    source_ref: "apps/web/src/app/(main)/tournaments/new/page.tsx"
+    landing_route: /tournaments/${scenario.variables.new_tournament_id}
+    variables:
+      new_tournament_id: null
+    steps:
+      - { id: STEP-01, action: navigate, target: /venues }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: navigate, target: /tournaments }
+      - { id: STEP-04, action: navigate, target: /tournaments/new }
+      - { id: STEP-05, action: type, selector: "#tournament-title", value: "AUTOQA Tournament Core" }
+      - { id: STEP-06, action: type, selector: "#tournament-date", value: "2099-12-31" }
+      - { id: STEP-07, action: type, selector: "#tournament-fee", value: "0" }
+      - { id: STEP-08, action: type, selector: "#tournament-description", value: "Autoqa tournament scenario." }
+      - { id: STEP-09, action: click, selector: "button.bg-blue-500" }
+      - id: STEP-10
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            tournaments: ">=+1"
+          target:
+            query: |
+              SELECT id, title, status
+              FROM tournaments
+              WHERE title = $1
+              ORDER BY created_at DESC
+              LIMIT 1;
+            params: ["AUTOQA Tournament Core"]
+            expect_rows: 1
+            expect_columns:
+              title: "AUTOQA Tournament Core"
+            capture:
+              new_tournament_id: id
+          landing_screen:
+            after_ms: 800
+            navigate: /tournaments/${scenario.variables.new_tournament_id}
+            assert_contains_text: "AUTOQA Tournament Core"
+
+  - id: SC-ONBOARD-001
+    description: "Onboarding step shell and skip redirect"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/onboarding/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /onboarding }
+      - { id: STEP-02, action: screenshot, baseline_ref: auto, diff_threshold_pct: 1.0 }
+      - { id: STEP-03, action: click, selector: "button[aria-label='온보딩 건너뛰기']" }
+      - { id: STEP-04, action: wait_url, pattern: "/home(?:\\?|$)", timeout_ms: 10000 }
+      - { id: STEP-05, action: assert_no_console_errors }
+
+  - id: SC-CALLBACK-001
+    description: "OAuth callback error fallback routes stay recoverable"
+    scope: core
+    personas: [guest]
+    source_ref: "apps/web/src/app/(auth)/callback/kakao/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: "/callback/kakao?error=access_denied" }
+      - id: STEP-02
+        action: assert_dom
+        assertions:
+          - { selector: "button", contains_text: ["로그인 페이지로"] }
+      - { id: STEP-03, action: navigate, target: "/callback/naver?error=access_denied" }
+      - id: STEP-04
+        action: assert_dom
+        assertions:
+          - { selector: "button", contains_text: ["로그인 페이지로"] }
+      - { id: STEP-05, action: assert_no_console_errors }
+
+  - id: SC-MY-001
+    description: "My pages portfolio and dispute message write path"
+    scope: core
+    personas: [sinaro]
+    source_ref: "apps/web/src/app/(main)/my/disputes/[id]/page.tsx"
+    steps:
+      - { id: STEP-01, action: navigate, target: /my/matches }
+      - { id: STEP-02, action: navigate, target: /my/teams }
+      - { id: STEP-03, action: navigate, target: /my/lessons }
+      - { id: STEP-04, action: navigate, target: /my/disputes }
+      - { id: STEP-05, action: click, selector: "a[href^='/my/disputes/']" }
+      - { id: STEP-06, action: wait_url, pattern: "/my/disputes/[^/]+$", timeout_ms: 10000 }
+      - { id: STEP-07, action: type, selector: "#dispute-reply-input", value: "AUTOQA dispute reply" }
+      - { id: STEP-08, action: click, selector: "button[aria-label='메시지 보내기']" }
+      - id: STEP-09
+        action: db_checkpoint
+        db_verify_level: target_row
+        expect:
+          counts:
+            dispute_messages: ">=+1"
+          target:
+            query: |
+              SELECT body
+              FROM dispute_messages dm
+              JOIN users u ON u.id = dm.author_id
+              WHERE u.nickname = $1
+              ORDER BY dm.created_at DESC
+              LIMIT 1;
+            params: ["${AUTOQA_SINARO_LABEL}"]
+            expect_rows: 1
+            expect_columns:
+              body: "AUTOQA dispute reply"
+      - { id: STEP-10, action: assert_no_console_errors }

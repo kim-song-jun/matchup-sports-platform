@@ -1,0 +1,274 @@
+# .autoqa/config.yaml — project-level autoqa configuration
+# Scaffolded by `autoqa init`. Commit to git.
+
+# ─────────────────────────────────────────────────────────────
+# App under test
+# ─────────────────────────────────────────────────────────────
+app:
+  base_url: http://localhost:3003
+  health_path: /landing                 # GET must return 2xx/3xx before autoqa runs
+  framework: nextjs                     # react-vite | nextjs | vue | svelte | plain-html | other
+
+# ─────────────────────────────────────────────────────────────
+# Theme toggle — how autoqa switches light/dark
+# Tailwind default: toggle `dark` class on <html>.
+# Override if your app uses a different mechanism.
+# ─────────────────────────────────────────────────────────────
+theme_toggle:
+  mode: class                           # class | attribute | storage | prefers-color-scheme
+  js: |
+    const nextTheme = arguments[0] === 'dark' ? 'dark' : 'light';
+    localStorage.setItem('theme', nextTheme);
+    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
+    document.documentElement.style.colorScheme = nextTheme;
+
+# ─────────────────────────────────────────────────────────────
+# Viewport overrides (optional — see references/viewport-matrix.md)
+# ─────────────────────────────────────────────────────────────
+# viewport_override:
+#   add:
+#     foldable.outer: { width: 380, height: 840 }
+
+# ─────────────────────────────────────────────────────────────
+# Personas — see references/persona-login-playbook.md
+# Referenced by oracle.yaml.app.personas; this is where the
+# host-side bits (storage state path, env var names) live.
+# This repo currently keeps Playwright storageState JSON under the
+# legacy `.autoqa/cookies/` directory name to avoid broad ignore churn.
+# ─────────────────────────────────────────────────────────────
+personas:
+  sinaro:
+    storage_state_file: .autoqa/cookies/sinaro.json
+    env_required: [AUTOQA_SINARO_LABEL]
+    storage_state_max_age_hours: 12
+  team-owner:
+    storage_state_file: .autoqa/cookies/team-owner.json
+    env_required: [AUTOQA_TEAM_OWNER_LABEL]
+    storage_state_max_age_hours: 12
+  team-manager:
+    storage_state_file: .autoqa/cookies/team-manager.json
+    env_required: [AUTOQA_TEAM_MANAGER_LABEL]
+    storage_state_max_age_hours: 12
+  team-member:
+    storage_state_file: .autoqa/cookies/team-member.json
+    env_required: [AUTOQA_TEAM_MEMBER_LABEL]
+    storage_state_max_age_hours: 12
+  mercenary-host:
+    storage_state_file: .autoqa/cookies/mercenary-host.json
+    env_required: [AUTOQA_MERCENARY_HOST_LABEL]
+    storage_state_max_age_hours: 12
+  seller:
+    storage_state_file: .autoqa/cookies/seller.json
+    env_required: [AUTOQA_SELLER_LABEL]
+    storage_state_max_age_hours: 12
+  instructor:
+    storage_state_file: .autoqa/cookies/instructor.json
+    env_required: [AUTOQA_INSTRUCTOR_LABEL]
+    storage_state_max_age_hours: 12
+  admin:
+    storage_state_file: .autoqa/cookies/admin.json
+    env_required: [AUTOQA_ADMIN_LABEL]
+    storage_state_max_age_hours: 12
+  guest:
+    storage_state_file: null            # no authenticated state needed
+    env_required: []
+
+session_contract:
+  kind: playwright-storage-state
+  expected_origin: http://localhost:3003
+  legacy_storage_dir: .autoqa/cookies
+  required_local_storage_keys: [accessToken, refreshToken, authUser]
+  fail_closed_when_invalid: true
+
+# ─────────────────────────────────────────────────────────────
+# Verification commands the fixer runs before committing
+# Commands execute in project root. Must exit 0 on success.
+# ─────────────────────────────────────────────────────────────
+verify:
+  cmds:
+    - name: typecheck
+      run: "pnpm --filter web exec tsc --noEmit"
+    - name: unit-test
+      run: "pnpm --filter web test"
+    - name: build
+      run: "pnpm --filter web build"
+
+# ─────────────────────────────────────────────────────────────
+# Paths the fixer is allowed to modify.
+# Auto-interpretation:
+#   - ends with a known file extension AND exists → single file
+#   - directory → recursive (all files under it)
+#   - glob characters (* ? [) → git ls-files + fnmatch
+#   - non-existent path → skipped with warning
+# ─────────────────────────────────────────────────────────────
+fixer:
+  paths_allowed:
+    - apps/web/src/app/                 # directory — recursive
+    - apps/web/src/components/          # directory — recursive
+    - apps/web/src/hooks/               # directory — recursive
+    - apps/web/src/lib/                 # directory — recursive
+    - apps/web/src/stores/              # directory — recursive
+    - apps/web/src/types/               # directory — recursive
+    - apps/web/public/mock/             # directory — recursive
+    - docs/scenarios/                   # directory — recursive
+    - .github/tasks/                    # directory (for task doc updates)
+  paths_denied:                         # explicit deny list (wins over allow)
+    - .env*
+    - docker-compose*.yml
+    - deploy/
+
+# ─────────────────────────────────────────────────────────────
+# Browser backend policy (adopted from runbook §5)
+# ─────────────────────────────────────────────────────────────
+browser:
+  primary: playwright-mcp               # playwright-mcp (default) | chrome-mcp
+  secondary: null                       # probed after primary; null to skip
+  interaction_settle_ms: 250            # wait briefly after click/type so React state can flush before the next step
+  computer_use:
+    enabled: false                      # manual escalation for drag / hover / device toolbar
+    allowed_actions: [drag, hover, device_toolbar]   # only invoke CU for these action kinds
+  backend_fallback_order: [playwright-mcp]   # probe order on startup
+
+# ─────────────────────────────────────────────────────────────
+# DB truth — see references/db-truth.md
+# ─────────────────────────────────────────────────────────────
+db_watcher:
+  enabled: true                         # set true when the project has a reachable DB
+  kind: postgres-docker                 # postgres-docker | postgres-host | sqlite | http
+  # Command used to run a single SQL statement. Adapter receives the statement as its last arg.
+  exec_cmd: "docker compose exec -T postgres psql -U teameet_user -d teameet_dev -Atc"
+  tables:                               # watcher background coarse counts
+    - users
+    - matches
+    - sport_teams
+    - team_matches
+    - marketplace_listings
+    - lessons
+    - notifications
+  watcher_log: /tmp/autoqa-db-watch/teameet-counts.log
+  # HTTP fallback for projects that expose admin count/row endpoints instead of DB access:
+  # kind: http
+  # base: "${AUTOQA_DB_API_BASE}"
+  # auth_header: "Authorization: Bearer ${AUTOQA_DB_API_TOKEN}"
+
+# ─────────────────────────────────────────────────────────────
+# Evidence storage policy (adopted from runbook §15)
+# ─────────────────────────────────────────────────────────────
+evidence:
+  raw_dir: .autoqa/runs                 # machine artifacts (gitignored)
+  curated_dir: docs/reference/autoqa    # human-facing before/after evidence (committed)
+  curate_on:
+    - finding_fixed                     # auto-copy run/baseline when a finding transitions to FIXED
+    - wave_complete                     # also at the end of each wave
+  retention:
+    raw_days: 14                        # prune .autoqa/runs older than 14 days
+    curated_days: null                  # keep curated evidence indefinitely
+
+# ─────────────────────────────────────────────────────────────
+# Regression contract (adopted from runbook §14)
+# ─────────────────────────────────────────────────────────────
+regression:
+  rerun_policy: [same, adjacent, landing, db]
+  # same     — rerun the exact scenario × matrix cell that failed
+  # adjacent — rerun sibling scenarios in the same AREA (oracle.scenarios[].adjacent_scenarios)
+  # landing  — rerun the scenario whose route matches the post-save redirect (oracle.scenarios[].landing_route)
+  # db       — rerun db_checkpoint steps even if UI passed
+  adjacent_scope: same_area             # same_area | same_task | explicit
+  landing_required_on: [write, save, submit]    # action kinds that mandate a landing rerun
+
+# ─────────────────────────────────────────────────────────────
+# Finding taxonomy policy (references/finding-taxonomy.md)
+# ─────────────────────────────────────────────────────────────
+taxonomy:
+  wave_priority: [A, B, C, D]           # fixer dispatch order
+  default_categories:
+    DOM: layout
+    DIFF: layout
+    API: truth
+    DB: truth
+    VISION: layout
+    GAP: state
+
+# ─────────────────────────────────────────────────────────────
+# Analyzer knobs
+# ─────────────────────────────────────────────────────────────
+analyzer:
+  diff_threshold_pct_default: 1.0
+  vision_axis_enabled: true
+  vision_axis_severity_min: warning     # only ship Critical/Warning to vision (token control)
+  orphan_api_severity: info             # endpoints hit at runtime but not in oracle
+  db_axis_enabled: true                 # disabled automatically when db_watcher.enabled == false
+
+# ─────────────────────────────────────────────────────────────
+# Orchestrator (background mode)
+# ─────────────────────────────────────────────────────────────
+background:
+  enabled: true
+  scheduler: heartbeat
+  auto_start_on_cycle_background: true
+  require_automation: true
+  require_heartbeat_tool: true
+  fail_closed_when_automation_unavailable: true
+
+orchestrator:
+  wake_interval_seconds_idle: 1800      # 30 min when idle
+  wake_interval_seconds_active: 60      # 1 min between phase transitions
+  max_cycles_same_finding: 3            # escalate to user after
+  budget_tokens_soft_cap: 500000        # per cron cycle — advisory
+  owner_stale_seconds: 1800             # run_owner claim older than this + PID dead → orchestrator may reclaim
+
+# ─────────────────────────────────────────────────────────────
+# AREA map — URL → AREA for scenario id derivation
+# ─────────────────────────────────────────────────────────────
+area_map:
+  "/":                   DASH
+  "/landing":            LANDING
+  "/about":              ABOUT
+  "/guide":              GUIDE
+  "/pricing":            PRICING
+  "/faq":                FAQ
+  "/login":              LOGIN
+  "/callback/":          CALLBACK
+  "/home":               HOME
+  "/feed":               FEED
+  "/onboarding":         ONBOARD
+  "/matches":            MATCH
+  "/matches/":           MATCH-DETAIL
+  "/team-matches":       TEAMMATCH
+  "/team-matches/":      TEAMMATCH-DETAIL
+  "/teams":              TEAM
+  "/teams/":             TEAM-DETAIL
+  "/mercenary":          MERC
+  "/mercenary/":         MERC-DETAIL
+  "/marketplace/orders/": MARKET-ORDER
+  "/marketplace":        MARKET
+  "/marketplace/":       MARKET-DETAIL
+  "/lessons":            LESSON
+  "/lessons/":           LESSON-DETAIL
+  "/chat":               COMMS
+  "/chat/":              CHAT-ROOM
+  "/notifications":      COMMS
+  "/profile":            ACCOUNT
+  "/settings":           ACCOUNT
+  "/payments/checkout":  PAY
+  "/payments":           PAY
+  "/payments/":          PAY-DETAIL
+  "/reviews":            TRUST
+  "/badges":             TRUST
+  "/my/":                MY
+  "/user/":              USER
+  "/users/":             USER-PUBLIC
+  "/venues":             HUB
+  "/venues/":            HUB-DETAIL
+  "/tournaments":        HUB
+  "/tournaments/":       HUB-DETAIL
+  "/admin":              ADMIN
+  "/admin/":             ADMIN-DETAIL
+
+# ─────────────────────────────────────────────────────────────
+# Git LFS reminder — baseline images tend to balloon
+# Uncomment the tip to let scaffold-autoqa.sh install
+# a .gitattributes entry.
+# ─────────────────────────────────────────────────────────────
+git_lfs:
+  install_gitattributes: true           # `.autoqa/baseline/ filter=lfs diff=lfs merge=lfs -text`

@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<title>Teameet — Design Review (Print)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body {
+    background: #f4f5f7;
+    font-family: 'Pretendard', sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* on-screen layout — stacked pages with visible page breaks */
+  .pr-doc {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    padding: 48px 16px;
+  }
+  .pr-cover {
+    width: 100%;
+    max-width: 900px;
+    padding: 64px 48px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    text-align: center;
+  }
+  .pr-cover h1 { font-size: 36px; font-weight: 700; margin: 0 0 12px; color: #191f28; letter-spacing: -0.02em; }
+  .pr-cover p { font-size: 15px; color: #6b7684; margin: 0; line-height: 1.6; }
+  .pr-cover .pr-meta { margin-top: 28px; display: flex; justify-content: center; gap: 32px; font-size: 13px; color: #8b95a1; }
+  .pr-cover .pr-meta b { color: #191f28; font-weight: 700; font-size: 20px; display: block; }
+
+  .pr-section-title {
+    width: 100%;
+    max-width: 900px;
+    padding: 24px 8px 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #191f28;
+    letter-spacing: -0.01em;
+  }
+  .pr-section-title small {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7684;
+    margin-top: 6px;
+  }
+
+  .pr-page {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    border-radius: 12px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .pr-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4e5968;
+    letter-spacing: -0.01em;
+  }
+  .pr-label small {
+    font-weight: 500;
+    color: #8b95a1;
+    margin-left: 8px;
+  }
+  .pr-frame {
+    border: 1px solid #e5e8eb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    position: relative;
+    flex: none;
+  }
+  .pr-frame > * {
+    /* ensure component roots fill the frame and don't overflow */
+    width: 100%;
+    height: 100%;
+  }
+
+  /* print — one artboard per page at native pixel size */
+  @media print {
+    @page { margin: 10mm; }
+    @page :first { margin: 15mm; }
+    html, body { background: #fff; }
+    .pr-doc { padding: 0; gap: 0; }
+    .pr-cover {
+      box-shadow: none;
+      border-radius: 0;
+      padding: 0;
+      width: auto;
+      break-after: page;
+      page-break-after: always;
+    }
+    .pr-section-title {
+      max-width: none;
+      padding: 0 0 8px;
+      break-before: page;
+      page-break-before: always;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .pr-section-title:first-of-type {
+      break-before: auto;
+    }
+    .pr-page {
+      box-shadow: none;
+      border-radius: 0;
+      padding: 0;
+      gap: 10px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      break-before: page;
+      page-break-before: always;
+    }
+    /* first page after a section title should NOT start a new page */
+    .pr-section-title + .pr-page {
+      break-before: avoid;
+      page-break-before: avoid;
+    }
+    .pr-frame {
+      border: 1px solid #e5e8eb;
+      box-shadow: none;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="lib/tokens.jsx"></script>
+<script type="text/babel" src="lib/data.jsx"></script>
+<script type="text/babel" src="lib/screens-match.jsx"></script>
+<script type="text/babel" src="lib/screens-team.jsx"></script>
+<script type="text/babel" src="lib/screens-other.jsx"></script>
+<script type="text/babel" src="lib/screens-more.jsx"></script>
+<script type="text/babel" src="lib/screens-sport.jsx"></script>
+<script type="text/babel" src="lib/screens-deep.jsx"></script>
+<script type="text/babel" src="lib/screens-variants.jsx"></script>
+<script type="text/babel" src="lib/screens-variants2.jsx"></script>
+<script type="text/babel" src="lib/screens-desktop.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+// Print-only shim replacements for DesignCanvas / DCSection / DCArtboard.
+// Flattens the canvas: each artboard renders at its native pixel dimensions
+// on its own printed page, preceded by a section header and a small label.
+
+function PrintDoc({ title, subtitle, children }) {
+  // Count all artboards across sections for the cover card.
+  let artboardCount = 0;
+  let sectionCount = 0;
+  React.Children.forEach(children, section => {
+    if (!React.isValidElement(section)) return;
+    sectionCount++;
+    React.Children.forEach(section.props.children, ab => {
+      if (React.isValidElement(ab)) artboardCount++;
+    });
+  });
+
+  return (
+    <div className="pr-doc">
+      <div className="pr-cover">
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+        <div className="pr-meta">
+          <div><b>{sectionCount}</b>sections</div>
+          <div><b>{artboardCount}</b>screens</div>
+          <div><b>Toss-based</b>design system</div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function PrintSection({ title, subtitle, children }) {
+  return (
+    <>
+      <div className="pr-section-title">
+        {title}
+        {subtitle && <small>{subtitle}</small>}
+      </div>
+      {children}
+    </>
+  );
+}
+
+function PrintArtboard({ label, width, height, children }) {
+  return (
+    <div className="pr-page">
+      <div className="pr-label">
+        {label}
+        <small>{width} × {height}</small>
+      </div>
+      <div className="pr-frame" style={{ width, height }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Swap the canvas components for the print variants. The screens-*.jsx files
+// reference these by name, so we alias globally before rendering.
+window.DesignCanvas = PrintDoc;
+window.DCSection    = PrintSection;
+window.DCArtboard   = PrintArtboard;
+
+// Also expose as locals for the JSX below.
+const DesignCanvas = PrintDoc;
+const DCSection    = PrintSection;
+const DCArtboard   = PrintArtboard;
+
+function App() {
+  return (
+    <>
+      <TokensCSS/>
+      <DesignCanvas title="Teameet — Design Review" subtitle="Toss-based mobile-first prototype · 전 화면 인쇄용 PDF">
+
+        <DCSection id="onboarding" title="01 · Onboarding" subtitle="신규 유저 온보딩">
+          <DCArtboard id="ob-1" label="Step 1 · 인트로" width={375} height={812}><Onboarding/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="home" title="02 · Home — 6가지 접근" subtitle="Toss 정석 (A/B/C) · 에디토리얼 · 다크 대시보드 · 스토리 피드">
+          <DCArtboard id="home-a" label="A · Toss 정석 (CTA 배너)" width={375} height={812}><Home variant="A"/></DCArtboard>
+          <DCArtboard id="home-b" label="B · 4 quick tiles"      width={375} height={812}><Home variant="B"/></DCArtboard>
+          <DCArtboard id="home-c" label="C · 인사말 미니멀"        width={375} height={812}><Home variant="C"/></DCArtboard>
+          <DCArtboard id="home-d" label="D · 에디토리얼 매거진"    width={375} height={812}><HomeEditorial/></DCArtboard>
+          <DCArtboard id="home-e" label="E · 다크 · 실시간 대시보드" width={375} height={812}><HomeDark/></DCArtboard>
+          <DCArtboard id="home-f" label="F · 소셜 피드 · 스토리"   width={375} height={812}><HomeStories/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches" title="03 · 매치 (개인) — 5가지 뷰" subtitle="카드 · 지도 · 타임라인 · 스와이프 · 콤팩트">
+          <DCArtboard id="m-list"     label="A · 카드 리스트"       width={375} height={812}><MatchesList/></DCArtboard>
+          <DCArtboard id="m-map"      label="B · 지도 기반"         width={375} height={812}><MatchesMap/></DCArtboard>
+          <DCArtboard id="m-timeline" label="C · 타임라인"          width={375} height={812}><MatchesTimeline/></DCArtboard>
+          <DCArtboard id="m-swipe"    label="D · 스와이프 매칭"     width={375} height={812}><MatchesSwipe/></DCArtboard>
+          <DCArtboard id="m-dense"    label="E · 콤팩트 피드"       width={375} height={812}><MatchesDense/></DCArtboard>
+          <DCArtboard id="m-detail"   label="매치 상세"              width={375} height={812}><MatchDetail/></DCArtboard>
+          <DCArtboard id="m-join"     label="참가 바텀시트"          width={375} height={812}>
+            <div style={{ position: 'relative', width: 375, height: 812 }}>
+              <MatchDetail/>
+              <JoinSheet open m={MATCHES[0]}/>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-new"      label="매치 만들기"            width={375} height={812}><MatchCreate/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="team-matches" title="04 · 팀 매칭" subtitle="S~D 등급 팀 매칭">
+          <DCArtboard id="tm-list"     label="팀 매칭 목록"   width={375} height={812}><TeamMatchesList/></DCArtboard>
+          <DCArtboard id="tm-detail"   label="팀 매칭 상세"   width={375} height={812}><TeamMatchDetail/></DCArtboard>
+          <DCArtboard id="team-profile" label="팀 프로필"     width={375} height={812}><TeamDetail/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="lessons" title="05 · 레슨 · 장터 · 시설">
+          <DCArtboard id="lessons" label="레슨 목록" width={375} height={812}><LessonsList/></DCArtboard>
+          <DCArtboard id="market"  label="장터"     width={375} height={812}><Marketplace/></DCArtboard>
+          <DCArtboard id="venues"  label="시설"     width={375} height={812}><Venues/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="chat" title="06 · 채팅 · 알림">
+          <DCArtboard id="chat-list" label="채팅 목록" width={375} height={812}><Chat/></DCArtboard>
+          <DCArtboard id="chat-room" label="채팅방"    width={375} height={812}><ChatRoom/></DCArtboard>
+          <DCArtboard id="notifs"    label="알림"      width={375} height={812}><Notifications/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="my" title="07 · 마이페이지">
+          <DCArtboard id="my"          label="마이"      width={375} height={812}><MyPage/></DCArtboard>
+          <DCArtboard id="my-activity" label="내 매치"    width={375} height={812}><MyActivity/></DCArtboard>
+          <DCArtboard id="settings"    label="설정"      width={375} height={812}><Settings/></DCArtboard>
+          <DCArtboard id="reviews"     label="받은 리뷰"  width={375} height={812}><ReviewsReceived/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="sports" title="08 · 종목별 특화 화면" subtitle="종목마다 실제로 다르게 동작하는 매칭 UX">
+          <DCArtboard id="sport-hub"  label="종목 허브"                width={375} height={812}><SportHub/></DCArtboard>
+          <DCArtboard id="soccer-pos" label="축구 · 포지션 선택"       width={375} height={812}><SoccerMatchDetail/></DCArtboard>
+          <DCArtboard id="futsal"     label="풋살 · 시간대 선택"       width={375} height={812}><FutsalMatch/></DCArtboard>
+          <DCArtboard id="basketball" label="농구 · 3on3 팀 구성"     width={375} height={812}><BasketballMatch/></DCArtboard>
+          <DCArtboard id="tennis"     label="테니스 · 단/복식 · NTRP" width={375} height={812}><TennisMatch/></DCArtboard>
+          <DCArtboard id="badminton"  label="배드민턴 · 복식 파트너"   width={375} height={812}><BadmintonMatch/></DCArtboard>
+          <DCArtboard id="hockey"     label="아이스하키 · 장비 체크"   width={375} height={812}><IceHockeyMatch/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="market" title="09 · 장터 · 시설 · 레슨 상세">
+          <DCArtboard id="listing-detail" label="매물 상세"   width={375} height={812}><ListingDetail/></DCArtboard>
+          <DCArtboard id="venue-detail"   label="시설 예약"   width={375} height={812}><VenueDetail/></DCArtboard>
+          <DCArtboard id="lesson-detail"  label="레슨 상세"   width={375} height={812}><LessonDetail/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="pay" title="10 · 결제 · 리뷰">
+          <DCArtboard id="checkout"     label="결제"         width={375} height={812}><PaymentCheckout/></DCArtboard>
+          <DCArtboard id="pay-success"  label="결제 완료"    width={375} height={812}><PaymentSuccess/></DCArtboard>
+          <DCArtboard id="pay-history"  label="결제 내역"    width={375} height={812}><PaymentHistory/></DCArtboard>
+          <DCArtboard id="review-write" label="리뷰 작성"    width={375} height={812}><ReviewWrite/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="home-plus" title="11 · 홈 (위젯 + FAB)">
+          <DCArtboard id="home-plus" label="Home · 풀 위젯" width={375} height={812}><HomePlus/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="level" title="12 · 종목별 실력 인증" subtitle="선출 · NTRP · 피겨 등급 · 군부 · BB 포지션">
+          <DCArtboard id="lv-soccer"    label="축구 · 선출 인증"    width={375} height={812}><SoccerLevelCert/></DCArtboard>
+          <DCArtboard id="lv-hockey"    label="아이스·피겨 · 등급"  width={375} height={812}><HockeyLevelCert/></DCArtboard>
+          <DCArtboard id="lv-tennis"    label="테니스 · NTRP"       width={375} height={812}><TennisLevelCert/></DCArtboard>
+          <DCArtboard id="lv-badminton" label="배드민턴 · 군부"     width={375} height={812}><BadmintonLevelCert/></DCArtboard>
+          <DCArtboard id="lv-basket"    label="농구 · 신장·특기"    width={375} height={812}><BasketLevelCert/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="pass" title="13 · 수강권 · 장비대여">
+          <DCArtboard id="lp-list"        label="수강권 보관함"   width={375} height={812}><LessonPass/></DCArtboard>
+          <DCArtboard id="lp-buy"         label="수강권 구매"     width={375} height={812}><LessonPassBuy/></DCArtboard>
+          <DCArtboard id="rental"         label="장비 대여 목록"  width={375} height={812}><EquipmentRental/></DCArtboard>
+          <DCArtboard id="rental-detail"  label="장비 대여 상세"  width={375} height={812}><RentalDetail/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="book" title="14 · 팀 · 시설 예약">
+          <DCArtboard id="venue-book"      label="시설 시간대 예약" width={375} height={812}><VenueBooking/></DCArtboard>
+          <DCArtboard id="team-join"       label="팀 가입 신청"     width={375} height={812}><TeamJoinRequest/></DCArtboard>
+          <DCArtboard id="team-match-book" label="교환 매치 예약"   width={375} height={812}><TeamMatchBook/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="desktop" title="15 · 데스크탑 웹">
+          <DCArtboard id="web-home"    label="Desktop · 홈"        width={1280} height={800}><DesktopHome/></DCArtboard>
+          <DCArtboard id="web-matches" label="Desktop · 매치 탐색" width={1280} height={800}><DesktopMatches/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin" title="16 · 관리자 Admin">
+          <DCArtboard id="admin-dash"     label="Admin · 대시보드"  width={1280} height={800}><AdminDashboard/></DCArtboard>
+          <DCArtboard id="admin-matches"  label="Admin · 매치 관리" width={1280} height={800}><AdminMatches/></DCArtboard>
+          <DCArtboard id="admin-user"     label="Admin · 유저 상세" width={1280} height={800}><AdminUserDetail/></DCArtboard>
+          <DCArtboard id="admin-reports"  label="Admin · 신고 처리" width={1280} height={800}><AdminReports/></DCArtboard>
+          <DCArtboard id="admin-payouts"  label="Admin · 정산"      width={1280} height={800}><AdminPayouts/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="extras" title="17 · 용병 · 대회 · 로그인 · 상태">
+          <DCArtboard id="login"      label="로그인"                  width={375} height={812}><Login/></DCArtboard>
+          <DCArtboard id="mercenary"  label="용병 구인"               width={375} height={812}><Mercenary/></DCArtboard>
+          <DCArtboard id="tourn"      label="대회"                    width={375} height={812}><Tournaments/></DCArtboard>
+          <DCArtboard id="states"     label="Empty · Loading · Error" width={375} height={812}><StatesBundle/></DCArtboard>
+        </DCSection>
+
+      </DesignCanvas>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+// Auto-print once fonts + React render are settled.
+// Skip when embedded in the design tool's iframe so preview stays usable;
+// only trigger when opened via the print tool (new tab / top-level window).
+(async () => {
+  if (window.top !== window.self) return;
+  try { await document.fonts.ready; } catch (e) {}
+  // Give React + babel one more frame + buffer to settle layout.
+  await new Promise(r => setTimeout(r, 800));
+  window.print();
+})();
+</script>
+</body>
+</html>

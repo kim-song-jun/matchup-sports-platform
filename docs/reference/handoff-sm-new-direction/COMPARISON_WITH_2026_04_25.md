@@ -8,6 +8,27 @@
 The visual grammar is mostly kept. The product priority and module grouping are
 changed.
 
+## Current Priority Override
+
+Compared with the previous `handoff-sm-new-direction` snapshot, mercenary is no
+longer a core module. It is now candidate priority `C07`.
+
+```text
+Previous candidate snapshot:
+Core included 05 Mercenary.
+
+Current candidate snapshot:
+Core excludes Mercenary.
+Core adds 05 Team browse / discovery.
+Candidate includes C07 Mercenary.
+```
+
+The M08 route, board, canonical id, and component evidence remains available;
+only its priority group changes.
+The new `05 · 팀 둘러보기` section is added directly after the existing team
+matching material so the original team matching reference and the new all-team
+browse direction can be compared.
+
 ## Keep
 
 - Existing source pack as historical reference.
@@ -34,7 +55,7 @@ Core:
 02 홈/추천
 03 개인 매치
 04 팀/팀매칭
-05 용병
+05 팀 둘러보기/탐색
 06 커뮤니티/채팅/알림
 07 마이/프로필/평판
 08 결제/환불/분쟁
@@ -51,6 +72,7 @@ C03 시설
 C04 대회
 C05 장비 대여
 C06 종목/실력/안전
+C07 용병
 ```
 
 This reorder is applied inside the candidate pack's rendered HTML. The original
@@ -66,6 +88,7 @@ The following modules move to candidate priority:
 - tournaments
 - equipment rental
 - sports/skill/safety
+- mercenary
 
 These modules remain useful references because they already include:
 
@@ -102,7 +125,7 @@ The following work is deferred beyond Phase 1:
 - Should tournaments be a near-term vertical or a future structured-play
   extension?
 - Which core route family should be migrated first if this candidate direction
-  is promoted: personal matches, teams/team matching, or mercenary?
+  is promoted: personal matches, teams/team matching, or community?
 - What QA threshold is required before the candidate pack can be referenced by
   production migration work?
 

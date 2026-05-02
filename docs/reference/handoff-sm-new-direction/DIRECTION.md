@@ -16,6 +16,46 @@ Canonical status: not canonical
 Implementation status: reference only
 ```
 
+## Current Priority Override
+
+This section supersedes the older module lists below for the current
+`handoff-sm-new-direction` candidate snapshot.
+
+```text
+Core:
+01 Auth / onboarding
+02 Home / recommendations
+03 Personal matches
+04 Teams / team matching
+05 Team browse / discovery
+06 Community / chat / notifications
+07 My / profile / reputation
+08 Payments / refunds / disputes
+09 Settings / legal / status
+10 Public / marketing
+11 Desktop web
+12 Admin / operations
+13 Common flows / interactions
+
+Candidate:
+C01 Lessons
+C02 Marketplace
+C03 Venues
+C04 Tournaments
+C05 Equipment rental
+C06 Sports / skill / safety
+C07 Mercenary
+```
+
+Comparison note:
+
+- Previous candidate snapshot placed mercenary in core as `05`.
+- Current candidate snapshot moves mercenary to candidate priority as `C07`.
+- Current `05` is now a team browse/discovery comparison section for viewing,
+  comparing, and selecting teams before joining or entering team matching.
+- Existing M08 ids, artboard ids, and component exports stay unchanged so QA and
+  prototype mount points remain stable.
+
 ## Preserve
 
 The candidate keeps the strongest parts of the 2026-04-25 handoff:
@@ -66,7 +106,7 @@ These modules form the first-priority service direction.
 02 홈/추천
 03 개인 매치
 04 팀/팀매칭
-05 용병
+05 팀 둘러보기/탐색
 06 커뮤니티/채팅/알림
 07 마이/프로필/평판
 08 결제/환불/분쟁
@@ -79,8 +119,11 @@ These modules form the first-priority service direction.
 
 ### Core Rationale
 
-- Authentication, onboarding, home, matches, teams, and mercenary are the
+- Authentication, onboarding, home, matches, and teams are the
   highest-frequency participation surfaces.
+- Team browse stays in core because team matching needs a preceding discovery
+  surface where users can compare teams, inspect trust signals, and choose a
+  team before applying or matching.
 - Community, chat, notifications, my/profile, and reputation are retention and
   activity surfaces.
 - Payments, refunds, and disputes need honest transaction grammar and clear
@@ -100,6 +143,7 @@ C03 시설
 C04 대회
 C05 장비 대여
 C06 종목/실력/안전
+C07 용병
 ```
 
 ### Candidate Rationale
@@ -114,7 +158,7 @@ Candidate does not mean deleted.
 
 ## Priority Changes From 2026-04-25
 
-- Mercenary moves into the core path.
+- Mercenary moves from the core path to candidate priority.
 - Sports/skill/safety moves to candidate priority until the product scope for sport-specific verification and safety checks is re-confirmed.
 - Community/chat/notifications remain core because activity and late-connect
   state are platform-wide concerns.
@@ -157,6 +201,16 @@ Applied scope:
 - Candidate modules are labeled `C01~C05` in the rendered section title.
 - Existing section ids, artboard ids, `data-canonical-id` aliases, and component
   export names were preserved.
+
+Phase 2a home rule:
+
+- When redesigning a numbered core module, keep the original section in place and
+  add a same-number comparison section directly below it.
+- For module `02`, `02 · 홈 · 추천` remains as the original reference and
+  `02 · 홈 · Toss canonical` copies the existing `홈 · Toss canonical` board as
+  the mobile-first baseline.
+- The `02 · 홈 · Toss canonical` section documents the UI rules and flow that
+  match the existing `HomeToss` design before the M02 grid is rewritten.
 
 Out of scope:
 

@@ -48,6 +48,11 @@ Required pattern:
 
 Rules:
 - hub가 무엇인지 첫 화면에서 바로 보여야 한다.
+- `02` home 작업은 원본 섹션을 보존하고 `02 · 홈 · Toss canonical`
+  비교 섹션에 기존 `HomeToss` 보드를 복사한 뒤, 그 디자인에 맞는 flow를
+  먼저 고정한다.
+- 홈 canonical flow는 `인사/활동 요약 -> 오늘 매치 featured card -> quick
+  actions -> 날씨 -> 추천 매치 -> 이번 달 통계/공지` 순서를 기본으로 한다.
 - list는 card decoration보다 정보 우선순위가 먼저다.
 - filter chip selection은 시각적으로 명확해야 한다.
 - 추천 이유가 있으면 숨기지 말고 설명한다.

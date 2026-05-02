@@ -90,6 +90,8 @@ Source: `/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-proje
 | matches-core | `m-timeline` | 매치 목록 · 시간대별 타임라인 | 375×812 | mb | `m03-mb-list-timeline` |
 | matches-core | `m-swipe` | 매치 목록 · 스와이프 매칭 | 375×812 | mb | `m03-mb-list-swipe` |
 | matches-core | `m-dense` | 매치 목록 · 콤팩트 피드 | 375×812 | mb | `m03-mb-flow-feed` |
+| matches-core-cardnews-compact | `m-list-cardnews-compact` | 매치 목록 · 카드뉴스 + 콤팩트 피드 병행 | 375×812 | mb | `m03-mb-flow-cardnews-compact` |
+| matches-core-card-compact-switcher | `m-list-card-compact-switcher` | 매치 목록 · 카드/콤팩트 선택형 | 375×812 | mb | `m03-mb-flow-card-compact-switcher` |
 | matches-core | `m-detail` | 매치 상세 | 375×812 | mb | `m03-mb-detail` |
 | matches-core | `m-join` | 매치 참가 바텀시트 | 375×812 | mb | `m03-mb-main-bottomsheet` |
 | matches-core | `m-new` | 매치 만들기 | 375×812 | mb | `m03-mb-create` |

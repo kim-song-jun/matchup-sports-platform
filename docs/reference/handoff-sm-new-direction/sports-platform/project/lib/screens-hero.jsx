@@ -147,6 +147,92 @@ const HomeToss = () => (
   </div>
 );
 
+const HomeTossCanonicalUiRules = () => (
+  <div style={{ width: 375, height: 812, background: 'var(--grey50)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <StatusBar/>
+    <div style={{ padding: '16px 20px 14px', background: 'var(--bg)', borderBottom: '1px solid var(--grey100)' }}>
+      <Badge tone="blue" size="sm">HOME CANONICAL</Badge>
+      <div style={{ fontSize: 23, fontWeight: 700, lineHeight: 1.28, letterSpacing: 0, marginTop: 8 }}>홈 디자인 규약</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45, marginTop: 6 }}>원본 `홈 · Toss canonical` 화면을 그대로 기준안으로 두고, 그 화면에서 지켜야 할 UI 규약을 정리합니다.</div>
+    </div>
+    <div style={{ flex: 1, overflow: 'auto', padding: 20, display: 'grid', gap: 12, alignContent: 'start' }}>
+      {[
+        ['상단 구조', '`teameet` 로고, 검색, 알림을 최소 chrome으로 유지하고 홈 첫 화면은 인사말과 활동 요약이 바로 읽히게 합니다.'],
+        ['Hero 카드', '오늘의 매치는 HomeToss의 blue featured card를 유지합니다. 이 카드는 홈의 유일한 강한 visual anchor입니다.'],
+        ['Quick action', '4개 shortcut은 HomeToss 구조를 유지하되 blue 외 색은 semantic support로만 사용하고 primary CTA처럼 보이지 않게 합니다.'],
+        ['추천 목록', '추천 매치는 가로 카드 리스트를 유지합니다. 종목, 제목, 인원, 가격 순서로 판단 정보를 고정합니다.'],
+        ['활동/신뢰', '이번 달 통계와 매너 점수는 sample/verified 상태를 분리해 실제 신뢰 지표처럼 과장하지 않습니다.'],
+      ].map(([title, sub], i) => (
+        <Card key={title} pad={16} style={{ boxShadow: 'none' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div className="tab-num" style={{ width: 32, height: 32, borderRadius: 12, background: i === 0 ? 'var(--blue500)' : 'var(--grey100)', color: i === 0 ? 'var(--static-white)' : 'var(--text-muted)', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 700 }}>{i + 1}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-strong)' }}>{title}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45, marginTop: 5 }}>{sub}</div>
+            </div>
+          </div>
+        </Card>
+      ))}
+      <Card pad={16} style={{ background: 'var(--bg)', boxShadow: 'none' }}>
+        <SectionTitle title="사용 컴포넌트" sub="Home canonical에서 허용하는 기본 vocabulary"/>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '4px 20px 0' }}>
+          {['NumberDisplay', 'KPIStat', 'SectionTitle', 'StackedAvatars', 'WeatherStrip', 'AnnouncementBar', 'TabBar'].map((item, i) => (
+            <HapticChip key={item} active={i === 0}>{item}</HapticChip>
+          ))}
+        </div>
+      </Card>
+    </div>
+  </div>
+);
+
+const HomeTossCanonicalFlowRules = () => (
+  <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <StatusBar/>
+    <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid var(--grey100)' }}>
+      <Badge tone="blue" size="sm">FLOW / STATE</Badge>
+      <div style={{ fontSize: 23, fontWeight: 700, lineHeight: 1.28, letterSpacing: 0, marginTop: 8 }}>홈 동작 기준</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45, marginTop: 6 }}>Grid 제작 전 원본 HomeToss 화면의 interaction과 state 기준을 먼저 고정합니다.</div>
+    </div>
+    <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+      <Card pad={18} style={{ boxShadow: 'none' }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>탐색 흐름</div>
+        <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+          {[
+            ['진입', '홈 진입 직후 인사말과 이번 달 활동/매너 점수가 먼저 보입니다.'],
+            ['오늘 매치 판단', 'blue featured card에서 시간, 장소, 인원, 참가 CTA를 확인합니다.'],
+            ['탐색 확장', 'quick action과 추천 매치 가로 리스트로 매치/팀/레슨/시설 탐색을 확장합니다.'],
+            ['활동 확인', '하단 통계와 announcement로 현재 활동 상태와 다음 행동을 확인합니다.'],
+          ].map(([title, sub], i) => (
+            <div key={title} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div className="tab-num" style={{ width: 26, height: 26, borderRadius: 999, background: i === 0 ? 'var(--blue500)' : 'var(--grey100)', color: i === 0 ? 'var(--static-white)' : 'var(--text-muted)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700 }}>{i + 1}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, marginTop: 2 }}>{sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+        {[
+          ['loading', 'KPI, featured card, 추천 카드 shape를 유지한 skeleton'],
+          ['empty', '추천 매치 영역에 다음 행동 CTA와 필터 완화 안내 제공'],
+          ['error', '추천 영역은 원인 + 재시도, 상단 활동 요약은 유지'],
+          ['permission', '위치 권한 없이도 지역 직접 선택 흐름 제공'],
+          ['pending', '추천 갱신 중 stale badge와 마지막 갱신 시각 표시'],
+        ].map(([state, rule]) => (
+          <Card key={state} pad={14} style={{ boxShadow: 'none' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+              <div className="tab-num" style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue500)' }}>{state}</div>
+              <div style={{ flex: 1, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, textAlign: 'right' }}>{rule}</div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 /* ── Match detail · refreshed using signatures ── */
 const MatchDetailToss = () => {
   const m = MATCHES[0];
@@ -420,5 +506,5 @@ const EmptyShowcase = () => (
 );
 
 Object.assign(window, {
-  HomeToss, MatchDetailToss, WalletToss, ActivityToss, EmptyShowcase,
+  HomeToss, HomeTossCanonicalUiRules, HomeTossCanonicalFlowRules, MatchDetailToss, WalletToss, ActivityToss, EmptyShowcase,
 });

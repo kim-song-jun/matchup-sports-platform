@@ -629,9 +629,232 @@ const MatchesMapV2 = () => {
   );
 };
 
+const TeamBrowseV2 = () => {
+  const [sport, setSport] = React.useState('all');
+  const [sort, setSort] = React.useState('recommended');
+  const teams = TEAMS.map((team, index) => ({
+    ...team,
+    region: ['마포구', '용산구', '강남구', '서초구'][index] || '서울',
+    record: ['12승 4무 5패', '8승 3무 6패', '18승 2무 4패', '10승 7무 3패'][index] || '기록 없음',
+    open: [true, true, false, true][index],
+    next: ['토 09:00 팀매치', '수 20:00 풋살', '일 10:00 농구', '목 19:00 정기전'][index] || '일정 조율 중',
+    fit: [92, 86, 78, 74][index] || 70,
+    tags: [
+      ['주말 활동', '신입 환영', '매너 우선'],
+      ['평일 저녁', '풋살', '빠른 응답'],
+      ['3on3', '경험자 선호', '경쟁형'],
+      ['복식', '정기 모임', '초중급'],
+    ][index] || ['팀'],
+  }));
+  const visibleTeams = teams.filter((team) => sport === 'all' || team.sport.includes(sport));
+  const sortedTeams = [...visibleTeams].sort((a, b) => {
+    if (sort === 'manner') return b.manner - a.manner;
+    if (sort === 'member') return b.members - a.members;
+    return b.fit - a.fit;
+  });
+
+  return (
+    <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <StatusBar/>
+      <div style={{ padding: '12px 20px 0', borderBottom: '1px solid var(--grey100)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, height: 42, borderRadius: 12, background: 'var(--grey100)', display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px' }}>
+            <Icon name="search" size={18} color="var(--text-caption)"/>
+            <div style={{ fontSize: 14, color: 'var(--text-placeholder)' }}>팀 이름, 지역, 종목 검색</div>
+          </div>
+          <button className="tm-pressable tm-break-keep" style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--grey100)', border: 'none', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <Icon name="filter" size={20}/>
+          </button>
+        </div>
+        <div style={{ padding: '16px 0 14px' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue500)', letterSpacing: 0 }}>TEAM DISCOVERY</div>
+          <div style={{ fontSize: 24, lineHeight: '31px', fontWeight: 800, color: 'var(--text-strong)', marginTop: 4, letterSpacing: 0 }}>
+            나와 맞는 팀을<br/>먼저 둘러보세요
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 14 }}>
+            <KPIStat label="모집 중" value={3} unit="팀"/>
+            <KPIStat label="평균 매너" value="4.8"/>
+            <KPIStat label="내 근처" value={12} unit="팀"/>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, padding: '10px 20px 8px', overflowX: 'auto' }}>
+        {[
+          ['all', '전체', teams.length],
+          ['축구', '축구', 1],
+          ['풋살', '풋살', 1],
+          ['농구', '농구', 1],
+          ['배드민턴', '배드민턴', 1],
+        ].map(([id, label, count]) => (
+          <HapticChip key={id} active={sport === id} onClick={() => setSport(id)} count={count}>{label}</HapticChip>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, padding: '0 20px 10px', overflowX: 'auto' }}>
+        {[
+          ['recommended', '추천순'],
+          ['manner', '매너 높은순'],
+          ['member', '멤버 많은순'],
+        ].map(([id, label]) => (
+          <button key={id} className="tm-pressable tm-break-keep" onClick={() => setSort(id)} style={{
+            height: 32,
+            padding: '0 12px',
+            borderRadius: 999,
+            border: '1px solid var(--border)',
+            background: sort === id ? 'var(--grey900)' : 'var(--bg)',
+            color: sort === id ? 'var(--static-white)' : 'var(--text-muted)',
+            fontSize: 12,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 20px 92px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {sortedTeams.map((team) => (
+          <div key={team.id} className="tm-card tm-card-interactive" style={{ padding: 16, borderRadius: 16 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ width: 58, height: 58, borderRadius: 18, background: team.color, color: 'var(--static-white)', display: 'grid', placeItems: 'center', fontSize: 26, fontWeight: 900, flexShrink: 0 }}>
+                {team.logo}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{team.name}</div>
+                  <Badge tone={team.open ? 'blue' : 'grey'} size="sm">{team.open ? '모집중' : '마감'}</Badge>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontWeight: 600 }}>
+                  {team.sport} · {team.region} · 멤버 {team.members}명
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 9 }}>
+                  {team.tags.map((tag) => <Badge key={tag} tone="grey" size="sm">{tag}</Badge>)}
+                </div>
+              </div>
+              <Icon name="chevR" size={18} color="var(--grey400)"/>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 14 }}>
+              <div style={{ padding: 10, borderRadius: 12, background: 'var(--grey50)' }}>
+                <div className="tab-num" style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)' }}>{team.fit}%</div>
+                <div style={{ fontSize: 10, color: 'var(--text-caption)', marginTop: 2 }}>추천 적합도</div>
+              </div>
+              <div style={{ padding: 10, borderRadius: 12, background: 'var(--grey50)' }}>
+                <div className="tab-num" style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)' }}>{team.manner}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-caption)', marginTop: 2 }}>매너 점수</div>
+              </div>
+              <div style={{ padding: 10, borderRadius: 12, background: 'var(--grey50)' }}>
+                <div className="tab-num" style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)' }}>{team.level}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-caption)', marginTop: 2 }}>팀 레벨</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--grey100)' }}>
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{team.record}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-caption)', marginTop: 3 }}>{team.next}</div>
+              </div>
+              <button className="tm-pressable tm-break-keep" disabled={!team.open} style={{
+                height: 36,
+                padding: '0 16px',
+                borderRadius: 999,
+                border: 'none',
+                background: team.open ? 'var(--blue500)' : 'var(--grey100)',
+                color: team.open ? 'var(--static-white)' : 'var(--text-caption)',
+                fontSize: 12,
+                fontWeight: 800,
+                opacity: team.open ? 1 : .7,
+              }}>{team.open ? '팀 보기' : '마감'}</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <BottomNav active="teams"/>
+    </div>
+  );
+};
+
+const TeamBrowseFlowBoard = () => (
+  <div style={{ width: 840, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', padding: 36, color: 'var(--text-strong)', overflow: 'hidden' }}>
+    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--blue500)' }}>05 FLOW</div>
+    <div style={{ fontSize: 30, lineHeight: '38px', fontWeight: 800, marginTop: 8, letterSpacing: 0 }}>팀 전체 조회 흐름</div>
+    <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 8 }}>02 홈 Toss canonical처럼 화면, 결정 정보, 다음 행동을 같은 보드 안에서 고정한다.</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginTop: 28 }}>
+      {[
+        ['1', '탐색', '검색과 종목 chip으로 팀 후보를 줄인다.'],
+        ['2', '비교', '추천 적합도, 매너, 레벨, 활동 지역을 같은 위치에서 읽는다.'],
+        ['3', '선택', '팀 카드를 눌러 팀 프로필로 진입한다.'],
+        ['4', '검증', '멤버, 최근 경기, 모집 상태, 권한을 확인한다.'],
+        ['5', '신청', '가입 신청 또는 팀매칭 요청으로 이어진다.'],
+      ].map(([n, title, sub]) => (
+        <div key={n} className="tm-card" style={{ padding: 16, minHeight: 190, borderRadius: 16 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 12, background: n === '1' ? 'var(--blue500)' : 'var(--grey100)', color: n === '1' ? 'var(--static-white)' : 'var(--text-strong)', display: 'grid', placeItems: 'center', fontWeight: 900 }}>{n}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, marginTop: 16 }}>{title}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.55, marginTop: 8 }}>{sub}</div>
+        </div>
+      ))}
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 28 }}>
+      <div className="tm-card" style={{ padding: 18, borderRadius: 16 }}>
+        <SectionTitle title="필수 상태" sub="목록만 만들지 않고 상태까지 함께 둔다."/>
+        {['모집 중 / 마감', '권한 없음', '검색 결과 없음', '팀 가입 신청 pending', '팀장 승인/거절'].map((item) => (
+          <ListItem key={item} title={item} sub="사용자가 다음 행동을 판단할 수 있는 사유와 CTA를 함께 둔다."/>
+        ))}
+      </div>
+      <div className="tm-card" style={{ padding: 18, borderRadius: 16 }}>
+        <SectionTitle title="진입/이탈" sub="bottom nav teams와 detail shell의 연결."/>
+        {[
+          ['진입', '/teams 또는 bottom nav teams'],
+          ['상세', '/teams/[id]'],
+          ['후속', '가입 신청, 팀매칭 요청, 채팅'],
+          ['관리', '내 팀, 팀장 도구'],
+        ].map(([title, sub]) => <ListItem key={title} title={title} sub={sub}/>)}
+      </div>
+    </div>
+  </div>
+);
+
+const TeamBrowseRulesBoard = () => (
+  <div style={{ width: 840, height: 812, background: 'var(--grey50)', fontFamily: 'var(--font)', padding: 36, color: 'var(--text-strong)', overflow: 'hidden' }}>
+    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--blue500)' }}>05 UI CONTRACT</div>
+    <div style={{ fontSize: 30, lineHeight: '38px', fontWeight: 800, marginTop: 8, letterSpacing: 0 }}>팀 탐색 화면 규약</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 26 }}>
+      {[
+        ['Layout', '검색 → 종목 chip → 정렬 chip → 팀 카드 리스트. Hero showcase를 쓰지 않는다.'],
+        ['Card', '팀 로고, 팀명, 모집 상태, 종목/지역/멤버, 태그, 추천 적합도, 매너, 레벨을 고정 위치에 둔다.'],
+        ['Action', 'primary CTA는 팀 보기 1개. 마감이면 disabled와 사유를 보여준다.'],
+        ['Trust', '매너/레벨/전적은 verified, estimated, sample을 구분할 수 있어야 한다.'],
+        ['Color', 'blue는 active chip과 CTA에만 사용한다. 팀 색상은 로고 surface 안에만 제한한다.'],
+        ['State', 'empty/loading/error/permission/pending/closed 상태를 case matrix에 연결한다.'],
+      ].map(([title, sub]) => (
+        <div key={title} className="tm-card" style={{ padding: 16, borderRadius: 16, minHeight: 162 }}>
+          <div style={{ fontSize: 15, fontWeight: 800 }}>{title}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 8 }}>{sub}</div>
+        </div>
+      ))}
+    </div>
+    <div className="tm-card" style={{ marginTop: 20, padding: 18, borderRadius: 16, background: 'var(--bg)' }}>
+      <SectionTitle title="02 홈 Toss canonical에서 가져온 원칙" sub="첫 화면은 장식보다 선택 가능한 후보와 다음 행동을 먼저 보여준다."/>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 12 }}>
+        {[
+          ['조용한 상단', '큰 배경 이미지 대신 검색과 요약 KPI'],
+          ['칩 언어', 'active는 blue, inactive는 neutral'],
+          ['숫자 문법', '멤버/매너/적합도는 tabular'],
+          ['상태 명시', '마감/권한/대기 상태를 버튼만으로 숨기지 않음'],
+        ].map(([title, sub]) => (
+          <div key={title} style={{ padding: 14, borderRadius: 14, background: 'var(--grey50)' }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>{title}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 6 }}>{sub}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 Object.assign(window, {
   LessonAcademyHub, LessonsListV2, MarketplaceV2, ChatRoomV2,
   TeamMatchDetailV2, TeamDetailV2,
+  TeamBrowseV2, TeamBrowseFlowBoard, TeamBrowseRulesBoard,
   MyActivityV2,
   MicroInteractionsDemo,
   MatchesMapV2,

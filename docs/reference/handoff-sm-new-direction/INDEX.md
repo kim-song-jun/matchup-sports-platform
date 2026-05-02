@@ -18,6 +18,31 @@ Implementation status: reference only
 Fork source: docs/reference/handoff-2026-04-25/
 ```
 
+## Current Priority Override
+
+This candidate snapshot now treats mercenary as a candidate module, not a core
+module.
+
+```text
+Core:
+auth, home, personal matches, teams/team matching, team browse/discovery,
+community/chat/notifications, my/profile/reputation,
+payments/refunds/disputes, settings/legal/status, public/marketing,
+desktop, admin, common flows.
+
+Candidate:
+lessons, marketplace, venues, tournaments, equipment rental,
+sports/skill/safety, mercenary.
+```
+
+Previous comparison point: mercenary was previously listed in the core set and
+rendered as `05`. The current snapshot moves it to `C07` while preserving M08
+ids and boards for comparison and QA stability.
+
+Current `05` is now a team browse/discovery comparison section. It fills the
+gap between team matching and team profile by giving users a full-team browse,
+comparison, and selection surface.
+
 Until this candidate is explicitly promoted, the active design rules remain:
 
 1. `DESIGN.md`
@@ -66,12 +91,12 @@ The new direction keeps the design grammar from the 2026-04-25 handoff:
 
 The service priority is reorganized into:
 
-- Core modules: auth, home, personal matches, teams/team matching, mercenary,
+- Core modules: auth, home, personal matches, teams/team matching, team browse,
   community/chat/notifications, my/profile/reputation,
   payments/refunds/disputes, settings/legal/status, public/marketing, desktop,
   admin, and common flows.
 - Candidate modules: lessons, marketplace, venues, tournaments, and equipment
-  rental.
+  rental, sports/skill/safety, and mercenary.
 
 Candidate modules are preserved for evaluation. They are not deleted.
 
@@ -102,9 +127,10 @@ Applied section order:
 00~00n Reference / DNA
 01 인증/온보딩
 02 홈/추천
+02 홈/Toss canonical 비교
 03 개인 매치
 04 팀/팀매칭
-05 용병
+05 팀 둘러보기/탐색
 06 커뮤니티/채팅/알림
 07 마이/프로필/평판
 08 결제/환불/분쟁
@@ -121,6 +147,7 @@ C03 시설
 C04 대회
 C05 장비 대여
 C06 종목/실력/안전
+C07 용병
 ```
 
 The rendered section order now places each core functional module next to its
@@ -129,6 +156,17 @@ viewport-grid sections.
 
 Existing section ids, artboard ids, canonical ids, and major component export
 names were preserved so QA scripts and prototype mount points remain stable.
+
+Phase 2a update:
+
+- Numbered core redesigns are added as same-number comparison sections directly
+  below the original section.
+- `02 · 홈 · Toss canonical` now follows the original `02 · 홈 · 추천` section.
+  It copies the existing `홈 · Toss canonical` board as the mobile-first
+  baseline and adds matching UI/flow rule boards for the next M02 grid pass.
+- `05 · 팀 둘러보기` now follows `04 · 팀 · 팀매칭` and its M04 viewport grid.
+  It adds a team browse screen plus flow/rule boards modeled after the `02`
+  comparison section, while preserving the original team matching section.
 
 ## Operating Rules
 

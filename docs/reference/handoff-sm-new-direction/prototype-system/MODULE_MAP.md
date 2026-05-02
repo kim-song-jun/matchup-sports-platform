@@ -7,6 +7,23 @@ candidate Phase 2에서 적용한 새 섹션 순서를 함께 기록한다.
 
 ## Candidate Phase 2 Section Order
 
+### Current Phase 2b Override
+
+Mercenary is now candidate priority, not core priority.
+
+```text
+Core sequence excludes 05 Mercenary.
+Core sequence adds 05 Team browse / discovery.
+Candidate sequence adds C07 Mercenary followed by M08 Mercenary viewport grid.
+```
+
+Previous comparison point: the older Phase 2 order placed `05 Mercenary` and
+`M08 Mercenary viewport grid` between teams/team matching and community. The
+current rendered direction moves both after `C06 Sports / skill / safety` while
+preserving existing section ids, artboard ids, canonical ids, and exports.
+The current `05` slot is now a new team browse comparison section placed after
+`04 Teams / team matching` and the M04 viewport grid.
+
 Phase 2는 보드 내부 구현, artboard id, canonical id, JSX export 이름을 바꾸지
 않고 top-level `DCSection` 순서와 candidate 섹션 타이틀만 재정렬했다.
 
@@ -15,13 +32,13 @@ Phase 2는 보드 내부 구현, artboard id, canonical id, JSX export 이름을
 01 인증/온보딩
 M01 인증/온보딩 viewport grid
 02 홈/추천
+02 홈/Toss canonical 비교
 M02 홈/추천 viewport grid
 03 개인 매치
 M03 개인 매치 viewport grid
 04 팀/팀매칭
 M04 팀/팀매칭 viewport grid
-05 용병
-M08 용병 viewport grid
+05 팀 둘러보기/탐색
 06 커뮤니티/채팅/알림
 M12 커뮤니티/채팅/알림 viewport grid
 07 마이/프로필/평판
@@ -50,6 +67,8 @@ C05 장비 대여
 M10 장비 대여 viewport grid
 C06 종목/실력/안전
 M11 종목/실력/안전 viewport grid
+C07 용병
+M08 용병 viewport grid
 ```
 
 The `M05~M10` canonical id prefixes are intentionally preserved even though
@@ -79,23 +98,32 @@ canonical-id tooling stable.
 |---|---|---:|
 | `01 · 인증 · 온보딩` | 로그인, OAuth callback, onboarding step, welcome, case matrix, state/edge, validation/permission, controls, motion, responsive/copy fit | 12 |
 | `02 · 홈 · 추천` | 홈 variant, widget/FAB, 추천 이유, 초대, case matrix, 상태/엣지, 버튼/FAB/필터, motion, responsive/copy fit | 13 |
+| `02 · 홈 · Toss canonical` | 원본 `02 · 홈 · 추천`을 보존한 비교 섹션. 기존 `홈 · Toss canonical` 보드를 그대로 복사해 기준안으로 두고, 해당 디자인에 맞는 UI 규약/동작 상태 보드를 함께 둔다. 다음 M02 grid 재작성 기준으로 사용한다. | 7 |
 | `03 · 개인 매치` | 매치 목록/지도/타임라인/상세/참가/생성/내 매치, case matrix, 상태/엣지, 참가시트, 지도 권한, controls, motion, responsive/copy fit | 16 |
 | `04 · 팀 · 팀매칭` | 팀 매칭, 팀 프로필, 팀 생성, 가입, 예약, 출석, 스코어, 평가, 팀장 도구, case matrix, 상태/엣지, 역할 권한, 가입 승인, 운영 충돌, controls, motion, responsive/copy fit | 24 |
-| `05 · 레슨 Academy` | Academy hub, 레슨 목록, 코치, 상세, 등록, 수강권, 코치 운영, 데스크탑 레슨, case matrix, 아카데미 IA, 상태/엣지, 수강권 lifecycle, 일정 예외, controls, motion, responsive/copy fit | 19 |
-| `06 · 장터 Marketplace` | 장터 목록/상세/등록/주문/내 판매글/데스크탑 장터, case matrix, 상태/엣지, 주문 lifecycle, 업로드/가격 예외, 분쟁/안전거래, controls, motion, responsive/copy fit | 16 |
-| `07 · 시설 Venues` | 시설 목록/지도/예약/상세/시설 운영/데스크탑 시설, case matrix, 상태/엣지, 슬롯 충돌, 지도/위치 권한, 휴관/가격 예외, controls, motion, responsive/copy fit | 16 |
-| `08 · 용병 Mercenary` | 용병 목록/상세/등록, case matrix, 상태/엣지, 포지션 충원/대기, 보상 변경/동의, 호스트 신뢰/안전, controls, motion, responsive/copy fit | 11 |
-| `09 · 대회 Tournaments` | 대회 목록/상세/대진표/운영 도구, case matrix, 대진 충돌, 결과 이의제기, 상금 계좌, controls, motion, responsive/copy fit | 12 |
-| `10 · 장비 대여` | 장비 대여 목록/상세/픽업·반납 운영, case matrix, 픽업/반납, 보증금/파손, 재고 충돌, controls, motion, responsive/copy fit | 11 |
-| `11 · 종목 · 실력 · 안전` | 종목별 UX, 실력 인증, 안전 체크, case matrix, 인증 거절, 장비/안전, 공개 범위, controls, motion, responsive/copy fit | 21 |
-| `12 · 커뮤니티 · 채팅 · 알림` | 채팅, 알림, 피드, 매치 내 채팅, case matrix, 메시지 실패, 차단 사용자, 알림 race, controls, motion, responsive/copy fit | 13 |
-| `13 · 마이 · 프로필 · 평판` | 마이 홈, 내 활동, 프로필, 리뷰, 뱃지, 확장 coverage, case matrix, 업로드 실패, 공개/신뢰, badge/review 상태, controls, motion, responsive/copy fit | 15 |
-| `14 · 결제 · 환불 · 분쟁` | 체크아웃, 결제 성공/내역/상세, 환불, 분쟁, trust center, case matrix, 보류/실패, 환불 edge, 영수증/정산, controls, motion, responsive/copy fit | 15 |
-| `15 · 설정 · 약관 · 상태` | 계정/알림/약관, 404, empty/loading/error, case matrix, OS 권한, 탈퇴 확인, 약관 버전, controls, motion, responsive/copy fit | 14 |
-| `16 · 공개 · 마케팅` | 모바일 랜딩, 가격, FAQ, 가이드, 공개 프로필, case matrix, 비로그인 한계, 비공개 프로필, 가격/FAQ edge, controls, motion, responsive/copy fit | 13 |
-| `17 · 데스크탑 웹` | 데스크탑 랜딩, 로그인 후 홈, 매치 탐색, case matrix, keyboard focus, side panel, table overflow, controls, motion, responsive/copy fit | 12 |
-| `18 · 관리자 · 운영` | Admin dashboard, 관리 테이블, 신고, 정산, 통계, 운영, detail shell, case matrix, bulk partial failure, concurrent processing, audit recovery, controls, motion, responsive/copy fit, dark sidebar | 21 |
-| `19 · 공통 플로우 · 인터랙션` | page readiness audit, 등록/수정 공통 shell, micro interaction demo, state/edge/interaction/readiness atlas | 7 |
+| `05 · 팀 둘러보기` | 전체 팀 조회, 팀 비교, 선택/가입 CTA, 추천/신뢰 신호, 02번형 flow/rule comparison board | 3 |
+| `06 · 커뮤니티 · 채팅 · 알림` | 채팅, 알림, 피드, 매치 내 채팅, case matrix, 메시지 실패, 차단 사용자, 알림 race, controls, motion, responsive/copy fit | 13 |
+| `07 · 마이 · 프로필 · 평판` | 마이 홈, 내 활동, 프로필, 리뷰, 뱃지, 확장 coverage, case matrix, 업로드 실패, 공개/신뢰, badge/review 상태, controls, motion, responsive/copy fit | 15 |
+| `08 · 결제 · 환불 · 분쟁` | 체크아웃, 결제 성공/내역/상세, 환불, 분쟁, trust center, case matrix, 보류/실패, 환불 edge, 영수증/정산, controls, motion, responsive/copy fit | 15 |
+| `09 · 설정 · 약관 · 상태` | 계정/알림/약관, 404, empty/loading/error, case matrix, OS 권한, 탈퇴 확인, 약관 버전, controls, motion, responsive/copy fit | 14 |
+| `10 · 공개 · 마케팅` | 모바일 랜딩, 가격, FAQ, 가이드, 공개 프로필, case matrix, 비로그인 한계, 비공개 프로필, 가격/FAQ edge, controls, motion, responsive/copy fit | 13 |
+| `11 · 데스크탑 웹` | 데스크탑 랜딩, 로그인 후 홈, 매치 탐색, case matrix, keyboard focus, side panel, table overflow, controls, motion, responsive/copy fit | 12 |
+| `12 · 관리자 · 운영` | Admin dashboard, 관리 테이블, 신고, 정산, 통계, 운영, detail shell, case matrix, bulk partial failure, concurrent processing, audit recovery, controls, motion, responsive/copy fit, dark sidebar | 21 |
+| `13 · 공통 플로우 · 인터랙션` | page readiness audit, 등록/수정 공통 shell, micro interaction demo, state/edge/interaction/readiness atlas | 7 |
+| `C01 · 레슨 Academy` | Academy hub, 레슨 목록, 코치, 상세, 등록, 수강권, 코치 운영, 데스크탑 레슨, case matrix, 아카데미 IA, 상태/엣지, 수강권 lifecycle, 일정 예외, controls, motion, responsive/copy fit | 19 |
+| `C02 · 장터 Marketplace` | 장터 목록/상세/등록/주문/내 판매글/데스크탑 장터, case matrix, 상태/엣지, 주문 lifecycle, 업로드/가격 예외, 분쟁/안전거래, controls, motion, responsive/copy fit | 16 |
+| `C03 · 시설 Venues` | 시설 목록/지도/예약/상세/시설 운영/데스크탑 시설, case matrix, 상태/엣지, 슬롯 충돌, 지도/위치 권한, 휴관/가격 예외, controls, motion, responsive/copy fit | 16 |
+| `C04 · 대회 Tournaments` | 대회 목록/상세/대진표/운영 도구, case matrix, 대진 충돌, 결과 이의제기, 상금 계좌, controls, motion, responsive/copy fit | 12 |
+| `C05 · 장비 대여` | 장비 대여 목록/상세/픽업·반납 운영, case matrix, 픽업/반납, 보증금/파손, 재고 충돌, controls, motion, responsive/copy fit | 11 |
+| `C06 · 종목 · 실력 · 안전` | 종목별 UX, 실력 인증, 안전 체크, case matrix, 인증 거절, 장비/안전, 공개 범위, controls, motion, responsive/copy fit | 21 |
+| `C07 · 용병 Mercenary` | 용병 목록/상세/등록, case matrix, 상태/엣지, 포지션 충원/대기, 보상 변경/동의, 호스트 신뢰/안전, controls, motion, responsive/copy fit | 11 |
+
+## Candidate Revision Notes
+
+| Section | Owning Module Rule | Boards |
+|---|---|---:|
+| `03 · 개인 매치 수정안 — 카드뉴스 + 콤팩트 피드` | 원본 `03 · 개인 매치` 바로 아래에 둔 비교용 revision. 기존 보드는 `*-revised-ref`로 복제해 원본과 비교 가능하게 유지하고, 새 결정 보드 `m-list-cardnews-compact`는 카드뉴스 추천과 콤팩트 피드를 한 화면에서 병행 사용한다. | 16 |
+| `03 · 개인 매치 수정안 2 — 카드/콤팩트 선택형` | 이전 수정안의 동시 노출을 보완한 최신 revision. 첫 화면은 카드형 또는 콤팩트형 중 하나만 렌더하고 세그먼트로 전환한다. 지도/타임라인/스와이프 보드는 제외하고 카드 리스트, 콤팩트 피드, 상세/참가/생성/상태 계열만 유지한다. | 13 |
 
 ## Placement Rules
 

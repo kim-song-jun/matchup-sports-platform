@@ -32,6 +32,11 @@
 
 ## Obligation Matrix per Module (POC + audit)
 
+Revision note:
+
+- `handoff-sm-new-direction` adds a comparison-only section `matches-core-cardnews-compact` directly under the original `03 개인 매치` section. It does not replace the original `matches-core` inventory row. The new decision board is `m-list-cardnews-compact` with canonical alias `m03-mb-flow-cardnews-compact`; copied comparison boards use `*-revised-ref` ids and `data-reference-canonical-id` to avoid duplicate canonical aliases.
+- The next comparison section `matches-core-card-compact-switcher` supersedes the simultaneous-exposure direction for review purposes. It keeps card and compact as selectable modes in one first screen, excludes map/timeline/swipe boards, and adds `m-list-card-compact-switcher` with canonical alias `m03-mb-flow-card-compact-switcher`.
+
 `✅` = 보드 존재 / `⚠️` = obligation gap (신규 추가 필요) / `—` = 의도된 비대상
 
 | Module | mb-main | tb-main | dt-main | mb-states (5+) | tb-states | dt-states | mb-components | tb-components | dt-components | mb-assets | tb-assets | dt-assets | mb-motion |

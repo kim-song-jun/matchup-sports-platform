@@ -516,7 +516,200 @@ const MatchesDenseV2 = () => (
   </div>
 );
 
+/* ─────────────── Matches Card News + Compact Feed Candidate ─────────────── */
+const MatchesCardNewsCompactV2 = () => {
+  const cardNews = MATCHES.slice(0, 3);
+  const feed = MATCHES.slice(0, 5);
+  return (
+    <div style={{ width:375,height:812,background:'var(--bg)',fontFamily:'var(--font)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
+      <StatusBar/>
+      <div style={{ padding:'12px 20px 10px',display:'flex',alignItems:'center',gap:8 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:18,fontWeight:800,color:'var(--text-strong)',letterSpacing:0 }}>개인 매치</div>
+          <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:3 }}>카드뉴스로 발견하고, 피드에서 빠르게 비교</div>
+        </div>
+        <button className="tm-pressable tm-break-keep" style={{ width:40,height:40,borderRadius:12,background:'var(--grey100)',border:'none',display:'grid',placeItems:'center',color:'var(--text-strong)',flexShrink:0 }}>
+          <Icon name="filter" size={18}/>
+        </button>
+      </div>
+      <div style={{ display:'flex',gap:8,padding:'0 20px 12px',overflowX:'auto' }}>
+        <HapticChip active>추천</HapticChip>
+        <HapticChip>오늘</HapticChip>
+        <HapticChip>마감임박</HapticChip>
+        <HapticChip>무료</HapticChip>
+      </div>
+      <div style={{ flex:1,overflow:'auto',paddingBottom:84 }}>
+        <div style={{ padding:'0 20px 12px' }}>
+          <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10 }}>
+            <div style={{ fontSize:14,fontWeight:800,color:'var(--text-strong)' }}>카드뉴스 추천</div>
+            <div style={{ fontSize:12,fontWeight:700,color:'var(--blue500)' }}>전체</div>
+          </div>
+          <div style={{ display:'flex',gap:12,overflowX:'auto',paddingBottom:2 }}>
+            {cardNews.map((m,i)=>{
+              const urgent = (m.cur/m.max)>=0.7;
+              return (
+                <div key={m.id || i} style={{ flexShrink:0,width:252,borderRadius:18,overflow:'hidden',border:'1px solid var(--border)',background:'var(--bg)' }}>
+                  <div style={{ height:142,background:`var(--grey100) url(${m.img}) center/cover`,position:'relative' }}>
+                    <div style={{ position:'absolute',inset:0,background:'linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.58))' }}/>
+                    <div style={{ position:'absolute',top:12,left:12,display:'flex',gap:6 }}>
+                      <span style={{ padding:'4px 9px',borderRadius:999,background:'rgba(0,0,0,.46)',color:'var(--static-white)',fontSize:11,fontWeight:800 }}>{SPORTS.find(s=>s.id===m.sport)?.label}</span>
+                      {urgent && <span style={{ padding:'4px 9px',borderRadius:999,background:'var(--red500)',color:'var(--static-white)',fontSize:11,fontWeight:800 }}>마감임박</span>}
+                    </div>
+                    <div style={{ position:'absolute',left:14,right:14,bottom:12,color:'var(--static-white)' }}>
+                      <div style={{ fontSize:11,fontWeight:700,opacity:.78,marginBottom:5 }}>{m.date} · {m.time}</div>
+                      <div style={{ fontSize:17,fontWeight:800,lineHeight:1.25,letterSpacing:0 }}>{m.title}</div>
+                    </div>
+                  </div>
+                  <div style={{ padding:'12px 14px 14px' }}>
+                    <div style={{ display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-muted)',marginBottom:10 }}>
+                      <Icon name="pin" size={13}/> <span style={{ overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{m.venue}</span>
+                    </div>
+                    <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+                      <span className="tab-num" style={{ fontSize:12,fontWeight:800,color:urgent?'var(--red500)':'var(--text-muted)' }}>{m.cur}/{m.max}명</span>
+                      <span className="tab-num" style={{ fontSize:14,fontWeight:800,color:'var(--text-strong)' }}>{m.fee===0?'무료':m.fee.toLocaleString()+'원'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ padding:'8px 20px 0' }}>
+          <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4 }}>
+            <div style={{ fontSize:14,fontWeight:800,color:'var(--text-strong)' }}>콤팩트 피드</div>
+            <div className="tab-num" style={{ fontSize:12,color:'var(--text-caption)',fontWeight:700 }}>{feed.length}개</div>
+          </div>
+          <div style={{ borderTop:'1px solid var(--grey100)' }}>
+            {feed.map((m,i)=>{
+              const urgent = (m.cur/m.max)>=0.7;
+              return (
+                <div key={m.id || i} style={{ display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--grey100)',alignItems:'center',cursor:'pointer' }}>
+                  <div style={{ width:58,height:58,borderRadius:13,background:`var(--grey100) url(${m.img}) center/cover`,flexShrink:0,position:'relative' }}>
+                    {urgent && <div style={{ position:'absolute',right:-2,bottom:-2,width:17,height:17,borderRadius:999,background:'var(--red500)',border:'2px solid var(--bg)' }}/>}
+                  </div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:3 }}>
+                      <span style={{ fontSize:11,padding:'2px 7px',borderRadius:999,background:'var(--grey100)',color:'var(--text-muted)',fontWeight:700 }}>{SPORTS.find(s=>s.id===m.sport)?.label}</span>
+                      {urgent && <span style={{ fontSize:11,color:'var(--red500)',fontWeight:800 }}>마감임박</span>}
+                    </div>
+                    <div style={{ fontSize:14,fontWeight:800,color:'var(--text-strong)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{m.title}</div>
+                    <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{m.venue} · {m.date} {m.time}</div>
+                  </div>
+                  <div style={{ textAlign:'right',flexShrink:0 }}>
+                    <div className="tab-num" style={{ fontSize:13,fontWeight:800,color:'var(--text-strong)' }}>{m.fee===0?'무료':(m.fee/1000)+'K'}</div>
+                    <div className="tab-num" style={{ fontSize:11,color:urgent?'var(--red500)':'var(--text-caption)',fontWeight:700,marginTop:4 }}>{m.cur}/{m.max}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <BottomNav active="matches"/>
+    </div>
+  );
+};
+
 /* ─────────────── Team Matches List V2 ─────────────── */
+const MatchesCardCompactSwitcherV2 = () => {
+  const [mode, setMode] = React.useState('card');
+  const shown = MATCHES.slice(0, 5);
+  const renderCard = (m, i) => {
+    const urgent = (m.cur / m.max) >= 0.7;
+    return (
+      <div key={m.id || i} style={{ borderRadius:16,overflow:'hidden',border:'1px solid var(--border)',background:'var(--bg)' }}>
+        <div style={{ position:'relative',aspectRatio:'16/9',background:`var(--grey100) url(${m.img}) center/cover` }}>
+          <div style={{ position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 46%,rgba(0,0,0,.58))' }}/>
+          <div style={{ position:'absolute',top:10,left:12,display:'flex',gap:6 }}>
+            <span style={{ padding:'4px 10px',borderRadius:999,background:'rgba(0,0,0,.48)',color:'var(--static-white)',fontSize:11,fontWeight:800 }}>{SPORTS.find(s=>s.id===m.sport)?.label}</span>
+            {urgent && <span style={{ padding:'4px 10px',borderRadius:999,background:'var(--red500)',color:'var(--static-white)',fontSize:11,fontWeight:800 }}>마감임박</span>}
+          </div>
+          <div style={{ position:'absolute',bottom:11,left:14,color:'var(--static-white)',fontSize:11,fontWeight:700 }}>{m.date} · {m.time}</div>
+        </div>
+        <div style={{ padding:'14px 16px 16px' }}>
+          <div style={{ fontSize:15,fontWeight:800,color:'var(--text-strong)',marginBottom:6,lineHeight:1.35 }}>{m.title}</div>
+          <div style={{ display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-muted)',marginBottom:10 }}>
+            <Icon name="pin" size={13}/> <span style={{ overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{m.venue}</span>
+          </div>
+          <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+            <span className="tab-num" style={{ fontSize:12,fontWeight:800,color:urgent?'var(--red500)':'var(--text-muted)' }}>{m.cur}/{m.max}명</span>
+            <span className="tab-num" style={{ fontSize:15,fontWeight:800,color:'var(--text-strong)' }}>{m.fee===0?'무료':m.fee.toLocaleString()+'원'}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const renderCompact = (m, i) => {
+    const urgent = (m.cur / m.max) >= 0.7;
+    return (
+      <div key={m.id || i} style={{ display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--grey100)',alignItems:'center' }}>
+        <div style={{ width:58,height:58,borderRadius:13,background:`var(--grey100) url(${m.img}) center/cover`,flexShrink:0,position:'relative' }}>
+          {urgent && <div style={{ position:'absolute',right:-2,bottom:-2,width:17,height:17,borderRadius:999,background:'var(--red500)',border:'2px solid var(--bg)' }}/>}
+        </div>
+        <div style={{ flex:1,minWidth:0 }}>
+          <div style={{ display:'flex',alignItems:'center',gap:6,marginBottom:3 }}>
+            <span style={{ fontSize:11,padding:'2px 7px',borderRadius:999,background:'var(--grey100)',color:'var(--text-muted)',fontWeight:700 }}>{SPORTS.find(s=>s.id===m.sport)?.label}</span>
+            {urgent && <span style={{ fontSize:11,color:'var(--red500)',fontWeight:800 }}>마감임박</span>}
+          </div>
+          <div style={{ fontSize:14,fontWeight:800,color:'var(--text-strong)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{m.title}</div>
+          <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{m.venue} · {m.date} {m.time}</div>
+        </div>
+        <div style={{ textAlign:'right',flexShrink:0 }}>
+          <div className="tab-num" style={{ fontSize:13,fontWeight:800,color:'var(--text-strong)' }}>{m.fee===0?'무료':(m.fee/1000)+'K'}</div>
+          <div className="tab-num" style={{ fontSize:11,color:urgent?'var(--red500)':'var(--text-caption)',fontWeight:700,marginTop:4 }}>{m.cur}/{m.max}</div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ width:375,height:812,background:'var(--bg)',fontFamily:'var(--font)',display:'flex',flexDirection:'column',overflow:'hidden' }}>
+      <StatusBar/>
+      <div style={{ padding:'12px 20px 10px' }}>
+        <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:12 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:18,fontWeight:800,color:'var(--text-strong)',letterSpacing:0 }}>개인 매치</div>
+            <div style={{ fontSize:12,color:'var(--text-muted)',marginTop:3 }}>카드형 또는 콤팩트형으로 전환</div>
+          </div>
+          <button className="tm-pressable tm-break-keep" style={{ width:40,height:40,borderRadius:12,background:'var(--grey100)',border:'none',display:'grid',placeItems:'center',color:'var(--text-strong)',flexShrink:0 }}>
+            <Icon name="filter" size={18}/>
+          </button>
+        </div>
+        <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,padding:4,borderRadius:14,background:'var(--grey100)' }}>
+          {[
+            ['card', '카드'],
+            ['compact', '콤팩트'],
+          ].map(([id, label]) => (
+            <button key={id} className="tm-pressable tm-break-keep" onClick={()=>setMode(id)} style={{
+              height:36,borderRadius:11,border:'none',
+              background:mode===id?'var(--bg)':'transparent',
+              color:mode===id?'var(--text-strong)':'var(--text-muted)',
+              fontSize:13,fontWeight:800,
+              boxShadow:mode===id?'0 1px 2px rgba(0,0,0,.05)':'none',
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display:'flex',gap:8,padding:'0 20px 12px',overflowX:'auto' }}>
+        <HapticChip active>추천</HapticChip>
+        <HapticChip>오늘</HapticChip>
+        <HapticChip>마감임박</HapticChip>
+        <HapticChip>무료</HapticChip>
+      </div>
+      <div style={{ flex:1,overflow:'auto',padding:'0 20px 84px' }}>
+        <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10 }}>
+          <div style={{ fontSize:14,fontWeight:800,color:'var(--text-strong)' }}>{mode==='card'?'카드형 추천':'콤팩트 피드'}</div>
+          <div className="tab-num" style={{ fontSize:12,color:'var(--text-caption)',fontWeight:700 }}>{shown.length}개</div>
+        </div>
+        <div style={mode==='card' ? { display:'flex',flexDirection:'column',gap:12 } : { borderTop:'1px solid var(--grey100)' }}>
+          {shown.map((m,i)=>mode==='card' ? renderCard(m,i) : renderCompact(m,i))}
+        </div>
+      </div>
+      <BottomNav active="matches"/>
+    </div>
+  );
+};
+
 const TeamMatchesListV2 = () => {
   const [grade, setGrade] = React.useState('all');
   const grades = ['all','S','A','B','C','D'];
@@ -773,7 +966,7 @@ const HomePlusV2 = () => {
 
 Object.assign(window, {
   HomeB_V2, HomeC_V2, HomeEditorialV2, HomeDarkV2, HomeStoriesV2,
-  MatchesListV2, MatchesTimelineV2, MatchesSwipeV2, MatchesDenseV2,
+  MatchesListV2, MatchesTimelineV2, MatchesSwipeV2, MatchesDenseV2, MatchesCardNewsCompactV2, MatchesCardCompactSwitcherV2,
   TeamMatchesListV2,
   NotificationsV2,
   MyPageV2,

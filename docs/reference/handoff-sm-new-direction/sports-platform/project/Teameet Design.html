@@ -439,6 +439,30 @@ function App() {
           </DCArtboard>
         </DCSection>
 
+        <DCSection id="home-discovery-toss-canonical" title="02 · 홈 · Toss canonical" subtitle="원본 02의 HomeToss 디자인을 복사해 기준안으로 두고, 해당 디자인에 맞는 UI 규약과 진행 흐름을 정리한 비교 섹션">
+          <DCArtboard id="home-a-toss" label="홈 · Toss canonical · copied baseline" width={375} height={812}>
+            <HomeToss/>
+          </DCArtboard>
+          <DCArtboard id="home-ui-rules-toss" label="홈 · Toss canonical UI 규약" width={375} height={812}>
+            <HomeTossCanonicalUiRules/>
+          </DCArtboard>
+          <DCArtboard id="home-flow-rules-toss" label="홈 · Toss canonical 동작/상태 기준" width={375} height={812}>
+            <HomeTossCanonicalFlowRules/>
+          </DCArtboard>
+          <DCArtboard id="home-case-matrix-toss" label="홈 · 케이스 매트릭스 · copied" width={375} height={812}>
+            <ModuleCaseMatrix module="home"/>
+          </DCArtboard>
+          <DCArtboard id="home-state-edge-toss" label="홈 · 상태/예외 UI · copied" width={375} height={812}>
+            <HomeStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="home-control-interactions-toss" label="홈 · 버튼/FAB/필터 상태 · copied" width={375} height={812}>
+            <HomeControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="home-motion-contract-toss" label="홈 · 모션 계약 · copied" width={840} height={812}>
+            <HomeMotionContractBoard/>
+          </DCArtboard>
+        </DCSection>
+
         <DCSection id="m02-grid" title="M02 · 홈 · 추천 (viewport grid POC)" subtitle="fix29에서 추가. m02-{mb|tb|dt}-{main|state-{loading/empty/error/permission/pending}|components|assets|motion}. 결정적 ID로 모든 화면을 식별.">
           <DCArtboard id="m02-mb-main" label="m02-mb-main — 모바일 메인" width={375} height={812}>
             <M02MobileMain/>
@@ -537,6 +561,108 @@ function App() {
             <MatchesMotionContractBoard/>
           </DCArtboard>
           <DCArtboard id="matches-responsive" label="개인 매치 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m03-dt-main-responsive">
+            <MatchesResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core-cardnews-compact" title="03 · 개인 매치 수정안 — 카드뉴스 + 콤팩트 피드" subtitle="원본 03을 바로 아래에 복제한 비교용 수정안. 발견/설득은 카드뉴스, 빠른 비교/선택은 콤팩트 피드가 담당한다.">
+          <DCArtboard id="m-list-cardnews-compact" label="매치 목록 · 카드뉴스 + 콤팩트 피드 병행" width={375} height={812} data-canonical-id="m03-mb-flow-cardnews-compact">
+            <MatchesCardNewsCompactV2/>
+          </DCArtboard>
+          <DCArtboard id="m-list-revised-ref" label="원본 비교 · 카드 리스트" width={375} height={812} data-reference-canonical-id="m03-mb-list">
+            <MatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="m-map-revised-ref" label="원본 비교 · 지도 기반" width={375} height={812} data-reference-canonical-id="m03-mb-list-map">
+            <MatchesMapV2/>
+          </DCArtboard>
+          <DCArtboard id="m-timeline-revised-ref" label="원본 비교 · 시간대별 타임라인" width={375} height={812} data-reference-canonical-id="m03-mb-list-timeline">
+            <MatchesTimelineV2/>
+          </DCArtboard>
+          <DCArtboard id="m-swipe-revised-ref" label="원본 비교 · 스와이프 매칭" width={375} height={812} data-reference-canonical-id="m03-mb-list-swipe">
+            <MatchesSwipeV2/>
+          </DCArtboard>
+          <DCArtboard id="m-dense-revised-ref" label="원본 비교 · 콤팩트 피드" width={375} height={812} data-reference-canonical-id="m03-mb-flow-feed">
+            <MatchesDenseV2/>
+          </DCArtboard>
+          <DCArtboard id="m-detail-revised-ref" label="원본 비교 · 매치 상세" width={375} height={812} data-reference-canonical-id="m03-mb-detail">
+            <MatchDetail/>
+          </DCArtboard>
+          <DCArtboard id="m-join-revised-ref" label="원본 비교 · 매치 참가 바텀시트" width={375} height={812} data-reference-canonical-id="m03-mb-main-bottomsheet">
+            <div style={{ position: 'relative', width: 375, height: 812 }}>
+              <MatchDetail/>
+              <JoinSheet open m={MATCHES[0]}/>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-new-revised-ref" label="원본 비교 · 매치 만들기" width={375} height={812} data-reference-canonical-id="m03-mb-create">
+            <MatchCreate/>
+          </DCArtboard>
+          <DCArtboard id="my-matches-revised-ref" label="원본 비교 · 내 매치" width={375} height={812} data-reference-canonical-id="m03-mb-main">
+            <MyMatches/>
+          </DCArtboard>
+          <DCArtboard id="matches-case-matrix-revised-ref" label="원본 비교 · 개인 매치 케이스 매트릭스" width={375} height={812} data-reference-canonical-id="m03-mb-main-matrix">
+            <ModuleCaseMatrix module="matches"/>
+          </DCArtboard>
+          <DCArtboard id="matches-state-edge-revised-ref" label="원본 비교 · 상태/예외 UI" width={375} height={812} data-reference-canonical-id="m03-mb-main-state-edge">
+            <MatchesStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-join-sheet-states-revised-ref" label="원본 비교 · 참가 바텀시트 상태" width={375} height={812} data-reference-canonical-id="m03-mb-main-bottomsheet-join-sheet-states">
+            <MatchesJoinSheetStatesBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-map-permission-edge-revised-ref" label="원본 비교 · 지도/권한 엣지케이스" width={375} height={812} data-reference-canonical-id="m03-mb-state-permission-map">
+            <MatchesMapPermissionBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-control-interactions-revised-ref" label="원본 비교 · 버튼/필터/CTA 상태" width={375} height={812} data-reference-canonical-id="m03-mb-components-filter">
+            <MatchesControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-motion-contract-revised-ref" label="원본 비교 · 모션 계약" width={840} height={812} data-reference-canonical-id="m03-tb-motion">
+            <MatchesMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-responsive-revised-ref" label="원본 비교 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-reference-canonical-id="m03-dt-main-responsive">
+            <MatchesResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core-card-compact-switcher" title="03 · 개인 매치 수정안 2 — 카드/콤팩트 선택형" subtitle="이전 수정안의 동시 노출을 조정한 최신안. 첫 화면은 카드형 또는 콤팩트형 중 하나만 보여주고, 사용자가 세그먼트로 전환한다. 지도/타임라인/스와이프 보드는 제외한다.">
+          <DCArtboard id="m-list-card-compact-switcher" label="매치 목록 · 카드/콤팩트 선택형" width={375} height={812} data-canonical-id="m03-mb-flow-card-compact-switcher">
+            <MatchesCardCompactSwitcherV2/>
+          </DCArtboard>
+          <DCArtboard id="m-list-switcher-ref" label="비교 · 카드 리스트" width={375} height={812} data-reference-canonical-id="m03-mb-list">
+            <MatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="m-dense-switcher-ref" label="비교 · 콤팩트 피드" width={375} height={812} data-reference-canonical-id="m03-mb-flow-feed">
+            <MatchesDenseV2/>
+          </DCArtboard>
+          <DCArtboard id="m-detail-switcher-ref" label="유지 · 매치 상세" width={375} height={812} data-reference-canonical-id="m03-mb-detail">
+            <MatchDetail/>
+          </DCArtboard>
+          <DCArtboard id="m-join-switcher-ref" label="유지 · 매치 참가 바텀시트" width={375} height={812} data-reference-canonical-id="m03-mb-main-bottomsheet">
+            <div style={{ position: 'relative', width: 375, height: 812 }}>
+              <MatchDetail/>
+              <JoinSheet open m={MATCHES[0]}/>
+            </div>
+          </DCArtboard>
+          <DCArtboard id="m-new-switcher-ref" label="유지 · 매치 만들기" width={375} height={812} data-reference-canonical-id="m03-mb-create">
+            <MatchCreate/>
+          </DCArtboard>
+          <DCArtboard id="my-matches-switcher-ref" label="유지 · 내 매치" width={375} height={812} data-reference-canonical-id="m03-mb-main">
+            <MyMatches/>
+          </DCArtboard>
+          <DCArtboard id="matches-case-matrix-switcher-ref" label="유지 · 개인 매치 케이스 매트릭스" width={375} height={812} data-reference-canonical-id="m03-mb-main-matrix">
+            <ModuleCaseMatrix module="matches"/>
+          </DCArtboard>
+          <DCArtboard id="matches-state-edge-switcher-ref" label="유지 · 상태/예외 UI" width={375} height={812} data-reference-canonical-id="m03-mb-main-state-edge">
+            <MatchesStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-join-sheet-states-switcher-ref" label="유지 · 참가 바텀시트 상태" width={375} height={812} data-reference-canonical-id="m03-mb-main-bottomsheet-join-sheet-states">
+            <MatchesJoinSheetStatesBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-control-interactions-switcher-ref" label="유지 · 버튼/필터/CTA 상태" width={375} height={812} data-reference-canonical-id="m03-mb-components-filter">
+            <MatchesControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-motion-contract-switcher-ref" label="유지 · 모션 계약" width={840} height={812} data-reference-canonical-id="m03-tb-motion">
+            <MatchesMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="matches-responsive-switcher-ref" label="유지 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-reference-canonical-id="m03-dt-main-responsive">
             <MatchesResponsiveBoard/>
           </DCArtboard>
         </DCSection>
@@ -653,56 +779,16 @@ function App() {
           <DCArtboard id="m04-mb-motion" label="m04-mb-motion" width={375} height={812}><M04MotionBoard/></DCArtboard>
         </DCSection>
 
-        <DCSection id="mercenary" title="05 · 용병 Mercenary" subtitle="용병 목록, 상세, 등록을 용병 기능으로 통합">
-          <DCArtboard id="mercenary" label="용병 목록" width={375} height={812} data-canonical-id="m08-mb-list-mercenary">
-            <MercenaryV2/>
+        <DCSection id="team-browse" title="05 · 팀 둘러보기" subtitle="기존 04 팀/팀매칭 아래에 추가한 비교 섹션. 전체 팀을 보고 비교한 뒤 선택/가입할 수 있는 탐색 화면과 흐름/규약을 정의">
+          <DCArtboard id="team-browse-list" label="팀 전체 조회" width={375} height={812} data-canonical-id="m04-mb-list-team-browse">
+            <TeamBrowseV2/>
           </DCArtboard>
-          <DCArtboard id="mercenary-detail" label="용병 상세" width={375} height={812} data-canonical-id="m08-mb-detail-detail">
-            <MercenaryDetailV2/>
+          <DCArtboard id="team-browse-flow" label="팀 전체 조회 · 흐름" width={840} height={812} data-canonical-id="m04-tb-flow-team-browse">
+            <TeamBrowseFlowBoard/>
           </DCArtboard>
-          <DCArtboard id="merc-new" label="용병 공고 등록" width={375} height={812} data-canonical-id="m08-mb-create">
-            <MercCreate/>
+          <DCArtboard id="team-browse-rules" label="팀 전체 조회 · 규약" width={840} height={812} data-canonical-id="m04-tb-components-team-browse">
+            <TeamBrowseRulesBoard/>
           </DCArtboard>
-          <DCArtboard id="mercenary-case-matrix" label="용병 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m08-mb-main-matrix">
-            <ModuleCaseMatrix module="mercenary"/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-state-edge" label="용병 · 상태/예외 UI" width={375} height={812} data-canonical-id="m08-mb-main">
-            <MercenaryStateEdgeBoard/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-position-filled" label="용병 · 포지션 충원/대기" width={375} height={812} data-canonical-id="m08-mb-main-position-filled">
-            <MercenaryPositionFilledBoard/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-reward-change" label="용병 · 보상 변경/동의" width={375} height={812} data-canonical-id="m08-mb-main-reward-change">
-            <MercenaryRewardChangeBoard/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-host-trust" label="용병 · 호스트 신뢰/안전" width={375} height={812} data-canonical-id="m08-mb-main-host-trust">
-            <MercenaryHostTrustBoard/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-control-interactions" label="용병 · 버튼/지원/취소 컨트롤" width={375} height={812} data-canonical-id="m08-mb-components">
-            <MercenaryControlInteractionBoard/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-motion-contract" label="용병 · 모션 계약" width={840} height={812} data-canonical-id="m08-tb-motion">
-            <MercenaryMotionContractBoard/>
-          </DCArtboard>
-          <DCArtboard id="mercenary-responsive" label="용병 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m08-dt-main-responsive">
-            <MercenaryResponsiveBoard/>
-          </DCArtboard>
-        </DCSection>
-
-        <DCSection id="m08-grid" title="M08 · 용병 Mercenary (viewport grid)" subtitle="fix30. ID schema m08-{mb|tb|dt}-{main|detail|create|state|components|assets|motion}. Routes: /mercenary /mercenary/[id] /teams/[id]/mercenary.">
-          <DCArtboard id="m08-mb-main" label="m08-mb-main" width={375} height={812}><M08MobileMain/></DCArtboard>
-          <DCArtboard id="m08-tb-main" label="m08-tb-main" width={768} height={1024}><M08TabletMain/></DCArtboard>
-          <DCArtboard id="m08-dt-main" label="m08-dt-main" width={1280} height={820}><M08DesktopMain/></DCArtboard>
-          <DCArtboard id="m08-mb-detail" label="m08-mb-detail" width={375} height={812}><M08MobileDetail/></DCArtboard>
-          <DCArtboard id="m08-mb-create" label="m08-mb-create" width={375} height={812}><M08MobileCreate/></DCArtboard>
-          <DCArtboard id="m08-mb-state-loading" label="m08-mb-state-loading" width={375} height={812}><M08MobileStateLoading/></DCArtboard>
-          <DCArtboard id="m08-mb-state-empty" label="m08-mb-state-empty" width={375} height={812}><M08MobileStateEmpty/></DCArtboard>
-          <DCArtboard id="m08-mb-state-deadline" label="m08-mb-state-deadline" width={375} height={812}><M08MobileStateDeadline/></DCArtboard>
-          <DCArtboard id="m08-mb-state-sold-out" label="m08-mb-state-sold-out" width={375} height={812}><M08MobileStateSoldOut/></DCArtboard>
-          <DCArtboard id="m08-mb-state-pending" label="m08-mb-state-pending" width={375} height={812}><M08MobileStatePending/></DCArtboard>
-          <DCArtboard id="m08-mb-components" label="m08-mb-components" width={375} height={812}><M08ComponentsBoard/></DCArtboard>
-          <DCArtboard id="m08-mb-assets" label="m08-mb-assets" width={375} height={812}><M08AssetsBoard/></DCArtboard>
-          <DCArtboard id="m08-mb-motion" label="m08-mb-motion" width={375} height={812}><M08MotionBoard/></DCArtboard>
         </DCSection>
 
         <DCSection id="community" title="06 · 커뮤니티 · 채팅 · 알림" subtitle="채팅, 알림, 피드, 매치 내 채팅 임베드를 커뮤니티 모듈로 통합">
@@ -1741,6 +1827,58 @@ function App() {
             <M11MotionBoard/>
           </DCArtboard>
         </DCSection>
+
+        <DCSection id="mercenary" title="C07 · 용병 Mercenary" subtitle="Core 05에서 candidate C07로 이동. 용병 목록, 상세, 등록을 용병 기능으로 통합">
+          <DCArtboard id="mercenary" label="용병 목록" width={375} height={812} data-canonical-id="m08-mb-list-mercenary">
+            <MercenaryV2/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-detail" label="용병 상세" width={375} height={812} data-canonical-id="m08-mb-detail-detail">
+            <MercenaryDetailV2/>
+          </DCArtboard>
+          <DCArtboard id="merc-new" label="용병 공고 등록" width={375} height={812} data-canonical-id="m08-mb-create">
+            <MercCreate/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-case-matrix" label="용병 · 케이스 매트릭스" width={375} height={812} data-canonical-id="m08-mb-main-matrix">
+            <ModuleCaseMatrix module="mercenary"/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-state-edge" label="용병 · 상태/예외 UI" width={375} height={812} data-canonical-id="m08-mb-main">
+            <MercenaryStateEdgeBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-position-filled" label="용병 · 포지션 충원/대기" width={375} height={812} data-canonical-id="m08-mb-main-position-filled">
+            <MercenaryPositionFilledBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-reward-change" label="용병 · 보상 변경/동의" width={375} height={812} data-canonical-id="m08-mb-main-reward-change">
+            <MercenaryRewardChangeBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-host-trust" label="용병 · 호스트 신뢰/안전" width={375} height={812} data-canonical-id="m08-mb-main-host-trust">
+            <MercenaryHostTrustBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-control-interactions" label="용병 · 버튼/지원/취소 컨트롤" width={375} height={812} data-canonical-id="m08-mb-components">
+            <MercenaryControlInteractionBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-motion-contract" label="용병 · 모션 계약" width={840} height={812} data-canonical-id="m08-tb-motion">
+            <MercenaryMotionContractBoard/>
+          </DCArtboard>
+          <DCArtboard id="mercenary-responsive" label="용병 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m08-dt-main-responsive">
+            <MercenaryResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="m08-grid" title="M08 · 용병 Mercenary (candidate viewport grid)" subtitle="Candidate C07 grid. fix30. ID schema m08-{mb|tb|dt}-{main|detail|create|state|components|assets|motion}. Routes: /mercenary /mercenary/[id] /teams/[id]/mercenary.">
+          <DCArtboard id="m08-mb-main" label="m08-mb-main" width={375} height={812}><M08MobileMain/></DCArtboard>
+          <DCArtboard id="m08-tb-main" label="m08-tb-main" width={768} height={1024}><M08TabletMain/></DCArtboard>
+          <DCArtboard id="m08-dt-main" label="m08-dt-main" width={1280} height={820}><M08DesktopMain/></DCArtboard>
+          <DCArtboard id="m08-mb-detail" label="m08-mb-detail" width={375} height={812}><M08MobileDetail/></DCArtboard>
+          <DCArtboard id="m08-mb-create" label="m08-mb-create" width={375} height={812}><M08MobileCreate/></DCArtboard>
+          <DCArtboard id="m08-mb-state-loading" label="m08-mb-state-loading" width={375} height={812}><M08MobileStateLoading/></DCArtboard>
+          <DCArtboard id="m08-mb-state-empty" label="m08-mb-state-empty" width={375} height={812}><M08MobileStateEmpty/></DCArtboard>
+          <DCArtboard id="m08-mb-state-deadline" label="m08-mb-state-deadline" width={375} height={812}><M08MobileStateDeadline/></DCArtboard>
+          <DCArtboard id="m08-mb-state-sold-out" label="m08-mb-state-sold-out" width={375} height={812}><M08MobileStateSoldOut/></DCArtboard>
+          <DCArtboard id="m08-mb-state-pending" label="m08-mb-state-pending" width={375} height={812}><M08MobileStatePending/></DCArtboard>
+          <DCArtboard id="m08-mb-components" label="m08-mb-components" width={375} height={812}><M08ComponentsBoard/></DCArtboard>
+          <DCArtboard id="m08-mb-assets" label="m08-mb-assets" width={375} height={812}><M08AssetsBoard/></DCArtboard>
+          <DCArtboard id="m08-mb-motion" label="m08-mb-motion" width={375} height={812}><M08MotionBoard/></DCArtboard>
+        </DCSection>
       </DesignCanvas>
 
       {tweaks && (
@@ -1794,9 +1932,12 @@ const SM_NEW_REFERENCE_SECTIONS = [
 const SM_NEW_CORE_SECTIONS = [
   'auth-onboarding',
   'home-discovery',
+  'home-discovery-toss-canonical',
   'matches-core',
+  'matches-core-cardnews-compact',
+  'matches-core-card-compact-switcher',
   'teams-team-matches',
-  'mercenary',
+  'team-browse',
   'community',
   'my-profile-trust',
   'payments-support',
@@ -1812,7 +1953,6 @@ const SM_NEW_CORE_GRID_SECTIONS = [
   'm02-grid',
   'm03-grid',
   'm04-grid',
-  'm08-grid',
   'm12-grid',
   'm13-grid',
   'm14-grid',
@@ -1836,6 +1976,8 @@ const SM_NEW_CANDIDATE_SECTIONS = [
   'm10-grid',
   'sports-level-safety',
   'm11-grid',
+  'mercenary',
+  'm08-grid',
 ];
 
 function SMNewVisibilityStyle({ mode }) {
@@ -1873,9 +2015,10 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
   const core = [
     ['auth-onboarding', '01 인증'],
     ['home-discovery', '02 홈'],
+    ['home-discovery-toss-canonical', '02 홈 Toss'],
     ['matches-core', '03 개인 매치'],
     ['teams-team-matches', '04 팀/팀매칭'],
-    ['mercenary', '05 용병'],
+    ['team-browse', '05 팀 둘러보기'],
     ['community', '06 커뮤니티'],
     ['my-profile-trust', '07 마이/평판'],
     ['payments-support', '08 결제/분쟁'],
@@ -1892,14 +2035,15 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['tournaments', 'C04 대회'],
     ['equipment-rental', 'C05 장비 대여'],
     ['sports-level-safety', 'C06 종목/안전'],
+    ['mercenary', 'C07 용병'],
   ];
   const grids = [
     ['m01-grid', 'M01 인증'],
     ['m02-grid', 'M02 홈'],
     ['m03-grid', 'M03 매치'],
     ['m04-grid', 'M04 팀'],
-    ['m08-grid', 'M08 용병'],
     ['m11-grid', 'M11 안전'],
+    ['m08-grid', 'M08 용병'],
     ['m12-grid', 'M12 커뮤니티'],
     ['m13-grid', 'M13 마이'],
     ['m14-grid', 'M14 결제'],

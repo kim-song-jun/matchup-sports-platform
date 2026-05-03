@@ -181,6 +181,24 @@ Candidate does not mean deleted.
 - Preserve mobile/tablet/desktop coverage expectations where the prototype
   already provides them.
 
+## 0502 디자인 수정 입력
+
+`0502 문서화.md`는 현재 후보 방향의 원문 디자인 수정 메모다.
+`0502-design-freeze-brief.md`는 해당 내용을 구조화한 작업용 정리본이다.
+이 정리본은 canonical 상태를 바꾸지 않으며, 원문을 잃지 않고 0502 요구사항을
+적용하기 쉽게 만든다.
+
+0502 입력은 현재 후보 방향에서 다음 축을 고정한다.
+
+- 5탭 모바일 쉘: 홈, 매치, 팀매치, 팀, 마이
+- 홈은 `02` 페이지
+- 개인 매치는 `03` 페이지
+- 팀매치는 `04` 페이지
+- 팀 둘러보기는 `05` 페이지
+- 채팅과 알림은 핵심 활동 흐름
+- 명시된 범위의 비로그인, 네트워크 오류, 빈 상태, 읽음/안 읽음, 승인중,
+  승인완료 상태
+
 ## Phase 1 Boundary
 
 Phase 1 defines this direction in documents only.

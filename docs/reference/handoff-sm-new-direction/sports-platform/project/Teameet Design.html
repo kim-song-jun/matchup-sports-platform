@@ -48,6 +48,7 @@ html, body { background: #f4f5f7; font-family: 'Pretendard', sans-serif; }
 <script type="text/babel" src="lib/screens-refresh3.jsx?v=20260425-fix32"></script>
 <script type="text/babel" src="lib/screens-v2main.jsx?v=20260425-fix32"></script>
 <script type="text/babel" src="lib/screens-v2main2.jsx?v=20260425-fix32"></script>
+<script type="text/babel" src="lib/screens-sm-revision.jsx?v=sm2-search"></script>
 <script type="text/babel" src="lib/screens-parity.jsx?v=20260425-fix32"></script>
 <script type="text/babel" src="lib/screens-case-matrix.jsx?v=20260425-fix32"></script>
 <script type="text/babel" src="lib/screens-readiness.jsx?v=20260425-fix32"></script>
@@ -355,6 +356,254 @@ function App() {
           </DCArtboard>
         </DCSection>
 
+        <DCSection id="auth-onboarding-sm-revision" title="01 · 인증 · 로그인 · SM 수정안" subtitle="SM 문서의 login 대상과 홈 비로그인 상태를 연결한 core 비교 섹션. 기존 01은 보존한다.">
+          <DCArtboard id="auth-sm-ref" label="원본 비교 · 로그인" width={375} height={812}>
+            <Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm-login" label="SM · 로그인 모바일" width={375} height={812}>
+            <SMRevisionLoginMobile/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm-grid" label="SM · 인증 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="01 인증/로그인 · SM mobile grid" items={[
+              { title: '로그인 대상', body: 'SM 원문은 login을 design-fix target으로 지정한다.' },
+              { title: '홈 연동', body: '비로그인 홈은 닉네임 없이 안녕하세요만 표시하고 개인 수치는 - 처리한다.' },
+              { title: '오류 상태', body: '네트워크 오류와 provider denied를 기존 auth state board와 연결한다.' },
+              { title: '다음 단계', body: '온보딩/인증 grid는 기존 01 보드를 유지하고 로그인 fallback만 SM 기준으로 비교한다.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="auth-onboarding-sm-revision-2" title="01 · 인증 · 로그인 · SM 수정안 2" subtitle="기존 01과 기존 SM 수정안은 보존하고, 같은 번호 아래에 mobile-first 인증 상태와 홈 fallback 연결을 다시 고정한다.">
+          <DCArtboard id="auth-sm2-ref" label="원본 비교 · 로그인 copied" width={375} height={812}>
+            <Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm2-mobile-main" label="SM2 · 로그인 모바일 main" width={375} height={812}>
+            <SMRevisionLoginMobileV2/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm2-terms" label="SM2 · 약관/disabled CTA" width={375} height={812}>
+            <SMRevisionAuthTermsV2/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm2-callback-loading" label="SM2 · callback loading" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="loading"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm2-callback-error" label="SM2 · callback error/conflict" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="conflict"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm2-home-fallback" label="SM2 · 비로그인 홈 fallback" width={375} height={812}>
+            <SMRevisionAuthFallbackV2/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm2-grid" label="SM2 · 인증 mobile grid" width={840} height={812}>
+            <SMRevisionAuthMobileGridV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="auth-onboarding-sm-revision-3" title="01 · 인증 · 온보딩 · SM 수정안 3" subtitle="원본 01의 로그인/종목/레벨/지역/확인 flow와 SM2의 상태/홈 fallback을 합친 mobile-first 통합안. 버튼별 행동까지 함께 고정한다.">
+          <DCArtboard id="auth-sm3-ref-login" label="원본 비교 · 로그인 copied" width={375} height={812}>
+            <Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-ref-sport" label="원본 비교 · 종목 선택 copied" width={375} height={812}>
+            <Onboarding/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-login" label="SM3 · 로그인 진입" width={375} height={812}>
+            <SMRevisionAuthSM3Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-email-login" label="SM3 · 이메일 로그인" width={375} height={812}>
+            <SMRevisionAuthEmailLoginSM3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-signup" label="SM3 · 회원가입" width={375} height={812}>
+            <SMRevisionAuthSignupSM3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-terms" label="SM3 · Step 1 약관 확인" width={375} height={812}>
+            <SMRevisionAuthSM3TermsStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-sport" label="SM3 · Step 2 종목 선택" width={375} height={812}>
+            <SMRevisionAuthSM3SportStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-level" label="SM3 · Step 3 레벨 선택" width={375} height={812}>
+            <SMRevisionAuthSM3LevelStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-level-disabled" label="SM3 · Step 3 레벨 선택 예외" width={375} height={812}>
+            <SMRevisionAuthSM3LevelStep disabled/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-region" label="SM3 · Step 4 지역 선택" width={375} height={812}>
+            <SMRevisionAuthSM3RegionStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-welcome" label="SM3 · 온보딩 환영" width={375} height={812}>
+            <SMRevisionAuthSM3Welcome/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-exceptions" label="SM3 · 예외/처리 상태" width={840} height={812}>
+            <SMRevisionAuthSM3ExceptionBoard/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm3-actions" label="SM3 · 버튼 행동표" width={840} height={812}>
+            <SMRevisionAuthSM3ActionMap/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="auth-onboarding-sm-revision-4" title="01 · 인증 · 온보딩 · SM 수정안 4" subtitle="SM3를 그대로 복사한 뒤, 기존 01/SM2/M01에서 빠진 확인, callback, disabled, 입력 오류, 권한 거부, 재진입 화면을 체크리스트와 함께 추가한 버전.">
+          <DCArtboard id="auth-sm4-checklist" label="SM4 · 추가 완료 체크리스트" width={840} height={812}>
+            <SMRevisionAuthSM4Checklist/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-ref-login" label="원본 비교 · 로그인 copied" width={375} height={812}>
+            <Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-ref-sport" label="원본 비교 · 종목 선택 copied" width={375} height={812}>
+            <OnboardingV2_Step1/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-ref-level" label="원본 비교 · 레벨 선택 copied" width={375} height={812}>
+            <OnboardingV2_Step2/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-ref-region" label="원본 비교 · 지역 선택 copied" width={375} height={812}>
+            <OnboardingV2_Step3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-ref-welcome" label="원본 비교 · 환영 copied" width={375} height={812}>
+            <OnboardingV2_Welcome/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-login" label="SM4 · 로그인 진입" width={375} height={812}>
+            <SMRevisionAuthSM3Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-email-login" label="SM4 · 이메일 로그인" width={375} height={812}>
+            <SMRevisionAuthEmailLoginSM3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-email-error" label="SM4 · 이메일 로그인 오류" width={375} height={812}>
+            <SMRevisionAuthSM4EmailLoginError/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-signup" label="SM4 · 회원가입" width={375} height={812}>
+            <SMRevisionAuthSignupSM3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-signup-error" label="SM4 · 회원가입 입력 오류" width={375} height={812}>
+            <SMRevisionAuthSM4SignupError/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-callback-loading" label="SM4 · OAuth callback loading" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="loading"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-callback-error" label="SM4 · OAuth callback error" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="error"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-callback-conflict" label="SM4 · OAuth account conflict" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="conflict"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-terms" label="SM4 · Step 1 약관 확인" width={375} height={812}>
+            <SMRevisionAuthSM3TermsStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-terms-disabled" label="SM4 · Step 1 약관 미동의" width={375} height={812}>
+            <SMRevisionAuthSM4TermsDisabled/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-sport" label="SM4 · Step 2 종목 선택" width={375} height={812}>
+            <SMRevisionAuthSM3SportStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-level" label="SM4 · Step 3 레벨 선택" width={375} height={812}>
+            <SMRevisionAuthSM3LevelStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-level-disabled" label="SM4 · Step 3 레벨 선택 예외" width={375} height={812}>
+            <SMRevisionAuthSM3LevelStep disabled/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-region" label="SM4 · Step 4 지역 선택" width={375} height={812}>
+            <SMRevisionAuthSM3RegionStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-location-denied" label="SM4 · 위치 권한 거부" width={375} height={812}>
+            <SMRevisionAuthSM4LocationDenied/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-resume" label="SM4 · 온보딩 이어하기" width={375} height={812}>
+            <SMRevisionAuthSM4Resume/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-confirm" label="SM4 · 선택 확인" width={375} height={812}>
+            <SMRevisionAuthSM4Confirm/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-welcome" label="SM4 · 온보딩 환영" width={375} height={812}>
+            <SMRevisionAuthSM3Welcome/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-exceptions" label="SM4 · 예외/처리 상태" width={840} height={812}>
+            <SMRevisionAuthSM3ExceptionBoard/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm4-actions" label="SM4 · 버튼 행동표" width={840} height={812}>
+            <SMRevisionAuthSM3ActionMap/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="auth-onboarding-sm-revision-5" title="01 · 인증 · 온보딩 · SM 수정안 5" subtitle="SM4를 복사한 비교 섹션. 원본 01/최신 SM4를 모두 참고해 버튼 동작, 화면 전환, 오류/권한/재진입 등 모든 상황 처리를 디자인 보드로 추가한다.">
+          <DCArtboard id="auth-sm5-checklist" label="SM5 · 추가 완료 체크리스트 copied" width={840} height={812}>
+            <SMRevisionAuthSM4Checklist/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-ref-login" label="원본 비교 · 로그인 copied" width={375} height={812}>
+            <Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-ref-sport" label="원본 비교 · 종목 선택 copied" width={375} height={812}>
+            <OnboardingV2_Step1/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-ref-level" label="원본 비교 · 레벨 선택 copied" width={375} height={812}>
+            <OnboardingV2_Step2/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-ref-region" label="원본 비교 · 지역 선택 copied" width={375} height={812}>
+            <OnboardingV2_Step3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-ref-welcome" label="원본 비교 · 환영 copied" width={375} height={812}>
+            <OnboardingV2_Welcome/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-login" label="SM5 · 로그인 진입 copied" width={375} height={812}>
+            <SMRevisionAuthSM3Login/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-email-login" label="SM5 · 이메일 로그인 copied" width={375} height={812}>
+            <SMRevisionAuthEmailLoginSM3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-email-error" label="SM5 · 이메일 로그인 오류 copied" width={375} height={812}>
+            <SMRevisionAuthSM4EmailLoginError/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-signup" label="SM5 · 회원가입 copied" width={375} height={812}>
+            <SMRevisionAuthSignupSM3/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-signup-error" label="SM5 · 회원가입 입력 오류 copied" width={375} height={812}>
+            <SMRevisionAuthSM4SignupError/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-callback-loading" label="SM5 · OAuth callback loading copied" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="loading"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-callback-error" label="SM5 · OAuth callback error copied" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="error"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-callback-conflict" label="SM5 · OAuth account conflict copied" width={375} height={812}>
+            <SMRevisionAuthCallbackV2 state="conflict"/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-terms" label="SM5 · Step 1 약관 확인 copied" width={375} height={812}>
+            <SMRevisionAuthSM3TermsStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-terms-disabled" label="SM5 · Step 1 약관 미동의 copied" width={375} height={812}>
+            <SMRevisionAuthSM4TermsDisabled/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-sport" label="SM5 · Step 2 종목 선택 copied" width={375} height={812}>
+            <SMRevisionAuthSM3SportStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-level" label="SM5 · Step 3 레벨 선택 copied" width={375} height={812}>
+            <SMRevisionAuthSM3LevelStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-level-disabled" label="SM5 · Step 3 레벨 선택 예외 copied" width={375} height={812}>
+            <SMRevisionAuthSM3LevelStep disabled/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-region" label="SM5 · Step 4 지역 선택 copied" width={375} height={812}>
+            <SMRevisionAuthSM3RegionStep/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-location-denied" label="SM5 · 위치 권한 거부 copied" width={375} height={812}>
+            <SMRevisionAuthSM4LocationDenied/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-resume" label="SM5 · 온보딩 이어하기 copied" width={375} height={812}>
+            <SMRevisionAuthSM4Resume/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-confirm" label="SM5 · 선택 확인 copied" width={375} height={812}>
+            <SMRevisionAuthSM4Confirm/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-welcome" label="SM5 · 온보딩 환영 copied" width={375} height={812}>
+            <SMRevisionAuthSM3Welcome/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-actions" label="SM5 · 버튼/입력 동작 매트릭스" width={840} height={812}>
+            <SMRevisionAuthSM5ActionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-states" label="SM5 · 모든 상황 처리" width={840} height={812}>
+            <SMRevisionAuthSM5StateMatrix/>
+          </DCArtboard>
+          <DCArtboard id="auth-sm5-flow" label="SM5 · 화면 전환 흐름" width={840} height={812}>
+            <SMRevisionAuthSM5Flow/>
+          </DCArtboard>
+        </DCSection>
+
         <DCSection id="m01-grid" title="M01 · 인증 · 온보딩 (viewport grid POC)" subtitle="fix29에서 추가. ID schema m01-{mb|tb|dt}-{main|state|components|assets|motion}. 모듈별 viewport × kind × state 결정적 식별자 시범.">
           <DCArtboard id="m01-mb-main" label="m01-mb-main — 모바일 메인" width={375} height={812}>
             <M01MobileMain/>
@@ -460,6 +709,106 @@ function App() {
           </DCArtboard>
           <DCArtboard id="home-motion-contract-toss" label="홈 · 모션 계약 · copied" width={840} height={812}>
             <HomeMotionContractBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="home-discovery-sm-revision" title="02 · 홈 · SM 수정안" subtitle="SM design freeze 기준. 원본 02를 보존하고 같은 번호 아래에 mobile-first 비교안을 추가한다.">
+          <DCArtboard id="home-sm-ref" label="원본 비교 · 홈 Toss canonical" width={375} height={812}>
+            <HomeToss/>
+          </DCArtboard>
+          <DCArtboard id="home-sm-mobile" label="SM · 홈 모바일" width={375} height={812}>
+            <SMRevisionHomeMobile/>
+          </DCArtboard>
+          <DCArtboard id="home-sm-signedout" label="SM · 홈 비로그인" width={375} height={812}>
+            <SMRevisionHomeMobile signedOut/>
+          </DCArtboard>
+          <DCArtboard id="home-sm-network" label="SM · 홈 네트워크 이슈" width={375} height={812}>
+            <SMRevisionHomeMobile network/>
+          </DCArtboard>
+          <DCArtboard id="home-sm-state-rules" label="SM · 홈 상태 규약" width={375} height={812}>
+            <SMRevisionHomeStates/>
+          </DCArtboard>
+          <DCArtboard id="home-sm-grid" label="SM · 홈 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="02 홈 · SM mobile grid" items={[
+              { title: '고정 셸', body: '상단 teameet, 검색, 알림 new 상태. 검색은 홈/마이에만 유지한다.' },
+              { title: '활동/매너', body: '비로그인과 네트워크 이슈는 경기수, 비교, 매너, 상위 값을 모두 - 처리한다.' },
+              { title: '추천 매치', body: '관심 종목 중 충원률이 가장 높은 경기 1개. 비로그인은 랜덤, 네트워크는 새로고침 필요.' },
+              { title: '카테고리', body: 'match, team match, team, my team 4개 shortcut. team은 05 전체 팀 조회로 이동한다.' },
+              { title: '통계/공지', body: '월간 통계는 참가, MVP, 결제 순서. 공지는 pinned만 노출하고 상세로 진입한다.' },
+              { title: '다음 단계', body: 'mobile이 확정되면 M02 grid를 SM 상태/인터랙션 기준으로 재작성한다.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="home-discovery-sm-revision-2" title="02 · 홈 · SM 수정안 2" subtitle="기존 02와 기존 SM 수정안은 보존하고, 같은 번호 아래에 0502 홈 요구사항을 mobile-first로 다시 고정한다.">
+          <DCArtboard id="home-sm2-ref" label="원본 비교 · 홈 Toss canonical copied" width={375} height={812}>
+            <HomeToss/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-mobile" label="SM2 · 홈 모바일 main" width={375} height={812}>
+            <SMRevisionHomeMobileV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-search" label="SM2 · 홈 검색 조회안 A · 그룹형" width={375} height={812}>
+            <SMRevisionHomeSearchMobileV2 variant="grouped"/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-search-b" label="SM2 · 홈 검색 조회안 B · 탭형" width={375} height={812}>
+            <SMRevisionHomeSearchMobileV2 variant="segmented"/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-signedout" label="SM2 · 홈 비로그인" width={375} height={812}>
+            <SMRevisionHomeMobileV2 signedOut/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-network" label="SM2 · 홈 네트워크 이슈" width={375} height={812}>
+            <SMRevisionHomeMobileV2 network/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-state-rules" label="SM2 · 홈 상태/미정 규약" width={375} height={812}>
+            <SMRevisionHomeStatesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-ui-rules" label="SM2 · 홈 UI 규약" width={840} height={812}>
+            <SMRevisionHomeUIRulesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-flow" label="SM2 · 홈 버튼 동작 흐름" width={840} height={812}>
+            <SMRevisionHomeInteractionFlowV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-search-rules" label="SM2 · 홈 검색 상태/동작 규약" width={840} height={812}>
+            <SMRevisionHomeSearchRulesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm2-grid" label="SM2 · 홈 mobile grid" width={840} height={812}>
+            <SMRevisionHomeMobileGridV2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="home-discovery-sm-revision-3" title="02 · 홈 · SM 수정안 3" subtitle="SM2를 복사한 비교 섹션. 원본 02/Toss canonical/SM2를 참고해 홈의 모든 버튼, 카드, 데이터 상태, 권한/네트워크 상황 처리를 추가로 고정한다.">
+          <DCArtboard id="home-sm3-ref" label="원본 비교 · 홈 Toss canonical copied" width={375} height={812}>
+            <HomeToss/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-mobile" label="SM3 · 홈 모바일 main copied" width={375} height={812}>
+            <SMRevisionHomeMobileV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-search" label="SM3 · 홈 검색 페이지 copied" width={375} height={812}>
+            <SMRevisionHomeSearchMobileV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-signedout" label="SM3 · 홈 비로그인 copied" width={375} height={812}>
+            <SMRevisionHomeMobileV2 signedOut/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-network" label="SM3 · 홈 네트워크 이슈 copied" width={375} height={812}>
+            <SMRevisionHomeMobileV2 network/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-state-rules" label="SM3 · 홈 상태/미정 규약 copied" width={375} height={812}>
+            <SMRevisionHomeStatesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-ui-rules" label="SM3 · 홈 UI 규약 copied" width={840} height={812}>
+            <SMRevisionHomeUIRulesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-search-rules" label="SM3 · 홈 검색 상태/동작 규약 copied" width={840} height={812}>
+            <SMRevisionHomeSearchRulesV2/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-actions" label="SM3 · 버튼/카드 동작 매트릭스" width={840} height={812}>
+            <SMRevisionHomeSM3ActionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-states" label="SM3 · 모든 상황 처리" width={840} height={812}>
+            <SMRevisionHomeSM3StateMatrix/>
+          </DCArtboard>
+          <DCArtboard id="home-sm3-flow" label="SM3 · 화면 전환/후속 처리" width={840} height={812}>
+            <SMRevisionHomeSM3Flow/>
           </DCArtboard>
         </DCSection>
 
@@ -667,6 +1016,139 @@ function App() {
           </DCArtboard>
         </DCSection>
 
+        <DCSection id="matches-core-sm-revision" title="03 · 개인 매치 · SM 수정안" subtitle="SM 문서의 검색, 카드/콤팩트 토글, 종목별 카운트, 상세/참가 bottom sheet 상태를 기존 03 아래에 비교안으로 추가한다.">
+          <DCArtboard id="matches-sm-ref-list" label="원본 비교 · 매치 목록" width={375} height={812}>
+            <MatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-card" label="SM · 매치 목록 카드형" width={375} height={812}>
+            <SMRevisionMatchListMobile/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-compact" label="SM · 매치 목록 콤팩트" width={375} height={812}>
+            <SMRevisionMatchListMobile compact/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-detail" label="SM · 매치 상세" width={375} height={812}>
+            <SMRevisionMatchDetailMobile/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-my-detail" label="SM · 내 매치 상세" width={375} height={812}>
+            <SMRevisionMatchDetailMobile mine/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-grid" label="SM · 개인 매치 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="03 개인 매치 · SM mobile grid" items={[
+              { title: '목록 셸', body: '상단바는 유지하지만 검색 액션은 제외. 본문 검색바와 카드/콤팩트 토글을 둔다.' },
+              { title: '종목 selector', body: '가로 스크롤 sport selector는 각 종목별 count를 표시하고 선택 시 요약 카운터를 갱신한다.' },
+              { title: '카드형', body: '이미지 상단에는 종목/레벨/마감 상태, 하단에는 일정. 본문에는 제목/위치/인원/가격.' },
+              { title: '콤팩트형', body: '이미지, 제목, 위치, 인원, 시간, 가격만 남겨 빠른 비교 피드로 사용한다.' },
+              { title: '상태', body: '네트워크 오류는 새로고침 필요합니다 필요, 조회 없음은 매치가 없습니다를 보존한다.' },
+              { title: '상세/참가', body: '상세는 하단바 제거, back/share/notification, sticky CTA, 결제하고 참가하기 sheet, 승인중/승인완료 상태.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core-sm-revision-3" title="03 · 개인 매치 · SM 수정안 3" subtitle="0502 문서와 기존 SM 수정안을 대조해 mobile-first 목록, 상태, 상세, 참가 sheet를 새 비교 섹션으로 다시 고정한다. 기존 03과 기존 수정안은 보존한다.">
+          <DCArtboard id="matches-sm3-ref-list" label="원본 비교 · 매치 목록" width={375} height={812} data-reference-canonical-id="m03-mb-list">
+            <MatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-ref-detail" label="원본 비교 · 매치 상세" width={375} height={812} data-reference-canonical-id="m03-mb-detail">
+            <MatchDetail/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-list-card" label="SM3 · 매치 목록 카드형" width={375} height={812} data-sm-id="m03-mb-list-sm3-card">
+            <SMRevisionMatchListMobileSM3 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-list-compact" label="SM3 · 매치 목록 콤팩트" width={375} height={812} data-sm-id="m03-mb-list-sm3-compact">
+            <SMRevisionMatchListMobileSM3 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-search-focus" label="SM3 · 검색 진입/입력중" width={375} height={812} data-sm-id="m03-mb-flow-search-focus-sm3">
+            <SMRevisionMatchSearchFocusMobileSM3/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-search" label="SM3 · 개인매치 검색 결과" width={375} height={812} data-sm-id="m03-mb-list-sm3-search">
+            <SMRevisionMatchSearchMobileSM3/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-state-empty" label="SM3 · 조회 없음" width={375} height={812} data-sm-id="m03-mb-state-empty-sm3">
+            <SMRevisionMatchStateMobileSM3 state="empty"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-state-error" label="SM3 · 네트워크 오류" width={375} height={812} data-sm-id="m03-mb-state-error-sm3">
+            <SMRevisionMatchStateMobileSM3 state="error"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-detail" label="SM3 · 매치 상세" width={375} height={812} data-sm-id="m03-mb-detail-sm3">
+            <SMRevisionMatchDetailMobileSM3/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-join-sheet" label="SM3 · 참가 요약 바텀시트" width={375} height={812} data-sm-id="m03-mb-main-bottomsheet-sm3">
+            <SMRevisionMatchDetailMobileSM3 sheet/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-join-feedback" label="SM3 · 승인 요청 피드백" width={375} height={812} data-sm-id="m03-mb-flow-join-feedback-sm3">
+            <SMRevisionMatchJoinFeedbackOverlaySM3/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-pending" label="SM3 · 승인중 상태" width={375} height={812} data-sm-id="m03-mb-state-pending-sm3">
+            <SMRevisionMatchDetailMobileSM3 status="pending"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-approved" label="SM3 · 승인완료 상태" width={375} height={812} data-sm-id="m03-mb-state-success-sm3">
+            <SMRevisionMatchDetailMobileSM3 status="approved"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-my-detail" label="SM3 · 내 매치 상세" width={375} height={812} data-sm-id="m03-mb-detail-my-sm3">
+            <SMRevisionMatchDetailMobileSM3 mine/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm3-grid" label="SM3 · 개인 매치 mobile grid" width={840} height={812} data-sm-id="m03-tb-main-sm3-mobile-grid">
+            <SMRevisionMatchMobileGridSM3/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core-sm-revision-4" title="03 · 개인 매치 · SM 수정안 4" subtitle="SM3를 복사한 비교 섹션. 원본 03과 최신 SM3를 참고해 목록/검색/상세/참가/내 매치의 모든 버튼 동작과 상태 처리를 추가로 고정한다.">
+          <DCArtboard id="matches-sm4-ref-list" label="원본 비교 · 매치 목록 copied" width={375} height={812} data-reference-canonical-id="m03-mb-list">
+            <MatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-ref-detail" label="원본 비교 · 매치 상세 copied" width={375} height={812} data-reference-canonical-id="m03-mb-detail">
+            <MatchDetail/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-list-card" label="SM4 · 매치 목록 카드형 copied" width={375} height={812}>
+            <SMRevisionMatchListMobileSM4 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-list-compact" label="SM4 · 매치 목록 콤팩트 copied" width={375} height={812}>
+            <SMRevisionMatchListMobileSM4 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-search-focus" label="SM4 · 검색 진입/입력중 copied" width={375} height={812}>
+            <SMRevisionMatchSearchFocusMobileSM4/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-search-card" label="SM4 · 개인매치 검색 결과 카드형" width={375} height={812}>
+            <SMRevisionMatchSearchMobileSM4 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-search-compact" label="SM4 · 개인매치 검색 결과 콤팩트" width={375} height={812}>
+            <SMRevisionMatchSearchMobileSM4 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-state-empty" label="SM4 · 조회 없음 copied" width={375} height={812}>
+            <SMRevisionMatchStateMobileSM3 state="empty" noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-state-error" label="SM4 · 네트워크 오류 copied" width={375} height={812}>
+            <SMRevisionMatchStateMobileSM3 state="error" noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-detail" label="SM4 · 매치 상세 copied" width={375} height={812}>
+            <SMRevisionMatchDetailMobileSM3 noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-join-sheet" label="SM4 · 참가 요약 바텀시트 copied" width={375} height={812}>
+            <SMRevisionMatchDetailMobileSM3 sheet noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-join-feedback" label="SM4 · 승인 요청 피드백 copied" width={375} height={812}>
+            <SMRevisionMatchJoinFeedbackOverlaySM3 noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-pending" label="SM4 · 승인중 상태 copied" width={375} height={812}>
+            <SMRevisionMatchDetailMobileSM3 status="pending" noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-approved" label="SM4 · 승인완료 상태 copied" width={375} height={812}>
+            <SMRevisionMatchDetailMobileSM3 status="approved" noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-my-detail" label="SM4 · 내 매치 상세 copied" width={375} height={812}>
+            <SMRevisionMatchDetailMobileSM3 mine noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-actions" label="SM4 · 버튼/화면 동작 매트릭스" width={840} height={812}>
+            <SMRevisionMatchSM4ActionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-states" label="SM4 · 모든 상황 처리" width={840} height={812}>
+            <SMRevisionMatchSM4StateMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm4-flow" label="SM4 · 목록-상세-참가 흐름" width={840} height={812}>
+            <SMRevisionMatchSM4Flow/>
+          </DCArtboard>
+        </DCSection>
+
         <DCSection id="m03-grid" title="M03 · 개인 매치 (viewport grid)" subtitle="fix30. ID schema m03-{mb|tb|dt}-{main|detail|create|state|components|assets|motion}. Routes: /matches /matches/[id] /matches/new /matches/[id]/edit.">
           <DCArtboard id="m03-mb-main" label="m03-mb-main" width={375} height={812}><M03MobileMain/></DCArtboard>
           <DCArtboard id="m03-tb-main" label="m03-tb-main" width={768} height={1024}><M03TabletMain/></DCArtboard>
@@ -760,6 +1242,130 @@ function App() {
           </DCArtboard>
         </DCSection>
 
+        <DCSection id="teams-team-matches-sm-revision" title="04 · 팀 · 팀매칭 · SM 수정안" subtitle="SM 문서의 팀매치 목록/상세, 팀 정보 vs, 채팅/신청, 내 매치 관리 상태를 기존 04 아래 비교안으로 추가한다.">
+          <DCArtboard id="team-matches-sm-ref" label="원본 비교 · 팀 매칭 목록" width={375} height={812}>
+            <TeamMatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-card" label="SM · 팀매치 목록 카드형" width={375} height={812}>
+            <SMRevisionMatchListMobile team/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-compact" label="SM · 팀매치 목록 콤팩트" width={375} height={812}>
+            <SMRevisionMatchListMobile team compact/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-detail" label="SM · 팀매치 상세" width={375} height={812}>
+            <SMRevisionMatchDetailMobile team/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-my-detail" label="SM · 내 팀매치 상세" width={375} height={812}>
+            <SMRevisionMatchDetailMobile team mine/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-grid" label="SM · 팀매치 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="04 팀매치 · SM mobile grid" items={[
+              { title: '목록 셸', body: '개인 매치와 동일하게 본문 검색바, 카드/콤팩트 토글, 종목별 count selector를 둔다.' },
+              { title: '카드형', body: '이미지 상단 종목/레벨/기간, 하단 일정. 본문에는 팀명, 위치, 인원, 가격, 승리수.' },
+              { title: '콤팩트형', body: '로고, 레벨, 매너정보, 팀명, 위치, 인원, 시간, 가격, 승리수를 밀도 있게 정렬한다.' },
+              { title: '상세 히어로', body: '이미지 박스는 팀 정보 vs 구조로 표현하고 날짜/시간/장소와 경기정보를 분리한다.' },
+              { title: '신청 흐름', body: '채팅과 신청 CTA를 제공하고, 신청 sheet는 결제하고 신청하기로 확정한다.' },
+              { title: '내 매치', body: '내 매치인 경우 신청 CTA 대신 매치 관리로 교체하고 관리 상세로 이동한다.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="teams-team-matches-sm-revision-2" title="04 · 팀 · 팀매칭 · SM 수정안 2" subtitle="0502 문서를 기준으로 기존 04와 기존 SM 수정안은 보존하고, 팀매치 고유 목록/상세/신청 상태를 mobile-first로 더 세분화한 비교안.">
+          <DCArtboard id="team-matches-sm2-ref" label="원본 비교 · 팀 매칭 목록" width={375} height={812}>
+            <TeamMatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-card" label="SM2 · 팀매치 목록 카드형" width={375} height={812}>
+            <SMRevisionTeamMatchListMobileSM2 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-compact" label="SM2 · 팀매치 목록 콤팩트형" width={375} height={812}>
+            <SMRevisionTeamMatchListMobileSM2 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-search-focus" label="SM2 · 팀매치 검색 진입" width={375} height={812}>
+            <SMRevisionTeamMatchSearchFocusMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-search-card" label="SM2 · 팀매치 검색 결과 카드형" width={375} height={812}>
+            <SMRevisionTeamMatchSearchMobileSM2 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-search-compact" label="SM2 · 팀매치 검색 결과 콤팩트형" width={375} height={812}>
+            <SMRevisionTeamMatchSearchMobileSM2 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-empty" label="SM2 · 조회 없음" width={375} height={812}>
+            <SMRevisionTeamMatchStateMobileSM2 state="empty"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-error" label="SM2 · 네트워크 오류" width={375} height={812}>
+            <SMRevisionTeamMatchStateMobileSM2 state="error"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-detail" label="SM2 · 팀매치 상세" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-apply-sheet" label="SM2 · 신청 요약 바텀시트" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 sheet/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-pending" label="SM2 · 신청 승인중" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 status="pending"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-approved" label="SM2 · 신청 승인완료" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 status="approved"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-mine" label="SM2 · 내 팀매치 관리 CTA" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 mine/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm2-grid" label="SM2 · 팀매치 mobile grid" width={840} height={812}>
+            <SMRevisionTeamMatchMobileGridSM2/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="teams-team-matches-sm-revision-3" title="04 · 팀 · 팀매칭 · SM 수정안 3" subtitle="SM2를 복사한 비교 섹션. 원본 04와 최신 SM2를 참고해 팀매치 목록/상세/채팅/신청/내 매치 관리의 모든 버튼 동작과 상황 처리를 추가한다.">
+          <DCArtboard id="team-matches-sm3-ref" label="원본 비교 · 팀 매칭 목록 copied" width={375} height={812}>
+            <TeamMatchesListV2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-card" label="SM3 · 팀매치 목록 카드형 copied" width={375} height={812}>
+            <SMRevisionTeamMatchListMobileSM2 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-compact" label="SM3 · 팀매치 목록 콤팩트형 copied" width={375} height={812}>
+            <SMRevisionTeamMatchListMobileSM2 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-search-focus" label="SM3 · 팀매치 검색 진입 copied" width={375} height={812}>
+            <SMRevisionTeamMatchSearchFocusMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-search-card" label="SM3 · 팀매치 검색 결과 카드형" width={375} height={812}>
+            <SMRevisionTeamMatchSearchMobileSM2 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-search-compact" label="SM3 · 팀매치 검색 결과 콤팩트형" width={375} height={812}>
+            <SMRevisionTeamMatchSearchMobileSM2 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-empty" label="SM3 · 조회 없음 copied" width={375} height={812}>
+            <SMRevisionTeamMatchStateMobileSM2 state="empty"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-error" label="SM3 · 네트워크 오류 copied" width={375} height={812}>
+            <SMRevisionTeamMatchStateMobileSM2 state="error"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-detail" label="SM3 · 팀매치 상세 copied" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-apply-sheet" label="SM3 · 신청 요약 바텀시트 copied" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 sheet/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-pending" label="SM3 · 신청 승인중 copied" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 status="pending"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-approved" label="SM3 · 신청 승인완료 copied" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 status="approved"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-mine" label="SM3 · 내 팀매치 관리 CTA copied" width={375} height={812}>
+            <SMRevisionTeamMatchDetailMobileSM2 mine/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-actions" label="SM3 · 버튼/화면 동작 매트릭스" width={840} height={812}>
+            <SMRevisionTeamMatchSM3ActionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-states" label="SM3 · 모든 상황 처리" width={840} height={812}>
+            <SMRevisionTeamMatchSM3StateMatrix/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm3-flow" label="SM3 · 목록-상세-신청/관리 흐름" width={840} height={812}>
+            <SMRevisionTeamMatchSM3Flow/>
+          </DCArtboard>
+        </DCSection>
+
         <DCSection id="m04-grid" title="M04 · 팀 · 팀매칭 (viewport grid)" subtitle="fix30. ID schema m04-{mb|tb|dt}-{main|detail|create|flow-evaluate|flow-checkin|state|components|assets|motion}. Routes: /teams /teams/[id] /team-matches/*.">
           <DCArtboard id="m04-mb-main" label="m04-mb-main" width={375} height={812}><M04MobileMain/></DCArtboard>
           <DCArtboard id="m04-tb-main" label="m04-tb-main" width={768} height={1024}><M04TabletMain/></DCArtboard>
@@ -788,6 +1394,46 @@ function App() {
           </DCArtboard>
           <DCArtboard id="team-browse-rules" label="팀 전체 조회 · 규약" width={840} height={812} data-canonical-id="m04-tb-components-team-browse">
             <TeamBrowseRulesBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="team-browse-sm-revision" title="05 · 팀 둘러보기 · SM 수정안" subtitle="SM 문서는 05 팀 전체조회의 shell만 명시한다. 기존 05를 보존하고 상하단바 유지, 팀 비교/선택 CTA 중심의 mobile 초안을 추가한다.">
+          <DCArtboard id="team-browse-sm-ref" label="원본 비교 · 팀 전체 조회" width={375} height={812}>
+            <TeamBrowseV2/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm-mobile" label="SM · 팀 전체조회 모바일" width={375} height={812}>
+            <SMRevisionTeamBrowseMobile/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm-grid" label="SM · 팀 전체조회 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="05 팀 전체조회 · SM mobile grid" items={[
+              { title: '확정된 것', body: '05 페이지로 이동하며 상단바와 하단바를 유지한다.' },
+              { title: '미정인 것', body: 'SM source note는 body 요구사항을 아직 정의하지 않았다.' },
+              { title: '임시 방향', body: '팀 비교, 신뢰 신호, 선택/가입 CTA를 두되 verified/estimated/sample 상태를 구분한다.' },
+              { title: '홈 shortcut', body: '홈의 team shortcut은 이 05 전체 팀 조회로 연결한다.' },
+              { title: '추후 결정', body: '나의 팀 shortcut destination은 별도 product decision 전까지 확정하지 않는다.' },
+              { title: '다음 단계', body: 'body 요구사항이 확정되면 list/detail/join grid로 확장한다.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="team-browse-sm-revision-2" title="05 · 팀 둘러보기 · SM2 수정안" subtitle="기존 05와 기존 05 SM 수정안은 보존하고, 같은 번호 아래에 0502 확정 shell + 기존 온보딩/홈/팀매치 문법을 참고한 mobile-first 비교안을 추가한다.">
+          <DCArtboard id="team-browse-sm2-ref" label="SM2 · 복사 기준 · 기존 05 SM" width={375} height={812}>
+            <SMRevisionTeamBrowseMobile/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm2-mobile" label="SM2 · 팀 둘러보기 모바일 main" width={375} height={812}>
+            <SMRevisionTeamBrowseMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm2-detail" label="SM2 · 팀 상세/가입 CTA" width={375} height={812}>
+            <SMRevisionTeamBrowseDetailSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm2-empty" label="SM2 · 조회 없음" width={375} height={812}>
+            <SMRevisionTeamBrowseStateSM2 state="empty"/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm2-error" label="SM2 · 네트워크 오류" width={375} height={812}>
+            <SMRevisionTeamBrowseStateSM2 state="error"/>
+          </DCArtboard>
+          <DCArtboard id="team-browse-sm2-grid" label="SM2 · 팀 둘러보기 mobile grid" width={840} height={812}>
+            <SMRevisionTeamBrowseMobileGridSM2/>
           </DCArtboard>
         </DCSection>
 
@@ -830,6 +1476,52 @@ function App() {
           </DCArtboard>
           <DCArtboard id="community-responsive" label="커뮤니티 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m12-dt-main-responsive">
             <CommunityResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="community-sm-revision" title="06 · 커뮤니티 · 채팅 · 알림 · SM 수정안" subtitle="SM 문서의 채팅 플로팅 진입, 채팅 목록/상세, 알림 그룹/모두읽음 상태를 기존 06 아래 비교안으로 추가한다.">
+          <DCArtboard id="community-sm-ref-chat" label="원본 비교 · 채팅 목록" width={375} height={812}>
+            <ChatListV2/>
+          </DCArtboard>
+          <DCArtboard id="community-sm-chat-list" label="SM · 채팅 목록" width={375} height={812}>
+            <SMRevisionChatListMobile/>
+          </DCArtboard>
+          <DCArtboard id="community-sm-chat-room" label="SM · 채팅방 상세" width={375} height={812}>
+            <SMRevisionChatRoomMobile/>
+          </DCArtboard>
+          <DCArtboard id="community-sm-notifications" label="SM · 알림" width={375} height={812}>
+            <SMRevisionNotificationsMobile/>
+          </DCArtboard>
+          <DCArtboard id="community-sm-grid" label="SM · 커뮤니티 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="06 채팅/알림 · SM mobile grid" items={[
+              { title: '채팅 진입', body: '하단바 바로 위 우측 하단에 채팅 floating button을 둔다.' },
+              { title: '채팅 목록', body: '뒤로가기, 채팅 title, 검색, 알림. 전체/개인매치/팀매치/팀 filter와 고정방 우선 정렬.' },
+              { title: '채팅방', body: '상하단바 제거, 상단 back, 카테고리별 주제와 관련 상세조회 link box를 노출한다.' },
+              { title: 'composer', body: '+ 버튼은 현재 이미지 전송만 지원하고 입력, 전송 액션을 하단에 고정한다.' },
+              { title: '알림', body: '상하단바 제거, unread count, 모두읽음, 날짜별 최신순, unread/read 상태를 구분한다.' },
+              { title: '제외', body: '알림 상세보기는 현재 범위에서 제외한다.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="community-sm-revision-2" title="06 · 커뮤니티 · 채팅 · 알림 · SM2 수정안" subtitle="기존 06과 기존 06 SM 수정안은 보존하고, 같은 번호 아래에 채팅 목록/채팅방/알림 읽음 상태를 mobile-first로 더 세분화한다.">
+          <DCArtboard id="community-sm2-ref" label="SM2 · 복사 기준 · 기존 06 SM" width={375} height={812}>
+            <SMRevisionChatListMobile/>
+          </DCArtboard>
+          <DCArtboard id="community-sm2-chat-list" label="SM2 · 채팅 목록" width={375} height={812}>
+            <SMRevisionChatListMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="community-sm2-chat-room" label="SM2 · 채팅방 상세" width={375} height={812}>
+            <SMRevisionChatRoomMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="community-sm2-notifications" label="SM2 · 알림 unread" width={375} height={812}>
+            <SMRevisionNotificationsMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="community-sm2-notifications-read" label="SM2 · 알림 모두읽음" width={375} height={812}>
+            <SMRevisionNotificationsMobileSM2 readAll/>
+          </DCArtboard>
+          <DCArtboard id="community-sm2-grid" label="SM2 · 커뮤니티 mobile grid" width={840} height={812}>
+            <SMRevisionCommunityMobileGridSM2/>
           </DCArtboard>
         </DCSection>
 
@@ -895,6 +1587,44 @@ function App() {
           </DCArtboard>
           <DCArtboard id="my-profile-responsive" label="마이 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m13-dt-detail-responsive">
             <MyProfileResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="my-profile-trust-sm-revision" title="07 · 마이 · 프로필 · 리뷰 · SM 수정안" subtitle="SM 문서의 user profile/review target을 core 비교 섹션으로 추가한다. 기존 07은 보존한다.">
+          <DCArtboard id="my-sm-ref" label="원본 비교 · 마이 홈" width={375} height={812}>
+            <MyPageV2/>
+          </DCArtboard>
+          <DCArtboard id="my-sm-profile-review" label="SM · 프로필/리뷰 모바일" width={375} height={812}>
+            <SMRevisionProfileReviewMobile/>
+          </DCArtboard>
+          <DCArtboard id="my-sm-grid" label="SM · 마이/리뷰 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="07 마이/프로필/리뷰 · SM mobile grid" items={[
+              { title: '상단 검색', body: 'SM 전역 규칙상 검색 버튼은 홈과 마이에서만 유지한다.' },
+              { title: '프로필', body: 'user profile은 매너, 활동, 신뢰 신호를 보여주되 verified/sample을 구분한다.' },
+              { title: '리뷰', body: 'review는 target surface이나 세부 body가 없으므로 받은 리뷰와 작성 flow를 companion board로 둔다.' },
+              { title: '다음 단계', body: '리뷰 작성은 매치/팀매치 완료 후 flow로 연결하고 상태/권한을 grid에 확장한다.' },
+            ]}/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="my-profile-trust-sm-revision-2" title="07 · 마이 · 프로필 · 리뷰 · SM2 수정안" subtitle="기존 07과 기존 07 SM 수정안은 보존하고, 같은 번호 아래에 프로필 신뢰 신호, 받은 리뷰, 리뷰 작성 companion flow, 비공개/오류 상태를 추가한다.">
+          <DCArtboard id="my-sm2-ref" label="SM2 · 복사 기준 · 기존 07 SM" width={375} height={812}>
+            <SMRevisionProfileReviewMobile/>
+          </DCArtboard>
+          <DCArtboard id="my-sm2-profile" label="SM2 · 마이/프로필 main" width={375} height={812}>
+            <SMRevisionProfileReviewMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="my-sm2-review-write" label="SM2 · 리뷰 작성" width={375} height={812}>
+            <SMRevisionReviewWriteMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="my-sm2-private" label="SM2 · 비공개 프로필" width={375} height={812}>
+            <SMRevisionProfileStateMobileSM2 state="private"/>
+          </DCArtboard>
+          <DCArtboard id="my-sm2-network" label="SM2 · 네트워크 오류" width={375} height={812}>
+            <SMRevisionProfileStateMobileSM2 state="network"/>
+          </DCArtboard>
+          <DCArtboard id="my-sm2-grid" label="SM2 · 마이/리뷰 mobile grid" width={840} height={812}>
+            <SMRevisionProfileReviewMobileGridSM2/>
           </DCArtboard>
         </DCSection>
 
@@ -991,6 +1721,26 @@ function App() {
           </DCArtboard>
           <DCArtboard id="payments-responsive" label="결제 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m14-dt-main-responsive">
             <PaymentsResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="payments-support-sm-revision" title="08 · 결제 · 환불 · SM 수정안" subtitle="SM 문서의 payment target을 core 비교 섹션으로 추가한다. mock/test 결제 정직성은 유지한다.">
+          <DCArtboard id="payments-sm-ref" label="원본 비교 · 체크아웃" width={375} height={812}>
+            <PaymentCheckoutV2/>
+          </DCArtboard>
+          <DCArtboard id="payments-sm-checkout" label="SM · 결제 모바일" width={375} height={812}>
+            <SMRevisionPaymentMobile/>
+          </DCArtboard>
+          <DCArtboard id="payments-sm-refund" label="SM · 환불 모바일" width={375} height={812}>
+            <SMRevisionPaymentMobile refund/>
+          </DCArtboard>
+          <DCArtboard id="payments-sm-grid" label="SM · 결제 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="08 결제/환불 · SM mobile grid" items={[
+              { title: '결제 대상', body: 'SM 원문은 payment를 design-fix target으로 지정한다.' },
+              { title: '정직한 mock mode', body: '테스트 결제/환불과 실제 청구/실환불 없음은 전 구간에서 명시한다.' },
+              { title: '상태 지속성', body: '성공/실패/pending은 toast만으로 끝내지 않고 상세/내역으로 이어진다.' },
+              { title: '환불', body: '환불은 처리 주체, 사유, 예상 다음 상태, 부분 실패를 표시한다.' },
+            ]}/>
           </DCArtboard>
         </DCSection>
 
@@ -1113,6 +1863,23 @@ function App() {
           </DCArtboard>
           <DCArtboard id="public-responsive" label="공개 · 반응형 Mobile/Tablet/Desktop" width={1280} height={820} data-canonical-id="m16-dt-main-responsive">
             <PublicResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="public-marketing-sm-revision" title="10 · 공개 · 랜딩 · SM 수정안" subtitle="SM 문서의 landing page target을 core 비교 섹션으로 추가한다. 기존 10은 보존한다.">
+          <DCArtboard id="landing-sm-ref" label="원본 비교 · 모바일 랜딩" width={375} height={812}>
+            <MobileLanding/>
+          </DCArtboard>
+          <DCArtboard id="landing-sm-mobile" label="SM · 랜딩 모바일" width={375} height={812}>
+            <SMRevisionLandingMobile/>
+          </DCArtboard>
+          <DCArtboard id="landing-sm-grid" label="SM · 랜딩 mobile grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="10 공개/랜딩 · SM mobile grid" items={[
+              { title: '랜딩 대상', body: 'SM 원문은 landing page를 design-fix target으로 지정한다.' },
+              { title: '첫 화면', body: 'badge/title만으로 비우지 않고 CTA와 다음 단계 요약을 즉시 보여준다.' },
+              { title: '연결성', body: '개인매치 03, 팀매치 04, 팀 05, 채팅/알림 06의 core 흐름을 소개한다.' },
+              { title: '다음 단계', body: 'mobile이 확정되면 desktop public shell은 별도 작업으로 확장한다.' },
+            ]}/>
           </DCArtboard>
         </DCSection>
 
@@ -1250,6 +2017,23 @@ function App() {
           </DCArtboard>
           <DCArtboard id="admin-responsive" label="Admin · 반응형 Tablet/Desktop/Wide" width={1280} height={820} data-canonical-id="m18-dt-main-responsive">
             <AdminResponsiveBoard/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="admin-ops-sm-revision" title="12 · 관리자 · 운영 · SM 수정안" subtitle="SM 문서의 admin target을 core 비교 섹션으로 추가한다. 기존 12는 보존한다.">
+          <DCArtboard id="admin-sm-ref" label="원본 비교 · Admin dashboard" width={1280} height={900}>
+            <AdminDashboardV2/>
+          </DCArtboard>
+          <DCArtboard id="admin-sm-mobile" label="SM · Admin 모바일 운영 큐" width={375} height={812}>
+            <SMRevisionAdminMobile/>
+          </DCArtboard>
+          <DCArtboard id="admin-sm-grid" label="SM · Admin grid" width={840} height={812}>
+            <SMRevisionRuleBoard title="12 Admin · SM operation grid" items={[
+              { title: 'Admin 대상', body: 'SM 원문은 admin을 design-fix target으로 지정한다.' },
+              { title: '운영 판단', body: '제재/정산/분쟁 처리는 local toast만으로 끝내지 않고 담당자, 사유, 결과를 남긴다.' },
+              { title: '부분 실패', body: 'bulk action과 운영 큐는 partial failure와 audit recovery를 표시한다.' },
+              { title: '모바일 admin', body: '모바일은 dense table 대신 summary card, compact queue row, lower-half action을 우선한다.' },
+            ]}/>
           </DCArtboard>
         </DCSection>
 
@@ -1931,20 +2715,43 @@ const SM_NEW_REFERENCE_SECTIONS = [
 
 const SM_NEW_CORE_SECTIONS = [
   'auth-onboarding',
+  'auth-onboarding-sm-revision',
+  'auth-onboarding-sm-revision-2',
+  'auth-onboarding-sm-revision-3',
+  'auth-onboarding-sm-revision-4',
+  'auth-onboarding-sm-revision-5',
   'home-discovery',
   'home-discovery-toss-canonical',
+  'home-discovery-sm-revision',
+  'home-discovery-sm-revision-2',
+  'home-discovery-sm-revision-3',
   'matches-core',
   'matches-core-cardnews-compact',
   'matches-core-card-compact-switcher',
+  'matches-core-sm-revision',
+  'matches-core-sm-revision-3',
+  'matches-core-sm-revision-4',
   'teams-team-matches',
+  'teams-team-matches-sm-revision',
+  'teams-team-matches-sm-revision-2',
+  'teams-team-matches-sm-revision-3',
   'team-browse',
+  'team-browse-sm-revision',
+  'team-browse-sm-revision-2',
   'community',
+  'community-sm-revision',
+  'community-sm-revision-2',
   'my-profile-trust',
+  'my-profile-trust-sm-revision',
+  'my-profile-trust-sm-revision-2',
   'payments-support',
+  'payments-support-sm-revision',
   'settings-states',
   'public-marketing',
+  'public-marketing-sm-revision',
   'desktop-web',
   'admin-ops',
+  'admin-ops-sm-revision',
   'common-flows-motion',
 ];
 
@@ -1980,10 +2787,25 @@ const SM_NEW_CANDIDATE_SECTIONS = [
   'm08-grid',
 ];
 
+const SM_FIRST_DESIGN_PROGRESS_SECTIONS = [
+  'auth-onboarding-sm-revision-5',
+  'home-discovery-sm-revision-3',
+  'matches-core-sm-revision-4',
+  'teams-team-matches-sm-revision-3',
+  'team-browse-sm-revision-2',
+  'community-sm-revision-2',
+  'my-profile-trust-sm-revision-2',
+  'payments-support-sm-revision',
+  'settings-states',
+  'public-marketing-sm-revision',
+];
+
 function SMNewVisibilityStyle({ mode }) {
   if (mode === 'all') return null;
   const ids =
-    mode === 'core'
+    mode === 'progress'
+      ? SM_FIRST_DESIGN_PROGRESS_SECTIONS
+      : mode === 'core'
       ? SM_NEW_CORE_SECTIONS
       : mode === 'core-grid'
         ? [...SM_NEW_CORE_SECTIONS, ...SM_NEW_CORE_GRID_SECTIONS]
@@ -2014,18 +2836,43 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
   ];
   const core = [
     ['auth-onboarding', '01 인증'],
+    ['auth-onboarding-sm-revision', '01 인증 SM'],
+    ['auth-onboarding-sm-revision-2', '01 인증 SM2'],
+    ['auth-onboarding-sm-revision-3', '01 인증 SM3'],
+    ['auth-onboarding-sm-revision-4', '01 인증 SM4'],
+    ['auth-onboarding-sm-revision-5', '01 인증 SM5'],
     ['home-discovery', '02 홈'],
     ['home-discovery-toss-canonical', '02 홈 Toss'],
+    ['home-discovery-sm-revision', '02 홈 SM'],
+    ['home-discovery-sm-revision-2', '02 홈 SM2'],
+    ['home-discovery-sm-revision-3', '02 홈 SM3'],
     ['matches-core', '03 개인 매치'],
+    ['matches-core-cardnews-compact', '03 매치 수정1'],
+    ['matches-core-card-compact-switcher', '03 매치 수정2'],
+    ['matches-core-sm-revision', '03 매치 SM'],
+    ['matches-core-sm-revision-3', '03 매치 SM3'],
+    ['matches-core-sm-revision-4', '03 매치 SM4'],
     ['teams-team-matches', '04 팀/팀매칭'],
+    ['teams-team-matches-sm-revision', '04 팀매치 SM'],
+    ['teams-team-matches-sm-revision-2', '04 팀매치 SM2'],
+    ['teams-team-matches-sm-revision-3', '04 팀매치 SM3'],
     ['team-browse', '05 팀 둘러보기'],
+    ['team-browse-sm-revision', '05 팀 SM'],
+    ['team-browse-sm-revision-2', '05 팀 SM2'],
     ['community', '06 커뮤니티'],
+    ['community-sm-revision', '06 커뮤니티 SM'],
+    ['community-sm-revision-2', '06 커뮤니티 SM2'],
     ['my-profile-trust', '07 마이/평판'],
+    ['my-profile-trust-sm-revision', '07 마이 SM'],
+    ['my-profile-trust-sm-revision-2', '07 마이 SM2'],
     ['payments-support', '08 결제/분쟁'],
+    ['payments-support-sm-revision', '08 결제 SM'],
     ['settings-states', '09 설정/상태'],
     ['public-marketing', '10 공개'],
+    ['public-marketing-sm-revision', '10 랜딩 SM'],
     ['desktop-web', '11 데스크탑'],
     ['admin-ops', '12 관리자'],
+    ['admin-ops-sm-revision', '12 관리자 SM'],
     ['common-flows-motion', '13 공통 플로우'],
   ];
   const candidate = [
@@ -2036,6 +2883,18 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['equipment-rental', 'C05 장비 대여'],
     ['sports-level-safety', 'C06 종목/안전'],
     ['mercenary', 'C07 용병'],
+  ];
+  const progress = [
+    ['auth-onboarding-sm-revision-5', '01 SM 수정안 5'],
+    ['home-discovery-sm-revision-3', '02 SM 수정안 3'],
+    ['matches-core-sm-revision-4', '03 SM 수정안 4'],
+    ['teams-team-matches-sm-revision-3', '04 SM 수정안 3'],
+    ['team-browse-sm-revision-2', '05 SM 수정안 2'],
+    ['community-sm-revision-2', '06 SM 수정안 2'],
+    ['my-profile-trust-sm-revision-2', '07 SM 수정안 2'],
+    ['payments-support-sm-revision', '08 SM 수정안 1'],
+    ['settings-states', '09'],
+    ['public-marketing-sm-revision', '10 SM 수정안'],
   ];
   const grids = [
     ['m01-grid', 'M01 인증'],
@@ -2050,7 +2909,15 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['m18-grid', 'M18 관리자'],
     ['m19-grid', 'M19 공통'],
   ];
-  const active = tab === 'reference' ? reference : tab === 'candidate' ? candidate : tab === 'grid' ? grids : core;
+  const active = viewMode === 'progress'
+    ? progress
+    : tab === 'reference'
+      ? reference
+      : tab === 'candidate'
+        ? candidate
+        : tab === 'grid'
+          ? grids
+          : core;
 
   const setModeAndJump = (mode, target) => {
     setViewMode(mode);
@@ -2123,7 +2990,10 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
               전체
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+            <button onClick={() => setModeAndJump('progress', 'auth-onboarding-sm-revision-5')} style={{ ...buttonStyle, background: viewMode === 'progress' ? '#111827' : '#fff', color: viewMode === 'progress' ? '#fff' : '#374151' }}>
+              1차 디자인 진행중
+            </button>
             <button onClick={() => setModeAndJump('candidate', 'lessons')} style={{ ...buttonStyle, background: viewMode === 'candidate' ? '#111827' : '#fff', color: viewMode === 'candidate' ? '#fff' : '#374151' }}>
               후보만
             </button>

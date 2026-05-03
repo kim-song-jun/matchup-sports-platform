@@ -10,6 +10,15 @@
 - 결제/환불/신청/운영 조치 같은 확정 flow는 필수 context를 화면에 남긴다.
 - `fix12`부터 모든 기능 모듈은 마지막에 case matrix board를 가진다. happy path 화면만 보고 구현하지 말고 해당 matrix의 state, edge case, interaction 항목을 같이 구현 단위로 본다.
 
+## SM Bottom Navigation
+
+SM 수정안부터 새 모바일 화면의 하단바는 `SMBottomNav`를 기본값으로 쓴다.
+
+- 탭은 `홈 / 매치 / 팀매치 / 팀 / 마이` 5개로 고정한다.
+- SM 화면은 `SMRevisionShell`을 사용해 하단바를 상속하고, 화면 성격에 따라 `navActive`만 지정한다.
+- 상세, 결제, 로그인, 채팅방, 알림처럼 SM 원문에서 상하단바 제외 또는 하단바 제외로 기록된 화면은 `bottom={false}` 또는 별도 sticky CTA shell을 쓴다.
+- 기존 prototype canonical bottom nav와 다르더라도 SM 수정안 이후 작업은 이 하단바를 우선 적용한다.
+
 ## 1. Onboarding Flow
 
 Owning section: `01 · 인증 · 온보딩`

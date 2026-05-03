@@ -124,6 +124,18 @@ canonical-id tooling stable.
 |---|---|---:|
 | `03 · 개인 매치 수정안 — 카드뉴스 + 콤팩트 피드` | 원본 `03 · 개인 매치` 바로 아래에 둔 비교용 revision. 기존 보드는 `*-revised-ref`로 복제해 원본과 비교 가능하게 유지하고, 새 결정 보드 `m-list-cardnews-compact`는 카드뉴스 추천과 콤팩트 피드를 한 화면에서 병행 사용한다. | 16 |
 | `03 · 개인 매치 수정안 2 — 카드/콤팩트 선택형` | 이전 수정안의 동시 노출을 보완한 최신 revision. 첫 화면은 카드형 또는 콤팩트형 중 하나만 렌더하고 세그먼트로 전환한다. 지도/타임라인/스와이프 보드는 제외하고 카드 리스트, 콤팩트 피드, 상세/참가/생성/상태 계열만 유지한다. | 13 |
+| `02 · 홈 · SM 수정안` | SM revision brief 기준 mobile-first 비교 섹션. 기존 홈 보드를 복사한 reference와 인사/활동/매너/featured/shortcut/weather/recommendation/stat/notice 상태, 비로그인, 네트워크 이슈, mobile grid rule을 함께 둔다. | 6 |
+| `03 · 개인 매치 · SM 수정안` | SM revision brief 기준 검색바, 카드/콤팩트 토글, 종목별 count selector, 요약 counter, 카드/콤팩트 목록, 상세/sticky CTA/참가 sheet 상태를 mobile-first로 고정한다. | 6 |
+| `03 · 개인 매치 · SM 수정안 3` | 0502 문서와 기존 SM 수정안을 대조해 새로 추가한 mobile-first 비교 섹션. 기존 원본/수정안은 보존하고 카드형/콤팩트형 단일 선택, 검색 진입/입력중, 검색 결과, 조회 없음, 네트워크 오류, 상세, 참가 요약 bottom sheet, 승인 요청 toast/popup feedback, 승인중/승인완료 disabled CTA, 내 매치 관리 CTA, mobile grid rule을 분리한다. | 15 |
+| `03 · 개인 매치 · SM 수정안 4` | SM3를 복사한 최신 비교 섹션. 매치 관련 화면의 app 상단바를 제거하고 본문 검색/필터를 최상단에 배치한다. 검색 실행 아이콘을 추가하며, `ㅁ|ㅁ` 카드형 검색 결과와 `ㅁ` 콤팩트 검색 결과를 모두 분리한다. | 18 |
+| `04 · 팀 · 팀매칭 · SM 수정안` | SM revision brief 기준 팀매치 카드/콤팩트 목록, 팀 정보 vs 상세, 채팅/신청, 결제하고 신청하기, 내 매치 관리 상태를 mobile-first로 고정한다. | 6 |
+| `05 · 팀 둘러보기 · SM 수정안` | SM 원문에서 확정된 상하단바 유지와 05 팀 전체조회 shell을 기준으로, body 미정 상태를 명시하고 팀 비교/신뢰/선택 CTA 초안을 둔다. | 3 |
+| `06 · 커뮤니티 · 채팅 · 알림 · SM 수정안` | SM revision brief 기준 채팅 floating entry, 채팅 목록 filter/pinned/recent order, 채팅방 context link/composer, 알림 unread/read/모두읽음/date grouping을 mobile-first로 고정한다. | 5 |
+| `01 · 인증 · 로그인 · SM 수정안` | SM 원문의 login target과 홈 비로그인 fallback을 연결한 mobile-first 비교 섹션. 기존 인증/onboarding 보드는 보존한다. | 3 |
+| `07 · 마이 · 프로필 · 리뷰 · SM 수정안` | SM 원문의 user profile/review target을 마이 core 아래에 추가하고, 검색 유지, 평판/리뷰 신호, 리뷰 작성 companion flow를 고정한다. | 3 |
+| `08 · 결제 · 환불 · SM 수정안` | SM 원문의 payment target을 결제 core 아래에 추가하고, mock/test 결제 정직성, 상태 지속성, 환불 처리 주체/사유를 고정한다. | 4 |
+| `10 · 공개 · 랜딩 · SM 수정안` | SM 원문의 landing page target을 공개 core 아래에 추가하고, 첫 화면 CTA/next-step summary와 core flow 연결성을 고정한다. | 3 |
+| `12 · 관리자 · 운영 · SM 수정안` | SM 원문의 admin target을 관리자 core 아래에 추가하고, 운영 큐, 담당자/사유/audit, partial failure, mobile admin density를 고정한다. | 3 |
 
 ## Placement Rules
 

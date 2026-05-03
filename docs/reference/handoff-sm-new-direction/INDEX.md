@@ -68,16 +68,18 @@ The copied baseline includes:
 
 1. `INDEX.md`
 2. `DIRECTION.md`
-3. `COMPARISON_WITH_2026_04_25.md`
-4. `prototype-system/README.md`
-5. `prototype-system/COMPONENT_CATALOG.md`
-6. `prototype-system/MODULE_MAP.md`
-7. `prototype-system/COMMON_FLOWS.md`
-8. `prototype-system/INTERACTIONS_AND_STATES.md`
-9. `prototype-system/PRODUCTION_HANDOFF_FIX26.md`
-10. `sports-platform/README.md`
-11. `sports-platform/chats/chat1.md`
-12. `sports-platform/project/Teameet Design.html`
+3. `0502-design-freeze-brief.md`
+4. `SM 문서화.md`
+5. `COMPARISON_WITH_2026_04_25.md`
+6. `prototype-system/README.md`
+7. `prototype-system/COMPONENT_CATALOG.md`
+8. `prototype-system/MODULE_MAP.md`
+9. `prototype-system/COMMON_FLOWS.md`
+10. `prototype-system/INTERACTIONS_AND_STATES.md`
+11. `prototype-system/PRODUCTION_HANDOFF_FIX26.md`
+12. `sports-platform/README.md`
+13. `sports-platform/chats/chat1.md`
+14. `sports-platform/project/Teameet Design.html`
 
 ## Candidate Direction Summary
 
@@ -99,6 +101,16 @@ The service priority is reorganized into:
   rental, sports/skill/safety, and mercenary.
 
 Candidate modules are preserved for evaluation. They are not deleted.
+
+## SM 디자인 고정 정리본
+
+`0502-design-freeze-brief.md`는 SM 디자인 수정 메모를 구조화한 작업용
+정리본이다. `SM 문서화.md`를 원문으로 그대로 보존하고, 같은 요구사항을
+쉘, 라우트, 상태, 목록/상세 variant, 애매한 항목 기준으로 재배열한다.
+
+후보 프로토타입이나 실제 제품 디자인을 수정할 때 이 문서를 우선 읽는다.
+원문과 충돌하는 세부사항이 있으면 원문을 삭제하지 말고, 정리본에 명시적인
+애매한 항목 로그를 추가한다.
 
 ## Phase 1 Scope
 
@@ -167,6 +179,19 @@ Phase 2a update:
 - `05 · 팀 둘러보기` now follows `04 · 팀 · 팀매칭` and its M04 viewport grid.
   It adds a team browse screen plus flow/rule boards modeled after the `02`
   comparison section, while preserving the original team matching section.
+
+Phase 2b SM design freeze update:
+
+- `0502-design-freeze-brief.md` is now reflected in same-number comparison
+  sections for `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `10`, and
+  `12`.
+- These sections are mobile-first and preserve the existing original boards.
+- Each SM comparison section includes copied baseline evidence plus a mobile
+  screen/state pass and a rule grid for the later m-grid rewrite.
+- SM revision and later SM mobile screens use the dedicated `SMBottomNav`
+  contract: `홈 / 매치 / 팀매치 / 팀 / 마이`.
+- Desktop-specific redesign is intentionally deferred until the mobile and grid
+  contracts are confirmed.
 
 ## Operating Rules
 

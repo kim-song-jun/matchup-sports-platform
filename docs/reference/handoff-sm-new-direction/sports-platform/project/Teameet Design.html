@@ -1569,42 +1569,147 @@ function App() {
           </DCArtboard>
         </DCSection>
 
-        <DCSection id="matches-core-sm-revision-6" title="03 · 개인 매치 · SM 수정안 6" subtitle="SM5를 보존한 다음 비교 섹션. 개인 매치 전체 조회의 리스트 보기 선택 버튼과 정렬 조건 디자인을 큰 틀 안에서 두 가지 모바일 대안으로 검토한다.">
-          <DCArtboard id="matches-sm6-ref-list" label="SM6 · SM5 목록 기준 복사본" width={375} height={812} data-reference-canonical-id="m03-mb-list-sm5">
-            <SMRevisionMatchListMobileSM4 mode="card"/>
-          </DCArtboard>
-          <DCArtboard id="matches-sm6-option-a-card" label="SM6 · 대안 A · 컨트롤 패널형" width={375} height={812} data-sm-id="m03-mb-list-sm6-option-a-card">
-            <SMRevisionMatchListMobileSM6A mode="card"/>
-          </DCArtboard>
-          <DCArtboard id="matches-sm6-option-a-compact" label="SM6 · 대안 A · 콤팩트 보기 전환" width={375} height={812} data-sm-id="m03-mb-list-sm6-option-a-compact">
-            <SMRevisionMatchListMobileSM6A mode="compact"/>
-          </DCArtboard>
-          <DCArtboard id="matches-sm6-option-b-compact" label="SM6 · 대안 B · 툴바 분리형" width={375} height={812} data-sm-id="m03-mb-list-sm6-option-b-compact">
-            <SMRevisionMatchListMobileSM6B mode="compact"/>
-          </DCArtboard>
-          <DCArtboard id="matches-sm6-option-b-card" label="SM6 · 대안 B · 카드 보기 전환" width={375} height={812} data-sm-id="m03-mb-list-sm6-option-b-card">
-            <SMRevisionMatchListMobileSM6B mode="card"/>
-          </DCArtboard>
-          <DCArtboard id="matches-sm6-list-rules" label="SM6 · 선택/정렬 디자인 판단 기준" width={840} height={812} data-sm-id="m03-tb-components-sm6-list-rules">
-            <SMRevisionMatchSM6ListRuleMatrix/>
-          </DCArtboard>
-        </DCSection>
-
-        <DCSection id="matches-core-sm-revision-7" title="03 · 개인 매치 · SM 수정안 7" subtitle="SM6를 보존한 다음 비교 섹션. 00 SM 최종본의 목록 상단바 검색 패턴을 개인 매치 전체 조회에 적용한다.">
+        <DCSection id="matches-core-sm-revision-7" title="03 · 개인 매치 · SM 수정안 7" subtitle="00 SM 최종본의 목록 상단바 검색 패턴을 개인 매치 전체 조회에 적용한다.">
           <DCArtboard id="matches-sm7-ref-final-topbar" label="SM7 · 00 최종본 검색바 · 필터형 기준" width={375} height={812} data-reference-canonical-id="m00-mb-shell-final-search-filter">
             <SMCoreSearchTypeExceptionMobile type="filter"/>
           </DCArtboard>
           <DCArtboard id="matches-sm7-list-card" label="SM7 · 목록 상단바 검색 · 카드형" width={375} height={812} data-sm-id="m03-mb-list-sm7-top-search-card">
             <SMRevisionMatchListMobileSM7 mode="card"/>
           </DCArtboard>
+          <DCArtboard id="matches-sm7-filter-sheet-option" label="SM7 · 종목 상단 + 필터 sheet · 카드형" width={375} height={812} data-sm-id="m03-mb-list-sm7-filter-sheet-option">
+            <SMRevisionMatchSM7FilterSheetOption mode="card"/>
+          </DCArtboard>
           <DCArtboard id="matches-sm7-list-compact" label="SM7 · 목록 상단바 검색 · 콤팩트형" width={375} height={812} data-sm-id="m03-mb-list-sm7-top-search-compact">
             <SMRevisionMatchListMobileSM7 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm7-sport-top-filter-sheet-option" label="SM7 · 종목 상단 + 필터 sheet · 콤팩트형" width={375} height={812} data-sm-id="m03-mb-list-sm7-sport-top-filter-sheet-option">
+            <SMRevisionMatchSM7FilterSheetOption mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm7-empty-text-state" label="SM7 · 매치 없음 · 텍스트 상태" width={375} height={812} data-sm-id="m03-mb-state-sm7-empty-text">
+            <SMRevisionMatchSM7EmptyTextState/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm7-search-error-toast-state" label="SM7 · 검색 예외 · red input + toast" width={375} height={812} data-sm-id="m03-mb-state-sm7-search-error-toast">
+            <SMRevisionMatchSM7SearchErrorToastState/>
           </DCArtboard>
           <DCArtboard id="matches-sm7-search-result" label="SM7 · 상단바 검색 결과 상태" width={375} height={812} data-sm-id="m03-mb-list-sm7-search-result">
             <SMRevisionMatchListMobileSM7 mode="compact" query="풋살"/>
           </DCArtboard>
           <DCArtboard id="matches-sm7-top-search-rules" label="SM7 · 00 최종본 검색 적용 기준" width={840} height={812} data-sm-id="m03-tb-components-sm7-top-search-rules">
             <SMRevisionMatchSM7TopSearchRules/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core-sm-final" title="03 · 개인 매치 · SM 최종본" subtitle="SM7의 목록/검색/필터/상태 규칙 전체와 앞선 수정본에서 확정한 매치 상세, 참가, 승인, 예외 처리 보드를 합친 최종 비교 섹션이다.">
+          <DCArtboard id="matches-sm-final-ref-final-topbar" label="최종 · 00 최종본 검색바 · 필터형 기준" width={375} height={812} data-reference-canonical-id="m00-mb-shell-final-search-filter">
+            <SMCoreSearchTypeExceptionMobile type="filter"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-list-card" label="최종 · 목록 상단바 검색 · 카드형" width={375} height={812} data-sm-id="m03-mb-list-sm-final-card">
+            <SMRevisionMatchListMobileSM7 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-filter-sheet-card" label="최종 · 종목 상단 + 필터 sheet · 카드형" width={375} height={812} data-sm-id="m03-mb-list-sm-final-filter-card">
+            <SMRevisionMatchSM7FilterSheetOption mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-list-compact" label="최종 · 목록 상단바 검색 · 콤팩트형" width={375} height={812} data-sm-id="m03-mb-list-sm-final-compact">
+            <SMRevisionMatchListMobileSM7 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-filter-sheet-compact" label="최종 · 종목 상단 + 필터 sheet · 콤팩트형" width={375} height={812} data-sm-id="m03-mb-list-sm-final-filter-compact">
+            <SMRevisionMatchSM7FilterSheetOption mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-empty-text" label="최종 · 매치 없음 · 텍스트 상태" width={375} height={812} data-sm-id="m03-mb-state-sm-final-empty-text">
+            <SMRevisionMatchSM7EmptyTextState/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-search-error-toast" label="최종 · 검색 예외 · red input + toast" width={375} height={812} data-sm-id="m03-mb-state-sm-final-search-error-toast">
+            <SMRevisionMatchSM7SearchErrorToastState/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-search-result" label="최종 · 상단바 검색 결과 상태" width={375} height={812} data-sm-id="m03-mb-list-sm-final-search-result">
+            <SMRevisionMatchListMobileSM7 mode="compact" query="풋살"/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-detail" label="최종 · 매치 상세" width={375} height={812} data-sm-id="m03-mb-detail-sm-final">
+            <SMRevisionMatchDetailMobileSM3 noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-join-sheet" label="최종 · 참가 요약 바텀시트" width={375} height={812} data-sm-id="m03-mb-main-bottomsheet-sm-final">
+            <SMRevisionMatchDetailMobileSM3 sheet noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-payment-complete-toast" label="최종 · 결제 후 신청 완료 toast" width={375} height={812} data-sm-id="m03-mb-flow-payment-complete-toast-sm-final">
+            <SMRevisionMatchPaymentCompleteToastSMFinal noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-join-feedback" label="최종 · 승인 요청 피드백" width={375} height={812} data-sm-id="m03-mb-flow-join-feedback-sm-final">
+            <SMRevisionMatchJoinFeedbackOverlaySM3 noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-pending" label="최종 · 승인중 상태" width={375} height={812} data-sm-id="m03-mb-state-pending-sm-final">
+            <SMRevisionMatchDetailMobileSM3 status="pending" noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-approved" label="최종 · 승인완료 상태" width={375} height={812} data-sm-id="m03-mb-state-success-sm-final">
+            <SMRevisionMatchDetailMobileSM3 status="approved" noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-my-detail" label="최종 · 내 매치 상세" width={375} height={812} data-sm-id="m03-mb-detail-my-sm-final">
+            <SMRevisionMatchDetailMobileSM3 mine noTop/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-participants" label="최종 · 참가자 더보기/프로필 예외" width={375} height={812} data-sm-id="m03-mb-detail-participants-sm-final">
+            <SMRevisionMatchParticipantsMobileSM5/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-create-gap" label="최종 · 만들기/수정 미정 gap 계약" width={375} height={812} data-sm-id="m03-mb-flow-create-gap-sm-final">
+            <SMRevisionMatchCreateGapMobileSM5/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-top-search-rules" label="최종 · 00 최종본 검색 적용 기준" width={840} height={812} data-sm-id="m03-tb-components-sm-final-top-search-rules">
+            <SMRevisionMatchSM7TopSearchRules/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-operation-process" label="최종 · 동작 과정" width={840} height={812} data-sm-id="m03-tb-components-sm-final-operation-process">
+            <SMRevisionMatchFinalOperationProcess/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-situation-exceptions" label="최종 · 상황/예외 처리 전체" width={840} height={812} data-sm-id="m03-tb-components-sm-final-situation-exceptions">
+            <SMRevisionMatchFinalSituationExceptionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-button-inputs" label="최종 · 버튼/입력 동작" width={840} height={812} data-sm-id="m03-tb-components-sm-final-button-inputs">
+            <SMRevisionMatchFinalButtonInputMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-button-exceptions" label="최종 · 모든 버튼 예외" width={840} height={812} data-sm-id="m03-tb-components-sm-final-button-exceptions">
+            <SMRevisionMatchFinalButtonExceptionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-full-flow" label="최종 · 전체 흐름" width={840} height={812} data-sm-id="m03-tb-components-sm-final-full-flow">
+            <SMRevisionMatchFinalFullFlow/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-actions" label="최종 · 모든 버튼 동작/예외 매트릭스" width={840} height={812} data-sm-id="m03-tb-components-sm-final-actions">
+            <SMRevisionMatchSM5ActionMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-states" label="최종 · 상태/예외 처리 완성본" width={840} height={812} data-sm-id="m03-tb-components-sm-final-states">
+            <SMRevisionMatchSM5StateMatrix/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-final-flow" label="최종 · 탐색-판단-참가-상태 흐름" width={840} height={812} data-sm-id="m03-tb-components-sm-final-flow">
+            <SMRevisionMatchSM5Flow/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="matches-core-sm-create-final" title="03-1 · 개인 매치 · 만들기/수정 · SM 최종본" subtitle="03 최종본의 개인 매치 조회 화면에서 우측 하단 + FAB로 진입하는 매치 만들기와, 내 매치 상세에서 이어지는 수정 flow를 mobile-first로 정리한 03-1 SM 최종본이다.">
+          <DCArtboard id="matches-sm-create-list-entry" label="03-1 · 조회 화면 FAB 진입" width={375} height={812} data-sm-id="m03-1-mb-entry-fab">
+            <SMRevisionMatchCreateListEntrySMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-step-sport" label="03-1 · 만들기 1 · 종목 선택" width={375} height={812} data-sm-id="m03-1-mb-create-step-sport">
+            <SMRevisionMatchCreateSportStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-step-info" label="03-1 · 만들기 2 · 매치 정보" width={375} height={812} data-sm-id="m03-1-mb-create-step-info">
+            <SMRevisionMatchCreateInfoStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-step-place-time" label="03-1 · 만들기 3 · 장소와 시간" width={375} height={812} data-sm-id="m03-1-mb-create-step-place-time">
+            <SMRevisionMatchCreatePlaceTimeStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-step-confirm" label="03-1 · 만들기 4 · 작성 내용 확인" width={375} height={812} data-sm-id="m03-1-mb-create-step-confirm">
+            <SMRevisionMatchCreateConfirmStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-share-complete" label="03-1 · 생성 완료 · 팀 공유" width={375} height={812} data-sm-id="m03-1-mb-create-share-complete">
+            <SMRevisionMatchCreateShareCompleteSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-edit-prefill" label="03-1 · 매치 수정 · prefill" width={375} height={812} data-sm-id="m03-1-mb-edit-prefill">
+            <SMRevisionMatchEditSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-actions" label="03-1 · 버튼/입력 동작" width={840} height={812} data-sm-id="m03-1-tb-components-actions">
+            <SMRevisionMatchCreateActionRulesSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-exceptions" label="03-1 · 상황/예외 처리" width={840} height={812} data-sm-id="m03-1-tb-components-exceptions">
+            <SMRevisionMatchCreateExceptionRulesSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="matches-sm-create-flow" label="03-1 · 전체 흐름" width={840} height={812} data-sm-id="m03-1-tb-components-flow">
+            <SMRevisionMatchCreateFullFlowSMFinal/>
           </DCArtboard>
         </DCSection>
 
@@ -1822,6 +1927,84 @@ function App() {
           </DCArtboard>
           <DCArtboard id="team-matches-sm3-flow" label="SM3 · 목록-상세-신청/관리 흐름" width={840} height={812}>
             <SMRevisionTeamMatchSM3Flow/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="teams-team-matches-sm-revision-4" title="04 · 팀 · 팀매칭 · SM 최종본" subtitle="03 개인 매치 SM 최종본의 검색, 필터, 종목 상단 유지, 1줄 매치수 요약, empty/error 예외 패턴을 팀매치 목록에 적용한 04 최종본이다. 기존 SM3는 보존한다.">
+          <DCArtboard id="team-matches-sm4-card" label="04 최종 · 03 최종 구조 적용 · 카드형" width={375} height={812} data-sm-id="m04-mb-list-sm4-card">
+            <SMRevisionTeamMatchListMobileSM4 mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-filter-card" label="04 최종 · 필터 sheet · 카드형" width={375} height={812} data-sm-id="m04-mb-list-sm4-filter-card">
+            <SMRevisionTeamMatchSM4FilterSheetOption mode="card"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-compact" label="04 최종 · 03 최종 구조 적용 · 콤팩트형" width={375} height={812} data-sm-id="m04-mb-list-sm4-compact">
+            <SMRevisionTeamMatchListMobileSM4 mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-filter-compact" label="04 최종 · 필터 sheet · 콤팩트형" width={375} height={812} data-sm-id="m04-mb-list-sm4-filter-compact">
+            <SMRevisionTeamMatchSM4FilterSheetOption mode="compact"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-search-result" label="04 최종 · 상단바 검색 결과" width={375} height={812} data-sm-id="m04-mb-list-sm4-search-result">
+            <SMRevisionTeamMatchListMobileSM4 mode="compact" query="풋살"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-empty" label="04 최종 · 매치 없음 · 텍스트 상태" width={375} height={812} data-sm-id="m04-mb-state-sm4-empty-text">
+            <SMRevisionTeamMatchSM4EmptyTextState/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-search-error-toast" label="04 최종 · 검색 예외 · red input + toast" width={375} height={812} data-sm-id="m04-mb-state-sm4-search-error-toast">
+            <SMRevisionTeamMatchSM4SearchErrorToastState/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-search-rules" label="04 최종 · 검색/필터/예외 적용 기준" width={840} height={812} data-sm-id="m04-tb-components-sm4-top-search-rules">
+            <SMRevisionTeamMatchSM4TopSearchRules/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-detail-reference" label="04 최종 · 상세/신청 상태 기준 유지" width={375} height={812} data-sm-id="m04-mb-detail-sm4-reference">
+            <SMRevisionTeamMatchDetailMobileSM2/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-pending" label="04 최종 · 신청 승인중 상태" width={375} height={812} data-sm-id="m04-mb-state-sm4-pending">
+            <SMRevisionTeamMatchDetailMobileSM2 status="pending"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-approved" label="04 최종 · 신청 승인완료 상태" width={375} height={812} data-sm-id="m04-mb-state-sm4-approved">
+            <SMRevisionTeamMatchDetailMobileSM2 status="approved"/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm4-mine" label="04 최종 · 내 팀매치 관리 CTA" width={375} height={812} data-sm-id="m04-mb-detail-sm4-mine">
+            <SMRevisionTeamMatchDetailMobileSM2 mine/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="teams-team-matches-sm-create-final" title="04-1 · 팀매치 · 만들기/수정 · SM 최종본" subtitle="03-1 매치 만들기와 같은 방향으로, 04 최종 팀매치 조회 화면의 우측 하단 + FAB에서 진입하는 팀매치 만들기와 수정 flow를 정리한 04-1 최종본이다.">
+          <DCArtboard id="team-matches-sm-create-list-entry" label="04-1 · 조회 화면 FAB 진입" width={375} height={812} data-sm-id="m04-1-mb-entry-fab">
+            <SMRevisionTeamMatchCreateListEntrySMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-step-team" label="04-1 최종 · 만들기 1 · 팀 선택" width={375} height={812} data-sm-id="m04-1-mb-create-step-team">
+            <SMRevisionTeamMatchCreateTeamStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-step-sport" label="04-1 최종 · 만들기 2 · 종목 선택" width={375} height={812} data-sm-id="m04-1-mb-create-step-sport">
+            <SMRevisionTeamMatchCreateSportStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-step-info" label="04-1 최종 · 만들기 3 · 매치 정보" width={375} height={812} data-sm-id="m04-1-mb-create-step-info">
+            <SMRevisionTeamMatchCreateInfoStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-step-condition" label="04-1 최종 · 만들기 4 · 경기조건" width={375} height={812} data-sm-id="m04-1-mb-create-step-condition">
+            <SMRevisionTeamMatchCreateConditionStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-step-place-time" label="04-1 최종 · 만들기 5 · 장소와 시간" width={375} height={812} data-sm-id="m04-1-mb-create-step-place-time">
+            <SMRevisionTeamMatchCreatePlaceTimeStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-step-confirm" label="04-1 최종 · 만들기 6 · 작성 내용 확인" width={375} height={812} data-sm-id="m04-1-mb-create-step-confirm">
+            <SMRevisionTeamMatchCreateConfirmStepSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-share-complete" label="04-1 최종 · 생성 완료 · 팀 공유" width={375} height={812} data-sm-id="m04-1-mb-create-share-complete">
+            <SMRevisionTeamMatchCreateShareCompleteSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-edit-prefill" label="04-1 최종 · 팀매치 수정 · prefill" width={375} height={812} data-sm-id="m04-1-mb-edit-prefill">
+            <SMRevisionTeamMatchEditSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-actions" label="04-1 최종 · 버튼/입력 동작" width={840} height={812} data-sm-id="m04-1-tb-components-actions">
+            <SMRevisionTeamMatchCreateActionRulesSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-exceptions" label="04-1 최종 · 상황/예외 처리" width={840} height={812} data-sm-id="m04-1-tb-components-exceptions">
+            <SMRevisionTeamMatchCreateExceptionRulesSMFinal/>
+          </DCArtboard>
+          <DCArtboard id="team-matches-sm-create-flow" label="04-1 최종 · 전체 흐름" width={840} height={812} data-sm-id="m04-1-tb-components-flow">
+            <SMRevisionTeamMatchCreateFullFlowSMFinal/>
           </DCArtboard>
         </DCSection>
 
@@ -3568,12 +3751,15 @@ const SM_NEW_CORE_SECTIONS = [
   'matches-core-sm-revision-3',
   'matches-core-sm-revision-4',
   'matches-core-sm-revision-5',
-  'matches-core-sm-revision-6',
   'matches-core-sm-revision-7',
+  'matches-core-sm-final',
+  'matches-core-sm-create-final',
   'teams-team-matches',
   'teams-team-matches-sm-revision',
   'teams-team-matches-sm-revision-2',
   'teams-team-matches-sm-revision-3',
+  'teams-team-matches-sm-revision-4',
+  'teams-team-matches-sm-create-final',
   'team-browse',
   'team-browse-sm-revision',
   'team-browse-sm-revision-2',
@@ -3642,9 +3828,12 @@ const SM_FIRST_DESIGN_PROGRESS_SECTIONS = [
   'auth-onboarding-sm-revision-6',
   'auth-onboarding-sm-revision-5',
   'home-discovery-sm-final',
+  'matches-core-sm-final',
+  'matches-core-sm-create-final',
   'matches-core-sm-revision-7',
-  'matches-core-sm-revision-6',
   'matches-core-sm-revision-5',
+  'teams-team-matches-sm-revision-4',
+  'teams-team-matches-sm-create-final',
   'team-browse-sm-revision-4',
   'community-sm-final',
   'my-profile-trust-sm-revision-3',
@@ -3658,8 +3847,10 @@ const SM_FIRST_DESIGN_COMPLETE_SECTIONS = [
   'core-shell-sm-final',
   'auth-onboarding-sm-final',
   'home-discovery-sm-final',
-  'matches-core-sm-revision-7',
-  'teams-team-matches-sm-revision-3',
+  'matches-core-sm-final',
+  'matches-core-sm-create-final',
+  'teams-team-matches-sm-revision-4',
+  'teams-team-matches-sm-create-final',
   'team-browse-sm-revision-4',
   'community-sm-final',
   'my-profile-trust-sm-revision-3',
@@ -3735,12 +3926,15 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['matches-core-sm-revision-3', '03 매치 SM3'],
     ['matches-core-sm-revision-4', '03 매치 SM4'],
     ['matches-core-sm-revision-5', '03 매치 SM5'],
-    ['matches-core-sm-revision-6', '03 매치 SM6'],
     ['matches-core-sm-revision-7', '03 매치 SM7'],
+    ['matches-core-sm-final', '03 매치 최종'],
+    ['matches-core-sm-create-final', '03-1 SM 최종'],
     ['teams-team-matches', '04 팀/팀매칭'],
     ['teams-team-matches-sm-revision', '04 팀매치 SM'],
     ['teams-team-matches-sm-revision-2', '04 팀매치 SM2'],
     ['teams-team-matches-sm-revision-3', '04 팀매치 SM3'],
+    ['teams-team-matches-sm-revision-4', '04 최종'],
+    ['teams-team-matches-sm-create-final', '04-1 최종'],
     ['team-browse', '05 팀 둘러보기'],
     ['team-browse-sm-revision', '05 팀 SM'],
     ['team-browse-sm-revision-2', '05 팀 SM2'],
@@ -3786,9 +3980,12 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['auth-onboarding-sm-revision-5', '01 SM 수정안 5'],
     ['home-discovery-sm-revision-5', '02 SM 수정안 5'],
     ['home-discovery-sm-final', '02 SM 최종본'],
+    ['matches-core-sm-final', '03 SM 최종본'],
+    ['matches-core-sm-create-final', '03-1 SM 최종본'],
     ['matches-core-sm-revision-7', '03 SM 수정안 7'],
-    ['matches-core-sm-revision-6', '03 SM 수정안 6'],
     ['matches-core-sm-revision-5', '03 SM 수정안 5'],
+    ['teams-team-matches-sm-revision-4', '04 최종본'],
+    ['teams-team-matches-sm-create-final', '04-1 최종본'],
     ['team-browse-sm-revision-4', '05 SM 수정안 4'],
     ['community-sm-final', '06 SM 최종본'],
     ['community-sm-revision-9', '06 SM 수정안 9'],
@@ -3802,8 +3999,10 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['core-shell-sm-final', '00 SM 최종'],
     ['auth-onboarding-sm-final', '01 인증 최종'],
     ['home-discovery-sm-final', '02 홈 최종'],
-    ['matches-core-sm-revision-7', '03 매치 SM7'],
-    ['teams-team-matches-sm-revision-3', '04 팀매치 SM3'],
+    ['matches-core-sm-final', '03 매치 최종'],
+    ['matches-core-sm-create-final', '03-1 매치 생성/수정 최종'],
+    ['teams-team-matches-sm-revision-4', '04 팀매치 최종'],
+    ['teams-team-matches-sm-create-final', '04-1 팀매치 생성/수정 최종'],
     ['team-browse-sm-revision-4', '05 팀 SM4'],
     ['community-sm-final', '06 커뮤니티 최종'],
     ['my-profile-trust-sm-revision-3', '07 마이 SM3'],

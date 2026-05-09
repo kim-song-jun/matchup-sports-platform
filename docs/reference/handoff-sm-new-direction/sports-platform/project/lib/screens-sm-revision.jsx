@@ -5845,12 +5845,139 @@ const SMRevisionHomeFinalSearchActionMatrix = () => (
   </SMRevisionPlusBoard>
 );
 
+const SM_NOTICE_ITEMS = [
+  {
+    tag: '고정',
+    title: '이번 주 고정 공지',
+    sub: '주말 경기장 입장 시간과 체크인 안내',
+    date: '오늘',
+    body: [
+      '이번 주말 참여자는 경기 시작 20분 전까지 도착해 주세요.',
+      '현장 체크인은 호스트가 공지한 위치에서 진행되며, 늦게 도착하면 참여 승인이 지연될 수 있습니다.',
+      '우천 또는 시설 사정으로 일정이 바뀌면 알림과 채팅방 공지로 다시 안내합니다.',
+    ],
+  },
+  {
+    tag: '업데이트',
+    title: '매너 점수 업데이트',
+    sub: '경기 후 리뷰 반영 기준 안내',
+    date: '어제',
+    body: [
+      '경기 종료 후 남긴 리뷰와 노쇼 신고는 매너 점수에 순차 반영됩니다.',
+      '확인 중인 신고는 바로 점수에 반영하지 않고, 운영 검토가 끝난 뒤 상태를 표시합니다.',
+    ],
+  },
+  {
+    tag: '안내',
+    title: '비 예보 경기 안내',
+    sub: '우천 시 취소와 환불 기준 확인',
+    date: '5월 2일',
+    body: [
+      '비 예보가 있는 경기는 호스트와 시설 상태를 확인한 뒤 취소 여부를 결정합니다.',
+      '결제가 포함된 경기는 취소 사유와 환불 상태를 결제 내역에서 함께 확인할 수 있습니다.',
+    ],
+  },
+];
+
+const SMNoticeTopBar = ({ title = '공지사항', back = false }) => (
+  <div style={{ minHeight: 56, padding: '8px 12px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg)', flexShrink: 0 }}>
+    {back && (
+      <button aria-label="뒤로가기" className="tm-btn tm-btn-icon tm-btn-ghost" style={{ width: 40, height: 40, borderRadius: 12 }}>
+        <Icon name="chevL" size={20}/>
+      </button>
+    )}
+    <div className="tm-text-body-lg" style={{ flex: 1, color: 'var(--text-strong)' }}>{title}</div>
+    <button aria-label="알림" className="tm-btn tm-btn-icon tm-btn-ghost" style={{ width: 40, height: 40, borderRadius: 12, color: 'var(--blue500)' }}>
+      <Icon name="bell" size={19}/>
+    </button>
+  </div>
+);
+
+const SMNoticeRow = ({ item, active = false }) => (
+  <button className="tm-pressable tm-break-keep" type="button" style={{
+    width: '100%',
+    minHeight: 82,
+    padding: '14px 16px',
+    borderRadius: 16,
+    background: active ? 'var(--blue50)' : 'var(--bg)',
+    border: active ? '1px solid var(--blue200)' : '1px solid var(--grey100)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    textAlign: 'left',
+  }}>
+    <span style={{ width: 38, height: 38, borderRadius: 14, background: active ? 'var(--blue500)' : 'var(--grey100)', color: active ? 'var(--static-white)' : 'var(--blue500)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+      <Icon name="bell" size={18}/>
+    </span>
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="tm-text-micro" style={{ display: 'block', color: active ? 'var(--blue500)' : 'var(--text-caption)' }}>{item.tag} · {item.date}</span>
+      <span className="tm-text-label" style={{ display: 'block', marginTop: 4, color: 'var(--text-strong)' }}>{item.title}</span>
+      <span className="tm-text-caption line-clamp-2" style={{ display: 'block', marginTop: 3, color: 'var(--text-muted)' }}>{item.sub}</span>
+    </span>
+    <Icon name="chevR" size={17} color="var(--grey400)"/>
+  </button>
+);
+
+const SMRevisionHomeNoticeListFinal = () => (
+  <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <StatusBar/>
+    <SMNoticeTopBar/>
+    <div style={{ flex: 1, overflow: 'auto', padding: '18px 20px 24px' }}>
+      <div className="tm-text-heading">공지사항</div>
+      <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+        홈에 노출되는 고정 공지와 운영 안내를 한곳에서 확인합니다.
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 18, overflowX: 'auto', paddingBottom: 2 }}>
+        {['전체', '고정', '업데이트', '안내'].map((label, index) => (
+          <button key={label} className={`tm-chip ${index === 0 ? 'tm-chip-active' : ''}`}>{label}</button>
+        ))}
+      </div>
+      <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
+        {SM_NOTICE_ITEMS.map((item, index) => <SMNoticeRow key={item.title} item={item} active={index === 0}/>)}
+      </div>
+    </div>
+    <SMBottomNav active="home"/>
+  </div>
+);
+
+const SMRevisionHomeNoticeDetailFinal = () => {
+  const item = SM_NOTICE_ITEMS[0];
+  return (
+    <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <StatusBar/>
+      <SMNoticeTopBar title="공지 상세" back/>
+      <div style={{ flex: 1, overflow: 'auto', padding: '18px 20px 28px' }}>
+        <Badge tone="blue" size="sm">{item.tag}</Badge>
+        <div className="tm-text-heading" style={{ marginTop: 12 }}>{item.title}</div>
+        <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{item.date} · teameet 운영팀</div>
+        <Card pad={18} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+          <div className="tm-text-label">요약</div>
+          <div className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-strong)', lineHeight: 1.6 }}>{item.sub}</div>
+        </Card>
+        <div style={{ marginTop: 22, display: 'grid', gap: 14 }}>
+          {item.body.map((paragraph) => (
+            <p key={paragraph} className="tm-text-body" style={{ margin: 0, color: 'var(--text-strong)', lineHeight: 1.75 }}>{paragraph}</p>
+          ))}
+        </div>
+        <Card pad={16} interactive style={{ marginTop: 24, borderColor: 'var(--blue200)', background: 'var(--blue50)' }}>
+          <div className="tm-text-label" style={{ color: 'var(--blue500)' }}>관련 매치 확인</div>
+          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+            체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에 같은 내용을 표시합니다.
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
 Object.assign(window, {
   SMRevisionHomeSearchFinalMobile,
   SMRevisionHomeSearchFinalNoInputMobile,
   SMRevisionHomeSearchFinalStateMobile,
   SMRevisionHomeSearchFinalRules,
   SMRevisionHomeFinalSearchActionMatrix,
+  SMRevisionHomeNoticeListFinal,
+  SMRevisionHomeNoticeDetailFinal,
 });
 
 const SMRevisionTeamBrowseSearchBarSM5 = ({ query = '', error = false, filterCount = 3 }) => (
@@ -6066,6 +6193,125 @@ const SMRevisionMyMatchesSM1 = ({ category = 'joined' }) => {
 const SMRevisionMyMatchesJoinedSM1 = () => <SMRevisionMyMatchesSM1 category="joined"/>;
 const SMRevisionMyMatchesCreatedSM1 = () => <SMRevisionMyMatchesSM1 category="created"/>;
 
+const SM1ActionDisclosure = ({ children, summary, defaultOpen = false }) => {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <>
+      <button
+        type="button"
+        className="tm-pressable"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          width: '100%',
+          padding: 0,
+          border: 'none',
+          background: 'transparent',
+          color: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        {summary}
+      </button>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {children}
+        </div>
+      )}
+    </>
+  );
+};
+
+const SM1ConfirmButton = ({ children, className, message, confirmLabel = '확인', style }) => {
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  return (
+    <div style={{ minWidth: 0, gridColumn: confirmOpen ? '1 / -1' : undefined, ...style }}>
+      <button type="button" className={className} onClick={() => setConfirmOpen(true)} style={{ width: '100%' }}>
+        {children}
+      </button>
+      {confirmOpen && (
+        <div style={{
+          marginTop: 10,
+          padding: 14,
+          borderRadius: 18,
+          border: '1px solid var(--blue200)',
+          background: 'linear-gradient(180deg, var(--bg) 0%, var(--blue50) 100%)',
+          boxShadow: '0 12px 28px rgba(49,130,246,.14)',
+        }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: 13,
+              background: 'var(--blue500)',
+              color: 'var(--static-white)',
+              display: 'grid',
+              placeItems: 'center',
+              flexShrink: 0,
+            }}>
+              <Icon name="check" size={17}/>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>한 번 더 확인</div>
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)', lineHeight: 1.5 }}>{message}</div>
+              <div className="tm-text-micro" style={{ marginTop: 7, color: 'var(--blue500)' }}>확인 후 상태가 바로 반영되는 액션입니다.</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={() => setConfirmOpen(false)}>취소</button>
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" onClick={() => setConfirmOpen(false)}>{confirmLabel}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SM1MemberActionPanel = ({ member }) => {
+  const [roleOpen, setRoleOpen] = React.useState(false);
+  const isAdmin = member.role === 'admin';
+  const options = [
+    { id: 'admin', label: '관리자' },
+    { id: 'member', label: '일반' },
+  ];
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <SM1ConfirmButton
+          className="tm-btn tm-btn-sm tm-btn-primary"
+          message={`${member.name}님의 공개 유저 정보를 확인할까요?`}
+          confirmLabel="보기"
+        >
+          유저 정보 보기
+        </SM1ConfirmButton>
+        <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={() => setRoleOpen(!roleOpen)}>
+          권한 변경
+        </button>
+      </div>
+      {roleOpen && (
+        <div style={{ marginTop: 8, padding: 10, borderRadius: 14, background: 'var(--grey50)', border: '1px solid var(--grey100)' }}>
+          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8 }}>변경할 권한을 선택합니다.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {options.map((option) => {
+              const current = option.id === 'admin' ? isAdmin : !isAdmin;
+              return (
+                <SM1ConfirmButton
+                  key={option.id}
+                  className={`tm-btn tm-btn-sm ${current ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+                  message={`${member.name}님의 권한을 ${option.label}${current ? ' 상태로 유지' : '(으)로 변경'}할까요?`}
+                  confirmLabel="적용"
+                >
+                  {option.label}{current ? ' · 현재' : ''}
+                </SM1ConfirmButton>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SMRevisionMyCreatedMatchManageSM1 = () => {
   const participants = [
     { name: '이도윤', meta: '승인완료 · 출석 예정', status: 'approved' },
@@ -6075,30 +6321,60 @@ const SMRevisionMyCreatedMatchManageSM1 = () => {
     { name: '박서준', meta: '신청 8분 전 · 매너 4.8', status: 'pending' },
     { name: '정하늘', meta: '신청 14분 전 · 매너 4.6', status: 'pending' },
   ];
-  const renderUser = (user, mode) => (
+  const [tab, setTab] = React.useState('participants');
+  const isParticipants = tab === 'participants';
+  const activeUsers = isParticipants ? participants : applicants;
+  const activeMode = isParticipants ? 'participant' : 'applicant';
+  const activeCopy = isParticipants
+    ? '이미 승인되어 참여 중인 신청자와 취소 요청을 관리합니다.'
+    : '새로 들어온 신청자는 신청 대기 그룹에서만 승인/거절합니다.';
+  const renderUser = (user, mode, index = 0) => (
     <Card key={user.name} pad={14}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{user.name.slice(0, 1)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-label">{user.name}</div>
-          <div className="tm-text-caption" style={{ marginTop: 3 }}>{user.meta}</div>
-        </div>
-        <SM1StatusPill status={user.status}/>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-        {mode === 'applicant' ? (
-          <>
-            <button className="tm-btn tm-btn-sm tm-btn-primary">승인</button>
-            <button className="tm-btn tm-btn-sm tm-btn-neutral">거절</button>
-          </>
-        ) : (
-          <>
-            <button className="tm-btn tm-btn-sm tm-btn-primary">유저 정보 보기</button>
-            <button className="tm-btn tm-btn-sm tm-btn-neutral">{user.status === 'cancelled' ? '취소 처리' : '승인 취소'}</button>
-          </>
+      <SM1ActionDisclosure
+        defaultOpen={index === 0}
+        summary={(
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{user.name.slice(0, 1)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-label">{user.name}</div>
+              <div className="tm-text-caption" style={{ marginTop: 3 }}>{user.meta}</div>
+            </div>
+            <SM1StatusPill status={user.status}/>
+          </div>
         )}
-      </div>
-      {mode === 'applicant' && <button className="tm-btn tm-btn-sm tm-btn-ghost tm-btn-block" style={{ marginTop: 8 }}>유저 정보 보기</button>}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {mode === 'applicant' ? (
+            <>
+              <SM1ConfirmButton className="tm-btn tm-btn-sm tm-btn-primary" message={`${user.name}님의 참가 신청을 승인할까요?`} confirmLabel="승인">
+                승인
+              </SM1ConfirmButton>
+              <SM1ConfirmButton className="tm-btn tm-btn-sm tm-btn-neutral" message={`${user.name}님의 참가 신청을 거절할까요?`} confirmLabel="거절">
+                거절
+              </SM1ConfirmButton>
+            </>
+          ) : (
+            <>
+              <SM1ConfirmButton className="tm-btn tm-btn-sm tm-btn-primary" message={`${user.name}님의 공개 유저 정보를 확인할까요?`} confirmLabel="보기">
+                유저 정보 보기
+              </SM1ConfirmButton>
+              <SM1ConfirmButton className="tm-btn tm-btn-sm tm-btn-neutral" message={`${user.name}님의 ${user.status === 'cancelled' ? '취소 요청을 처리' : '참가 승인을 취소'}할까요?`} confirmLabel="확인">
+                {user.status === 'cancelled' ? '취소 처리' : '승인 취소'}
+              </SM1ConfirmButton>
+            </>
+          )}
+        </div>
+        {mode === 'applicant' && (
+          <SM1ConfirmButton
+            className="tm-btn tm-btn-sm tm-btn-ghost tm-btn-block"
+            style={{ marginTop: 8 }}
+            message={`${user.name}님의 공개 유저 정보를 확인할까요?`}
+            confirmLabel="보기"
+          >
+            유저 정보 보기
+          </SM1ConfirmButton>
+        )}
+      </SM1ActionDisclosure>
     </Card>
   );
   return (
@@ -6108,18 +6384,40 @@ const SMRevisionMyCreatedMatchManageSM1 = () => {
           <div className="tm-text-body-lg">잠실 러닝 크루 매치</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>참여중 8명 · 신청 대기 2명 · 취소 요청 1명</div>
         </Card>
-        <div style={{ marginTop: 14 }}>
-          <div className="tm-text-label">참여중</div>
-          <div className="tm-text-caption" style={{ marginTop: 3 }}>이미 승인되어 참여 중인 유저와 취소 요청자를 관리한다.</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-            {participants.map((user) => renderUser(user, 'participant'))}
-          </div>
+        <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 4, borderRadius: 14, background: 'var(--grey100)' }}>
+          {[
+            ['participants', '참여중', participants.length],
+            ['applicants', '신청대기', applicants.length],
+          ].map(([id, label, count]) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                className="tm-pressable"
+                onClick={() => setTab(id)}
+                style={{
+                  minHeight: 44,
+                  borderRadius: 12,
+                  border: '1px solid',
+                  borderColor: active ? 'var(--blue500)' : 'transparent',
+                  background: active ? 'var(--bg)' : 'transparent',
+                  color: active ? 'var(--blue500)' : 'var(--text-muted)',
+                  fontWeight: 800,
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <span className="tm-text-label">{label} {count}</span>
+              </button>
+            );
+          })}
         </div>
-        <div style={{ marginTop: 18 }}>
-          <div className="tm-text-label">신청 대기</div>
-          <div className="tm-text-caption" style={{ marginTop: 3 }}>새로 신청한 유저는 이 그룹에서만 승인/거절한다.</div>
+        <div style={{ marginTop: 14 }}>
+          <div className="tm-text-label">{isParticipants ? '참여중' : '신청대기'}</div>
+          <div className="tm-text-caption" style={{ marginTop: 3 }}>{activeCopy}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-            {applicants.map((user) => renderUser(user, 'applicant'))}
+            {activeUsers.map((user, index) => renderUser(user, activeMode, index))}
           </div>
         </div>
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" style={{ marginTop: 16 }}>매치 수정으로 이동</button>
@@ -6217,8 +6515,12 @@ const SMRevisionApplicantTeamProfileSM1 = () => (
         </div>
       </Card>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-        <button className="tm-btn tm-btn-md tm-btn-primary">팀 신청 승인</button>
-        <button className="tm-btn tm-btn-md tm-btn-neutral">거절</button>
+        <SM1ConfirmButton className="tm-btn tm-btn-md tm-btn-primary" message="팀 신청을 승인할까요?" confirmLabel="승인">
+          팀 신청 승인
+        </SM1ConfirmButton>
+        <SM1ConfirmButton className="tm-btn tm-btn-md tm-btn-neutral" message="팀 신청을 거절할까요?" confirmLabel="거절">
+          거절
+        </SM1ConfirmButton>
       </div>
       <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
         <div className="tm-text-label">팀 정보 연결</div>
@@ -6310,38 +6612,60 @@ const SMRevisionMyTeamMembersSM1 = () => {
     { name: '정하늘', meta: '가입 신청 10분 전 · 풋살 · 매너 4.7', role: 'member' },
     { name: '문태오', meta: '초대 링크 신청 · 러닝 병행', role: 'member' },
   ];
-  const renderMember = (member) => (
+  const renderMember = (member, index = 0) => (
     <Card key={member.name} pad={14}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{member.name.slice(0, 1)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-label">{member.name}</div>
-          <div className="tm-text-caption" style={{ marginTop: 3 }}>{member.meta}</div>
+      {member.role === 'owner' ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{member.name.slice(0, 1)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="tm-text-label">{member.name}</div>
+            <div className="tm-text-caption" style={{ marginTop: 3 }}>{member.meta}</div>
+          </div>
+          <SM1RoleBadge role={member.role}/>
         </div>
-        <SM1RoleBadge role={member.role}/>
-      </div>
-      {member.role !== 'owner' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-          <button className="tm-btn tm-btn-sm tm-btn-primary">{member.role === 'member' ? '관리자 부여' : '권한 유지'}</button>
-          <button className="tm-btn tm-btn-sm tm-btn-neutral">{member.role === 'admin' ? '권한 회수' : '내보내기'}</button>
-        </div>
+      ) : (
+        <SM1ActionDisclosure
+          defaultOpen={index === 1}
+          summary={(
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{member.name.slice(0, 1)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-label">{member.name}</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>{member.meta}</div>
+              </div>
+              <SM1RoleBadge role={member.role}/>
+            </div>
+          )}
+        >
+          <SM1MemberActionPanel member={member}/>
+        </SM1ActionDisclosure>
       )}
     </Card>
   );
-  const renderRequest = (member) => (
+  const renderRequest = (member, index = 0) => (
     <Card key={member.name} pad={14}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{member.name.slice(0, 1)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-label">{member.name}</div>
-          <div className="tm-text-caption" style={{ marginTop: 3 }}>{member.meta}</div>
+      <SM1ActionDisclosure
+        defaultOpen={index === 0}
+        summary={(
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 14, background: 'var(--grey100)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>{member.name.slice(0, 1)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-label">{member.name}</div>
+              <div className="tm-text-caption" style={{ marginTop: 3 }}>{member.meta}</div>
+            </div>
+            <SM1StatusPill status="pending"/>
+          </div>
+        )}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <SM1ConfirmButton className="tm-btn tm-btn-sm tm-btn-primary" message={`${member.name}님의 가입 신청을 승인할까요?`} confirmLabel="승인">
+            가입 승인
+          </SM1ConfirmButton>
+          <SM1ConfirmButton className="tm-btn tm-btn-sm tm-btn-neutral" message={`${member.name}님의 가입 신청을 거절할까요?`} confirmLabel="거절">
+            거절
+          </SM1ConfirmButton>
         </div>
-        <SM1StatusPill status="pending"/>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-        <button className="tm-btn tm-btn-sm tm-btn-primary">가입 승인</button>
-        <button className="tm-btn tm-btn-sm tm-btn-neutral">거절</button>
-      </div>
+      </SM1ActionDisclosure>
     </Card>
   );
   return (
@@ -6359,7 +6683,7 @@ const SMRevisionMyTeamMembersSM1 = () => {
         </Card>
         <Card pad={14} style={{ background: 'var(--grey50)', marginTop: 12 }}>
           <div className="tm-text-label">권한 규칙</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>팀장과 관리자는 일반 멤버에게 관리자 권한을 줄 수 있고, 관리자 권한을 회수할 수 있다. 팀장 권한은 별도 위임 flow가 필요하다.</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>팀장과 관리자는 팀원의 권한을 관리자 또는 일반으로 변경할 수 있다. 팀장 권한은 별도 위임 flow가 필요하다.</div>
         </Card>
         <div style={{ marginTop: 14 }}>
           <div className="tm-text-label">팀 멤버</div>

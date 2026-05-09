@@ -1101,9 +1101,6 @@ function App() {
         </DCSection>
 
         <DCSection id="home-discovery-sm-final" title="02 · 홈 · SM 최종본" subtitle="SM 수정안 5를 기준으로 최종 정리. 홈 검색은 00 최종 검색바를 쓰고, 최근 검색/빠른 조건은 미입력·결과 없음·오류·stale 상태에서도 유지한다. 전체보기와 위치 기반 예외는 제거한다.">
-          <DCArtboard id="home-final-ref" label="원본 비교 · 홈 Toss canonical copied" width={375} height={812}>
-            <HomeToss/>
-          </DCArtboard>
           <DCArtboard id="home-final-mobile" label="최종 · 홈 모바일 main copied" width={375} height={812}>
             <SMRevisionHomeMobileV2/>
           </DCArtboard>
@@ -1148,6 +1145,15 @@ function App() {
           </DCArtboard>
           <DCArtboard id="home-final-flow" label="최종 · 전체 화면 전환/복구 흐름 copied" width={840} height={812}>
             <SMRevisionHomeSM4Flow/>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="home-notice-sm-final" title="02-1 · 홈 공지사항 · SM 최종본" subtitle="02 홈 최종본의 공지사항 영역을 확장한 전체 조회와 세부 조회 화면. 기존 02 최종본은 유지하고 공지 전용 mobile-first 보드만 추가한다.">
+          <DCArtboard id="home-notice-final-list" label="02-1 최종 · 공지사항 전체 조회" width={375} height={812}>
+            <SMRevisionHomeNoticeListFinal/>
+          </DCArtboard>
+          <DCArtboard id="home-notice-final-detail" label="02-1 최종 · 공지사항 세부 조회" width={375} height={812}>
+            <SMRevisionHomeNoticeDetailFinal/>
           </DCArtboard>
         </DCSection>
 
@@ -2188,9 +2194,6 @@ function App() {
         </DCSection>
 
         <DCSection id="team-browse-sm-revision-5" title="05 · 팀 둘러보기 · SM5 최종본" subtitle="SM4를 복사한 최종 비교 섹션. 00 목록 상단 검색, 03/04 검색·필터, 팀 정보 상세, 팀소개 카드 기준을 mobile-first로 확정한다.">
-          <DCArtboard id="team-browse-sm5-ref" label="SM5 copy base - existing 05 SM4" width={375} height={812}>
-            <SMRevisionTeamBrowseMobileSM4/>
-          </DCArtboard>
           <DCArtboard id="team-browse-sm5-mobile" label="SM5 mobile - search + filters applied" width={375} height={812}>
             <SMRevisionTeamBrowseMobileSM5/>
           </DCArtboard>
@@ -3755,6 +3758,7 @@ const SM_NEW_CORE_SECTIONS = [
   'home-discovery-sm-revision-4',
   'home-discovery-sm-revision-5',
   'home-discovery-sm-final',
+  'home-notice-sm-final',
   'matches-core',
   'matches-core-cardnews-compact',
   'matches-core-card-compact-switcher',
@@ -3838,6 +3842,7 @@ const SM_FIRST_DESIGN_PROGRESS_SECTIONS = [
   'auth-onboarding-sm-revision-6',
   'auth-onboarding-sm-revision-5',
   'home-discovery-sm-final',
+  'home-notice-sm-final',
   'matches-core-sm-final',
   'matches-core-sm-create-final',
   'matches-core-sm-revision-7',
@@ -3845,7 +3850,6 @@ const SM_FIRST_DESIGN_PROGRESS_SECTIONS = [
   'teams-team-matches-sm-revision-4',
   'teams-team-matches-sm-create-final',
   'team-browse-sm-revision-5',
-  'team-browse-sm-revision-4',
   'community-sm-final',
   'my-profile-trust-sm-revision',
   'payments-support-sm-revision',
@@ -3857,12 +3861,12 @@ const SM_FIRST_DESIGN_COMPLETE_SECTIONS = [
   'core-shell-sm-final',
   'auth-onboarding-sm-final',
   'home-discovery-sm-final',
+  'home-notice-sm-final',
   'matches-core-sm-final',
   'matches-core-sm-create-final',
   'teams-team-matches-sm-revision-4',
   'teams-team-matches-sm-create-final',
   'team-browse-sm-revision-5',
-  'team-browse-sm-revision-4',
   'community-sm-final',
   'my-profile-trust-sm-revision',
   'payments-support-sm-revision',
@@ -3930,6 +3934,7 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['home-discovery-sm-revision-4', '02 홈 SM4'],
     ['home-discovery-sm-revision-5', '02 홈 SM5'],
     ['home-discovery-sm-final', '02 홈 최종'],
+    ['home-notice-sm-final', '02-1 공지 최종'],
     ['matches-core', '03 개인 매치'],
     ['matches-core-cardnews-compact', '03 매치 수정1'],
     ['matches-core-card-compact-switcher', '03 매치 수정2'],
@@ -3950,7 +3955,6 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['team-browse-sm-revision', '05 팀 SM'],
     ['team-browse-sm-revision-2', '05 팀 SM2'],
     ['team-browse-sm-revision-3', '05 팀 SM3'],
-    ['team-browse-sm-revision-4', '05 팀 SM4'],
     ['team-browse-sm-revision-5', '05 팀 SM5 최종'],
     ['community', '06 커뮤니티'],
     ['community-sm-revision', '06 커뮤니티 SM'],
@@ -3990,6 +3994,7 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['auth-onboarding-sm-revision-5', '01 SM 수정안 5'],
     ['home-discovery-sm-revision-5', '02 SM 수정안 5'],
     ['home-discovery-sm-final', '02 SM 최종본'],
+    ['home-notice-sm-final', '02-1 공지 최종본'],
     ['matches-core-sm-final', '03 SM 최종본'],
     ['matches-core-sm-create-final', '03-1 SM 최종본'],
     ['matches-core-sm-revision-7', '03 SM 수정안 7'],
@@ -4008,13 +4013,14 @@ function SMNewViewerGuide({ onJump, viewMode, setViewMode }) {
     ['core-shell-sm-final', '00 SM 최종'],
     ['auth-onboarding-sm-final', '01 인증 최종'],
     ['home-discovery-sm-final', '02 홈 최종'],
+    ['home-notice-sm-final', '02-1 공지 최종'],
     ['matches-core-sm-final', '03 매치 최종'],
     ['matches-core-sm-create-final', '03-1 매치 생성/수정 최종'],
     ['teams-team-matches-sm-revision-4', '04 팀매치 최종'],
     ['teams-team-matches-sm-create-final', '04-1 팀매치 생성/수정 최종'],
-    ['team-browse-sm-revision-4', '05 팀 SM4'],
     ['team-browse-sm-revision-5', '05 팀 SM5 최종'],
     ['community-sm-final', '06 커뮤니티 최종'],
+    ['my-profile-trust-sm-revision', '07 마이 SM1 최종'],
     ['payments-support-sm-revision', '08 결제 SM'],
     ['settings-states', '09 설정'],
     ['public-marketing-sm-revision', '10 공개 SM'],

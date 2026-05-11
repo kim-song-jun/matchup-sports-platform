@@ -66,10 +66,10 @@ The copied baseline includes:
 
 ## Reading Order
 
-1. `INDEX.md`
+1. `HANDOFF.md`
 2. `DIRECTION.md`
 3. `0502-design-freeze-brief.md`
-4. `SM 문서화.md`
+4. `0502 문서화.md`
 5. `COMPARISON_WITH_2026_04_25.md`
 6. `prototype-system/README.md`
 7. `prototype-system/COMPONENT_CATALOG.md`
@@ -77,9 +77,15 @@ The copied baseline includes:
 9. `prototype-system/COMMON_FLOWS.md`
 10. `prototype-system/INTERACTIONS_AND_STATES.md`
 11. `prototype-system/PRODUCTION_HANDOFF_FIX26.md`
-12. `sports-platform/README.md`
-13. `sports-platform/chats/chat1.md`
-14. `sports-platform/project/Teameet Design.html`
+12. `ARCHIVE.md`
+13. `CLEANUP_PLAN.md`
+14. `sports-platform/README.md`
+15. `sports-platform/chats/chat1.md`
+16. `sports-platform/project/Teameet Design.html`
+
+`HANDOFF.md` is the consolidated current handoff. `ARCHIVE.md` explains which
+older fix logs and source notes are retained as evidence rather than first-read
+working docs.
 
 ## Candidate Direction Summary
 
@@ -105,7 +111,7 @@ Candidate modules are preserved for evaluation. They are not deleted.
 ## SM 디자인 고정 정리본
 
 `0502-design-freeze-brief.md`는 SM 디자인 수정 메모를 구조화한 작업용
-정리본이다. `SM 문서화.md`를 원문으로 그대로 보존하고, 같은 요구사항을
+정리본이다. `0502 문서화.md`를 원문으로 그대로 보존하고, 같은 요구사항을
 쉘, 라우트, 상태, 목록/상세 variant, 애매한 항목 기준으로 재배열한다.
 
 후보 프로토타입이나 실제 제품 디자인을 수정할 때 이 문서를 우선 읽는다.

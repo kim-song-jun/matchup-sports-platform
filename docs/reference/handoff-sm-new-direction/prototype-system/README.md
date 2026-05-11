@@ -4,6 +4,12 @@
 
 기존 `ANALYSIS.md`, `SYSTEM_CANDIDATE.md`, `SECTION_UNIFICATION_MATRIX.md`, `SOURCE_PROTOTYPE_PARITY.md`는 handoff 분석과 source/prototype parity를 설명한다. 이 폴더는 그 다음 단계인 **운영 가능한 prototype system**만 모은다.
 
+현재 `handoff-sm-new-direction`의 첫 진입점은 상위 `HANDOFF.md`다. 이 폴더의
+`DESIGN_QA_FIX*`, `PAGE_READINESS_AUDIT_FIX*`, `PROTOTYPE_*`, `*_FIX*` 문서는
+대부분 과거 라운드 증거다. 삭제하지 않고 보존하되, 현재 방향 판단은
+`HANDOFF.md`, `DIRECTION.md`, `MODULE_MAP.md`, `COMPONENT_CATALOG.md`를 먼저 따른다.
+archive 기준은 상위 `ARCHIVE.md`에 둔다.
+
 ## Current Prototype
 
 - URL: `http://127.0.0.1:8765/Teameet%20Design.html?v=20260425-fix32`

@@ -16,6 +16,14 @@ Canonical status: not canonical
 Implementation status: reference only
 ```
 
+Operational summary:
+
+- Current consolidated handoff: `HANDOFF.md`
+- Cleanup and archive decision log: `CLEANUP_PLAN.md`
+- Older evidence and deprecated priority notes: `ARCHIVE.md`
+- If this file conflicts with `docs/reference/handoff-sm-new-direction-plan.md`,
+  the plan document wins.
+
 ## Current Priority Override
 
 This section supersedes the older module lists below for the current

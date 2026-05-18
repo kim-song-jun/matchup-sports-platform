@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionTeamMatchCreateConfirmStepSMFinal } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
 export default function TeamMatchCreateConfirmPage() {
-  return (
-    <DesignFrame title="08 팀매치 만들기 확인 · 1차 디자인 완료">
-      <SMRevisionTeamMatchCreateConfirmStepSMFinal />
-    </DesignFrame>
-  );
+  return <FirstDesignPage screen="teamMatchCreateConfirm" />;
 }

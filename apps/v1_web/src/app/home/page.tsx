@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionHomeMobileV2 } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
 export default function HomePage() {
-  return (
-    <DesignFrame title="02 홈 · 1차 디자인 완료">
-      <SMRevisionHomeMobileV2 />
-    </DesignFrame>
-  );
+  return <FirstDesignPage screen="home" />;
 }

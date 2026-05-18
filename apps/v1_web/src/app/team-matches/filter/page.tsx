@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionTeamMatchSM4FilterSheetOption } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
 export default function TeamMatchFilterPage() {
-  return (
-    <DesignFrame title="05 팀매치 필터 · 1차 디자인 완료">
-      <SMRevisionTeamMatchSM4FilterSheetOption />
-    </DesignFrame>
-  );
+  return <FirstDesignPage screen="teamMatchFilter" />;
 }

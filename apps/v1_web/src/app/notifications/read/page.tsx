@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionNotificationsMobileSM2 } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
-export default function NotificationsReadPage() {
-  return (
-    <DesignFrame title="06 알림 읽음 처리 · 1차 디자인 완료">
-      <SMRevisionNotificationsMobileSM2 readAll />
-    </DesignFrame>
-  );
+export default function ReadNotificationsPage() {
+  return <FirstDesignPage screen="notificationsRead" />;
 }

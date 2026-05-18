@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionTeamMatchSM4SearchErrorToastState } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
-export default function TeamMatchErrorPage() {
-  return (
-    <DesignFrame title="05 팀매치 검색 오류 · 1차 디자인 완료">
-      <SMRevisionTeamMatchSM4SearchErrorToastState />
-    </DesignFrame>
-  );
+export default function ErrorTeamMatchesPage() {
+  return <FirstDesignPage screen="teamMatchError" />;
 }

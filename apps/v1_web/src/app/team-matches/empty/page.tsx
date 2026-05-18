@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionTeamMatchSM4EmptyTextState } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
-export default function TeamMatchEmptyPage() {
-  return (
-    <DesignFrame title="05 팀매치 없음 · 1차 디자인 완료">
-      <SMRevisionTeamMatchSM4EmptyTextState />
-    </DesignFrame>
-  );
+export default function EmptyTeamMatchesPage() {
+  return <FirstDesignPage screen="teamMatchEmpty" />;
 }

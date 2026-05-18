@@ -138,6 +138,11 @@ button {
   padding: 64px 20px 96px;
 }
 
+.v1-public-main {
+  min-height: 100vh;
+  padding: 28px 20px 52px;
+}
+
 .v1-header {
   position: fixed;
   z-index: 20;
@@ -166,6 +171,22 @@ button {
   line-height: 1.2;
   font-weight: 800;
   color: var(--text-strong);
+}
+
+.v1-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.v1-back-button {
+  width: 30px;
+  height: 30px;
+  margin-left: -8px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--text-body);
 }
 
 .v1-eyebrow {
@@ -495,6 +516,51 @@ button {
   border-radius: 8px;
   padding: 14px;
   background: rgba(255, 255, 255, 0.55);
+}
+
+.v1-search-box {
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
+.v1-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-strong);
+}
+
+.v1-state {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.v1-form-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.v1-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+.v1-floating-cta {
+  position: sticky;
+  bottom: 92px;
+  margin-top: 18px;
 }
 
 @media (min-width: 760px) {

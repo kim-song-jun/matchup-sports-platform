@@ -1246,9 +1246,9 @@ Use this board as the live stage tracker.
 | 1. API freeze | Done | product/dev | `docs/reference/sm-new-api-v1-contract-checklist.md` |
 | 2. DB freeze | Done | backend/data | v1 state/permission/DB implementation docs closed |
 | 3. App scaffold + Prisma | Mostly Done | backend/data + frontend | full v1 Prisma model/seed/migration applied; fixture factories pending |
-| 4. Backend | Partial | backend | v1 domain routes implemented; integration/state/idempotency/docs still pending |
-| 5. Frontend contract | Pending | frontend/data | `apps/v1_web` hooks/types/MSW |
-| 6. Design binding | Partial | frontend/ui | route/design scaffold exists; real API hook binding pending |
+| 4. Backend | Partial | backend | v1 domain routes and docs implemented; integration/state/idempotency hardening still pending |
+| 5. Frontend contract | Partial | frontend/data | first-pass `apps/v1_web` hooks/types/MSW scaffold; route binding pending |
+| 6. Design binding | Partial | frontend/ui | active routes now import first-complete design components through `FirstDesignPage`; productization/API binding pending |
 | 7. QA/cutover | Pending | QA/dev | scenario/E2E/visual report |
 
 ### Current V1 Completion Map
@@ -1290,19 +1290,26 @@ What is currently in progress:
 - Backend is in a "domain routes implemented, hardening pending" state.
   Treat the API as ready for contract documentation and frontend hook handoff,
   not as final release-complete.
-- Frontend is in a route/design scaffold state. Screens exist as v1 surfaces,
-  but the API contract layer and real data binding are not built yet.
-- Documentation is in transition:
-  reference docs and task status exist, but the implementation-facing
-  `docs/api/v1/**` contract has not been published.
+- Frontend is back in a design-first import state. Active app routes now render
+  exported first-complete design components through `FirstDesignPage` and
+  `DesignFrame` so visual parity can be reviewed before productization.
+- Documentation now has an implementation-facing v1 API publication under
+  `docs/api/v1/**`. It is published from the frozen reference contract and
+  current controller/DTO/service evidence, with pending endpoints called out.
 
 What remains for v1 completion:
 
-- Publish `docs/api/v1/**` from the frozen reference contract and current
-  controller/DTO/service evidence.
-- Build the v1 frontend contract layer before screen binding:
+- Continue binding the first-pass v1 frontend contract layer to screens:
   `apps/v1_web/src/types/api.ts`, API client, domain hooks, query keys, and
-  MSW handlers.
+  MSW handlers now exist. Core route pages read hooks with mock fallback;
+  detail/create/edit/manage scaffolds have first-pass entity/mutation hook names
+  with mock fallback. Route params, submit payload shaping, and real mutation
+  handlers are still pending.
+- Continue the first-design port map from
+  `.github/tasks/84-v1-first-design-port-map.md`; core/detail/create/manage
+  routes and the missing auth/onboarding/settings/admin/public surfaces now
+  point at first-complete design components. Some settings/profile/admin routes
+  use the closest exported placeholder and need visual review.
 - Bind v1 web screens to hooks and remove primary hardcoded/mock data from
   production-candidate journeys.
 - Add v1 API fixture factories and integration/state-machine tests for the
@@ -1320,13 +1327,11 @@ What remains for v1 completion:
 
 Recommended near-term sequence:
 
-1. `docs/api/v1/**` publication.
-2. v1 frontend `types/api.ts` + API client + hooks/query keys/MSW.
-3. Bind core screens to hooks: home, notices, matches, teams, team matches,
-   notifications, chat, my/profile.
-4. Add fixture factories and integration tests for matches/teams/team matches.
-5. Add live `make dev-v1` smoke checklist and execute it.
-6. Start Playwright specs from the v1 scenario matrix.
+1. Run visual review against all first-design routes and close missing/placeholder mappings.
+2. Only after visual import is accepted, productize route components and bind API hooks.
+3. Add fixture factories and integration tests for matches/teams/team matches.
+4. Add live `make dev-v1` smoke checklist and execute it.
+5. Start Playwright specs from the v1 scenario matrix.
 
 ### Wave 0 -- Contract Freeze
 
@@ -1504,7 +1509,7 @@ Forbidden during initial waves:
 - [x] Create `docs/reference/sm-new-state-machines.md`.
 - [x] Create `docs/reference/sm-new-permission-matrix.md`.
 - [x] Create `docs/reference/sm-new-db-v1-implementation-design.md`.
-- [ ] Publish frozen reference contract into `docs/api/v1/**`.
+- [x] Publish frozen reference contract into `docs/api/v1/**`.
 - [x] Use new v1 DB instead of extending the existing DB.
 - [x] Use new app folders: `apps/v1_api`, `apps/v1_web`.
 - [x] Use v1 runtime routes on the new web app, not `/sm-new/*` under existing `apps/web`.
@@ -1564,7 +1569,7 @@ full v1 feature development begins.
 - [x] Permission matrix drafted and closed for v1.
 - [x] DB implementation design drafted and closed for v1.
 - [x] API contract docs drafted as reference checklist.
-- [ ] API contract published to `docs/api/v1/**`.
+- [x] API contract published to `docs/api/v1/**`.
 - [x] Runtime implementation started with `apps/v1_api`, `apps/v1_web`, and `v1_postgres` scaffold.
 - [x] `apps/v1_api` currently has health/common/Prisma runtime scaffold.
 - [x] `apps/v1_api/prisma/schema.prisma` currently uses `V1RuntimeCheck`
@@ -1648,9 +1653,9 @@ full v1 feature development begins.
 - [x] Docker v1 DB migration/seed was verified from the user's terminal.
 - [x] User confirmed v1 health/master/notice endpoints render correctly after seed.
 - [ ] V1 domain API implementation is partially complete: main v1 API domains
-  are implemented, while integration/state/idempotency coverage and
-  `docs/api/v1/**` publication are still pending. Payment/support remain
-  deferred by scope.
+  are implemented and `docs/api/v1/**` is published, while
+  integration/state/idempotency coverage is still pending. Payment/support
+  remain deferred by scope.
 - [ ] V1 frontend contract/hooks/MSW are pending.
 - [ ] V1 design screen binding is pending.
 - [ ] Scenario/E2E/visual/cutover report is pending.
@@ -1683,8 +1688,10 @@ Inspection result:
 
 Important gaps found during inspection:
 
-- [ ] `docs/api/v1/**` has not been published yet; only the reference checklist
-  and planning documents are present.
+- [x] `docs/api/v1/**` is now published. It includes global contract, domain
+  endpoint tables, DTO highlights, state/permission notes, and deferred
+  boundaries. Pending frozen-but-not-implemented endpoints are explicitly
+  marked.
 - [ ] `apps/v1_web/src/hooks` and `apps/v1_web/src/types` are still empty, so
   frontend contract hooks, shared API types, query keys, and MSW handlers remain
   the next blocking layer.
@@ -1702,18 +1709,28 @@ Important gaps found during inspection:
 
 Recommended next execution order:
 
-1. Publish `docs/api/v1/**` from the frozen reference contract and current
-   controller/DTO evidence.
-2. Add v1 frontend contract layer: `types/api.ts`, API client, domain hooks,
+1. Add v1 frontend contract layer: `types/api.ts`, API client, domain hooks,
    query keys, and MSW fixtures.
-3. Add v1 API fixture factories and integration/state-machine tests for
+2. Add v1 API fixture factories and integration/state-machine tests for
    matches, teams, team matches, chat/notifications, profile, and admin audit.
-4. Centralize pagination/error/permission/idempotency helpers where repeated
+3. Centralize pagination/error/permission/idempotency helpers where repeated
    service logic now exists.
-5. Run live v1 smoke against `make dev-v1`: health, master/notices,
+4. Run live v1 smoke against `make dev-v1`: health, master/notices,
    auth/onboarding, each domain list/detail/mutation, and v1 web core routes.
-6. Convert the scenario matrix into Playwright specs after route/hook binding is
+5. Convert the scenario matrix into Playwright specs after route/hook binding is
    stable.
+
+## 12.2 API V1 Docs Publication -- 2026-05-18
+
+- [x] Added `docs/api/v1/README.md`.
+- [x] Added `docs/api/v1/global-contract.md`.
+- [x] Added implementation-facing domain docs under `docs/api/v1/domains/`.
+- [x] Documented actual runtime prefix as `/api/v1` based on
+  `apps/v1_api/src/main.ts`.
+- [x] Marked frozen-but-not-yet-implemented auth/terms/search endpoints as
+  pending instead of presenting them as live runtime APIs.
+- [x] Preserved v1 deferred boundaries for payment/support and other
+  out-of-scope domains.
 
 ## 13. Ambiguity Log
 

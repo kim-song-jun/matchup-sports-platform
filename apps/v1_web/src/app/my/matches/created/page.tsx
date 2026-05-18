@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionMyMatchesCreatedSM1 } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
 export default function MyCreatedMatchesPage() {
-  return (
-    <DesignFrame title="11 만든 매치 · 1차 디자인 완료">
-      <SMRevisionMyMatchesCreatedSM1 />
-    </DesignFrame>
-  );
+  return <FirstDesignPage screen="myMatchesCreated" />;
 }

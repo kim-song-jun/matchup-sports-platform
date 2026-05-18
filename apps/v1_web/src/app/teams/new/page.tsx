@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionTeamBrowseDetailSM5 } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
-export default function NewTeamPage() {
-  return (
-    <DesignFrame title="05 팀 상세/정보 · 1차 디자인 완료">
-      <SMRevisionTeamBrowseDetailSM5 />
-    </DesignFrame>
-  );
+export default function TeamCreatePage() {
+  return <FirstDesignPage screen="teamBrowseDetail" />;
 }

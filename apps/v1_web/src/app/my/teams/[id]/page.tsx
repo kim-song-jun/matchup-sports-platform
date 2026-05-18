@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionMyTeamDetailSM1 } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
 export default function MyTeamDetailPage() {
-  return (
-    <DesignFrame title="11 내 팀 상세 · 1차 디자인 완료">
-      <SMRevisionMyTeamDetailSM1 />
-    </DesignFrame>
-  );
+  return <FirstDesignPage screen="myTeamDetail" />;
 }

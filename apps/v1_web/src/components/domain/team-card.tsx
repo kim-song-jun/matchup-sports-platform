@@ -2,6 +2,12 @@ import Link from 'next/link';
 import type { TeamCard as TeamCardType } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 
+const trustLabel = {
+  verified: '검증됨',
+  estimated: '추정',
+  sample: '샘플',
+};
+
 export function TeamCard({ team, href = '#' }: { team: TeamCardType; href?: string }) {
   const trustTone = team.trust === 'verified' ? 'green' : team.trust === 'sample' ? 'orange' : 'blue';
 
@@ -15,9 +21,9 @@ export function TeamCard({ team, href = '#' }: { team: TeamCardType; href?: stri
           </p>
           <div className="v1-meta">
             <Badge tone="blue">{team.sport}</Badge>
-            <Badge tone={trustTone}>{team.trust}</Badge>
+            <Badge tone={trustTone}>{trustLabel[team.trust]}</Badge>
             <Badge tone={team.joinStatus === 'closed' ? 'red' : 'green'}>
-              {team.joinStatus === 'closed' ? '모집 마감' : '승인 가입'}
+              {team.joinStatus === 'closed' ? '모집 마감' : '승인 가능'}
             </Badge>
           </div>
         </div>

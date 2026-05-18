@@ -1,10 +1,5 @@
-import { DesignFrame } from '@/components/design/design-frame';
-import { SMRevisionMyMatchesJoinedSM1 } from '@/design-source/sm-first-design';
+import { FirstDesignPage } from '@/components/design/first-design-page';
 
 export default function MyJoinedMatchesPage() {
-  return (
-    <DesignFrame title="11 참가한 매치 · 1차 디자인 완료">
-      <SMRevisionMyMatchesJoinedSM1 />
-    </DesignFrame>
-  );
+  return <FirstDesignPage screen="myMatchesJoined" />;
 }

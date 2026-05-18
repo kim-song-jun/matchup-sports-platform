@@ -1,5 +1,7 @@
 # Teameet API Integration Docs
 
+For the isolated SM New v1 app pair, use [v1/README.md](./v1/README.md). The v1 docs are scoped to `apps/v1_api`, `apps/v1_web`, and the separate v1 database, not the existing app cutover path.
+
 이 디렉터리는 프론트엔드 통합을 위한 실행 계약 문서다. Swagger는 참고용이고, 실제 구현 기준은 이 문서 세트다.
 
 ## 문서 읽는 순서

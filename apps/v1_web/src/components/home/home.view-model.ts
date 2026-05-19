@@ -78,6 +78,8 @@ export function getHomeViewModel(): HomeViewModel {
     signedOut: false,
     network: false,
     hasNewNotification: true,
+    chatUnreadCount: 4,
+    chatHref: '/chat',
     stats: {
       monthlyActivity: 12,
       monthlyActivitySub: '지난달보다 +3',
@@ -90,9 +92,9 @@ export function getHomeViewModel(): HomeViewModel {
     featuredMatch: sortedMatches[0],
     recommendedMatches: matches,
     quickActions: [
-      { label: '매치', sub: '03', color: 'var(--blue500)', background: 'var(--blue50)' },
-      { label: '팀매치', sub: '04', color: 'var(--orange500)', background: 'var(--orange50)' },
-      { label: '팀', sub: '05', color: 'var(--green500)', background: 'var(--green50)' },
+      { label: '매치', sub: '03', href: '/matches', color: 'var(--blue500)', background: 'var(--blue50)' },
+      { label: '팀매치', sub: '04', href: '/team-matches', color: 'var(--orange500)', background: 'var(--orange50)' },
+      { label: '팀', sub: '05', href: '/teams', color: 'var(--green500)', background: 'var(--green50)' },
       { label: '나의 팀', sub: '미정', color: 'var(--grey500)', background: 'var(--grey100)', disabled: true },
     ],
     weather: {

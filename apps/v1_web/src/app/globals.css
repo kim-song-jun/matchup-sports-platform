@@ -169,6 +169,18 @@ button:disabled {
   gap: 2px;
 }
 
+.tm-topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.tm-topbar-title .tm-btn-icon {
+  margin-left: -10px;
+  margin-right: 2px;
+}
+
 .tm-scroll-area {
   position: fixed;
   top: 100px;
@@ -310,6 +322,7 @@ button:disabled {
   width: 44px;
   height: 44px;
   padding: 0;
+  position: relative;
 }
 
 .tm-btn-sm {
@@ -351,6 +364,16 @@ button:disabled {
 
 .tm-btn-danger {
   background: var(--red500);
+  color: var(--static-white);
+}
+
+.tm-btn-warning {
+  background: var(--orange500);
+  color: var(--static-white);
+}
+
+.tm-btn-success {
+  background: var(--green500);
   color: var(--static-white);
 }
 
@@ -445,6 +468,10 @@ button:disabled {
   color: var(--static-white);
 }
 
+.tm-featured-link {
+  display: block;
+}
+
 .tm-quick-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -462,6 +489,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   padding: 0;
+  color: inherit;
 }
 
 .tm-quick-action:disabled {
@@ -531,6 +559,7 @@ button:disabled {
   overflow: hidden;
   padding: 0;
   text-align: left;
+  color: inherit;
 }
 
 .tm-match-card-media {
@@ -714,8 +743,8 @@ button:disabled {
 }
 
 .tm-floating-fab {
-  position: fixed;
-  left: calc(50% + 111px);
+  position: absolute;
+  right: 20px;
   bottom: 92px;
   width: 56px;
   height: 56px;
@@ -724,11 +753,38 @@ button:disabled {
   color: var(--static-white);
   display: grid;
   place-items: center;
-  font-size: 30px;
+  font-size: 0;
   line-height: 1;
   font-weight: 500;
   box-shadow: 0 12px 26px rgba(49, 130, 246, 0.32);
   z-index: 30;
+}
+
+.tm-create-fixed-cta {
+  padding-top: 12px;
+}
+
+.tm-home-chat-fab {
+  font-size: 0;
+}
+
+.tm-floating-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: var(--red500);
+  border: 2px solid var(--bg);
+  color: var(--static-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
 }
 
 .tm-match-detail {
@@ -925,6 +981,12 @@ button:disabled {
   background: var(--grey900);
   display: grid;
   place-items: center;
+}
+
+.tm-team-info-link {
+  display: block;
+  margin-top: 14px;
+  padding: 16px;
 }
 
 .tm-team-list {
@@ -1238,13 +1300,6 @@ button:disabled {
 .tm-notification-card-unread .tm-notification-icon {
   background: var(--blue500);
   color: var(--static-white);
-}
-
-@media (max-width: 430px) {
-  .tm-floating-fab {
-    left: auto;
-    right: 20px;
-  }
 }
 
 .tm-empty-state {

@@ -38,6 +38,25 @@ export function MatchIcon(props: IconProps) {
   );
 }
 
+export function PlusIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M12 5 V19" />
+      <path d="M5 12 H19" />
+    </SvgIcon>
+  );
+}
+
+export function ShareIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M14 5 H19 V10" />
+      <path d="M19 5 L12 12" />
+      <path d="M11 6 H7 A2 2 0 0 0 5 8 V17 A2 2 0 0 0 7 19 H16 A2 2 0 0 0 18 17 V13" />
+    </SvgIcon>
+  );
+}
+
 export function TeamMatchIcon(props: IconProps) {
   return (
     <SvgIcon {...props}>
@@ -76,6 +95,24 @@ export function BellIcon(props: IconProps) {
     <SvgIcon {...props}>
       <path d="M18 8 A6 6 0 0 0 6 8 C6 15 3 16 3 18 H21 C21 16 18 15 18 8" />
       <path d="M10 21 H14" />
+    </SvgIcon>
+  );
+}
+
+export function ChatIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M5 5 H19 A2 2 0 0 1 21 7 V15 A2 2 0 0 1 19 17 H9 L5 21 V17 H5 A2 2 0 0 1 3 15 V7 A2 2 0 0 1 5 5 Z" />
+      <path d="M8 10 H16" />
+      <path d="M8 13 H13" />
+    </SvgIcon>
+  );
+}
+
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="m15 6-6 6 6 6" />
     </SvgIcon>
   );
 }

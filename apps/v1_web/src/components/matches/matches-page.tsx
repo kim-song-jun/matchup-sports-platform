@@ -1,12 +1,17 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
-import { BellIcon, ChevronRightIcon, SearchIcon } from '@/components/v1-ui/icons';
+import { BellIcon, ChevronLeftIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import type { MatchCardModel, MatchCreateViewModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 
 export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   return (
-    <AppChrome title="매치" activeTab="matches" hasNewNotification>
+    <AppChrome
+      title="매치"
+      activeTab="matches"
+      hasNewNotification
+      floatingSlot={<MatchCreateFloatingButton />}
+    >
       <div className="tm-match-list">
         <MatchSearchBar query={model.query} filterCount={model.filterCount} />
         <SportSelector sports={model.sports} />
@@ -25,8 +30,15 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
         </div>
       </div>
-      <Link className="tm-floating-fab" href="/matches/new/sport" aria-label="매치 만들기">+</Link>
     </AppChrome>
+  );
+}
+
+function MatchCreateFloatingButton() {
+  return (
+    <Link className="tm-floating-fab" href="/matches/new/sport" aria-label="매치 만들기">
+      <PlusIcon size={25} strokeWidth={2.2} />
+    </Link>
   );
 }
 
@@ -34,6 +46,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const { match, mode } = model;
   const locked = mode === 'pending' || mode === 'approved' || match.status === 'full';
   const cta = mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인완료' : mode === 'pending' ? '승인중' : match.status === 'full' ? '모집완료' : '참가하기';
+  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
 
   return (
     <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
@@ -41,9 +54,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         <div className="tm-match-detail-hero" style={{ backgroundImage: `url(${match.image})` }}>
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/matches" aria-label="뒤로가기">‹</Link>
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/matches" aria-label="뒤로가기">
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </Link>
               <div style={{ display: 'flex', gap: 4 }}>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유">↗</button>
+                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유"><ShareIcon size={20} /></button>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림"><BellIcon size={20} /></button>
               </div>
             </div>
@@ -81,8 +96,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <span className="tm-text-label tab-num">{match.fee.toLocaleString('ko-KR')}원</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'mine' ? '1fr' : '104px 1fr', gap: 8 }}>
-          {mode !== 'mine' ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button">채팅</button> : null}
-          <button className={`tm-btn tm-btn-lg ${locked ? 'tm-btn-neutral' : 'tm-btn-primary'}`} type="button" disabled={locked}>{cta}</button>
+          {mode !== 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/chat/room-1">채팅</Link> : null}
+          {mode === 'mine' ? (
+            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={`/matches/${match.id}/edit`}>{cta}</Link>
+          ) : (
+            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={locked}>{cta}</button>
+          )}
         </div>
       </div>
     </AppChrome>
@@ -94,7 +113,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   const edit = model.step === 'edit';
   const stepNo = edit ? 2 : stepToNumber(model.step);
   return (
-    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false}>
+    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? '/matches/match-1' : '/matches'}>
       <div className="tm-create-shell">
         <CreateProgress step={stepNo} edit={edit} />
         {model.step === 'sport' ? <SportStep model={model} /> : null}
@@ -102,7 +121,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-create-fixed-cta">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'sport' ? '/matches' : '/matches/new'}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음'}</Link>
@@ -217,7 +236,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
   return (
-    <AppChrome title="매치 만들기 완료" activeTab="matches" bottomNav={false}>
+    <AppChrome title="매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/matches">
       <div className="tm-create-shell">
         <EmptyState title="매치가 만들어졌어요" sub="개인매치도 먼저 내 팀에게 공유해서 팀원 참여 가능 여부를 확인할 수 있습니다." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>

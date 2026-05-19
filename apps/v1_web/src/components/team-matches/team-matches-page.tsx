@@ -1,12 +1,17 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
-import { BellIcon, SearchIcon } from '@/components/v1-ui/icons';
+import { BellIcon, ChevronLeftIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import type { TeamMatchCreateViewModel, TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 
 export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel }) {
   return (
-    <AppChrome title="팀매치" activeTab="teamMatches" hasNewNotification>
+    <AppChrome
+      title="팀매치"
+      activeTab="teamMatches"
+      hasNewNotification
+      floatingSlot={<TeamMatchCreateFloatingButton />}
+    >
       <div className="tm-match-list">
         <div className="tm-match-searchbar">
           <div className="tm-match-search-input"><span className="tm-text-body" style={{ color: 'var(--text-caption)' }}>지역, 팀 이름, 경기조건 검색</span></div>
@@ -18,8 +23,15 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         <div className="tm-match-section-head"><div><div className="tm-text-label">팀매치</div><div className="tm-text-caption" style={{ marginTop: 2 }}>종목은 상단에 유지하고 정렬과 보기 방식은 필터에서 조정합니다.</div></div><span className="tm-badge tm-badge-blue">필터 {model.filterCount}</span></div>
         <div className="tm-match-card-stack">{model.matches.map((match, index) => <TeamMatchCard key={match.id} match={match} index={index} />)}</div>
       </div>
-      <Link className="tm-floating-fab" href="/team-matches/new/team" aria-label="팀매치 만들기">+</Link>
     </AppChrome>
+  );
+}
+
+function TeamMatchCreateFloatingButton() {
+  return (
+    <Link className="tm-floating-fab" href="/team-matches/new/team" aria-label="팀매치 만들기">
+      <PlusIcon size={25} strokeWidth={2.2} />
+    </Link>
   );
 }
 
@@ -27,13 +39,16 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const { match, mode } = model;
   const locked = mode === 'pending' || mode === 'approved';
   const cta = mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인완료' : mode === 'pending' ? '승인중' : '신청하기';
+  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   return (
     <AppChrome title="" activeTab="teamMatches" bottomNav={false} topBar={false}>
       <article className="tm-match-detail">
         <div className="tm-team-vs-hero">
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/team-matches" aria-label="뒤로가기">‹</Link>
-            <div style={{ display: 'flex', gap: 4 }}><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button">↗</button><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button"><BellIcon size={20} /></button></div>
+            <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/team-matches" aria-label="뒤로가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.2} />
+            </Link>
+            <div style={{ display: 'flex', gap: 4 }}><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유"><ShareIcon size={20} /></button><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림"><BellIcon size={20} /></button></div>
           </div>
           <div className="tm-team-vs-row">
             <div><div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.68)' }}>홈팀</div><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div><div className="tm-text-micro" style={{ color: 'rgba(255,255,255,.72)' }}>매너 {match.manner} · 승 {match.wins}</div></div>
@@ -46,12 +61,13 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           <InfoRow label="장소" value={match.venue} sub={match.address} />
           <InfoRow label="경기정보" value={`${match.sport} · ${match.format}`} sub={`${match.grade}등급 · 유니폼 ${match.uniform}`} />
           <InfoRow label="참가비" value={`${match.opponentCost.toLocaleString('ko-KR')}원`} sub={match.opponentCost === 0 ? '무료초청 · 실제 청구 없음' : `총 비용 ${match.cost.toLocaleString('ko-KR')}원`} />
-          {mode === 'pending' ? <StateCard title="신청 확인을 완료했어요" body="홈팀 검토가 끝나면 알림으로 알려드릴게요." /> : null}
-          <Card pad={16} style={{ marginTop: 14 }}><div className="tm-text-body-lg">팀 정보 보러가기</div><div className="tm-text-caption" style={{ marginTop: 6 }}>팀 상세조회로 이동해 매너, 전적, 멤버 구성을 확인합니다.</div></Card>
+          {mode === 'pending' ? <StateCard tone="orange" title="신청 확인을 완료했어요" body="홈팀 검토가 끝나면 알림으로 알려드릴게요." /> : null}
+          {mode === 'approved' ? <StateCard tone="green" title="승인완료" body="팀매치 참가가 확정되었습니다. 경기 전 안내를 계속 확인할 수 있습니다." /> : null}
+          <Link className="tm-card tm-pressable tm-team-info-link" href="/teams/team-1"><div className="tm-text-body-lg">팀 정보 보러가기</div><div className="tm-text-caption" style={{ marginTop: 6 }}>팀 상세조회로 이동해 매너, 전적, 멤버 구성을 확인합니다.</div></Link>
           <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">신청팀</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.applicantTeams.map((team) => <ListItem key={team.name} title={team.name} sub={team.meta} trailing={team.status} />)}</div></Card>
         </div>
       </article>
-      <div className="tm-fixed-cta"><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : locked ? '신청 상태' : '채팅 후 신청 가능'}</span><span className="tm-text-label tab-num">{match.opponentCost.toLocaleString('ko-KR')}원</span></div><div style={{ display: 'grid', gridTemplateColumns: mode === 'mine' ? '1fr' : '104px 1fr', gap: 8 }}>{mode !== 'mine' ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button">채팅</button> : null}<button className={`tm-btn tm-btn-lg ${locked ? 'tm-btn-neutral' : 'tm-btn-primary'}`} disabled={locked} type="button">{cta}</button></div></div>
+      <div className="tm-fixed-cta"><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : locked ? '신청 상태' : '채팅 후 신청 가능'}</span><span className="tm-text-label tab-num">{match.opponentCost.toLocaleString('ko-KR')}원</span></div><div style={{ display: 'grid', gridTemplateColumns: mode === 'mine' ? '1fr' : '104px 1fr', gap: 8 }}>{mode !== 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/chat/room-1">채팅</Link> : null}{mode === 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={`/team-matches/${match.id}/edit`}>{cta}</Link> : <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={locked} type="button">{cta}</button>}</div></div>
     </AppChrome>
   );
 }
@@ -61,7 +77,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const edit = model.step === 'edit';
   const step = edit ? 3 : stepToNumber(model.step);
   return (
-    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="teamMatches" bottomNav={false}>
+    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="teamMatches" bottomNav={false} backHref={edit ? '/team-matches/team-match-1' : '/team-matches'}>
       <div className="tm-create-shell">
         <CreateProgress step={step} edit={edit} />
         {model.step === 'team' ? <TeamStep model={model} /> : null}
@@ -71,7 +87,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'team' ? '/team-matches' : '/team-matches/new/team'}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link><Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{edit ? '변경사항 저장' : model.step === 'confirm' ? '팀매치 만들기' : '다음'}</Link></div></div>
+      <div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'team' ? '/team-matches' : '/team-matches/new/team'}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link><Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{edit ? '변경사항 저장' : model.step === 'confirm' ? '팀매치 만들기' : '다음'}</Link></div></div>
     </AppChrome>
   );
 }
@@ -90,7 +106,7 @@ function SportStep({ model }: { model: TeamMatchCreateViewModel }) {
 
 function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: boolean }) {
   const d = model.draft;
-  return <div><h1 className="tm-text-heading">매치 정보</h1><CreateField label="매치 제목" value={d.title} /><CreateField label="설명" value={d.description} multiline /><div className="tm-team-create-preview"><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>우리 팀 VS 상대팀</div></div>{edit ? <><CreateField label="실력등급" value={d.grade} /><CreateField label="경기방식" value={d.format} /><CreateField label="경기 스타일" value={d.style} /><CreateField label="유니폼 색상" value={d.uniform} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" /></div><StateCard title="수정 모드" body="팀 주장/관리자만 저장할 수 있고 실패 시 입력값을 유지합니다." /></> : null}</div>;
+  return <div><h1 className="tm-text-heading">매치 정보</h1><CreateField label="매치 제목" value={d.title} /><CreateField label="설명" value={d.description} multiline /><div className="tm-team-create-preview"><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>우리 팀 VS 상대팀</div></div>{edit ? <><CreateField label="실력등급" value={d.grade} /><CreateField label="경기방식" value={d.format} /><CreateField label="경기 스타일" value={d.style} /><CreateField label="유니폼 색상" value={d.uniform} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" /></div><StateCard tone="orange" title="수정 모드" body="팀 주장/관리자만 저장할 수 있고 실패 시 입력값을 유지합니다." /></> : null}</div>;
 }
 
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
@@ -109,15 +125,15 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
-  return <AppChrome title="팀매치 만들기 완료" activeTab="teamMatches" bottomNav={false}><div className="tm-create-shell"><EmptyState title="팀매치가 만들어졌어요" sub="먼저 우리 팀에게 공유해서 참가 가능 여부와 운영 준비를 확인할 수 있습니다." /><Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}><div className="tm-text-body-lg">{model.selectedTeam} 팀 채팅</div><div className="tm-text-caption" style={{ marginTop: 4 }}>14명에게 팀매치 링크와 경기조건을 공유</div></Card>{['팀 채팅에 공유', '초대 링크 복사', '상대팀 후보에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 경기조건을 공유합니다.</div></Card>)}</div><div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches/team-match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">팀 채팅에 공유</button></div></div></AppChrome>;
+  return <AppChrome title="팀매치 만들기 완료" activeTab="teamMatches" bottomNav={false} backHref="/team-matches"><div className="tm-create-shell"><EmptyState title="팀매치가 만들어졌어요" sub="먼저 우리 팀에게 공유해서 참가 가능 여부와 운영 준비를 확인할 수 있습니다." /><Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}><div className="tm-text-body-lg">{model.selectedTeam} 팀 채팅</div><div className="tm-text-caption" style={{ marginTop: 4 }}>14명에게 팀매치 링크와 경기조건을 공유</div></Card>{['팀 채팅에 공유', '초대 링크 복사', '상대팀 후보에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 경기조건을 공유합니다.</div></Card>)}</div><div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches/team-match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">팀 채팅에 공유</button></div></div></AppChrome>;
 }
 
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label">{value}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
 }
 
-function StateCard({ title, body }: { title: string; body: string }) {
-  return <Card pad={14} style={{ marginTop: 14, background: 'rgba(254,152,0,.10)' }}><div className="tm-text-label" style={{ color: 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
+function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
+  return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'rgba(3,178,108,.08)' : 'rgba(254,152,0,.10)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
 }
 
 function CreateProgress({ step, edit }: { step: number; edit: boolean }) {

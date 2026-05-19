@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {
   BellIcon,
+  ChevronLeftIcon,
   HomeIcon,
   MatchIcon,
   MyIcon,
@@ -28,21 +29,25 @@ const tabs: Array<{
 type AppChromeProps = {
   title: string;
   children: ReactNode;
+  floatingSlot?: ReactNode;
   activeTab?: V1NavTab;
   showSearch?: boolean;
   hasNewNotification?: boolean;
   bottomNav?: boolean;
   topBar?: boolean;
+  backHref?: string;
 };
 
 export function AppChrome({
   title,
   children,
+  floatingSlot,
   activeTab = 'home',
   showSearch = false,
   hasNewNotification = false,
   bottomNav = true,
   topBar = true,
+  backHref,
 }: AppChromeProps) {
   const frameClassName = [
     'tm-app-frame',
@@ -55,7 +60,14 @@ export function AppChrome({
       <StatusBar />
       {topBar ? (
         <header className="tm-topbar">
-          <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>{title}</div>
+          <div className="tm-topbar-title">
+            {backHref ? (
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label="뒤로가기">
+                <ChevronLeftIcon size={22} strokeWidth={2.2} />
+              </Link>
+            ) : null}
+            <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>{title}</div>
+          </div>
           <div className="tm-topbar-actions">
             {showSearch ? (
               <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/search" aria-label="검색">
@@ -72,6 +84,7 @@ export function AppChrome({
       <main className="tm-scroll-area" style={{ paddingBottom: bottomNav ? 12 : 0 }}>
         {children}
       </main>
+      {floatingSlot}
       {bottomNav ? <BottomNav activeTab={activeTab} /> : null}
     </div>
   );

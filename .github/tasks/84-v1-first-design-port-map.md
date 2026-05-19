@@ -210,6 +210,10 @@ Missing or unclear:
   profile summary, monthly activity, joined/created match lists, my team
   management, member review, profile edit, settings, legal, notification
   settings, and withdrawal warning surfaces.
+- [x] Detail pass started with `02 home`: compared active
+  `HomePageView` against `SMRevisionHomeMobileV2`, kept the existing
+  componentized structure, and corrected route continuity for home shortcuts,
+  featured/recommended match cards, section actions, and notice rows.
 
 ## Detail Pass Handoff
 
@@ -258,14 +262,84 @@ Deferred:
 
 Next detail-pass order:
 
-1. Compare each componentized route against the `Team Design > 1차 디자인 완료`
-   source and correct spacing, font weight, radius, fixed chrome behavior, and
-   sticky/fixed CTA placement.
-2. Fold state variants into the owning component where practical: empty, error,
-   pending, disabled, complete, permission, duplicate submit, and stale states.
-3. Verify route flow continuity: home -> list -> detail -> create/edit -> my.
-4. Before API binding, reshape view-model fields to match the intended DTO and
-   hook contracts so page components can stay mostly unchanged.
+1. [x] `/home`
+   - Active implementation already matched the `SMRevisionHomeMobileV2`
+     spacing/radius/density baseline closely.
+   - Converted quick actions to real links for `/matches`, `/team-matches`,
+     and `/teams`; kept `나의 팀` disabled because its route remains undecided.
+   - Converted featured/recommended match cards to `/matches/[id]`, the
+     추천 매치 section action to `/matches`, notice rows to `/notices/[id]`,
+     and 공지사항 전체보기 to `/notices`.
+   - Fixed the shared icon button positioning so the notification new dot is
+     anchored to the topbar action itself.
+   - Restored the `06` design's home chat floating entry above the bottom nav
+     and exposed unread count through the home view-model.
+2. [x] `/matches`, `/matches/[id]`, `/matches/new/*`
+   - Rechecked active match list/detail/create/edit against
+     `SMRevisionMatchListMobileSM7`, `SMRevisionMatchDetailMobileSM3`, and
+     the `03-1` create final components.
+   - Replaced text glyph controls with shared icons for list FAB, detail back,
+     and share action while keeping the existing componentized route structure.
+   - Added create/edit/complete back navigation through shared `AppChrome`
+     (`/matches/new/*` -> `/matches`, edit -> detail, complete -> list).
+   - Connected detail secondary CTA to `/chat/room-1` and the owner manage CTA
+     to `/matches/[id]/edit`; pending/approved locked buttons now keep distinct
+     orange/green status fills instead of neutral-only disabled styling.
+3. [x] `/team-matches`, `/team-matches/[id]`, `/team-matches/new/*`
+   - Rechecked active team-match list/detail/create/edit against
+     `SMRevisionTeamMatchListMobileSM4`, `SMRevisionTeamMatchDetailMobileSM2`,
+     and the `04-1` create final components.
+   - Moved the team-match create FAB into the shared shell `floatingSlot`, so
+     it stays fixed to the app frame and does not move with content scroll.
+   - Replaced text glyph controls with shared icons for list FAB, detail back,
+     and share action.
+   - Added create/edit/complete back navigation through shared `AppChrome`
+     (`/team-matches/new/*` -> `/team-matches`, edit -> detail, complete ->
+     list).
+   - Connected detail secondary CTA to `/chat/room-1`, owner manage CTA to
+     `/team-matches/[id]/edit`, and team info card to `/teams/team-1`.
+   - Pending/approved locked buttons now keep distinct orange/green status
+     fills instead of neutral-only disabled styling.
+4. [ ] `/teams`, `/teams/[id]`, `/teams/new`, `/teams/[id]/members`
+5. [ ] `/chat`, `/chat/[id]`, `/notifications`
+   - Partial correction: `/notifications` now uses shared shell back navigation
+     to return to `/home`, matching the community design's back-title chrome.
+   - Partial correction: `/chat` now returns to `/home`, and `/chat/[id]`
+     returns to `/chat` through the same shared shell back navigation.
+6. [ ] `/my`, `/my/matches/*`, `/my/teams/*`, `/my/profile/edit`,
+   `/my/settings/*`
+
+Validation notes:
+
+- `git diff --check -- apps/v1_web/src/app/globals.css apps/v1_web/src/components/home/home-page.tsx apps/v1_web/src/components/home/home.types.ts apps/v1_web/src/components/home/home.view-model.ts apps/v1_web/src/components/v1-ui/primitives.tsx` passed.
+- `pnpm --filter v1_web exec tsc --noEmit --pretty false` was attempted but
+  PowerShell blocked `pnpm.ps1` by execution policy.
+- `pnpm.cmd install --frozen-lockfile` required network access on first run
+  and then completed with the lockfile unchanged.
+- `pnpm.cmd --filter v1_web exec tsc --noEmit --pretty false` passed after
+  dependencies were installed.
+- `pnpm.cmd --filter v1_web dev` still fails on this Windows host because the
+  script depends on `sh`; smoke used direct `next dev --hostname 0.0.0.0
+  --port 3013` instead.
+- Smoke routes returned `200`: `/home`, `/matches`, `/matches/match-2`,
+  `/notices`, `/notices/notice-1`.
+- Follow-up smoke for the home/community correction returned `200`: `/home`,
+  `/notifications`, `/chat`.
+- Follow-up smoke for chat back-navigation chrome returned `200`: `/chat`,
+  `/chat/room-1`.
+- Match detail pass smoke returned `200`: `/matches`, `/matches/match-1`,
+  `/matches/new/sport`, `/matches/new`, `/matches/new/place-time`,
+  `/matches/new/confirm`, `/matches/new/complete`, `/matches/match-1/edit`.
+- Restarted the v1 dev server on `3013` after the matches changes; readiness
+  check returned `200` for `/matches`.
+- Team-match detail pass smoke returned `200`: `/team-matches`,
+  `/team-matches/team-match-1`, `/team-matches/new/team`,
+  `/team-matches/new/sport`, `/team-matches/new/info`,
+  `/team-matches/new/condition`, `/team-matches/new/place-time`,
+  `/team-matches/new/confirm`, `/team-matches/new/complete`,
+  `/team-matches/team-match-1/edit`.
+- Restarted the v1 dev server on `3013` after the team-match changes;
+  readiness check returned `200` for `/team-matches`.
 
 ## Ambiguity Log
 

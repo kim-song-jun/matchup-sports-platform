@@ -1,11 +1,18 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { BellIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { BellIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
   return (
-    <AppChrome title="채팅" activeTab="my" bottomNav={false} hasNewNotification>
+    <AppChrome
+      title="채팅"
+      activeTab="my"
+      bottomNav={false}
+      backHref="/home"
+      hasNewNotification
+      floatingSlot={<ChatRoomFloatingButton />}
+    >
       <div className="tm-chat-list">
         <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button">{category.label} {category.count}</button>)}</div>
         <div className="tm-chat-section-label">고정 {model.pinnedRooms.length}</div>
@@ -13,14 +20,21 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
         <div className="tm-chat-section-label">채팅방 {model.rooms.length}</div>
         {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
       </div>
-      <Link className="tm-floating-fab" href="/chat/room-1" aria-label="채팅 열기">+</Link>
     </AppChrome>
+  );
+}
+
+function ChatRoomFloatingButton() {
+  return (
+    <Link className="tm-floating-fab" href="/chat/room-1" aria-label="채팅 열기">
+      <PlusIcon size={25} strokeWidth={2.2} />
+    </Link>
   );
 }
 
 export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false}>
+    <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat">
       <div className="tm-chat-room">
         <div className="tm-chat-context">
           <Link className="tm-card tm-chat-context-card" href={model.context.href}>
@@ -41,7 +55,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
 export function NotificationsPageView({ model }: { model: NotificationsViewModel }) {
   const groups = ['오늘', '어제'] as const;
   return (
-    <AppChrome title={`알림 ${model.unreadCount}`} activeTab="my" bottomNav={false}>
+    <AppChrome title={`알림 ${model.unreadCount}`} activeTab="my" bottomNav={false} backHref="/home">
       <div className="tm-notification-list">
         <div className="tm-notification-toolbar"><span className="tm-text-caption">{model.unreadCount > 0 ? '읽지 않은 알림이 있습니다.' : '모든 알림을 확인했습니다.'}</span><Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notifications/read">모두읽음</Link></div>
         {groups.map((group) => {

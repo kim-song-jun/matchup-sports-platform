@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRightIcon } from './icons';
 
@@ -69,20 +70,29 @@ type SectionTitleProps = {
   title: string;
   sub?: string;
   action?: string;
+  actionHref?: string;
 };
 
-export function SectionTitle({ title, sub, action }: SectionTitleProps) {
+export function SectionTitle({ title, sub, action, actionHref }: SectionTitleProps) {
+  const actionContent = (
+    <>
+      {action}
+      <ChevronRightIcon size={14} strokeWidth={2.2} />
+    </>
+  );
+
   return (
     <div className="tm-section-title" style={{ alignItems: sub ? 'flex-start' : 'center' }}>
       <div>
         <div className="tm-text-body-lg">{title}</div>
         {sub ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div> : null}
       </div>
-      {action ? (
-        <button className="tm-section-action" type="button">
-          {action}
-          <ChevronRightIcon size={14} strokeWidth={2.2} />
-        </button>
+      {action && actionHref ? (
+        <Link className="tm-section-action" href={actionHref}>
+          {actionContent}
+        </Link>
+      ) : action ? (
+        <button className="tm-section-action" type="button">{actionContent}</button>
       ) : null}
     </div>
   );
@@ -93,11 +103,12 @@ type ListItemProps = {
   sub?: string;
   trailing?: string;
   chev?: boolean;
+  href?: string;
 };
 
-export function ListItem({ title, sub, trailing, chev }: ListItemProps) {
-  return (
-    <div className="tm-list-row">
+export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
+  const content = (
+    <>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>
           {title}
@@ -106,6 +117,16 @@ export function ListItem({ title, sub, trailing, chev }: ListItemProps) {
       </div>
       {trailing ? <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>{trailing}</div> : null}
       {chev ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}
+    </>
+  );
+
+  return href ? (
+    <Link className="tm-list-row tm-pressable" href={href}>
+      {content}
+    </Link>
+  ) : (
+    <div className="tm-list-row">
+      {content}
     </div>
   );
 }

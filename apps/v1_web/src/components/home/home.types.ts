@@ -15,6 +15,7 @@ export type HomeMatchCard = {
 export type HomeQuickAction = {
   label: string;
   sub: string;
+  href?: string;
   disabled?: boolean;
   color: string;
   background: string;
@@ -42,6 +43,8 @@ export type HomeViewModel = {
   signedOut: boolean;
   network: boolean;
   hasNewNotification: boolean;
+  chatUnreadCount: number;
+  chatHref: string;
   stats: HomeStats;
   featuredMatch: HomeMatchCard;
   recommendedMatches: HomeMatchCard[];

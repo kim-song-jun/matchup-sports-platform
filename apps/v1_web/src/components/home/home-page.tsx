@@ -1,12 +1,20 @@
+import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { ChatIcon } from '@/components/v1-ui/icons';
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
-import type { HomeMatchCard, HomeViewModel } from './home.types';
+import type { HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
 
   return (
-    <AppChrome title="teameet" activeTab="home" showSearch hasNewNotification={model.hasNewNotification && !model.network}>
+    <AppChrome
+      title="teameet"
+      activeTab="home"
+      showSearch
+      hasNewNotification={model.hasNewNotification && !model.network}
+      floatingSlot={<HomeChatFloatingButton model={model} />}
+    >
       <div style={{ padding: '8px 20px 24px' }}>
         <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
           {dash ? '안녕하세요' : `안녕하세요, ${model.viewerName}님`}
@@ -41,14 +49,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       <div style={{ padding: '0 20px 28px' }}>
         <div className="tm-quick-grid">
           {model.quickActions.map((item) => (
-            <button key={item.label} className="tm-pressable tm-quick-action" disabled={item.disabled} type="button">
-              <div className="tm-quick-icon" style={{ background: item.background, color: item.color }}>
-                {item.label[0].toUpperCase()}
-              </div>
-              <span className="tm-text-micro" style={{ color: 'var(--text-strong)', textAlign: 'center', lineHeight: 1.2 }}>
-                {item.label}
-              </span>
-            </button>
+            <QuickAction key={item.label} item={item} />
           ))}
         </div>
       </div>
@@ -57,7 +58,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         <WeatherStrip {...model.weather} />
       </div>
 
-      <SectionTitle title="추천 매치" sub={model.network ? '다시 불러오기가 필요합니다' : '실력에 맞는 경기 5개'} action="전체보기" />
+      <SectionTitle title="추천 매치" sub={model.network ? '다시 불러오기가 필요합니다' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
       {model.network ? (
         <div style={{ padding: '0 20px 8px' }}>
           <EmptyState title="새로고침이 필요합니다" sub="추천 목록과 대표 매치를 다시 불러올 수 있어야 합니다." cta="다시 불러오기" />
@@ -78,13 +79,13 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       <div style={{ padding: '0 20px 24px' }}>
         <div className="tm-notice-head">
           <div className="tm-text-body-lg">공지사항</div>
-          <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
+          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
             전체보기
-          </button>
+          </Link>
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
           {model.notices.map((notice) => (
-            <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} chev />
+            <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
           ))}
         </div>
       </div>
@@ -92,8 +93,44 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   );
 }
 
-function FeaturedMatchCard({ match, network, signedOut }: { match: HomeMatchCard; network: boolean; signedOut: boolean }) {
+function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   return (
+    <Link className="tm-floating-fab tm-home-chat-fab" href={model.chatHref} aria-label={`채팅 ${model.chatUnreadCount}개 읽지 않음`}>
+      <ChatIcon size={22} strokeWidth={2.2} />
+      {model.chatUnreadCount > 0 ? <span className="tm-floating-count tab-num">{model.chatUnreadCount}</span> : null}
+    </Link>
+  );
+}
+
+function QuickAction({ item }: { item: HomeQuickAction }) {
+  const content = (
+    <>
+      <div className="tm-quick-icon" style={{ background: item.background, color: item.color }}>
+        {item.label[0].toUpperCase()}
+      </div>
+      <span className="tm-text-micro" style={{ color: 'var(--text-strong)', textAlign: 'center', lineHeight: 1.2 }}>
+        {item.label}
+      </span>
+    </>
+  );
+
+  if (item.disabled || !item.href) {
+    return (
+      <button className="tm-pressable tm-quick-action" disabled type="button" aria-label={`${item.label} 준비 중`}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link className="tm-pressable tm-quick-action" href={item.href}>
+      {content}
+    </Link>
+  );
+}
+
+function FeaturedMatchCard({ match, network, signedOut }: { match: HomeMatchCard; network: boolean; signedOut: boolean }) {
+  const card = (
     <Card pad={0} style={{ overflow: 'hidden' }}>
       <div
         className="tm-featured-media"
@@ -129,13 +166,19 @@ function FeaturedMatchCard({ match, network, signedOut }: { match: HomeMatchCard
       </div>
     </Card>
   );
+
+  return network ? card : (
+    <Link className="tm-featured-link tm-pressable" href={`/matches/${match.id}`}>
+      {card}
+    </Link>
+  );
 }
 
 function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
   return (
     <div className="tm-match-rail">
       {matches.map((match) => (
-        <button key={match.id} className="tm-pressable tm-match-card" type="button">
+        <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
           <div className="tm-match-card-media" style={{ background: `url(${match.imageUrl}) center/cover` }} />
           <div style={{ padding: 12 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue500)' }}>{match.sportLabel}</div>
@@ -151,7 +194,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
               </span>
             </div>
           </div>
-        </button>
+        </Link>
       ))}
     </div>
   );

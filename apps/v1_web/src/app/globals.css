@@ -123,30 +123,6 @@ button:disabled {
   position: relative;
 }
 
-.tm-status-bar {
-  height: 44px;
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--grey900);
-  background: var(--bg);
-  position: fixed;
-  top: 0;
-  left: 50%;
-  width: min(100%, 375px);
-  transform: translateX(-50%);
-  z-index: 20;
-}
-
-.tm-status-icons {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-}
-
 .tm-topbar {
   min-height: 56px;
   padding: 8px 16px;
@@ -155,11 +131,10 @@ button:disabled {
   justify-content: space-between;
   border-bottom: 1px solid var(--grey100);
   background: var(--bg);
-  position: fixed;
-  top: 44px;
-  left: 50%;
-  width: min(100%, 375px);
-  transform: translateX(-50%);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   z-index: 20;
 }
 
@@ -182,13 +157,12 @@ button:disabled {
 }
 
 .tm-scroll-area {
-  position: fixed;
-  top: 100px;
+  position: absolute;
+  top: 56px;
   bottom: 74px;
-  left: 50%;
-  width: min(100%, 375px);
+  left: 0;
+  width: 100%;
   min-height: 0;
-  transform: translateX(-50%);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -196,7 +170,7 @@ button:disabled {
 }
 
 .tm-app-frame-no-topbar .tm-scroll-area {
-  top: 44px;
+  top: 0;
 }
 
 .tm-app-frame-no-bottom .tm-scroll-area {
@@ -211,11 +185,10 @@ button:disabled {
   padding: 6px 0 16px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  position: fixed;
+  position: absolute;
   bottom: 0;
-  left: 50%;
-  width: min(100%, 375px);
-  transform: translateX(-50%);
+  left: 0;
+  width: 100%;
   z-index: 20;
 }
 
@@ -989,15 +962,21 @@ button:disabled {
   padding: 16px;
 }
 
-.tm-team-list {
-  padding: 12px 20px 104px;
-}
-
 .tm-team-searchbar {
-  min-height: 48px;
+  min-height: 56px;
+  padding: 8px 10px 8px 20px;
+  border-bottom: 1px solid var(--grey100);
+  background: var(--bg);
   display: flex;
   align-items: center;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.tm-team-list {
+  padding: 14px 20px 104px;
 }
 
 .tm-team-search-input {
@@ -1005,14 +984,70 @@ button:disabled {
   min-height: 44px;
   border-radius: 14px;
   background: var(--grey100);
-  border: 1px solid var(--blue500);
+  border: 1px solid transparent;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px;
+  gap: 6px;
+  padding: 0 8px 0 14px;
   color: var(--text-strong);
   font-size: 15px;
   font-weight: 600;
+  min-width: 0;
+}
+
+.tm-team-search-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-team-filter-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  color: var(--text-strong);
+}
+
+.tm-team-filter-count {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  padding: 0 4px;
+  background: var(--blue500);
+  color: var(--static-white);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.tm-team-summary-bar {
+  min-height: 44px;
+  border-radius: 12px;
+  background: var(--grey50);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.tm-section-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .tm-team-stat-grid {
@@ -1092,9 +1127,19 @@ button:disabled {
   gap: 10px;
 }
 
-.tm-team-hero {
-  min-height: 224px;
-  padding: 12px 20px 20px;
+.tm-team-intro-box {
+  margin-top: 14px;
+  border: 1px solid var(--grey100);
+  border-radius: 14px;
+  background: var(--grey50);
+  padding: 12px;
+}
+
+.tm-team-card-selected .tm-team-intro-box {
+  background: var(--bg);
+}
+
+.tm-team-detail-hero-card {
   background: var(--grey900);
   color: var(--static-white);
 }
@@ -1103,25 +1148,129 @@ button:disabled {
   padding: 18px 20px 128px;
 }
 
+.tm-section-title {
+  margin-top: 22px;
+  margin-bottom: 10px;
+}
+
+.tm-team-info-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--grey100);
+}
+
+.tm-team-info-row:last-child,
+.tm-team-info-block:last-child {
+  border-bottom: 0;
+}
+
+.tm-team-info-row .tm-text-body {
+  min-width: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.tm-team-info-block {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--grey100);
+}
+
+.tm-team-form-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.tm-team-form-chip-row .tm-chip {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.tm-team-image-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.tm-team-image-slot {
+  border-radius: 14px;
+  border: 1px solid var(--grey100);
+  background: var(--bg);
+  padding: 12px;
+}
+
+.tm-team-thumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tm-team-thumb {
+  min-width: 78px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--blue100);
+  background: var(--blue50);
+  color: var(--blue500);
+  display: grid;
+  place-items: center;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tm-team-thumb-example {
+  border-color: var(--orange50);
+  background: var(--orange50);
+  color: var(--orange500);
+}
+
+.tm-member-section {
+  margin-top: 18px;
+}
+
+.tm-member-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .tm-chat-list {
-  padding: 14px 0 96px;
+  padding: 18px 0 96px;
 }
 
 .tm-chat-list .tm-sport-chip-row {
-  padding: 0 20px 10px;
+  padding: 0 20px 14px;
+}
+
+.tm-chat-section {
+  margin-top: 14px;
 }
 
 .tm-chat-section-label {
-  padding: 14px 20px 6px;
+  padding: 0 20px 8px;
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 700;
 }
 
+.tm-chat-card-stack {
+  display: grid;
+  gap: 10px;
+  padding: 0 20px;
+}
+
 .tm-chat-row {
-  min-height: 74px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--grey100);
+  min-height: 76px;
+  padding: 14px;
+  border: 1px solid var(--grey100);
+  border-radius: 16px;
   background: var(--bg);
   color: inherit;
   text-decoration: none;
@@ -1132,6 +1281,7 @@ button:disabled {
 
 .tm-chat-row-unread {
   background: var(--blue50);
+  border-color: rgba(49,130,246,.24);
 }
 
 .tm-chat-avatar {
@@ -1191,6 +1341,17 @@ button:disabled {
   padding: 14px;
   color: inherit;
   text-decoration: none;
+}
+
+.tm-chat-context-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--blue50);
+  color: var(--blue500);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
 }
 
 .tm-chat-thread {
@@ -1264,9 +1425,28 @@ button:disabled {
 
 .tm-notification-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.tm-notification-toolbar .tm-text-caption {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-notification-toast {
+  min-height: 44px;
+  margin-top: 12px;
+  border-radius: 14px;
+  background: var(--green50);
+  color: var(--green500);
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .tm-notification-card {
@@ -1300,6 +1480,17 @@ button:disabled {
 .tm-notification-card-unread .tm-notification-icon {
   background: var(--blue500);
   color: var(--static-white);
+}
+
+.tm-notification-meta {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-caption);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .tm-empty-state {
@@ -1826,15 +2017,17 @@ button:disabled {
 .tm-my-shell {
   display: grid;
   gap: 14px;
+  padding: 18px 20px 96px;
 }
 
 .tm-my-profile-head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 18px;
+  gap: 16px;
+  margin: -18px -20px 0;
+  padding: 20px 20px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--grey50);
 }
 
 .tm-my-avatar {
@@ -1852,8 +2045,27 @@ button:disabled {
 .tm-my-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.tm-my-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: -14px -20px 2px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--grey50);
+}
+
+.tm-my-profile-stats > div {
+  min-width: 0;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+
+.tm-my-profile-stats > div:last-child {
+  border-right: 0;
 }
 
 .tm-my-stat-grid {
@@ -1871,9 +2083,10 @@ button:disabled {
 
 .tm-my-section-label {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  margin: 4px 2px 8px;
+  margin: 6px 2px 8px;
+  letter-spacing: .3px;
 }
 
 .tm-my-menu-row {
@@ -1921,11 +2134,21 @@ button:disabled {
   margin-top: 14px;
 }
 
+.tm-segment-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--grey100);
+}
+
 .tm-my-team-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-radius: 8px;
+  border: 1px solid var(--grey100);
+  border-radius: 16px;
   background: var(--surface);
   padding: 16px;
   color: inherit;
@@ -1934,7 +2157,8 @@ button:disabled {
 .tm-my-team-hero {
   display: grid;
   gap: 12px;
-  border-radius: 8px;
+  border: 1px solid var(--grey100);
+  border-radius: 16px;
   background: var(--surface);
   padding: 18px;
 }

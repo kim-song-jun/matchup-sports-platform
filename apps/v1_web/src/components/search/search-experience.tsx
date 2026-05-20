@@ -71,12 +71,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const showStateMessage = viewState === 'empty' || viewState === 'error' || viewState === 'stale';
 
   return (
-    <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-      <div style={{ height: 44, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 15, fontWeight: 600, color: 'var(--grey900)' }}>
-        <span>9:41</span>
-        <span>5G</span>
-      </div>
-
+    <div style={{ width: 'min(100%, 375px)', height: '100dvh', margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <form onSubmit={submit} style={{ minHeight: 56, padding: '8px 10px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
         <button type="button" aria-label="back" onClick={goBack} style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />

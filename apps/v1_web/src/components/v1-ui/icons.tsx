@@ -90,6 +90,16 @@ export function SearchIcon(props: IconProps) {
   );
 }
 
+export function FilterIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M4 6 H20" />
+      <path d="M7 12 H17" />
+      <path d="M10 18 H14" />
+    </SvgIcon>
+  );
+}
+
 export function BellIcon(props: IconProps) {
   return (
     <SvgIcon {...props}>

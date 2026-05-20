@@ -170,8 +170,8 @@ Missing or unclear:
 ### Phase 6 -- Verification
 
 - [ ] Run `make dev-v1`.
-- [ ] Smoke `localhost:3013` core routes.
-- [ ] Capture mobile viewport evidence for each required design section.
+- [x] Smoke `localhost:3013` core routes.
+- [x] Capture mobile viewport evidence for each required design section.
 - [ ] Convert `docs/scenarios/12-v1-sm-new-e2e-scenarios.md` into Playwright specs after hook binding.
 
 ## Acceptance Criteria
@@ -210,6 +210,12 @@ Missing or unclear:
   profile summary, monthly activity, joined/created match lists, my team
   management, member review, profile edit, settings, legal, notification
   settings, and withdrawal warning surfaces.
+- [x] Completed mobile visual acceptance evidence for the componentized v1
+  core route set: 39 routes captured at the 375x812 mobile contract with zero
+  automated route/status issues.
+- [x] Started the shell/chrome consistency pass: removed the mock mobile
+  status bar from active `AppChrome` routes and the standalone search surface,
+  then realigned topbar and scroll-area anchors to the actual app-frame top.
 - [x] Detail pass started with `02 home`: compared active
   `HomePageView` against `SMRevisionHomeMobileV2`, kept the existing
   componentized structure, and corrected route continuity for home shortcuts,
@@ -300,14 +306,49 @@ Next detail-pass order:
      `/team-matches/[id]/edit`, and team info card to `/teams/team-1`.
    - Pending/approved locked buttons now keep distinct orange/green status
      fills instead of neutral-only disabled styling.
-4. [ ] `/teams`, `/teams/[id]`, `/teams/new`, `/teams/[id]/members`
-5. [ ] `/chat`, `/chat/[id]`, `/notifications`
+4. [x] `/teams`, `/teams/[id]`, `/teams/new`, `/teams/[id]/members`
+   - Rechecked active team browse/detail/create/member routes against
+     `SMRevisionTeamBrowseMobileSM5`, `SMRevisionTeamBrowseDetailSM5`, and
+     the related `07` member-management final surface.
+   - Moved the team create FAB into the shared shell `floatingSlot`, keeping it
+     app-frame fixed instead of content-scroll anchored.
+   - Updated the team browse surface to the SM5 search/filter chrome, one-line
+     summary bar, and team-intro card density instead of the earlier three-stat
+     card layout.
+   - Expanded team detail to show basic info, multi-sport chips, SNS/link
+     fields, uploaded-vs-example image slots, and member entry continuity.
+   - Updated create/edit to expose only saveable fields and disabled pending
+     save CTAs until real persistence is bound, avoiding false success.
+   - Split member management into team members and join requests with explicit
+     locked/pending actions.
+5. [x] `/chat`, `/chat/[id]`, `/notifications`
    - Partial correction: `/notifications` now uses shared shell back navigation
      to return to `/home`, matching the community design's back-title chrome.
    - Partial correction: `/chat` now returns to `/home`, and `/chat/[id]`
      returns to `/chat` through the same shared shell back navigation.
-6. [ ] `/my`, `/my/matches/*`, `/my/teams/*`, `/my/profile/edit`,
+   - Rechecked active community routes against `SMRevisionChatListMobileSM2`,
+     `SMRevisionChatRoomMobileSM2`, and `SMRevisionNotificationsMobileSM2`.
+   - Updated chat list to show search/notification chrome, chip filters,
+     fixed-frame chat FAB, pinned-first grouping, and card-style unread rows.
+   - Updated chat room context card, message input, and send action so the
+     unbound send state is disabled instead of appearing successful.
+   - Updated notifications to use explicit href/action labels per item,
+     a read-all state route, and read-all disabled/success copy without
+     pretending a live mutation has completed.
+6. [x] `/my`, `/my/matches/*`, `/my/teams/*`, `/my/profile/edit`,
    `/my/settings/*`
+   - Rechecked active my/profile/team-management routes against
+     `SMRevisionMyPageSM1`, `SMRevisionMyMatchesJoinedSM1`,
+     `SMRevisionMyMatchesCreatedSM1`, `SMRevisionMyTeamsSM1`,
+     `SMRevisionMyTeamDetailSM1`, and `SMRevisionMyTeamMembersSM1`.
+   - Updated `/my` to the SM1 profile band and four-stat summary rhythm.
+   - Added segmented joined/created match navigation and made unbound manage
+     actions disabled/pending instead of false-success buttons.
+   - Added explicit back navigation across my subpages and kept team detail
+     CTA continuity to team chat and public team information.
+   - Updated profile edit, logout, withdrawal, member approval, and request
+     actions to show pending/disabled states until real API contracts are
+     bound.
 
 Validation notes:
 
@@ -340,6 +381,62 @@ Validation notes:
   `/team-matches/team-match-1/edit`.
 - Restarted the v1 dev server on `3013` after the team-match changes;
   readiness check returned `200` for `/team-matches`.
+- `pnpm.cmd --filter v1_web exec tsc --noEmit --pretty false` could not run
+  directly from the current WSL `bash` shell because the Windows batch file was
+  parsed as shell script; `cmd.exe /c pnpm.cmd ...` also failed with a WSL
+  interop socket error. Equivalent `pnpm --filter v1_web exec tsc --noEmit
+  --pretty false` passed.
+- Team detail pass smoke returned `200`: `/teams`, `/teams/team-1`,
+  `/teams/new`, `/teams/team-1/edit`, `/teams/team-1/members`.
+- Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev:e2e`
+  from WSL after the team changes; readiness GET returned `200` for `/teams`.
+- Community detail pass smoke returned `200`: `/chat`, `/chat/room-1`,
+  `/notifications`, `/notifications/read`.
+- Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev:e2e`
+  from WSL after the community changes; readiness GET returned `200` for
+  `/chat`.
+- My/profile detail pass smoke returned `200`: `/my`,
+  `/my/matches/joined`, `/my/matches/created`, `/my/teams`,
+  `/my/teams/team-1`, `/my/teams/team-1/members`, `/my/profile/edit`,
+  `/my/settings`, `/my/settings/notifications`, `/my/settings/legal`,
+  `/my/settings/withdrawal`.
+- Restarting with `pnpm --filter v1_web dev:e2e` initially hit a Next dev
+  chunk-load/manifest drift 500 on `/my`; restarted with
+  `pnpm --filter v1_web dev` to clear `.next`, then readiness GET returned
+  `200` for `/my`.
+- Added `scripts/qa/v1-mobile-design-acceptance.mjs` for route-level mobile
+  design acceptance capture. The preferred Playwright browser path was blocked
+  in this host because Playwright Chromium install reported unsupported
+  `ubuntu26.04-x64`, and no system Linux Chromium was available.
+- `visual-qa-codex` MCP capture was unavailable in this runtime, so visual
+  evidence used the script's Windows Chrome CLI fallback with
+  `CHROME_CLI_EXECUTABLE='/mnt/c/Program Files/Google/Chrome/Application/chrome.exe'`.
+  The fallback uses `CHROME_CLI_WINDOW_SIZE=487,1056` and
+  `CHROME_CLI_DEVICE_SCALE_FACTOR=1.3` to approximate the 375x812 CSS viewport
+  under Windows display scaling.
+- Mobile visual acceptance run passed for 39 routes with zero automated issues:
+  `output/playwright/visual-audit/v1-mobile-acceptance-2026-05-20-dsf/report.md`.
+  Representative manual review covered `/home`, `/matches`, `/team-matches`,
+  `/team-matches/team-match-1`, `/teams`, `/teams/team-1`, `/my`,
+  `/chat/room-1`, and `/my/settings/withdrawal`; no critical visual blockers
+  were found.
+- Post-evidence checks passed: `git diff --check --
+  .github/tasks/84-v1-first-design-port-map.md
+  scripts/qa/v1-mobile-design-acceptance.mjs`,
+  `node --check scripts/qa/v1-mobile-design-acceptance.mjs`, and
+  `pnpm --filter v1_web exec tsc --noEmit --pretty false`.
+- Final dev-server readiness: a stale `next-server (v1)` process on `3013`
+  returned `500` after the failed restart attempt; stopped only that process,
+  restarted with `pnpm --filter v1_web dev`, and confirmed `200` for `/home`
+  and `/teams`.
+- Shell/chrome pass validation passed: active component search has no remaining
+  `9:41`, `tm-status-bar`, `tm-status-icons`, or `StatusBar` references outside
+  `design-source`; `git diff --check -- apps/v1_web/src/components/v1-ui/shell.tsx
+  apps/v1_web/src/app/globals.css apps/v1_web/src/components/search/search-experience.tsx`
+  passed; `pnpm --filter v1_web exec tsc --noEmit --pretty false` passed.
+- Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev` after
+  the shell/chrome pass; readiness smoke returned `200` for `/home`, `/search`,
+  and `/matches/match-1`.
 
 ## Ambiguity Log
 

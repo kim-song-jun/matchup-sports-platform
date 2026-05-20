@@ -2,6 +2,7 @@ export type ChatRoomModel = {
   id: string;
   title: string;
   type: '개인매치' | '팀매치' | '팀';
+  href: string;
   last: string;
   time: string;
   unread: number;
@@ -28,6 +29,8 @@ export type NotificationModel = {
   body: string;
   time: string;
   unread: boolean;
+  href: string;
+  actionLabel: string;
 };
 
 export type NotificationsViewModel = {

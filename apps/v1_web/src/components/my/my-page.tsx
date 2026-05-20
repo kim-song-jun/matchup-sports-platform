@@ -29,7 +29,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
           <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">수정</Link>
         </section>
-        <div className="tm-my-stat-grid">{model.user.stats.map((stat) => <Card key={stat.label} pad={14}><KPIStat {...stat} /></Card>)}</div>
+        <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
         <Card pad={16}>
           <div className="tm-text-body-lg">이번 달 활동</div>
           <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
@@ -41,11 +41,17 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
 }
 
 export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
+  const joined = model.mode === 'joined';
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false}>
+    <AppChrome title="내 매치" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
-        <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
+        <div className="tm-segment-row">
+          <Link className={`tm-btn tm-btn-md ${joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/joined">참여한 매치</Link>
+          <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created">생성한 매치</Link>
+        </div>
+        <div>
+          <div className="tm-text-label">{model.title}</div>
+          <div className="tm-text-caption" style={{ marginTop: 3 }}>{joined ? '내가 신청한 승인 대기, 승인 완료, 종료된 매치만 보여줍니다.' : '내가 생성한 매치만 보여주고 참여자 관리와 매치 수정 상태를 분리합니다.'}</div>
         </div>
         <div className="tm-my-list-stack">
           {model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)}
@@ -57,7 +63,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
 
 export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
   return (
-    <AppChrome title="내 팀" activeTab="my" bottomNav={false}>
+    <AppChrome title="내 팀" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
@@ -72,7 +78,7 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
 
 export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }) {
   return (
-    <AppChrome title="팀 관리" activeTab="my" bottomNav={false}>
+    <AppChrome title="팀 정보" activeTab="my" bottomNav={false} backHref="/my/teams">
       <div className="tm-my-shell">
         <section className="tm-my-team-hero">
           <div className="tm-team-logo tm-team-logo-large">{model.team.logo}</div>
@@ -91,14 +97,14 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
         <div className="tm-my-section-label">최근 팀 매치</div>
         <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
       </div>
-      <div className="tm-fixed-cta"><Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/chat/room-1">팀 채팅 열기</Link></div>
+      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-primary" href="/chat/room-1">팀 채팅</Link><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link></div></div>
     </AppChrome>
   );
 }
 
 export function MyTeamMembersPageView({ model }: { model: MyTeamMembersViewModel }) {
   return (
-    <AppChrome title="멤버 관리" activeTab="my" bottomNav={false}>
+    <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref="/my/teams/team-1">
       <div className="tm-my-shell">
         <h1 className="tm-text-heading">{model.teamName}</h1>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
@@ -113,7 +119,7 @@ export function MyTeamMembersPageView({ model }: { model: MyTeamMembersViewModel
 
 export function ProfileEditPageView({ model }: { model: ProfileEditViewModel }) {
   return (
-    <AppChrome title="프로필 수정" activeTab="my" bottomNav={false}>
+    <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-create-shell">
         <section className="tm-my-profile-head">
           <div className="tm-my-avatar">{model.user.initials}</div>
@@ -123,18 +129,19 @@ export function ProfileEditPageView({ model }: { model: ProfileEditViewModel }) 
           </div>
         </section>
         {model.fields.map((field) => <CreateField key={field.label} {...field} />)}
+        <Card pad={14} style={{ marginTop: 14, background: 'var(--blue50)' }}><div className="tm-text-label">저장 준비 상태</div><div className="tm-text-caption" style={{ marginTop: 5 }}>프로필 저장 API 연결 전에는 입력값을 화면에만 유지합니다.</div></Card>
       </div>
-      <div className="tm-fixed-cta"><button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button">저장하기</button></div>
+      <div className="tm-fixed-cta"><button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>저장 준비중</button></div>
     </AppChrome>
   );
 }
 
 export function SettingsPageView({ model }: { model: SettingsViewModel }) {
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false}>
+    <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
-        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button">로그아웃</button>
+        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>로그아웃 준비중</button>
       </div>
     </AppChrome>
   );
@@ -142,7 +149,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
 
 export function NotificationSettingsPageView({ model }: { model: NotificationSettingsViewModel }) {
   return (
-    <AppChrome title="알림 설정" activeTab="my" bottomNav={false}>
+    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         {model.settings.map((setting) => (
           <Card key={setting.label} pad={16}>
@@ -162,7 +169,7 @@ export function NotificationSettingsPageView({ model }: { model: NotificationSet
 
 export function LegalPageView({ model }: { model: SettingsViewModel }) {
   return (
-    <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false}>
+    <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <Card pad={16}>
           <ListItem title="이용약관" sub="서비스 이용에 필요한 기본 약관" trailing="2026.05" chev />
@@ -177,7 +184,7 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
 
 export function WithdrawalPageView() {
   return (
-    <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false}>
+    <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <section className="tm-danger-panel">
           <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
@@ -189,7 +196,7 @@ export function WithdrawalPageView() {
           <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
         </Card>
       </div>
-      <div className="tm-fixed-cta"><button className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block" type="button">탈퇴 요청하기</button></div>
+      <div className="tm-fixed-cta"><button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>탈퇴 요청 준비중</button></div>
     </AppChrome>
   );
 }
@@ -215,6 +222,7 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
 }
 
 function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
+  const canReview = match.status === 'ended';
   return (
     <Card pad={16}>
       <div className="tm-my-card-head">
@@ -227,7 +235,7 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
       <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
-        {manage ? <button className="tm-btn tm-btn-sm tm-btn-primary" type="button">관리</button> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button">리뷰</button>}
+        {manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>관리 준비중</button> : <button className={`tm-btn tm-btn-sm ${canReview ? 'tm-btn-primary' : 'tm-btn-neutral'}`} type="button" disabled={!canReview}>{canReview ? '리뷰' : '리뷰 대기'}</button>}
       </div>
     </Card>
   );
@@ -259,7 +267,7 @@ function MemberGroup({ title, members, review }: { title: string; members: Array
           <Card key={member.name} pad={14}>
             <div className="tm-my-card-head">
               <ListItem title={member.name} sub={`${member.role} · ${member.meta}`} trailing={member.status} />
-              {review ? <button className="tm-btn tm-btn-sm tm-btn-primary" type="button">승인</button> : null}
+              {review ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>승인 대기</button> : null}
             </div>
           </Card>
         ))}

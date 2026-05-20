@@ -27,6 +27,12 @@ export type TeamListViewModel = {
   teams: TeamModel[];
 };
 
+export type TeamStateViewModel = TeamListViewModel & {
+  state: 'search' | 'empty' | 'error' | 'filter';
+  title: string;
+  description: string;
+};
+
 export type TeamDetailViewModel = {
   team: TeamModel & {
     description: string;

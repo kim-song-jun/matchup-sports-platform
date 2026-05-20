@@ -24,6 +24,12 @@ export type TeamMatchListViewModel = {
   matches: TeamMatchModel[];
 };
 
+export type TeamMatchStateViewModel = TeamMatchListViewModel & {
+  state: 'empty' | 'error' | 'filter';
+  title: string;
+  description: string;
+};
+
 export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;

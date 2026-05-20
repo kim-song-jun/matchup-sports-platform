@@ -1,5 +1,6 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { TeamStatePageView } from '@/components/teams/teams-page';
+import { getTeamStateViewModel } from '@/components/teams/teams.view-model';
 
 export default function TeamSearchEmptyPage() {
-  return <FirstDesignPage screen="teamBrowseEmpty" />;
+  return <TeamStatePageView model={getTeamStateViewModel('empty')} />;
 }

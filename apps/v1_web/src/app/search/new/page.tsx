@@ -1,5 +1,5 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { SearchExperience } from '@/components/search/search-experience';
 
 export default function NewSearchPage() {
-  return <FirstDesignPage screen="searchNew" />;
+  return <SearchExperience state="new" />;
 }

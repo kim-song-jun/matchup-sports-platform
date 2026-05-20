@@ -1,5 +1,6 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { MatchStatePageView } from '@/components/matches/matches-page';
+import { getMatchStateViewModel } from '@/components/matches/matches.view-model';
 
 export default function MatchFilterPage() {
-  return <FirstDesignPage screen="matchFilter" />;
+  return <MatchStatePageView model={getMatchStateViewModel('filter')} />;
 }

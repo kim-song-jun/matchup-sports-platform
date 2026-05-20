@@ -1,5 +1,5 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { SearchExperience } from '@/components/search/search-experience';
 
 export default function ErrorSearchPage() {
-  return <FirstDesignPage screen="searchError" />;
+  return <SearchExperience state="error" />;
 }

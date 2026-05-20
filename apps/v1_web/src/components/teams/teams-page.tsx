@@ -1,9 +1,16 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { FilterIcon, PlusIcon, SearchIcon } from '@/components/v1-ui/icons';
-import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
+import type {
+  TeamDetailViewModel,
+  TeamFormViewModel,
+  TeamListViewModel,
+  TeamMembersViewModel,
+  TeamModel,
+  TeamStateViewModel,
+} from './teams.types';
 
 export function TeamListPageView({ model }: { model: TeamListViewModel }) {
   return (
@@ -28,6 +35,73 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
           <span className="tm-badge tm-badge-blue">검색/필터</span>
         </div>
         <div className="tm-team-card-stack">{model.teams.map((team, index) => <TeamCard key={team.id} team={team} selected={index === 0} />)}</div>
+      </div>
+    </AppChrome>
+  );
+}
+
+export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
+  if (model.state === 'filter') return <TeamFilterPageView model={model} />;
+
+  return (
+    <AppChrome title={model.title} activeTab="teams" bottomNav={false} backHref="/teams">
+      <TeamSearchBar model={model} />
+      <div className="tm-team-list">
+        {model.state === 'search' ? (
+          <>
+            <div className="tm-team-summary-bar">
+              <div className="tm-text-label">검색어 `{model.query}`</div>
+              <div className="tm-text-caption tab-num">{model.summary.total}팀 · 모집중 {model.summary.recruiting}</div>
+            </div>
+            <div className="tm-team-card-stack">{model.teams.map((team, index) => <TeamCard key={team.id} team={team} selected={index === 0} />)}</div>
+          </>
+        ) : (
+          <>
+            <EmptyState title={model.title} sub={model.description} />
+            {model.state === 'error' ? (
+              <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+                <div className="tm-text-label">아직 재시도 API가 연결되지 않았어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+                  지금은 목록으로 돌아가 상태를 확인할 수 있고, 실제 재시도 mutation은 API 바인딩 후 연결합니다.
+                </div>
+                <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
+              </Card>
+            ) : null}
+          </>
+        )}
+      </div>
+    </AppChrome>
+  );
+}
+
+function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
+  return (
+    <AppChrome title="필터" activeTab="teams" bottomNav={false} backHref="/teams">
+      <div className="tm-create-shell">
+        <section>
+          <h1 className="tm-text-heading">팀 조건</h1>
+          <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
+        </section>
+        <Card pad={16}>
+          <div className="tm-text-body-lg">빠른 조건</div>
+          <div className="tm-sport-chip-row" style={{ marginTop: 12 }}>
+            {model.chips.map((chip) => <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button">{chip.label}</button>)}
+          </div>
+        </Card>
+        <Card pad={16}>
+          <div className="tm-text-body-lg">가입 조건</div>
+          <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
+            <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
+            <ListItem title="모집 상태" sub="모집중 우선" trailing="1개" />
+            <ListItem title="활동 빈도" sub="주 1회 이상" trailing="1개" />
+          </div>
+        </Card>
+      </div>
+      <div className="tm-fixed-cta">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/teams">초기화</Link>
+          <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/teams">{model.teams.length}개 결과 보기</Link>
+        </div>
       </div>
     </AppChrome>
   );

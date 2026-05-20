@@ -1,4 +1,10 @@
-import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
+import type {
+  TeamDetailViewModel,
+  TeamFormViewModel,
+  TeamListViewModel,
+  TeamMembersViewModel,
+  TeamStateViewModel,
+} from './teams.types';
 
 const teams = [
   {
@@ -62,6 +68,51 @@ export function getTeamListViewModel(): TeamListViewModel {
     chips: ['전체 42', '모집중 18', '내 주변', '초중급', '주 1회'].map((label, index) => ({ label, active: index === 0 })),
     summary: { scope: '서울 전체 · 팀 둘러보기', total: 42, recruiting: 18, nearby: 7 },
     teams,
+  };
+}
+
+export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamStateViewModel {
+  const base = getTeamListViewModel();
+  const copy = {
+    search: {
+      title: '팀 검색',
+      description: '검색어가 입력된 팀 둘러보기 상태를 확인하는 QA용 fixture입니다.',
+      query: '풋살',
+      teams,
+    },
+    empty: {
+      title: '조건에 맞는 팀이 없어요',
+      description: '지역, 종목, 모집 상태 조건을 줄이면 가입 가능한 팀을 다시 볼 수 있습니다.',
+      query: '없는 팀',
+      teams: [],
+    },
+    error: {
+      title: '팀 목록을 불러오지 못했어요',
+      description: '네트워크 또는 API 연결 상태를 확인한 뒤 목록으로 돌아가 다시 시도해주세요.',
+      query: '풋살',
+      teams: [],
+    },
+    filter: {
+      title: '팀 필터',
+      description: '현재 선택된 팀 조건을 확인하는 QA용 fixture입니다. 실제 적용은 목록 API 바인딩 후 연결합니다.',
+      query: '',
+      teams,
+    },
+  }[state];
+
+  return {
+    ...base,
+    state,
+    title: copy.title,
+    description: copy.description,
+    query: copy.query,
+    teams: copy.teams,
+    summary: {
+      ...base.summary,
+      total: copy.teams.length,
+      recruiting: copy.teams.filter((team) => team.status === 'open').length,
+      nearby: state === 'empty' || state === 'error' ? 0 : base.summary.nearby,
+    },
   };
 }
 

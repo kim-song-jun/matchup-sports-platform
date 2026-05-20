@@ -233,6 +233,16 @@ Missing or unclear:
   `HomePageView` against `SMRevisionHomeMobileV2`, kept the existing
   componentized structure, and corrected route continuity for home shortcuts,
   featured/recommended match cards, section actions, and notice rows.
+- [x] Continued the componentized `02` follow-on pass for search and notices:
+  `/search/*` now uses the standalone `SearchExperience`, and `/notices`
+  routes use `notices.types -> notices.view-model -> notices-page` instead of
+  rendering `FirstDesignPage` or `design-source` directly.
+- [x] Continued the core state fixture pass for `03`, `04`, and `05`:
+  `/matches/{empty,error,filter,joined,participants}`,
+  `/team-matches/{empty,error,filter}`, and
+  `/teams/search`, `/teams/search/empty`, `/teams/search/error`,
+  `/teams/filter` now use the owning domain component/view-model layer instead
+  of rendering `FirstDesignPage` or `design-source` directly.
 
 ## Detail Pass Handoff
 
@@ -487,6 +497,34 @@ Validation notes:
 - Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev` after
   the fixed bottom surface pass; readiness smoke returned `200` for `/login`,
   `/matches/match-1`, and `/chat/room-1`.
+- Search/notices componentization validation passed: active route search has
+  no remaining `FirstDesignPage`, `design-source`, or `components/design`
+  imports under `/search`, `/notices`, `components/search`, or
+  `components/notices`; `pnpm --filter v1_web exec tsc --noEmit --pretty
+  false` passed.
+- Search/notices checks passed: `git diff --check --
+  .github/tasks/84-v1-first-design-port-map.md
+  apps/v1_web/src/app/globals.css apps/v1_web/src/app/search
+  apps/v1_web/src/app/notices apps/v1_web/src/components/notices` passed;
+  smoke returned `200` for `/search`, `/search/new`, `/search/empty`,
+  `/search/error`, `/search/stale`, `/notices`, and `/notices/notice-1`.
+- Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev` after
+  the search/notices pass; readiness smoke returned `200` for `/search` and
+  `/notices`.
+- Core state fixture validation passed: active route search has no remaining
+  `FirstDesignPage`, `design-source`, or `components/design` imports under
+  `/matches`, `/team-matches`, `/teams`, or their owning components;
+  `git diff --check -- apps/v1_web/src/app/matches
+  apps/v1_web/src/components/matches apps/v1_web/src/app/team-matches
+  apps/v1_web/src/components/team-matches apps/v1_web/src/app/teams
+  apps/v1_web/src/components/teams` passed; `pnpm --filter v1_web exec tsc
+  --noEmit --pretty false` passed.
+- Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev` after
+  the core state fixture pass; smoke returned `200` for `/matches/empty`,
+  `/matches/error`, `/matches/filter`, `/matches/joined`,
+  `/matches/participants`, `/team-matches/empty`, `/team-matches/error`,
+  `/team-matches/filter`, `/teams/search`, `/teams/search/empty`,
+  `/teams/search/error`, and `/teams/filter`.
 
 ## Ambiguity Log
 

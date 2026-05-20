@@ -1,4 +1,10 @@
-import type { MatchCreateStep, MatchCreateViewModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
+import type {
+  MatchCreateStep,
+  MatchCreateViewModel,
+  MatchDetailViewModel,
+  MatchListViewModel,
+  MatchStateViewModel,
+} from './matches.types';
 
 const matches = [
   {
@@ -107,6 +113,50 @@ export function getMatchListViewModel(): MatchListViewModel {
       urgent: 4,
     },
     matches,
+  };
+}
+
+export function getMatchStateViewModel(state: MatchStateViewModel['state']): MatchStateViewModel {
+  const base = getMatchListViewModel();
+  const copy = {
+    empty: {
+      title: '조건에 맞는 매치가 없어요',
+      description: '지역, 시간, 종목 조건을 줄이면 참여 가능한 매치를 다시 볼 수 있습니다.',
+      matches: [],
+    },
+    error: {
+      title: '매치 목록을 불러오지 못했어요',
+      description: '네트워크 또는 API 연결 상태를 확인한 뒤 목록으로 돌아가 다시 시도해주세요.',
+      matches: [],
+    },
+    filter: {
+      title: '필터',
+      description: '현재 선택된 조건을 확인하는 QA용 fixture입니다. 실제 적용은 목록 API 바인딩 후 연결합니다.',
+      matches: base.matches,
+    },
+    joined: {
+      title: '참여한 매치',
+      description: '신청 대기와 승인 완료 상태의 개인 매치를 모아 보여줍니다.',
+      matches: base.matches.filter((match) => match.status === 'pending' || match.status === 'approved'),
+    },
+    participants: {
+      title: '참가자',
+      description: '매치 상세의 참가자 목록을 독립 route에서 확인하는 QA용 fixture입니다.',
+      matches: base.matches,
+    },
+  }[state];
+
+  return {
+    ...base,
+    state,
+    title: copy.title,
+    description: copy.description,
+    matches: copy.matches,
+    summary: {
+      ...base.summary,
+      label: copy.title,
+      count: copy.matches.length,
+    },
   };
 }
 

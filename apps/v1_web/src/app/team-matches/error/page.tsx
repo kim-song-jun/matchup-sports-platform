@@ -1,5 +1,6 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { TeamMatchStatePageView } from '@/components/team-matches/team-matches-page';
+import { getTeamMatchStateViewModel } from '@/components/team-matches/team-matches.view-model';
 
 export default function ErrorTeamMatchesPage() {
-  return <FirstDesignPage screen="teamMatchError" />;
+  return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
 }

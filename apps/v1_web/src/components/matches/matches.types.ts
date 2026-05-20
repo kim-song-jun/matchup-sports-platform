@@ -29,6 +29,12 @@ export type MatchListViewModel = {
   matches: MatchCardModel[];
 };
 
+export type MatchStateViewModel = MatchListViewModel & {
+  state: 'empty' | 'error' | 'filter' | 'joined' | 'participants';
+  title: string;
+  description: string;
+};
+
 export type MatchDetailViewModel = {
   match: MatchCardModel & {
     description: string;

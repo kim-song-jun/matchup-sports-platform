@@ -1,4 +1,10 @@
-import type { TeamMatchCreateStep, TeamMatchCreateViewModel, TeamMatchDetailViewModel, TeamMatchListViewModel } from './team-matches.types';
+import type {
+  TeamMatchCreateStep,
+  TeamMatchCreateViewModel,
+  TeamMatchDetailViewModel,
+  TeamMatchListViewModel,
+  TeamMatchStateViewModel,
+} from './team-matches.types';
 
 const teamMatches = [
   { id: 'team-match-1', title: 'FC 발빠른놈들 vs 상대팀 구합니다', sport: '축구', hostTeam: 'FC 발빠른놈들', venue: '상암 월드컵 A구장', date: '5월 11일 일', time: '09:00', format: '11:11', grade: 'A', cost: 280000, opponentCost: 140000, uniform: '빨강', manner: 4.8, wins: 23, status: 'open' as const },
@@ -34,6 +40,39 @@ export function getTeamMatchListViewModel(): TeamMatchListViewModel {
     ],
     summary: { count: 28, today: 5, urgent: 3 },
     matches: teamMatches,
+  };
+}
+
+export function getTeamMatchStateViewModel(state: TeamMatchStateViewModel['state']): TeamMatchStateViewModel {
+  const base = getTeamMatchListViewModel();
+  const copy = {
+    empty: {
+      title: '조건에 맞는 팀매치가 없어요',
+      description: '종목, 지역, 등급 조건을 줄이면 신청 가능한 팀매치를 다시 볼 수 있습니다.',
+      matches: [],
+    },
+    error: {
+      title: '팀매치 목록을 불러오지 못했어요',
+      description: '네트워크 또는 API 연결 상태를 확인한 뒤 목록으로 돌아가 다시 시도해주세요.',
+      matches: [],
+    },
+    filter: {
+      title: '팀매치 필터',
+      description: '현재 선택된 팀매치 조건을 확인하는 QA용 fixture입니다. 실제 적용은 목록 API 바인딩 후 연결합니다.',
+      matches: base.matches,
+    },
+  }[state];
+
+  return {
+    ...base,
+    state,
+    title: copy.title,
+    description: copy.description,
+    matches: copy.matches,
+    summary: {
+      ...base.summary,
+      count: copy.matches.length,
+    },
   };
 }
 

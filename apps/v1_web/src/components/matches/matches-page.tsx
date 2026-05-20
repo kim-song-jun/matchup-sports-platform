@@ -2,7 +2,13 @@ import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
-import type { MatchCardModel, MatchCreateViewModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
+import type {
+  MatchCardModel,
+  MatchCreateViewModel,
+  MatchDetailViewModel,
+  MatchListViewModel,
+  MatchStateViewModel,
+} from './matches.types';
 
 export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   return (
@@ -29,6 +35,92 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         <div className="tm-match-card-stack">
           {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
         </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
+  if (model.state === 'filter') return <MatchFilterPageView model={model} />;
+  if (model.state === 'participants') return <MatchParticipantsPageView />;
+
+  return (
+    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches">
+      <div className="tm-match-list">
+        <EmptyState title={model.title} sub={model.description} />
+        {model.state === 'error' ? (
+          <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+            <div className="tm-text-label">아직 재시도 API가 연결되지 않았어요</div>
+            <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+              지금은 목록으로 돌아가 상태를 확인할 수 있고, 실제 재시도 mutation은 API 바인딩 후 연결합니다.
+            </div>
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
+          </Card>
+        ) : null}
+        {model.state === 'joined' ? (
+          <div className="tm-match-card-stack" style={{ marginTop: 18 }}>
+            {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
+          </div>
+        ) : null}
+      </div>
+    </AppChrome>
+  );
+}
+
+function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
+  return (
+    <AppChrome title="필터" activeTab="matches" bottomNav={false} backHref="/matches">
+      <div className="tm-create-shell">
+        <section>
+          <h1 className="tm-text-heading">매치 조건</h1>
+          <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
+        </section>
+        <Card pad={16}>
+          <div className="tm-text-body-lg">종목</div>
+          <div className="tm-sport-chip-row" style={{ marginTop: 12 }}>
+            {model.sports.map((sport) => <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label}</button>)}
+          </div>
+        </Card>
+        <Card pad={16}>
+          <div className="tm-text-body-lg">현재 적용된 조건</div>
+          <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
+            <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
+            <ListItem title="날짜" sub="이번 주" trailing="변경 가능" />
+            <ListItem title="모집 상태" sub="모집중 우선" trailing="2개" />
+          </div>
+        </Card>
+      </div>
+      <div className="tm-fixed-cta">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches">초기화</Link>
+          <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/matches">{model.matches.length}개 결과 보기</Link>
+        </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+function MatchParticipantsPageView() {
+  const participants = [
+    { name: '김정민', meta: '호스트 · 매너 4.9', status: '승인완료' },
+    { name: '박서준', meta: '초급 · 최근 3경기', status: '승인완료' },
+    { name: '이하나', meta: '중급 · 빠른 응답', status: '승인중' },
+  ];
+
+  return (
+    <AppChrome title="참가자" activeTab="matches" bottomNav={false} backHref="/matches/match-1">
+      <div className="tm-match-list">
+        <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
+          <div className="tm-text-body-lg">주말 풋살 한판!</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>승인 완료 2명 · 승인중 1명 · 정원 10명</div>
+        </Card>
+        <div className="tm-my-list-stack" style={{ marginTop: 14 }}>
+          {participants.map((person) => <ListItem key={person.name} title={person.name} sub={person.meta} trailing={person.status} />)}
+        </div>
+        <Card pad={14} style={{ marginTop: 16, background: 'var(--grey50)' }}>
+          <div className="tm-text-label">참가자 관리는 상세/수정 플로우에서 연결됩니다</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>이 route는 참가자 상태 표현을 확인하기 위한 읽기 전용 fixture입니다.</div>
+        </Card>
       </div>
     </AppChrome>
   );

@@ -1,5 +1,6 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { NoticeListPageView } from '@/components/notices/notices-page';
+import { getNoticeListViewModel } from '@/components/notices/notices.view-model';
 
 export default function NoticesPage() {
-  return <FirstDesignPage screen="noticeList" />;
+  return <NoticeListPageView model={getNoticeListViewModel()} />;
 }

@@ -1,18 +1,89 @@
-import type { LoginViewModel, OnboardingStep, OnboardingViewModel, SignupViewModel, TermsViewModel } from './auth.types';
+import type { AuthExceptionKind, AuthExceptionViewModel, EmailLoginViewModel, LoginViewModel, OnboardingStep, OnboardingViewModel, SignupCompleteViewModel, SignupFormViewModel, TermsViewModel } from './auth.types';
 
 export function getLoginViewModel(): LoginViewModel {
   return {
     heroTitle: '같이 뛸 사람을\n한 번에 찾아요',
     heroSub: 'Teameet에 오신 걸 환영합니다',
-    emailHref: '/signup',
+    emailHref: '/login/email',
     guestHref: '/home',
     signupHref: '/terms',
     providers: [
-      { label: '카카오', background: '#FEE500', color: 'var(--static-black)', disabled: true },
-      { label: '네이버', background: 'var(--green500)', color: 'var(--static-white)', disabled: true },
-      { label: 'Apple', background: 'var(--static-black)', color: 'var(--static-white)', disabled: true },
+      { label: '카카오', background: '#FEE500', color: 'var(--static-black)', href: '/auth/provider-denied' },
+      { label: '네이버', background: 'var(--green500)', color: 'var(--static-white)', href: '/auth/missing-email' },
+      { label: 'Apple', background: 'var(--static-black)', color: 'var(--static-white)', href: '/auth/account-conflict' },
     ],
   };
+}
+
+export function getEmailLoginViewModel(): EmailLoginViewModel {
+  return {
+    backHref: '/login',
+    title: '이메일로\n로그인하세요',
+    sub: '입력은 이메일과 비밀번호만 받습니다. 실패해도 입력값을 유지하고 같은 화면에서 복구합니다.',
+    fields: [
+      { label: '이메일', placeholder: 'you@example.com', type: 'email' },
+      { label: '비밀번호', placeholder: '비밀번호', type: 'password' },
+    ],
+    primary: { label: '로그인', href: '/onboarding/resume' },
+    forgot: { label: '비밀번호 찾기', disabled: true, tone: 'neutral' },
+    signupHref: '/terms',
+    notice: {
+      title: '오류 처리',
+      body: '이메일 형식 오류, 비밀번호 불일치, 네트워크 실패는 field helper와 persistent error card로 표시합니다.',
+    },
+  };
+}
+
+export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptionViewModel {
+  const models: Record<AuthExceptionKind, AuthExceptionViewModel> = {
+    'provider-denied': {
+      backHref: '/login',
+      badge: '소셜 권한 거부',
+      title: '로그인을 완료하지 못했어요',
+      body: '필수 정보 제공 동의가 취소되었습니다. 계정은 생성되지 않았고, 같은 제공자 또는 다른 로그인 방법으로 다시 시도할 수 있습니다.',
+      tone: 'orange',
+      primary: { label: '다시 로그인하기', href: '/login' },
+      secondary: { label: '다른 방법 선택', href: '/login', tone: 'neutral' },
+    },
+    'missing-email': {
+      backHref: '/login',
+      badge: '이메일 누락',
+      title: '확인 가능한 이메일이 필요해요',
+      body: '소셜 계정에서 검증된 이메일을 받을 수 없습니다. 이메일을 직접 입력하고 인증한 뒤 같은 온보딩 흐름을 이어갑니다.',
+      tone: 'orange',
+      primary: { label: '이메일 직접 인증', href: '/login/email' },
+      secondary: { label: '소셜 계정 바꾸기', href: '/login', tone: 'neutral' },
+    },
+    blocked: {
+      backHref: '/login',
+      badge: '계정 제한',
+      title: '현재 계정은 이용할 수 없어요',
+      body: '정지, 탈퇴 대기, 운영 제한 상태에서는 계속하기와 홈 이동을 모두 막고 고객센터 요청 경로만 제공합니다.',
+      tone: 'red',
+      primary: { label: '고객센터 문의', disabled: true, tone: 'danger' },
+      secondary: { label: '로그인으로 돌아가기', href: '/login', tone: 'neutral' },
+    },
+    'account-conflict': {
+      backHref: '/login',
+      badge: '계정 충돌',
+      title: '이미 가입된 정보가 있어요',
+      body: '같은 이메일 또는 휴대폰이 다른 인증 수단과 연결되어 있습니다. 기존 계정을 확인한 뒤 연결 또는 병합을 진행합니다.',
+      tone: 'orange',
+      primary: { label: '기존 계정 확인', href: '/login/email' },
+      secondary: { label: '다른 방법 선택', href: '/login', tone: 'neutral' },
+    },
+    'location-denied': {
+      backHref: '/onboarding/region',
+      badge: '위치 권한',
+      title: '현재 위치를 사용할 수 없어요',
+      body: '위치 권한을 거부해도 종목과 실력 입력값은 유지됩니다. 수동 지역 선택으로 온보딩을 마칠 수 있습니다.',
+      tone: 'orange',
+      primary: { label: '수동으로 지역 선택', href: '/onboarding/region' },
+      secondary: { label: '설정에서 권한 열기', disabled: true, tone: 'neutral' },
+    },
+  };
+
+  return models[kind];
 }
 
 export function getTermsViewModel(): TermsViewModel {
@@ -30,7 +101,26 @@ export function getTermsViewModel(): TermsViewModel {
   };
 }
 
-export function getSignupViewModel(): SignupViewModel {
+export function getSignupFormViewModel(): SignupFormViewModel {
+  return {
+    backHref: '/terms',
+    title: '계정을 만들고\n운동 설정을 이어가요',
+    sub: '회원가입 후 종목, 레벨, 지역 선택 화면으로 이어집니다.',
+    fields: [
+      { label: '닉네임', placeholder: '사용할 닉네임', type: 'text', helper: '사용 가능한 닉네임이에요.', state: 'success', action: { label: '중복체크', disabled: true, tone: 'neutral' } },
+      { label: '이메일', placeholder: 'you@example.com', type: 'email' },
+      { label: '비밀번호', placeholder: '8자 이상', type: 'password' },
+      { label: '비밀번호 확인', placeholder: '비밀번호 다시 입력', type: 'password', helper: '일치하지 않으면 가입 CTA는 비활성화합니다.' },
+    ],
+    notice: {
+      title: '가입 후 행동',
+      body: '가입 성공 시 로그인 상태로 종목 선택 step에 진입합니다. 닉네임 중복 실패와 비밀번호 불일치는 현재 화면에 남겨 복구합니다.',
+    },
+    primary: { label: '회원가입하고 계속', href: '/signup/complete' },
+  };
+}
+
+export function getSignupCompleteViewModel(): SignupCompleteViewModel {
   return {
     title: '회원가입이 완료됐어요',
     sub: '이제 운동 설정을 하면 더 정확한 매치 추천을 받을 수 있습니다.',

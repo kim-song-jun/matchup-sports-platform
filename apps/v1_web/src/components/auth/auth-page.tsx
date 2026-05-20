@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import type { AuthAction, LoginViewModel, OnboardingOption, OnboardingViewModel, SignupViewModel, TermsViewModel } from './auth.types';
+import type { AuthAction, AuthExceptionViewModel, EmailLoginViewModel, LoginProvider, LoginViewModel, OnboardingOption, OnboardingViewModel, SignupCompleteViewModel, SignupField, SignupFormViewModel, TermsViewModel } from './auth.types';
 
 export function LoginPageView({ model }: { model: LoginViewModel }) {
   return (
@@ -12,7 +12,7 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           <div className="tm-auth-logo">T</div>
           <h1 className="tm-text-heading tm-auth-title">{model.heroTitle}</h1>
           <p className="tm-text-body tm-auth-sub">{model.heroSub}</p>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" href={model.emailHref}>이메일로 로그인</Link>
+          <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
           <p className="tm-text-caption tm-auth-helper">기존 계정이 있으면 이메일 로그인 후 종목, 레벨, 지역 확인으로 이어집니다.</p>
         </div>
         <div>
@@ -22,20 +22,49 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </p>
           <AuthDivider />
           <div className="tm-auth-provider-row">
-            {model.providers.map((provider) => (
-              <button
-                key={provider.label}
-                className="tm-btn tm-btn-md tm-pressable"
-                disabled={provider.disabled}
-                style={{ background: provider.background, color: provider.color }}
-                type="button"
-              >
-                {provider.label}
-              </button>
-            ))}
+            {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
           </div>
-          <p className="tm-text-caption tm-auth-policy">소셜 로그인은 API 연결 전 준비 상태입니다. 계속하면 서비스 약관과 개인정보 처리방침을 확인합니다.</p>
+          <p className="tm-text-caption tm-auth-policy">계속하면 서비스 약관과 개인정보 처리방침에 동의합니다.</p>
         </div>
+      </div>
+    </AuthFrame>
+  );
+}
+
+export function EmailLoginPageView({ model }: { model: EmailLoginViewModel }) {
+  return (
+    <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} fixedAction={<AuthActionButton action={model.primary} />}>
+      <div className="tm-auth-body">
+        <span className="tm-badge tm-badge-blue">EMAIL LOGIN</span>
+        <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
+        <p className="tm-text-body tm-auth-sub">{model.sub}</p>
+        <div className="tm-auth-form">
+          {model.fields.map((field) => <AuthField key={field.label} {...field} />)}
+        </div>
+        <div className="tm-auth-link-row">
+          <AuthSmallAction action={model.forgot} />
+          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
+        </div>
+        <Card pad={16} className="tm-auth-soft-card">
+          <div className="tm-text-body-lg">{model.notice.title}</div>
+          <div className="tm-text-caption">{model.notice.body}</div>
+        </Card>
+      </div>
+    </AuthFrame>
+  );
+}
+
+export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel }) {
+  return (
+    <AuthFrame topTitle="로그인 확인" backHref={model.backHref} fixedAction={<ExceptionActions model={model} />}>
+      <div className="tm-auth-exception">
+        <span className={`tm-badge ${model.tone === 'red' ? 'tm-badge-red' : 'tm-badge-orange'}`}>{model.badge}</span>
+        <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
+        <p className="tm-text-body tm-auth-sub">{model.body}</p>
+        <Card pad={16} className={`tm-auth-exception-card tm-auth-exception-card-${model.tone}`}>
+          <div className="tm-text-label">처리 기준</div>
+          <div className="tm-text-caption">입력값과 온보딩 임시 선택값은 보존하고, 계정 상태를 성공처럼 처리하지 않습니다.</div>
+        </Card>
       </div>
     </AuthFrame>
   );
@@ -69,7 +98,26 @@ export function TermsPageView({ model }: { model: TermsViewModel }) {
   );
 }
 
-export function SignupPageView({ model }: { model: SignupViewModel }) {
+export function SignupFormPageView({ model }: { model: SignupFormViewModel }) {
+  return (
+    <AuthFrame topTitle="회원가입" backHref={model.backHref} fixedAction={<AuthActionButton action={model.primary} />}>
+      <div className="tm-auth-body">
+        <span className="tm-badge tm-badge-blue">SIGN UP</span>
+        <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
+        <p className="tm-text-body tm-auth-sub">{model.sub}</p>
+        <div className="tm-auth-form tm-auth-signup-form">
+          {model.fields.map((field) => <SignupFieldRow key={field.label} field={field} />)}
+        </div>
+        <Card pad={16} className="tm-auth-soft-card">
+          <div className="tm-text-body-lg">{model.notice.title}</div>
+          <div className="tm-text-caption">{model.notice.body}</div>
+        </Card>
+      </div>
+    </AuthFrame>
+  );
+}
+
+export function SignupCompletePageView({ model }: { model: SignupCompleteViewModel }) {
   return (
     <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />}>
       <div className="tm-auth-complete">
@@ -142,6 +190,57 @@ function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction }: { ch
 function AuthActionButton({ action }: { action: AuthAction }) {
   const className = `tm-btn tm-btn-lg ${action.disabled ? 'tm-btn-neutral' : action.tone === 'danger' ? 'tm-btn-danger' : action.tone === 'neutral' ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`;
   return action.href && !action.disabled ? <Link className={className} href={action.href}>{action.label}</Link> : <button className={className} type="button" disabled={action.disabled}>{action.label}</button>;
+}
+
+function AuthSmallAction({ action }: { action: AuthAction }) {
+  const className = `tm-btn tm-btn-sm ${action.disabled ? 'tm-btn-ghost tm-btn-disabled' : 'tm-btn-ghost'}`;
+  return action.href && !action.disabled ? <Link className={className} href={action.href}>{action.label}</Link> : <button className={className} type="button" disabled={action.disabled}>{action.label}</button>;
+}
+
+function ProviderButton({ provider }: { provider: LoginProvider }) {
+  const style = { background: provider.background, color: provider.color };
+
+  return provider.href && !provider.disabled ? (
+    <Link className="tm-btn tm-btn-md tm-pressable" href={provider.href} style={style}>
+      {provider.label}
+    </Link>
+  ) : (
+    <button className="tm-btn tm-btn-md tm-pressable" disabled={provider.disabled} style={style} type="button">
+      {provider.label}
+    </button>
+  );
+}
+
+function AuthField({ label, placeholder, type, helper, state = 'default' }: { label: string; placeholder: string; type: 'email' | 'password'; helper?: string; state?: 'default' | 'error' | 'success' }) {
+  return (
+    <label className="tm-auth-field">
+      <span className="tm-text-label">{label}</span>
+      <input className={`tm-input tm-auth-input tm-auth-input-${state}`} placeholder={placeholder} type={type} />
+      {helper ? <span className={`tm-text-caption tm-auth-field-helper tm-auth-field-helper-${state}`}>{helper}</span> : null}
+    </label>
+  );
+}
+
+function SignupFieldRow({ field }: { field: SignupField }) {
+  return (
+    <label className="tm-auth-field">
+      <span className="tm-text-label">{field.label}</span>
+      <span className={field.action ? 'tm-auth-field-with-action' : ''}>
+        <input className={`tm-input tm-auth-input tm-auth-input-${field.state ?? 'default'}`} placeholder={field.placeholder} type={field.type} />
+        {field.action ? <AuthSmallAction action={field.action} /> : null}
+      </span>
+      {field.helper ? <span className={`tm-text-caption tm-auth-field-helper tm-auth-field-helper-${field.state ?? 'default'}`}>{field.helper}</span> : null}
+    </label>
+  );
+}
+
+function ExceptionActions({ model }: { model: AuthExceptionViewModel }) {
+  return (
+    <>
+      <AuthActionButton action={model.primary} />
+      {model.secondary ? <><div style={{ height: 8 }} /><AuthActionButton action={model.secondary} /></> : null}
+    </>
+  );
 }
 
 function SignupActions({ primary, secondary }: { primary: AuthAction; secondary: AuthAction }) {

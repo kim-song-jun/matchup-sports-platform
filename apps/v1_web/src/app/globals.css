@@ -267,11 +267,18 @@ button:disabled {
 
 .tm-auth-login {
   min-height: 100%;
-  padding: 48px 24px 24px;
+  padding: 40px 24px 24px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 28px;
+}
+
+.tm-auth-login > div:first-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .tm-auth-logo {
@@ -295,11 +302,16 @@ button:disabled {
 .tm-auth-sub {
   color: var(--text-muted);
   margin-top: 10px;
+  margin-bottom: 34px;
 }
 
 .tm-auth-helper {
   margin-top: 10px;
   line-height: 1.5;
+}
+
+.tm-auth-email-link {
+  margin-top: 0;
 }
 
 .tm-auth-center {
@@ -330,9 +342,12 @@ button:disabled {
 }
 
 .tm-auth-provider-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 10px;
+}
+
+.tm-auth-provider-row > * {
+  flex: 1;
 }
 
 .tm-auth-policy {
@@ -353,6 +368,75 @@ button:disabled {
   display: grid;
   gap: 10px;
   margin-top: 18px;
+}
+
+.tm-auth-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 30px;
+}
+
+.tm-auth-field {
+  display: grid;
+  gap: 8px;
+}
+
+.tm-auth-field-helper {
+  margin-top: -2px;
+}
+
+.tm-auth-field-helper-error {
+  color: var(--red500);
+}
+
+.tm-auth-field-helper-success {
+  color: var(--green500);
+}
+
+.tm-auth-field-with-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 8px;
+}
+
+.tm-auth-link-row {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tm-auth-soft-card {
+  margin-top: 22px;
+  background: var(--grey50);
+}
+
+.tm-auth-soft-card .tm-text-caption {
+  margin-top: 6px;
+}
+
+.tm-auth-exception {
+  min-height: 100%;
+  padding: 72px 24px 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tm-auth-exception-card {
+  margin-top: 22px;
+}
+
+.tm-auth-exception-card .tm-text-caption {
+  margin-top: 6px;
+}
+
+.tm-auth-exception-card-orange {
+  background: rgba(254, 152, 0, .10);
+}
+
+.tm-auth-exception-card-red {
+  background: rgba(240, 68, 82, .08);
 }
 
 .tm-auth-agree-all {
@@ -629,6 +713,12 @@ button:disabled {
   color: var(--text-strong);
 }
 
+.tm-btn-outline {
+  border: 1px solid var(--grey200);
+  background: var(--bg);
+  color: var(--text-strong);
+}
+
 .tm-btn-danger {
   background: var(--red500);
   color: var(--static-white);
@@ -646,6 +736,11 @@ button:disabled {
 
 .tm-btn:disabled {
   opacity: 0.78;
+}
+
+.tm-btn-disabled {
+  color: var(--text-caption);
+  cursor: not-allowed;
 }
 
 .tm-badge {
@@ -674,6 +769,40 @@ button:disabled {
 .tm-badge-orange {
   background: var(--orange50);
   color: var(--orange500);
+}
+
+.tm-badge-red {
+  background: var(--red50);
+  color: var(--red500);
+}
+
+.tm-input {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text-strong);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.tm-input::placeholder {
+  color: var(--text-caption);
+}
+
+.tm-input:focus {
+  border-color: var(--blue500);
+}
+
+.tm-auth-input-error {
+  border-color: var(--red500);
+}
+
+.tm-auth-input-success {
+  border-color: var(--green500);
 }
 
 .tm-chip {

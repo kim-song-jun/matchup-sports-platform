@@ -10,6 +10,21 @@ const outDir = path.join('output', 'playwright', 'visual-audit', runId);
 const execFileAsync = promisify(execFile);
 
 const routes = [
+  '/login',
+  '/login/email',
+  '/auth/provider-denied',
+  '/auth/missing-email',
+  '/auth/blocked',
+  '/auth/account-conflict',
+  '/auth/location-denied',
+  '/terms',
+  '/signup',
+  '/signup/complete',
+  '/onboarding/resume',
+  '/onboarding/sport',
+  '/onboarding/level',
+  '/onboarding/region',
+  '/onboarding/confirm',
   '/home',
   '/matches',
   '/matches/match-1',

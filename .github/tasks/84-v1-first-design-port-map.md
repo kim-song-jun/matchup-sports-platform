@@ -51,7 +51,7 @@ inventory and must stay visible in publishing work.
 | No | Design section | Required product page(s) | Current route evidence | Port status | Exception/state handling |
 |---|---|---|---|---|---|
 | 00 | `core-shell-sm-final` | shared shell, top bar, bottom nav, search entry, notification entry | `components/design/first-design-page.tsx`, `components/design/design-frame.tsx` | Imported | First-complete design shell is active on v1 routes. Product shell replacement comes after visual import review. |
-| 01 | `auth-onboarding-sm-final` | login, terms, signup, onboarding sport/level/region/confirm/resume | `/login`, `/signup`, `/terms`, `/onboarding/*` | Imported | Provider denied, email missing, conflict, blocked, incomplete resume, validation failure are available in design-source and need route exposure if QA requires separate URLs. |
+| 01 | `auth-onboarding-sm-final` | login, email login, terms, signup form, signup complete, onboarding sport/level/region/confirm/resume, auth exception states | `/login`, `/login/email`, `/signup`, `/signup/complete`, `/terms`, `/onboarding/*`, `/auth/{provider-denied,missing-email,blocked,account-conflict,location-denied}` | Componentized core | Provider denied, email missing, conflict, blocked, and location denied now have route-backed exception surfaces. Real auth submit/API binding remains a later contract-binding task. Placeholder-only actions such as password reset, support, and browser permission settings are disabled instead of misrouting. |
 | 02 | `home-discovery-sm-final` | `/home`, search entry, recommendations, quick actions, home notices | `/home`, `/search`, `/search/new`, `/search/empty`, `/search/error`, `/search/stale` | Imported | Search states are exposed through fixture routes where available. |
 | 02-1 | `home-notice-sm-final` | `/notices`, `/notices/[id]` | routes exist | Imported | Notices are read-only. |
 | 03 | `matches-core-sm-final` | `/matches`, `/matches/[id]`, `/matches/participants`, joined/created management entry | routes exist: list/detail/empty/error/filter/joined/participants | Imported | Empty/error/filter are separate fixture routes for first visual review. |
@@ -73,7 +73,8 @@ inventory and must stay visible in publishing work.
 Covered as route scaffold:
 
 - `/landing`
-- `/login`, `/signup`, `/terms`
+- `/login`, `/login/email`, `/signup`, `/signup/complete`, `/terms`
+- `/auth/provider-denied`, `/auth/missing-email`, `/auth/blocked`, `/auth/account-conflict`, `/auth/location-denied`
 - `/onboarding/resume`, `/onboarding/sport`, `/onboarding/level`, `/onboarding/region`, `/onboarding/confirm`
 - `/home`
 - `/search`, `/search/new`, `/search/empty`, `/search/error`, `/search/stale`
@@ -224,6 +225,19 @@ Missing or unclear:
   onboarding routes: `/login`, `/terms`, `/signup`, and `/onboarding/*` now
   use `auth.types -> auth.view-model -> auth-page` instead of rendering
   `FirstDesignPage` and `design-source` directly.
+- [x] Closed the missing `01` login surface gap: `/login` now mirrors
+  `SMRevisionAuthSM3Login` with email login, guest start, signup, provider
+  buttons, and policy copy;
+  `/login/email` renders an email/password login form; and
+  `/auth/provider-denied`, `/auth/missing-email`, `/auth/blocked`,
+  `/auth/account-conflict`, and `/auth/location-denied` render persistent
+  exception recovery screens through `auth.types -> auth.view-model ->
+  auth-page`.
+- [x] Corrected the `01` signup flow split: `/signup` now represents the
+  signup input form from `SMRevisionAuthSignupSM3`, while
+  `/signup/complete` carries the previous completion guide and continues to
+  `/onboarding/sport`. Password reset, blocked-account support, and browser
+  permission settings remain disabled until real destination contracts exist.
 - [x] Continued the shell/chrome consistency pass for fixed bottom surfaces:
   `.tm-fixed-cta` and `.tm-chat-inputbar` now anchor to the `AppChrome` frame
   instead of the viewport, matching the existing frame-level FAB behavior; my
@@ -243,6 +257,28 @@ Missing or unclear:
   `/teams/search`, `/teams/search/empty`, `/teams/search/error`,
   `/teams/filter` now use the owning domain component/view-model layer instead
   of rendering `FirstDesignPage` or `design-source` directly.
+- [x] Started API Binding Wave 1 for home and read-only core browse/detail:
+  `/home`, `/matches`, `/matches/[id]`, `/team-matches`,
+  `/team-matches/[id]`, `/teams`, `/teams/[id]`, `/notices`, and
+  `/notices/[id]` now keep the server route wrapper but render through
+  client containers that call existing v1 read hooks and normalize API
+  responses into the current first-design page models. Mutation actions remain
+  out of scope for this wave.
+- [x] Expanded the v1 API seed into an enum/state coverage dataset while
+  preserving the existing public representative samples. The seed now includes
+  account and onboarding states, auth provider/status variants, terms and
+  notice publication states, trust states, personal match and application
+  terminal/pending states, team status/join-policy/member/join-application
+  states, team-match states, chat room/participant/message states, notification
+  target/read states, admin role/status variants, and status change actor
+  variants. Payment/refund/dispute/support data remains intentionally absent
+  because those domains are out of scope for v1.
+- [x] Verified the expanded seed with `pnpm --filter v1_api exec tsc --noEmit
+  --pretty false`, `docker exec teameet_v1_api_dev sh -c 'cd
+  /app/apps/v1_api && pnpm db:seed'`, v1 API restart/readiness, and targeted
+  smoke for match `closed`/`expired`, team-match `matched`, closed team browse,
+  public-only notices, admin overview counts, notification read/unread target
+  types, and archived chat room coverage.
 
 ## Detail Pass Handoff
 
@@ -480,6 +516,11 @@ Validation notes:
 - Auth/onboarding smoke returned `200`: `/login`, `/terms`, `/signup`,
   `/onboarding/resume`, `/onboarding/sport`, `/onboarding/level`,
   `/onboarding/region`, and `/onboarding/confirm`.
+- Auth login gap follow-up added route-backed surfaces for `/login/email`,
+  `/auth/provider-denied`, `/auth/missing-email`, `/auth/blocked`,
+  `/auth/account-conflict`, and `/auth/location-denied`; the mobile acceptance
+  route list now includes these plus `/login`, `/terms`, `/signup`,
+  `/signup/complete`, and `/onboarding/*`.
 - Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev` after
   the auth/onboarding pass; readiness smoke returned `200` for `/login` and
   `/onboarding/confirm`.
@@ -525,10 +566,23 @@ Validation notes:
   `/matches/participants`, `/team-matches/empty`, `/team-matches/error`,
   `/team-matches/filter`, `/teams/search`, `/teams/search/empty`,
   `/teams/search/error`, and `/teams/filter`.
+- API Binding Wave 1 validation passed: active route search has no remaining
+  `FirstDesignPage`, `design-source`, or `components/design` imports under the
+  home/matches/team-matches/teams/notices wave scope; `git diff --check --
+  apps/v1_web/src/app/home apps/v1_web/src/app/matches
+  apps/v1_web/src/app/team-matches apps/v1_web/src/app/teams
+  apps/v1_web/src/app/notices apps/v1_web/src/components/home
+  apps/v1_web/src/components/matches apps/v1_web/src/components/team-matches
+  apps/v1_web/src/components/teams apps/v1_web/src/components/notices`
+  passed; `pnpm --filter v1_web exec tsc --noEmit --pretty false` passed.
+- Restarted the v1 dev server on `3013` with `pnpm --filter v1_web dev` after
+  API Binding Wave 1; smoke returned `200` for `/home`, `/matches`,
+  `/matches/match-1`, `/team-matches`, `/team-matches/team-match-1`, `/teams`,
+  `/teams/team-1`, `/notices`, and `/notices/notice-1`.
 
 ## Ambiguity Log
 
-- Auth/signup/terms/onboarding now have v1 route scaffolds, but social auth provider handling remains pending API contract binding.
+- Auth/login/signup/terms/onboarding and auth exception states now have v1 route scaffolds, but real social/email auth submit handling remains pending API contract binding. Password reset, support inquiry, and browser permission settings are intentionally disabled until their route/API contracts are defined.
 - Settings/profile edit are fixed under `/my/settings` and `/my/profile/edit` for the current v1 slice.
 - Admin v1 has minimum route scaffolds under `/admin` and `/admin/audit`; non-minimum operations remain deferred.
 - Public marketing has a `/landing` scaffold, while `/` still redirects to `/home` until launch routing is decided.

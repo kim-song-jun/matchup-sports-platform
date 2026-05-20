@@ -11,6 +11,7 @@ export type LoginProvider = {
   label: string;
   background: string;
   color: string;
+  href?: string;
   disabled?: boolean;
 };
 
@@ -23,6 +24,29 @@ export type LoginViewModel = {
   providers: LoginProvider[];
 };
 
+export type EmailLoginViewModel = {
+  backHref: string;
+  title: string;
+  sub: string;
+  fields: Array<{ label: string; placeholder: string; type: 'email' | 'password'; helper?: string; state?: 'default' | 'error' | 'success' }>;
+  primary: AuthAction;
+  forgot: AuthAction;
+  signupHref: string;
+  notice: { title: string; body: string };
+};
+
+export type AuthExceptionKind = 'provider-denied' | 'missing-email' | 'blocked' | 'account-conflict' | 'location-denied';
+
+export type AuthExceptionViewModel = {
+  backHref: string;
+  badge: string;
+  title: string;
+  body: string;
+  tone: 'orange' | 'red';
+  primary: AuthAction;
+  secondary?: AuthAction;
+};
+
 export type TermsViewModel = {
   backHref: string;
   title: string;
@@ -31,7 +55,25 @@ export type TermsViewModel = {
   primary: AuthAction;
 };
 
-export type SignupViewModel = {
+export type SignupField = {
+  label: string;
+  placeholder: string;
+  type: 'text' | 'email' | 'password';
+  helper?: string;
+  state?: 'default' | 'error' | 'success';
+  action?: AuthAction;
+};
+
+export type SignupFormViewModel = {
+  backHref: string;
+  title: string;
+  sub: string;
+  fields: SignupField[];
+  notice: { title: string; body: string };
+  primary: AuthAction;
+};
+
+export type SignupCompleteViewModel = {
   title: string;
   sub: string;
   steps: Array<{ title: string; body: string; done: boolean }>;

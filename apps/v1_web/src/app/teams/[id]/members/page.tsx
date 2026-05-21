@@ -1,6 +1,6 @@
-import { TeamMembersPageView } from '@/components/teams/teams-page';
-import { getTeamMembersViewModel } from '@/components/teams/teams.view-model';
+import { TeamMembersPageClient } from '@/components/teams/teams-client';
 
-export default function TeamMembersPage() {
-  return <TeamMembersPageView model={getTeamMembersViewModel()} />;
+export default async function TeamMembersPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <TeamMembersPageClient teamId={id} />;
 }

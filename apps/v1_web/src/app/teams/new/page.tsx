@@ -1,6 +1,5 @@
-import { TeamFormPageView } from '@/components/teams/teams-page';
-import { getTeamFormViewModel } from '@/components/teams/teams.view-model';
+import { TeamCreatePageClient } from '@/components/teams/teams-form-client';
 
 export default function TeamCreatePage() {
-  return <TeamFormPageView model={getTeamFormViewModel('create')} />;
+  return <TeamCreatePageClient />;
 }

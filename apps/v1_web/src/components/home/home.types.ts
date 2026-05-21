@@ -8,8 +8,9 @@ export type HomeMatchCard = {
   time: string;
   currentParticipants: number;
   maxParticipants: number;
-  fee: number;
+  actionLabel: string;
   imageUrl: string;
+  reason?: string;
 };
 
 export type HomeQuickAction = {
@@ -34,8 +35,8 @@ export type HomeStats = {
   mannerScore: string;
   mannerScoreSub: string;
   joined: number | '-';
-  mvp: number | '-';
-  paid: string;
+  trustState: string;
+  pending: string;
 };
 
 export type HomeViewModel = {
@@ -45,6 +46,7 @@ export type HomeViewModel = {
   hasNewNotification: boolean;
   chatUnreadCount: number;
   chatHref: string;
+  retry?: () => void;
   stats: HomeStats;
   featuredMatch: HomeMatchCard;
   recommendedMatches: HomeMatchCard[];

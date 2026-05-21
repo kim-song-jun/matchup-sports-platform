@@ -88,6 +88,13 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
+if [ "${DEPLOY_SYNC_V1_SEED_DATA:-true}" != "false" ]; then
+  echo "[INFO] Syncing v1 seed data..."
+  sudo docker exec teameet_v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed.ts"
+else
+  echo "[INFO] Skipping v1 seed data sync because DEPLOY_SYNC_V1_SEED_DATA=false"
+fi
+
 echo "[INFO] Waiting for teameet_web routing..."
 for i in $(seq 1 45); do
   if curl -fsS http://localhost:3000/api/v1/health >/dev/null 2>&1 && \
@@ -127,8 +134,12 @@ elif [ "${RUN_SEED}" = "true" ]; then
   sudo docker exec teameet_api npx prisma db seed
 fi
 
-echo "[INFO] Syncing canonical mock data..."
-sudo docker exec teameet_api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/seed-mocks.ts --checksum-gate" || true
+if [ "${DEPLOY_SYNC_MOCK_DATA:-true}" != "false" ]; then
+  echo "[INFO] Syncing canonical mock data..."
+  sudo docker exec teameet_api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/seed-mocks.ts --checksum-gate" || true
+else
+  echo "[INFO] Skipping canonical mock data sync because DEPLOY_SYNC_MOCK_DATA=false"
+fi
 
 echo "[INFO] Syncing DB-backed image data..."
 sudo docker exec teameet_api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/seed-images.ts" || echo "::warning::seed-images sync failed"

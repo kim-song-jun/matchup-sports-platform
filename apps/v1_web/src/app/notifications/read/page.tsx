@@ -1,6 +1,5 @@
-import { NotificationsPageView } from '@/components/community/community-page';
-import { getNotificationsViewModel } from '@/components/community/community.view-model';
+import { redirect } from 'next/navigation';
 
 export default function ReadNotificationsPage() {
-  return <NotificationsPageView model={getNotificationsViewModel(true)} />;
+  redirect('/notifications');
 }

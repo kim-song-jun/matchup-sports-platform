@@ -1,6 +1,5 @@
-import { MatchCreatePageView } from '@/components/matches/matches-page';
-import { getMatchCreateViewModel } from '@/components/matches/matches.view-model';
+import { MatchCreatePageClient } from '@/components/matches/matches-create-client';
 
 export default function MatchCreateConfirmPage() {
-  return <MatchCreatePageView model={getMatchCreateViewModel('confirm')} />;
+  return <MatchCreatePageClient step="confirm" />;
 }

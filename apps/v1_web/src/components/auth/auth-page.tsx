@@ -164,7 +164,7 @@ export function OnboardingPageView({ model }: { model: OnboardingViewModel }) {
   );
 }
 
-function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction }: { children: ReactNode; topTitle?: string; backHref?: string; skipHref?: string; fixedAction?: ReactNode }) {
+export function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction }: { children: ReactNode; topTitle?: string; backHref?: string; skipHref?: string; fixedAction?: ReactNode }) {
   return (
     <div className="tm-auth-frame">
       {topTitle || backHref || skipHref ? (

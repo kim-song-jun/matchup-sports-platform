@@ -1,6 +1,5 @@
-import { SettingsPageView } from '@/components/my/my-page';
-import { settingsModel } from '@/components/my/my.view-model';
+import { SettingsPageClient } from '@/components/my/my-api-clients';
 
 export default function MySettingsPage() {
-  return <SettingsPageView model={settingsModel} />;
+  return <SettingsPageClient />;
 }

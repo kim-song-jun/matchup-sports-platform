@@ -8,18 +8,37 @@ export type ChatRoomModel = {
   unread: number;
   pinned?: boolean;
   initials: string;
+  actionPending?: boolean;
+  onTogglePin?: () => void;
+  onRequestLeave?: () => void;
 };
 
 export type ChatListViewModel = {
-  categories: Array<{ label: string; count: number; active?: boolean }>;
+  categories: Array<{ label: ChatRoomModel['type'] | '전체'; count: number; active?: boolean; onSelect?: () => void }>;
   pinnedRooms: ChatRoomModel[];
   rooms: ChatRoomModel[];
+  status?: 'loading' | 'error' | 'ready';
+  emptyTitle?: string;
+  emptyBody?: string;
+  emptyHref?: string;
+  onRetry?: () => void;
+  leaveConfirm?: {
+    title: string;
+    body: string;
+    pending?: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+  };
 };
 
 export type ChatRoomViewModel = {
   title: string;
   context: { title: string; sub: string; href: string };
   messages: Array<{ id: string; who: 'me' | 'other' | 'system'; label: string; body: string }>;
+  draft?: string;
+  sending?: boolean;
+  onDraftChange?: (value: string) => void;
+  onSend?: () => void;
 };
 
 export type NotificationModel = {
@@ -36,4 +55,7 @@ export type NotificationModel = {
 export type NotificationsViewModel = {
   unreadCount: number;
   notifications: NotificationModel[];
+  readAllPending?: boolean;
+  onReadAll?: () => void;
+  onOpen?: (notification: NotificationModel) => void;
 };

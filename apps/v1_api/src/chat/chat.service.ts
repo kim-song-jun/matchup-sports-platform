@@ -52,7 +52,7 @@ export class ChatService {
     const hasNext = rooms.length > limit;
 
     return {
-      items: pageItems.map((room) => this.toRoomListItem(room, user.id)),
+      items: await Promise.all(pageItems.map((room) => this.toRoomListItem(room, user.id))),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
   }
@@ -135,6 +135,22 @@ export class ChatService {
         where: { id: room.id },
         data: { lastMessageAt: created.sentAt },
       });
+      const recipients = await tx.v1ChatRoomParticipant.findMany({
+        where: { chatRoomId: room.id, status: 'active', userId: { not: user.id } },
+        select: { userId: true },
+      });
+      if (recipients.length > 0) {
+        await tx.v1Notification.createMany({
+          data: recipients.map((participant) => ({
+            recipientUserId: participant.userId,
+            targetType: 'chat',
+            targetId: room.id,
+            title: getRoomTitle(room),
+            body: content.slice(0, 120),
+            deepLink: `/chat/${room.id}`,
+          })),
+        });
+      }
       return created;
     });
 
@@ -283,9 +299,20 @@ export class ChatService {
     } satisfies Prisma.V1ChatRoomInclude;
   }
 
-  private toRoomListItem(room: RoomWithRelations, userId: string) {
+  private async toRoomListItem(room: RoomWithRelations, userId: string) {
     const me = room.participants.find((participant) => participant.userId === userId);
     const lastMessage = room.messages[0] ?? null;
+    const lastReadMessage = me?.lastReadMessageId
+      ? await this.prisma.v1ChatMessage.findUnique({ where: { id: me.lastReadMessageId }, select: { sentAt: true } })
+      : null;
+    const unreadCount = await this.prisma.v1ChatMessage.count({
+      where: {
+        chatRoomId: room.id,
+        status: 'sent',
+        senderUserId: { not: userId },
+        ...(lastReadMessage ? { sentAt: { gt: lastReadMessage.sentAt } } : {}),
+      },
+    });
     return {
       roomId: room.id,
       roomType: getRoomType(room),
@@ -295,7 +322,7 @@ export class ChatService {
       lastMessage: lastMessage
         ? { messageId: lastMessage.id, contentPreview: lastMessage.body.slice(0, 80), sentAt: lastMessage.sentAt }
         : null,
-      unreadCount: 0,
+      unreadCount,
       pinned: Boolean(me?.pinnedAt),
       muted: false,
     };

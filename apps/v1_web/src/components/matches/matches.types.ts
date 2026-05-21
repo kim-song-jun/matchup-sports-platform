@@ -8,7 +8,7 @@ export type MatchCardModel = {
   time: string;
   current: number;
   capacity: number;
-  fee: number;
+  actionLabel: string;
   level: string;
   host: string;
   image: string;
@@ -40,9 +40,19 @@ export type MatchDetailViewModel = {
     description: string;
     address: string;
     rules: string[];
-    participants: Array<{ name: string; meta: string; status: string }>;
+    participants: Array<{
+      name: string;
+      meta: string;
+      status: string;
+      onApprove?: () => void;
+      onReject?: () => void;
+      actionPending?: boolean;
+    }>;
   };
   mode: 'default' | 'pending' | 'approved' | 'mine';
+  applyLabel?: string;
+  applyPending?: boolean;
+  onApply?: () => void;
 };
 
 export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'complete' | 'edit';
@@ -57,7 +67,7 @@ export type MatchCreateViewModel = {
     description: string;
     image: string;
     capacity: number;
-    fee: number;
+    actionLabel: string;
     minLevel: string;
     maxLevel: string;
     gender: string;
@@ -67,5 +77,21 @@ export type MatchCreateViewModel = {
     date: string;
     startTime: string;
     endTime: string;
+  };
+  form?: {
+    selectedSportId: string;
+    regionId: string;
+    regions: Array<{ id: string; name: string }>;
+    onSelectSport: (sportName: string) => void;
+    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number) => void;
+    onRegionChange: (regionId: string) => void;
+    onBack: () => void;
+    onNext: () => void;
+    onSubmit: () => void;
+    onCancel?: () => void;
+    submitLabel?: string;
+    submitting?: boolean;
+    error?: string | null;
+    lockedReason?: string | null;
   };
 };

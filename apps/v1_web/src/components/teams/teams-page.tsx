@@ -110,7 +110,7 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
 export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
-  const cta = mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 가능 여부 확인';
+  const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
   return (
     <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
       <article className="tm-team-detail-body">
@@ -146,12 +146,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <div className="tm-text-body-lg">주요 멤버</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>팀장/운영진과 최근 활동 멤버</div>
             </div>
-            <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/teams/team-1/members">멤버</Link>
+            <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
           </div>
           <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta}`} trailing={member.status} />)}</div>
         </Card>
       </article>
-      <div className="tm-fixed-cta"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div><button className={`tm-btn tm-btn-lg ${locked ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`} type="button">{cta}</button></div>
+      <div className="tm-fixed-cta"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div><button className={`tm-btn tm-btn-lg ${locked ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={model.onCta}>{model.ctaPending ? '처리 중' : cta}</button></div>
     </AppChrome>
   );
 }
@@ -159,22 +159,28 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
   const edit = model.mode === 'edit';
   const team = model.team;
+  const form = model.form;
   return (
     <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false}>
       <div className="tm-create-shell">
         <h1 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h1>
         <p className="tm-text-body" style={{ marginTop: 8 }}>목록과 상세에 저장되는 정보만 노출하고, 예시 이미지는 제출 데이터에 포함하지 않습니다.</p>
-        <CreateField label="팀 이름" value={team.name} />
+        {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
+        <CreateField label="팀 이름" value={team.name} onChange={(value) => form?.onFieldChange('name', value)} />
         <div className="tm-create-field">
           <div className="tm-text-label">종목 (복수 선택 가능)</div>
-          <div className="tm-team-form-chip-row">{['축구', '풋살', '농구', '배드민턴', '테니스'].map((sport) => <span key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`}>{sport}</span>)}</div>
+          <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '농구', '배드민턴', '테니스']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
         </div>
-        <div className="tm-create-two-col"><CreateField label="시/도" value={team.city} /><CreateField label="구/군" value={team.county} /></div>
-        <CreateField label="팀 소개" value={team.description} multiline />
-        <div className="tm-create-two-col"><CreateField label="레벨" value={team.level} /><CreateField label="정원" value={`${team.capacity}`} suffix="명" /></div>
-        <CreateField label="활동 방식" value={team.activity} />
-        <CreateField label="연락처" value={team.contact} />
-        {team.links.map((link) => <CreateField key={link.label} label={link.label} value={link.value} />)}
+        <div className="tm-create-two-col"><CreateField label="시/도" value={team.city} onChange={(value) => form?.onFieldChange('city', value)} /><CreateField label="구/군" value={team.county} onChange={(value) => form?.onFieldChange('county', value)} /></div>
+        <CreateField label="팀 소개" value={team.description} multiline onChange={(value) => form?.onFieldChange('description', value)} />
+        <div className="tm-create-two-col"><CreateField label="레벨" value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><CreateField label="정원" value={`${team.capacity}`} suffix="명" type="number" onChange={(value) => form?.onFieldChange('capacity', Number(value))} /></div>
+        <CreateField label="활동 방식" value={team.activity} onChange={(value) => form?.onFieldChange('activity', value)} />
+        <CreateField label="연락처" value={team.contact} onChange={(value) => form?.onFieldChange('contact', value)} />
+        {team.links.map((link, index) => <CreateField key={link.label} label={link.label} value={link.value} onChange={(value) => {
+          const next = [...team.links];
+          next[index] = { ...link, value };
+          form?.onFieldChange('links', next);
+        }} />)}
         <div className="tm-team-image-grid" style={{ marginTop: 14 }}>
           <ImageSlot title="로고 이미지" count={edit ? 1 : 0} />
           <ImageSlot title="커버 이미지" count={edit ? 1 : 0} />
@@ -182,7 +188,7 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
         </div>
         <Card pad={14} style={{ marginTop: 14, background: edit ? 'var(--orange50)' : 'var(--blue50)' }}><div className="tm-text-label">{edit ? '변경사항 저장' : '생성 후 상태'}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{edit ? '팀장 또는 운영진 권한 확인 후 저장됩니다. 현재 화면은 저장 API 연결 전 입력 유지 상태입니다.' : '생성 직후 팀장은 관리자 권한을 갖고 멤버 초대를 시작합니다. 현재 화면은 저장 API 연결 전 준비 상태입니다.'}</div></Card>
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams/team-1' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled>{edit ? '저장 준비중' : '생성 준비중'}</button></div></div>
+      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
   );
 }
@@ -202,10 +208,10 @@ export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) 
           <div className="tm-text-caption" style={{ marginTop: 5 }}>팀장과 관리자는 일반 멤버 권한을 변경할 수 있습니다. 팀장 위임은 별도 플로우가 필요합니다.</div>
         </Card>
         <MemberSection title="팀 멤버" sub="이미 팀에 속한 멤버의 역할과 권한을 관리합니다.">
-          {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={`${member.role} · ${member.meta}`} status={member.status} locked={member.locked} />)}
+          {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={`${member.role} · ${member.meta}`} status={member.status} locked={member.locked} onPromote={member.onPromote} onDemote={member.onDemote} onRemove={member.onRemove} actionPending={member.actionPending} />)}
         </MemberSection>
         <MemberSection title="가입 신청" sub="아직 팀원이 아닌 신청자는 별도 그룹에서 승인/거절합니다.">
-          {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} status={request.status} pending />)}
+          {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} status={request.status} pending onApprove={request.onApprove} onReject={request.onReject} actionPending={request.actionPending} />)}
         </MemberSection>
       </div>
     </AppChrome>
@@ -287,18 +293,18 @@ function MemberSection({ title, sub, children }: { title: string; sub: string; c
   return <section className="tm-member-section"><div className="tm-text-label">{title}</div><div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div><div style={{ display: 'grid', gap: 10, marginTop: 10 }}>{children}</div></section>;
 }
 
-function MemberCard({ title, sub, status, pending, locked }: { title: string; sub: string; status: string; pending?: boolean; locked?: boolean }) {
+function MemberCard({ title, sub, status, pending, locked, onPromote, onDemote, onRemove, onApprove, onReject, actionPending }: { title: string; sub: string; status: string; pending?: boolean; locked?: boolean; onPromote?: () => void; onDemote?: () => void; onRemove?: () => void; onApprove?: () => void; onReject?: () => void; actionPending?: boolean }) {
   return (
     <Card pad={14}>
       <ListItem title={title} sub={sub} trailing={status} />
       <div className="tm-member-actions">
-        <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={locked}>{locked ? '권한 고정' : pending ? '승인 대기' : '권한 변경'}</button>
-        {pending ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>거절 대기</button> : null}
+        {pending ? <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={!onApprove || actionPending} onClick={onApprove}>승인</button> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={locked || actionPending || (!onPromote && !onDemote)} onClick={onPromote ?? onDemote}>{locked ? '권한 고정' : onDemote ? '멤버로 변경' : '운영진 지정'}</button>}
+        {pending ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={!onReject || actionPending} onClick={onReject}>거절</button> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={locked || !onRemove || actionPending} onClick={onRemove}>내보내기</button>}
       </div>
     </Card>
   );
 }
 
-function CreateField({ label, value, suffix, multiline }: { label: string; value: string; suffix?: string; multiline?: boolean }) {
-  return <div className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}><span className="tm-text-body" style={{ color: 'var(--text-strong)' }}>{value}</span>{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></div>;
+function CreateField({ label, value, suffix, multiline, type = 'text', onChange }: { label: string; value: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
+  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: 'var(--text-strong)' }}>{value}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
 }

@@ -16,9 +16,17 @@ export type ApiErrorBody = {
 export type CursorPage<T> = {
   items: T[];
   nextCursor: string | null;
+  pageInfo?: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
 };
 
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
+export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full';
+export type V1TeamMatchApiStatus = 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'expired';
+export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn';
+export type V1TeamMatchViewerState = 'none' | 'guest' | 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
 export type TrustState = 'verified' | 'estimated' | 'sample';
 
 export type V1User = {
@@ -56,6 +64,8 @@ export type V1DevLoginResponse = V1AuthMe & {
   };
 };
 
+export type V1AuthSessionResponse = V1DevLoginResponse;
+
 export type V1Sport = {
   id: string;
   name: string;
@@ -68,68 +78,660 @@ export type V1Region = {
   parentId: string | null;
 };
 
+export type V1OnboardingStep = 'terms' | 'signup' | 'sport' | 'level' | 'region' | 'confirm' | 'done';
+
+export type V1OnboardingDetail = {
+  status: string;
+  currentStep: V1OnboardingStep;
+  canResume: boolean;
+  missing: Array<'terms' | 'profile' | 'sports' | 'levels' | 'regions'>;
+  sports: Array<{
+    sportId: string;
+    sportName: string;
+    levelId: string | null;
+    levelName: string | null;
+  }>;
+  regions: Array<{
+    regionId: string;
+    name: string;
+    primary: boolean;
+  }>;
+  regionOptional: boolean;
+};
+
+export type V1OnboardingPreferencePayload = {
+  sports?: Array<{ sportId: string; levelId?: string | null }>;
+  regions?: Array<{ regionId: string; primary: boolean }>;
+  currentStep: Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
+};
+
+export type V1OnboardingMutationResult = {
+  status: string;
+  currentStep?: string;
+  canContinue?: boolean;
+  missing: string[];
+  next?: { route: string; reason: string };
+  limited?: boolean;
+};
+
 export type V1Notice = {
-  id: string;
+  id?: string;
+  noticeId?: string;
+  audience?: string;
   title: string;
-  category: string;
+  category?: string;
   publishedAt: string;
-  body?: string;
+  body?: string | null;
+};
+
+export type V1NoticesResponse = {
+  notices: V1Notice[];
+  pageInfo?: {
+    hasNextPage?: boolean;
+    nextCursor: string | null;
+  };
+};
+
+export type V1NoticeResponse = {
+  notice: V1Notice;
 };
 
 export type V1Match = {
   id: string;
+  matchId?: string;
   title: string;
+  description?: string | null;
+  descriptionPreview?: string | null;
+  imageUrl?: string | null;
   sportName: string;
+  sport?: { sportId: string; name: string };
   levelLabel: string;
+  regionName?: string | null;
+  region?: { regionId: string; name: string } | null;
   placeName: string;
+  place?: { name: string; addressText?: string | null };
   startsAt: string;
+  endsAt?: string | null;
+  deadlineAt?: string | null;
   capacityText: string;
+  capacity?: number;
+  participantCount?: number;
   status: V1Status;
+  displayState?: string;
+  approvalRequired?: boolean;
+  paymentRequired?: boolean;
+  viewerState?: V1ViewerState;
+  viewer?: {
+    state: V1ViewerState;
+    applicationId: string | null;
+    participantId: string | null;
+    canApply: boolean;
+  };
+  host?: {
+    userId: string;
+    displayName: string;
+    profileImageUrl?: string | null;
+    trustState?: string;
+  };
+  participantsPreview?: Array<{
+    participantId: string;
+    userId: string;
+    displayName: string;
+    role: string;
+    status: string;
+  }>;
+  rulesText?: string | null;
   ctaState?: string;
+};
+
+export type V1MatchEdit = {
+  matchId: string;
+  editable: boolean;
+  lockedReason: string | null;
+  form: {
+    sportId: string;
+    regionId?: string | null;
+    title: string;
+    description?: string | null;
+    imageUrl?: string | null;
+    startsAt: string;
+    endsAt?: string | null;
+    deadlineAt?: string | null;
+    capacity: number;
+    manualPlaceName: string;
+    addressText?: string | null;
+    rulesText?: string | null;
+  };
+  status: V1MatchApiStatus;
+  participantCount: number;
+  version: string;
+};
+
+export type V1MatchApplicationEligibility = {
+  matchId: string;
+  eligible: boolean;
+  reasonCode: string;
+  message: string;
+  viewerState: Exclude<V1ViewerState, 'guest'>;
+  applicationId: string | null;
+  participantId: string | null;
+  requiresApproval: boolean;
+  requiresPayment: boolean;
+};
+
+export type V1MatchApplicationResult = {
+  applicationId: string;
+  matchId: string;
+  status: string;
+  viewerState: V1ViewerState;
+  detailRoute: string;
+};
+
+export type V1MatchMutationPayload = {
+  sportId: string;
+  regionId?: string | null;
+  title: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+  deadlineAt?: string | null;
+  capacity: number;
+  manualPlaceName: string;
+  addressText?: string | null;
+  rulesText?: string | null;
+};
+
+export type V1MatchUpdatePayload = V1MatchMutationPayload & {
+  version: string;
+};
+
+export type V1MatchMutationResult = {
+  matchId: string;
+  status: V1MatchApiStatus;
+  hostParticipantId?: string;
+  detailRoute: string;
+  manageRoute?: string;
+  updatedAt?: string;
+  version?: string;
+};
+
+export type V1MatchApplication = {
+  applicationId: string;
+  applicantUserId: string;
+  displayName: string;
+  profileImageUrl: string | null;
+  trustState: string;
+  mannerScore: number | null;
+  reviewCount: number;
+  status: string;
+  message: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+};
+
+export type V1MatchApplicationsPage = {
+  matchId: string;
+  items: V1MatchApplication[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
 };
 
 export type V1Team = {
   id: string;
+  teamId?: string;
   name: string;
   sportName: string;
+  sport?: { sportId: string; name: string };
   regionName: string;
+  region?: { regionId: string; name: string } | null;
   memberCount: number;
-  trustState: TrustState;
+  trustState: TrustState | 'none';
   joinPolicy: 'approval_required' | 'closed';
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
+  introductionPreview?: string | null;
+  viewerRole?: string;
+  viewerJoinState?: string;
+};
+
+export type V1MyTeam = {
+  teamId: string;
+  membershipId: string;
+  name: string;
+  role: 'owner' | 'manager' | 'member';
+  status: string;
+  logoUrl: string | null;
+  sport: { sportId: string; name: string };
+  region: { regionId: string; name: string } | null;
+  memberCount: number;
+  canManage: boolean;
+  canCreateTeamMatch: boolean;
+  detailRoute: string;
+  manageRoute: string | null;
+};
+
+export type V1MyTeamsResponse = V1MyTeam[] & {
+  items: V1MyTeam[];
+};
+
+export type V1TeamDetail = {
+  id?: string;
+  teamId: string;
+  name: string;
+  status: string;
+  visibility: string;
+  sportName?: string;
+  sport: { sportId: string; name: string };
+  regionName?: string | null;
+  region: { regionId: string; name: string } | null;
+  joinPolicy?: 'approval_required' | 'closed';
+  trustState?: TrustState | 'none';
+  version?: string;
+  profile: {
+    logoUrl: string | null;
+    coverImageUrl: string | null;
+    introduction: string | null;
+    activityAreaText: string | null;
+    skillLevelText: string | null;
+    joinPolicy: string;
+    memberGoalCount: number | null;
+  };
+  owner: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+  membersPreview: Array<{
+    membershipId: string;
+    userId: string;
+    displayName: string;
+    role: string;
+  }>;
+  memberCount: number;
+  managerCount: number;
+  trust: {
+    trustState: TrustState;
+    score: number | null;
+  };
+  viewer: {
+    role: string;
+    membershipId: string | null;
+    joinState: string;
+    canRequestJoin: boolean;
+    disabledReason: string | null;
+    manageRoute: string | null;
+  };
+};
+
+export type V1TeamMutationPayload = {
+  sportId: string;
+  regionId: string;
+  name: string;
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
+  introduction?: string | null;
+  activityAreaText?: string | null;
+  skillLevelText?: string | null;
+  joinPolicy: 'approval_required' | 'closed';
+  memberGoalCount?: number | null;
+};
+
+export type V1TeamUpdatePayload = V1TeamMutationPayload & {
+  version: string;
+};
+
+export type V1TeamMutationResult = {
+  teamId: string;
+  membershipId?: string;
+  role?: string;
+  status?: string;
+  updatedAt?: string;
+  version?: string;
+  detailRoute: string;
+  manageRoute?: string;
+};
+
+export type V1TeamJoinEligibility = {
+  teamId: string;
+  eligible: boolean;
+  reasonCode: string;
+  message: string;
+  joinPolicy: 'approval_required' | 'closed';
+  viewerRole: string;
+  joinState: string;
+  applicationId: string | null;
+  requiresApproval: boolean;
+  immediateJoinSupported: boolean;
+};
+
+export type V1TeamJoinApplicationResult = {
+  applicationId: string;
+  teamId: string;
+  status: string;
+  joinState: string;
+  requiresApproval?: boolean;
+  immediateJoinSupported?: boolean;
+  membershipId?: string;
+  memberCount?: number;
+};
+
+export type V1TeamJoinApplication = {
+  applicationId: string;
+  status: string;
+  message: string | null;
+  createdAt: string;
+  applicant: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+    trustState: string;
+  };
+};
+
+export type V1TeamJoinApplicationsPage = {
+  teamId: string;
+  reviewerRole: string;
+  items: V1TeamJoinApplication[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+export type V1TeamMembershipMutationResult = {
+  membershipId: string;
+  teamId: string;
+  role?: string;
+  status?: string;
+  managerCount?: number;
+  memberCount?: number;
+  removedAt?: string;
+};
+
+export type V1TeamMember = {
+  membershipId: string;
+  userId: string;
+  displayName: string;
+  profileImageUrl: string | null;
+  role: 'owner' | 'manager' | 'member';
+  status: string;
+  joinedAt: string;
+  canChangeRole: boolean;
+  canRemove: boolean;
+};
+
+export type V1TeamMembersPage = {
+  items: V1TeamMember[];
+  summary: {
+    ownerCount: number;
+    managerCount: number;
+    memberCount: number;
+  };
+  viewerRole: 'owner' | 'manager' | 'member';
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
 };
 
 export type V1TeamMatch = V1Match & {
-  hostTeamId: string;
-  hostTeamName: string;
+  teamMatchId?: string;
+  sport?: { sportId: string; name: string };
+  region?: { regionId: string; name: string } | null;
+  place?: { name: string; addressText?: string | null };
+  displayState?: V1TeamMatchApiStatus;
+  costNote?: string | null;
+  rulesText?: string | null;
+  paymentRequired?: boolean;
+  hostTeamId?: string;
+  hostTeamName?: string;
+  hostTeam?: {
+    teamId: string;
+    name: string;
+    logoUrl?: string | null;
+    trustState?: string;
+    ownerUserId?: string;
+  };
+  approvedOpponentTeam?: {
+    teamId: string;
+    name: string;
+    applicationId: string;
+  } | null;
+  viewerState?: V1TeamMatchViewerState;
+  viewer?: {
+    state: V1TeamMatchViewerState;
+    manageableHostTeam?: boolean;
+    eligibleTeams?: Array<{
+      teamId: string;
+      name: string;
+      role: string;
+      eligible: boolean;
+      reasonCode: string;
+    }>;
+    manageRoute?: string | null;
+  };
   applicantTeamState?: string;
 };
 
-export type V1ChatRoom = {
-  id: string;
-  targetType: 'match' | 'team_match';
-  targetId: string;
+export type V1TeamMatchMutationPayload = {
+  hostTeamId: string;
+  sportId: string;
+  regionId: string;
   title: string;
-  lastMessagePreview: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+  deadlineAt?: string | null;
+  manualPlaceName: string;
+  addressText?: string | null;
+  costNote?: string | null;
+  rulesText?: string | null;
+};
+
+export type V1TeamMatchUpdatePayload = V1TeamMatchMutationPayload & {
+  version: string;
+};
+
+export type V1TeamMatchMutationResult = {
+  teamMatchId: string;
+  status: V1TeamMatchApiStatus;
+  hostTeamId?: string;
+  detailRoute: string;
+  manageRoute?: string;
+  updatedAt?: string;
+  version?: string;
+};
+
+export type V1TeamMatchEdit = {
+  teamMatchId: string;
+  editable: boolean;
+  lockedReason: string | null;
+  form: {
+    hostTeamId: string;
+    sportId: string;
+    regionId: string;
+    title: string;
+    description?: string | null;
+    imageUrl?: string | null;
+    startsAt: string;
+    endsAt?: string | null;
+    deadlineAt?: string | null;
+    manualPlaceName: string;
+    addressText?: string | null;
+    costNote?: string | null;
+    rulesText?: string | null;
+  };
+  status: V1TeamMatchApiStatus;
+  version: string;
+};
+
+export type V1TeamMatchEligibility = {
+  teamMatchId: string;
+  requiresApproval: boolean;
+  requiresPayment: boolean;
+  teams: Array<{
+    teamId: string;
+    name: string;
+    role: string;
+    eligible: boolean;
+    reasonCode: string;
+    applicationId: string | null;
+  }>;
+};
+
+export type V1TeamMatchApplicationResult = {
+  applicationId: string;
+  teamMatchId: string;
+  applicantTeamId: string;
+  status: string;
+  requiresApproval?: boolean;
+  requiresPayment?: boolean;
+  teamMatchStatus?: V1TeamMatchApiStatus;
+  approvedApplicantTeamId?: string | null;
+};
+
+export type V1TeamMatchApplication = {
+  applicationId: string;
+  status: string;
+  message: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  applicantTeam: {
+    teamId: string;
+    name: string;
+    logoUrl: string | null;
+    trustState: string;
+    score: number | null;
+    matchCount: number;
+  };
+  appliedBy: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+  canApprove: boolean;
+  canReject: boolean;
+};
+
+export type V1TeamMatchApplicationsPage = {
+  teamMatchId: string;
+  items: V1TeamMatchApplication[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+export type V1MyTeamMatch = {
+  teamMatchId: string;
+  title: string;
+  sportName: string;
+  startsAt: string;
+  status: V1TeamMatchApiStatus;
+  relation: 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
+  teamId?: string | null;
+  teamName?: string | null;
+  applicationId: string | null;
+  manageRoute: string | null;
+  detailRoute: string;
+};
+
+export type V1ChatRoom = {
+  roomId: string;
+  roomType: 'match' | 'team_match';
+  title: string;
+  status: string;
+  linkedTarget: {
+    type: 'match' | 'team_match' | null;
+    id: string | null;
+    title: string;
+    route: string | null;
+  };
+  lastMessage: {
+    messageId: string;
+    contentPreview: string;
+    sentAt: string;
+  } | null;
   unreadCount: number;
-  updatedAt: string;
+  pinned: boolean;
+  muted: boolean;
 };
 
 export type V1ChatMessage = {
-  id: string;
+  messageId: string;
+  sender: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+  content: string | null;
+  status: string;
+  sentAt: string;
+  mine: boolean;
+};
+
+export type V1ChatRoomDetail = {
   roomId: string;
-  senderId: string;
+  roomType: 'match' | 'team_match';
+  status: string;
+  title: string;
+  linkedTarget: V1ChatRoom['linkedTarget'];
+  me: {
+    participantId: string | null;
+    status: string;
+    pinned: boolean;
+    mutedUntil: string | null;
+    lastReadMessageId: string | null;
+  };
+  participants: Array<{
+    userId: string;
+    displayName: string;
+    role: string;
+  }>;
+};
+
+export type V1ChatMessageSendResult = {
+  messageId: string;
+  roomId: string;
   content: string;
-  createdAt: string;
+  status: string;
+  sentAt: string;
+};
+
+export type V1ChatRoomMeUpdate = {
+  roomId: string;
+  pinned: boolean;
+  mutedUntil: string | null;
+  lastReadMessageId: string | null;
+  status: string;
+};
+
+export type V1ChatRoomLeaveResult = {
+  roomId: string;
+  status: string;
 };
 
 export type V1Notification = {
-  id: string;
+  notificationId: string;
   type: string;
   title: string;
-  body: string;
-  read: boolean;
-  href: string;
+  body: string | null;
+  target: {
+    type: string;
+    id: string | null;
+    route: string | null;
+  };
+  status: 'created' | 'read';
+  readAt: string | null;
   createdAt: string;
+};
+
+export type V1NotificationsPage = CursorPage<V1Notification> & {
+  unreadCount: number;
 };
 
 export type V1NotificationPreferences = {
@@ -140,15 +742,45 @@ export type V1NotificationPreferences = {
 
 export type V1Profile = {
   userId: string;
-  displayName: string;
-  regionName: string;
-  bio: string;
-  trustState: TrustState;
+  accountStatus: string;
+  email: string;
+  profile: {
+    displayName: string;
+    profileImageUrl: string | null;
+    bio: string | null;
+    visibilityStatus: 'public' | 'members_only' | 'private';
+  };
+  reputation: {
+    trustState: TrustState;
+    mannerScore: number | null;
+    activityCount: number;
+    reviewCount: number;
+  };
+  displayName?: string;
+  regionName?: string;
+  bio?: string;
+  trustState?: TrustState;
 };
 
 export type V1Settings = {
-  notifications: V1NotificationPreferences;
-  withdrawalRequested: boolean;
+  account: {
+    email: string;
+    phone: string | null;
+    accountStatus: string;
+    providers: string[];
+  };
+  profile: {
+    displayName: string;
+    visibilityStatus: 'public' | 'members_only' | 'private';
+  };
+  notifications: {
+    matchEnabled: boolean;
+    teamEnabled: boolean;
+    teamMatchEnabled: boolean;
+    chatEnabled: boolean;
+    noticeEnabled: boolean;
+    marketingEnabled: boolean;
+  };
 };
 
 export type V1HomeRecommendation = {
@@ -159,6 +791,13 @@ export type V1HomeRecommendation = {
   startsAt: string;
   participantCount?: number;
   capacity?: number;
+};
+
+export type V1HomeShortcut = {
+  key: 'matches' | 'team_matches' | 'teams' | 'my_team';
+  enabled: boolean;
+  route: string | null;
+  disabledReason: string | null;
 };
 
 export type V1Home = {
@@ -180,6 +819,7 @@ export type V1Home = {
     participantCount: number;
     capacity: number;
   } | null;
+  shortcuts?: V1HomeShortcut[];
   recommendations?: V1HomeRecommendation[];
   notice?: { noticeId: string; title: string; pinned: boolean } | null;
   notifications?: { unreadCount: number };

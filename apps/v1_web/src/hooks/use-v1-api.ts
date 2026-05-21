@@ -8,20 +8,56 @@ import type {
   V1AdminLog,
   V1AdminOverview,
   V1AuthMe,
+  V1AuthSessionResponse,
   V1ChatMessage,
+  V1ChatMessageSendResult,
   V1ChatRoom,
+  V1ChatRoomDetail,
+  V1ChatRoomLeaveResult,
+  V1ChatRoomMeUpdate,
   V1DevLoginResponse,
   V1Home,
   V1Match,
+  V1MatchApplicationEligibility,
+  V1MatchApplicationsPage,
+  V1MatchApplicationResult,
+  V1MatchEdit,
+  V1MatchMutationPayload,
+  V1MatchMutationResult,
+  V1MatchUpdatePayload,
+  V1MyTeamsResponse,
+  V1MyTeamMatch,
   V1Notification,
   V1NotificationPreferences,
+  V1NotificationsPage,
   V1Notice,
+  V1NoticeResponse,
+  V1NoticesResponse,
+  V1OnboardingDetail,
+  V1OnboardingMutationResult,
+  V1OnboardingPreferencePayload,
   V1Profile,
   V1Region,
   V1Settings,
   V1Sport,
   V1Team,
+  V1TeamDetail,
+  V1TeamJoinApplicationResult,
+  V1TeamJoinApplicationsPage,
+  V1TeamJoinEligibility,
+  V1TeamMembersPage,
+  V1TeamMembershipMutationResult,
   V1TeamMatch,
+  V1TeamMatchApplicationResult,
+  V1TeamMatchApplicationsPage,
+  V1TeamMatchEdit,
+  V1TeamMatchEligibility,
+  V1TeamMatchMutationPayload,
+  V1TeamMatchMutationResult,
+  V1TeamMatchUpdatePayload,
+  V1TeamMutationPayload,
+  V1TeamMutationResult,
+  V1TeamUpdatePayload,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -43,17 +79,40 @@ export function useV1DevLogin() {
   });
 }
 
+export function useV1Logout() {
+  return useMutation({
+    mutationFn: () => v1Post<{ ok: boolean }>('/auth/logout'),
+  });
+}
+
+export function useV1EmailLogin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { email: string; password: string }) => v1Post<V1AuthSessionResponse>('/auth/login', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1Register() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { nickname: string; email: string; password: string; requiredTermsAccepted: boolean }) =>
+      v1Post<V1AuthSessionResponse>('/auth/register', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
 export function useV1Onboarding() {
   return useQuery({
     queryKey: v1Keys.onboarding(),
-    queryFn: () => v1Get<unknown>('/onboarding'),
+    queryFn: () => v1Get<V1OnboardingDetail>('/onboarding'),
   });
 }
 
 export function useV1SaveOnboardingPreferences() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Patch<unknown>('/onboarding/preferences', body),
+    mutationFn: (body: V1OnboardingPreferencePayload) => v1Patch<V1OnboardingMutationResult>('/onboarding/preferences', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.onboarding() }),
   });
 }
@@ -61,8 +120,19 @@ export function useV1SaveOnboardingPreferences() {
 export function useV1CompleteOnboarding() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => v1Post<unknown>('/onboarding/complete'),
+    mutationFn: () => v1Post<V1OnboardingMutationResult>('/onboarding/complete'),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1DeferOnboarding() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason: 'skip_now' | 'later' | 'unknown' }) => v1Post<V1OnboardingMutationResult>('/onboarding/defer', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.onboarding() });
+    },
   });
 }
 
@@ -90,14 +160,14 @@ export function useV1Home(filters?: ListFilters) {
 export function useV1Notices() {
   return useQuery({
     queryKey: v1Keys.notices(),
-    queryFn: () => v1Get<V1Notice[]>('/notices'),
+    queryFn: () => v1Get<V1NoticesResponse>('/notices'),
   });
 }
 
 export function useV1Notice(noticeId: string) {
   return useQuery({
     queryKey: v1Keys.notice(noticeId),
-    queryFn: () => v1Get<V1Notice>(`/notices/${noticeId}`),
+    queryFn: () => v1Get<V1NoticeResponse>(`/notices/${noticeId}`),
     enabled: Boolean(noticeId),
   });
 }
@@ -117,20 +187,108 @@ export function useV1Match(matchId: string) {
   });
 }
 
+export function useV1MatchEdit(matchId: string) {
+  return useQuery({
+    queryKey: [...v1Keys.match(matchId), 'edit'] as const,
+    queryFn: () => v1Get<V1MatchEdit>(`/matches/${matchId}/edit`),
+    enabled: Boolean(matchId),
+  });
+}
+
+export function useV1MatchApplicationEligibility(matchId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.match(matchId), 'application-eligibility'] as const,
+    queryFn: () => v1Get<V1MatchApplicationEligibility>(`/matches/${matchId}/application-eligibility`),
+    enabled: Boolean(matchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
 export function useV1CreateMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Post<V1Match>('/matches', body),
+    mutationFn: (body: V1MatchMutationPayload) => v1Post<V1MatchMutationResult>('/matches', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.matches() }),
+  });
+}
+
+export function useV1ApplyMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { message?: string | null }) => v1Post<V1MatchApplicationResult>(`/matches/${matchId}/applications`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'application-eligibility'] });
+    },
   });
 }
 
 export function useV1UpdateMatch(matchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Patch<V1Match>(`/matches/${matchId}`, body),
+    mutationFn: (body: V1MatchUpdatePayload) => v1Patch<V1MatchMutationResult>(`/matches/${matchId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+    },
+  });
+}
+
+export function useV1CancelMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) => v1Post<{ matchId: string; status: string; detailRoute: string }>(`/matches/${matchId}/cancel`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+    },
+  });
+}
+
+export function useV1MatchApplications(matchId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.match(matchId), 'applications', filters ?? {}] as const,
+    queryFn: () => v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, filters),
+    enabled: Boolean(matchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1WithdrawMatchApplication(matchId: string, applicationId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<V1MatchApplicationResult>(`/match-applications/${applicationId}/withdraw`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'application-eligibility'] });
+    },
+  });
+}
+
+export function useV1ApproveMatchApplication(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, note }: { applicationId: string; note?: string | null }) =>
+      v1Post<V1MatchApplicationResult>(`/match-applications/${applicationId}/approve`, { note: note ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+    },
+  });
+}
+
+export function useV1RejectMatchApplication(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; reason?: string | null }) =>
+      v1Post<V1MatchApplicationResult>(`/match-applications/${applicationId}/reject`, { reason: reason ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
     },
   });
@@ -151,10 +309,18 @@ export function useV1Team(teamId: string) {
   });
 }
 
+export function useV1TeamDetail(teamId: string) {
+  return useQuery({
+    queryKey: [...v1Keys.team(teamId), 'detail'] as const,
+    queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
+    enabled: Boolean(teamId),
+  });
+}
+
 export function useV1CreateTeam() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Post<V1Team>('/teams', body),
+    mutationFn: (body: V1TeamMutationPayload) => v1Post<V1TeamMutationResult>('/teams', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teams() }),
   });
 }
@@ -162,7 +328,7 @@ export function useV1CreateTeam() {
 export function useV1UpdateTeam(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Patch<V1Team>(`/teams/${teamId}`, body),
+    mutationFn: (body: V1TeamUpdatePayload) => v1Patch<V1TeamMutationResult>(`/teams/${teamId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
@@ -173,7 +339,108 @@ export function useV1UpdateTeam(teamId: string) {
 export function useV1MyTeams(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.all, 'me', 'teams', filters ?? {}] as const,
-    queryFn: () => v1Get<V1Team[]>('/me/teams', filters),
+    queryFn: () => v1Get<V1MyTeamsResponse>('/me/teams', filters),
+  });
+}
+
+export function useV1TeamMembers(teamId: string, filters?: ListFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.team(teamId), 'members', filters ?? {}] as const,
+    queryFn: () => v1Get<V1TeamMembersPage>(`/teams/${teamId}/members`, filters),
+    enabled: Boolean(teamId),
+  });
+}
+
+export function useV1TeamJoinEligibility(teamId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.team(teamId), 'join-eligibility'] as const,
+    queryFn: () => v1Get<V1TeamJoinEligibility>(`/teams/${teamId}/join-eligibility`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1CreateTeamJoinApplication(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { message?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/teams/${teamId}/join-applications`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+    },
+  });
+}
+
+export function useV1TeamJoinApplications(teamId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.team(teamId), 'join-applications', filters ?? {}] as const,
+    queryFn: () => v1Get<V1TeamJoinApplicationsPage>(`/teams/${teamId}/join-applications`, filters),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1WithdrawTeamJoinApplication(teamId: string, applicationId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+    },
+  });
+}
+
+export function useV1ApproveTeamJoinApplication(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, note }: { applicationId: string; note?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/approve`, { note: note ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-applications'] });
+    },
+  });
+}
+
+export function useV1RejectTeamJoinApplication(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; reason?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/reject`, { reason: reason ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-applications'] });
+    },
+  });
+}
+
+export function useV1ChangeTeamMembershipRole(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membershipId, role }: { membershipId: string; role: 'manager' | 'member' }) =>
+      v1Patch<V1TeamMembershipMutationResult>(`/team-memberships/${membershipId}/role`, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
+    },
+  });
+}
+
+export function useV1RemoveTeamMembership(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membershipId, reason }: { membershipId: string; reason?: string | null }) =>
+      v1Post<V1TeamMembershipMutationResult>(`/team-memberships/${membershipId}/remove`, { reason: reason ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
+    },
   });
 }
 
@@ -192,10 +459,27 @@ export function useV1TeamMatch(teamMatchId: string) {
   });
 }
 
+export function useV1TeamMatchEdit(teamMatchId: string) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'edit'] as const,
+    queryFn: () => v1Get<V1TeamMatchEdit>(`/team-matches/${teamMatchId}/edit`),
+    enabled: Boolean(teamMatchId),
+  });
+}
+
+export function useV1TeamMatchEligibility(teamMatchId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'application-eligibility', filters ?? {}] as const,
+    queryFn: () => v1Get<V1TeamMatchEligibility>(`/team-matches/${teamMatchId}/application-eligibility`, filters),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
 export function useV1CreateTeamMatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Post<V1TeamMatch>('/team-matches', body),
+    mutationFn: (body: V1TeamMatchMutationPayload) => v1Post<V1TeamMatchMutationResult>('/team-matches', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() }),
   });
 }
@@ -203,11 +487,91 @@ export function useV1CreateTeamMatch() {
 export function useV1UpdateTeamMatch(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: unknown) => v1Patch<V1TeamMatch>(`/team-matches/${teamMatchId}`, body),
+    mutationFn: (body: V1TeamMatchUpdatePayload) => v1Patch<V1TeamMatchMutationResult>(`/team-matches/${teamMatchId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
     },
+  });
+}
+
+export function useV1CancelTeamMatch(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<{ teamMatchId: string; status: string; detailRoute: string }>(`/team-matches/${teamMatchId}/cancel`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+    },
+  });
+}
+
+export function useV1ApplyTeamMatch(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { applicantTeamId: string; message?: string | null }) =>
+      v1Post<V1TeamMatchApplicationResult>(`/team-matches/${teamMatchId}/applications`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'application-eligibility'] });
+    },
+  });
+}
+
+export function useV1TeamMatchApplications(teamMatchId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.teamMatch(teamMatchId), 'applications', filters ?? {}] as const,
+    queryFn: () => v1Get<V1TeamMatchApplicationsPage>(`/team-matches/${teamMatchId}/applications`, filters),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+export function useV1WithdrawTeamMatchApplication(teamMatchId: string, applicationId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<V1TeamMatchApplicationResult>(`/team-match-applications/${applicationId}/withdraw`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'application-eligibility'] });
+    },
+  });
+}
+
+export function useV1ApproveTeamMatchApplication(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, note }: { applicationId: string; note?: string | null }) =>
+      v1Post<V1TeamMatchApplicationResult>(`/team-match-applications/${applicationId}/approve`, { note: note ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'applications'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+    },
+  });
+}
+
+export function useV1RejectTeamMatchApplication(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; reason?: string | null }) =>
+      v1Post<V1TeamMatchApplicationResult>(`/team-match-applications/${applicationId}/reject`, { reason: reason ?? null }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'applications'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+    },
+  });
+}
+
+export function useV1MyTeamMatches(filters?: ListFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'me', 'team-matches', filters ?? {}] as const,
+    queryFn: () => v1Get<CursorPage<V1MyTeamMatch>>('/me/team-matches', filters),
   });
 }
 
@@ -226,17 +590,82 @@ export function useV1ChatMessages(roomId: string, filters?: ListFilters) {
   });
 }
 
+export function useV1ChatRoom(roomId: string) {
+  return useQuery({
+    queryKey: v1Keys.chatRoom(roomId),
+    queryFn: () => v1Get<V1ChatRoomDetail>(`/chat/rooms/${roomId}`),
+    enabled: Boolean(roomId),
+  });
+}
+
+export function useV1SendChatMessage(roomId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { content: string }) => v1Post<V1ChatMessageSendResult>(`/chat/rooms/${roomId}/messages`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notifications() });
+    },
+  });
+}
+
+export function useV1UpdateMyChatRoom(roomId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null }) =>
+      v1Patch<V1ChatRoomMeUpdate>(`/chat/rooms/${roomId}/me`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
+    },
+  });
+}
+
+export function useV1UpdateChatRoomMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roomId, ...body }: { roomId: string; pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null }) =>
+      v1Patch<V1ChatRoomMeUpdate>(`/chat/rooms/${roomId}/me`, body),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(variables.roomId) });
+    },
+  });
+}
+
+export function useV1LeaveChatRoom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roomId, reason }: { roomId: string; reason?: string | null }) =>
+      v1Post<V1ChatRoomLeaveResult>(`/chat/rooms/${roomId}/leave`, { reason: reason ?? null }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(variables.roomId) });
+    },
+  });
+}
+
 export function useV1Notifications(filters?: ListFilters) {
   return useQuery({
     queryKey: v1Keys.notifications(filters),
-    queryFn: () => v1Get<CursorPage<V1Notification>>('/notifications', filters),
+    queryFn: () => v1Get<V1NotificationsPage>('/notifications', filters),
   });
 }
 
 export function useV1ReadNotification() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (notificationId: string) => v1Patch<V1Notification>(`/notifications/${notificationId}/read`),
+    mutationFn: (notificationId: string) => v1Patch<{ notificationId: string; status: 'read'; readAt: string }>(`/notifications/${notificationId}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.notifications() }),
+  });
+}
+
+export function useV1ReadAllNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { type?: string | null }) =>
+      v1Post<{ updatedCount: number; readAt: string; unreadCount: number }>('/notifications/read-all', body ?? {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.notifications() }),
   });
 }
@@ -255,10 +684,48 @@ export function useV1Profile() {
   });
 }
 
+export function useV1UpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { displayName: string; profileImageUrl?: string | null; bio?: string | null; visibilityStatus: 'public' | 'members_only' | 'private' }) =>
+      v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
+  });
+}
+
 export function useV1Settings() {
   return useQuery({
     queryKey: v1Keys.settings(),
     queryFn: () => v1Get<V1Settings>('/me/settings'),
+  });
+}
+
+export function useV1UpdateSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      visibilityStatus?: 'public' | 'members_only' | 'private';
+      notifications?: Partial<V1Settings['notifications']>;
+    }) => v1Patch<{ profile: V1Settings['profile']; notifications: V1Settings['notifications']; updatedAt: string }>('/me/settings', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
+    },
+  });
+}
+
+export function useV1WithdrawalRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<{ userId: string; accountStatus: string; requestedAt: string }>('/me/withdrawal-request', body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
   });
 }
 

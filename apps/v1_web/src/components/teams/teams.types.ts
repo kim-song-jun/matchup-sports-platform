@@ -49,6 +49,9 @@ export type TeamDetailViewModel = {
     membersList: Array<{ name: string; role: string; meta: string; status: string }>;
   };
   mode: 'default' | 'pending' | 'mine' | 'closed';
+  ctaLabel?: string;
+  ctaPending?: boolean;
+  onCta?: () => void;
 };
 
 export type TeamFormMode = 'create' | 'edit';
@@ -69,11 +72,42 @@ export type TeamFormViewModel = {
     contact: string;
     links: Array<{ label: string; value: string }>;
   };
+  form?: {
+    sportId: string;
+    regionId: string;
+    regions: Array<{ id: string; name: string }>;
+    sports: Array<{ id: string; name: string }>;
+    joinPolicy: 'approval_required' | 'closed';
+    onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
+    onSportChange: (sportId: string) => void;
+    onRegionChange: (regionId: string) => void;
+    onJoinPolicyChange: (joinPolicy: 'approval_required' | 'closed') => void;
+    onSubmit: () => void;
+    submitting?: boolean;
+    error?: string | null;
+  };
 };
 
 export type TeamMembersViewModel = {
   teamName: string;
   summary: { total: number; managers: number; pending: number };
-  members: Array<{ name: string; role: string; meta: string; status: string; locked?: boolean }>;
-  requests: Array<{ name: string; meta: string; status: string }>;
+  members: Array<{
+    name: string;
+    role: string;
+    meta: string;
+    status: string;
+    locked?: boolean;
+    onPromote?: () => void;
+    onDemote?: () => void;
+    onRemove?: () => void;
+    actionPending?: boolean;
+  }>;
+  requests: Array<{
+    name: string;
+    meta: string;
+    status: string;
+    onApprove?: () => void;
+    onReject?: () => void;
+    actionPending?: boolean;
+  }>;
 };

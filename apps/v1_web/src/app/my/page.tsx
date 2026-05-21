@@ -1,6 +1,5 @@
-import { MyHomePageView } from '@/components/my/my-page';
-import { myHomeModel } from '@/components/my/my.view-model';
+import { MyHomePageClient } from '@/components/my/my-api-clients';
 
 export default function MyPage() {
-  return <MyHomePageView model={myHomeModel} />;
+  return <MyHomePageClient />;
 }

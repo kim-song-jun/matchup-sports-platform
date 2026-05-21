@@ -19,17 +19,17 @@ export function getEmailLoginViewModel(): EmailLoginViewModel {
   return {
     backHref: '/login',
     title: '이메일로\n로그인하세요',
-    sub: '입력은 이메일과 비밀번호만 받습니다. 실패해도 입력값을 유지하고 같은 화면에서 복구합니다.',
+    sub: '가입한 이메일과 비밀번호로 로그인합니다. 실패해도 입력값은 유지하고 같은 화면에서 복구합니다.',
     fields: [
       { label: '이메일', placeholder: 'you@example.com', type: 'email' },
       { label: '비밀번호', placeholder: '비밀번호', type: 'password' },
     ],
-    primary: { label: '로그인', href: '/onboarding/resume' },
-    forgot: { label: '비밀번호 찾기', disabled: true, tone: 'neutral' },
+    primary: { label: '로그인', tone: 'primary' },
+    forgot: { label: '비밀번호 찾기', href: '/auth/password-reset', tone: 'neutral' },
     signupHref: '/terms',
     notice: {
-      title: '오류 처리',
-      body: '이메일 형식 오류, 비밀번호 불일치, 네트워크 실패는 field helper와 persistent error card로 표시합니다.',
+      title: 'Mock login 유지',
+      body: 'seeded preview 계정은 이전 화면의 Mock login으로 계속 사용할 수 있습니다. 이메일 로그인은 실제 가입 계정에 연결됩니다.',
     },
   };
 }
@@ -81,6 +81,15 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       primary: { label: '수동으로 지역 선택', href: '/onboarding/region' },
       secondary: { label: '설정에서 권한 열기', disabled: true, tone: 'neutral' },
     },
+    'password-reset': {
+      backHref: '/login/email',
+      badge: '비밀번호 찾기',
+      title: '비밀번호 재설정은 준비 중이에요',
+      body: '이메일/SMS 발송 인프라가 연결되기 전까지는 재설정 링크를 보낸 것처럼 처리하지 않습니다. 현재는 Mock login 또는 새 이메일 회원가입으로 복구할 수 있습니다.',
+      tone: 'orange',
+      primary: { label: '이메일 로그인으로 돌아가기', href: '/login/email' },
+      secondary: { label: 'Mock login 사용하기', href: '/login', tone: 'neutral' },
+    },
   };
 
   return models[kind];
@@ -92,8 +101,8 @@ export function getTermsViewModel(): TermsViewModel {
     title: '가입 전에 약관을 먼저 확인합니다',
     sub: '필수 약관을 모두 동의해야 회원가입 입력 화면으로 이동할 수 있습니다.',
     agreements: [
-      { title: '서비스 이용약관', meta: '필수 · 최신 버전 2026.05', required: true, checked: true },
-      { title: '개인정보 처리방침', meta: '필수 · 인증/매치 참여에 필요', required: true, checked: true },
+      { title: '서비스 이용약관', meta: '필수 · 보기', required: true, checked: true },
+      { title: '개인정보 처리방침', meta: '필수 · 보기', required: true, checked: true },
       { title: '위치 기반 서비스', meta: '선택 · 나중에 설정 가능', required: false, checked: false },
       { title: '마케팅 알림', meta: '선택 · 설정에서 변경 가능', required: false, checked: false },
     ],
@@ -105,18 +114,18 @@ export function getSignupFormViewModel(): SignupFormViewModel {
   return {
     backHref: '/terms',
     title: '계정을 만들고\n운동 설정을 이어가요',
-    sub: '회원가입 후 종목, 레벨, 지역 선택 화면으로 이어집니다.',
+    sub: '회원가입 후 원본 01의 종목, 레벨, 지역 선택 화면으로 이어진다.',
     fields: [
-      { label: '닉네임', placeholder: '사용할 닉네임', type: 'text', helper: '사용 가능한 닉네임이에요.', state: 'success', action: { label: '중복체크', disabled: true, tone: 'neutral' } },
+      { label: '닉네임', placeholder: '사용할 닉네임', type: 'text', helper: '2자 이상 입력해 주세요.', action: { label: '중복체크', disabled: true, tone: 'neutral' } },
       { label: '이메일', placeholder: 'you@example.com', type: 'email' },
       { label: '비밀번호', placeholder: '8자 이상', type: 'password' },
       { label: '비밀번호 확인', placeholder: '비밀번호 다시 입력', type: 'password', helper: '일치하지 않으면 가입 CTA는 비활성화합니다.' },
     ],
     notice: {
       title: '가입 후 행동',
-      body: '가입 성공 시 로그인 상태로 종목 선택 step에 진입합니다. 닉네임 중복 실패와 비밀번호 불일치는 현재 화면에 남겨 복구합니다.',
+      body: '가입 성공 시 로그인 상태로 종목 선택 step에 진입한다. 닉네임 중복 실패와 비밀번호 불일치는 현재 화면에 남겨 복구한다.',
     },
-    primary: { label: '회원가입하고 계속', href: '/signup/complete' },
+    primary: { label: '회원가입하고 계속', tone: 'primary' },
   };
 }
 

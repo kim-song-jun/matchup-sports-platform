@@ -24,6 +24,7 @@ export type MyMenuSection = {
 export type MyHomeViewModel = {
   user: MyUser;
   sections: MyMenuSection[];
+  hasNewNotification?: boolean;
 };
 
 export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended';
@@ -43,9 +44,14 @@ export type MyMatchesViewModel = {
   title: string;
   summary: Array<{ label: string; value: number; unit: string }>;
   matches: MyMatch[];
+  apiNotice?: {
+    title: string;
+    body: string;
+    tone: 'info' | 'warning';
+  };
 };
 
-export type MyTeamRole = 'owner' | 'admin' | 'member';
+export type MyTeamRole = 'owner' | 'manager' | 'admin' | 'member';
 
 export type MyTeam = {
   id: string;
@@ -70,6 +76,7 @@ export type MyTeamDetailViewModel = {
   team: MyTeam;
   actions: MyMenuItem[];
   recentMatches: MyMatch[];
+  chatHref?: string;
 };
 
 export type MyMember = {
@@ -77,6 +84,13 @@ export type MyMember = {
   role: string;
   meta: string;
   status: string;
+  onPromote?: () => void;
+  onDemote?: () => void;
+  onRemove?: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
+  actionPending?: boolean;
+  locked?: boolean;
 };
 
 export type MyTeamMembersViewModel = {

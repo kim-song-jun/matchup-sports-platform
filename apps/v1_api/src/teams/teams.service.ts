@@ -99,12 +99,18 @@ export class TeamsService {
     const viewer = this.getViewer(team, user);
 
     return {
+      id: team.id,
       teamId: team.id,
       name: team.name,
       status: team.status,
       visibility: 'public',
+      sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
+      regionName: team.region?.name ?? null,
       region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
+      joinPolicy: team.joinPolicy,
+      trustState: team.trustScore?.trustState ?? 'none',
+      version: team.updatedAt.toISOString(),
       profile: {
         logoUrl: team.profile?.logoUrl ?? null,
         coverImageUrl: team.profile?.coverImageUrl ?? null,
@@ -148,6 +154,7 @@ export class TeamsService {
       joinPolicy: team.joinPolicy,
       viewerRole: viewer.role,
       joinState: viewer.joinState,
+      applicationId: team.joinApplications[0]?.id ?? null,
       requiresApproval: true,
       immediateJoinSupported: false,
     };
@@ -1029,11 +1036,14 @@ export class TeamsService {
   private toListItem(team: TeamWithRelations, user: V1AuthUser | null) {
     const viewer = this.getViewer(team, user);
     return {
+      id: team.id,
       teamId: team.id,
       name: team.name,
       logoUrl: team.profile?.logoUrl ?? null,
       coverImageUrl: team.profile?.coverImageUrl ?? null,
+      sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
+      regionName: team.region?.name ?? null,
       region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
       introductionPreview: team.profile?.description ? team.profile.description.slice(0, 120) : null,
       joinPolicy: team.joinPolicy,

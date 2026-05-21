@@ -1,6 +1,5 @@
-import { NotificationsPageView } from '@/components/community/community-page';
-import { getNotificationsViewModel } from '@/components/community/community.view-model';
+import { NotificationsPageClient } from '@/components/community/community-api-clients';
 
 export default function NotificationsPage() {
-  return <NotificationsPageView model={getNotificationsViewModel()} />;
+  return <NotificationsPageClient />;
 }

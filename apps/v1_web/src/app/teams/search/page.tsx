@@ -1,6 +1,6 @@
-import { TeamStatePageView } from '@/components/teams/teams-page';
-import { getTeamStateViewModel } from '@/components/teams/teams.view-model';
+import { TeamSearchPageClient } from '@/components/teams/teams-client';
 
-export default function TeamSearchPage() {
-  return <TeamStatePageView model={getTeamStateViewModel('search')} />;
+export default async function TeamSearchPage({ searchParams }: { searchParams: Promise<{ query?: string; q?: string }> }) {
+  const params = await searchParams;
+  return <TeamSearchPageClient queryText={params.query ?? params.q ?? ''} />;
 }

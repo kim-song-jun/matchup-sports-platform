@@ -1,6 +1,5 @@
-import { TeamMatchCreatePageView } from '@/components/team-matches/team-matches-page';
-import { getTeamMatchCreateViewModel } from '@/components/team-matches/team-matches.view-model';
+import { TeamMatchCreatePageClient } from '@/components/team-matches/team-matches-create-client';
 
 export default function TeamMatchCreatePlaceTimePage() {
-  return <TeamMatchCreatePageView model={getTeamMatchCreateViewModel('place-time')} />;
+  return <TeamMatchCreatePageClient step="place-time" />;
 }

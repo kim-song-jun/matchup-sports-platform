@@ -1,6 +1,5 @@
-import { MyTeamsPageView } from '@/components/my/my-page';
-import { myTeamsModel } from '@/components/my/my.view-model';
+import { MyTeamsPageClient } from '@/components/my/my-api-clients';
 
 export default function MyTeamsPage() {
-  return <MyTeamsPageView model={myTeamsModel} />;
+  return <MyTeamsPageClient />;
 }

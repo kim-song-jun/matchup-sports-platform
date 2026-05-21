@@ -1,6 +1,5 @@
-import { MatchCreatePageView } from '@/components/matches/matches-page';
-import { getMatchCreateViewModel } from '@/components/matches/matches.view-model';
+import { MatchCreatePageClient } from '@/components/matches/matches-create-client';
 
 export default function NewMatchPage() {
-  return <MatchCreatePageView model={getMatchCreateViewModel('info')} />;
+  return <MatchCreatePageClient step="info" />;
 }

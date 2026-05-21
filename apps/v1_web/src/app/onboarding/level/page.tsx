@@ -1,6 +1,5 @@
-import { OnboardingPageView } from '@/components/auth/auth-page';
-import { getOnboardingViewModel } from '@/components/auth/auth.view-model';
+import { OnboardingClient } from '@/components/auth/onboarding-client';
 
 export default function OnboardingLevelPage() {
-  return <OnboardingPageView model={getOnboardingViewModel('level')} />;
+  return <OnboardingClient step="level" />;
 }

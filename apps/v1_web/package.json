@@ -6,8 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "sh -c 'mkdir -p .next && find .next -mindepth 1 -maxdepth 1 -exec rm -rf {} + && next dev --hostname 0.0.0.0 --port 3013'",
-    "dev:e2e": "next dev --hostname 0.0.0.0 --port 3013",
+    "dev": "sh -c 'mkdir -p .next && find .next -mindepth 1 -maxdepth 1 -exec rm -rf {} + && next dev --webpack --hostname 0.0.0.0 --port 3013'",
+    "dev:e2e": "next dev --webpack --hostname 0.0.0.0 --port 3013",
     "build": "next build",
     "start": "next start",
     "lint": "echo '[v1_web] lint delegated to tsc --noEmit'",

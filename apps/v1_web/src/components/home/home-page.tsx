@@ -43,7 +43,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
       <div style={{ margin: '0 20px 28px' }}>
         <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
-        <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} />
+        <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
       </div>
 
       <div style={{ padding: '0 20px 28px' }}>
@@ -61,7 +61,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       <SectionTitle title="추천 매치" sub={model.network ? '다시 불러오기가 필요합니다' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
       {model.network ? (
         <div style={{ padding: '0 20px 8px' }}>
-          <EmptyState title="새로고침이 필요합니다" sub="추천 목록과 대표 매치를 다시 불러올 수 있어야 합니다." cta="다시 불러오기" />
+          <EmptyState title="새로고침이 필요합니다" sub="추천 목록과 대표 매치를 다시 불러올 수 있어야 합니다." cta="다시 불러오기" onCta={model.retry} />
         </div>
       ) : (
         <RecommendedMatchRail matches={model.recommendedMatches} />
@@ -71,8 +71,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         <SectionTitle title="이번 달 통계" />
         <div className="tm-kpi-panel">
           <KPIStat label="참가" value={dash ? '-' : model.stats.joined} unit={dash ? undefined : '회'} />
-          <KPIStat label="MVP" value={dash ? '-' : model.stats.mvp} unit={dash ? undefined : '개'} />
-          <KPIStat label="결제" value={dash ? '-' : model.stats.paid} />
+          <KPIStat label="신뢰" value={dash ? '-' : model.stats.trustState} />
+          <KPIStat label="대기" value={dash ? '-' : model.stats.pending} />
         </div>
       </div>
 
@@ -129,7 +129,17 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
   );
 }
 
-function FeaturedMatchCard({ match, network, signedOut }: { match: HomeMatchCard; network: boolean; signedOut: boolean }) {
+function FeaturedMatchCard({
+  match,
+  network,
+  signedOut,
+  onRetry,
+}: {
+  match: HomeMatchCard;
+  network: boolean;
+  signedOut: boolean;
+  onRetry?: () => void;
+}) {
   const card = (
     <Card pad={0} style={{ overflow: 'hidden' }}>
       <div
@@ -140,7 +150,7 @@ function FeaturedMatchCard({ match, network, signedOut }: { match: HomeMatchCard
           <div className="tm-featured-overlay">
             <div className="tm-featured-text">
               <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>
-                {signedOut ? '랜덤 추천 매치' : '관심 종목 중 충원률 가장 높은 경기'}
+                {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
               </div>
               <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
                 {match.title}
@@ -153,7 +163,9 @@ function FeaturedMatchCard({ match, network, signedOut }: { match: HomeMatchCard
         {network ? (
           <>
             <div className="tm-text-body-lg">새로고침이 필요합니다</div>
-            <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 10 }}>다시 불러오기</button>
+            <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 10 }} onClick={onRetry}>
+              다시 불러오기
+            </button>
           </>
         ) : (
           <>
@@ -190,7 +202,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
                 {match.currentParticipants}/{match.maxParticipants}명
               </span>
               <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
-                {match.fee.toLocaleString('ko-KR')}원
+                {match.actionLabel}
               </span>
             </div>
           </div>

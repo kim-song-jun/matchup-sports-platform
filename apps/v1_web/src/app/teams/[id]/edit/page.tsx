@@ -1,6 +1,6 @@
-import { TeamFormPageView } from '@/components/teams/teams-page';
-import { getTeamFormViewModel } from '@/components/teams/teams.view-model';
+import { TeamEditPageClient } from '@/components/teams/teams-form-client';
 
-export default function TeamEditPage() {
-  return <TeamFormPageView model={getTeamFormViewModel('edit')} />;
+export default async function TeamEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <TeamEditPageClient teamId={id} />;
 }

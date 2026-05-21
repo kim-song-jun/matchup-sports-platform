@@ -32,6 +32,7 @@ type AppChromeProps = {
   floatingSlot?: ReactNode;
   activeTab?: V1NavTab;
   showSearch?: boolean;
+  showNotifications?: boolean;
   hasNewNotification?: boolean;
   bottomNav?: boolean;
   topBar?: boolean;
@@ -44,6 +45,7 @@ export function AppChrome({
   floatingSlot,
   activeTab = 'home',
   showSearch = false,
+  showNotifications = true,
   hasNewNotification = false,
   bottomNav = true,
   topBar = true,
@@ -73,10 +75,12 @@ export function AppChrome({
                 <SearchIcon size={21} strokeWidth={2} />
               </Link>
             ) : null}
-            <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/notifications" aria-label="알림">
-              <BellIcon size={21} strokeWidth={2} />
-              {hasNewNotification ? <span className="tm-unread-dot" /> : null}
-            </Link>
+            {showNotifications ? (
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/notifications" aria-label="알림">
+                <BellIcon size={21} strokeWidth={2} />
+                {hasNewNotification ? <span className="tm-unread-dot" /> : null}
+              </Link>
+            ) : null}
           </div>
         </header>
       ) : null}

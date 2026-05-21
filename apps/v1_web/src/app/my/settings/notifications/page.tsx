@@ -1,6 +1,5 @@
-import { NotificationSettingsPageView } from '@/components/my/my-page';
-import { notificationSettingsModel } from '@/components/my/my.view-model';
+import { NotificationSettingsPageClient } from '@/components/my/my-api-clients';
 
 export default function MyNotificationSettingsPage() {
-  return <NotificationSettingsPageView model={notificationSettingsModel} />;
+  return <NotificationSettingsPageClient />;
 }

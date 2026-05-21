@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
@@ -6,6 +7,7 @@ import type {
   MyHomeViewModel,
   MyMatch,
   MyMatchesViewModel,
+  MyMember,
   MyMenuItem,
   MyTeam,
   MyTeamDetailViewModel,
@@ -18,7 +20,7 @@ import type {
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   return (
-    <AppChrome title="마이" activeTab="my" hasNewNotification>
+    <AppChrome title="마이" activeTab="my" hasNewNotification={model.hasNewNotification}>
       <div className="tm-my-shell">
         <section className="tm-my-profile-head">
           <div className="tm-my-avatar">{model.user.initials}</div>
@@ -53,6 +55,12 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           <div className="tm-text-label">{model.title}</div>
           <div className="tm-text-caption" style={{ marginTop: 3 }}>{joined ? '내가 신청한 승인 대기, 승인 완료, 종료된 매치만 보여줍니다.' : '내가 생성한 매치만 보여주고 참여자 관리와 매치 수정 상태를 분리합니다.'}</div>
         </div>
+        {model.apiNotice ? (
+          <Card pad={14} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
+            <div className="tm-text-body-lg">{model.apiNotice.title}</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.apiNotice.body}</div>
+          </Card>
+        ) : null}
         <div className="tm-my-list-stack">
           {model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)}
         </div>
@@ -97,14 +105,14 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
         <div className="tm-my-section-label">최근 팀 매치</div>
         <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-primary" href="/chat/room-1">팀 채팅</Link><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link></div></div>
+      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link></div></div>
     </AppChrome>
   );
 }
 
-export function MyTeamMembersPageView({ model }: { model: MyTeamMembersViewModel }) {
+export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: { model: MyTeamMembersViewModel; backHref?: string }) {
   return (
-    <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref="/my/teams/team-1">
+    <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref={backHref}>
       <div className="tm-my-shell">
         <h1 className="tm-text-heading">{model.teamName}</h1>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
@@ -141,7 +149,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
     <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
-        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>로그아웃 준비중</button>
+        <LogoutButton />
       </div>
     </AppChrome>
   );
@@ -258,7 +266,7 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   );
 }
 
-function MemberGroup({ title, members, review }: { title: string; members: Array<{ name: string; role: string; meta: string; status: string }>; review?: boolean }) {
+function MemberGroup({ title, members, review }: { title: string; members: MyMember[]; review?: boolean }) {
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
@@ -267,7 +275,17 @@ function MemberGroup({ title, members, review }: { title: string; members: Array
           <Card key={member.name} pad={14}>
             <div className="tm-my-card-head">
               <ListItem title={member.name} sub={`${member.role} · ${member.meta}`} trailing={member.status} />
-              {review ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>승인 대기</button> : null}
+              {review ? (
+                <div className="tm-member-actions">
+                  <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={!member.onApprove || member.actionPending} onClick={member.onApprove}>승인</button>
+                  <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={!member.onReject || member.actionPending} onClick={member.onReject}>거절</button>
+                </div>
+              ) : (
+                <div className="tm-member-actions">
+                  <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={member.locked || member.actionPending || (!member.onPromote && !member.onDemote)} onClick={member.onPromote ?? member.onDemote}>{member.locked ? '권한 고정' : member.onDemote ? '멤버로 변경' : '운영진 지정'}</button>
+                  <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={member.locked || !member.onRemove || member.actionPending} onClick={member.onRemove}>내보내기</button>
+                </div>
+              )}
             </div>
           </Card>
         ))}

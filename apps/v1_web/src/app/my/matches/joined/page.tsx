@@ -1,6 +1,5 @@
-import { MyMatchesPageView } from '@/components/my/my-page';
-import { getMyMatchesModel } from '@/components/my/my.view-model';
+import { MyMatchesPageClient } from '@/components/my/my-matches-client';
 
 export default function MyJoinedMatchesPage() {
-  return <MyMatchesPageView model={getMyMatchesModel('joined')} />;
+  return <MyMatchesPageClient mode="joined" />;
 }

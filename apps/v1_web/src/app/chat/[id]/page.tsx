@@ -1,6 +1,6 @@
-import { ChatRoomPageView } from '@/components/community/community-page';
-import { getChatRoomViewModel } from '@/components/community/community.view-model';
+import { ChatRoomPageClient } from '@/components/community/community-api-clients';
 
-export default function ChatRoomPage() {
-  return <ChatRoomPageView model={getChatRoomViewModel()} />;
+export default async function ChatRoomPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <ChatRoomPageClient roomId={id} />;
 }

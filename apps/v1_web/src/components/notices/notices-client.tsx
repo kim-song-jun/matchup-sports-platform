@@ -12,7 +12,7 @@ export function NoticeListPageClient() {
   const model: NoticeListViewModel = query.data
     ? {
         ...fallback,
-        notices: query.data.map(toNotice),
+        notices: getNoticeItems(query.data).map(toNotice),
       }
     : fallback;
 
@@ -25,7 +25,7 @@ export function NoticeDetailPageClient({ noticeId }: { noticeId: string }) {
   const model: NoticeDetailViewModel = query.data
     ? {
         ...fallback,
-        notice: toNotice(query.data),
+        notice: toNotice(query.data.notice ?? fallbackNotice(noticeId)),
       }
     : fallback;
 
@@ -36,13 +36,32 @@ function toNotice(notice: V1Notice): NoticeModel {
   const body = notice.body ?? '공지 본문을 불러왔지만 상세 내용은 아직 등록되지 않았습니다.';
 
   return {
-    id: notice.id,
-    tag: notice.category,
+    id: notice.noticeId ?? notice.id ?? 'notice',
+    tag: notice.category ?? notice.audience ?? '공지',
     title: notice.title,
     summary: body,
     date: formatDate(notice.publishedAt),
-    pinned: notice.category === '운영',
+    pinned: notice.category === '운영' || notice.audience === 'public',
     body: body.split('\n').filter(Boolean),
+  };
+}
+
+function getNoticeItems(data: unknown): V1Notice[] {
+  if (Array.isArray(data)) return data as V1Notice[];
+  if (typeof data === 'object' && data && 'notices' in data && Array.isArray((data as { notices?: unknown }).notices)) {
+    return (data as { notices: V1Notice[] }).notices;
+  }
+  return [];
+}
+
+function fallbackNotice(noticeId: string): V1Notice {
+  const fallback = getNoticeDetailViewModel(noticeId).notice;
+  return {
+    id: fallback.id,
+    title: fallback.title,
+    category: fallback.tag,
+    body: fallback.body.join('\n'),
+    publishedAt: new Date().toISOString(),
   };
 }
 

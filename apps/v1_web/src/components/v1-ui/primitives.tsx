@@ -135,9 +135,10 @@ type EmptyStateProps = {
   title: string;
   sub: string;
   cta?: string;
+  onCta?: () => void;
 };
 
-export function EmptyState({ title, sub, cta }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta }: EmptyStateProps) {
   return (
     <div className="tm-empty-state">
       <div className="tm-empty-icon" />
@@ -145,7 +146,11 @@ export function EmptyState({ title, sub, cta }: EmptyStateProps) {
       <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {sub}
       </div>
-      {cta ? <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 24 }}>{cta}</button> : null}
+      {cta ? (
+        <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 24 }} onClick={onCta}>
+          {cta}
+        </button>
+      ) : null}
     </div>
   );
 }

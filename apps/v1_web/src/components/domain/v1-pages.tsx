@@ -179,7 +179,7 @@ export function TeamsProductPage() {
 
 export function NoticesProductPage({ detail = false }: { detail?: boolean }) {
   const noticesQuery = useV1Notices();
-  const items = (noticesQuery.data ?? notices).map(toNoticeItem);
+  const items = (noticesQuery.data?.notices ?? notices).map(toNoticeItem);
   const notice = items[detail ? 1 : 0] ?? items[0] ?? notices[0];
   return (
     <AppShell>
@@ -442,7 +442,7 @@ function toTeamCard(team: V1Team | MockTeam): MockTeam {
       sport: team.sportName,
       region: team.regionName,
       members: `${team.memberCount}명`,
-      trust: team.trustState,
+      trust: team.trustState === 'none' ? 'sample' : team.trustState,
       joinStatus: team.joinPolicy,
     };
   }
@@ -453,10 +453,10 @@ function toTeamCard(team: V1Team | MockTeam): MockTeam {
 function toNoticeItem(notice: V1Notice | MockNotice): MockNotice {
   if ('publishedAt' in notice) {
     return {
-      id: notice.id,
+      id: notice.noticeId ?? notice.id ?? 'notice',
       title: notice.title,
       date: formatShortDate(notice.publishedAt),
-      category: notice.category,
+      category: notice.category ?? notice.audience ?? '공지',
       body: notice.body ?? '',
     };
   }
@@ -467,12 +467,12 @@ function toNoticeItem(notice: V1Notice | MockNotice): MockNotice {
 function toNotificationItem(notification: V1Notification | MockNotification): MockNotification {
   if ('createdAt' in notification) {
     return {
-      id: notification.id,
+      id: notification.notificationId,
       title: notification.title,
-      body: notification.body,
+      body: notification.body ?? '',
       time: formatShortDate(notification.createdAt),
-      read: notification.read,
-      href: notification.href,
+      read: notification.status === 'read',
+      href: notification.target.route ?? '/notifications',
     };
   }
 
@@ -480,13 +480,13 @@ function toNotificationItem(notification: V1Notification | MockNotification): Mo
 }
 
 function toChatRoom(room: V1ChatRoom | MockChatRoom): MockChatRoom {
-  if ('targetType' in room) {
+  if ('roomType' in room) {
     return {
-      id: room.id,
+      id: room.roomId,
       title: room.title,
-      target: room.targetType === 'match' ? '개인 매치' : '팀매치',
-      preview: room.lastMessagePreview,
-      time: formatShortDate(room.updatedAt),
+      target: room.roomType === 'match' ? '개인 매치' : '팀매치',
+      preview: room.lastMessage?.contentPreview ?? '아직 메시지가 없습니다.',
+      time: formatShortDate(room.lastMessage?.sentAt ?? ''),
       unread: room.unreadCount,
     };
   }

@@ -1,6 +1,5 @@
-import { TermsPageView } from '@/components/auth/auth-page';
-import { getTermsViewModel } from '@/components/auth/auth.view-model';
+import { TermsClient } from '@/components/auth/terms-client';
 
 export default function TermsPage() {
-  return <TermsPageView model={getTermsViewModel()} />;
+  return <TermsClient />;
 }

@@ -30,6 +30,17 @@ Current decision: first import every `1차 디자인 완료` surface into `apps/
 - Production-candidate `apps/v1_web/src/app` routes no longer import
   `DesignFrame` or `design-source`; design references remain only outside app
   routes.
+- `/` now uses the v1 session entry policy instead of a fixed app redirect:
+  no valid local dev session goes to `/login`, valid session goes to `/home`,
+  and stale session hints are cleared before returning to `/login`.
+- V1 email/password auth is now API-bound for the current v1 session contract:
+  `POST /auth/register` creates `V1User`, email `V1AuthIdentity`,
+  `V1UserProfile`, onboarding progress, notification preference, and required
+  `V1UserTermsConsent` rows; `POST /auth/login` verifies the email identity
+  password hash; both return the same localStorage-backed session shape as
+  mock/dev login.
+- The seeded mock/dev login selector must remain available during the v1
+  preview even though real email login/register now exists.
 
 ## Porting Rule
 
@@ -51,7 +62,7 @@ inventory and must stay visible in publishing work.
 | No | Design section | Required product page(s) | Current route evidence | Port status | Exception/state handling |
 |---|---|---|---|---|---|
 | 00 | `core-shell-sm-final` | shared shell, top bar, bottom nav, search entry, notification entry | `components/design/first-design-page.tsx`, `components/design/design-frame.tsx` | Imported | First-complete design shell is active on v1 routes. Product shell replacement comes after visual import review. |
-| 01 | `auth-onboarding-sm-final` | login, email login, terms, signup form, signup complete, onboarding sport/level/region/confirm/resume, auth exception states | `/login`, `/login/email`, `/signup`, `/signup/complete`, `/terms`, `/onboarding/*`, `/auth/{provider-denied,missing-email,blocked,account-conflict,location-denied}` | Componentized core | Provider denied, email missing, conflict, blocked, and location denied now have route-backed exception surfaces. Real auth submit/API binding remains a later contract-binding task. Placeholder-only actions such as password reset, support, and browser permission settings are disabled instead of misrouting. |
+| 01 | `auth-onboarding-sm-final` | login, email login, terms, signup form, signup complete, onboarding sport/level/region/confirm/resume, auth exception states | `/login`, `/login/email`, `/signup`, `/signup/complete`, `/terms`, `/onboarding/*`, `/auth/{provider-denied,missing-email,blocked,account-conflict,location-denied,password-reset}` | API-bound core | Email login/register, required terms persistence, onboarding preference save/complete/defer, logout, and seeded mock login are API-bound. Social auth and real password-reset delivery remain deferred without fake success. |
 | 02 | `home-discovery-sm-final` | `/home`, search entry, recommendations, quick actions, home notices | `/home`, `/search`, `/search/new`, `/search/empty`, `/search/error`, `/search/stale` | Imported | Search states are exposed through fixture routes where available. |
 | 02-1 | `home-notice-sm-final` | `/notices`, `/notices/[id]` | routes exist | Imported | Notices are read-only. |
 | 03 | `matches-core-sm-final` | `/matches`, `/matches/[id]`, `/matches/participants`, joined/created management entry | routes exist: list/detail/empty/error/filter/joined/participants | Imported | Empty/error/filter are separate fixture routes for first visual review. |
@@ -63,7 +74,7 @@ inventory and must stay visible in publishing work.
 | 07 | `my-profile-trust-sm-revision` | `/my`, `/my/matches/joined`, `/my/matches/created`, `/my/teams`, `/my/teams/[id]`, `/my/teams/[id]/members`, profile/trust sections | core my/team management plus `/my/profile/edit` | Componentized core | Profile/settings routes now use API-bindable my components; deeper trust/review history states remain future API-bound variants. |
 | 08 | `payments-support-sm-revision` | disabled/read-only payment/support surfaces only if visible | no dedicated v1 payment/support route expected | Deferred | Must not show fake payment/refund/support success. Match/team-match CTA maps to application request, not checkout. |
 | 09 | `settings-states` | settings main, notification settings, legal, logout, withdrawal | `/my/settings`, `/my/settings/notifications`, `/my/settings/legal`, `/my/settings/withdrawal` | Closest imported | Dedicated settings export is not present; current routes use profile/trust/notification designs as placeholders. |
-| 10 | `public-marketing-sm-revision` | landing/public entry route if launch needs it | `/landing`; `/` still redirects to `/home` | Imported | Root remains app-first until launch routing is decided. |
+| 10 | `public-marketing-sm-revision` | landing/public entry route if launch needs it | `/landing`; `/` branches by v1 session state | Imported | Root remains app-first but now sends guests to `/login` and valid sessions to `/home`. |
 | 11 | `desktop-web` | responsive desktop treatment for core pages | no desktop-specific implementation confirmed | Pending | Implement after mobile core pages are stable. Same APIs, wider layout. Keyboard/focus state must be covered. |
 | 12 | `admin-ops-sm-revision` | admin minimum dashboard/status/audit pages | `/admin`, `/admin/audit` | Imported | API exists for admin minimum. Non-minimum admin actions remain blocked/deferred. |
 | 13 | `common-flows-motion` | shared list/detail/form/mutation states across all domains | scattered state routes exist | Pending | Loading, empty, error, retry, stale, duplicate submit, permission denied, destructive confirm, optimistic navigation must become shared UI patterns. |
@@ -194,6 +205,16 @@ Missing or unclear:
 - [x] Complete first-design route conversion into `DesignFrame`.
 - [x] Add missing auth/onboarding/settings/profile/admin/public route scaffolds.
 - [x] Add first-pass v1 frontend contract layer: API types, client, query keys, hooks, and MSW fixtures/handlers.
+- [x] Add mock/dev login API binding for seeded preview users:
+  `POST /auth/dev-login`, `DevLoginPanel`, and localStorage-backed
+  `x-v1-user-*` headers.
+- [x] Add session-aware entry routing: `/` sends guests to `/login`, valid
+  sessions to `/home`, and stale hints back to `/login` after clearing them.
+- [x] Add first protected-route gate for authenticated-only v1 surfaces:
+  `/my`, `/notifications`, `/chat`, create/edit routes, and team management
+  routes redirect to `/login?redirect=/target` when no valid session exists.
+- [x] Add v1 logout UX under `/my/settings`, clearing the local dev session,
+  removing v1 query cache, and returning to `/login`.
 - [x] Repoint active v1 routes to first-complete design components before productization.
 - [x] Corrected the design map so publishing work follows source design numbers
   instead of sequential scenario numbering.
@@ -235,9 +256,30 @@ Missing or unclear:
   auth-page`.
 - [x] Corrected the `01` signup flow split: `/signup` now represents the
   signup input form from `SMRevisionAuthSignupSM3`, while
-  `/signup/complete` carries the previous completion guide and continues to
-  `/onboarding/sport`. Password reset, blocked-account support, and browser
-  permission settings remain disabled until real destination contracts exist.
+  `/signup/complete` is kept as a QA/preview completion state rather than a
+  real registration success route. Password reset, blocked-account support,
+  and browser permission settings remain disabled until real destination
+  contracts exist.
+- [x] Removed fake link-only auth success from the `01` routes while
+  preserving seeded mock/dev login: `/login/email` and `/signup` no longer
+  use static hrefs to simulate success; they now submit through real auth
+  mutations before navigation.
+- [x] Bound real v1 email auth while keeping mock/dev login:
+  `POST /auth/register`, `POST /auth/login`, scrypt password hashing,
+  required terms consent persistence, `/login/email` client submit, and
+  `/signup` client submit now share the same v1 session storage contract as
+  `POST /auth/dev-login`.
+- [x] Bound core v1 onboarding selection flow:
+  `/onboarding/sport`, `/onboarding/level`, `/onboarding/region`,
+  `/onboarding/confirm`, and `/onboarding/resume` now use
+  `GET /onboarding`, `GET /master/sports`, `GET /master/regions`,
+  `PATCH /onboarding/preferences`, `POST /onboarding/complete`, and
+  `POST /onboarding/defer`. Sport and level are completion blockers; region is
+  optional but saved when selected.
+- [x] Added route-backed password-reset exception handling without fake email
+  delivery: `/auth/password-reset` explains that reset delivery is deferred
+  until email/SMS infrastructure exists and routes users back to email login or
+  seeded Mock login.
 - [x] Continued the shell/chrome consistency pass for fixed bottom surfaces:
   `.tm-fixed-cta` and `.tm-chat-inputbar` now anchor to the `AppChrome` frame
   instead of the viewport, matching the existing frame-level FAB behavior; my
@@ -579,11 +621,36 @@ Validation notes:
   API Binding Wave 1; smoke returned `200` for `/home`, `/matches`,
   `/matches/match-1`, `/team-matches`, `/team-matches/team-match-1`, `/teams`,
   `/teams/team-1`, `/notices`, and `/notices/notice-1`.
+- Auth entry validation from the v1 login/signup work passed in the previous
+  handoff: v1 Docker API health returned `200`, `POST
+  http://localhost:8121/api/v1/auth/dev-login` with `host@teameet.v1`
+  returned `201`, and the host v1 web proxy on `3014` returned `201` for the
+  same mock login route.
+- Current auth/session contract: guest `/home` remains allowed through the
+  visible "로그인 없이 시작하기" path, while authenticated-only surfaces use the
+  shared `RequireAuth` client gate and preserve a sanitized relative
+  `redirect` query for post-login navigation.
+- Current `01` auth contract: `/login` retains the seeded Mock login selector
+  for preview users. `/login/email` uses `POST /auth/login`; `/signup` uses
+  `POST /auth/register`, creates required terms consents, stores the same v1
+  local session hint, and then routes to `/signup/complete`.
+- Current `01` onboarding contract: onboarding routes are auth-gated. The
+  client keeps a session draft, hydrates from `GET /onboarding`, saves
+  selected sports/levels/regions through `PATCH /onboarding/preferences`,
+  completes through `POST /onboarding/complete`, and defers through
+  `POST /onboarding/defer`.
 
 ## Ambiguity Log
 
-- Auth/login/signup/terms/onboarding and auth exception states now have v1 route scaffolds, but real social/email auth submit handling remains pending API contract binding. Password reset, support inquiry, and browser permission settings are intentionally disabled until their route/API contracts are defined.
+- Auth/login/signup/terms/onboarding and auth exception states now have v1 route scaffolds. Email login/register and onboarding selection persistence are API-bound for the current localStorage-header v1 session contract; real social auth remains pending API contract binding. Password reset delivery, support inquiry, and browser permission settings are intentionally disabled or route-backed as honest deferred states until their external contracts exist.
 - Settings/profile edit are fixed under `/my/settings` and `/my/profile/edit` for the current v1 slice.
 - Admin v1 has minimum route scaffolds under `/admin` and `/admin/audit`; non-minimum operations remain deferred.
-- Public marketing has a `/landing` scaffold, while `/` still redirects to `/home` until launch routing is decided.
+- Public marketing has a `/landing` scaffold, while `/` is now an app-first
+  session entry route: no v1 session goes to `/login`, a valid session goes to
+  `/home`, and stale local session hints are cleared.
+- Social auth is still undecided for v1 launch. Email/password auth, terms
+  consent persistence, and onboarding preference persistence exist, but the
+  current session mechanism is still the v1 localStorage-header contract, not
+  production-grade httpOnly cookie/JWT auth. Password reset has a truthful
+  route-backed exception surface but no email/SMS delivery yet.
 - State fixture routes such as `/matches/empty` and `/search/error` are useful for QA but should not become user navigation destinations unless deliberately exposed.

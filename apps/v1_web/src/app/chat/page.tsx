@@ -1,6 +1,5 @@
-import { ChatListPageView } from '@/components/community/community-page';
-import { getChatListViewModel } from '@/components/community/community.view-model';
+import { ChatListPageClient } from '@/components/community/community-api-clients';
 
 export default function ChatPage() {
-  return <ChatListPageView model={getChatListViewModel()} />;
+  return <ChatListPageClient />;
 }

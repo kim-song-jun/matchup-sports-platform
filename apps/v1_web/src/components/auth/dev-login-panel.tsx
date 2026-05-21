@@ -3,9 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useV1DevLogin } from '@/hooks/use-v1-api';
-
-const V1_USER_ID_KEY = 'teameet.v1.userId';
-const V1_USER_EMAIL_KEY = 'teameet.v1.userEmail';
+import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 
 const personas = [
   { label: 'Host', email: 'host@teameet.v1' },
@@ -23,13 +21,9 @@ export function DevLoginPanel() {
       { email: selectedEmail },
       {
         onSuccess: (result) => {
-          window.localStorage.setItem(V1_USER_ID_KEY, result.session.userId);
-          if (result.session.userEmail) {
-            window.localStorage.setItem(V1_USER_EMAIL_KEY, result.session.userEmail);
-          } else {
-            window.localStorage.removeItem(V1_USER_EMAIL_KEY);
-          }
-          router.replace('/home');
+          saveStoredV1Session(result.session);
+          const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
+          router.replace(redirect ?? '/home');
         },
       },
     );

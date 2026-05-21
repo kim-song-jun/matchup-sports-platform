@@ -4,14 +4,12 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { clearStoredV1Session, hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
 
 type SessionEntryGateProps = {
   mode: 'root' | 'login';
   children?: ReactNode;
 };
-
-const V1_USER_ID_KEY = 'teameet.v1.userId';
-const V1_USER_EMAIL_KEY = 'teameet.v1.userEmail';
 
 export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
   const router = useRouter();
@@ -31,7 +29,8 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
     }
 
     if (authMe.isSuccess) {
-      router.replace('/home');
+      const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
+      router.replace(redirect ?? '/home');
       return;
     }
 
@@ -48,16 +47,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
   return <SessionFallback />;
 }
 
-function hasStoredV1Session() {
-  return Boolean(window.localStorage.getItem(V1_USER_ID_KEY) || window.localStorage.getItem(V1_USER_EMAIL_KEY));
-}
-
-function clearStoredV1Session() {
-  window.localStorage.removeItem(V1_USER_ID_KEY);
-  window.localStorage.removeItem(V1_USER_EMAIL_KEY);
-}
-
-function SessionFallback() {
+export function SessionFallback() {
   return (
     <main className="tm-auth-frame">
       <div className="tm-auth-scroll tm-auth-scroll-full">

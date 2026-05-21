@@ -1,6 +1,5 @@
-import { MatchCreatePageView } from '@/components/matches/matches-page';
-import { getMatchCreateViewModel } from '@/components/matches/matches.view-model';
+import { MatchEditPageClient } from '@/components/matches/matches-create-client';
 
-export default function MatchEditPage() {
-  return <MatchCreatePageView model={getMatchCreateViewModel('edit')} />;
+export default function MatchEditPage({ params }: { params: { id: string } }) {
+  return <MatchEditPageClient matchId={params.id} />;
 }

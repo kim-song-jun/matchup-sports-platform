@@ -137,7 +137,8 @@ function MatchCreateFloatingButton() {
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
   const { match, mode } = model;
   const locked = mode === 'pending' || mode === 'approved' || match.status === 'full';
-  const cta = mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인완료' : mode === 'pending' ? '승인중' : match.status === 'full' ? '모집완료' : '참가하기';
+  const canRunAction = Boolean(model.onApply);
+  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인완료' : mode === 'pending' ? '승인중' : match.status === 'full' ? '모집완료' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
 
   return (
@@ -165,7 +166,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="날짜와 시간" value={`${match.date} ${match.time}`} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
           <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${match.capacity - match.current}자리 남음`} />
-          <InfoRow label="참가비" value={`${match.fee.toLocaleString('ko-KR')}원`} sub="테스트 결제 흐름에서는 실제 청구 없음" />
+          <InfoRow label="신청 방식" value={match.actionLabel} sub="v1은 결제 없이 호스트 승인으로만 참가가 확정됩니다." />
           {mode === 'pending' ? <StateCard tone="orange" title="신청 확인을 완료했어요" body="호스트가 승인하면 알림으로 알려드릴게요." /> : null}
           {mode === 'approved' ? <StateCard tone="green" title="승인완료" body="참가가 확정되었습니다. 경기 전 안내를 계속 확인할 수 있습니다." /> : null}
           <Card pad={16} style={{ marginTop: 14 }}>
@@ -176,7 +177,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <div className="tm-text-body-lg">참가자</div>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               {match.participants.map((person) => (
-                <ListItem key={person.name} title={person.name} sub={person.meta} trailing={person.status} />
+                <div key={person.name}>
+                  <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                  {person.onApprove || person.onReject ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                      <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={person.actionPending} onClick={person.onApprove}>승인</button>
+                      <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={person.actionPending} onClick={person.onReject}>거절</button>
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </div>
           </Card>
@@ -185,14 +194,16 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       <div className="tm-fixed-cta">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : locked ? '신청 상태' : '참가 신청 가능'}</span>
-          <span className="tm-text-label tab-num">{match.fee.toLocaleString('ko-KR')}원</span>
+          <span className="tm-text-label">{match.actionLabel}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'mine' ? '1fr' : '104px 1fr', gap: 8 }}>
           {mode !== 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/chat/room-1">채팅</Link> : null}
           {mode === 'mine' ? (
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={`/matches/${match.id}/edit`}>{cta}</Link>
           ) : (
-            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={locked}>{cta}</button>
+            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={model.onApply}>
+              {model.applyPending ? '신청 중' : cta}
+            </button>
           )}
         </div>
       </div>
@@ -204,10 +215,15 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   if (model.step === 'complete') return <MatchComplete model={model} />;
   const edit = model.step === 'edit';
   const stepNo = edit ? 2 : stepToNumber(model.step);
+  const primaryLabel = model.form?.submitLabel ?? (edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음');
+  const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
+  const secondaryAction = model.form?.onBack;
   return (
     <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? '/matches/match-1' : '/matches'}>
       <div className="tm-create-shell">
         <CreateProgress step={stepNo} edit={edit} />
+        {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
+        {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치입니다" body={model.form.lockedReason} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
         {model.step === 'info' || model.step === 'edit' ? <InfoStep model={model} edit={edit} /> : null}
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
@@ -215,9 +231,20 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
       </div>
       <div className="tm-fixed-cta tm-create-fixed-cta">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'sport' ? '/matches' : '/matches/new'}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음'}</Link>
+          {secondaryAction ? (
+            <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</button>
+          ) : (
+            <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'sport' ? '/matches' : '/matches/new'}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</Link>
+          )}
+          {primaryAction ? (
+            <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.form?.submitting || Boolean(model.form?.lockedReason)} onClick={primaryAction}>
+              {model.form?.submitting ? '저장 중' : primaryLabel}
+            </button>
+          ) : (
+            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{primaryLabel}</Link>
+          )}
         </div>
+        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
     </AppChrome>
   );
@@ -259,7 +286,7 @@ function MatchCardItem({ match, index }: { match: MatchCardModel; index: number 
         <div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">
           <span className="tm-text-caption">{match.region} · {match.host}</span>
-          <span className="tm-text-label tab-num">{match.fee.toLocaleString('ko-KR')}원</span>
+          <span className="tm-text-label">{match.actionLabel}</span>
         </div>
       </div>
     </Link>
@@ -295,7 +322,7 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
 }
 
 function SportStep({ model }: { model: MatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>매치 목록의 종목 chip과 같은 기준으로 생성 후 필터에 반영됩니다.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <Card key={sport} pad={16} className={sport === model.selectedSport ? 'tm-create-selected' : ''}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : '선택 가능'}</div></Card>)}</div></div>;
+  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>매치 목록의 종목 chip과 같은 기준으로 생성 후 필터에 반영됩니다.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <button key={sport} className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectSport(sport)}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : '선택 가능'}</div></button>)}</div></div>;
 }
 
 function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean }) {
@@ -303,8 +330,8 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
   return (
     <div>
       <h1 className="tm-text-heading">매치 정보</h1>
-      <CreateField label="매치 제목" value={draft.title} />
-      <CreateField label="설명" value={draft.description} multiline />
+      <CreateField label="매치 제목" value={draft.title} onChange={(value) => model.form?.onFieldChange('title', value)} />
+      <CreateField label="설명" value={draft.description} multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <Card pad={0} style={{ marginTop: 14, overflow: 'hidden' }}>
         <div className="tm-create-image-preview" style={{ backgroundImage: `url(${draft.image})` }}><span className="tm-badge tm-badge-grey">예시 이미지</span></div>
         <div style={{ padding: 14 }}>
@@ -312,8 +339,9 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
           <div className="tm-text-caption" style={{ marginTop: 8 }}>선택된 파일 없음 · 예시 이미지는 제출 데이터에 포함되지 않아요.</div>
         </div>
       </Card>
-      <div className="tm-create-two-col"><CreateField label="최대 인원" value={`${draft.capacity}`} /><CreateField label="참가비" value={`${draft.fee}`} suffix="원" /></div>
-      <div className="tm-create-two-col"><CreateField label="최소 레벨" value={draft.minLevel} /><CreateField label="최대 레벨" value={draft.maxLevel} /></div>
+      <div className="tm-create-two-col"><CreateField label="최대 인원" value={`${draft.capacity}`} type="number" onChange={(value) => model.form?.onFieldChange('capacity', Number(value))} /><CreateField label="신청 방식" value={draft.actionLabel} /></div>
+      <div className="tm-create-two-col"><CreateField label="최소 레벨" value={draft.minLevel} onChange={(value) => model.form?.onFieldChange('minLevel', value)} /><CreateField label="최대 레벨" value={draft.maxLevel} onChange={(value) => model.form?.onFieldChange('maxLevel', value)} /></div>
+      <CreateField label="규칙" value={draft.rules} multiline onChange={(value) => model.form?.onFieldChange('rules', value)} />
       {edit ? <StateCard tone="orange" title="수정 모드" body="기존 값은 prefill되고 변경사항만 저장합니다. 저장 실패 시 입력값을 유지합니다." /> : null}
     </div>
   );
@@ -321,12 +349,12 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
 
 function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
-  return <div><h1 className="tm-text-heading">장소와 시간</h1><Card pad={16} className="tm-create-selected" style={{ marginTop: 16 }}><div className="tm-text-body-lg">{draft.venue}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{draft.address}</div></Card><CreateField label="장소 직접 입력" value="" placeholder="예: 한강공원 축구장, 동네 체육관 등" /><CreateField label="날짜" value={draft.date} /><div className="tm-create-two-col"><CreateField label="시작 시간" value={draft.startTime} /><CreateField label="종료 시간" value={draft.endTime} /></div></div>;
+  return <div><h1 className="tm-text-heading">장소와 시간</h1><Card pad={16} className="tm-create-selected" style={{ marginTop: 16 }}><div className="tm-text-body-lg">{draft.venue}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{draft.address}</div></Card><CreateField label="장소 직접 입력" value={draft.venue} placeholder="예: 한강공원 축구장, 동네 체육관 등" onChange={(value) => model.form?.onFieldChange('venue', value)} /><CreateField label="상세 주소" value={draft.address} onChange={(value) => model.form?.onFieldChange('address', value)} /><CreateField label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} /><div className="tm-create-two-col"><CreateField label="시작 시간" value={draft.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} /><CreateField label="종료 시간" value={draft.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} /></div></div>;
 }
 
 function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
-  return <div><h1 className="tm-text-heading">작성된 내용을 확인해주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: `url(${draft.image})` }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원/참가비" value={`최대 ${draft.capacity}명 · ${draft.fee.toLocaleString('ko-KR')}원`} /><InfoRow label="이미지" value="선택된 파일 없음" sub="예시 이미지는 저장되지 않음" /></Card></div>;
+  return <div><h1 className="tm-text-heading">작성된 내용을 확인해주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: `url(${draft.image})` }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원/신청 방식" value={`최대 ${draft.capacity}명 · ${draft.actionLabel}`} /><InfoRow label="이미지" value="선택된 파일 없음" sub="예시 이미지는 저장되지 않음" /></Card></div>;
 }
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
@@ -345,8 +373,24 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
   );
 }
 
-function CreateField({ label, value, placeholder, suffix, multiline }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean }) {
-  return <div className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}><span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></div>;
+function CreateField({ label, value, placeholder, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
+  return (
+    <label className="tm-create-field">
+      <div className="tm-text-label">{label}</div>
+      <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>
+        {onChange ? (
+          multiline ? (
+            <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+          ) : (
+            <input className="tm-create-native-input" type={type} value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+          )
+        ) : (
+          <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>
+        )}
+        {suffix ? <span className="tm-text-caption">{suffix}</span> : null}
+      </div>
+    </label>
+  );
 }
 
 function stepToNumber(step: MatchCreateViewModel['step']) {

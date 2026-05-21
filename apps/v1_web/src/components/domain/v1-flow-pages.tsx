@@ -189,7 +189,15 @@ export function TeamDetailProductPage({ mode = 'detail' }: { mode?: 'detail' | '
 
 export function MyTeamsProductPage({ members = false }: { members?: boolean }) {
   const myTeamsQuery = useV1MyTeams();
-  const items = myTeamsQuery.data?.map((item) => toFlowTeam(item, team)) ?? teams.slice(0, 2);
+  const items = myTeamsQuery.data?.items.map((item) => ({
+    id: item.teamId,
+    name: item.name,
+    sport: item.sport.name,
+    region: item.region?.name ?? '지역 미정',
+    members: `${item.memberCount}명`,
+    trust: 'sample' as const,
+    joinStatus: 'approval_required' as const,
+  })) ?? teams.slice(0, 2);
   return (
     <AppShell>
       <main className="v1-main">
@@ -320,7 +328,7 @@ function toFlowTeam(item: V1Team | undefined, fallback: MockTeam): MockTeam {
     sport: item.sportName,
     region: item.regionName,
     members: `${item.memberCount}명`,
-    trust: item.trustState,
+    trust: item.trustState === 'none' ? 'sample' : item.trustState,
     joinStatus: item.joinPolicy,
   };
 }

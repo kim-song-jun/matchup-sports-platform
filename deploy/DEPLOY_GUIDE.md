@@ -168,11 +168,16 @@ TOSS_WEBHOOK_SECRET=
 
 # Deploy-safe canonical mock sync (disable only with literal "false")
 DEPLOY_SYNC_MOCK_DATA=true
+
+# V1 preview seed sync (disable only with literal "false")
+DEPLOY_SYNC_V1_SEED_DATA=true
 ```
 
 `TOSS_SECRET_KEY`와 `TOSS_CLIENT_KEY`가 비어 있으면 결제 기능은 mock mode로 남고, 애플리케이션 배포 자체는 계속된다. GitHub Actions deploy는 `TOSS_*` repo secret을 EC2 `deploy/.env`의 source of truth로 취급하므로, secret이 비어 있거나 없으면 해당 runtime 값도 빈 값으로 동기화된다.
 
 `DEPLOY_SYNC_MOCK_DATA`는 기본값이 `true`다. 운영자가 이 값을 정확히 `false`로 넣지 않는 한, 배포 시마다 checksum-gated mock sync가 실행되고 catalog checksum이 바뀌었을 때만 canonical mock dataset을 다시 반영한다. catalog는 KST 날짜 anchor를 포함하므로 날짜가 넘어가면 mock 일정도 다음 배포에서 함께 앞으로 이동한다.
+
+`DEPLOY_SYNC_V1_SEED_DATA`는 기본값이 `true`다. 운영자가 이 값을 정확히 `false`로 넣지 않는 한, GitHub Actions 배포의 container restart 단계에서 `teameet_v1_api` health 확인 후 `apps/v1_api/prisma/seed.ts`를 실행해 v1 프리뷰용 seed 데이터를 동기화한다.
 
 `HOSTNAME`은 운영 compose에서 `0.0.0.0`으로 고정한다. Next standalone가 container IP에만 bind하면 앱은 떠 있어도 `localhost` healthcheck가 실패해 `web`/`nginx` dependency gate가 깨질 수 있다.
 

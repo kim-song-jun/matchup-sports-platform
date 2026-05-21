@@ -1,6 +1,5 @@
-import { SignupFormPageView } from '@/components/auth/auth-page';
-import { getSignupFormViewModel } from '@/components/auth/auth.view-model';
+import { SignupClient } from '@/components/auth/signup-client';
 
 export default function SignupPage() {
-  return <SignupFormPageView model={getSignupFormViewModel()} />;
+  return <SignupClient />;
 }

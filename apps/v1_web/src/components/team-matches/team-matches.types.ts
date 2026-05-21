@@ -34,9 +34,19 @@ export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;
     address: string;
-    applicantTeams: Array<{ name: string; meta: string; status: string }>;
+    applicantTeams: Array<{
+      name: string;
+      meta: string;
+      status: string;
+      onApprove?: () => void;
+      onReject?: () => void;
+      actionPending?: boolean;
+    }>;
   };
   mode: 'default' | 'pending' | 'approved' | 'mine';
+  applyLabel?: string;
+  applyPending?: boolean;
+  onApply?: () => void;
 };
 
 export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'complete' | 'edit';
@@ -61,5 +71,23 @@ export type TeamMatchCreateViewModel = {
     date: string;
     startTime: string;
     endTime: string;
+  };
+  form?: {
+    selectedTeamId: string;
+    selectedSportId: string;
+    regionId: string;
+    regions: Array<{ id: string; name: string }>;
+    onSelectTeam: (teamName: string) => void;
+    onSelectSport: (sportName: string) => void;
+    onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number) => void;
+    onRegionChange: (regionId: string) => void;
+    onBack: () => void;
+    onNext: () => void;
+    onSubmit: () => void;
+    onCancel?: () => void;
+    submitLabel?: string;
+    submitting?: boolean;
+    error?: string | null;
+    lockedReason?: string | null;
   };
 };

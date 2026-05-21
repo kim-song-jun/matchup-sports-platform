@@ -1,10 +1,148 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary } from '../onboarding/onboarding-summary';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { hashPassword, verifyPassword } from './password-hash';
 
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async register(dto: RegisterDto) {
+    if (!dto.requiredTermsAccepted) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Required terms must be accepted before registration',
+      });
+    }
+
+    const email = normalizeEmail(dto.email);
+    const nickname = dto.nickname.trim();
+    const existing = await this.prisma.v1User.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException({
+        code: 'CONFLICT',
+        message: 'Email is already registered',
+      });
+    }
+
+    const requiredTerms = await this.prisma.v1TermsDocument.findMany({
+      where: { isRequired: true, status: 'published' },
+      select: { id: true },
+    });
+
+    if (requiredTerms.length === 0) {
+      throw new BadRequestException({
+        code: 'TERMS_NOT_READY',
+        message: 'Published required terms are not available',
+      });
+    }
+
+    const passwordHash = await hashPassword(dto.password);
+    const user = await this.prisma.v1User.create({
+      data: {
+        email,
+        accountStatus: 'active',
+        onboardingStatus: 'signup_done',
+        lastLoginAt: new Date(),
+        authIdentities: {
+          create: {
+            provider: V1AuthProvider.email,
+            providerUserKey: email,
+            email,
+            passwordHash,
+            status: 'active',
+            lastLoginAt: new Date(),
+          },
+        },
+        profile: {
+          create: {
+            nickname,
+            displayName: nickname,
+            visibility: 'public',
+          },
+        },
+        onboardingProgress: {
+          create: {
+            currentStep: 'sport',
+          },
+        },
+        notificationPreference: {
+          create: {
+            importantEnabled: true,
+            activityEnabled: true,
+            marketingEnabled: false,
+          },
+        },
+        termsConsents: {
+          create: requiredTerms.map((termsDocument) => ({
+            termsDocumentId: termsDocument.id,
+          })),
+        },
+      },
+      select: { id: true, email: true },
+    });
+
+    return this.sessionResponse(user.id, user.email);
+  }
+
+  async login(dto: LoginDto) {
+    const email = normalizeEmail(dto.email);
+    const identity = await this.prisma.v1AuthIdentity.findUnique({
+      where: {
+        provider_providerUserKey: {
+          provider: V1AuthProvider.email,
+          providerUserKey: email,
+        },
+      },
+      select: {
+        id: true,
+        passwordHash: true,
+        status: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            accountStatus: true,
+          },
+        },
+      },
+    });
+
+    const passwordMatches = await verifyPassword(dto.password, identity?.passwordHash);
+    if (!identity || !passwordMatches) {
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Email or password is incorrect',
+      });
+    }
+
+    if (identity.status !== 'active' || identity.user.accountStatus !== 'active') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'This account cannot sign in',
+      });
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.v1AuthIdentity.update({
+        where: { id: identity.id },
+        data: { lastLoginAt: new Date() },
+      }),
+      this.prisma.v1User.update({
+        where: { id: identity.user.id },
+        data: { lastLoginAt: new Date() },
+      }),
+    ]);
+
+    return this.sessionResponse(identity.user.id, identity.user.email);
+  }
 
   async devLogin(email: string) {
     const user = await this.prisma.v1User.findUnique({
@@ -35,13 +173,7 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return {
-      session: {
-        userId: user.id,
-        userEmail: user.email,
-      },
-      ...(await this.me(user.id)),
-    };
+    return this.sessionResponse(user.id, user.email);
   }
 
   async me(userId: string) {
@@ -123,4 +255,18 @@ export class AuthService {
       },
     };
   }
+
+  private async sessionResponse(userId: string, userEmail: string | null) {
+    return {
+      session: {
+        userId,
+        userEmail,
+      },
+      ...(await this.me(userId)),
+    };
+  }
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }

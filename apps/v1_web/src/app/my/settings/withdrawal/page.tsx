@@ -1,5 +1,5 @@
-import { WithdrawalPageView } from '@/components/my/my-page';
+import { WithdrawalPageClient } from '@/components/my/my-api-clients';
 
 export default function MyWithdrawalPage() {
-  return <WithdrawalPageView />;
+  return <WithdrawalPageClient />;
 }

@@ -22,7 +22,7 @@ export const myUser = {
     { label: '참여 매치', value: 87, unit: '회' },
     { label: '소속 팀', value: 3, unit: '팀' },
     { label: '매너 점수', value: '4.9' },
-    { label: '뱃지', value: 12, unit: '개' },
+    { label: '신뢰', value: '샘플' },
   ],
   monthly: [
     { label: '이번 달 경기', value: 12, unit: '회' },
@@ -45,8 +45,6 @@ export const myHomeModel: MyHomeViewModel = {
       title: '커뮤니티',
       items: [
         { label: '내 팀', sub: '소속 팀과 운영 권한을 확인해요', href: '/my/teams', icon: 'T' },
-        { label: '받은 리뷰', sub: '매너 평가와 신뢰 신호를 모아봐요', href: '/reviews', icon: 'R' },
-        { label: '뱃지', sub: '활동으로 얻은 인증을 확인해요', href: '/badges', icon: 'B' },
       ],
     },
     {

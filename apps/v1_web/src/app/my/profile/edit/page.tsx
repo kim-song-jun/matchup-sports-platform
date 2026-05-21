@@ -1,6 +1,5 @@
-import { ProfileEditPageView } from '@/components/my/my-page';
-import { profileEditModel } from '@/components/my/my.view-model';
+import { ProfileEditPageClient } from '@/components/my/my-api-clients';
 
 export default function MyProfileEditPage() {
-  return <ProfileEditPageView model={profileEditModel} />;
+  return <ProfileEditPageClient />;
 }

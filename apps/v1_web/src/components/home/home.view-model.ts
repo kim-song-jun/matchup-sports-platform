@@ -11,7 +11,7 @@ const matches: HomeMatchCard[] = [
     time: '14:00',
     currentParticipants: 18,
     maxParticipants: 22,
-    fee: 12000,
+    actionLabel: '승인제 신청',
     imageUrl: '/mock/generated/team-huddle.webp',
   },
   {
@@ -24,7 +24,7 @@ const matches: HomeMatchCard[] = [
     time: '20:30',
     currentParticipants: 9,
     maxParticipants: 10,
-    fee: 8000,
+    actionLabel: '승인제 신청',
     imageUrl: '/mock/generated/futsal-rooftop.webp',
   },
   {
@@ -37,7 +37,7 @@ const matches: HomeMatchCard[] = [
     time: '10:00',
     currentParticipants: 5,
     maxParticipants: 6,
-    fee: 5000,
+    actionLabel: '승인제 신청',
     imageUrl: '/mock/generated/basketball-hardwood.webp',
   },
   {
@@ -50,7 +50,7 @@ const matches: HomeMatchCard[] = [
     time: '19:00',
     currentParticipants: 7,
     maxParticipants: 8,
-    fee: 6000,
+    actionLabel: '승인제 신청',
     imageUrl: '/mock/generated/badminton-club.webp',
   },
   {
@@ -63,7 +63,7 @@ const matches: HomeMatchCard[] = [
     time: '21:00',
     currentParticipants: 12,
     maxParticipants: 20,
-    fee: 18000,
+    actionLabel: '승인제 신청',
     imageUrl: '/mock/generated/ice-hockey-arena.webp',
   },
 ];
@@ -86,8 +86,8 @@ export function getHomeViewModel(): HomeViewModel {
       mannerScore: '4.9',
       mannerScoreSub: '상위 8%',
       joined: 8,
-      mvp: 2,
-      paid: '86,000',
+      trustState: '샘플',
+      pending: '대기 없음',
     },
     featuredMatch: sortedMatches[0],
     recommendedMatches: matches,

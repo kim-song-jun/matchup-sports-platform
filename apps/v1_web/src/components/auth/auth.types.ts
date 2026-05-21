@@ -35,7 +35,7 @@ export type EmailLoginViewModel = {
   notice: { title: string; body: string };
 };
 
-export type AuthExceptionKind = 'provider-denied' | 'missing-email' | 'blocked' | 'account-conflict' | 'location-denied';
+export type AuthExceptionKind = 'provider-denied' | 'missing-email' | 'blocked' | 'account-conflict' | 'location-denied' | 'password-reset';
 
 export type AuthExceptionViewModel = {
   backHref: string;

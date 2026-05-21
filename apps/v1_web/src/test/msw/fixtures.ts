@@ -97,13 +97,19 @@ export const v1TeamMatchesFixture: V1TeamMatch[] = [
 export const v1ChatRoomsFixture: CursorPage<V1ChatRoom> = {
   items: [
     {
-      id: 'chat-1',
-      targetType: 'match',
-      targetId: 'match-1',
+      roomId: 'chat-1',
+      roomType: 'match',
       title: '성수 풋살장 동네 5:5',
-      lastMessagePreview: '오늘 경기 전 준비물을 확인해 주세요.',
+      status: 'active',
+      linkedTarget: { type: 'match', id: 'match-1', title: '성수 풋살장 동네 5:5', route: '/matches/match-1' },
+      lastMessage: {
+        messageId: 'message-1',
+        contentPreview: '오늘 경기 전 준비물을 확인해 주세요.',
+        sentAt: '2026-05-18T09:00:00.000Z',
+      },
       unreadCount: 2,
-      updatedAt: '2026-05-18T09:00:00.000Z',
+      pinned: false,
+      muted: false,
     },
   ],
   nextCursor: null,
@@ -112,33 +118,50 @@ export const v1ChatRoomsFixture: CursorPage<V1ChatRoom> = {
 export const v1ChatMessagesFixture: CursorPage<V1ChatMessage> = {
   items: [
     {
-      id: 'message-1',
-      roomId: 'chat-1',
-      senderId: 'user-2',
+      messageId: 'message-1',
+      sender: { userId: 'user-2', displayName: '상대', profileImageUrl: null },
       content: '오늘 경기 전 준비물을 확인해 주세요.',
-      createdAt: '2026-05-18T09:00:00.000Z',
+      status: 'sent',
+      sentAt: '2026-05-18T09:00:00.000Z',
+      mine: false,
     },
   ],
   nextCursor: null,
 };
 
-export const v1NotificationsFixture: CursorPage<V1Notification> = {
+export const v1NotificationsFixture = {
   items: [
     {
-      id: 'notification-1',
+      notificationId: 'notification-1',
       type: 'match_application',
       title: '매치 신청이 접수되었습니다',
       body: '호스트 승인을 기다리고 있습니다.',
-      read: false,
-      href: '/matches/match-1',
+      target: { type: 'match', id: 'match-1', route: '/matches/match-1' },
+      status: 'created',
+      readAt: null,
       createdAt: '2026-05-18T09:00:00.000Z',
     },
   ],
   nextCursor: null,
+  unreadCount: 1,
 };
 
 export const v1ProfileFixture: V1Profile = {
   userId: 'user-1',
+  accountStatus: 'active',
+  email: 'host@teameet.v1',
+  profile: {
+    displayName: '송준',
+    profileImageUrl: null,
+    bio: '풋살과 러닝을 중심으로 활동 중입니다.',
+    visibilityStatus: 'public',
+  },
+  reputation: {
+    trustState: 'sample',
+    mannerScore: 4.8,
+    activityCount: 12,
+    reviewCount: 5,
+  },
   displayName: '송준',
   regionName: '서울 강동',
   bio: '풋살과 러닝을 중심으로 활동 중입니다.',
@@ -146,12 +169,24 @@ export const v1ProfileFixture: V1Profile = {
 };
 
 export const v1SettingsFixture: V1Settings = {
+  account: {
+    email: 'host@teameet.v1',
+    phone: null,
+    accountStatus: 'active',
+    providers: ['password'],
+  },
+  profile: {
+    displayName: '송준',
+    visibilityStatus: 'public',
+  },
   notifications: {
-    importantEnabled: true,
-    activityEnabled: true,
+    matchEnabled: true,
+    teamEnabled: true,
+    teamMatchEnabled: true,
+    chatEnabled: true,
+    noticeEnabled: true,
     marketingEnabled: false,
   },
-  withdrawalRequested: false,
 };
 
 export const v1HomeFixture: V1Home = {

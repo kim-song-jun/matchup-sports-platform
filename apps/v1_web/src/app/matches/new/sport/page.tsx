@@ -1,6 +1,5 @@
-import { MatchCreatePageView } from '@/components/matches/matches-page';
-import { getMatchCreateViewModel } from '@/components/matches/matches.view-model';
+import { MatchCreatePageClient } from '@/components/matches/matches-create-client';
 
 export default function MatchCreateSportPage() {
-  return <MatchCreatePageView model={getMatchCreateViewModel('sport')} />;
+  return <MatchCreatePageClient step="sport" />;
 }

@@ -1,4 +1,5 @@
 import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
+import { getStoredV1Session } from './session-storage';
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
@@ -28,8 +29,7 @@ export function getV1ApiBaseUrl() {
 export function getV1DevAuthHeaders(): HeadersInit {
   if (typeof window === 'undefined') return {};
 
-  const userId = window.localStorage.getItem('teameet.v1.userId');
-  const userEmail = window.localStorage.getItem('teameet.v1.userEmail');
+  const { userId, userEmail } = getStoredV1Session();
 
   return {
     ...(userId ? { 'x-v1-user-id': userId } : {}),

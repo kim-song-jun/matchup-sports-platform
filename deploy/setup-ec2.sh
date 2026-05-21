@@ -190,8 +190,33 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
-echo "🧩 checksum-gated mock sync 실행..."
-sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+echo "⏳ V1 API 헬스체크 대기 중..."
+for i in $(seq 1 45); do
+  if curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null 2>&1; then
+    echo "✅ V1 API 준비 완료"
+    break
+  fi
+  if [ "$i" -eq 45 ]; then
+    echo "❌ V1 API가 제시간에 준비되지 않았습니다."
+    sudo docker logs teameet_v1_api --tail 120 || true
+    exit 1
+  fi
+  sleep 2
+done
+
+if [ "${DEPLOY_SYNC_MOCK_DATA:-true}" != "false" ]; then
+  echo "🧩 checksum-gated mock sync 실행..."
+  sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
+else
+  echo "🧩 DEPLOY_SYNC_MOCK_DATA=false 이므로 mock sync를 건너뜁니다."
+fi
+
+if [ "${DEPLOY_SYNC_V1_SEED_DATA:-true}" != "false" ]; then
+  echo "🧩 v1 seed sync 실행..."
+  sudo docker exec teameet_v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed.ts"
+else
+  echo "🧩 DEPLOY_SYNC_V1_SEED_DATA=false 이므로 v1 seed sync를 건너뜁니다."
+fi
 
 echo "🖼️ 이미지 backfill sync 실행..."
 sudo docker exec teameet_api npx ts-node prisma/seed-images.ts

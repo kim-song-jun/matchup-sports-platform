@@ -127,7 +127,7 @@ export function MatchesProductPage({ kind = 'personal' }: { kind?: 'personal' | 
   return (
     <AppShell>
       <main className="v1-main">
-        <FilterBar items={isTeam ? ['추천', '축구', '농구', '이번 주', '모집 중'] : ['추천', '풋살', '러닝', '오늘', '신청 가능']} />
+        <FilterBar items={isTeam ? ['추천', '축구', '풋살', '러닝', '수영'] : ['추천', '축구', '풋살', '러닝', '수영']} />
         <Section
           title={isTeam ? '팀매치 찾기' : '개인 매치 찾기'}
           subtitle={isTeam ? '팀 owner/manager만 신청할 수 있습니다.' : '결제 없이 신청과 승인 상태만 제공합니다.'}
@@ -359,7 +359,7 @@ export function SearchProductPage({ state = 'results' }: { state?: 'results' | '
 
         <Section title="최근 검색">
           <div className="v1-toolbar">
-            {['동네 강남', '오늘 참여 가능', '마감 임박', '초급 환영'].map((item, index) => (
+            {['동네 강남', '오늘 참여 가능', '마감 임박', '초보 환영'].map((item, index) => (
               <button key={item} className={index === 0 ? 'v1-chip v1-chip-active' : 'v1-chip'} type="button">
                 {item}
               </button>
@@ -369,7 +369,7 @@ export function SearchProductPage({ state = 'results' }: { state?: 'results' | '
 
         <Section title="빠른 조건">
           <div className="v1-grid-2">
-            {['오늘 참여 가능', '24시간 내 마감', '초급 환영', '팀매치 포함'].map((item) => (
+            {['오늘 참여 가능', '24시간 내 마감', '초보 환영', '팀매치 포함'].map((item) => (
               <button key={item} type="button" className="v1-quick">{item}</button>
             ))}
           </div>

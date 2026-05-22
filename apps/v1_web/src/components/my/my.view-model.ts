@@ -15,7 +15,7 @@ export const myUser = {
   name: '김정민',
   handle: '@jungmin',
   region: '서울 강남구',
-  sports: ['축구', '농구', '러닝'],
+  sports: ['축구', '풋살', '러닝'],
   intro: '퇴근 후에도 꾸준히 움직이는 팀 스포츠 유저',
   initials: '김',
   stats: [
@@ -59,8 +59,8 @@ export const myHomeModel: MyHomeViewModel = {
 
 const joinedMatches: MyMatch[] = [
   { id: 'match-1', title: '상암 주말 축구', meta: '5월 23일 토 · 18:00 · 상암 풋살파크', status: 'approved', statusLabel: '승인 완료', note: '경기 2시간 전까지 채팅방에서 출석을 확인해요.', href: '/matches/match-1' },
-  { id: 'match-2', title: '강남 테니스 복식', meta: '5월 25일 월 · 20:00 · 강남 스포츠센터', status: 'pending', statusLabel: '승인 대기', note: '호스트가 실력 레벨과 매너 기록을 검토 중이에요.', href: '/matches/match-2' },
-  { id: 'match-3', title: '마포 배드민턴', meta: '5월 12일 화 · 19:30 · 마포체육관', status: 'ended', statusLabel: '종료', note: '상대 평가와 리뷰를 남길 수 있어요.', href: '/matches/match-3' },
+  { id: 'match-2', title: '강남 수영 레인', meta: '5월 25일 월 · 20:00 · 강남 스포츠센터', status: 'pending', statusLabel: '승인 대기', note: '호스트가 실력 레벨과 매너 기록을 검토 중이에요.', href: '/matches/match-2' },
+  { id: 'match-3', title: '마포 풋살', meta: '5월 12일 화 · 19:30 · 마포체육관', status: 'ended', statusLabel: '종료', note: '상대 평가와 리뷰를 남길 수 있어요.', href: '/matches/match-3' },
 ];
 
 const createdMatches: MyMatch[] = [
@@ -85,7 +85,7 @@ export function getMyMatchesModel(mode: 'joined' | 'created'): MyMatchesViewMode
 export const myTeams: MyTeam[] = [
   { id: 'team-1', name: 'FC 발빠른놈들', logo: 'F', sport: '축구', region: '서울 마포', role: 'owner', roleLabel: '팀장', members: 18, manner: '4.9', next: '토요일 18:00 정기전', description: '주말 저녁마다 꾸준히 뛰는 축구 팀이에요. 빠른 전환과 즐거운 경기 분위기를 중요하게 봅니다.' },
   { id: 'team-2', name: '강남 러너스', logo: 'R', sport: '러닝', region: '서울 강남', role: 'admin', roleLabel: '운영진', members: 42, manner: '4.8', next: '목요일 07:00 한강 러닝', description: '평일 아침 5km와 주말 LSD를 함께하는 러닝 크루입니다.' },
-  { id: 'team-3', name: '마포 배드민턴', logo: 'B', sport: '배드민턴', region: '서울 마포', role: 'member', roleLabel: '멤버', members: 24, manner: '4.7', next: '수요일 20:00 정기 모임', description: '초중급 복식 위주로 매너 있는 게임을 만드는 배드민턴 팀입니다.' },
+  { id: 'team-3', name: '마포 스윔', logo: 'S', sport: '수영', region: '서울 마포', role: 'member', roleLabel: '멤버', members: 24, manner: '4.7', next: '수요일 20:00 정기 모임', description: '초보-중수 레인 위주로 매너 있는 운동을 만드는 수영 팀입니다.' },
 ];
 
 export const myTeamsModel: MyTeamsViewModel = {

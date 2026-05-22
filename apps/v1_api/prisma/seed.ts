@@ -13,19 +13,15 @@ const prisma = new PrismaClient();
 const sports = [
   ['soccer', '축구'],
   ['futsal', '풋살'],
-  ['basketball', '농구'],
-  ['baseball', '야구'],
-  ['badminton', '배드민턴'],
-  ['tennis', '테니스'],
   ['running', '러닝'],
+  ['swimming', '수영'],
 ] as const;
 
 const levels = [
   ['beginner', '입문'],
-  ['novice', '초급'],
-  ['intermediate', '중급'],
-  ['advanced', '상급'],
-  ['expert', '최상급'],
+  ['novice', '초보'],
+  ['intermediate', '중수'],
+  ['advanced', '고수'],
 ] as const;
 
 const users = [
@@ -53,6 +49,13 @@ async function seedRuntimeCheck() {
 
 async function seedSports() {
   const result: Record<string, string> = {};
+  const sportCodes = sports.map(([code]) => code);
+  const levelCodes = levels.map(([code]) => code);
+
+  await prisma.v1Sport.updateMany({
+    where: { code: { notIn: sportCodes } },
+    data: { isActive: false },
+  });
 
   for (const [index, [code, name]] of sports.entries()) {
     const sport = await prisma.v1Sport.upsert({
@@ -87,6 +90,11 @@ async function seedSports() {
         },
       });
     }
+
+    await prisma.v1SportLevel.updateMany({
+      where: { sportId: sport.id, code: { notIn: levelCodes } },
+      data: { isActive: false },
+    });
   }
 
   return result;
@@ -283,7 +291,7 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
         create: {
           description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
           activityNote: '주 2회 러닝',
-          skillNote: '초급부터 중급까지',
+          skillNote: '초보부터 중수까지',
         },
       },
       trustScore: {
@@ -363,7 +371,7 @@ async function seedMatches(userIds: Record<string, string>, sportIds: Record<str
       startAt: new Date('2026-05-20T10:00:00.000Z'),
       endAt: new Date('2026-05-20T11:00:00.000Z'),
       maxParticipants: 6,
-      levelNote: '초급 환영',
+      levelNote: '초보 환영',
       genderRule: '무관',
       costNote: '무료',
       status: 'recruiting',

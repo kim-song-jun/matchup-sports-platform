@@ -103,8 +103,8 @@ function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
 function MatchParticipantsPageView() {
   const participants = [
     { name: '김정민', meta: '호스트 · 매너 4.9', status: '승인완료' },
-    { name: '박서준', meta: '초급 · 최근 3경기', status: '승인완료' },
-    { name: '이하나', meta: '중급 · 빠른 응답', status: '승인중' },
+    { name: '박서준', meta: '초보 · 최근 3경기', status: '승인완료' },
+    { name: '이하나', meta: '중수 · 빠른 응답', status: '승인중' },
   ];
 
   return (

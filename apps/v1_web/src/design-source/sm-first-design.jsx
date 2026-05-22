@@ -603,10 +603,8 @@ Object.assign(globalThis, { TokensCSS, SBtn, Chip, Badge, Progress, Card, Phone,
 const IMG = {
   soccer:   'assets/mock/generated/team-huddle.webp',
   futsal:   'assets/mock/generated/futsal-rooftop.webp',
-  basket:   'assets/mock/generated/basketball-hardwood.webp',
-  badmin:   'assets/mock/generated/badminton-club.webp',
-  hockey:   'assets/mock/generated/ice-hockey-arena.webp',
-  tennis:   'assets/mock/sports/tennis-baseline.svg',
+  running:  'assets/mock/sports/soccer-sunrise.svg',
+  swimRef:  'assets/mock/sports/swimming-lanes.svg',
   swim:     'assets/mock/sports/swimming-lanes.svg',
   venue1:   'assets/mock/generated/venue-clubhouse.webp',
   venue2:   'assets/mock/generated/venue-lights.webp',
@@ -634,19 +632,15 @@ const SPORTS = [
   { id: 'all',        label: '전체',    emoji: '전' },
   { id: 'soccer',     label: '축구',    emoji: '축', img: IMG.soccer },
   { id: 'futsal',     label: '풋살',    emoji: '풋', img: IMG.futsal },
-  { id: 'basketball', label: '농구',    emoji: '농', img: IMG.basket },
-  { id: 'badminton',  label: '배드민턴', emoji: '배', img: IMG.badmin },
-  { id: 'ice_hockey', label: '아이스하키', emoji: '하', img: IMG.hockey },
-  { id: 'tennis',     label: '테니스',  emoji: '테', img: IMG.tennis },
+  { id: 'running',    label: '러닝',    emoji: '런', img: IMG.venue3 },
+  { id: 'swim',       label: '수영',    emoji: '수', img: IMG.swim },
 ];
 
 const MATCHES = [
-  { id: 1,  sport: 'soccer',     title: '주말 축구 한 판, 같이 뛰어요',  venue: '상암월드컵경기장 보조구장', date: '5월 3일 (토)', time: '14:00', cur: 18, max: 22, fee: 12000, level: '중급',  img: IMG.soccer, host: '정민', lvl: 'B' },
-  { id: 2,  sport: 'futsal',     title: '수요일 저녁 풋살 매치',        venue: '이태원 풋살파크 A코트', date: '5월 7일 (수)', time: '20:30', cur: 9,  max: 10, fee: 8000,  level: '초급',  img: IMG.futsal, host: '지훈', lvl: 'C', urgent: true },
-  { id: 3,  sport: 'basketball', title: '3on3 하프코트 농구',          venue: '강남농구장 2번코트',    date: '5월 4일 (일)', time: '10:00', cur: 5,  max: 6,  fee: 5000,  level: '중상급', img: IMG.basket, host: '수아', lvl: 'A' },
-  { id: 4,  sport: 'badminton',  title: '복식 배드민턴 정기모임',        venue: '서초체육관',           date: '5월 6일 (화)', time: '19:00', cur: 7,  max: 8,  fee: 6000,  level: '중급',  img: IMG.badmin, host: '소희', lvl: 'B', urgent: true },
-  { id: 5,  sport: 'ice_hockey', title: '아이스하키 친선경기',          venue: '목동 아이스링크',      date: '5월 10일 (토)', time: '21:00', cur: 12, max: 20, fee: 18000, level: '상급',  img: IMG.hockey, host: '준호', lvl: 'S' },
-  { id: 6,  sport: 'tennis',     title: '테니스 단식 상대 구해요',      venue: '올림픽공원 테니스장',   date: '5월 5일 (월)', time: '07:00', cur: 1,  max: 2,  fee: 15000, level: '중급',  img: IMG.tennis, host: '예은', lvl: 'B' },
+  { id: 1,  sport: 'soccer',  title: '주말 축구 한 판, 같이 뛰어요', venue: '상암월드컵경기장 보조구장', date: '5월 3일 (토)', time: '14:00', cur: 18, max: 22, fee: 12000, level: '중수', img: IMG.soccer, host: '정민', lvl: '중수' },
+  { id: 2,  sport: 'futsal',  title: '수요일 저녁 풋살 매치',       venue: '이태원 풋살파크 A코트', date: '5월 7일 (수)', time: '20:30', cur: 9,  max: 10, fee: 8000,  level: '초보', img: IMG.futsal, host: '지훈', lvl: '초보', urgent: true },
+  { id: 3,  sport: 'running', title: '잠실 아침 러닝 크루',         venue: '잠실한강공원', date: '5월 4일 (일)', time: '07:00', cur: 11, max: 15, fee: 5000, level: '입문', img: IMG.venue3, host: '수아', lvl: '입문' },
+  { id: 4,  sport: 'swim',    title: '마포 자유수영 레인',          venue: '마포 스포츠센터 수영장', date: '5월 6일 (화)', time: '19:00', cur: 14, max: 20, fee: 6000, level: '중수', img: IMG.swim, host: '소희', lvl: '중수', urgent: true },
 ];
 
 const TEAM_MATCHES = [
@@ -658,31 +652,31 @@ const TEAM_MATCHES = [
 const TEAMS = [
   { id: 1, name: 'FC 발빠른놈들',    sport: '축구',   members: 24, level: 'B', manner: 4.8, logo: '⚽', color: 'var(--blue500)' },
   { id: 2, name: '다이나믹 FS',      sport: '풋살',   members: 14, level: 'B', manner: 4.6, logo: '🔥', color: 'var(--red500)' },
-  { id: 3, name: '강남 바스켓',      sport: '농구',   members: 12, level: 'A', manner: 4.9, logo: '🏀', color: 'var(--orange500)' },
-  { id: 4, name: '서초 셔틀콕',      sport: '배드민턴', members: 18, level: 'B', manner: 4.7, logo: '🏸', color: 'var(--green500)' },
+  { id: 3, name: '강남 러너스',      sport: '러닝',   members: 12, level: '중수', manner: 4.9, logo: 'R', color: 'var(--orange500)' },
+  { id: 4, name: '마포 스윔',        sport: '수영',   members: 18, level: '초보', manner: 4.7, logo: 'S', color: 'var(--green500)' },
 ];
 
 const LESSONS = [
-  { id: 1, title: '1:1 맞춤 축구 개인레슨', coach: '박준수 코치', img: IMG.coach1, avatar: IMG.av1, price: 60000, unit: '회', venue: '상암 풋볼파크', rating: 4.9, reviews: 128, tags: ['초급', '1:1'] },
+  { id: 1, title: '1:1 맞춤 축구 개인레슨', coach: '박준수 코치', img: IMG.coach1, avatar: IMG.av1, price: 60000, unit: '회', venue: '상암 풋볼파크', rating: 4.9, reviews: 128, tags: ['초보', '1:1'] },
   { id: 2, title: '주니어 축구 그룹레슨',    coach: '김지훈 코치', img: IMG.coach2, avatar: IMG.av2, price: 35000, unit: '회', venue: '반포 체육공원', rating: 4.8, reviews: 76,  tags: ['초등', '그룹'] },
   { id: 3, title: '성인 풋살 기초반',        coach: '이민정 코치', img: IMG.coach3, avatar: IMG.av3, price: 45000, unit: '회', venue: '이태원 풋살파크', rating: 4.7, reviews: 54,  tags: ['기초', '그룹'] },
-  { id: 4, title: '농구 슛 집중 원데이',     coach: '최현우 코치', img: IMG.coach4, avatar: IMG.av4, price: 55000, unit: '회', venue: '강남 농구장', rating: 4.9, reviews: 42,  tags: ['원데이'] },
+  { id: 4, title: '러닝 자세 집중 원데이',   coach: '최현우 코치', img: IMG.coach4, avatar: IMG.av4, price: 55000, unit: '회', venue: '강남 러닝트랙', rating: 4.9, reviews: 42,  tags: ['원데이'] },
 ];
 
 const LISTINGS = [
   { id: 1, title: '나이키 머큐리얼 슈퍼플라이 9 (275mm)', price: 180000, img: IMG.gear1, venue: '강남구', cond: '상태 최상', category: '축구화' },
-  { id: 2, title: '요넥스 아크세이버 11 프로 배드민턴 라켓', price: 120000, img: IMG.gear2, venue: '서초구', cond: '거의 새것', category: '라켓' },
+  { id: 2, title: '수영 트레이닝 풀부이 세트', price: 120000, img: IMG.gear2, venue: '서초구', cond: '거의 새것', category: '수영용품' },
   { id: 3, title: '아디다스 프레데터 엣지+ 풋살화',           price: 95000,  img: IMG.gear3, venue: '마포구', cond: '사용감 있음', category: '풋살화' },
-  { id: 4, title: '몰텐 농구공 GG7X (공식구)',              price: 65000,  img: IMG.gear4, venue: '송파구', cond: '새상품', category: '농구공' },
+  { id: 4, title: '러닝 폼롤러 세트',                       price: 65000,  img: IMG.gear4, venue: '송파구', cond: '새상품', category: '러닝용품' },
 ];
 
 const VENUES = [
   { id: 1, name: '상암 월드컵경기장 보조구장', type: '축구장',   img: IMG.venue1, address: '서울 마포구 상암동 1-1',  region: '마포', district: '서울', price: 180000, unit: '시간', rating: 4.7, reviews: 234, dist: '2.1km', indoor: false, facilities: ['샤워실', '주차', '라커', '야간조명'], openNow: true, nextSlot: '오늘 18:00' },
   { id: 2, name: '이태원 풋살파크',            type: '풋살장',   img: IMG.venue2, address: '서울 용산구 이태원동 22',  region: '용산', district: '서울', price: 60000,  unit: '시간', rating: 4.5, reviews: 189, dist: '4.8km', indoor: true,  facilities: ['실내', '주차', '샤워실'],              openNow: true, nextSlot: '오늘 20:30' },
-  { id: 3, name: '강남 농구장',               type: '농구장',   img: IMG.venue3, address: '서울 강남구 역삼동 723',   region: '강남', district: '서울', price: 25000,  unit: '시간', rating: 4.6, reviews: 92,  dist: '1.3km', indoor: false, facilities: ['야외', '야간조명', '3on3'],            openNow: false, nextSlot: '내일 07:00' },
-  { id: 4, name: '잠실종합운동장 테니스장',     type: '테니스장', img: IMG.tennis, address: '서울 송파구 올림픽로 25',   region: '송파', district: '서울', price: 45000,  unit: '시간', rating: 4.8, reviews: 312, dist: '6.2km', indoor: false, facilities: ['하드코트', '주차', '샤워실', '라커'],   openNow: true, nextSlot: '오늘 16:00' },
-  { id: 5, name: '목동 아이스링크',             type: '아이스링크', img: IMG.hockey, address: '서울 양천구 목동서로 161', region: '양천', district: '서울', price: 120000, unit: '시간', rating: 4.6, reviews: 78,  dist: '9.4km', indoor: true,  facilities: ['국제규격', '라커', '장비대여'],         openNow: false, nextSlot: '내일 21:00' },
-  { id: 6, name: '서초체육관 배드민턴장',       type: '배드민턴장', img: IMG.badmin, address: '서울 서초구 반포대로 58',  region: '서초', district: '서울', price: 18000,  unit: '시간', rating: 4.4, reviews: 156, dist: '3.5km', indoor: true,  facilities: ['실내', '주차', '샤워실'],               openNow: true, nextSlot: '오늘 19:00' },
+  { id: 3, name: '강남 러닝트랙',             type: '러닝장', img: IMG.venue3, address: '서울 강남구 역삼동 723',   region: '강남', district: '서울', price: 25000,  unit: '시간', rating: 4.6, reviews: 92,  dist: '1.3km', indoor: false, facilities: ['야외', '야간조명', '트랙'],            openNow: false, nextSlot: '내일 07:00' },
+  { id: 4, name: '잠실종합운동장 수영장',       type: '수영장', img: IMG.swim, address: '서울 송파구 올림픽로 25',   region: '송파', district: '서울', price: 45000,  unit: '시간', rating: 4.8, reviews: 312, dist: '6.2km', indoor: true, facilities: ['레인', '주차', '샤워실', '라커'],   openNow: true, nextSlot: '오늘 16:00' },
+  { id: 5, name: '목동 러닝파크',             type: '러닝장', img: IMG.venue3, address: '서울 양천구 목동서로 161', region: '양천', district: '서울', price: 120000, unit: '시간', rating: 4.6, reviews: 78,  dist: '9.4km', indoor: false,  facilities: ['트랙', '라커', '장비대여'],         openNow: false, nextSlot: '내일 21:00' },
+  { id: 6, name: '서초체육관 수영장',          type: '수영장', img: IMG.swim, address: '서울 서초구 반포대로 58',  region: '서초', district: '서울', price: 18000,  unit: '시간', rating: 4.4, reviews: 156, dist: '3.5km', indoor: true,  facilities: ['실내', '주차', '샤워실'],               openNow: true, nextSlot: '오늘 19:00' },
 ];
 
 const REGIONS = [
@@ -1825,7 +1819,7 @@ const SMRevisionHomeSearchMobileV2 = ({ variant = 'grouped' }) => {
               ['오늘 참여 가능', '오늘매치수 기준'],
               ['내 주변 5km', '위치 권한 확인'],
               ['마감임박', '24시간 이내'],
-              ['초급 환영', '레벨 필터 적용'],
+              ['초보 환영', '레벨 필터 적용'],
             ].map(([title, sub], index) => (
               <Card key={title} pad={14} interactive style={{ background: index === 0 ? 'var(--blue50)' : 'var(--bg)' }}>
                 <div className="tm-text-label" style={{ color: index === 0 ? 'var(--blue500)' : 'var(--text-strong)' }}>{title}</div>
@@ -2138,7 +2132,7 @@ const SMRevisionMatchSearchFocusMobileSM3 = () => (
           ['오늘 참여 가능', '오늘매치수 기준'],
           ['내 주변 5km', '위치 권한 필요 시 안내'],
           ['마감임박', '24시간 이내'],
-          ['초급 환영', '레벨 필터 적용'],
+          ['초보 환영', '레벨 필터 적용'],
         ].map(([title, sub]) => (
           <Card key={title} pad={14} interactive>
             <div className="tm-text-label">{title}</div>
@@ -2223,7 +2217,7 @@ const SMRevisionMatchDetailMobileSM3 = ({ mine = false, status = 'default', shee
         </Card>
         <Card pad={16} style={{ marginTop: 10 }}>
           <div className="tm-text-body-lg">경기 소개글</div>
-          <div className="tm-text-caption" style={{ marginTop: 6 }}>시간 맞춰 도착할 수 있는 분만 신청해주세요. 초급도 편하게 참여할 수 있습니다.</div>
+          <div className="tm-text-caption" style={{ marginTop: 6 }}>시간 맞춰 도착할 수 있는 분만 신청해주세요. 초보도 편하게 참여할 수 있습니다.</div>
         </Card>
         <Card pad={16} style={{ marginTop: 10 }}>
           <div className="tm-text-body-lg">참가자 리스트</div>
@@ -2371,7 +2365,7 @@ const SMRevisionTeamBrowseMobile = () => (
       <div className="tm-text-heading">팀 전체조회</div>
       <div className="tm-text-body" style={{ marginTop: 6 }}>SM 문서에는 body 요구사항이 아직 없으므로 shell, 비교, 선택 CTA를 먼저 고정한다.</div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '18px 0' }}>
-        {['전체', '축구', '풋살', '농구', '배드민턴'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
+        {['전체', '축구', '풋살', '러닝', '수영'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {TEAMS.map((team) => (
@@ -2889,7 +2883,7 @@ const SMRevisionAuthSM3SportStep = () => (
       <div style={{ flex: 1, overflow: 'auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {SPORTS.filter(s => s.id !== 'all').map((sport) => {
-            const selected = ['soccer', 'futsal', 'ice_hockey', 'badminton'].includes(sport.id);
+            const selected = ['soccer', 'futsal', 'running', 'swim'].includes(sport.id);
             return (
               <button key={sport.id} className="tm-card tm-pressable" style={{
                 aspectRatio: '1/1',
@@ -2961,9 +2955,9 @@ const SMRevisionAuthSM3LevelStep = ({ disabled = false }) => (
       <div className="tm-text-body" style={{ color: 'var(--text-muted)', marginTop: 8, marginBottom: 18 }}>선택한 종목마다 원본 레벨 선택 리스트로 입력해요</div>
       <div style={{ flex: 1, overflow: 'auto', paddingRight: 2 }}>
         {[
-          { sport: '축구', selected: 'B', rows: [['S', '선수 출신', '전/현직 선수'], ['A', '상급', '동호회 선수급'], ['B', '중급', '주 2-3회 규칙적 참여'], ['C', '초급', '취미로 시작한 정도'], ['D', '입문', '처음 시작해요']] },
-          { sport: '풋살', selected: 'C', rows: [['A', '상급', '팀 전술 이해'], ['B', '중급', '주 1회 이상'], ['C', '초중급', '5:5 경험 1년 이상']] },
-          { sport: '하키', selected: 'D', rows: [['B', '리그 경험', '경기 규칙과 포지션 이해'], ['C', '동호회', '스케이트 경력 1년 이상'], ['D', '입문', '스케이트 경력 입력 필요']] },
+          { sport: '축구', selected: 'B', rows: [['S', '선수 출신', '전/현직 선수'], ['A', '고수', '동호회 선수급'], ['B', '중수', '주 2-3회 규칙적 참여'], ['C', '초보', '취미로 시작한 정도'], ['D', '입문', '처음 시작해요']] },
+          { sport: '풋살', selected: 'C', rows: [['A', '고수', '팀 전술 이해'], ['B', '중수', '주 1회 이상'], ['C', '초보-중수', '5:5 경험 1년 이상']] },
+          { sport: '수영', selected: 'D', rows: [['B', '리그 경험', '경기 규칙과 포지션 이해'], ['C', '동호회', '스케이트 경력 1년 이상'], ['D', '입문', '스케이트 경력 입력 필요']] },
         ].map((group) => (
           <div key={group.sport} style={{ marginBottom: 18 }}>
             <div className="tm-text-body-lg" style={{ marginBottom: 10 }}>{group.sport}</div>
@@ -2987,7 +2981,7 @@ const SMRevisionAuthSM3LevelStep = ({ disabled = false }) => (
                 </button>
               );
             })}
-            {group.sport === '하키' && (
+            {group.sport === '수영' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
                 <div className="tm-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-caption)' }}>스케이트 3년</div>
                 <div className="tm-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-caption)' }}>장비 보유</div>
@@ -3072,7 +3066,7 @@ const SMRevisionAuthSM3Welcome = () => (
       <div style={{ display: 'grid', gap: 10, marginTop: 26 }}>
         <Card pad={16}>
           <div className="tm-text-caption">종목</div>
-          <div className="tm-text-body-lg" style={{ marginTop: 4 }}>축구, 풋살, 하키, 배드민턴</div>
+          <div className="tm-text-body-lg" style={{ marginTop: 4 }}>축구, 풋살, 수영, 수영</div>
         </Card>
         <Card pad={16}>
           <div className="tm-text-caption">지역</div>
@@ -3201,8 +3195,8 @@ const SMRevisionAuthSM4Confirm = () => (
       <div className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-muted)' }}>각 항목의 수정 버튼은 해당 온보딩 step으로 돌아가고, 저장된 선택값을 유지한다.</div>
       <div style={{ display: 'grid', gap: 12, marginTop: 24 }}>
         {[
-          ['관심 종목', '축구 · 풋살 · 아이스하키 · 배드민턴', 'Step 2로 이동'],
-          ['종목별 레벨', '축구 B · 풋살 C · 하키 D · 배드민턴 B', 'Step 3으로 이동'],
+          ['관심 종목', '축구 · 풋살 · 수영 · 수영', 'Step 2로 이동'],
+          ['종목별 레벨', '축구 B · 풋살 C · 수영 D · 수영 B', 'Step 3으로 이동'],
           ['주 활동 지역', '마포구 · 강남구', 'Step 4로 이동'],
         ].map(([title, value, action]) => (
           <Card key={title} pad={16}>
@@ -3313,8 +3307,8 @@ const SMRevisionAuthSM4Resume = () => (
       <div className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-muted)' }}>앱 종료나 뒤로가기 후 재진입하면 마지막 저장 지점과 누락 항목을 먼저 보여준다.</div>
       <div style={{ display: 'grid', gap: 10, marginTop: 24 }}>
         {[
-          ['완료', '관심 종목', '축구 · 풋살 · 아이스하키'],
-          ['진행 중', '레벨 선택', '하키 레벨 입력 필요'],
+          ['완료', '관심 종목', '축구 · 풋살 · 수영'],
+          ['진행 중', '레벨 선택', '수영 레벨 입력 필요'],
           ['대기', '지역 선택', '레벨 완료 후 진행'],
         ].map(([status, title, sub]) => (
           <Card key={title} pad={15}>
@@ -3806,9 +3800,9 @@ const SMRevisionTeamMatchMobileGridSM2 = () => (
 );
 
 const SM2_TEAM_BROWSE_TEAMS = [
-  { name: '성수 러너스 FC', sport: '풋살', region: '성동', members: 18, fit: 94, manner: 4.9, status: '모집중', tone: 'blue', logo: 'SR', trust: 'verified', next: '수 20:00 정기전', tags: ['주 1회', '초중급', '빠른 응답'] },
-  { name: '마포 위클리 배드민턴', sport: '배드민턴', region: '마포', members: 24, fit: 88, manner: 4.8, status: '검토중', tone: 'orange', logo: 'MW', trust: 'estimated', next: '토 09:00 복식', tags: ['신입 환영', '여성 멤버', '대관 보유'] },
-  { name: '강남 하프코트', sport: '농구', region: '강남', members: 12, fit: 76, manner: 4.7, status: '마감', tone: 'grey', logo: 'GH', trust: 'sample', next: '다음 모집 알림', tags: ['3on3', '경험자 선호', '월 2회'] },
+  { name: '성수 러너스 FC', sport: '풋살', region: '성동', members: 18, fit: 94, manner: 4.9, status: '모집중', tone: 'blue', logo: 'SR', trust: 'verified', next: '수 20:00 정기전', tags: ['주 1회', '초보-중수', '빠른 응답'] },
+  { name: '마포 위클리 수영', sport: '수영', region: '마포', members: 24, fit: 88, manner: 4.8, status: '검토중', tone: 'orange', logo: 'MW', trust: 'estimated', next: '토 09:00 복식', tags: ['신입 환영', '여성 멤버', '대관 보유'] },
+  { name: '강남 하프코트', sport: '러닝', region: '강남', members: 12, fit: 76, manner: 4.7, status: '마감', tone: 'grey', logo: 'GH', trust: 'sample', next: '다음 모집 알림', tags: ['3on3', '경험자 선호', '월 2회'] },
 ];
 
 const SM2InlineStat = ({ label, value, sub }) => (
@@ -3852,7 +3846,7 @@ const SMRevisionTeamBrowseMobileSM2 = () => (
       <div className="tm-text-heading">나와 맞는 팀을 먼저 비교해요</div>
       <div className="tm-text-body" style={{ marginTop: 6 }}>0502 문서에는 05의 상하단바 유지까지만 확정되어 있어, 기존 온보딩의 선택 카드와 02 홈의 조용한 추천 문법을 합쳐 팀 탐색 기준을 고정합니다.</div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '18px 0 12px' }}>
-        {['전체 42', '풋살 12', '축구 8', '배드민턴 9', '농구 6', '테니스 7'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
+        {['전체 42', '풋살 12', '축구 8', '수영 9', '러닝 6', '수영 7'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <SM2InlineStat label="모집중" value="18팀" sub="서울 기준"/>
@@ -3880,7 +3874,7 @@ const SMRevisionTeamBrowseDetailSM2 = () => {
           {[
             ['활동 방식', '주 1회 정기전 · 신규 멤버 3명 모집'],
             ['신뢰 신호', 'verified · 최근 경기 12회 · 신고 0건'],
-            ['가입 조건', '풋살 초중급 · 성동/광진권 활동 가능'],
+            ['가입 조건', '풋살 초보-중수 · 성동/광진권 활동 가능'],
           ].map(([label, value]) => <SMRevisionInfoRow key={label} label={label} value={value}/>)}
         </Card>
       </div>
@@ -3899,7 +3893,7 @@ const SMRevisionTeamBrowseStateSM2 = ({ state = 'empty' }) => {
       <div style={{ padding: '18px 20px' }}>
         <div className="tm-text-heading">팀 둘러보기</div>
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '18px 0' }}>
-          {['전체 0', '풋살 0', '축구 0', '배드민턴 0'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
+          {['전체 0', '풋살 0', '축구 0', '수영 0'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
         </div>
         <EmptyState
           title={isError ? '새로고침이 필요합니다' : '조건에 맞는 팀이 없습니다'}
@@ -3994,7 +3988,7 @@ const SMRevisionAuthSM5Flow = () => (
       ['로그인 진입', 'social/email/signup 선택', 'OAuth 또는 form으로 분기'],
       ['callback', 'provider 처리', 'loading/success/error/conflict'],
       ['약관', '필수 동의 확인', 'disabled/active CTA'],
-      ['종목', '지원 종목 선택', '축구/풋살/하키/수영/러닝/배드민턴/테니스'],
+      ['종목', '지원 종목 선택', '축구/풋살/수영/수영/러닝/수영/수영'],
       ['레벨', '종목별 입력', '선출/NTRP/스케이트 연차 등'],
       ['지역', '권한 또는 수동 선택', '권한 거부 fallback'],
       ['확인', '선택 요약', '수정/완료'],
@@ -4138,7 +4132,7 @@ const SMRevisionMatchSearchFocusMobileSM4 = () => (
           ['오늘 참여 가능', '오늘매치수 기준'],
           ['내 주변 5km', '위치 권한 필요 시 안내'],
           ['마감임박', '24시간 이내'],
-          ['초급 환영', '레벨 필터 적용'],
+          ['초보 환영', '레벨 필터 적용'],
         ].map(([title, sub]) => (
           <Card key={title} pad={14} interactive>
             <div className="tm-text-label">{title}</div>
@@ -4402,7 +4396,7 @@ const SMRevisionTeamMatchSM4TopSearchRules = () => (
 const SM2_CHAT_ROOMS = [
   { title: '성수 러너스 FC', type: '팀', last: '이번 주 정기전 참석 가능하신가요?', time: '2분 전', unread: 3, pinned: true, avatar: IMG.av1 },
   { title: '주말 풋살 매치', type: '개인매치', last: '참가 승인 완료됐습니다.', time: '18분 전', unread: 1, pinned: false, avatar: IMG.av3 },
-  { title: '마포 배드민턴 팀매치', type: '팀매치', last: '상대팀 유니폼은 흰색입니다.', time: '어제', unread: 0, pinned: false, avatar: IMG.av4 },
+  { title: '마포 수영 팀매치', type: '팀매치', last: '상대팀 유니폼은 흰색입니다.', time: '어제', unread: 0, pinned: false, avatar: IMG.av4 },
 ];
 
 const SMRevisionChatListMobileSM2 = () => (
@@ -4673,7 +4667,7 @@ const SMRevisionTeamBrowseSearchBlockSM3Restored = ({ state = 'results' }) => {
         <SBtn variant="ghost" size="sm">취소</SBtn>
       </div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0 10px' }}>
-        {['전체 42', '모집중 18', '내 주변', '초중급', '주 1회'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
+        {['전체 42', '모집중 18', '내 주변', '초보-중수', '주 1회'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
       </div>
       {isEmpty || isError ? (
         <EmptyState
@@ -4711,7 +4705,7 @@ const SMRevisionTeamBrowseSearchMobileSM3Restored = ({ state = 'results' }) => (
 const SMRevisionTeamBrowseListSearchBarSM4Restored = ({ state = 'results' }) => {
   const isError = state === 'error';
   const isTyping = state === 'typing' || state === 'results';
-  const value = state === 'empty' ? '하키 강남' : isTyping ? '풋살 강동' : '';
+  const value = state === 'empty' ? '수영 강남' : isTyping ? '풋살 강동' : '';
   return (
     <div style={{ minHeight: 56, padding: '8px 10px 8px 20px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg)', flexShrink: 0 }}>
       <div style={{ flex: 1, minHeight: 44, borderRadius: 14, background: 'var(--grey100)', border: isError ? '1px solid var(--red500)' : isTyping ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px 0 14px' }}>
@@ -4749,7 +4743,7 @@ const SMRevisionTeamBrowseListBodySM4Restored = ({ state = 'results' }) => {
   return (
     <div style={{ padding: '14px 20px 96px' }}>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10 }}>
-        {['전체 42', '모집중 18', '내 주변', '초중급', '주 1회'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
+        {['전체 42', '모집중 18', '내 주변', '초보-중수', '주 1회'].map((label, index) => <HapticChip key={label} active={index === 0}>{label}</HapticChip>)}
       </div>
       {isEmpty || isError ? (
         <EmptyState
@@ -4801,7 +4795,7 @@ const SMRevisionTeamBrowseJoinSheetSM3Restored = ({ state = 'ready' }) => {
         <div className="tm-text-body" style={{ color: 'var(--text-muted)', marginTop: 8 }}>{content[1]}</div>
         <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
           <SMRevisionInfoRow label="팀" value={team.name}/>
-          <SMRevisionInfoRow label="활동 조건" value="주 1회 · 초중급 · 강동/광진권"/>
+          <SMRevisionInfoRow label="활동 조건" value="주 1회 · 초보-중수 · 강동/광진권"/>
           <SMRevisionInfoRow label="신뢰 상태" value={`${team.trust} · sample/estimated/verified 구분 유지`}/>
         </div>
         <SBtn full size="lg" variant={content[3]} style={{ marginTop: 14 }}>{content[2]}</SBtn>
@@ -5173,7 +5167,7 @@ const SMCoreSearchExceptionCard = ({ row, index, type }) => {
   const isFilter = type === 'filter';
   const isError = state === 'error';
   const isOpen = state === 'filter-open';
-  const value = state === 'typing' ? (isFilter ? '풋살 · 오늘' : '강남 풋살') : state === 'empty' ? (isFilter ? '강동 · 수영' : '새벽 테니스') : '';
+  const value = state === 'typing' ? (isFilter ? '풋살 · 오늘' : '강남 풋살') : state === 'empty' ? (isFilter ? '강동 · 수영' : '새벽 수영') : '';
   return (
     <div style={{ padding: 12, borderRadius: 16, background: 'var(--bg)', border: '1px solid var(--grey100)', display: 'grid', gap: 10 }}>
       <div style={{ minHeight: 46, display: 'flex', alignItems: 'center', gap: 1, opacity: state === 'disabled' ? .62 : 1 }}>
@@ -5306,7 +5300,7 @@ const SMRevisionHomeSearchMobileSM5Final = ({ query = '동네', noInput = false 
         {[
           ['오늘 참여 가능', '오늘 매치만 기준'],
           ['마감임박', '24시간 이내'],
-          ['초급 환영', '레벨 필터 적용'],
+          ['초보 환영', '레벨 필터 적용'],
           ['팀 매치 포함', '팀매치 결과 함께 보기'],
         ].map(([title, sub], index) => (
           <Card key={title} pad={14} interactive style={{ background: index === 0 ? 'var(--blue50)' : 'var(--bg)' }}>
@@ -5491,7 +5485,7 @@ const SMRevisionAuthSM5SportStep = () => (
     <SMRevisionAuthSM5SetupHeader step={1} title="관심 종목을 선택해 주세요" sub="선택한 종목을 기준으로 다음 실력 입력 단계가 구성됩니다."/>
     <div style={{ flex: 1, padding: '22px 20px 112px', overflow: 'auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {['축구', '풋살', '하키', '배드민턴', '농구', '테니스'].map((label, index) => (
+        {['축구', '풋살', '수영', '수영', '러닝', '수영'].map((label, index) => (
           <Card key={label} pad={16} style={{ minHeight: 88, borderColor: index < 4 ? 'rgba(49,130,246,.32)' : 'var(--grey100)', background: index < 4 ? 'var(--blue50)' : 'var(--bg)' }}>
             <div className="tm-text-body-lg" style={{ color: index < 4 ? 'var(--blue500)' : 'var(--text-strong)' }}>{label}</div>
             <div className="tm-text-caption" style={{ marginTop: 6 }}>{index < 4 ? '선택됨' : '선택 가능'}</div>
@@ -5509,7 +5503,7 @@ const SMRevisionAuthSM5LevelStep = ({ disabled = false }) => (
   <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
     <SMRevisionAuthSM5SetupHeader step={2} title="종목별 실력을 입력해 주세요" sub="무리 없는 매칭을 위해 종목마다 현재 실력을 선택합니다."/>
     <div style={{ flex: 1, padding: '22px 20px 112px', overflow: 'auto' }}>
-      {['축구', '풋살', '하키', '배드민턴'].map((label, index) => (
+      {['축구', '풋살', '수영', '수영'].map((label, index) => (
         <Card key={label} pad={16} style={{ marginBottom: 10, opacity: disabled && index > 0 ? .48 : 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
             <div>
@@ -5685,8 +5679,8 @@ const SMRevisionAuthFinalWelcome = () => (
         {[
           ['약관 동의 완료', '서비스 이용약관과 개인정보 처리방침 동의가 완료되었습니다.'],
           ['회원가입 완료', '계정 생성이 완료되었습니다.'],
-          ['관심 종목 완료', '축구 · 풋살 · 하키 · 배드민턴'],
-          ['실력 입력 완료', '축구 B · 풋살 C · 하키 D · 배드민턴 B'],
+          ['관심 종목 완료', '축구 · 풋살 · 수영 · 수영'],
+          ['실력 입력 완료', '축구 B · 풋살 C · 수영 D · 수영 B'],
           ['활동 지역 완료', '마포구 · 강남구 · 위치 권한 선택'],
         ].map(([title, body]) => (
           <Card key={title} pad={14} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -5710,9 +5704,9 @@ const SMRevisionAuthFinalWelcome = () => (
 const SM9_CHAT_ROOMS = [
   { title: '주말 풋살 매치', type: '개인매치', category: '개인매치', last: '오늘 14:00 경기 인원 확인 부탁드려요.', time: '방금', unread: 2, pinned: true, avatar: 'assets/mock/profile/profile-01.svg' },
   { title: '성수 러너스 FC', type: '팀', category: '팀', last: '이번 주 훈련 장소가 변경됐어요.', time: '9분', unread: 0, pinned: true, avatar: 'assets/mock/profile/profile-02.svg' },
-  { title: '마포 배드민턴 친선전', type: '팀매치', category: '팀매치', last: '라인업 확인 후 확정 부탁드립니다.', time: '23분', unread: 4, pinned: false, avatar: 'assets/mock/profile/profile-03.svg' },
-  { title: '강남 테니스 싱글 매치', type: '개인매치', category: '개인매치', last: '코트 예약 링크 공유드렸습니다.', time: '1시간', unread: 0, pinned: false, avatar: 'assets/mock/profile/profile-04.svg' },
-  { title: '하키 입문 팀', type: '팀', category: '팀', last: '장비 대여 가능 인원을 확인 중입니다.', time: '어제', unread: 1, pinned: false, avatar: 'assets/mock/profile/profile-05.svg' },
+  { title: '마포 수영 친선전', type: '팀매치', category: '팀매치', last: '라인업 확인 후 확정 부탁드립니다.', time: '23분', unread: 4, pinned: false, avatar: 'assets/mock/profile/profile-03.svg' },
+  { title: '강남 수영 싱글 매치', type: '개인매치', category: '개인매치', last: '코트 예약 링크 공유드렸습니다.', time: '1시간', unread: 0, pinned: false, avatar: 'assets/mock/profile/profile-04.svg' },
+  { title: '수영 입문 팀', type: '팀', category: '팀', last: '장비 대여 가능 인원을 확인 중입니다.', time: '어제', unread: 1, pinned: false, avatar: 'assets/mock/profile/profile-05.svg' },
 ];
 
 const SM9_CHAT_CATEGORIES = [
@@ -6202,8 +6196,8 @@ const SMRevisionMatchFinalFullFlow = () => (
   </SMRevisionPlusBoard>
 );
 
-const SM_MATCH_CREATE_SPORTS = ['풋살', '축구', '농구', '배드민턴', '테니스', '러닝'];
-const SM_MATCH_CREATE_LEVELS = ['입문', '초급', '중급', '상급'];
+const SM_MATCH_CREATE_SPORTS = ['풋살', '축구', '러닝', '수영', '수영', '러닝'];
+const SM_MATCH_CREATE_LEVELS = ['입문', '초보', '중수', '고수'];
 
 const SMRevisionMatchCreateProgress = ({ step = 1, edit = false }) => (
   <div style={{ padding: '14px 20px 10px' }}>
@@ -6283,7 +6277,7 @@ const SMRevisionMatchCreateInfoStepSMFinal = ({ edit = false }) => (
   <SMRevisionMatchCreateShell step={2} edit={edit} title={edit ? '매치 수정' : '매치 만들기'} primary={edit ? '변경사항 저장' : '다음'} secondary={edit ? '변경 취소' : '이전'}>
     <div className="tm-text-heading">매치 정보</div>
     <SMRevisionMatchCreateField label="매치 제목" value="주말 풋살 한판!" placeholder="예: 주말 풋살 한판!"/>
-    <SMRevisionMatchCreateField label="설명" value="초급도 편하게 참여할 수 있는 주말 풋살 매치입니다." placeholder="매치에 대한 설명을 적어주세요" multiline/>
+    <SMRevisionMatchCreateField label="설명" value="초보도 편하게 참여할 수 있는 주말 풋살 매치입니다." placeholder="매치에 대한 설명을 적어주세요" multiline/>
     <div style={{ marginTop: 14 }}>
       <div className="tm-text-label">이미지 (선택)</div>
       <Card pad={0} style={{ marginTop: 8, overflow: 'hidden' }}>
@@ -6302,8 +6296,8 @@ const SMRevisionMatchCreateInfoStepSMFinal = ({ edit = false }) => (
       <SMRevisionMatchCreateField label="참가비" value="15000" placeholder="15000" suffix="원"/>
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-      <SMRevisionMatchCreateField label="최소 레벨" value="초급" placeholder="선택"/>
-      <SMRevisionMatchCreateField label="최대 레벨" value="중급" placeholder="선택"/>
+      <SMRevisionMatchCreateField label="최소 레벨" value="초보" placeholder="선택"/>
+      <SMRevisionMatchCreateField label="최대 레벨" value="중수" placeholder="선택"/>
     </div>
     <div style={{ marginTop: 14 }}>
       <div className="tm-text-label">성별 제한</div>
@@ -6350,9 +6344,9 @@ const SMRevisionMatchCreateConfirmStepSMFinal = () => (
     <Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}>
       <div style={{ height: 126, background: `url(${MATCHES[0].img}) center/cover` }}/>
       <div style={{ padding: 16 }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}><Badge tone="blue">풋살</Badge><Badge tone="grey">초급-중급</Badge><Badge tone="grey">성별 무관</Badge></div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}><Badge tone="blue">풋살</Badge><Badge tone="grey">초보-중수</Badge><Badge tone="grey">성별 무관</Badge></div>
         <div className="tm-text-subhead">주말 풋살 한판!</div>
-        <div className="tm-text-caption" style={{ marginTop: 6 }}>초급도 편하게 참여할 수 있는 주말 풋살 매치입니다.</div>
+        <div className="tm-text-caption" style={{ marginTop: 6 }}>초보도 편하게 참여할 수 있는 주말 풋살 매치입니다.</div>
       </div>
     </Card>
     <Card pad={16} style={{ marginTop: 12 }}>
@@ -6904,7 +6898,7 @@ const SMRevisionHomeSearchAssistBlockFinal = () => (
       {[
         ['오늘 참여 가능', '오늘 매치만 기준'],
         ['마감임박', '24시간 이내'],
-        ['초급 환영', '레벨 필터 적용'],
+        ['초보 환영', '레벨 필터 적용'],
         ['팀 매치 포함', '팀매치 결과 함께 보기'],
       ].map(([title, sub], index) => (
         <Card key={title} pad={14} interactive style={{ background: index === 0 ? 'var(--blue50)' : 'var(--bg)' }}>
@@ -7175,7 +7169,7 @@ const SMRevisionMyPageSM1 = () => (
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: 0 }}>김정민</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, fontWeight: 500 }}>@jungmin · 서울 강남구</div>
             <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-              {['축구', '농구'].map((t) => <span key={t} style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--blue50)', color: 'var(--blue500)', fontSize: 11, fontWeight: 700 }}>{t}</span>)}
+              {['축구', '러닝'].map((t) => <span key={t} style={{ padding: '3px 10px', borderRadius: 999, background: 'var(--blue50)', color: 'var(--blue500)', fontSize: 11, fontWeight: 700 }}>{t}</span>)}
             </div>
           </div>
           <button className="tm-pressable tm-break-keep" style={{ height: 34, padding: '0 14px', borderRadius: 999, background: 'var(--grey200)', border: 'none', fontSize: 12, fontWeight: 700, color: 'var(--text-strong)', cursor: 'pointer' }}>편집</button>
@@ -7220,9 +7214,9 @@ const SMRevisionMyPageSM1 = () => (
 const SMRevisionMyActivitySM1 = () => {
   const history = [
     { sport: '축', title: '상암 주말 축구', date: '2024.12.14', venue: '상암 보조구장', result: 'win' },
-    { sport: '농', title: '이태원 3on3 농구', date: '2024.12.07', venue: '이태원 농구장', result: 'lose' },
-    { sport: '테', title: '강남 테니스 복식', date: '2024.11.30', venue: '강남구민체육관', result: 'win' },
-    { sport: '배', title: '마포 배드민턴', date: '2024.11.23', venue: '마포스포츠센터', result: 'draw' },
+    { sport: '농', title: '이태원 3on3 러닝', date: '2024.12.07', venue: '이태원 러닝장', result: 'lose' },
+    { sport: '테', title: '강남 수영 복식', date: '2024.11.30', venue: '강남구민체육관', result: 'win' },
+    { sport: '배', title: '마포 수영', date: '2024.11.23', venue: '마포스포츠센터', result: 'draw' },
   ];
   return (
     <div style={{ width: 375, height: 812, background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -7301,8 +7295,8 @@ const SM1MyScreen = ({ title, children, bottom = true }) => (
 const SMRevisionMyMatchesSM1 = ({ category = 'joined' }) => {
   const joined = [
     { title: '상암 주말 축구', meta: '12.14 토 · 상암 보조구장', status: 'pending' },
-    { title: '강남 테니스 복식', meta: '12.21 토 · 강남구민체육관', status: 'approved' },
-    { title: '마포 배드민턴', meta: '11.23 토 · 마포스포츠센터', status: 'ended' },
+    { title: '강남 수영 복식', meta: '12.21 토 · 강남구민체육관', status: 'approved' },
+    { title: '마포 수영', meta: '11.23 토 · 마포스포츠센터', status: 'ended' },
   ];
   const created = [
     { title: '잠실 러닝 크루 매치', meta: '승인 대기 3명 · 승인완료 8명', status: 'recruiting' },
@@ -7623,8 +7617,8 @@ const SMRevisionApplicantUserProfileSM1 = () => (
         </div>
       </Card>
       <div style={{ marginTop: 12 }}>
-        <ListItem title="최근 참여 매치" sub="강남 테니스 복식 · 승인완료" trailing="4.9" chev/>
-        <ListItem title="소속 팀" sub="FC 발빠른놈들 · 강남 러너스 · 마포 배드민턴" trailing="3팀" chev/>
+        <ListItem title="최근 참여 매치" sub="강남 수영 복식 · 승인완료" trailing="4.9" chev/>
+        <ListItem title="소속 팀" sub="FC 발빠른놈들 · 강남 러너스 · 마포 수영" trailing="3팀" chev/>
         <ListItem title="받은 뱃지" sub="시간약속 · 매너플레이 · 팀워크" trailing="9개" chev/>
       </div>
       <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
@@ -7722,7 +7716,7 @@ const SMRevisionMyTeamsSM1 = () => (
       {[
         ['FC 발빠른놈들', '팀장 · 풋살 · 24명', 'owner'],
         ['강남 러너스', '관리자 · 러닝 · 48명', 'admin'],
-        ['마포 배드민턴', '일반 멤버 · 배드민턴 · 18명', 'member'],
+        ['마포 수영', '일반 멤버 · 수영 · 18명', 'member'],
       ].map(([name, meta, role]) => (
         <Card key={name} pad={14} style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -7910,7 +7904,7 @@ const SMRevisionTeamBrowseShellSM5 = ({ children, query = '', error = false, fil
 
 const SMRevisionTeamBrowseChipRowSM5 = () => (
   <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10 }}>
-    {['전체 42', '모집중 18', '내 주변', '초중급', '주 1회', '풋살'].map((label, index) => (
+    {['전체 42', '모집중 18', '내 주변', '초보-중수', '주 1회', '풋살'].map((label, index) => (
       <HapticChip key={label} active={index === 0} count={index === 0 ? 42 : undefined}>{label}</HapticChip>
     ))}
   </div>
@@ -7925,9 +7919,9 @@ const SMRevisionTeamBrowseSummarySM5 = () => (
 );
 
 const SM5_TEAM_INTROS = [
-  '주 1회 정기적으로 풋살을 즐기는 동네 팀입니다. 초중급 멤버와 빠른 응답을 중요하게 봅니다.',
-  '주말 오전 복식 위주로 운영하는 배드민턴 팀입니다. 신입과 여성 멤버가 함께 뛰기 편한 분위기입니다.',
-  '3on3 하프코트 농구를 꾸준히 하는 팀입니다. 경험자 중심이지만 다음 모집 알림을 받을 수 있습니다.',
+  '주 1회 정기적으로 풋살을 즐기는 동네 팀입니다. 초보-중수 멤버와 빠른 응답을 중요하게 봅니다.',
+  '주말 오전 복식 위주로 운영하는 수영 팀입니다. 신입과 여성 멤버가 함께 뛰기 편한 분위기입니다.',
+  '3on3 하프코트 러닝를 꾸준히 하는 팀입니다. 경험자 중심이지만 다음 모집 알림을 받을 수 있습니다.',
 ];
 
 const SM5TeamBrowseCard = ({ team, selected = false, index = 0 }) => (
@@ -7999,7 +7993,7 @@ const SMRevisionTeamBrowseDetailSM5 = () => (
       <Card pad={18} style={{ background: 'var(--grey900)', color: 'var(--static-white)' }}>
         <div style={{ width: 60, height: 60, borderRadius: 18, background: 'var(--blue500)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>TT</div>
         <div className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>04221553 test</div>
-        <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>축구 · 풋살 · 농구 · 인천 연수구 · 모집중</div>
+        <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>축구 · 풋살 · 러닝 · 인천 연수구 · 모집중</div>
       </Card>
 
       <SectionTitle title="팀 기본 정보" sub="조회 화면에서도 등록 필수값과 선택값을 빠짐없이 구분합니다."/>
@@ -8007,13 +8001,13 @@ const SMRevisionTeamBrowseDetailSM5 = () => (
         <SM5TeamInfoRow label="팀명" value="04221553 test" required/>
         <div style={{ padding: '10px 0', borderBottom: '1px solid var(--grey100)' }}>
           <div className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 800, marginBottom: 8 }}>종목 (복수 선택 가능)*</div>
-          <SM5TeamInfoChips items={['축구', '풋살', '농구', '배드민턴', '아이스하키', '수영', '테니스', '야구', '배구', '피겨', '쇼트트랙']} activeCount={3}/>
+          <SM5TeamInfoChips items={['축구', '풋살', '러닝', '수영', '수영', '수영', '수영', '축구', '배구', '피겨', '쇼트트랙']} activeCount={3}/>
           <div className="tm-text-micro" style={{ color: 'var(--blue500)', marginTop: 8 }}>3개 종목 선택됨</div>
         </div>
         <SM5TeamInfoRow label="팀 소개" value="04221553 test"/>
         <SM5TeamInfoRow label="시/도" value="인천" required/>
         <SM5TeamInfoRow label="구/군" value="연수구"/>
-        <SM5TeamInfoRow label="레벨" value="초급"/>
+        <SM5TeamInfoRow label="레벨" value="초보"/>
         <SM5TeamInfoRow label="모집 여부" value="모집중 · 모집마감 상태 분리"/>
       </Card>
 
@@ -8105,7 +8099,7 @@ const SMRevisionTeamBrowseFilterSheetSM5 = () => (
       </div>
       {[
         ['정렬', ['추천순', '모집중', '매너 높은순', '최근 활동']],
-        ['팀 조건', ['초중급', '주 1회 이상', '가입 가능', '여성 환영']],
+        ['팀 조건', ['초보-중수', '주 1회 이상', '가입 가능', '여성 환영']],
         ['신뢰 신호', ['verified', 'estimated', 'sample 구분']],
       ].map(([title, options], groupIndex) => (
         <div key={title} style={{ marginTop: 18 }}>

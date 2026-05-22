@@ -25,8 +25,10 @@ export const v1UserFixture: V1User = {
 };
 
 export const v1SportsFixture: V1Sport[] = [
-  { id: 'sport-futsal', name: '풋살', levels: [{ id: 'level-beginner', name: '초급' }, { id: 'level-middle', name: '중급' }] },
-  { id: 'sport-running', name: '러닝', levels: [{ id: 'level-entry', name: '입문' }] },
+  { id: 'sport-soccer', name: '축구', levels: [{ id: 'soccer-beginner', name: '입문' }, { id: 'soccer-novice', name: '초보' }, { id: 'soccer-intermediate', name: '중수' }, { id: 'soccer-advanced', name: '고수' }] },
+  { id: 'sport-futsal', name: '풋살', levels: [{ id: 'futsal-beginner', name: '입문' }, { id: 'futsal-novice', name: '초보' }, { id: 'futsal-intermediate', name: '중수' }, { id: 'futsal-advanced', name: '고수' }] },
+  { id: 'sport-running', name: '러닝', levels: [{ id: 'running-beginner', name: '입문' }, { id: 'running-novice', name: '초보' }, { id: 'running-intermediate', name: '중수' }, { id: 'running-advanced', name: '고수' }] },
+  { id: 'sport-swimming', name: '수영', levels: [{ id: 'swimming-beginner', name: '입문' }, { id: 'swimming-novice', name: '초보' }, { id: 'swimming-intermediate', name: '중수' }, { id: 'swimming-advanced', name: '고수' }] },
 ];
 
 export const v1RegionsFixture: V1Region[] = [
@@ -57,7 +59,7 @@ export const v1MatchesFixture: V1Match[] = [
     id: 'match-1',
     title: '성수 풋살장 동네 5:5',
     sportName: '풋살',
-    levelLabel: '초급-중급',
+    levelLabel: '초보-중수',
     placeName: '성수 실내풋살장',
     startsAt: '2026-05-18T20:00:00.000Z',
     capacityText: '7/10명',

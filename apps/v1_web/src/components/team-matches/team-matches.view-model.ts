@@ -36,7 +36,8 @@ export function getTeamMatchListViewModel(): TeamMatchListViewModel {
       { label: '전체', count: teamMatches.length, active: true },
       { label: '풋살', count: 12 },
       { label: '축구', count: 8 },
-      { label: '농구', count: 3 },
+      { label: '러닝', count: 3 },
+      { label: '수영', count: 2 },
     ],
     summary: { count: 28, today: 5, urgent: 3 },
     matches: teamMatches,
@@ -99,9 +100,9 @@ export function getTeamMatchCreateViewModel(step: TeamMatchCreateStep): TeamMatc
     teams: [
       { name: 'FC 발빠른놈들', sport: '축구', members: 24, role: '주장 권한' },
       { name: '다이나믹 FS', sport: '풋살', members: 14, role: '주장 권한', selected: true },
-      { name: '강남 바스켓', sport: '농구', members: 12, role: '멤버 · 생성 권한 확인 필요' },
+      { name: '강남 러너스', sport: '러닝', members: 12, role: '멤버 · 생성 권한 확인 필요' },
     ],
-    sports: ['풋살', '축구', '농구', '배드민턴', '테니스', '러닝'],
+    sports: ['축구', '풋살', '러닝', '수영'],
     draft,
   };
 }

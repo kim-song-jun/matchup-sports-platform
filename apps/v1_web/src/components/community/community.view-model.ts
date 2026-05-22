@@ -3,7 +3,7 @@ import type { ChatListViewModel, ChatRoomViewModel, NotificationsViewModel } fro
 const rooms = [
   { id: 'room-1', title: '성수 러너스 FC', type: '팀' as const, href: '/teams/team-1', last: '이번 주 정기전 참석 가능하신가요?', time: '2분 전', unread: 3, pinned: true, initials: '성' },
   { id: 'room-2', title: '주말 풋살 매치', type: '개인매치' as const, href: '/matches/match-1', last: '참가 승인 완료됐습니다.', time: '18분 전', unread: 1, initials: '풋' },
-  { id: 'room-3', title: '마포 배드민턴 팀매치', type: '팀매치' as const, href: '/team-matches/team-match-1', last: '상대팀 유니폼은 흰색입니다.', time: '어제', unread: 0, initials: '마' },
+  { id: 'room-3', title: '마포 풋살 팀매치', type: '팀매치' as const, href: '/team-matches/team-match-1', last: '상대팀 유니폼은 흰색입니다.', time: '어제', unread: 0, initials: '마' },
   { id: 'room-4', title: '강동 위클리 풋살', type: '팀' as const, href: '/teams/team-1', last: '새 멤버 신청이 들어왔어요.', time: '2일 전', unread: 0, initials: '강' },
 ];
 

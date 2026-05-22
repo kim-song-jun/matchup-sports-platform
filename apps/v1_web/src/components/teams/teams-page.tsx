@@ -169,7 +169,7 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
         <CreateField label="팀 이름" value={team.name} onChange={(value) => form?.onFieldChange('name', value)} />
         <div className="tm-create-field">
           <div className="tm-text-label">종목 (복수 선택 가능)</div>
-          <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '농구', '배드민턴', '테니스']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
+          <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
         </div>
         <div className="tm-create-two-col"><CreateField label="시/도" value={team.city} onChange={(value) => form?.onFieldChange('city', value)} /><CreateField label="구/군" value={team.county} onChange={(value) => form?.onFieldChange('county', value)} /></div>
         <CreateField label="팀 소개" value={team.description} multiline onChange={(value) => form?.onFieldChange('description', value)} />

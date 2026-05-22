@@ -161,7 +161,7 @@ export function DesignInteractions({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (hasAny(text, ['성수 러너스 FC', '주말 풋살 매치', '마포 배드민턴 팀매치'])) {
+    if (hasAny(text, ['성수 러너스 FC', '주말 풋살 매치', '마포 풋살 팀매치'])) {
       go('/chat/sample');
       return;
     }

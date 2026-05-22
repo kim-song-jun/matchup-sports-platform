@@ -15,13 +15,13 @@ const recentSearches = ['동네', '강남', '오늘 대기', '마감임박'];
 const quickFilters = [
   ['오늘 참여 가능', '오늘 매치만 기준'],
   ['마감임박', '24시간 이내'],
-  ['초급 환영', '레벨 필터 적용'],
+  ['초보 환영', '레벨 필터 적용'],
   ['팀 매치 포함', '팀매치 결과 함께 보기'],
 ];
 
 const baseResults = [
   { type: '매치', title: '성수 저녁 풋살', meta: '성수 풋살파크 · 오늘 20:00 · 8/10명', href: '/matches/sample' },
-  { type: '팀매치', title: '마포 배드민턴 팀매치', meta: '마포 실내체육관 · 토요일 · 상대팀 모집중', href: '/team-matches/sample' },
+  { type: '팀매치', title: '마포 풋살 팀매치', meta: '마포 실내체육관 · 토요일 · 상대팀 모집중', href: '/team-matches/sample' },
   { type: '팀', title: '성수 러너스 FC', meta: '풋살 · 성동구 · 신입 환영', href: '/teams/sample' },
 ];
 

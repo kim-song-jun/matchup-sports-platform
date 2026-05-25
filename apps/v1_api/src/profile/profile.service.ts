@@ -12,6 +12,87 @@ export class ProfileService {
     return toProfileResponse(snapshot);
   }
 
+  async activitySummary(user: V1AuthUser) {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const activeMemberships = await this.prisma.v1TeamMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'active',
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { teamId: true },
+    });
+    const teamIds = activeMemberships.map((membership) => membership.teamId);
+    const teamMatchWhere = teamIds.length
+      ? {
+          deletedAt: null,
+          OR: [
+            { hostTeamId: { in: teamIds } },
+            {
+              applications: {
+                some: {
+                  applicantTeamId: { in: teamIds },
+                  status: { in: ['requested' as const, 'approved' as const] },
+                },
+              },
+            },
+          ],
+        }
+      : null;
+
+    const [
+      reputation,
+      personalActivityCount,
+      monthlyPersonalMatchCount,
+      teamActivityCount,
+      monthlyTeamMatchCount,
+    ] = await Promise.all([
+      this.prisma.v1UserReputationSummary.findUnique({
+        where: { userId: user.id },
+        select: { mannerScore: true },
+      }),
+      this.prisma.v1MatchParticipant.count({
+        where: {
+          userId: user.id,
+          status: { in: ['active', 'completed'] },
+          match: { deletedAt: null },
+        },
+      }),
+      this.prisma.v1MatchParticipant.count({
+        where: {
+          userId: user.id,
+          status: { in: ['active', 'completed'] },
+          match: { deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
+        },
+      }),
+      teamMatchWhere ? this.prisma.v1TeamMatch.count({ where: teamMatchWhere }) : 0,
+      teamMatchWhere
+        ? this.prisma.v1TeamMatch.count({
+            where: {
+              ...teamMatchWhere,
+              startAt: { gte: monthStart, lt: nextMonthStart },
+            },
+          })
+        : 0,
+    ]);
+    const mannerScore = reputation?.mannerScore ? Number(reputation.mannerScore) : null;
+
+    return {
+      totals: {
+        activityCount: personalActivityCount + teamActivityCount,
+        teamCount: teamIds.length,
+        mannerScore,
+      },
+      monthly: {
+        matchCount: monthlyPersonalMatchCount + monthlyTeamMatchCount,
+        mannerScore,
+        winRate: null,
+      },
+    };
+  }
+
   async updateMe(user: V1AuthUser, dto: UpdateProfileDto) {
     this.assertMutableAccount(user);
     const profile = await this.prisma.v1UserProfile.upsert({

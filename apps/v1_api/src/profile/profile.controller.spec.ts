@@ -15,6 +15,7 @@ const user = {
 describe('ProfileController', () => {
   const profileService = {
     me: jest.fn(),
+    activitySummary: jest.fn(),
     updateMe: jest.fn(),
     publicProfile: jest.fn(),
     settings: jest.fn(),
@@ -51,6 +52,17 @@ describe('ProfileController', () => {
     const dto = { displayName: '민수', visibilityStatus: 'public' as const };
     profileService.updateMe.mockResolvedValue({ profile: dto });
     await expect(controller.updateMe(user, dto)).resolves.toEqual({ profile: dto });
+  });
+
+  it('returns my activity summary', async () => {
+    profileService.activitySummary.mockResolvedValue({
+      totals: { activityCount: 3, teamCount: 2, mannerScore: 4.8 },
+      monthly: { matchCount: 1, mannerScore: 4.8, winRate: null },
+    });
+    await expect(controller.activitySummary(user)).resolves.toEqual({
+      totals: { activityCount: 3, teamCount: 2, mannerScore: 4.8 },
+      monthly: { matchCount: 1, mannerScore: 4.8, winRate: null },
+    });
   });
 
   it('returns public profile', async () => {

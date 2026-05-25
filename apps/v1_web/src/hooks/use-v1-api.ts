@@ -27,6 +27,7 @@ import type {
   V1MatchMutationPayload,
   V1MatchMutationResult,
   V1MatchUpdatePayload,
+  V1MyActivitySummary,
   V1MyTeamsResponse,
   V1MyTeamMatch,
   V1Notification,
@@ -219,6 +220,13 @@ export function useV1Matches(filters?: ListFilters, options?: QueryOptions) {
     queryKey: v1Keys.matches(filters),
     queryFn: () => v1Get<CursorPage<V1Match>>('/matches', filters),
     enabled: options?.enabled,
+  });
+}
+
+export function useV1MyMatches(filters?: ListFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'me', 'matches', filters ?? {}] as const,
+    queryFn: () => v1Get<CursorPage<V1Match>>('/me/matches', filters),
   });
 }
 
@@ -726,6 +734,13 @@ export function useV1Profile() {
   return useQuery({
     queryKey: v1Keys.profile(),
     queryFn: () => v1Get<V1Profile>('/me/profile'),
+  });
+}
+
+export function useV1MyActivitySummary() {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'me', 'activity-summary'] as const,
+    queryFn: () => v1Get<V1MyActivitySummary>('/me/activity-summary'),
   });
 }
 

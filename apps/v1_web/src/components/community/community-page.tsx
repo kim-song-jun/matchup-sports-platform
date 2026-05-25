@@ -139,6 +139,7 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
   const actionWidth = 144;
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return;
     startXRef.current = event.clientX;
     draggingRef.current = true;
     movedRef.current = false;
@@ -179,22 +180,21 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
   };
 
   const offset = draggingRef.current ? dragOffset : isOpen ? -actionWidth : 0;
-  const actionsVisible = offset < -1;
 
   return (
     <div className={`tm-chat-row ${room.unread ? 'tm-chat-row-unread' : ''}`}>
       <div
-        className={`tm-chat-row-swipe ${actionsVisible ? 'tm-chat-row-swipe-actions-visible' : ''}`}
+        className="tm-chat-row-swipe"
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: draggingRef.current ? 'none' : undefined,
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
       >
-        <div className="tm-chat-row-actions" aria-label={`${room.title} 채팅방 작업`}>
-          <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정해제' : '고정'}</span></button>
-          <button className="tm-chat-row-action tm-chat-row-action-danger" type="button" disabled={room.actionPending} onClick={room.onRequestLeave}><X size={18} strokeWidth={2.2} /><span>나가기</span></button>
-        </div>
-        <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick} style={{ transform: `translateX(${offset}px)` }}>
+        <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick}>
           <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: `url(${room.avatarUrl})` } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue">고정</span> : null}</div>
@@ -206,6 +206,10 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
           </div>
           <div className="tm-chat-row-meta"><div className="tm-text-micro">{room.time}</div></div>
         </Link>
+        <div className="tm-chat-row-actions" aria-label={`${room.title} 채팅방 작업`}>
+          <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정해제' : '고정'}</span></button>
+          <button className="tm-chat-row-action tm-chat-row-action-danger" type="button" disabled={room.actionPending} onClick={room.onRequestLeave}><X size={18} strokeWidth={2.2} /><span>나가기</span></button>
+        </div>
       </div>
     </div>
   );

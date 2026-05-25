@@ -42,3 +42,20 @@ export class MatchesQueryDto {
   @IsIn(['card', 'compact'])
   view?: 'card' | 'compact';
 }
+
+export class MyMatchesQueryDto {
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @IsIn(['joined', 'created'])
+  mode?: 'joined' | 'created';
+}

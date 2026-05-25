@@ -5,6 +5,7 @@
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/matches` | optional user | `MatchesQueryDto` | cursor list |
+| `GET` | `/api/v1/me/matches` | user | `MyMatchesQueryDto` | current user's joined or created match list |
 | `POST` | `/api/v1/matches` | user | `MutateMatchDto` | created match |
 | `GET` | `/api/v1/matches/:matchId/edit` | user host | path id | editable match payload |
 | `GET` | `/api/v1/matches/:matchId` | optional user | path id | match detail and CTA state |
@@ -29,6 +30,12 @@
 - `status?: "recruiting" | "closed" | "completed" | "cancelled" | "expired"`
 - `sort?: "recommended" | "latest" | "starts_at" | "deadline"`
 - `view?: "card" | "compact"`
+
+`MyMatchesQueryDto`:
+
+- `cursor?: string`
+- `limit?: number`, 1-50
+- `mode?: "joined" | "created"`
 
 ## Mutation DTO
 

@@ -7,6 +7,7 @@ import { Card, ListItem } from '@/components/v1-ui/primitives';
 import {
   useV1ApproveTeamJoinApplication,
   useV1ChangeTeamMembershipRole,
+  useV1MyActivitySummary,
   useV1MyTeams,
   useV1MyTeamMatches,
   useV1Notifications,
@@ -21,7 +22,7 @@ import {
   useV1UpdateSettings,
   useV1WithdrawalRequest,
 } from '@/hooks/use-v1-api';
-import type { V1MyTeam, V1MyTeamMatch, V1Profile, V1Settings, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1Settings, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   SettingsPageView,
@@ -34,13 +35,19 @@ import { myHomeModel, myTeamsModel, profileEditModel, settingsModel } from './my
 
 export function MyHomePageClient() {
   const profile = useV1Profile();
+  const activitySummary = useV1MyActivitySummary();
   const teams = useV1MyTeams();
   const notifications = useV1Notifications({ status: 'unread', limit: 1 });
 
   const model = useMemo(() => {
     if (!profile.data) return myHomeModel;
-    return toMyHomeModel(profile.data, teams.data?.items ?? [], notificationUnreadCount(notifications.data) > 0);
-  }, [profile.data, teams.data, notifications.data]);
+    return toMyHomeModel(
+      profile.data,
+      teams.data?.items ?? [],
+      notificationUnreadCount(notifications.data) > 0,
+      activitySummary.data,
+    );
+  }, [profile.data, teams.data, notifications.data, activitySummary.data]);
 
   return <MyHomePageView model={model} />;
 }
@@ -279,8 +286,15 @@ export function WithdrawalPageClient() {
   );
 }
 
-function toMyHomeModel(profile: V1Profile, teams: V1MyTeam[], hasNewNotification: boolean): MyHomeViewModel {
+function toMyHomeModel(
+  profile: V1Profile,
+  teams: V1MyTeam[],
+  hasNewNotification: boolean,
+  activitySummary?: V1MyActivitySummary,
+): MyHomeViewModel {
   const displayName = profile.profile.displayName;
+  const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
+  const monthlyMannerScore = activitySummary?.monthly.mannerScore ?? totalMannerScore;
   return {
     ...myHomeModel,
     hasNewNotification,
@@ -291,10 +305,14 @@ function toMyHomeModel(profile: V1Profile, teams: V1MyTeam[], hasNewNotification
       initials: initials(displayName),
       intro: profile.profile.bio ?? myHomeModel.user.intro,
       stats: [
-        { label: '활동', value: profile.reputation.activityCount, unit: '회' },
-        { label: '소속 팀', value: teams.length, unit: '팀' },
-        { label: '매너 점수', value: profile.reputation.mannerScore ?? '-' },
-        { label: '신뢰', value: trustLabel(profile.reputation.trustState) },
+        { label: '활동', value: activitySummary?.totals.activityCount ?? profile.reputation.activityCount, unit: '회' },
+        { label: '소속 팀', value: activitySummary?.totals.teamCount ?? teams.length, unit: '팀' },
+        { label: '매너 점수', value: formatScore(totalMannerScore) },
+      ],
+      monthly: [
+        { label: '이번 달 경기', value: activitySummary?.monthly.matchCount ?? 0, unit: '경기' },
+        { label: '매너 점수', value: formatScore(monthlyMannerScore) },
+        { label: '승률', value: formatWinRate(activitySummary?.monthly.winRate) },
       ],
     },
   };
@@ -420,14 +438,18 @@ function visibilityLabel(value: string) {
   return '전체 공개';
 }
 
-function trustLabel(value: string) {
-  if (value === 'verified') return '검증';
-  if (value === 'estimated') return '추정';
-  return '-';
-}
-
 function hasTrustValue(value: string) {
   return value === 'verified' || value === 'estimated';
+}
+
+function formatScore(value: number | null | undefined) {
+  if (typeof value !== 'number') return '-';
+  return Number.isInteger(value) ? value : value.toFixed(1);
+}
+
+function formatWinRate(value: number | null | undefined) {
+  if (typeof value !== 'number') return '-';
+  return `${Math.round(value)}%`;
 }
 
 function initials(value: string) {

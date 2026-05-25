@@ -1,17 +1,16 @@
 'use client';
 
-import { useV1Matches } from '@/hooks/use-v1-api';
+import { useV1MyMatches } from '@/hooks/use-v1-api';
 import type { V1Match } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
 import { getMyMatchesModel } from './my.view-model';
 
 export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
-  const query = useV1Matches({ limit: 50 });
+  const query = useV1MyMatches({ mode, limit: 50 });
   const fallback = getMyMatchesModel(mode);
   const items = query.data?.items ?? [];
-  const filtered = items.filter((match) => (mode === 'created' ? getViewerState(match) === 'host' : isJoinedState(getViewerState(match))));
-  const matches = filtered.map(toMyMatch);
+  const matches = items.map(toMyMatch);
 
   const model: MyMatchesViewModel = {
     ...fallback,
@@ -76,10 +75,6 @@ function buildSummary(mode: 'joined' | 'created', matches: MyMatch[]) {
 
 function getViewerState(match: V1Match) {
   return match.viewerState ?? match.viewer?.state ?? 'none';
-}
-
-function isJoinedState(state: string) {
-  return state === 'requested' || state === 'approved' || state === 'participant';
 }
 
 function toMyStatus(match: V1Match): MyMatchStatus {

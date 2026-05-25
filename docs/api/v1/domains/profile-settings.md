@@ -5,6 +5,7 @@
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/me/profile` | user | headers only | current user's profile |
+| `GET` | `/api/v1/me/activity-summary` | user | headers only | current user's activity/team/manner/monthly summary |
 | `PATCH` | `/api/v1/me/profile` | user | `UpdateProfileDto` | updated profile |
 | `GET` | `/api/v1/users/:userId/public-profile` | optional/user by visibility | path id | public profile |
 | `GET` | `/api/v1/me/settings` | user | headers only | settings aggregate |
@@ -25,6 +26,15 @@
 
 - `visibilityStatus?: "public" | "members_only" | "private"`
 - `notifications?: { matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
+
+`GET /me/activity-summary` response:
+
+- `totals.activityCount`: count of user's personal match participation plus related team matches
+- `totals.teamCount`: active teams the user belongs to
+- `totals.mannerScore`: current user manner score, or `null`
+- `monthly.matchCount`: current-month personal and team match count
+- `monthly.mannerScore`: current manner score shown in the monthly card, or `null`
+- `monthly.winRate`: `null` until a v1 match result/win-loss source exists
 
 ## State And Copy
 

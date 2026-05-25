@@ -16,6 +16,12 @@ export class ProfileController {
     return this.profileService.me(user);
   }
 
+  @Get('me/activity-summary')
+  @UseGuards(V1AuthGuard)
+  activitySummary(@CurrentUser() user: V1AuthUser) {
+    return this.profileService.activitySummary(user);
+  }
+
   @Patch('me/profile')
   @UseGuards(V1AuthGuard)
   updateMe(@CurrentUser() user: V1AuthUser, @Body() dto: UpdateProfileDto) {

@@ -19,15 +19,14 @@ export const myUser = {
   intro: '퇴근 후에도 꾸준히 움직이는 팀 스포츠 유저',
   initials: '김',
   stats: [
-    { label: '참여 매치', value: 87, unit: '회' },
-    { label: '소속 팀', value: 3, unit: '팀' },
+    { label: '참여 매치', value: 0, unit: '회' },
+    { label: '소속 팀', value: 0, unit: '팀' },
     { label: '매너 점수', value: '-' },
-    { label: '신뢰', value: '-' },
   ],
   monthly: [
-    { label: '이번 달 경기', value: 12, unit: '회' },
-    { label: '이동 거리', value: 34, unit: 'km' },
-    { label: '승률', value: 68, unit: '%' },
+    { label: '이번 달 경기', value: 0, unit: '경기' },
+    { label: '매너 점수', value: '-' },
+    { label: '승률', value: '-' },
   ],
 };
 

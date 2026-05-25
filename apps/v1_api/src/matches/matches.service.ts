@@ -15,7 +15,7 @@ import {
   RejectMatchApplicationDto,
   WithdrawMatchApplicationDto,
 } from './dto/match-application.dto';
-import { MatchesQueryDto } from './dto/matches-query.dto';
+import { MatchesQueryDto, MyMatchesQueryDto } from './dto/matches-query.dto';
 import { CancelMatchDto, MutateMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
 
 type MatchWithRelations = V1Match & {
@@ -66,6 +66,54 @@ export class MatchesService {
       include: this.matchInclude(user),
     });
 
+    const pageItems = matches.slice(0, limit);
+    const hasNext = matches.length > limit;
+
+    return {
+      items: pageItems.map((match) => this.toListItem(match, user)),
+      pageInfo: {
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+        hasNext,
+      },
+    };
+  }
+
+  async myMatches(user: V1AuthUser, query: MyMatchesQueryDto) {
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const relationWhere: Prisma.V1MatchWhereInput =
+      query.mode === 'created'
+        ? { hostUserId: user.id }
+        : {
+            OR: [
+              {
+                participants: {
+                  some: {
+                    userId: user.id,
+                    role: 'participant',
+                    status: { in: ['active', 'completed'] },
+                  },
+                },
+              },
+              {
+                applications: {
+                  some: {
+                    applicantUserId: user.id,
+                    status: { in: ['requested', 'approved'] },
+                  },
+                },
+              },
+            ],
+          };
+    const matches = await this.prisma.v1Match.findMany({
+      where: {
+        deletedAt: null,
+        ...relationWhere,
+      },
+      orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      include: this.matchInclude(user),
+    });
     const pageItems = matches.slice(0, limit);
     const hasNext = matches.length > limit;
 

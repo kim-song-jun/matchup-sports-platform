@@ -11,6 +11,7 @@ import {
   useV1TeamMatchEdit,
   useV1UpdateTeamMatch,
 } from '@/hooks/use-v1-api';
+import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyTeam, V1TeamMatchEdit, V1TeamMatchMutationPayload } from '@/types/api';
 import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
@@ -33,6 +34,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const [regionId, setRegionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const myTeams = normalizeMyTeams(teams.data);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
   useEffect(() => {
     if (!selectedTeamId && myTeams?.[0]) setSelectedTeamId(myTeams[0].teamId);
@@ -43,8 +45,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   }, [selectedSportId, sports.data]);
 
   useEffect(() => {
-    if (!regionId && regions.data?.[0]) setRegionId(regions.data[0].id);
-  }, [regionId, regions.data]);
+    if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
+  }, [regionId, regionOptions]);
 
   const model = buildCreateModel({
     step,
@@ -54,7 +56,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     regionId,
     teams: myTeams?.map((team) => ({ id: team.teamId, name: team.name, sport: team.sport.name, members: team.memberCount, role: team.canCreateTeamMatch ? '생성 권한' : team.role })) ?? [],
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
-    regions: regions.data?.map((region) => ({ id: region.id, name: region.name })) ?? [],
+    regions: regionOptions,
     error,
     submitting: createTeamMatch.isPending,
     onSelectTeam: (teamName) => {

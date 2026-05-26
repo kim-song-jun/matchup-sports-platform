@@ -1,6 +1,8 @@
 import type { AuthExceptionKind, AuthExceptionViewModel, EmailLoginViewModel, LoginViewModel, OnboardingStep, OnboardingViewModel, SignupCompleteViewModel, SignupFormViewModel, TermsViewModel } from './auth.types';
 
 export function getLoginViewModel(): LoginViewModel {
+  const kakaoHref = buildKakaoAuthUrl();
+
   return {
     heroTitle: '같이 뛸 사람을\n한 번에 찾아요',
     heroSub: 'Teameet에 오신 걸 환영합니다',
@@ -8,11 +10,25 @@ export function getLoginViewModel(): LoginViewModel {
     guestHref: '/home',
     signupHref: '/terms',
     providers: [
-      { label: '카카오', background: '#FEE500', color: 'var(--static-black)', disabled: true },
+      { label: '카카오', background: '#FEE500', color: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
       { label: '네이버', background: 'var(--green500)', color: 'var(--static-white)', disabled: true },
       { label: 'Apple', background: 'var(--static-black)', color: 'var(--static-white)', disabled: true },
     ],
   };
+}
+
+function buildKakaoAuthUrl() {
+  const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+  const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+  if (!clientId || !redirectUri) return null;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+  });
+
+  return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 
 export function getEmailLoginViewModel(): EmailLoginViewModel {
@@ -118,7 +134,7 @@ export function getTermsViewModel(): TermsViewModel {
         required: false,
         checked: false,
         locationBased: true,
-        detail: '선택 시 브라우저 위치 권한을 요청하고, 현재 위치를 기준으로 가까운 매치와 팀을 추천할 수 있습니다. 거부해도 지역을 직접 선택해 계속 이용할 수 있습니다.',
+        detail: '선택 시 가까운 매치와 팀 추천에 위치 정보를 사용할 수 있습니다. 브라우저 위치 권한은 지역 설정 화면에서 별도로 요청하며, 거부해도 지역을 직접 선택해 계속 이용할 수 있습니다.',
       },
     ],
     primary: { label: '동의하고 회원가입하기', href: '/signup' },

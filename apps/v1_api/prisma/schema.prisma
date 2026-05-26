@@ -18,6 +18,8 @@ enum V1AccountStatus {
 enum V1OnboardingStatus {
   not_started
   terms_done
+  social_terms_required
+  social_profile_required
   signup_done
   sport_done
   level_done
@@ -201,7 +203,7 @@ model V1RuntimeCheck {
 
 model V1User {
   id               String             @id @default(uuid())
-  email            String             @unique
+  email            String?            @unique
   phone            String?            @unique
   accountStatus    V1AccountStatus    @default(active) @map("account_status")
   onboardingStatus V1OnboardingStatus @default(not_started) @map("onboarding_status")
@@ -382,6 +384,8 @@ model V1Region {
   code      String   @unique
   name      String
   level     Int
+  centerLat Float?   @map("center_lat")
+  centerLng Float?   @map("center_lng")
   isActive  Boolean  @default(true) @map("is_active")
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")

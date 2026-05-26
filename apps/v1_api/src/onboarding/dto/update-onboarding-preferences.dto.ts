@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -28,6 +29,25 @@ class RegionPreferenceDto {
   primary!: boolean;
 }
 
+class CurrentLocationDto {
+  @IsNumber()
+  latitude!: number;
+
+  @IsNumber()
+  longitude!: number;
+
+  @IsOptional()
+  @IsNumber()
+  accuracy?: number | null;
+
+  @IsString()
+  capturedAt!: string;
+
+  @IsOptional()
+  @IsUUID()
+  matchedRegionId?: string | null;
+}
+
 export class UpdateOnboardingPreferencesDto {
   @IsOptional()
   @IsArray()
@@ -46,4 +66,9 @@ export class UpdateOnboardingPreferencesDto {
   @IsString()
   @IsIn(['sport', 'level', 'region', 'confirm'])
   currentStep!: Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CurrentLocationDto)
+  currentLocation?: CurrentLocationDto | null;
 }

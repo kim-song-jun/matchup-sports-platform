@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChatIcon } from '@/components/v1-ui/icons';
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
+import { cssUrl } from '@/lib/assets';
 import type { HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
@@ -135,7 +136,7 @@ function FeaturedMatchCard({
     <Card pad={0} style={{ overflow: 'hidden' }}>
       <div
         className="tm-featured-media"
-        style={{ background: network ? 'var(--grey100)' : `url(${match.imageUrl}) center/cover` }}
+        style={{ background: network ? 'var(--grey100)' : `${cssUrl(match.imageUrl)} center/cover` }}
       >
         {!network ? (
           <div className="tm-featured-overlay">
@@ -182,7 +183,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
     <div className="tm-match-rail">
       {matches.map((match) => (
         <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
-          <div className="tm-match-card-media" style={{ background: `url(${match.imageUrl}) center/cover` }} />
+          <div className="tm-match-card-media" style={{ background: `${cssUrl(match.imageUrl)} center/cover` }} />
           <div style={{ padding: 12 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue500)' }}>{match.sportLabel}</div>
             <div className="tm-text-label line-clamp-2" style={{ color: 'var(--text-strong)', marginTop: 4, minHeight: 36 }}>

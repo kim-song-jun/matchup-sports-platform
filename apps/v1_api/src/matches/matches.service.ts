@@ -215,14 +215,14 @@ export class MatchesService {
   async create(user: V1AuthUser, dto: MutateMatchDto) {
     this.assertActiveAccount(user);
     const dates = this.validateMatchDates(dto);
-    await this.validateMasterRefs(dto.sportId, dto.regionId ?? null);
+    await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const match = await tx.v1Match.create({
         data: {
           hostUserId: user.id,
           sportId: dto.sportId,
-          regionId: dto.regionId ?? null,
+          regionId: dto.regionId,
           title: dto.title,
           description: dto.description ?? null,
           imageUrl: dto.imageUrl ?? null,
@@ -313,7 +313,7 @@ export class MatchesService {
     }
 
     const dates = this.validateMatchDates(dto);
-    await this.validateMasterRefs(dto.sportId, dto.regionId ?? null);
+    await this.validateMasterRefs(dto.sportId, dto.regionId);
     const participantCount = await this.getActiveParticipantCount(match.id);
 
     if (dto.capacity < participantCount) {
@@ -324,7 +324,7 @@ export class MatchesService {
       where: { id: match.id },
       data: {
         sportId: dto.sportId,
-        regionId: dto.regionId ?? null,
+        regionId: dto.regionId,
         title: dto.title,
         description: dto.description ?? null,
         imageUrl: dto.imageUrl ?? null,
@@ -872,7 +872,7 @@ export class MatchesService {
     return { startsAt, endsAt, deadlineAt };
   }
 
-  private async validateMasterRefs(sportId: string, regionId: string | null) {
+  private async validateMasterRefs(sportId: string, regionId: string) {
     const sport = await this.prisma.v1Sport.findFirst({
       where: { id: sportId, isActive: true },
       select: { id: true },
@@ -881,14 +881,12 @@ export class MatchesService {
       throw validationError('sportId is invalid or inactive', 'sportId');
     }
 
-    if (regionId) {
-      const region = await this.prisma.v1Region.findFirst({
-        where: { id: regionId, isActive: true },
-        select: { id: true },
-      });
-      if (!region) {
-        throw validationError('regionId is invalid or inactive', 'regionId');
-      }
+    const region = await this.prisma.v1Region.findFirst({
+      where: { id: regionId, isActive: true, level: 2 },
+      select: { id: true },
+    });
+    if (!region) {
+      throw validationError('regionId must be an active district region', 'regionId');
     }
   }
 

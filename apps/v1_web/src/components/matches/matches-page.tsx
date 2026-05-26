@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { cssUrl } from '@/lib/assets';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -163,7 +164,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   return (
     <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
       <article className="tm-match-detail">
-        <div className="tm-match-detail-hero" style={{ backgroundImage: `url(${match.image})` }}>
+        <div className="tm-match-detail-hero" style={{ backgroundImage: cssUrl(match.image) }}>
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/matches" aria-label="뒤로가기">
@@ -464,7 +465,7 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
 function MatchCardItem({ match, index }: { match: MatchCardModel; index: number }) {
   return (
     <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
-      <div className="tm-match-list-media" style={{ backgroundImage: `url(${match.image})` }}>
+      <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
         <span className="tm-badge tm-badge-blue">{index === 0 ? '추천' : match.sport}</span>
         <span className="tm-match-count-badge tab-num">{match.current}/{match.capacity}</span>
       </div>
@@ -548,7 +549,7 @@ function ImageUploadField({ image, onChange }: { image: string; onChange?: (valu
 
   return (
     <Card pad={0} style={{ marginTop: 14, overflow: 'hidden' }}>
-      <div className="tm-create-image-preview" style={{ backgroundImage: `url(${image})` }}>
+      <div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(image) }}>
         <span className="tm-badge tm-badge-grey">대표 이미지</span>
       </div>
       <div style={{ padding: 14 }}>
@@ -634,6 +635,7 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
   return (
     <div>
       <h1 className="tm-text-heading">장소와 시간</h1>
+      <RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} />
       <CreateField label="장소" value={draft.venue} placeholder="예: 한강공원 축구장, 동네 체육관 등" onChange={(value) => model.form?.onFieldChange('venue', value)} />
       <CreateField label="상세 주소" value={draft.address} placeholder="예: 서울 영등포구 여의동로 330" onChange={(value) => model.form?.onFieldChange('address', value)} />
       <CreateField label="날짜" value={draft.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} />
@@ -645,9 +647,23 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
   );
 }
 
+function RegionSelect({ value, regions, onChange }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void }) {
+  return (
+    <label className="tm-create-field">
+      <div className="tm-text-label">지역</div>
+      <select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}>
+        <option value="">시/군/구 선택</option>
+        {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+      </select>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색과 추천 기준이고, 장소와 상세 주소는 직접 입력합니다.</div>
+    </label>
+  );
+}
+
 function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
-  return <div><h1 className="tm-text-heading">작성된 내용을 확인해주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: `url(${draft.image})` }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시됩니다" /></Card></div>;
+  const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
+  return <div><h1 className="tm-text-heading">작성된 내용을 확인해주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용됩니다" /><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시됩니다" /></Card></div>;
 }
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {

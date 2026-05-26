@@ -14,9 +14,8 @@ export class MutateMatchDto {
   @IsUUID()
   sportId!: string;
 
-  @IsOptional()
   @IsUUID()
-  regionId?: string | null;
+  regionId!: string;
 
   @IsString()
   @MaxLength(80)

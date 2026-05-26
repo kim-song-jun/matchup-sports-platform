@@ -10,7 +10,7 @@ export class V1ApiError extends Error {
   readonly details: unknown;
 
   constructor(body: ApiErrorBody) {
-    super(body.message);
+    super(toErrorMessage(body.message));
     this.name = 'V1ApiError';
     this.statusCode = body.statusCode;
     this.code = body.code;
@@ -18,11 +18,23 @@ export class V1ApiError extends Error {
   }
 }
 
-const defaultBaseUrl = '/api/v1';
+function toErrorMessage(message: unknown) {
+  if (typeof message === 'string') return message;
+  if (Array.isArray(message)) return message.join(', ');
+  if (message && typeof message === 'object' && 'message' in message) {
+    return toErrorMessage((message as { message: unknown }).message);
+  }
+  return 'Request failed';
+}
+
+function getDefaultBaseUrl() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';
+  return `${basePath}/api/v1`;
+}
 
 export function getV1ApiBaseUrl() {
   const configured = process.env.NEXT_PUBLIC_API_URL;
-  if (!configured) return defaultBaseUrl;
+  if (!configured) return getDefaultBaseUrl();
   return configured.endsWith('/api/v1') ? configured : `${configured.replace(/\/$/, '')}/api/v1`;
 }
 

@@ -8,7 +8,7 @@ export type ApiErrorBody = {
   status: 'error';
   statusCode: number;
   code: string;
-  message: string;
+  message: unknown;
   details?: unknown;
   timestamp: string;
 };
@@ -31,9 +31,9 @@ export type TrustState = 'verified' | 'estimated' | 'sample';
 
 export type V1User = {
   id: string;
-  email: string;
+  email: string | null;
   displayName: string;
-  onboardingStatus: 'pending' | 'completed' | 'deferred';
+  onboardingStatus: string;
 };
 
 export type V1AuthMe = {
@@ -42,7 +42,7 @@ export type V1AuthMe = {
     email: string | null;
     phone?: string | null;
     accountStatus?: string;
-    onboardingStatus: 'pending' | 'completed' | 'deferred';
+    onboardingStatus: string;
     lastLoginAt?: string | null;
     createdAt?: string;
   };
@@ -62,6 +62,9 @@ export type V1DevLoginResponse = V1AuthMe & {
     userId: string;
     userEmail: string | null;
   };
+  next?: {
+    route: string;
+  };
 };
 
 export type V1AuthSessionResponse = V1DevLoginResponse;
@@ -78,7 +81,10 @@ export type V1Region = {
   code?: string;
   name: string;
   parentId: string | null;
-  level?: string;
+  level?: number;
+  centerLat?: number | null;
+  centerLng?: number | null;
+  parent?: { id: string; code?: string; name: string } | null;
   children?: V1Region[];
 };
 
@@ -88,6 +94,12 @@ export type V1MasterSportsResponse = {
 
 export type V1MasterRegionsResponse = {
   regions: Array<Omit<V1Region, 'parentId'> & { parentId?: string | null; children?: Array<Omit<V1Region, 'parentId' | 'children'> & { parentId?: string | null }> }>;
+};
+
+export type V1ResolveLocationResponse = {
+  region: V1Region | null;
+  source: 'kakao' | 'nearest' | 'none';
+  distanceMeters?: number | null;
 };
 
 export type V1OnboardingStep = 'terms' | 'signup' | 'sport' | 'level' | 'region' | 'confirm' | 'done';
@@ -115,6 +127,13 @@ export type V1OnboardingPreferencePayload = {
   sports?: Array<{ sportId: string; levelId?: string | null }>;
   regions?: Array<{ regionId: string; primary: boolean }>;
   currentStep: Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
+  currentLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number | null;
+    capturedAt: string;
+    matchedRegionId?: string | null;
+  } | null;
 };
 
 export type V1OnboardingMutationResult = {
@@ -254,7 +273,7 @@ export type V1MatchApplicationResult = {
 
 export type V1MatchMutationPayload = {
   sportId: string;
-  regionId?: string | null;
+  regionId: string;
   title: string;
   description?: string | null;
   imageUrl?: string | null;
@@ -776,7 +795,9 @@ export type V1NotificationPreferences = {
 export type V1Profile = {
   userId: string;
   accountStatus: string;
-  email: string;
+  email: string | null;
+  authProvider: 'email' | 'kakao' | 'naver' | null;
+  regionName: string | null;
   profile: {
     displayName: string;
     profileImageUrl: string | null;
@@ -790,7 +811,6 @@ export type V1Profile = {
     reviewCount: number;
   };
   displayName?: string;
-  regionName?: string;
   bio?: string;
   trustState?: TrustState;
 };

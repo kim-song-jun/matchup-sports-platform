@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { getEmailLoginViewModel, getLoginViewModel, getSignupCompleteViewModel, getSignupFormViewModel } from './auth.view-model';
 
 describe('auth view models', () => {
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+    delete process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+  });
+
   it('keeps the quick login entry path available for v1', () => {
     const model = getLoginViewModel();
 
@@ -14,6 +19,25 @@ describe('auth view models', () => {
       { label: 'Apple', disabled: true },
     ]);
     expect(model.providers.every((provider) => !('href' in provider))).toBe(true);
+  });
+
+  it('enables Kakao when Kakao OAuth env is configured', () => {
+    process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID = 'kakao-rest-key';
+    process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI = 'https://teameet.co.kr/v1/callback/kakao';
+
+    const model = getLoginViewModel();
+
+    expect(model.providers).toHaveLength(3);
+    expect(model.providers[0]).toMatchObject({
+      label: '카카오',
+      background: '#FEE500',
+      color: 'var(--static-black)',
+      disabled: false,
+    });
+    expect(model.providers[0].href).toBe(
+      'https://kauth.kakao.com/oauth/authorize?client_id=kakao-rest-key&redirect_uri=https%3A%2F%2Fteameet.co.kr%2Fv1%2Fcallback%2Fkakao&response_type=code',
+    );
+    expect(model.providers.slice(1).every((provider) => provider.disabled === true)).toBe(true);
   });
 
   it('keeps email login on a submit-driven real API flow', () => {

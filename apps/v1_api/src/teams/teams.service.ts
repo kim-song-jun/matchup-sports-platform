@@ -990,11 +990,11 @@ export class TeamsService {
 
     if (regionId) {
       const region = await this.prisma.v1Region.findFirst({
-        where: { id: regionId, isActive: true },
+        where: { id: regionId, isActive: true, level: 2 },
         select: { id: true },
       });
       if (!region) {
-        throw validationError('regionId is invalid or inactive', 'regionId');
+        throw validationError('regionId must be an active district region', 'regionId');
       }
     }
   }

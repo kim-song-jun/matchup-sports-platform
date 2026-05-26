@@ -101,31 +101,93 @@ async function seedSports() {
 }
 
 async function seedRegions() {
-  const seoul = await prisma.v1Region.upsert({
-    where: { code: 'seoul' },
-    update: { name: '서울', level: 1, isActive: true, sortOrder: 1 },
-    create: { code: 'seoul', name: '서울', level: 1, isActive: true, sortOrder: 1 },
-  });
+  const parents = [
+    ['seoul', '서울', 1, 37.5665, 126.9780],
+    ['gyeonggi', '경기', 2, 37.4138, 127.5183],
+  ] as const;
+  const parentIds: Record<string, string> = {};
 
-  const gyeonggi = await prisma.v1Region.upsert({
-    where: { code: 'gyeonggi' },
-    update: { name: '경기', level: 1, isActive: true, sortOrder: 2 },
-    create: { code: 'gyeonggi', name: '경기', level: 1, isActive: true, sortOrder: 2 },
-  });
+  for (const [code, name, sortOrder, centerLat, centerLng] of parents) {
+    const region = await prisma.v1Region.upsert({
+      where: { code },
+      update: { parentId: null, name, level: 1, centerLat, centerLng, isActive: true, sortOrder },
+      create: { code, name, level: 1, centerLat, centerLng, isActive: true, sortOrder },
+    });
+
+    parentIds[code] = region.id;
+  }
 
   const childRegions = [
-    [seoul.id, 'seoul-gangnam', '강남구', 1],
-    [seoul.id, 'seoul-songpa', '송파구', 2],
-    [seoul.id, 'seoul-mapo', '마포구', 3],
-    [gyeonggi.id, 'gyeonggi-seongnam', '성남시', 1],
-    [gyeonggi.id, 'gyeonggi-suwon', '수원시', 2],
+    ['seoul', 'seoul-jongno', '종로구', 1, 37.5735, 126.9788],
+    ['seoul', 'seoul-jung', '중구', 2, 37.5636, 126.9976],
+    ['seoul', 'seoul-yongsan', '용산구', 3, 37.5326, 126.9905],
+    ['seoul', 'seoul-seongdong', '성동구', 4, 37.5633, 127.0369],
+    ['seoul', 'seoul-gwangjin', '광진구', 5, 37.5384, 127.0823],
+    ['seoul', 'seoul-dongdaemun', '동대문구', 6, 37.5744, 127.0396],
+    ['seoul', 'seoul-jungnang', '중랑구', 7, 37.6063, 127.0927],
+    ['seoul', 'seoul-seongbuk', '성북구', 8, 37.5894, 127.0167],
+    ['seoul', 'seoul-gangbuk', '강북구', 9, 37.6396, 127.0257],
+    ['seoul', 'seoul-dobong', '도봉구', 10, 37.6688, 127.0471],
+    ['seoul', 'seoul-nowon', '노원구', 11, 37.6542, 127.0568],
+    ['seoul', 'seoul-eunpyeong', '은평구', 12, 37.6027, 126.9291],
+    ['seoul', 'seoul-seodaemun', '서대문구', 13, 37.5791, 126.9368],
+    ['seoul', 'seoul-mapo', '마포구', 14, 37.5663, 126.9019],
+    ['seoul', 'seoul-yangcheon', '양천구', 15, 37.5169, 126.8664],
+    ['seoul', 'seoul-gangseo', '강서구', 16, 37.5509, 126.8495],
+    ['seoul', 'seoul-guro', '구로구', 17, 37.4955, 126.8877],
+    ['seoul', 'seoul-geumcheon', '금천구', 18, 37.4569, 126.8958],
+    ['seoul', 'seoul-yeongdeungpo', '영등포구', 19, 37.5264, 126.8962],
+    ['seoul', 'seoul-dongjak', '동작구', 20, 37.5124, 126.9393],
+    ['seoul', 'seoul-gwanak', '관악구', 21, 37.4784, 126.9516],
+    ['seoul', 'seoul-seocho', '서초구', 22, 37.4836, 127.0327],
+    ['seoul', 'seoul-gangnam', '강남구', 23, 37.5172, 127.0473],
+    ['seoul', 'seoul-songpa', '송파구', 24, 37.5145, 127.1059],
+    ['seoul', 'seoul-gangdong', '강동구', 25, 37.5301, 127.1238],
+    ['gyeonggi', 'gyeonggi-suwon', '수원시', 1, 37.2636, 127.0286],
+    ['gyeonggi', 'gyeonggi-seongnam', '성남시', 2, 37.4201, 127.1265],
+    ['gyeonggi', 'gyeonggi-uijeongbu', '의정부시', 3, 37.7381, 127.0337],
+    ['gyeonggi', 'gyeonggi-anyang', '안양시', 4, 37.3943, 126.9568],
+    ['gyeonggi', 'gyeonggi-bucheon', '부천시', 5, 37.5035, 126.7660],
+    ['gyeonggi', 'gyeonggi-gwangmyeong', '광명시', 6, 37.4786, 126.8646],
+    ['gyeonggi', 'gyeonggi-pyeongtaek', '평택시', 7, 36.9921, 127.1127],
+    ['gyeonggi', 'gyeonggi-dongducheon', '동두천시', 8, 37.9037, 127.0606],
+    ['gyeonggi', 'gyeonggi-ansan', '안산시', 9, 37.3219, 126.8309],
+    ['gyeonggi', 'gyeonggi-goyang', '고양시', 10, 37.6584, 126.8320],
+    ['gyeonggi', 'gyeonggi-gwacheon', '과천시', 11, 37.4292, 126.9877],
+    ['gyeonggi', 'gyeonggi-guri', '구리시', 12, 37.5943, 127.1296],
+    ['gyeonggi', 'gyeonggi-namyangju', '남양주시', 13, 37.6360, 127.2165],
+    ['gyeonggi', 'gyeonggi-osan', '오산시', 14, 37.1498, 127.0772],
+    ['gyeonggi', 'gyeonggi-siheung', '시흥시', 15, 37.3800, 126.8029],
+    ['gyeonggi', 'gyeonggi-gunpo', '군포시', 16, 37.3617, 126.9352],
+    ['gyeonggi', 'gyeonggi-uiwang', '의왕시', 17, 37.3449, 126.9683],
+    ['gyeonggi', 'gyeonggi-hanam', '하남시', 18, 37.5393, 127.2149],
+    ['gyeonggi', 'gyeonggi-yongin', '용인시', 19, 37.2411, 127.1776],
+    ['gyeonggi', 'gyeonggi-paju', '파주시', 20, 37.7599, 126.7799],
+    ['gyeonggi', 'gyeonggi-icheon', '이천시', 21, 37.2723, 127.4350],
+    ['gyeonggi', 'gyeonggi-anseong', '안성시', 22, 37.0080, 127.2797],
+    ['gyeonggi', 'gyeonggi-gimpo', '김포시', 23, 37.6153, 126.7156],
+    ['gyeonggi', 'gyeonggi-hwaseong', '화성시', 24, 37.1996, 126.8310],
+    ['gyeonggi', 'gyeonggi-gwangju', '광주시', 25, 37.4294, 127.2550],
+    ['gyeonggi', 'gyeonggi-yangju', '양주시', 26, 37.7853, 127.0458],
+    ['gyeonggi', 'gyeonggi-pocheon', '포천시', 27, 37.8949, 127.2003],
+    ['gyeonggi', 'gyeonggi-yeoju', '여주시', 28, 37.2983, 127.6371],
+    ['gyeonggi', 'gyeonggi-yeoncheon', '연천군', 29, 38.0964, 127.0750],
+    ['gyeonggi', 'gyeonggi-gapyeong', '가평군', 30, 37.8315, 127.5099],
+    ['gyeonggi', 'gyeonggi-yangpyeong', '양평군', 31, 37.4917, 127.4876],
   ] as const;
 
-  for (const [parentId, code, name, sortOrder] of childRegions) {
+  const childCodes = childRegions.map(([, code]) => code);
+  await prisma.v1Region.updateMany({
+    where: { level: 2, code: { notIn: childCodes } },
+    data: { isActive: false },
+  });
+
+  for (const [parentCode, code, name, sortOrder, centerLat, centerLng] of childRegions) {
+    const parentId = parentIds[parentCode];
     await prisma.v1Region.upsert({
       where: { code },
-      update: { parentId, name, level: 2, isActive: true, sortOrder },
-      create: { parentId, code, name, level: 2, isActive: true, sortOrder },
+      update: { parentId, name, level: 2, centerLat, centerLng, isActive: true, sortOrder },
+      create: { parentId, code, name, level: 2, centerLat, centerLng, isActive: true, sortOrder },
     });
   }
 

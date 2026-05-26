@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
@@ -195,7 +196,7 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
         onPointerCancel={handlePointerEnd}
       >
         <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick}>
-          <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: `url(${room.avatarUrl})` } : undefined}>{room.avatarUrl ? null : room.initials}</div>
+          <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue">고정</span> : null}</div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>

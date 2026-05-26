@@ -1,0 +1,3 @@
+ALTER TABLE "v1_regions"
+ADD COLUMN "center_lat" DOUBLE PRECISION,
+ADD COLUMN "center_lng" DOUBLE PRECISION;

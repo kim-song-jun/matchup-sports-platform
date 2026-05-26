@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam } from '@/hooks/use-v1-api';
+import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
 import { TeamFormPageView } from './teams-page';
 import type { TeamFormViewModel } from './teams.types';
@@ -20,14 +21,15 @@ export function TeamCreatePageClient() {
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
   const [error, setError] = useState<string | null>(null);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
   useEffect(() => {
     if (!sportId && sports.data?.[0]) setSportId(sports.data[0].id);
   }, [sportId, sports.data]);
 
   useEffect(() => {
-    if (!regionId && regions.data?.[0]) setRegionId(regions.data[0].id);
-  }, [regionId, regions.data]);
+    if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
+  }, [regionId, regionOptions]);
 
   const model = buildModel({
     mode: 'create',
@@ -36,7 +38,7 @@ export function TeamCreatePageClient() {
     regionId,
     joinPolicy,
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
-    regions: regions.data?.map((region) => ({ id: region.id, name: region.name })) ?? [],
+    regions: regionOptions,
     error,
     submitting: createTeam.isPending,
     setDraft,
@@ -176,7 +178,14 @@ function buildModel({
         setSportId(nextSportId);
         if (sport) setDraft((current) => ({ ...current, sport: sport.name, sports: [sport.name] }));
       },
-      onRegionChange: setRegionId,
+      onRegionChange: (nextRegionId) => {
+        const region = regions.find((item) => item.id === nextRegionId);
+        setRegionId(nextRegionId);
+        if (region) {
+          const [city, ...countyParts] = region.name.split(' ');
+          setDraft((current) => ({ ...current, region: region.name, city, county: countyParts.join(' ') }));
+        }
+      },
       onJoinPolicyChange: setJoinPolicy,
       onSubmit,
       submitting,

@@ -41,6 +41,7 @@ import type {
   V1OnboardingPreferencePayload,
   V1Profile,
   V1Region,
+  V1ResolveLocationResponse,
   V1RecentSearch,
   V1RecentSearchesResponse,
   V1Settings,
@@ -104,6 +105,23 @@ export function useV1Register() {
   return useMutation({
     mutationFn: (body: { nickname: string; email: string; password: string; gender: 'male' | 'female'; requiredTermsAccepted: boolean }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1CompleteSocialProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { nickname: string; gender: 'male' | 'female' }) =>
+      v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1CompleteSocialTerms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { requiredTermsAccepted: boolean }) => v1Post<V1AuthSessionResponse>('/auth/social-terms', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -175,6 +193,13 @@ export function useV1MasterRegions() {
         ...(region.children ?? []).map((child) => ({ ...child, parentId: child.parentId ?? region.id })),
       ]);
     },
+  });
+}
+
+export function useV1ResolveLocation() {
+  return useMutation({
+    mutationFn: (body: { latitude: number; longitude: number }) =>
+      v1Post<V1ResolveLocationResponse>('/master/regions/resolve-location', body),
   });
 }
 

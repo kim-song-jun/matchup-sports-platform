@@ -45,6 +45,8 @@ export function buildOnboardingSummary(input: {
   const currentStep =
     input.onboardingStatus === 'completed'
       ? 'done'
+      : input.onboardingStatus === 'social_terms_required' || input.onboardingStatus === 'social_profile_required'
+        ? statusStep
       : normalizeStep(input.currentStep) ?? statusStep;
 
   return {
@@ -133,7 +135,10 @@ function stepFromStatus(status: V1OnboardingStatus): V1OnboardingStep {
   switch (status) {
     case 'not_started':
     case 'terms_done':
+    case 'social_terms_required':
       return 'terms';
+    case 'social_profile_required':
+      return 'signup';
     case 'signup_done':
       return 'sport';
     case 'sport_done':

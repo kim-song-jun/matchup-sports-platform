@@ -56,6 +56,7 @@ describe('MatchesController', () => {
   it('creates a match', async () => {
     const dto = {
       sportId: '00000000-0000-4000-8000-000000000001',
+      regionId: '00000000-0000-4000-8000-000000000002',
       title: '러닝 매치',
       startsAt: '2026-06-01T10:00:00.000Z',
       capacity: 6,
@@ -119,6 +120,7 @@ describe('MatchesController', () => {
   it('updates a match', async () => {
     const dto = {
       sportId: '00000000-0000-4000-8000-000000000001',
+      regionId: '00000000-0000-4000-8000-000000000002',
       title: '수정된 매치',
       startsAt: '2026-06-01T10:00:00.000Z',
       capacity: 6,

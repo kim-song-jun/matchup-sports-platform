@@ -799,8 +799,8 @@ export class TeamMatchesService {
   private async validateMasterRefs(sportId: string, regionId: string) {
     const sport = await this.prisma.v1Sport.findFirst({ where: { id: sportId, isActive: true }, select: { id: true } });
     if (!sport) throw validationError('sportId is invalid or inactive', 'sportId');
-    const region = await this.prisma.v1Region.findFirst({ where: { id: regionId, isActive: true }, select: { id: true } });
-    if (!region) throw validationError('regionId is invalid or inactive', 'regionId');
+    const region = await this.prisma.v1Region.findFirst({ where: { id: regionId, isActive: true, level: 2 }, select: { id: true } });
+    if (!region) throw validationError('regionId must be an active district region', 'regionId');
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {

@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { useV1CompleteSocialTerms } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { saveSignupTermsAccepted } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
@@ -10,12 +12,15 @@ import { getTermsViewModel } from './auth.view-model';
 export function TermsClient() {
   const model = getTermsViewModel();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const socialTerms = useV1CompleteSocialTerms();
+  const mode = searchParams.get('mode');
+  const isSocialMode = mode === 'social';
   const [checkedByTitle, setCheckedByTitle] = useState(() =>
     Object.fromEntries(model.agreements.map((agreement) => [agreement.title, false])),
   );
   const [openByTitle, setOpenByTitle] = useState<Record<string, boolean>>({});
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'requesting' | 'allowed' | 'denied' | 'unsupported'>('idle');
-  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const requiredAccepted = useMemo(
     () => model.agreements.every((agreement) => !agreement.required || checkedByTitle[agreement.title]),
@@ -30,38 +35,35 @@ export function TermsClient() {
     }));
   };
 
-  const requestLocation = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setLocationStatus('unsupported');
-      setLocationLabel(null);
-      return;
-    }
-
-    setLocationStatus('requesting');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocationStatus('allowed');
-        setLocationLabel(`${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`);
-      },
-      () => {
-        setLocationStatus('denied');
-        setLocationLabel(null);
-      },
-      { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
-    );
-  };
-
   const toggleAgreement = (title: string, nextChecked: boolean, locationBased?: boolean) => {
     setCheckedByTitle((current) => ({ ...current, [title]: nextChecked }));
 
     if (locationBased && nextChecked) {
-      requestLocation();
       setOpenByTitle((current) => ({ ...current, [title]: true }));
     }
   };
 
   const continueToSignup = () => {
     if (!requiredAccepted) {
+      return;
+    }
+
+    setError(null);
+    if (isSocialMode) {
+      socialTerms.mutate(
+        { requiredTermsAccepted: true },
+        {
+          onSuccess: (result) => router.push(result.next?.route ?? '/signup/social'),
+          onError: (nextError) => {
+            if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
+              setError('가입 시간이 만료되었습니다. 카카오 로그인부터 다시 진행해 주세요.');
+              return;
+            }
+
+            setError(nextError instanceof Error ? nextError.message : '약관 동의를 저장하지 못했습니다.');
+          },
+        },
+      );
       return;
     }
 
@@ -72,16 +74,22 @@ export function TermsClient() {
   return (
     <AuthFrame
       topTitle="약관 동의"
-      backHref={model.backHref}
+      backHref={isSocialMode ? undefined : model.backHref}
       fixedAction={
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!requiredAccepted} onClick={continueToSignup} type="button">
-          {requiredAccepted ? model.primary.label : '필수 약관 동의 후 가능'}
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!requiredAccepted || socialTerms.isPending} onClick={continueToSignup} type="button">
+          {socialTerms.isPending ? '저장 중' : requiredAccepted ? model.primary.label : '필수 약관 동의 후 가능'}
         </button>
       }
     >
       <div className="tm-auth-body">
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
+        {error ? (
+          <div className="tm-auth-soft-card tm-auth-soft-card-error">
+            <div className="tm-text-body-lg">약관을 저장하지 못했어요</div>
+            <div className="tm-text-caption">{error}</div>
+          </div>
+        ) : null}
         <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setRequired(!requiredChecked)} type="button">
           <TermsCheck checked={requiredChecked} />
           <span className="tm-text-body-lg">필수 약관 전체 동의</span>
@@ -123,7 +131,7 @@ export function TermsClient() {
                 {open ? (
                   <div className="tm-auth-agreement-detail">
                     <div className="tm-text-caption">{item.detail}</div>
-                    {item.locationBased ? <LocationConsentStatus status={locationStatus} label={locationLabel} checked={checked} /> : null}
+                    {item.locationBased ? <LocationConsentStatus checked={checked} /> : null}
                   </div>
                 ) : null}
               </div>
@@ -139,21 +147,14 @@ function TermsCheck({ checked }: { checked: boolean }) {
   return <span className={`tm-auth-check ${checked ? 'tm-auth-check-on' : ''}`}>✓</span>;
 }
 
-function LocationConsentStatus({ status, label, checked }: { status: 'idle' | 'requesting' | 'allowed' | 'denied' | 'unsupported'; label: string | null; checked: boolean }) {
+function LocationConsentStatus({ checked }: { checked: boolean }) {
   if (!checked) {
     return null;
   }
 
-  const text =
-    status === 'requesting'
-      ? '현재 위치 권한을 확인하는 중입니다.'
-      : status === 'allowed'
-        ? `위치 확인 완료${label ? ` · ${label}` : ''}`
-        : status === 'denied'
-          ? '위치 권한이 거부되었습니다. 지역 직접 선택으로 계속 이용할 수 있습니다.'
-          : status === 'unsupported'
-            ? '이 브라우저에서는 위치 확인을 지원하지 않습니다.'
-            : '위치 기반 추천을 사용할 준비가 되었습니다.';
-
-  return <div className={`tm-auth-location-status tm-auth-location-status-${status} tm-text-caption`}>{text}</div>;
+  return (
+    <div className="tm-auth-location-status tm-auth-location-status-allowed tm-text-caption">
+      위치 기반 서비스 약관에 동의했습니다. 브라우저 위치 권한은 지역 설정 화면에서 별도로 선택할 수 있습니다.
+    </div>
+  );
 }

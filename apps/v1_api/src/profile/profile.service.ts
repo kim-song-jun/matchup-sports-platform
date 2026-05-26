@@ -256,6 +256,14 @@ export class ProfileService {
       include: {
         profile: true,
         reputationSummary: true,
+        regions: {
+          include: {
+            region: {
+              include: { parent: true },
+            },
+          },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
         authIdentities: { where: { status: 'active' }, select: { provider: true } },
       },
     });
@@ -286,9 +294,26 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
     userId: user.id,
     accountStatus: user.accountStatus,
     email: user.email,
+    authProvider: user.authIdentities[0]?.provider ?? null,
+    regionName: formatPrimaryRegion(user.regions),
     profile: toProfilePayload(user.profile),
     reputation: toReputationPayload(user.reputationSummary),
   };
+}
+
+function formatPrimaryRegion(
+  regions: Array<{
+    region: {
+      name: string;
+      parent: { name: string } | null;
+    };
+  }>,
+) {
+  const primary = regions[0];
+  if (!primary) return null;
+  return primary.region.parent?.name
+    ? `${primary.region.parent.name} ${primary.region.name}`
+    : primary.region.name;
 }
 
 function toProfilePayload(profile: {

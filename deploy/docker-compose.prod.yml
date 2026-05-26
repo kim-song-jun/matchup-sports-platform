@@ -155,6 +155,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}
       JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       API_PORT: 8121
       NODE_ENV: production
     healthcheck:
@@ -186,6 +189,8 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: /v1/api/v1
       NEXT_PUBLIC_BASE_PATH: /v1
+      NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       INTERNAL_API_ORIGIN: ${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}
       HOSTNAME: 0.0.0.0
       PORT: 3013

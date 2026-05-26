@@ -322,6 +322,7 @@ export const v1ProfileFixture: V1Profile = {
   userId: 'user-1',
   accountStatus: 'active',
   email: 'host@teameet.v1',
+  authProvider: 'email',
   profile: {
     displayName: '송준',
     profileImageUrl: null,

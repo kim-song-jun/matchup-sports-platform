@@ -301,7 +301,8 @@ function toMyHomeModel(
     user: {
       ...myHomeModel.user,
       name: displayName,
-      handle: profile.email,
+      handle: profile.email ?? authProviderLabel(profile.authProvider),
+      region: profile.regionName ?? myHomeModel.user.region,
       initials: initials(displayName),
       intro: profile.profile.bio ?? myHomeModel.user.intro,
       stats: [
@@ -450,6 +451,12 @@ function formatScore(value: number | null | undefined) {
 function formatWinRate(value: number | null | undefined) {
   if (typeof value !== 'number') return '-';
   return `${Math.round(value)}%`;
+}
+
+function authProviderLabel(provider: V1Profile['authProvider']) {
+  if (provider === 'kakao') return '카카오 로그인';
+  if (provider === 'naver') return '네이버 로그인';
+  return '소셜 로그인';
 }
 
 function initials(value: string) {

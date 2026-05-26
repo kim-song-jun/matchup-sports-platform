@@ -10,6 +10,7 @@ import {
   useV1MatchEdit,
   useV1UpdateMatch,
 } from '@/hooks/use-v1-api';
+import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MatchEdit, V1MatchMutationPayload } from '@/types/api';
 import { MatchCreatePageView } from './matches-page';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
@@ -34,13 +35,15 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     if (!selectedSportId && sports.data?.[0]) setSelectedSportId(sports.data[0].id);
   }, [selectedSportId, sports.data]);
 
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+
   const model = buildCreateModel({
     step,
     draft,
     selectedSportId,
     regionId,
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
-    regions: regions.data?.map((region) => ({ id: region.id, name: region.name })) ?? [],
+    regions: regionOptions,
     error,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
@@ -55,7 +58,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload) {
-        setError('종목, 제목, 장소, 날짜와 시간을 확인해주세요.');
+        setError('종목, 지역, 제목, 장소, 날짜와 시간을 확인해주세요.');
         return;
       }
       createMatch.mutate(payload, {
@@ -282,7 +285,7 @@ function draftFromEdit(edit: V1MatchEdit): MatchDraft {
 }
 
 function buildPayload(draft: MatchDraft, sportId: string, regionId: string): V1MatchMutationPayload | null {
-  if (!sportId || !draft.title.trim() || !draft.venue.trim() || !draft.date || !draft.startTime) return null;
+  if (!sportId || !regionId || !draft.title.trim() || !draft.venue.trim() || !draft.date || !draft.startTime) return null;
 
   const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
   const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
@@ -290,7 +293,7 @@ function buildPayload(draft: MatchDraft, sportId: string, regionId: string): V1M
 
   return {
     sportId,
-    regionId: regionId || null,
+    regionId,
     title: draft.title.trim(),
     description: draft.description.trim() || null,
     imageUrl: draft.image || null,

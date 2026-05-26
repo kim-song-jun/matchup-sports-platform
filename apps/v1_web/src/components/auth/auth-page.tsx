@@ -20,10 +20,14 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
           <p className="tm-text-body tm-auth-center">
             아직 계정이 없나요? <Link href={model.signupHref}>회원가입</Link>
           </p>
-          <AuthDivider />
-          <div className="tm-auth-provider-row">
-            {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
-          </div>
+          {model.providers.length > 0 ? (
+            <>
+              <AuthDivider />
+              <div className="tm-auth-provider-row">
+                {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
+              </div>
+            </>
+          ) : null}
           {devLogin}
           <p className="tm-text-caption tm-auth-policy">계속하면 서비스 약관과 개인정보 처리방침에 동의합니다.</p>
         </div>
@@ -202,8 +206,16 @@ function AuthSmallAction({ action }: { action: AuthAction }) {
 function ProviderButton({ provider }: { provider: LoginProvider }) {
   const style = { background: provider.background, color: provider.color };
 
+  if (provider.href?.startsWith('http') && !provider.disabled) {
+    return (
+      <a className="tm-btn tm-btn-md tm-pressable" href={provider.href} style={style}>
+        {provider.label}
+      </a>
+    );
+  }
+
   return provider.href && !provider.disabled ? (
-    <Link className="tm-btn tm-btn-md tm-pressable" href={provider.href} style={style}>
+    <Link className="tm-btn tm-btn-md tm-pressable" href={provider.href} prefetch={false} style={style}>
       {provider.label}
     </Link>
   ) : (

@@ -9,8 +9,10 @@ import {
   useV1MasterRegions,
   useV1MasterSports,
   useV1Onboarding,
+  useV1ResolveLocation,
   useV1SaveOnboardingPreferences,
 } from '@/hooks/use-v1-api';
+import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1OnboardingPreferencePayload, V1OnboardingStep } from '@/types/api';
 import { AuthFrame } from './auth-page';
 
@@ -19,7 +21,19 @@ type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level
 type OnboardingDraft = {
   sports: Array<{ sportId: string; levelId: string | null }>;
   regions: Array<{ regionId: string; primary: boolean }>;
+  currentLocation?: CurrentLocationDraft | null;
 };
+
+type CurrentLocationDraft = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  capturedAt: string;
+  matchedRegionId?: string | null;
+  matchedRegionName?: string | null;
+};
+
+type LocationStatus = 'idle' | 'requesting' | 'allowed' | 'denied' | 'unsupported' | 'unmatched';
 
 const draftKey = 'teameet.v1.onboardingDraft';
 
@@ -59,9 +73,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const savePreferences = useV1SaveOnboardingPreferences();
   const completeOnboarding = useV1CompleteOnboarding();
   const deferOnboarding = useV1DeferOnboarding();
+  const resolveLocation = useV1ResolveLocation();
   const [draft, setDraft] = useState<OnboardingDraft>({ sports: [], regions: [] });
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
 
   useEffect(() => {
     if (hydrated || !onboarding.data) return;
@@ -69,6 +85,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     const initial = stored ?? {
       sports: onboarding.data.sports.map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })),
       regions: onboarding.data.regions.map((region) => ({ regionId: region.regionId, primary: region.primary })),
+      currentLocation: null,
     };
     setDraft(initial);
     setHydrated(true);
@@ -79,7 +96,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   }, [draft, hydrated]);
 
   const sports = sportsQuery.data ?? [];
-  const regions = (regionsQuery.data ?? []).filter((region) => region.parentId !== null);
+  const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
   const selectedSportIds = new Set(draft.sports.map((sport) => sport.sportId));
   const selectedRegionIds = new Set(draft.regions.map((region) => region.regionId));
   const missingLevels = draft.sports.some((sport) => !sport.levelId);
@@ -92,7 +109,20 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const saveAndGo = (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => {
     setError(null);
     savePreferences.mutate(
-      { sports: draft.sports, regions: draft.regions, currentStep },
+      {
+        sports: draft.sports,
+        regions: draft.regions,
+        currentStep,
+        currentLocation: draft.currentLocation
+          ? {
+              latitude: draft.currentLocation.latitude,
+              longitude: draft.currentLocation.longitude,
+              accuracy: draft.currentLocation.accuracy,
+              capturedAt: draft.currentLocation.capturedAt,
+              matchedRegionId: draft.currentLocation.matchedRegionId ?? null,
+            }
+          : null,
+      },
       {
         onSuccess: () => router.push(href),
         onError: (nextError) => setError(getErrorMessage(nextError)),
@@ -120,6 +150,65 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       },
       onError: (nextError) => setError(getErrorMessage(nextError)),
     });
+  };
+
+  const requestCurrentLocation = () => {
+    setError(null);
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocationStatus('unsupported');
+      return;
+    }
+
+    setLocationStatus('requesting');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
+          capturedAt: new Date().toISOString(),
+        };
+        resolveLocation.mutate(
+          { latitude: nextLocation.latitude, longitude: nextLocation.longitude },
+          {
+            onSuccess: (result) => {
+              const matchedRegionId = result.region?.id ?? null;
+              const matchedRegionName = result.region
+                ? result.region.parent?.name
+                  ? `${result.region.parent.name} ${result.region.name}`
+                  : result.region.name
+                : null;
+
+              setDraft((current) => ({
+                ...upsertPrimaryRegion(current, matchedRegionId),
+                currentLocation: {
+                  ...nextLocation,
+                  matchedRegionId,
+                  matchedRegionName,
+                },
+              }));
+              setLocationStatus(matchedRegionId ? 'allowed' : 'unmatched');
+            },
+            onError: () => {
+              setDraft((current) => ({
+                ...current,
+                currentLocation: {
+                  ...nextLocation,
+                  matchedRegionId: null,
+                  matchedRegionName: null,
+                },
+              }));
+              setLocationStatus('unmatched');
+            },
+          },
+        );
+      },
+      () => {
+        setLocationStatus('denied');
+      },
+      { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
+    );
   };
 
   const fixedAction = (
@@ -193,7 +282,10 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         ) : null}
         {step === 'region' ? (
           <>
-            <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" onClick={() => router.push('/auth/location-denied')} type="button">현재 위치로 찾기</button>
+            <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" disabled={locationStatus === 'requesting'} onClick={requestCurrentLocation} type="button">
+              {locationStatus === 'requesting' ? '현재 위치 확인 중' : '현재 위치로 찾기'}
+            </button>
+            <LocationNotice location={draft.currentLocation ?? null} status={locationStatus} />
             <div className="tm-auth-chip-wrap">
               {regions.map((region) => (
                 <button
@@ -202,14 +294,13 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   onClick={() => setDraft((current) => toggleRegion(current, region.id))}
                   type="button"
                 >
-                  {region.name}
-                </button>
-              ))}
-            </div>
-            <Notice title="위치 권한 예외" body="권한 거부 시 선택한 종목과 실력은 유지하고 수동 지역 선택으로 복구합니다." tone="orange" />
+              {region.name}
+            </button>
+          ))}
+        </div>
           </>
         ) : null}
-        {step === 'confirm' ? <ConfirmPanel draft={draft} regions={regionsQuery.data ?? []} sports={sports} /> : null}
+        {step === 'confirm' ? <ConfirmPanel draft={draft} regions={regions} sports={sports} /> : null}
       </div>
     </AuthFrame>
   );
@@ -304,9 +395,41 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
     <div className="tm-auth-stack">
       <Card pad={15}><div className="tm-text-label">관심 종목과 실력</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sportSummary || '선택 필요'}</div></Card>
       <Card pad={15}><div className="tm-text-label">활동 지역</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{regionSummary || '선택 안 함'}</div></Card>
+      {draft.currentLocation ? (
+        <Card pad={15}>
+          <div className="tm-text-label">현재 위치</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>
+            {formatLocation(draft.currentLocation)}
+          </div>
+        </Card>
+      ) : null}
       <Notice title="완료 상태" body="홈 진입 후에도 설정에서 종목, 실력, 지역을 수정할 수 있습니다." tone="green" />
     </div>
   );
+}
+
+function LocationNotice({ location, status }: { location: CurrentLocationDraft | null; status: LocationStatus }) {
+  if (status === 'requesting') {
+    return <Notice title="현재 위치 확인 중" body="브라우저 위치 권한을 확인하고 있습니다." />;
+  }
+
+  if (status === 'denied') {
+    return <Notice title="위치 권한 거부" body="브라우저에서 위치 권한이 거부되었습니다. 지역을 직접 선택해 계속할 수 있습니다." tone="orange" />;
+  }
+
+  if (status === 'unsupported') {
+    return <Notice title="위치 확인 불가" body="이 브라우저에서는 현재 위치 확인을 지원하지 않습니다. 지역을 직접 선택해 주세요." tone="orange" />;
+  }
+
+  if (status === 'unmatched' && location) {
+    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았습니다.`} tone="orange" />;
+  }
+
+  if (location) {
+    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · ${location.matchedRegionName ?? '가까운 지역'}을 선택했습니다.`} tone="green" />;
+  }
+
+  return <Notice title="위치 권한" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택합니다. 거부해도 직접 선택할 수 있습니다." />;
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
@@ -344,6 +467,21 @@ function toggleRegion(draft: OnboardingDraft, regionId: string): OnboardingDraft
     ...draft,
     regions: next.map((region, index) => ({ ...region, primary: index === 0 })),
   };
+}
+
+function upsertPrimaryRegion(draft: OnboardingDraft, regionId: string | null): OnboardingDraft {
+  if (!regionId) return draft;
+
+  const existing = draft.regions.filter((region) => region.regionId !== regionId);
+  return {
+    ...draft,
+    regions: [{ regionId, primary: true }, ...existing.map((region) => ({ ...region, primary: false }))],
+  };
+}
+
+function formatLocation(location: CurrentLocationDraft) {
+  const accuracy = location.accuracy ? ` · 오차 약 ${Math.round(location.accuracy)}m` : '';
+  return `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}${accuracy}`;
 }
 
 function getBackHref(step: OnboardingRouteStep) {

@@ -39,12 +39,14 @@ export type TeamMatchListViewModel = {
     closeHref: string;
     resetHref: string;
     applyHref: string;
-    sort: 'recommended' | 'deadline' | 'grade' | 'price';
+    sort: '' | 'recommended' | 'deadline' | 'latest';
     view: 'card' | 'compact';
-    genderRule: 'all' | '성별 무관' | '남' | '여';
-    sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'grade' | 'price'; href: string; active?: boolean }>;
+    genderRule: '' | '성별 무관' | '남' | '여';
+    levels: Array<'입문' | '초보' | '중수' | '고수'>;
+    sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
     viewOptions: Array<{ label: string; value: 'card' | 'compact'; description: string; href: string; active?: boolean }>;
-    genderOptions: Array<{ label: string; value: 'all' | '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
+    genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
+    levelOptions: Array<{ label: string; value: '입문' | '초보' | '중수' | '고수'; href: string; active?: boolean }>;
   };
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
   summary: { count: number; today: number; urgent: number };

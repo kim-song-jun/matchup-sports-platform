@@ -29,6 +29,7 @@ export function MatchListPageClient() {
   const selectedSort = toMatchSort(searchParams.get('sort'));
   const selectedView = toMatchView(searchParams.get('view'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
+  const selectedLevels = toLevelFilters(searchParams.get('levels'));
   const filterOpen = searchParams.get('filter') === '1';
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
@@ -39,12 +40,13 @@ export function MatchListPageClient() {
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
   const allMatches = useV1Matches();
+  const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels);
   const matchFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
-    if (selectedGenderRule !== 'all') filters.genderRule = selectedGenderRule;
+    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    if (selectedSort !== 'recommended') filters.sort = selectedSort;
+    if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedSportId, selectedSort, selectedView, submittedQuery]);
@@ -58,6 +60,7 @@ export function MatchListPageClient() {
 
   const base = getMatchListViewModel();
   const items = query.data?.items;
+  const visibleItems = filterMatchesByLevels(items, selectedLevels);
   const countItems = allMatches.data?.items ?? items ?? [];
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,
@@ -79,24 +82,26 @@ export function MatchListPageClient() {
     ? {
         ...base,
         query: submittedQuery,
+        filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, filterOpen),
-        matches: items.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
+        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        matches: visibleItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
         sports: buildSportSummary(countItems, base, selectedSportId, sports.data),
         summary: {
           ...base.summary,
-          count: items.length,
-          today: countToday(items),
-          urgent: items.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
+          count: visibleItems.length,
+          today: countToday(visibleItems),
+          urgent: visibleItems.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
         },
       }
     : {
         ...base,
         query: submittedQuery,
+        filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, filterOpen),
+        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
       };
 
   return <MatchListPageView model={model} />;
@@ -249,35 +254,43 @@ function buildMatchFilterSheet(
   sort: NonNullable<MatchListViewModel['filterSheet']>['sort'],
   view: NonNullable<MatchListViewModel['filterSheet']>['view'],
   genderRule: NonNullable<MatchListViewModel['filterSheet']>['genderRule'],
+  levels: NonNullable<MatchListViewModel['filterSheet']>['levels'],
   open: boolean,
 ): NonNullable<MatchListViewModel['filterSheet']> {
   const sortOptions: NonNullable<MatchListViewModel['filterSheet']>['sortOptions'] = [
-    { label: '추천순', value: 'recommended', href: buildMatchHref(params, { sort: 'recommended', filter: '1' }), active: sort === 'recommended' },
-    { label: '마감임박', value: 'deadline', href: buildMatchHref(params, { sort: 'deadline', filter: '1' }), active: sort === 'deadline' },
-    { label: '최신순', value: 'latest', href: buildMatchHref(params, { sort: 'latest', filter: '1' }), active: sort === 'latest' },
+    { label: '추천순', value: 'recommended', href: buildMatchHref(params, { sort: sort === 'recommended' ? null : 'recommended', filter: '1' }), active: sort === 'recommended' },
+    { label: '마감임박', value: 'deadline', href: buildMatchHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
+    { label: '최신순', value: 'latest', href: buildMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
   const viewOptions: NonNullable<MatchListViewModel['filterSheet']>['viewOptions'] = [
     { label: '카드형', value: 'card', description: '이미지와 핵심 정보를 크게', href: buildMatchHref(params, { view: 'card', filter: '1' }), active: view === 'card' },
     { label: '콤팩트형', value: 'compact', description: '더 많은 매치를 빠르게', href: buildMatchHref(params, { view: 'compact', filter: '1' }), active: view === 'compact' },
   ];
   const genderOptions: NonNullable<MatchListViewModel['filterSheet']>['genderOptions'] = [
-    { label: '전체', value: 'all', href: buildMatchHref(params, { genderRule: null, filter: '1' }), active: genderRule === 'all' },
-    { label: '성별 무관', value: '성별 무관', href: buildMatchHref(params, { genderRule: '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
-    { label: '남', value: '남', href: buildMatchHref(params, { genderRule: '남', filter: '1' }), active: genderRule === '남' },
-    { label: '여', value: '여', href: buildMatchHref(params, { genderRule: '여', filter: '1' }), active: genderRule === '여' },
+    { label: '성별 무관', value: '성별 무관', href: buildMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
+    { label: '남', value: '남', href: buildMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
+    { label: '여', value: '여', href: buildMatchHref(params, { genderRule: genderRule === '여' ? null : '여', filter: '1' }), active: genderRule === '여' },
   ];
+  const levelOptions: NonNullable<MatchListViewModel['filterSheet']>['levelOptions'] = levelFilterValues.map((level) => ({
+    label: level,
+    value: level,
+    href: buildMatchHref(params, { levels: toggleLevelFilter(levels, level), filter: '1' }),
+    active: levels.includes(level),
+  }));
 
   return {
     open,
     closeHref: buildMatchHref(params, { filter: null }),
-    resetHref: buildMatchHref(params, { sort: null, view: null, genderRule: null, filter: '1' }),
+    resetHref: buildMatchHref(params, { sort: null, view: null, genderRule: null, levels: null, filter: '1' }),
     applyHref: buildMatchHref(params, { filter: null }),
     sort,
     view,
     genderRule,
+    levels,
     sortOptions,
     viewOptions,
     genderOptions,
+    levelOptions,
   };
 }
 
@@ -291,18 +304,57 @@ function buildMatchHref(params: URLSearchParams, overrides: Record<string, strin
   return queryString ? `/matches?${queryString}` : '/matches';
 }
 
-function toMatchSort(value: string | null): 'recommended' | 'deadline' | 'latest' {
-  if (value === 'deadline' || value === 'latest') return value;
-  return 'recommended';
+function toMatchSort(value: string | null): '' | 'recommended' | 'deadline' | 'latest' {
+  if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
+  return '';
 }
 
 function toMatchView(value: string | null): 'card' | 'compact' {
   return value === 'compact' ? 'compact' : 'card';
 }
 
-function toGenderRuleFilter(value: string | null): 'all' | '성별 무관' | '남' | '여' {
+function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' | '여' {
   if (value === '성별 무관' || value === '남' || value === '여') return value;
-  return 'all';
+  return '';
+}
+
+const levelFilterValues = ['입문', '초보', '중수', '고수'] as const;
+
+function toLevelFilters(value: string | null): Array<(typeof levelFilterValues)[number]> {
+  if (!value) return [];
+  const selected = value.split(',').filter((level): level is (typeof levelFilterValues)[number] =>
+    levelFilterValues.includes(level as (typeof levelFilterValues)[number]),
+  );
+  return Array.from(new Set(selected));
+}
+
+function toggleLevelFilter(levels: Array<(typeof levelFilterValues)[number]>, level: (typeof levelFilterValues)[number]) {
+  const next = levels.includes(level) ? levels.filter((item) => item !== level) : [...levels, level];
+  return next.length ? next.join(',') : null;
+}
+
+function filterMatchesByLevels(matches: V1Match[] | undefined, levels: Array<(typeof levelFilterValues)[number]>) {
+  if (!matches || levels.length === 0) return matches ?? [];
+  return matches.filter((match) => levels.includes(toLevelFilterLabel(match.levelLabel)));
+}
+
+function toLevelFilterLabel(label: string): (typeof levelFilterValues)[number] {
+  if (label.includes('입문')) return '입문';
+  if (label.includes('초보')) return '초보';
+  if (label.includes('중수')) return '중수';
+  if (label.includes('고수')) return '고수';
+  if (label.startsWith('A')) return '고수';
+  if (label.startsWith('B')) return '중수';
+  if (label.startsWith('C')) return '초보';
+  return '입문';
+}
+
+function countMatchFilters(
+  sort: '' | 'recommended' | 'deadline' | 'latest',
+  genderRule: '' | '성별 무관' | '남' | '여',
+  levels: Array<(typeof levelFilterValues)[number]>,
+) {
+  return Number(Boolean(sort)) + Number(Boolean(genderRule)) + levels.length;
 }
 
 function countToday(items: V1Match[]) {

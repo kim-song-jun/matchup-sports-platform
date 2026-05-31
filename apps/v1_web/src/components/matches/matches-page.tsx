@@ -277,7 +277,6 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
 }
 
 function MatchSearchBar({ query, filterCount, search, filterHref = '/matches?filter=1' }: { query: string; filterCount: number; search?: MatchListViewModel['search']; filterHref?: string }) {
-  void filterCount;
   return (
     <div className="tm-list-searchbar">
       <form
@@ -326,6 +325,7 @@ function MatchSearchBar({ query, filterCount, search, filterHref = '/matches?fil
       </form>
       <Link className="tm-list-filter-button" href={filterHref} aria-label="필터">
         <FilterIcon size={21} strokeWidth={2} />
+        {filterCount > 0 ? <span className="tm-list-filter-count tab-num">{filterCount}</span> : null}
       </Link>
     </div>
   );
@@ -359,6 +359,14 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
           <div className="tm-text-label">성별 조건</div>
           <div className="tm-filter-chip-wrap">
             {sheet.genderOptions.map((option) => (
+              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href}>{option.label}</Link>
+            ))}
+          </div>
+        </div>
+        <div className="tm-filter-section">
+          <div className="tm-text-label">레벨</div>
+          <div className="tm-filter-chip-wrap">
+            {sheet.levelOptions.map((option) => (
               <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href}>{option.label}</Link>
             ))}
           </div>

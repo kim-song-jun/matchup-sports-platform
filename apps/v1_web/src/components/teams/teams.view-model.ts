@@ -194,7 +194,7 @@ export function getTeamListViewModel(): TeamListViewModel {
   return {
     query: '',
     placeholder: '팀명, 지역, 종목 검색',
-    filterCount: 3,
+    filterCount: 0,
     chips: ['전체 42', '모집중 18', '내 주변', '초보-중수', '주 1회'].map((label, index) => ({ label, active: index === 0 })),
     summary: { scope: '서울 전체 · 팀 둘러보기', total: 42, recruiting: 18, nearby: 7 },
     teams,

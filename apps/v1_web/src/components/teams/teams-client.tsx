@@ -28,10 +28,10 @@ export function TeamListPageClient() {
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamSort(searchParams.get('sort'));
-  const selectedCondition = toTeamCondition(searchParams.get('condition'));
-  const selectedTrust = toTeamTrust(searchParams.get('trust'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
+  const selectedLevels = toLevelFilters(searchParams.get('levels'));
   const filterOpen = searchParams.get('filter') === '1';
+  const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels);
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
@@ -43,15 +43,15 @@ export function TeamListPageClient() {
   const sports = useV1MasterSports();
   const allTeams = useV1Teams();
   const teamFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest' | 'trust'; genderRule?: string } = {};
+    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
-    if (selectedGenderRule !== 'all') filters.genderRule = selectedGenderRule;
+    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    if (selectedCondition === 'joinable' || selectedSort === 'recruiting') filters.joinPolicy = 'approval_required';
-    if (selectedSort === 'recent') filters.sort = 'latest';
-    if (selectedSort === 'manner') filters.sort = 'trust';
+    if (selectedSort === 'deadline') filters.joinPolicy = 'approval_required';
+    if (selectedSort === 'latest') filters.sort = 'latest';
+    if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedCondition, selectedGenderRule, selectedSort, selectedSportId, submittedQuery]);
+  }, [selectedGenderRule, selectedSort, selectedSportId, submittedQuery]);
   const filteredTeams = useV1Teams(
     teamFilters,
     { enabled: Boolean(teamFilters) },
@@ -64,6 +64,8 @@ export function TeamListPageClient() {
 
   const base = getTeamListViewModel();
   const items = query.data?.items;
+  const teamItems = items?.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0])) ?? [];
+  const visibleTeams = filterTeamsByLevels(teamItems, selectedLevels);
   const countItems = allTeams.data?.items ?? items ?? [];
   const searchModel: NonNullable<TeamListViewModel['search']> = {
     value: searchValue,
@@ -85,23 +87,25 @@ export function TeamListPageClient() {
     ? {
         ...base,
         query: submittedQuery,
+        filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildTeamHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedCondition, selectedTrust, selectedGenderRule, filterOpen),
+        filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
         chips: buildTeamSportChips(countItems, base, selectedSportId, sports.data),
-        teams: items.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0])),
+        teams: visibleTeams,
         summary: {
           ...base.summary,
-          total: items.length,
-          recruiting: items.filter((item) => item.joinPolicy === 'approval_required').length,
+          total: visibleTeams.length,
+          recruiting: visibleTeams.filter((item) => item.status === 'open').length,
         },
       }
     : {
         ...base,
         query: submittedQuery,
+        filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildTeamHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedCondition, selectedTrust, selectedGenderRule, filterOpen),
+        filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
         chips: buildTeamSportChips(countItems, base, selectedSportId, sports.data),
       };
 
@@ -318,47 +322,38 @@ function buildTeamSportChips(items: V1Team[], fallback: TeamListViewModel, selec
 function buildTeamFilterSheet(
   params: URLSearchParams,
   sort: NonNullable<TeamListViewModel['filterSheet']>['sort'],
-  condition: NonNullable<TeamListViewModel['filterSheet']>['condition'],
-  trust: NonNullable<TeamListViewModel['filterSheet']>['trust'],
   genderRule: NonNullable<TeamListViewModel['filterSheet']>['genderRule'],
+  levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
   open: boolean,
 ): NonNullable<TeamListViewModel['filterSheet']> {
   const sortOptions: NonNullable<TeamListViewModel['filterSheet']>['sortOptions'] = [
-    { label: '추천순', value: 'recommended', href: buildTeamHref(params, { sort: 'recommended', filter: '1' }), active: sort === 'recommended' },
-    { label: '모집중', value: 'recruiting', href: buildTeamHref(params, { sort: 'recruiting', filter: '1' }), active: sort === 'recruiting' },
-    { label: '매너 높은순', value: 'manner', href: buildTeamHref(params, { sort: 'manner', filter: '1' }), active: sort === 'manner' },
-    { label: '최근 활동', value: 'recent', href: buildTeamHref(params, { sort: 'recent', filter: '1' }), active: sort === 'recent' },
-  ];
-  const conditionOptions: NonNullable<TeamListViewModel['filterSheet']>['conditionOptions'] = [
-    { label: '초보-중수', value: 'beginner', href: buildTeamHref(params, { condition: 'beginner', filter: '1' }), active: condition === 'beginner' },
-    { label: '주 1회 이상', value: 'weekly', href: buildTeamHref(params, { condition: 'weekly', filter: '1' }), active: condition === 'weekly' },
-    { label: '가입 가능', value: 'joinable', href: buildTeamHref(params, { condition: 'joinable', filter: '1' }), active: condition === 'joinable' },
-    { label: '여성 환영', value: 'women', href: buildTeamHref(params, { condition: 'women', filter: '1' }), active: condition === 'women' },
-  ];
-  const trustOptions: NonNullable<TeamListViewModel['filterSheet']>['trustOptions'] = [
-    { label: '검증됨', value: 'verified', href: buildTeamHref(params, { trust: 'verified', filter: '1' }), active: trust === 'verified' },
-    { label: '추정', value: 'estimated', href: buildTeamHref(params, { trust: 'estimated', filter: '1' }), active: trust === 'estimated' },
+    { label: '추천순', value: 'recommended', href: buildTeamHref(params, { sort: sort === 'recommended' ? null : 'recommended', filter: '1' }), active: sort === 'recommended' },
+    { label: '마감임박', value: 'deadline', href: buildTeamHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
+    { label: '최신순', value: 'latest', href: buildTeamHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
   const genderOptions: NonNullable<TeamListViewModel['filterSheet']>['genderOptions'] = [
-    { label: '전체', value: 'all', href: buildTeamHref(params, { genderRule: null, filter: '1' }), active: genderRule === 'all' },
-    { label: '성별 무관', value: '성별 무관', href: buildTeamHref(params, { genderRule: '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
-    { label: '남', value: '남', href: buildTeamHref(params, { genderRule: '남', filter: '1' }), active: genderRule === '남' },
-    { label: '여', value: '여', href: buildTeamHref(params, { genderRule: '여', filter: '1' }), active: genderRule === '여' },
+    { label: '성별 무관', value: '성별 무관', href: buildTeamHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
+    { label: '남', value: '남', href: buildTeamHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
+    { label: '여', value: '여', href: buildTeamHref(params, { genderRule: genderRule === '여' ? null : '여', filter: '1' }), active: genderRule === '여' },
   ];
+  const levelOptions: NonNullable<TeamListViewModel['filterSheet']>['levelOptions'] = levelFilterValues.map((level) => ({
+    label: level,
+    value: level,
+    href: buildTeamHref(params, { levels: toggleLevelFilter(levels, level), filter: '1' }),
+    active: levels.includes(level),
+  }));
 
   return {
     open,
     closeHref: buildTeamHref(params, { filter: null }),
-    resetHref: buildTeamHref(params, { sort: null, condition: null, trust: null, genderRule: null, filter: '1' }),
+    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levels: null, filter: '1' }),
     applyHref: buildTeamHref(params, { filter: null }),
     sort,
-    condition,
-    trust,
     genderRule,
+    levels,
     sortOptions,
-    conditionOptions,
-    trustOptions,
     genderOptions,
+    levelOptions,
   };
 }
 
@@ -373,23 +368,41 @@ function buildTeamHref(params: URLSearchParams, overrides: Record<string, string
 }
 
 function toTeamSort(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['sort'] {
-  if (value === 'recruiting' || value === 'manner' || value === 'recent') return value;
-  return 'recommended';
+  if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
+  return '';
 }
 
-function toTeamCondition(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['condition'] {
-  if (value === 'weekly' || value === 'joinable' || value === 'women') return value;
-  return 'beginner';
-}
-
-function toTeamTrust(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['trust'] {
-  if (value === 'estimated') return value;
-  return 'verified';
-}
-
-function toGenderRuleFilter(value: string | null): 'all' | '성별 무관' | '남' | '여' {
+function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' | '여' {
   if (value === '성별 무관' || value === '남' || value === '여') return value;
-  return 'all';
+  return '';
+}
+
+const levelFilterValues = ['입문', '초보', '중수', '고수'] as const;
+
+function toLevelFilters(value: string | null): Array<(typeof levelFilterValues)[number]> {
+  if (!value) return [];
+  const selected = value.split(',').filter((level): level is (typeof levelFilterValues)[number] =>
+    levelFilterValues.includes(level as (typeof levelFilterValues)[number]),
+  );
+  return Array.from(new Set(selected));
+}
+
+function toggleLevelFilter(levels: Array<(typeof levelFilterValues)[number]>, level: (typeof levelFilterValues)[number]) {
+  const next = levels.includes(level) ? levels.filter((item) => item !== level) : [...levels, level];
+  return next.length ? next.join(',') : null;
+}
+
+function filterTeamsByLevels(teams: TeamModel[], levels: Array<(typeof levelFilterValues)[number]>) {
+  if (levels.length === 0) return teams;
+  return teams.filter((team) => levels.some((level) => team.tags.some((tag) => tag.includes(level)) || team.intro.includes(level)));
+}
+
+function countTeamFilters(
+  sort: NonNullable<TeamListViewModel['filterSheet']>['sort'],
+  genderRule: NonNullable<TeamListViewModel['filterSheet']>['genderRule'],
+  levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
+) {
+  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
 }
 
 function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {

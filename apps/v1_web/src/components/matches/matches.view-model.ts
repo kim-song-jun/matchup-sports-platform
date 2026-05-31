@@ -167,7 +167,7 @@ const draft = {
 export function getMatchListViewModel(): MatchListViewModel {
   return {
     query: '',
-    filterCount: 2,
+    filterCount: 0,
     sports: [
       { label: '전체', count: matches.length, active: true },
       { label: '풋살', count: 8 },

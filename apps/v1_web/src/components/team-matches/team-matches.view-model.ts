@@ -76,7 +76,7 @@ const draft = {
 export function getTeamMatchListViewModel(): TeamMatchListViewModel {
   return {
     query: '',
-    filterCount: 2,
+    filterCount: 0,
     sports: [
       { label: '전체', count: teamMatches.length, active: true },
       { label: '풋살', count: 12 },

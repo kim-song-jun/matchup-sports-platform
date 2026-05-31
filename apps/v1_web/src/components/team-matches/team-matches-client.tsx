@@ -31,7 +31,9 @@ export function TeamMatchListPageClient() {
   const selectedSort = toTeamMatchSort(searchParams.get('sort'));
   const selectedView = toTeamMatchView(searchParams.get('view'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
+  const selectedLevels = toLevelFilters(searchParams.get('levels'));
   const filterOpen = searchParams.get('filter') === '1';
+  const activeFilterCount = countTeamMatchFilters(selectedSort, selectedGenderRule, selectedLevels);
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
@@ -43,11 +45,11 @@ export function TeamMatchListPageClient() {
   const sportsQuery = useV1MasterSports();
   const allQuery = useV1TeamMatches();
   const teamMatchFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string } = {};
+    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
-    if (selectedGenderRule !== 'all') filters.genderRule = selectedGenderRule;
+    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    if (selectedSort === 'deadline') filters.sort = 'deadline';
+    if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedSportId, selectedSort, selectedView, submittedQuery]);
@@ -63,6 +65,7 @@ export function TeamMatchListPageClient() {
 
   const base = getTeamMatchListViewModel();
   const items = query.data?.items;
+  const visibleItems = filterTeamMatchesByLevels(items, selectedLevels);
   const allItems = allQuery.data?.items ?? items ?? [];
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
     value: searchValue,
@@ -84,24 +87,26 @@ export function TeamMatchListPageClient() {
     ? {
         ...base,
         query: submittedQuery,
+        filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildTeamMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, filterOpen),
+        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
         sports: buildSportChips({
           base,
           sports: sportsQuery.data,
           matches: allItems,
           selectedSportId,
         }),
-        matches: items.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
-        summary: { ...base.summary, count: items.length, today: items.length },
+        matches: visibleItems.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
+        summary: { ...base.summary, count: visibleItems.length, today: visibleItems.length },
       }
     : {
         ...base,
         query: submittedQuery,
+        filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildTeamMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, filterOpen),
+        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
         sports: buildSportChips({
           base,
           sports: sportsQuery.data,
@@ -240,36 +245,43 @@ function buildTeamMatchFilterSheet(
   sort: NonNullable<TeamMatchListViewModel['filterSheet']>['sort'],
   view: NonNullable<TeamMatchListViewModel['filterSheet']>['view'],
   genderRule: NonNullable<TeamMatchListViewModel['filterSheet']>['genderRule'],
+  levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels'],
   open: boolean,
 ): NonNullable<TeamMatchListViewModel['filterSheet']> {
   const sortOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['sortOptions'] = [
-    { label: '추천순', value: 'recommended', href: buildTeamMatchHref(params, { sort: 'recommended', filter: '1' }), active: sort === 'recommended' },
-    { label: '마감임박', value: 'deadline', href: buildTeamMatchHref(params, { sort: 'deadline', filter: '1' }), active: sort === 'deadline' },
-    { label: '등급높은순', value: 'grade', href: buildTeamMatchHref(params, { sort: 'grade', filter: '1' }), active: sort === 'grade' },
-    { label: '가격낮은순', value: 'price', href: buildTeamMatchHref(params, { sort: 'price', filter: '1' }), active: sort === 'price' },
+    { label: '추천순', value: 'recommended', href: buildTeamMatchHref(params, { sort: sort === 'recommended' ? null : 'recommended', filter: '1' }), active: sort === 'recommended' },
+    { label: '마감임박', value: 'deadline', href: buildTeamMatchHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
+    { label: '최신순', value: 'latest', href: buildTeamMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
   const viewOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['viewOptions'] = [
     { label: '카드형', value: 'card', description: 'VS 히어로와 팀 정보', href: buildTeamMatchHref(params, { view: 'card', filter: '1' }), active: view === 'card' },
     { label: '콤팩트형', value: 'compact', description: '더 많은 팀매치 비교', href: buildTeamMatchHref(params, { view: 'compact', filter: '1' }), active: view === 'compact' },
   ];
   const genderOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['genderOptions'] = [
-    { label: '전체', value: 'all', href: buildTeamMatchHref(params, { genderRule: null, filter: '1' }), active: genderRule === 'all' },
-    { label: '성별 무관', value: '성별 무관', href: buildTeamMatchHref(params, { genderRule: '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
-    { label: '남', value: '남', href: buildTeamMatchHref(params, { genderRule: '남', filter: '1' }), active: genderRule === '남' },
-    { label: '여', value: '여', href: buildTeamMatchHref(params, { genderRule: '여', filter: '1' }), active: genderRule === '여' },
+    { label: '성별 무관', value: '성별 무관', href: buildTeamMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
+    { label: '남', value: '남', href: buildTeamMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
+    { label: '여', value: '여', href: buildTeamMatchHref(params, { genderRule: genderRule === '여' ? null : '여', filter: '1' }), active: genderRule === '여' },
   ];
+  const levelOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['levelOptions'] = levelFilterValues.map((level) => ({
+    label: level,
+    value: level,
+    href: buildTeamMatchHref(params, { levels: toggleLevelFilter(levels, level), filter: '1' }),
+    active: levels.includes(level),
+  }));
 
   return {
     open,
     closeHref: buildTeamMatchHref(params, { filter: null }),
-    resetHref: buildTeamMatchHref(params, { sort: null, view: null, genderRule: null, filter: '1' }),
+    resetHref: buildTeamMatchHref(params, { sort: null, view: null, genderRule: null, levels: null, filter: '1' }),
     applyHref: buildTeamMatchHref(params, { filter: null }),
     sort,
     view,
     genderRule,
+    levels,
     sortOptions,
     viewOptions,
     genderOptions,
+    levelOptions,
   };
 }
 
@@ -284,17 +296,56 @@ function buildTeamMatchHref(params: URLSearchParams, overrides: Record<string, s
 }
 
 function toTeamMatchSort(value: string | null): NonNullable<TeamMatchListViewModel['filterSheet']>['sort'] {
-  if (value === 'deadline' || value === 'grade' || value === 'price') return value;
-  return 'recommended';
+  if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
+  return '';
 }
 
 function toTeamMatchView(value: string | null): NonNullable<TeamMatchListViewModel['filterSheet']>['view'] {
   return value === 'compact' ? 'compact' : 'card';
 }
 
-function toGenderRuleFilter(value: string | null): 'all' | '성별 무관' | '남' | '여' {
+function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' | '여' {
   if (value === '성별 무관' || value === '남' || value === '여') return value;
-  return 'all';
+  return '';
+}
+
+const levelFilterValues = ['입문', '초보', '중수', '고수'] as const;
+
+function toLevelFilters(value: string | null): Array<(typeof levelFilterValues)[number]> {
+  if (!value) return [];
+  const selected = value.split(',').filter((level): level is (typeof levelFilterValues)[number] =>
+    levelFilterValues.includes(level as (typeof levelFilterValues)[number]),
+  );
+  return Array.from(new Set(selected));
+}
+
+function toggleLevelFilter(levels: Array<(typeof levelFilterValues)[number]>, level: (typeof levelFilterValues)[number]) {
+  const next = levels.includes(level) ? levels.filter((item) => item !== level) : [...levels, level];
+  return next.length ? next.join(',') : null;
+}
+
+function filterTeamMatchesByLevels(matches: V1TeamMatch[] | undefined, levels: Array<(typeof levelFilterValues)[number]>) {
+  if (!matches || levels.length === 0) return matches ?? [];
+  return matches.filter((match) => levels.includes(toLevelFilterLabel(match.levelLabel)));
+}
+
+function toLevelFilterLabel(label: string): (typeof levelFilterValues)[number] {
+  if (label.includes('입문')) return '입문';
+  if (label.includes('초보')) return '초보';
+  if (label.includes('중수')) return '중수';
+  if (label.includes('고수')) return '고수';
+  if (label.startsWith('A')) return '고수';
+  if (label.startsWith('B')) return '중수';
+  if (label.startsWith('C')) return '초보';
+  return '입문';
+}
+
+function countTeamMatchFilters(
+  sort: NonNullable<TeamMatchListViewModel['filterSheet']>['sort'],
+  genderRule: NonNullable<TeamMatchListViewModel['filterSheet']>['genderRule'],
+  levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels'],
+) {
+  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
 }
 
 function toApplicantTeams(

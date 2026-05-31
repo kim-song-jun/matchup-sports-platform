@@ -277,6 +277,7 @@ function TeamSearchBar({ model }: { model: TeamListViewModel }) {
       </form>
       <Link className="tm-list-filter-button" href={model.filterHref ?? '/teams?filter=1'} aria-label="필터">
         <FilterIcon size={21} strokeWidth={2} />
+        {model.filterCount > 0 ? <span className="tm-list-filter-count tab-num">{model.filterCount}</span> : null}
       </Link>
     </div>
   );
@@ -300,9 +301,8 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
         </div>
         {[
           ['정렬', sheet.sortOptions],
-          ['팀 조건', sheet.conditionOptions],
           ['성별 조건', sheet.genderOptions],
-          ['신뢰 신호', sheet.trustOptions],
+          ['레벨', sheet.levelOptions],
         ].map(([title, options]) => (
           <div key={title as string} className="tm-filter-section">
             <div className="tm-text-label">{title as string}</div>

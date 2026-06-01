@@ -195,7 +195,9 @@ export type V1Match = {
   imageUrl?: string | null;
   sportName: string;
   sport?: { sportId: string; name: string };
-  levelLabel: string;
+  levelLabel?: string | null;
+  minLevel?: { code: string; name: string } | null;
+  maxLevel?: { code: string; name: string } | null;
   regionName?: string | null;
   region?: { regionId: string; name: string } | null;
   placeName: string;
@@ -252,6 +254,8 @@ export type V1MatchEdit = {
     manualPlaceName: string;
     addressText?: string | null;
     rulesText?: string | null;
+    minLevelCode?: string | null;
+    maxLevelCode?: string | null;
     genderRule?: string | null;
   };
   status: V1MatchApiStatus;
@@ -292,6 +296,8 @@ export type V1MatchMutationPayload = {
   manualPlaceName: string;
   addressText?: string | null;
   rulesText?: string | null;
+  minLevelCode?: string | null;
+  maxLevelCode?: string | null;
   genderRule?: string | null;
 };
 
@@ -346,6 +352,10 @@ export type V1Team = {
   logoUrl?: string | null;
   coverImageUrl?: string | null;
   introductionPreview?: string | null;
+  skillLevelText?: string | null;
+  levelLabel?: string | null;
+  minLevel?: { code: string; name: string } | null;
+  maxLevel?: { code: string; name: string } | null;
   genderRule?: string | null;
   viewerRole?: string;
   viewerJoinState?: string;
@@ -390,6 +400,9 @@ export type V1TeamDetail = {
     introduction: string | null;
     activityAreaText: string | null;
     skillLevelText: string | null;
+    levelLabel?: string | null;
+    minLevel?: { code: string; name: string } | null;
+    maxLevel?: { code: string; name: string } | null;
     genderRule?: string | null;
     joinPolicy: string;
     memberGoalCount: number | null;
@@ -431,6 +444,8 @@ export type V1TeamMutationPayload = {
   introduction?: string | null;
   activityAreaText?: string | null;
   skillLevelText?: string | null;
+  minLevelCode?: string | null;
+  maxLevelCode?: string | null;
   genderRule?: string | null;
   joinPolicy: 'approval_required' | 'closed';
   memberGoalCount?: number | null;
@@ -542,6 +557,8 @@ export type V1TeamMatch = V1Match & {
   displayState?: V1TeamMatchApiStatus;
   costNote?: string | null;
   rulesText?: string | null;
+  minLevelCode?: string | null;
+  maxLevelCode?: string | null;
   genderRule?: string | null;
   paymentRequired?: boolean;
   hostTeamId?: string;
@@ -588,6 +605,8 @@ export type V1TeamMatchMutationPayload = {
   addressText?: string | null;
   costNote?: string | null;
   rulesText?: string | null;
+  minLevelCode?: string | null;
+  maxLevelCode?: string | null;
   genderRule?: string | null;
 };
 
@@ -623,6 +642,8 @@ export type V1TeamMatchEdit = {
     addressText?: string | null;
     costNote?: string | null;
     rulesText?: string | null;
+    minLevelCode?: string | null;
+    maxLevelCode?: string | null;
     genderRule?: string | null;
   };
   status: V1TeamMatchApiStatus;

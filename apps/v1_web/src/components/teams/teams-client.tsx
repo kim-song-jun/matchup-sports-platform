@@ -18,6 +18,7 @@ import {
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
+import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
@@ -29,7 +30,7 @@ export function TeamListPageClient() {
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamSort(searchParams.get('sort'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
-  const selectedLevels = toLevelFilters(searchParams.get('levels'));
+  const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const filterOpen = searchParams.get('filter') === '1';
   const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels);
   const initialQuery = searchParams.get('q') ?? '';
@@ -43,15 +44,16 @@ export function TeamListPageClient() {
   const sports = useV1MasterSports();
   const allTeams = useV1Teams();
   const teamFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string } = {};
+    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
+    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     if (selectedSort === 'deadline') filters.joinPolicy = 'approval_required';
     if (selectedSort === 'latest') filters.sort = 'latest';
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedSort, selectedSportId, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedSort, selectedSportId, submittedQuery]);
   const filteredTeams = useV1Teams(
     teamFilters,
     { enabled: Boolean(teamFilters) },
@@ -64,8 +66,8 @@ export function TeamListPageClient() {
 
   const base = getTeamListViewModel();
   const items = query.data?.items;
-  const teamItems = items?.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0])) ?? [];
-  const visibleTeams = filterTeamsByLevels(teamItems, selectedLevels);
+  const visibleItems = filterTeamsByLevels(items, selectedLevels);
+  const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
   const countItems = allTeams.data?.items ?? items ?? [];
   const searchModel: NonNullable<TeamListViewModel['search']> = {
     value: searchValue,
@@ -197,13 +199,13 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           ...toTeamDetail(query.data, fallback.team),
           description: query.data.profile.introduction ?? fallback.team.description,
           activity: query.data.profile.activityAreaText ?? fallback.team.activity,
-          condition: query.data.profile.skillLevelText ?? fallback.team.condition,
+          condition: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.condition,
           genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
           trustNote: trustNoteLabel(query.data.trust.trustState, query.data.trust.score),
           schedule: fallback.team.schedule,
           city: fallback.team.city,
           county: query.data.region?.name ?? fallback.team.county,
-          level: query.data.profile.skillLevelText ?? fallback.team.level,
+          level: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.level,
           contact: fallback.team.contact,
           links: fallback.team.links,
           images: fallback.team.images,
@@ -295,6 +297,7 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     status: team.joinPolicy === 'closed' ? 'closed' : 'open',
     statusLabel: team.joinPolicy === 'closed' ? '마감' : '모집중',
     trust: toTrustBadge(team.trustState),
+    tags: [team.levelLabel ?? team.skillLevelText ?? fallback.tags[0] ?? '전체 레벨', fallback.tags[1] ?? '주 1회', team.genderRule ?? fallback.genderRule],
     genderRule: team.genderRule ?? fallback.genderRule,
     intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀입니다. 가입은 팀 운영 정책에 따라 처리됩니다.`,
   };
@@ -336,17 +339,17 @@ function buildTeamFilterSheet(
     { label: '남', value: '남', href: buildTeamHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
     { label: '여', value: '여', href: buildTeamHref(params, { genderRule: genderRule === '여' ? null : '여', filter: '1' }), active: genderRule === '여' },
   ];
-  const levelOptions: NonNullable<TeamListViewModel['filterSheet']>['levelOptions'] = levelFilterValues.map((level) => ({
-    label: level,
-    value: level,
-    href: buildTeamHref(params, { levels: toggleLevelFilter(levels, level), filter: '1' }),
-    active: levels.includes(level),
+  const levelOptions: NonNullable<TeamListViewModel['filterSheet']>['levelOptions'] = V1_LEVELS.map(({ code, label }) => ({
+    label,
+    value: code,
+    href: buildTeamHref(params, { levelCodes: toggleLevelCode(levels, code), levels: null, filter: '1' }),
+    active: levels.includes(code),
   }));
 
   return {
     open,
     closeHref: buildTeamHref(params, { filter: null }),
-    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levels: null, filter: '1' }),
+    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levelCodes: null, levels: null, filter: '1' }),
     applyHref: buildTeamHref(params, { filter: null }),
     sort,
     genderRule,
@@ -377,24 +380,9 @@ function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' 
   return '';
 }
 
-const levelFilterValues = ['입문', '초보', '중수', '고수'] as const;
-
-function toLevelFilters(value: string | null): Array<(typeof levelFilterValues)[number]> {
-  if (!value) return [];
-  const selected = value.split(',').filter((level): level is (typeof levelFilterValues)[number] =>
-    levelFilterValues.includes(level as (typeof levelFilterValues)[number]),
-  );
-  return Array.from(new Set(selected));
-}
-
-function toggleLevelFilter(levels: Array<(typeof levelFilterValues)[number]>, level: (typeof levelFilterValues)[number]) {
-  const next = levels.includes(level) ? levels.filter((item) => item !== level) : [...levels, level];
-  return next.length ? next.join(',') : null;
-}
-
-function filterTeamsByLevels(teams: TeamModel[], levels: Array<(typeof levelFilterValues)[number]>) {
-  if (levels.length === 0) return teams;
-  return teams.filter((team) => levels.some((level) => team.tags.some((tag) => tag.includes(level)) || team.intro.includes(level)));
+function filterTeamsByLevels(teams: V1Team[] | undefined, levels: NonNullable<TeamListViewModel['filterSheet']>['levels']) {
+  if (!teams || levels.length === 0) return teams ?? [];
+  return teams.filter((team) => levelRangeMatches(levels, team.minLevel?.code, team.maxLevel?.code, team.levelLabel ?? team.skillLevelText));
 }
 
 function countTeamFilters(

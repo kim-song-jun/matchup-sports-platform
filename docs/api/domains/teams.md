@@ -29,16 +29,19 @@ Query:
 
 | 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `sportType` | string | No | enum 문자열 |
-| `city` | string | No | 정확 매칭 |
-| `recruiting` | string | No | `"true"`일 때만 recruiting 필터 |
+| `sportId` | uuid | No | `v1_master_sports.id` |
+| `regionId` | uuid | No | district region |
+| `query` | string | No | team name/introduction 검색 |
+| `genderRule` | string | No | `성별 무관`, `남`, `여` |
+| `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
+| `joinPolicy` | string | No | `approval_required`, `closed` |
+| `sort` | recommended/latest/member_count | No | 기본 recommended |
 | `cursor` | string | No | cursor |
-| `limit` | string | No | 수동 parse 후 1~100 clamp |
+| `limit` | number | No | 1~100 clamp |
 
 CAUTION:
 
-- 이 endpoint는 DTO가 아니라 controller 수동 parse를 사용한다.
-- `limit=abc`는 validation 에러가 아니라 기본값/보정값으로 처리된다.
+- Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 
 ## POST /teams (CreateTeamDto)
 
@@ -47,15 +50,20 @@ CAUTION:
 | 필드 | 타입 | 필수 |
 |---|---|---|
 | `name` | string(max 100) | Yes |
-| `sportType` | enum(SportType) | Yes |
-| `description` | string | No |
-| `logoUrl`, `coverImageUrl` | string | No |
-| `photos` | string[] | No |
-| `city`, `district` | string | No |
-| `level` | int(1~5) | No |
-| `isRecruiting` | boolean | No |
-| `contactInfo` | string | No |
-| `instagramUrl`, `youtubeUrl`, `shortsUrl`, `kakaoOpenChat`, `websiteUrl` | url | No |
+| `sportId` | uuid | Yes |
+| `regionId` | uuid | No |
+| `introduction` | string | No |
+| `activityAreaText` | string | No |
+| `skillLevelText` | string | No |
+| `minLevelCode` | level code | No |
+| `maxLevelCode` | level code | No |
+| `genderRule` | string | No |
+| `joinPolicy` | string | No |
+
+- Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
+- `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
+- `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.
+- `skillLevelText`는 표시/레거시 설명용이고, 필터와 `levelLabel`은 `minSportLevelId`, `maxSportLevelId` FK를 기준으로 계산한다.
 
 생성 시 트랜잭션으로 owner 멤버십(`role=owner`, `status=active`)이 자동 생성된다.
 
@@ -98,6 +106,7 @@ CAUTION:
 
 - `/teams/me` 원응답은 membership 배열이며, `useMyTeams`가 `MyTeam`으로 평탄화한다.
 - `useTransferTeamOwnership`는 backend body와 동일한 `{ toUserId, demoteTo }` 사용.
+- 목록 필터 URL은 `levelCodes`를 canonical source로 사용한다. legacy `levels` query는 읽기 호환만 유지한다.
 
 ## CAUTION
 
@@ -121,12 +130,9 @@ CAUTION:
 
 ## Source References
 
-- `apps/api/src/teams/teams.controller.ts`
-- `apps/api/src/teams/dto/create-team.dto.ts`
-- `apps/api/src/teams/dto/update-team.dto.ts`
-- `apps/api/src/teams/dto/membership.dto.ts`
-- `apps/api/src/teams/teams.service.ts`
-- `apps/api/src/teams/team-membership.service.ts`
-- `apps/api/src/teams/teams.service.spec.ts`
-- `apps/web/src/hooks/use-api.ts`
-- `apps/web/src/types/api.ts`
+- `apps/v1_api/src/teams/teams.controller.ts`
+- `apps/v1_api/src/teams/dto/*.ts`
+- `apps/v1_api/src/teams/teams.service.ts`
+- `apps/v1_api/src/sports/level-range.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
+- `apps/v1_web/src/types/api.ts`

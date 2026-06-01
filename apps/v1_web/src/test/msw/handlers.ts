@@ -56,24 +56,38 @@ export const v1MswHandlers = [
     return ok({ notices, pageInfo: { hasNextPage: false, nextCursor: null } });
   }),
   http.get(`${api}/notices/:noticeId`, ({ params }) => ok({ notice: v1NoticesFixture.find((item) => item.id === params.noticeId) ?? v1NoticesFixture[0] })),
-  http.get(`${api}/matches`, () => ok(page(v1MatchesFixture))),
+  http.get(`${api}/matches`, ({ request }) => {
+    const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
+    const matches = levelCodes.length
+      ? v1MatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : v1MatchesFixture;
+    return ok(page(matches));
+  }),
   http.get(`${api}/matches/:matchId`, ({ params }) => ok(v1MatchesFixture.find((item) => item.id === params.matchId) ?? v1MatchesFixture[0])),
   http.get(`${api}/teams`, ({ request }) => {
     const sportId = new URL(request.url).searchParams.get('sportId');
+    const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const sport = v1SportsFixture.find((item) => item.id === sportId);
-    const teams = sport
+    const teamsBySport = sport
       ? v1TeamsFixture.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
       : v1TeamsFixture;
+    const teams = levelCodes.length
+      ? teamsBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : teamsBySport;
     return ok(page(teams));
   }),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(v1TeamsFixture.find((item) => item.id === params.teamId) ?? v1TeamsFixture[0])),
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
   http.get(`${api}/team-matches`, ({ request }) => {
     const sportId = new URL(request.url).searchParams.get('sportId');
+    const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const sport = v1SportsFixture.find((item) => item.id === sportId);
-    const teamMatches = sport
+    const teamMatchesBySport = sport
       ? v1TeamMatchesFixture.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
       : v1TeamMatchesFixture;
+    const teamMatches = levelCodes.length
+      ? teamMatchesBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : teamMatchesBySport;
     return ok(page(teamMatches));
   }),
   http.get(`${api}/team-matches/:teamMatchId`, ({ params }) => ok(v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId) ?? v1TeamMatchesFixture[0])),
@@ -164,3 +178,15 @@ export const v1MswHandlers = [
   http.get(`${api}/admin/overview`, () => ok(v1AdminOverviewFixture)),
   http.get(`${api}/admin/action-logs`, () => ok(v1AdminLogsFixture)),
 ];
+
+const levelOrder = ['beginner', 'novice', 'intermediate', 'advanced'];
+
+function rangeMatches(selected: string[], minCode?: string, maxCode?: string) {
+  const min = levelOrder.indexOf(minCode ?? '');
+  const max = levelOrder.indexOf(maxCode ?? '');
+  if (min < 0 || max < 0) return false;
+  return selected.some((code) => {
+    const order = levelOrder.indexOf(code);
+    return order >= min && order <= max;
+  });
+}

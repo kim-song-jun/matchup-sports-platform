@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ChangeTeamMembershipRoleDto,
   MutateTeamDto,
@@ -39,6 +40,8 @@ type TeamWithRelations = V1Team & {
     description: string | null;
     activityNote: string | null;
     skillNote: string | null;
+    minSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
+    maxSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
     genderRule: string | null;
   } | null;
   memberships: Array<
@@ -67,6 +70,7 @@ export class TeamsService {
         ...(query.sportId ? { sportId: query.sportId } : {}),
         ...(query.regionId ? { regionId: query.regionId } : {}),
         ...(query.genderRule ? { AND: [getTeamGenderRuleWhere(query.genderRule)] } : {}),
+        ...teamLevelCodeWhere(parseLevelCodes(query.levelCodes)),
         ...(query.joinPolicy ? { joinPolicy: query.joinPolicy } : {}),
         ...(query.query
           ? {
@@ -119,6 +123,9 @@ export class TeamsService {
         introduction: team.profile?.description ?? null,
         activityAreaText: team.profile?.activityNote ?? null,
         skillLevelText: team.profile?.skillNote ?? null,
+        levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
+        minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
+        maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
         genderRule: team.profile?.genderRule ?? '성별 무관',
         joinPolicy: team.joinPolicy,
         memberGoalCount: null,
@@ -168,6 +175,7 @@ export class TeamsService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const team = await tx.v1Team.create({
         data: {
           ownerUserId: user.id,
@@ -185,6 +193,8 @@ export class TeamsService {
               description: dto.introduction ?? null,
               activityNote: dto.activityAreaText ?? null,
               skillNote: dto.skillLevelText ?? null,
+              minSportLevelId: levelRange.minSportLevelId,
+              maxSportLevelId: levelRange.maxSportLevelId,
               genderRule: dto.genderRule ?? null,
             },
           },
@@ -247,6 +257,7 @@ export class TeamsService {
 
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const updated = await this.prisma.$transaction(async (tx) => {
+      const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const nextTeam = await tx.v1Team.update({
         where: { id: team.id },
         data: {
@@ -265,6 +276,8 @@ export class TeamsService {
           description: dto.introduction ?? null,
           activityNote: dto.activityAreaText ?? null,
           skillNote: dto.skillLevelText ?? null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
         },
         create: {
@@ -274,6 +287,8 @@ export class TeamsService {
           description: dto.introduction ?? null,
           activityNote: dto.activityAreaText ?? null,
           skillNote: dto.skillLevelText ?? null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
         },
       });
@@ -1010,6 +1025,8 @@ export class TeamsService {
           description: true,
           activityNote: true,
           skillNote: true,
+          minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
+          maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           genderRule: true,
         },
       },
@@ -1054,6 +1071,10 @@ export class TeamsService {
       regionName: team.region?.name ?? null,
       region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
       introductionPreview: team.profile?.description ? team.profile.description.slice(0, 120) : null,
+      skillLevelText: team.profile?.skillNote ?? null,
+      levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
+      minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
+      maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
       genderRule: team.profile?.genderRule ?? '성별 무관',
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,
@@ -1132,6 +1153,22 @@ function getTeamGenderRuleWhere(genderRule: NonNullable<TeamsQueryDto['genderRul
   }
 
   return { profile: { genderRule } };
+}
+
+function teamLevelCodeWhere(levelCodes: ReturnType<typeof parseLevelCodes>): Prisma.V1TeamWhereInput {
+  if (levelCodes.length === 0) return {};
+
+  return {
+    profile: {
+      OR: levelCodes.map((code) => {
+        const order = SPORT_LEVEL_CODES.indexOf(code);
+        return {
+          minSportLevel: { is: { code: { in: SPORT_LEVEL_CODES.slice(0, order + 1) } } },
+          maxSportLevel: { is: { code: { in: SPORT_LEVEL_CODES.slice(order) } } },
+        };
+      }),
+    },
+  };
 }
 
 function getJoinReason(

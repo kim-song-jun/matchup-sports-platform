@@ -372,6 +372,12 @@ model V1SportLevel {
 
   sport           V1Sport                 @relation(fields: [sportId], references: [id], onDelete: Cascade)
   userPreferences V1UserSportPreference[]
+  minMatches      V1Match[]               @relation("V1MatchMinSportLevel")
+  maxMatches      V1Match[]               @relation("V1MatchMaxSportLevel")
+  minTeamProfiles V1TeamProfile[]         @relation("V1TeamProfileMinSportLevel")
+  maxTeamProfiles V1TeamProfile[]         @relation("V1TeamProfileMaxSportLevel")
+  minTeamMatches  V1TeamMatch[]           @relation("V1TeamMatchMinSportLevel")
+  maxTeamMatches  V1TeamMatch[]           @relation("V1TeamMatchMaxSportLevel")
 
   @@unique([sportId, code])
   @@index([sportId, isActive, sortOrder])
@@ -487,6 +493,8 @@ model V1Match {
   endAt           DateTime?     @map("end_at")
   maxParticipants Int           @map("max_participants")
   levelNote       String?       @map("level_note")
+  minSportLevelId String?       @map("min_sport_level_id")
+  maxSportLevelId String?       @map("max_sport_level_id")
   genderRule      String?       @map("gender_rule")
   costNote        String?       @map("cost_note")
   status          V1MatchStatus @default(recruiting)
@@ -498,6 +506,8 @@ model V1Match {
 
   hostUser     V1User               @relation("V1MatchHost", fields: [hostUserId], references: [id], onDelete: Restrict)
   sport        V1Sport              @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  minSportLevel V1SportLevel?       @relation("V1MatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
+  maxSportLevel V1SportLevel?       @relation("V1MatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
   region       V1Region?            @relation(fields: [regionId], references: [id], onDelete: Restrict)
   applications V1MatchApplication[]
   participants V1MatchParticipant[]
@@ -505,6 +515,8 @@ model V1Match {
 
   @@index([hostUserId])
   @@index([sportId, regionId, status, startAt])
+  @@index([minSportLevelId])
+  @@index([maxSportLevelId])
   @@index([status])
   @@index([startAt])
   @@index([createdAt])
@@ -598,13 +610,19 @@ model V1TeamProfile {
   description   String?
   activityNote  String?   @map("activity_note")
   skillNote     String?   @map("skill_note")
+  minSportLevelId String? @map("min_sport_level_id")
+  maxSportLevelId String? @map("max_sport_level_id")
   genderRule    String?   @map("gender_rule")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
   team V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  minSportLevel V1SportLevel? @relation("V1TeamProfileMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
+  maxSportLevel V1SportLevel? @relation("V1TeamProfileMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
 
+  @@index([minSportLevelId])
+  @@index([maxSportLevelId])
   @@map("v1_team_profiles")
 }
 
@@ -684,6 +702,8 @@ model V1TeamMatch {
   startAt                 DateTime          @map("start_at")
   endAt                   DateTime?         @map("end_at")
   formatNote              String?           @map("format_note")
+  minSportLevelId         String?           @map("min_sport_level_id")
+  maxSportLevelId         String?           @map("max_sport_level_id")
   genderRule              String?           @map("gender_rule")
   costNote                String?           @map("cost_note")
   status                  V1TeamMatchStatus @default(recruiting)
@@ -697,6 +717,8 @@ model V1TeamMatch {
   hostTeam              V1Team                   @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User                   @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
   sport                 V1Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  minSportLevel         V1SportLevel?            @relation("V1TeamMatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
+  maxSportLevel         V1SportLevel?            @relation("V1TeamMatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
   region                V1Region                 @relation(fields: [regionId], references: [id], onDelete: Restrict)
   approvedApplicantTeam V1Team?                  @relation("V1ApprovedApplicantTeam", fields: [approvedApplicantTeamId], references: [id], onDelete: SetNull)
   applications          V1TeamMatchApplication[]
@@ -705,6 +727,8 @@ model V1TeamMatch {
   @@index([hostTeamId])
   @@index([createdByUserId])
   @@index([sportId, regionId, status, startAt])
+  @@index([minSportLevelId])
+  @@index([maxSportLevelId])
   @@index([approvedApplicantTeamId])
   @@index([status])
   @@index([startAt])

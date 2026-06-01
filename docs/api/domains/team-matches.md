@@ -24,11 +24,13 @@ Query:
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `sportType` | enum | No | 종목 필터 |
-| `gender` | MatchGender (`any`, `male`, `female`) | No | recruitment gender condition |
-| `city` | string | No | `hostTeam.city` 기준 |
+| `sportId` | uuid | No | `v1_master_sports.id` |
+| `query` | string | No | title/description/place/team 검색 |
+| `genderRule` | string | No | `성별 무관`, `남`, `여` |
+| `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `status` | string | No | 단일 status 또는 comma-separated status list |
 | `teamId` | uuid | No | host 또는 applicant team 기준 |
+| `sort` | recommended/deadline/latest | No | 기본 recommended |
 | `cursor` | string | No | cursor pagination |
 | `limit` | int(1~100) | No | default 20 |
 
@@ -37,6 +39,7 @@ Rules:
 - `status`를 생략하면 기본값은 `recruiting`
 - `status=scheduled,completed,cancelled`처럼 다중 조회 가능
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
+- Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 
 ## POST /team-matches
 
@@ -45,18 +48,25 @@ Body: `CreateTeamMatchDto`
 Required:
 
 - `hostTeamId`
-- `sportType`
+- `sportId`
+- `regionId`
 - `title`
-- `matchDate`
-- `startTime`
-- `endTime`
-- `venueName`
-- `venueAddress`
+- `startsAt`
+- `manualPlaceName`
+
+Optional level fields:
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `minLevelCode` | level code | No | `beginner`, `novice`, `intermediate`, `advanced` |
+| `maxLevelCode` | level code | No | same |
+
+- `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
+- `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.
 
 Rules:
 
 - `hostTeamId`에 대해 요청자는 `manager+`여야 한다
-- 심판이 없는 경우 `quarterCount` 기준 기본 referee schedule을 생성한다
 
 ## PATCH /team-matches/:id
 
@@ -73,11 +83,10 @@ Supported behaviors:
 대표 수정 필드:
 
 - `title`, `description`
-- `matchDate`, `startTime`, `endTime`, `quarterCount`
-- `venueName`, `venueAddress`, `venueInfo`
-- `totalFee`, `opponentFee`
-- `gender`, `requiredLevel`, `matchStyle`, `allowMercenary`, `hasReferee`
-- `skillGrade`, `gameFormat`, `matchType`, `proPlayerCount`, `uniformColor`, `notes`
+- `startsAt`, `endsAt`, `deadlineAt`
+- `manualPlaceName`, `addressText`
+- `costNote`, `rulesText`, `genderRule`
+- `minLevelCode`, `maxLevelCode`
 
 ### 2. 모집글 취소
 
@@ -188,12 +197,14 @@ Success:
 - user-facing status vocabulary는 `recruiting`, `scheduled`, `checking_in`, `in_progress`, `completed`, `cancelled` 기준으로 맞춘다
 - `/my/team-matches`, `/teams/:id/matches`는 history 조회 시 다중 `status` query를 명시적으로 넘겨야 한다
 - edit/cancel UI는 `PATCH /team-matches/:id`를 사용한다
+- 목록 필터 URL은 `levelCodes`를 canonical source로 사용한다. legacy `levels` query는 읽기 호환만 유지한다.
+- 레벨 표시 텍스트는 `formatNote`가 아니라 `minSportLevelId`, `maxSportLevelId` FK에서 계산한 `levelLabel`을 사용한다.
 
 ## Source References
 
-- `apps/api/src/team-matches/team-matches.controller.ts`
-- `apps/api/src/team-matches/team-matches.service.ts`
-- `apps/api/src/team-matches/dto/*.ts`
-- `apps/api/test/integration/team-matches.e2e-spec.ts`
-- `apps/web/src/hooks/api/use-team-matches.ts`
-- `apps/web/src/types/api.ts`
+- `apps/v1_api/src/team-matches/team-matches.controller.ts`
+- `apps/v1_api/src/team-matches/team-matches.service.ts`
+- `apps/v1_api/src/team-matches/dto/*.ts`
+- `apps/v1_api/src/sports/level-range.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
+- `apps/v1_web/src/types/api.ts`

@@ -19,6 +19,11 @@ export class TeamsQueryDto {
   query?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  levelCodes?: string;
+
+  @IsOptional()
   @IsUUID()
   sportId?: string;
 

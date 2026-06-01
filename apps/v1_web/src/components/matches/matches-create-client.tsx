@@ -10,6 +10,7 @@ import {
   useV1MatchEdit,
   useV1UpdateMatch,
 } from '@/hooks/use-v1-api';
+import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MatchEdit, V1MatchMutationPayload } from '@/types/api';
 import { MatchCreatePageView } from './matches-page';
@@ -276,6 +277,8 @@ function draftFromEdit(edit: V1MatchEdit): MatchDraft {
     capacity: edit.form.capacity,
     rules: edit.form.rulesText ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),
+    minLevel: levelCodeToDraftLabel(edit.form.minLevelCode) ?? buildDefaultDraft().minLevel,
+    maxLevel: levelCodeToDraftLabel(edit.form.maxLevelCode) ?? buildDefaultDraft().maxLevel,
     venue: edit.form.manualPlaceName,
     address: edit.form.addressText ?? '',
     date: toDateInput(start),
@@ -303,9 +306,19 @@ function buildPayload(draft: MatchDraft, sportId: string, regionId: string): V1M
     capacity: Math.max(Number(draft.capacity) || 2, 2),
     manualPlaceName: draft.venue.trim(),
     addressText: draft.address.trim() || null,
-    rulesText: [draft.rules, draft.minLevel || draft.maxLevel ? `${draft.minLevel}-${draft.maxLevel}` : ''].filter(Boolean).join(' · ') || null,
+    rulesText: draft.rules.trim() || null,
+    minLevelCode: labelToLevelCode(draft.minLevel),
+    maxLevelCode: labelToLevelCode(draft.maxLevel),
     genderRule: normalizeGenderRule(draft.gender),
   };
+}
+
+function levelCodeToDraftLabel(code?: string | null) {
+  if (code === 'beginner') return '입문';
+  if (code === 'novice') return '초보';
+  if (code === 'intermediate') return '중수';
+  if (code === 'advanced') return '고수';
+  return null;
 }
 
 function normalizeGenderRule(value?: string | null) {

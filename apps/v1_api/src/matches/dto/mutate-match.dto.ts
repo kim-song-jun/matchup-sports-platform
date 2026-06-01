@@ -64,6 +64,16 @@ export class MutateMatchDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
+  minLevelCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  maxLevelCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
   genderRule?: string | null;
 }
 

@@ -23,21 +23,17 @@
 
 | 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `q` | string | No | title/description/venue 검색 |
-| `sportType` | enum | No | 소문자 sport type |
-| `city`, `district` | string | No | venue relation 필터 |
-| `date` | YYYY-MM-DD | No | matchDate |
-| `levelMin`, `levelMax` | int | No | transform(parseInt) |
-| `gender` | MatchGender (`any`, `male`, `female`) | No | recruitment gender condition |
-| `maxFee` | int | No | `fee <= maxFee` |
-| `freeOnly` | boolean | No | `fee = 0` |
-| `availableOnly` | boolean | No | recruiting만 |
-| `beginnerFriendly` | boolean | No | `levelMax <= 2` |
-| `sort` | upcoming/latest/deadline | No | 기본 upcoming |
+| `query` | string | No | title/description/place 검색 |
+| `sportId` | uuid | No | `v1_master_sports.id` |
+| `regionId` | uuid | No | district region |
+| `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
+| `genderRule` | string | No | `성별 무관`, `남`, `여` |
+| `sort` | recommended/latest/deadline | No | 기본 recommended |
 | `cursor` | string | No | cursor pagination |
 | `limit` | 1~50 | No | 기본 20 |
 
-- Response: `{ items, nextCursor }`
+- Response: `{ items, pageInfo }`
+- Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 
 ## POST /matches (CreateMatchDto)
 
@@ -45,19 +41,25 @@
 
 | 필드 | 타입 | 필수 | 기본값 |
 |---|---|---|---|
+| `sportId` | uuid | Yes | - |
+| `regionId` | uuid | Yes | - |
 | `title` | string | Yes | - |
 | `description` | string | No | - |
 | `imageUrl` | string | No | - |
-| `sportType` | enum | Yes | - |
-| `venueId` | string | Yes | - |
-| `matchDate` | date string | Yes | - |
-| `startTime`, `endTime` | HH:mm | Yes | - |
-| `maxPlayers` | int(2~30) | Yes | - |
-| `fee` | int >= 0 | No | 0 |
-| `levelMin` | int(1~5) | No | 1 |
-| `levelMax` | int(1~5) | No | 5 |
-| `gender` | MatchGender (`any`, `male`, `female`) | No | any |
-| `teamConfig` | object | No | - |
+| `startsAt` | ISO datetime | Yes | - |
+| `endsAt` | ISO datetime | No | - |
+| `deadlineAt` | ISO datetime | No | - |
+| `capacity` | int(2~100) | Yes | - |
+| `manualPlaceName` | string | Yes | - |
+| `addressText` | string | No | - |
+| `rulesText` | string | No | 안내/규칙 표시용 |
+| `minLevelCode` | level code | No | - |
+| `maxLevelCode` | level code | No | - |
+| `genderRule` | string | No | 성별 무관 |
+
+- Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
+- `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
+- `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.
 
 - 부가 동작
 - host는 자동 participant 생성
@@ -69,6 +71,7 @@
 - `cancelled`, `completed`, `in_progress` 상태에서는 수정 불가
 - `maxPlayers`를 현재 참가자 수보다 낮게 수정 불가
 - `imageUrl`은 `null` 전달로 제거 가능
+- `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
 
 ## POST /matches/:id/join
 
@@ -106,20 +109,21 @@
 
 ## Frontend Mapping Notes
 
-- `useMatches`, `useMatch`, `useRecommendedMatches`, `useUpdateMatch`, `useCancelMatch`, `useCloseMatch`, `useArriveMatch` 사용
+- `useV1Matches`, `useV1Match`, `useV1CreateMatch`, `useV1UpdateMatch` 사용
+- 목록 필터 URL은 `levelCodes`를 canonical source로 사용한다. legacy `levels` query는 읽기 호환만 유지한다.
 - `useCancelMatch`는 body optional(`reason`)이며 미전달 가능
 
 ## CAUTION
 
 - 프론트 `UpdateMatchInput`에 `location`, `status`가 있으나 backend `UpdateMatchDto`에는 없음
 - submit 전에 DTO 필드로 정제하지 않으면 `400` 가능
+- 레벨 표시 텍스트는 `rulesText`가 아니라 `minSportLevelId`, `maxSportLevelId` FK에서 계산한 `levelLabel`을 사용한다.
 
 ## Source References
 
-- `apps/api/src/matches/matches.controller.ts`
-- `apps/api/src/matches/dto/match.dto.ts`
-- `apps/api/src/matches/matches.service.ts`
-- `apps/api/test/integration/matches.e2e-spec.ts`
-- `apps/api/src/matches/matches.service.spec.ts`
-- `apps/web/src/hooks/use-api.ts`
-- `apps/web/src/types/api.ts`
+- `apps/v1_api/src/matches/matches.controller.ts`
+- `apps/v1_api/src/matches/dto/*.ts`
+- `apps/v1_api/src/matches/matches.service.ts`
+- `apps/v1_api/src/sports/level-range.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
+- `apps/v1_web/src/types/api.ts`

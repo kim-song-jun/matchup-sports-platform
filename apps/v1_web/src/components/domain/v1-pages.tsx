@@ -422,7 +422,7 @@ function toMatchCard(match: V1Match | MockMatch): MockMatch {
       id: match.id,
       title: match.title,
       sport: match.sportName,
-      level: match.levelLabel,
+      level: match.levelLabel ?? '전체 레벨',
       place: match.placeName,
       schedule: formatShortDate(match.startsAt),
       capacity: match.capacityText,

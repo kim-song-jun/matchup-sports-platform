@@ -80,6 +80,8 @@ export const v1MatchesFixture: V1Match[] = [
     title: '성수 풋살장 동네 5:5',
     sportName: '풋살',
     levelLabel: '초보-중수',
+    minLevel: { code: 'novice', name: '초보' },
+    maxLevel: { code: 'intermediate', name: '중수' },
     placeName: '성수 실내풋살장',
     startsAt: '2026-05-18T20:00:00.000Z',
     capacityText: '7/10명',
@@ -97,6 +99,9 @@ export const v1TeamsFixture: V1Team[] = [
     memberCount: 18,
     trustState: 'verified',
     joinPolicy: 'approval_required',
+    levelLabel: '초보-중수',
+    minLevel: { code: 'novice', name: '초보' },
+    maxLevel: { code: 'intermediate', name: '중수' },
   },
 ];
 
@@ -106,6 +111,8 @@ export const v1TeamMatchesFixture: V1TeamMatch[] = [
     title: '마포 FC 상대팀 모집',
     sportName: '축구',
     levelLabel: 'A-',
+    minLevel: { code: 'advanced', name: '고수' },
+    maxLevel: { code: 'advanced', name: '고수' },
     placeName: '마포 월드컵 보조구장',
     startsAt: '2026-05-22T21:00:00.000Z',
     capacityText: '상대 0/1팀',

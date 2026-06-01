@@ -11,6 +11,7 @@ import {
   useV1TeamMatchEdit,
   useV1UpdateTeamMatch,
 } from '@/hooks/use-v1-api';
+import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyTeam, V1TeamMatchEdit, V1TeamMatchMutationPayload } from '@/types/api';
 import { TeamMatchCreatePageView } from './team-matches-page';
@@ -279,7 +280,7 @@ function draftFromEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     ...buildDefaultDraft(),
     title: edit.form.title,
     description: edit.form.description ?? '',
-    grade: parsed.grade,
+    grade: levelCodeToDraftGrade(edit.form.minLevelCode) ?? parsed.grade,
     format: parsed.format,
     style: parsed.style,
     uniform: parsed.uniform,
@@ -292,6 +293,14 @@ function draftFromEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     startTime: start.toTimeString().slice(0, 5),
     endTime: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5),
   };
+}
+
+function levelCodeToDraftGrade(code?: string | null) {
+  if (code === 'advanced') return 'A';
+  if (code === 'intermediate') return 'B';
+  if (code === 'novice') return 'C';
+  if (code === 'beginner') return 'D';
+  return null;
 }
 
 function buildPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string): V1TeamMatchMutationPayload | null {
@@ -314,6 +323,8 @@ function buildPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string
     addressText: draft.address.trim() || null,
     costNote: `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원`,
     rulesText: [draft.grade, draft.format, draft.style, draft.uniform].filter(Boolean).join(' · ') || null,
+    minLevelCode: labelToLevelCode(draft.grade),
+    maxLevelCode: labelToLevelCode(draft.grade),
     genderRule: normalizeGenderRule(draft.gender),
   };
 }

@@ -100,6 +100,17 @@ async function seedSports() {
   return result;
 }
 
+async function getLevelRangeIds(sportId: string, minCode: (typeof levels)[number][0], maxCode: (typeof levels)[number][0]) {
+  const found = await prisma.v1SportLevel.findMany({
+    where: { sportId, code: { in: [minCode, maxCode] } },
+    select: { id: true, code: true },
+  });
+  return {
+    minSportLevelId: found.find((level) => level.code === minCode)?.id ?? null,
+    maxSportLevelId: found.find((level) => level.code === maxCode)?.id ?? null,
+  };
+}
+
 async function seedRegions() {
   const parents = [
     ['seoul', '서울', 1, 37.5665, 126.9780],
@@ -340,6 +351,8 @@ async function seedUsers() {
 }
 
 async function seedTeams(userIds: Record<string, string>, sportIds: Record<string, string>, regionId: string) {
+  const runningNoviceIntermediate = await getLevelRangeIds(sportIds.running, 'novice', 'intermediate');
+  const futsalBeginnerAdvanced = await getLevelRangeIds(sportIds.futsal, 'beginner', 'advanced');
   const ownerTeam = await prisma.v1Team.upsert({
     where: { id: '00000000-0000-4000-8000-000000000101' },
     update: {
@@ -365,6 +378,7 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
           description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
           activityNote: '주 2회 러닝',
           skillNote: '초보부터 중수까지',
+          ...runningNoviceIntermediate,
           genderRule: '성별 무관',
         },
       },
@@ -402,9 +416,33 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
       profile: {
         create: {
           description: '주말 풋살 상대를 찾는 v1 seed 팀입니다.',
+          ...futsalBeginnerAdvanced,
           genderRule: '남',
         },
       },
+    },
+  });
+
+  await prisma.v1TeamProfile.upsert({
+    where: { teamId: ownerTeam.id },
+    update: { skillNote: '초보부터 중수까지', ...runningNoviceIntermediate, genderRule: '성별 무관' },
+    create: {
+      teamId: ownerTeam.id,
+      description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
+      activityNote: '주 2회 러닝',
+      skillNote: '초보부터 중수까지',
+      ...runningNoviceIntermediate,
+      genderRule: '성별 무관',
+    },
+  });
+  await prisma.v1TeamProfile.upsert({
+    where: { teamId: applicantTeam.id },
+    update: { ...futsalBeginnerAdvanced, genderRule: '남' },
+    create: {
+      teamId: applicantTeam.id,
+      description: '주말 풋살 상대를 찾는 v1 seed 팀입니다.',
+      ...futsalBeginnerAdvanced,
+      genderRule: '남',
     },
   });
 
@@ -428,11 +466,13 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
 }
 
 async function seedMatches(userIds: Record<string, string>, sportIds: Record<string, string>, regionId: string) {
+  const runningNoviceIntermediate = await getLevelRangeIds(sportIds.running, 'novice', 'intermediate');
   const match = await prisma.v1Match.upsert({
     where: { id: '00000000-0000-4000-8000-000000000201' },
     update: {
       title: '강남 저녁 러닝 멤버 모집',
       status: 'recruiting',
+      ...runningNoviceIntermediate,
     },
     create: {
       id: '00000000-0000-4000-8000-000000000201',
@@ -447,6 +487,7 @@ async function seedMatches(userIds: Record<string, string>, sportIds: Record<str
       endAt: new Date('2026-05-20T11:00:00.000Z'),
       maxParticipants: 6,
       levelNote: '초보 환영',
+      ...runningNoviceIntermediate,
       genderRule: '성별 무관',
       costNote: '무료',
       status: 'recruiting',
@@ -477,12 +518,14 @@ async function seedTeamMatches(
   ownerTeamId: string,
   applicantTeamId: string,
 ) {
+  const futsalIntermediate = await getLevelRangeIds(sportIds.futsal, 'intermediate', 'intermediate');
   const teamMatch = await prisma.v1TeamMatch.upsert({
     where: { id: '00000000-0000-4000-8000-000000000301' },
     update: {
       title: '토요일 풋살 상대팀 모집',
       status: 'recruiting',
       genderRule: '남',
+      ...futsalIntermediate,
     },
     create: {
       id: '00000000-0000-4000-8000-000000000301',
@@ -497,6 +540,7 @@ async function seedTeamMatches(
       startAt: new Date('2026-05-23T05:00:00.000Z'),
       endAt: new Date('2026-05-23T07:00:00.000Z'),
       formatNote: '6:6',
+      ...futsalIntermediate,
       genderRule: '남',
       costNote: '구장비 N분의 1',
       status: 'recruiting',
@@ -904,11 +948,12 @@ async function seedCoverageTeams(
     });
 
     const genderRule = index % 3 === 0 ? '여' : index % 3 === 1 ? '남' : '성별 무관';
+    const levelRange = await getLevelRangeIds(sportIds.futsal, 'beginner', 'advanced');
 
     await prisma.v1TeamProfile.upsert({
       where: { teamId: id },
-      update: { description: `${name} seed coverage`, activityNote: '상태 커버리지', skillNote: '전체 레벨', genderRule },
-      create: { teamId: id, description: `${name} seed coverage`, activityNote: '상태 커버리지', skillNote: '전체 레벨', genderRule },
+      update: { description: `${name} seed coverage`, activityNote: '상태 커버리지', skillNote: '전체 레벨', ...levelRange, genderRule },
+      create: { teamId: id, description: `${name} seed coverage`, activityNote: '상태 커버리지', skillNote: '전체 레벨', ...levelRange, genderRule },
     });
 
     await prisma.v1TeamTrustScore.upsert({
@@ -996,10 +1041,12 @@ async function seedCoverageMatches(
   sportIds: Record<string, string>,
   regionId: string,
 ) {
+  const runningAllLevels = await getLevelRangeIds(sportIds.running, 'beginner', 'advanced');
   const statuses = ['recruiting', 'closed', 'cancelled', 'completed', 'archived'] as const;
   for (const [index, status] of statuses.entries()) {
     const id = `00000000-0000-4000-8000-00000000130${index + 1}`;
     const genderRule = index % 3 === 0 ? '성별 무관' : index % 3 === 1 ? '남' : '여';
+    const levelRange = await getLevelRangeIds(sportIds.running, 'beginner', 'advanced');
     await prisma.v1Match.upsert({
       where: { id },
       update: {
@@ -1011,6 +1058,7 @@ async function seedCoverageMatches(
         startAt: futureStart,
         endAt: futureEnd,
         genderRule,
+        ...levelRange,
         cancelledAt: status === 'cancelled' ? seedNow : null,
         completedAt: status === 'completed' ? seedNow : null,
       },
@@ -1027,6 +1075,7 @@ async function seedCoverageMatches(
         endAt: futureEnd,
         maxParticipants: 6,
         levelNote: '상태 커버리지',
+        ...levelRange,
         genderRule,
         costNote: '무료',
         status,
@@ -1046,6 +1095,7 @@ async function seedCoverageMatches(
       status: 'recruiting',
       startAt: pastStart,
       endAt: pastEnd,
+      ...runningAllLevels,
       genderRule: '성별 무관',
     },
     create: {
@@ -1060,6 +1110,7 @@ async function seedCoverageMatches(
       startAt: pastStart,
       endAt: pastEnd,
       maxParticipants: 6,
+      ...runningAllLevels,
       genderRule: '성별 무관',
       status: 'recruiting',
     },
@@ -1128,6 +1179,7 @@ async function seedCoverageTeamMatches(
   sportIds: Record<string, string>,
   regionId: string,
 ) {
+  const futsalIntermediate = await getLevelRangeIds(sportIds.futsal, 'intermediate', 'intermediate');
   const statuses = ['recruiting', 'matched', 'cancelled', 'completed', 'archived'] as const;
   for (const [index, status] of statuses.entries()) {
     const id = `00000000-0000-4000-8000-00000000140${index + 1}`;
@@ -1144,6 +1196,7 @@ async function seedCoverageTeamMatches(
         approvedApplicantTeamId: status === 'matched' ? '00000000-0000-4000-8000-000000001202' : null,
         startAt: futureStart,
         endAt: futureEnd,
+        ...futsalIntermediate,
         genderRule,
         cancelledAt: status === 'cancelled' ? seedNow : null,
         completedAt: status === 'completed' ? seedNow : null,
@@ -1161,6 +1214,7 @@ async function seedCoverageTeamMatches(
         startAt: futureStart,
         endAt: futureEnd,
         formatNote: '6:6',
+        ...futsalIntermediate,
         genderRule,
         costNote: '구장비 N분의 1',
         status,
@@ -1182,6 +1236,7 @@ async function seedCoverageTeamMatches(
       status: 'recruiting',
       startAt: pastStart,
       endAt: pastEnd,
+      ...futsalIntermediate,
       genderRule: '성별 무관',
     },
     create: {
@@ -1196,6 +1251,7 @@ async function seedCoverageTeamMatches(
       placeAddress: '서울 송파구',
       startAt: pastStart,
       endAt: pastEnd,
+      ...futsalIntermediate,
       genderRule: '성별 무관',
       status: 'recruiting',
     },
@@ -1293,9 +1349,10 @@ async function seedHostChatDemoData(
   await upsertMessage('00000000-0000-4000-8000-000000000402', primaryMatchRoom.id, userIds['host@teameet.v1'], '네, 조끼랑 물 챙겨갈게요', new Date('2026-05-18T08:52:00.000Z'));
   await upsertMessage('00000000-0000-4000-8000-000000000403', primaryMatchRoom.id, userIds['applicant@teameet.v1'], '오늘 경기 준비물 확인해 주세요', new Date('2026-05-18T09:00:00.000Z'));
 
+  const extraMatchLevels = await getLevelRangeIds(sportIds.running, 'beginner', 'novice');
   const extraMatch = await prisma.v1Match.upsert({
     where: { id: '00000000-0000-4000-8000-000000000202' },
-    update: { title: '강동 러닝 번개', status: 'recruiting' },
+    update: { title: '강동 러닝 번개', status: 'recruiting', ...extraMatchLevels },
     create: {
       id: '00000000-0000-4000-8000-000000000202',
       hostUserId: userIds['host@teameet.v1'],
@@ -1309,6 +1366,7 @@ async function seedHostChatDemoData(
       endAt: new Date('2026-05-24T11:00:00.000Z'),
       maxParticipants: 8,
       levelNote: '입문-초보',
+      ...extraMatchLevels,
       genderRule: '여',
       costNote: '무료',
       status: 'recruiting',
@@ -1346,9 +1404,10 @@ async function seedHostChatDemoData(
   await upsertMessage('00000000-0000-4000-8000-000000000413', primaryTeamMatchRoom.id, userIds['owner@teameet.v1'], '상대팀 유니폼은 흰색입니다', new Date('2026-05-17T21:10:00.000Z'));
   await prisma.v1ChatRoomParticipant.update({ where: { chatRoomId_userId: { chatRoomId: primaryTeamMatchRoom.id, userId: userIds['host@teameet.v1'] } }, data: { lastReadMessageId: teamMatchRead.id } });
 
+  const extraTeamMatchLevels = await getLevelRangeIds(sportIds.futsal, 'novice', 'novice');
   const extraTeamMatch = await prisma.v1TeamMatch.upsert({
     where: { id: '00000000-0000-4000-8000-000000000302' },
-    update: { title: '잠실 교환매치', status: 'recruiting' },
+    update: { title: '잠실 교환매치', status: 'recruiting', ...extraTeamMatchLevels },
     create: {
       id: '00000000-0000-4000-8000-000000000302',
       hostTeamId: ownerTeamId,
@@ -1362,6 +1421,7 @@ async function seedHostChatDemoData(
       startAt: new Date('2026-05-25T10:00:00.000Z'),
       endAt: new Date('2026-05-25T12:00:00.000Z'),
       formatNote: '6:6',
+      ...extraTeamMatchLevels,
       genderRule: '여',
       costNote: '구장비 N분의 1',
       status: 'recruiting',

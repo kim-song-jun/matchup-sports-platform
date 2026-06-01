@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam } from '@/hooks/use-v1-api';
+import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
 import { TeamFormPageView } from './teams-page';
@@ -84,7 +85,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       sports: [query.data.sport.name],
       city: query.data.region?.name ?? '',
       county: '',
-      level: query.data.profile.skillLevelText ?? '',
+      level: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? '',
       genderRule: query.data.profile.genderRule ?? '성별 무관',
       activity: query.data.profile.activityAreaText ?? '',
       capacity: query.data.profile.memberGoalCount ?? query.data.memberCount,
@@ -196,6 +197,7 @@ function buildModel({
 
 function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinPolicy: 'approval_required' | 'closed'): V1TeamMutationPayload | null {
   if (!sportId || !regionId || !draft.name.trim()) return null;
+  const [minLevelText, maxLevelText] = parseDraftLevelRange(draft.level);
   return {
     sportId,
     regionId,
@@ -206,10 +208,19 @@ function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinP
     introduction: draft.description.trim() || null,
     activityAreaText: draft.activity.trim() || null,
     skillLevelText: draft.level.trim() || null,
+    minLevelCode: minLevelText ? labelToLevelCode(minLevelText) : null,
+    maxLevelCode: maxLevelText ? labelToLevelCode(maxLevelText) : null,
     genderRule: normalizeGenderRule(draft.genderRule),
     joinPolicy,
     memberGoalCount: Number(draft.capacity) || null,
   };
+}
+
+function parseDraftLevelRange(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === '전체 레벨') return ['입문', '고수'] as const;
+  const [minLevel, maxLevel] = trimmed.split(/[-~]/).map((item) => item.trim()).filter(Boolean);
+  return [minLevel ?? trimmed, maxLevel ?? minLevel ?? trimmed] as const;
 }
 
 function normalizeGenderRule(value?: string | null) {

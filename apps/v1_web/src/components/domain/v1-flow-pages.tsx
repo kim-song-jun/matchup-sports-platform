@@ -310,7 +310,7 @@ function toFlowMatch(match: V1Match | undefined, fallback: MockMatch): MockMatch
     id: match.id,
     title: match.title,
     sport: match.sportName,
-    level: match.levelLabel,
+    level: match.levelLabel ?? fallback.level,
     place: match.placeName,
     schedule: formatShortDate(match.startsAt),
     capacity: match.capacityText,

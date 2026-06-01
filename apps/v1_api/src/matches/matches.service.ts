@@ -8,6 +8,7 @@ import {
 import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ApproveMatchApplicationDto,
   CreateMatchApplicationDto,
@@ -20,6 +21,8 @@ import { CancelMatchDto, MutateMatchDto, UpdateMatchDto } from './dto/mutate-mat
 
 type MatchWithRelations = V1Match & {
   sport: { id: string; name: string };
+  minSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
+  maxSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
   region: { id: string; name: string } | null;
   participants: Array<
     V1MatchParticipant & {
@@ -47,6 +50,7 @@ export class MatchesService {
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.regionId ? { regionId: query.regionId } : {}),
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
+      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(query.query
         ? {
             OR: [
@@ -167,6 +171,9 @@ export class MatchesService {
       participantCount: this.getParticipantCount(match),
       status: this.getApiStatus(match),
       displayState: this.getDisplayState(match),
+      levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
+      minLevel: match.minSportLevel ? { code: match.minSportLevel.code, name: match.minSportLevel.name } : null,
+      maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
       rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
       genderRule: match.genderRule,
       approvalRequired: true,
@@ -218,6 +225,7 @@ export class MatchesService {
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const match = await tx.v1Match.create({
         data: {
           hostUserId: user.id,
@@ -232,6 +240,8 @@ export class MatchesService {
           endAt: dates.endsAt,
           maxParticipants: dto.capacity,
           levelNote: dto.rulesText ?? null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           status: 'recruiting',
         },
@@ -293,6 +303,8 @@ export class MatchesService {
         manualPlaceName: match.placeName,
         addressText: match.placeAddress,
         rulesText: match.levelNote,
+        minLevelCode: match.minSportLevel?.code ?? null,
+        maxLevelCode: match.maxSportLevel?.code ?? null,
         genderRule: match.genderRule,
       },
       status: this.getApiStatus(match),
@@ -314,6 +326,7 @@ export class MatchesService {
 
     const dates = this.validateMatchDates(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
+    const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const participantCount = await this.getActiveParticipantCount(match.id);
 
     if (dto.capacity < participantCount) {
@@ -334,6 +347,8 @@ export class MatchesService {
         endAt: dates.endsAt,
         maxParticipants: dto.capacity,
         levelNote: dto.rulesText ?? null,
+        minSportLevelId: levelRange.minSportLevelId,
+        maxSportLevelId: levelRange.maxSportLevelId,
         genderRule: dto.genderRule ?? null,
       },
     });
@@ -703,6 +718,8 @@ export class MatchesService {
   private matchInclude(user: V1AuthUser | null) {
     return {
       sport: { select: { id: true, name: true } },
+      minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
+      maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
       region: { select: { id: true, name: true } },
       participants: {
         where: { status: { in: ['active', 'completed'] } },
@@ -748,6 +765,9 @@ export class MatchesService {
       participantCount: this.getParticipantCount(match),
       status: this.getApiStatus(match),
       displayState: this.getDisplayState(match),
+      levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
+      minLevel: match.minSportLevel ? { code: match.minSportLevel.code, name: match.minSportLevel.name } : null,
+      maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
       rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
       genderRule: match.genderRule,
       approvalRequired: true,
@@ -893,6 +913,10 @@ export class MatchesService {
   private async getHostMatch(user: V1AuthUser, matchId: string) {
     const match = await this.prisma.v1Match.findFirst({
       where: { id: matchId, deletedAt: null },
+      include: {
+        minSportLevel: { select: { code: true } },
+        maxSportLevel: { select: { code: true } },
+      },
     });
 
     if (!match) {

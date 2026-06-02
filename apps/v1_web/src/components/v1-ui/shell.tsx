@@ -92,7 +92,7 @@ export function AppChrome({
           </div>
         </header>
       ) : null}
-      <main className="tm-scroll-area" style={{ paddingBottom: bottomNav ? 12 : 0 }}>
+      <main className="tm-scroll-area" style={{ paddingBottom: bottomNav ? 'var(--v1-shell-scroll-bottom-pad)' : 0 }}>
         {children}
       </main>
       {floatingSlot}

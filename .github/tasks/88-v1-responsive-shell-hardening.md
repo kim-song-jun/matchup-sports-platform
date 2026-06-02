@@ -66,14 +66,15 @@ This task is a responsive stability pass, not a redesign. Colors, typography, ca
 
 ## Implementation Plan
 
-- [ ] 1. Add v1 shell/layout tokens while preserving current values.
+- [x] 1. Add v1 shell/layout tokens while preserving current values.
   - Planned files:
     - `apps/v1_web/src/app/globals.css`
+    - `apps/v1_web/src/components/v1-ui/shell.tsx`
   - Expected behavior:
     - Existing visual result remains the same around `375px`.
     - Width, padding, topbar, bottom nav, CTA, and safe-area dimensions become token-driven.
 
-- [ ] 2. Evolve `AppChrome` toward the v1 canonical shell.
+- [x] 2. Evolve `AppChrome` toward the v1 canonical shell.
   - Planned files:
     - `apps/v1_web/src/components/v1-ui/shell.tsx`
     - `apps/v1_web/src/app/globals.css`
@@ -82,7 +83,7 @@ This task is a responsive stability pass, not a redesign. Colors, typography, ca
     - Shell becomes responsive across `320-480px`.
     - Legacy `tm-*` class usage remains as compatibility where needed.
 
-- [ ] 3. Bring `/search` under the same v1 shell sizing rules.
+- [x] 3. Bring `/search` under the same v1 shell sizing rules.
   - Planned files:
     - `apps/v1_web/src/components/search/search-experience.tsx`
     - `apps/v1_web/src/app/globals.css`
@@ -90,7 +91,7 @@ This task is a responsive stability pass, not a redesign. Colors, typography, ca
     - Search still looks like the current search page.
     - Search no longer owns a separate inline `375px` app frame.
 
-- [ ] 4. Fix main-tab responsive pressure points.
+- [x] 4. Fix main-tab responsive pressure points.
   - Routes:
     - `/home`
     - `/matches`
@@ -152,6 +153,15 @@ Record every change in this section before or immediately after editing.
 - Created task document for v1 responsive shell hardening.
 - No frontend runtime code changed yet in this task.
 
+### 2026-06-02
+
+- Step 1 complete: added `--v1-shell-*` layout tokens for frame width, topbar height, bottom-nav height, page padding, CTA bottom padding, and safe-area bottom inset.
+- Connected `tm-*` compatibility shell, fixed CTA/filter surfaces, and `v1-*` shell dimensions to the new tokens without changing baseline values.
+- Updated `AppChrome` scroll-area bottom padding to consume `--v1-shell-scroll-bottom-pad`.
+- Step 2 complete: added `--v1-app-chrome-frame-width` and moved `AppChrome` frame, fixed CTA, and filter overlay surfaces to a 480px max frame while preserving the 375px baseline and leaving auth/design reference frames unchanged.
+- Step 3 complete: replaced `/search` inline `375px` frame, topbar height, horizontal content padding, and error toast bottom spacing with the v1 shell tokens.
+- Step 4 complete: added narrow-viewport wrapping for main-tab quick actions, match/team summary rows, card footer rows, and my-page card actions without changing the default design state.
+
 ## Backup / Rollback Map
 
 Use this section to identify exactly what can be reverted if a step changes the design unexpectedly.
@@ -159,21 +169,21 @@ Use this section to identify exactly what can be reverted if a step changes the 
 | Step | Files | Rollback Strategy |
 | --- | --- | --- |
 | Documentation setup | `.github/tasks/88-v1-responsive-shell-hardening.md` | Revert this task doc only if the work is abandoned. |
-| Shell tokens | TBD | Revert CSS token block and class references from the same commit/diff chunk. |
-| `AppChrome` shell update | TBD | Revert `shell.tsx` and matching CSS shell changes together. |
-| Search shell alignment | TBD | Revert `search-experience.tsx` and matching search CSS changes together. |
-| Page-specific fixes | TBD | Revert each route/component fix independently. |
+| Shell tokens | `apps/v1_web/src/app/globals.css`, `apps/v1_web/src/components/v1-ui/shell.tsx` | Revert CSS token block and class references from the same commit/diff chunk. |
+| `AppChrome` shell update | `apps/v1_web/src/app/globals.css` | Revert `--v1-app-chrome-frame-width` and `.tm-app-frame` / `.tm-fixed-cta` / filter layer width references together. |
+| Search shell alignment | `apps/v1_web/src/components/search/search-experience.tsx` | Revert search inline token references to the prior fixed values. |
+| Page-specific fixes | `apps/v1_web/src/app/globals.css` | Revert the `@media (max-width: 360px)` main-tab wrapping rules and related `min-width: 0` safeguards. |
 
 ## Validation Log
 
 Record commands, route checks, and viewport observations here.
 
-- Pending.
+- 2026-06-02: `pnpm --filter v1_web exec tsc --noEmit` passed after Steps 1-4.
 
 ## Progress Snapshot
 
-- Current step: planning/documentation setup before code edits.
-- Next step: implement v1 shell/layout tokens with no visual redesign.
+- Current step: Step 4 main-tab responsive pressure points complete.
+- Next step: Step 5 fix utility responsive pressure points.
 
 ## Ambiguity Log
 

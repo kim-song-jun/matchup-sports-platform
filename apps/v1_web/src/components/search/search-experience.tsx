@@ -115,8 +115,8 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const effectiveShowStateMessage = effectiveViewState === 'empty' || effectiveViewState === 'error' || effectiveViewState === 'stale';
 
   return (
-    <div style={{ width: 'min(100%, 375px)', height: '100dvh', margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-      <form onSubmit={submit} style={{ minHeight: 56, padding: '8px 10px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
+    <div style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100dvh', margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <form onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 10px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
         <button type="button" aria-label="back" onClick={goBack} style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />
         </button>
@@ -143,7 +143,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
         </div>
       </form>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '18px 20px 22px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '18px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom))' }}>
         <div className="tm-text-label">최근 검색</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           {(recentSearches.data?.items ?? []).map((item, index) => (
@@ -216,7 +216,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       </div>
 
       {effectiveViewState === 'error' ? (
-        <div style={{ position: 'absolute', left: 20, right: 20, bottom: 22, minHeight: 48, borderRadius: 14, background: 'rgba(25,31,40,.94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', fontSize: 13, fontWeight: 700 }}>
+        <div style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 14, background: 'rgba(25,31,40,.94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', fontSize: 13, fontWeight: 700 }}>
           새로고침이 필요합니다. 잠시 후 다시 검색해 주세요.
         </div>
       ) : null}

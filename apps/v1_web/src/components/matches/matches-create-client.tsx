@@ -38,6 +38,10 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
+  useEffect(() => {
+    if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
+  }, [regionId, regionOptions]);
+
   const model = buildCreateModel({
     step,
     draft,

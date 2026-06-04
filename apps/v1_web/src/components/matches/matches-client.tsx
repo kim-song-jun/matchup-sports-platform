@@ -4,15 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApplyMatch,
-  useV1ApproveMatchApplication,
   useV1Match,
   useV1MatchApplicationEligibility,
-  useV1MatchApplications,
   useV1Matches,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
-  useV1RejectMatchApplication,
+  useV1ResolveChatRoom,
   useV1WithdrawMatchApplication,
 } from '@/hooks/use-v1-api';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
@@ -132,14 +130,13 @@ export function MatchListPageClient() {
 }
 
 export function MatchDetailPageClient({ matchId }: { matchId: string }) {
+  const router = useRouter();
   const query = useV1Match(matchId);
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
-  const applications = useV1MatchApplications(matchId, { status: 'requested', limit: 10 }, { enabled: viewerState === 'host' });
   const applyMatch = useV1ApplyMatch(matchId);
-  const approveApplication = useV1ApproveMatchApplication(matchId);
-  const rejectApplication = useV1RejectMatchApplication(matchId);
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
+  const resolveChatRoom = useV1ResolveChatRoom();
   const fallback = getMatchDetailViewModel();
 
   if (query.isError) {
@@ -155,15 +152,27 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
           address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
           rules: query.data.rulesText ? [query.data.rulesText] : fallback.match.rules,
-          participants: toParticipants(query.data, fallback.match.participants, applications.data?.items, {
-            pending: approveApplication.isPending || rejectApplication.isPending,
-            approve: (applicationId) => approveApplication.mutate({ applicationId }),
-            reject: (applicationId) => rejectApplication.mutate({ applicationId, reason: 'host_rejected_from_v1_web' }),
-          }),
+          manageHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
+          participants: toParticipants(
+            query.data,
+            fallback.match.participants,
+            viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
+          ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
         applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.message),
         applyPending: applyMatch.isPending || withdrawMatch.isPending,
+        statusLabel: statusLabel(viewerState, getStatus(query.data)),
+        chatLabel: chatLabel(viewerState),
+        chatPending: resolveChatRoom.isPending,
+        onChat: canOpenMatchChat(viewerState)
+          ? () => resolveChatRoom.mutate(
+              { targetType: 'match', targetId: matchId },
+              { onSuccess: (room) => router.push(room.route.replace('/chat/rooms/', '/chat/')) },
+            )
+          : undefined,
+        onShare: () => shareMatch(query.data),
+        onNotify: () => router.push('/notifications'),
         onApply: getApplyAction({
           viewerState,
           eligible: eligibility.data?.eligible,
@@ -197,7 +206,7 @@ function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
     host: match.host?.displayName ?? fallback.host,
     image: match.imageUrl ?? fallback.image,
     status,
-    deadline: status === 'open' ? '신청 가능' : status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : fallback.deadline,
+    deadline: formatDeadline(match.deadlineAt, status),
     actionLabel: actionLabel(status),
   };
 }
@@ -205,26 +214,22 @@ function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
 function toParticipants(
   match: V1Match,
   fallback: MatchDetailViewModel['match']['participants'],
-  applications?: Array<{ applicationId: string; displayName: string; message: string | null; status: string }>,
-  actions?: { pending: boolean; approve: (applicationId: string) => void; reject: (applicationId: string) => void },
+  manageHref?: string,
 ) {
-  if (applications?.length) {
-    return applications.map((application) => ({
-      name: application.displayName,
-      meta: application.message ? `신청 메시지 · ${application.message}` : '신청자',
-      status: application.status === 'requested' ? '승인 대기' : application.status,
-      actionPending: actions?.pending,
-      onApprove: actions ? () => actions.approve(application.applicationId) : undefined,
-      onReject: actions ? () => actions.reject(application.applicationId) : undefined,
-    }));
+  if (!match.participantsPreview?.length) {
+    return [{
+      name: match.host?.displayName ?? fallback[0]?.name ?? '호스트',
+      meta: '매치 만든 사람',
+      status: '승인완료',
+      href: manageHref,
+    }];
   }
 
-  if (!match.participantsPreview?.length) return fallback;
-
-  return match.participantsPreview.map((participant) => ({
+  return match.participantsPreview.filter((participant) => participant.role === 'host').map((participant) => ({
     name: participant.displayName,
-    meta: participant.role === 'host' ? '호스트' : '참가자',
+    meta: '매치 만든 사람',
     status: participant.status === 'confirmed' ? '승인완료' : participant.status,
+    href: manageHref,
   }));
 }
 
@@ -389,12 +394,58 @@ function applyLabel(viewerState: V1ViewerState, status: V1MatchApiStatus, messag
   return message && message !== '신청할 수 있습니다.' ? message : '참가 신청';
 }
 
+function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
+  if (viewerState === 'host') return '내가 만든 매치';
+  if (viewerState === 'requested') return '승인 대기';
+  if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
+  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 마감';
+  return '신청 가능';
+}
+
+function chatLabel(viewerState: V1ViewerState) {
+  return viewerState === 'approved' || viewerState === 'participant' ? '채팅' : '승인 후 채팅';
+}
+
+function canOpenMatchChat(viewerState: V1ViewerState) {
+  return viewerState === 'approved' || viewerState === 'participant';
+}
+
 function actionLabel(status: MatchCardModel['status']) {
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'full') return '신청 마감';
   if (status === 'mine') return '내 매치';
   return '승인제 신청';
+}
+
+function formatDeadline(value: string | null | undefined, status: MatchCardModel['status']) {
+  if (status === 'pending') return '승인 대기';
+  if (status === 'approved') return '승인 완료';
+  if (status === 'full') return '신청 마감';
+  if (status === 'mine') return '내 매치';
+  if (!value) return '신청 가능';
+
+  const deadline = new Date(value);
+  if (Number.isNaN(deadline.getTime())) return '신청 가능';
+  const diffMs = deadline.getTime() - Date.now();
+  if (diffMs <= 0) return '신청 마감';
+  const diffHours = Math.ceil(diffMs / 3_600_000);
+  if (diffHours < 24) return `마감 ${diffHours}시간 전`;
+  const diffDays = Math.ceil(diffHours / 24);
+  return `마감 ${diffDays}일 전`;
+}
+
+async function shareMatch(match: V1Match) {
+  const title = match.title;
+  const path = `/matches/${match.matchId ?? match.id}`;
+  const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
+
+  if (navigator.share) {
+    await navigator.share({ title, url });
+    return;
+  }
+
+  await navigator.clipboard?.writeText(url);
 }
 
 function getApplyAction({

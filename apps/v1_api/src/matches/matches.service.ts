@@ -147,7 +147,7 @@ export class MatchesService {
     }
 
     const viewer = this.getViewer(match, user);
-    const participantsPreview = match.participants.slice(0, 6).map((participant) => ({
+    const participantsPreview = match.participants.filter((participant) => participant.role === 'host').slice(0, 1).map((participant) => ({
       participantId: participant.id,
       userId: participant.userId,
       displayName:
@@ -166,7 +166,7 @@ export class MatchesService {
       place: { name: match.placeName, addressText: match.placeAddress },
       startsAt: match.startAt,
       endsAt: match.endAt,
-      deadlineAt: null,
+      deadlineAt: match.deadlineAt,
       capacity: match.maxParticipants,
       participantCount: this.getParticipantCount(match),
       status: this.getApiStatus(match),
@@ -238,6 +238,7 @@ export class MatchesService {
           placeAddress: dto.addressText ?? null,
           startAt: dates.startsAt,
           endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
           maxParticipants: dto.capacity,
           levelNote: dto.rulesText ?? null,
           minSportLevelId: levelRange.minSportLevelId,
@@ -298,7 +299,7 @@ export class MatchesService {
         imageUrl: match.imageUrl,
         startsAt: match.startAt,
         endsAt: match.endAt,
-        deadlineAt: null,
+        deadlineAt: match.deadlineAt,
         capacity: match.maxParticipants,
         manualPlaceName: match.placeName,
         addressText: match.placeAddress,
@@ -345,6 +346,7 @@ export class MatchesService {
         placeAddress: dto.addressText ?? null,
         startAt: dates.startsAt,
         endAt: dates.endsAt,
+        deadlineAt: dates.deadlineAt,
         maxParticipants: dto.capacity,
         levelNote: dto.rulesText ?? null,
         minSportLevelId: levelRange.minSportLevelId,
@@ -606,7 +608,11 @@ export class MatchesService {
     if (application.status !== 'requested') {
       throw stateConflict('Only requested applications can be approved');
     }
-    if (application.match.status !== 'recruiting' || application.match.startAt < new Date()) {
+    if (
+      application.match.status !== 'recruiting' ||
+      application.match.startAt < new Date() ||
+      (application.match.deadlineAt && application.match.deadlineAt < new Date())
+    ) {
       throw stateConflict('Match is not recruiting');
     }
 
@@ -760,7 +766,7 @@ export class MatchesService {
       place: { name: match.placeName, addressText: match.placeAddress },
       startsAt: match.startAt,
       endsAt: match.endAt,
-      deadlineAt: null,
+      deadlineAt: match.deadlineAt,
       capacity: match.maxParticipants,
       participantCount: this.getParticipantCount(match),
       status: this.getApiStatus(match),
@@ -844,6 +850,7 @@ export class MatchesService {
     if (viewerState === 'requested') return 'ALREADY_REQUESTED';
     if (viewerState === 'approved' || viewerState === 'participant') return 'ALREADY_PARTICIPANT';
     if (this.getParticipantCount(match) >= match.maxParticipants) return 'FULL';
+    if (match.deadlineAt && match.deadlineAt < new Date()) return 'DEADLINE_PASSED';
     if (match.status !== 'recruiting') return 'NOT_RECRUITING';
     return 'OK';
   }
@@ -862,6 +869,7 @@ export class MatchesService {
   private getDisplayState(match: MatchWithRelations) {
     if (match.status === 'recruiting' && match.startAt < new Date()) return 'expired';
     if (match.status === 'recruiting' && this.getParticipantCount(match) >= match.maxParticipants) return 'full';
+    if (match.status === 'recruiting' && match.deadlineAt && match.deadlineAt < new Date()) return 'closed';
     return match.status;
   }
 

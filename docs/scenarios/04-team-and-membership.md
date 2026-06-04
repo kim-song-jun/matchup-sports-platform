@@ -11,7 +11,7 @@
 
 - [x] TEAM-001 팀 생성 후 owner 관점 반영 (`e2e/tests/team-owner-flow.spec.ts`)
 - [x] TEAM-002 owner/manager 권한 차등 (`e2e/tests/team-manager-membership.spec.ts`)
-- [ ] TEAM-003 팀 목록/상세 fallback photo slot과 logo slot 분리 유지 (`visual/manual + follow-up automation`)
+- [ ] TEAM-003 팀 상세 이미지 슬롯 제거와 주요 멤버 공개 범위 표시 (`visual/manual + follow-up automation`)
 - [x] TEAM-004 일반 멤버 self-leave와 내 팀 동기화
 - [x] TEAM-005 owner role change / remove member 반영 (`TEAM-005-A/B` pass, `TEAM-005-C` planned)
 
@@ -85,16 +85,22 @@
 | `TEAM-002-B` | Negative | manager는 owner 전용 메뉴 없이 supported CTA만 본다 | Playwright | Automated | `team-manager-membership.spec.ts` |
 | `TEAM-002-C` | Negative | member는 읽기/탈퇴 수준 표면만 보고 owner 전용 CTA를 보지 못한다 | Playwright | Automated | `team-manager-membership.spec.ts` |
 
-## TEAM-003 fallback photo slot과 logo slot 분리
+## TEAM-003 팀 상세 이미지 슬롯 제거와 주요 멤버 공개 범위 표시
 
 ### Status
 
 - Planned for dedicated automation.
 - Current verification remains documented as visual/manual QA.
 
-### Blocker
+### Expected
 
-- photo/logo fallback assertions need stable DOM hooks on team list/detail media slots.
+- `/teams/:id` 상세에는 필수 별표, 복수 선택 보조 문구, 신뢰 신호, 이미지/업로드/추가 사진 슬롯이 노출되지 않는다.
+- 주요 멤버 행은 role/meta/status와 별도로 `공개` 또는 `비공개` 공개 범위를 표시한다.
+- `/teams/new`에는 이미지 업로드 UI가 없고 생성 전용 1단계 진행 표시가 노출된다.
+
+### Notes
+
+- 2026-06-04: 팀 이미지 슬롯 유지 전제를 폐기하고 사용자 피드백 기준으로 상세/생성의 이미지 업로드 affordance를 제거했다.
 
 ## TEAM-004 일반 멤버 self-leave와 내 팀 동기화
 

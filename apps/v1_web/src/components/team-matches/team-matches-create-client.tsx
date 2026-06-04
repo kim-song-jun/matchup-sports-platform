@@ -35,11 +35,15 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const [regionId, setRegionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const myTeams = normalizeMyTeams(teams.data);
+  const creatableTeams = myTeams?.filter((team) => team.canCreateTeamMatch) ?? [];
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
   useEffect(() => {
-    if (!selectedTeamId && myTeams?.[0]) setSelectedTeamId(myTeams[0].teamId);
-  }, [selectedTeamId, myTeams]);
+    if (!selectedTeamId && creatableTeams[0]) setSelectedTeamId(creatableTeams[0].teamId);
+    if (selectedTeamId && !creatableTeams.some((team) => team.teamId === selectedTeamId)) {
+      setSelectedTeamId(creatableTeams[0]?.teamId ?? '');
+    }
+  }, [creatableTeams, selectedTeamId]);
 
   useEffect(() => {
     if (!selectedSportId && sports.data?.[0]) setSelectedSportId(sports.data[0].id);
@@ -55,7 +59,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     selectedTeamId,
     selectedSportId,
     regionId,
-    teams: myTeams?.map((team) => ({ id: team.teamId, name: team.name, sport: team.sport.name, members: team.memberCount, role: team.canCreateTeamMatch ? '생성 권한' : team.role })) ?? [],
+    teams: creatableTeams.map((team) => ({ id: team.teamId, name: team.name, sport: team.sport.name, members: team.memberCount, role: team.role === 'owner' ? '팀장' : '관리자' })),
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
     regions: regionOptions,
     error,
@@ -212,9 +216,7 @@ function buildCreateModel({
     ...fallback,
     selectedTeam: selectedTeam?.name ?? fallback.selectedTeam,
     selectedSport: selectedSport?.name ?? fallback.selectedSport,
-    teams: teams.length
-      ? teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId }))
-      : fallback.teams,
+    teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId })),
     sports: sports.length ? sports.map((sport) => sport.name) : fallback.sports,
     draft,
     form: {

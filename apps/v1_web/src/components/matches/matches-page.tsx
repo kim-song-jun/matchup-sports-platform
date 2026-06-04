@@ -158,8 +158,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const { match, mode } = model;
   const locked = mode === 'pending' || mode === 'approved' || match.status === 'full';
   const canRunAction = Boolean(model.onApply);
-  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인완료' : mode === 'pending' ? '승인중' : match.status === 'full' ? '모집완료' : '참가 신청');
+  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
+  const showChat = mode === 'approved' && Boolean(model.onChat);
 
   return (
     <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
@@ -171,8 +172,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
               <div style={{ display: 'flex', gap: 4 }}>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유"><ShareIcon size={20} /></button>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림"><BellIcon size={20} /></button>
+                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={model.onShare}><ShareIcon size={20} /></button>
+                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
               </div>
             </div>
             <div>
@@ -190,27 +191,21 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         <div className="tm-match-detail-body">
           <InfoRow label="날짜와 시간" value={`${match.date} ${match.time}`} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
-          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${match.capacity - match.current}자리 남음`} />
+          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음`} />
           <InfoRow label="성별 조건" value={match.gender} />
-          <InfoRow label="신청 방식" value={match.actionLabel} sub="v1은 결제 없이 호스트 승인으로만 참가가 확정됩니다." />
-          {mode === 'pending' ? <StateCard tone="orange" title="신청 확인을 완료했어요" body="호스트가 승인하면 알림으로 알려드릴게요." /> : null}
-          {mode === 'approved' ? <StateCard tone="green" title="승인완료" body="참가가 확정되었습니다. 경기 전 안내를 계속 확인할 수 있습니다." /> : null}
-          <Card pad={16} style={{ marginTop: 14 }}>
-            <div className="tm-text-body-lg">매치 소개</div>
-            <p className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>{match.description}</p>
-          </Card>
+          {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
             <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               {match.participants.map((person) => (
                 <div key={person.name}>
-                  <ListItem title={person.name} sub={person.meta} trailing={person.status} />
-                  {person.onApprove || person.onReject ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-                      <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={person.actionPending} onClick={person.onApprove}>승인</button>
-                      <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={person.actionPending} onClick={person.onReject}>거절</button>
-                    </div>
-                  ) : null}
+                  {person.href ? (
+                    <Link href={person.href} aria-label={`${person.name} 관리 페이지로 이동`}>
+                      <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                    </Link>
+                  ) : (
+                    <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                  )}
                 </div>
               ))}
             </div>
@@ -219,16 +214,20 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       </article>
       <div className="tm-fixed-cta">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : locked ? '신청 상태' : '참가 신청 가능'}</span>
-          <span className="tm-text-label">{match.actionLabel}</span>
+          <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
+          <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: mode === 'mine' ? '1fr' : '104px 1fr', gap: 8 }}>
-          {mode !== 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/chat/room-1">채팅</Link> : null}
+        <div style={{ display: 'grid', gridTemplateColumns: showChat ? '104px 1fr' : '1fr', gap: 8 }}>
+          {showChat ? (
+            <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>
+              {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
+            </button>
+          ) : null}
           {mode === 'mine' ? (
-            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={`/matches/${match.id}/edit`}>{cta}</Link>
+            <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
           ) : (
             <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={model.onApply}>
-              {model.applyPending ? '신청 중' : cta}
+              {model.applyPending ? '처리 중' : cta}
             </button>
           )}
         </div>
@@ -236,7 +235,6 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
     </AppChrome>
   );
 }
-
 export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) {
   if (model.step === 'complete') return <MatchComplete model={model} />;
   const edit = model.step === 'edit';
@@ -545,9 +543,11 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
 }
 
 function ImageUploadField({ image, onChange }: { image: string; onChange?: (value: string) => void }) {
+  const [fileName, setFileName] = useState('');
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setFileName(file.name);
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') onChange?.(reader.result);
@@ -562,9 +562,15 @@ function ImageUploadField({ image, onChange }: { image: string; onChange?: (valu
       </div>
       <div style={{ padding: 14 }}>
         <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block">
-          이미지 업로드
+          {fileName ? '이미지 변경' : '이미지 업로드'}
           <input className="sr-only" type="file" accept="image/*" onChange={handleChange} />
         </label>
+        {fileName ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
+            <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
+            <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.('/mock/generated/futsal-rooftop.webp'); }}>제거</button>
+          </div>
+        ) : null}
       </div>
     </Card>
   );

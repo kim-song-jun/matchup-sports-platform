@@ -201,19 +201,18 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           activity: query.data.profile.activityAreaText ?? fallback.team.activity,
           condition: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.condition,
           genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
-          trustNote: trustNoteLabel(query.data.trust.trustState, query.data.trust.score),
           schedule: fallback.team.schedule,
           city: fallback.team.city,
           county: query.data.region?.name ?? fallback.team.county,
           level: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.level,
           contact: fallback.team.contact,
           links: fallback.team.links,
-          images: fallback.team.images,
           membersList: query.data.membersPreview.map((member) => ({
             name: member.displayName,
             role: roleLabel(member.role),
             meta: member.role,
             status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
+            visibility: member.role === 'owner' || member.role === 'manager' ? '공개' : '비공개',
           })),
         },
         mode: toDetailMode(query.data),
@@ -408,7 +407,6 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     trust: toTrustBadge(team.trustState ?? team.trust.trustState),
     genderRule: team.profile.genderRule ?? fallback.genderRule,
     intro: team.profile.introduction ?? fallback.intro,
-    manner: hasTrustValue(team.trust.trustState) && team.trust.score !== null ? String(team.trust.score) : '-',
   };
 }
 
@@ -458,16 +456,6 @@ function roleLabel(role: string) {
 function toTrustBadge(state: V1Team['trustState'] | V1TeamDetail['trustState']): TeamModel['trust'] {
   if (!state || state === 'none' || state === 'sample') return 'none';
   return state;
-}
-
-function hasTrustValue(state?: string | null) {
-  return state === 'verified' || state === 'estimated';
-}
-
-function trustNoteLabel(state: string, score: number | null) {
-  if (!hasTrustValue(state)) return '-';
-  const label = state === 'verified' ? '검증됨' : '추정';
-  return score === null ? label : `${label} · ${score}`;
 }
 
 function toMemberModel(

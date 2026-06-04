@@ -65,7 +65,6 @@ export type TeamDetailViewModel = {
     description: string;
     activity: string;
     condition: string;
-    trustNote: string;
     schedule: string;
     city: string;
     county: string;
@@ -73,8 +72,7 @@ export type TeamDetailViewModel = {
     genderRule: string;
     contact: string;
     links: Array<{ label: string; value: string }>;
-    images: Array<{ title: string; count: number; max?: number; example?: boolean }>;
-    membersList: Array<{ name: string; role: string; meta: string; status: string }>;
+    membersList: Array<{ name: string; role: string; meta: string; status: string; visibility: '공개' | '비공개' }>;
   };
   mode: 'default' | 'pending' | 'mine' | 'closed';
   ctaLabel?: string;

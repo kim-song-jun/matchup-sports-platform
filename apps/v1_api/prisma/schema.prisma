@@ -509,6 +509,7 @@ model V1Match {
   placeAddress    String?       @map("place_address")
   startAt         DateTime      @map("start_at")
   endAt           DateTime?     @map("end_at")
+  deadlineAt      DateTime?     @map("deadline_at")
   maxParticipants Int           @map("max_participants")
   levelNote       String?       @map("level_note")
   minSportLevelId String?       @map("min_sport_level_id")

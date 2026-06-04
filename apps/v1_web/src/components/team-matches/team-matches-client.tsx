@@ -4,13 +4,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApplyTeamMatch,
-  useV1ApproveTeamMatchApplication,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
-  useV1RejectTeamMatchApplication,
+  useV1ResolveChatRoom,
   useV1TeamMatch,
-  useV1TeamMatchApplications,
   useV1TeamMatchEligibility,
   useV1TeamMatches,
   useV1WithdrawTeamMatchApplication,
@@ -143,13 +141,12 @@ export function TeamMatchListPageClient() {
 }
 
 export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string }) {
+  const router = useRouter();
   const query = useV1TeamMatch(teamMatchId);
   const viewerState = query.data ? getViewerState(query.data) : 'none';
   const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' });
-  const applications = useV1TeamMatchApplications(teamMatchId, { status: 'requested', limit: 10 }, { enabled: viewerState === 'host_team' });
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
-  const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
-  const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
+  const resolveChatRoom = useV1ResolveChatRoom();
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
   const fallback = getTeamMatchDetailViewModel();
@@ -164,15 +161,28 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           ...toTeamMatch(query.data, fallback.match),
           description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
           address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
-          applicantTeams: toApplicantTeams(query.data, fallback.match.applicantTeams, applications.data?.items, {
-            pending: approveApplication.isPending || rejectApplication.isPending,
-            approve: (applicationId) => approveApplication.mutate({ applicationId }),
-            reject: (applicationId) => rejectApplication.mutate({ applicationId, reason: 'host_rejected_from_v1_web' }),
-          }),
+          hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
+          manageHref: viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
+          applicantTeams: toApplicantTeams(
+            query.data,
+            fallback.match.applicantTeams,
+            viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
+          ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
         applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility),
         applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+        statusLabel: statusLabel(viewerState, getStatus(query.data)),
+        chatLabel: chatLabel(viewerState, getStatus(query.data)),
+        chatPending: resolveChatRoom.isPending,
+        onChat: canOpenTeamMatchChat(viewerState, getStatus(query.data))
+          ? () => resolveChatRoom.mutate(
+              { targetType: 'team_match', targetId: teamMatchId },
+              { onSuccess: (room) => router.push(room.route.replace('/chat/rooms/', '/chat/')) },
+            )
+          : undefined,
+        onShare: () => shareTeamMatch(query.data),
+        onNotify: () => router.push('/notifications'),
         onApply: getApplyAction({
           viewerState,
           selectedTeamId: selectedEligibility?.teamId,
@@ -327,30 +337,13 @@ function countTeamMatchFilters(
 function toApplicantTeams(
   match: V1TeamMatch,
   fallback: TeamMatchDetailViewModel['match']['applicantTeams'],
-  applications?: Array<{
-    applicationId: string;
-    status: string;
-    message: string | null;
-    applicantTeam: { name: string; score: number | null; matchCount: number };
-  }>,
-  actions?: { pending: boolean; approve: (applicationId: string) => void; reject: (applicationId: string) => void },
+  manageHref?: string,
 ) {
-  if (applications?.length) {
-    return applications.map((application) => ({
-      name: application.applicantTeam.name,
-      meta: `${application.applicantTeam.score ?? '-'} · ${application.applicantTeam.matchCount}경기${application.message ? ` · ${application.message}` : ''}`,
-      status: application.status === 'requested' ? '신청대기' : application.status,
-      actionPending: actions?.pending,
-      onApprove: application.status === 'requested' && actions ? () => actions.approve(application.applicationId) : undefined,
-      onReject: application.status === 'requested' && actions ? () => actions.reject(application.applicationId) : undefined,
-    }));
-  }
-
   if (match.approvedOpponentTeam) {
-    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인완료' }];
+    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인완료', href: manageHref }];
   }
 
-  return fallback;
+  return fallback.map((team) => ({ ...team, href: manageHref }));
 }
 
 function getStatus(match: V1TeamMatch): V1TeamMatchApiStatus {
@@ -386,6 +379,35 @@ function applyLabel(
   if (status !== 'recruiting') return '신청 불가';
   if (team?.eligible) return `${team.name}으로 신청`;
   return reasonLabel(team?.reasonCode);
+}
+
+function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
+  if (viewerState === 'host_team') return '내가 만든 팀매치';
+  if (viewerState === 'requested') return '승인 대기';
+  if (viewerState === 'approved' || status === 'matched') return '승인 완료';
+  if (status !== 'recruiting') return '신청 마감';
+  return '신청 가능';
+}
+
+function chatLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
+  return canOpenTeamMatchChat(viewerState, status) ? '채팅' : '승인 후 채팅';
+}
+
+function canOpenTeamMatchChat(viewerState: V1TeamMatchViewerState, _status: V1TeamMatchApiStatus) {
+  return viewerState === 'approved';
+}
+
+async function shareTeamMatch(match: V1TeamMatch) {
+  const title = match.title;
+  const path = `/team-matches/${match.teamMatchId ?? match.id}`;
+  const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
+
+  if (navigator.share) {
+    await navigator.share({ title, url });
+    return;
+  }
+
+  await navigator.clipboard?.writeText(url);
 }
 
 function getApplyAction({

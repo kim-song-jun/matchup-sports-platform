@@ -38,10 +38,12 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 ## State And Permissions
 
 - Team match create immediately publishes `recruiting`.
+- Create UI must source host team choices from the current user's active owner/manager teams. Member-only teams are not valid host team options.
 - Applicant is a team, not a user.
 - Applicant team must be managed by the acting user.
 - Host team cannot apply to itself.
 - Approval moves the selected application to `approved` and the team match to `matched`; only one applicant team can be approved.
+- Team match chat is available only after an applicant team has been approved/matched.
 - `costNote` is text-only. No payment API is called.
 
 Primary tables:

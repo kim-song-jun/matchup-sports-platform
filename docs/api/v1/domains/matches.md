@@ -59,6 +59,8 @@
 ## State And Permissions
 
 - Create publishes a `recruiting` match and creates/keeps the host participant contract.
+- Detail `participantCount` includes the host participant. `participantsPreview` is limited to the host on the detail surface.
+- `deadlineAt` is persisted and returned on list/detail/edit responses. Once it passes, application eligibility returns `DEADLINE_PASSED` and the display state is treated as closed for CTA purposes.
 - Apply creates a `requested` application. There is no payment or checkout step.
 - Host approval creates or activates a participant and updates capacity-derived CTA state.
 - Withdraw/reject/cancel preserve history through application/status rows.

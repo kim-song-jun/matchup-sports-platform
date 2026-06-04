@@ -42,17 +42,17 @@ Every numbered step in this task requires explicit user approval before implemen
 
 ## Acceptance Criteria
 
-- [ ] Completed personal matches unlock eligible review targets only for approved/active participants.
-- [ ] Completed team matches unlock eligible opposing team review targets only for valid participating team members.
-- [ ] Cancelled, not-participated, disputed, expired, and self-review cases are locked with concrete reasons.
-- [ ] A user can submit rating `1-5` and one or more predefined review tags for an eligible target.
-- [ ] Duplicate submissions for the same reviewer, target, and event do not create duplicate records.
-- [ ] Written reviews appear in the written tab.
-- [ ] Received reviews appear grouped by event.
-- [ ] Submitting a personal match review updates target user reputation summary using a clearly documented real-data signal.
-- [ ] Submitting a team match review updates target team trust score using a clearly documented real-data signal.
-- [ ] Frontend uses v1 shared shell/components/tokens and follows `14 리뷰 최종` design intent.
-- [ ] API, DTO, frontend hooks/types, seed/fixtures, scenarios, and tests are synced in the same change set.
+- [x] Completed personal matches unlock eligible review targets only for approved/active participants.
+- [x] Completed team matches unlock eligible opposing team review targets only for valid participating team members.
+- [x] Cancelled, not-participated, disputed, expired, and self-review cases are locked with concrete reasons.
+- [x] A user can submit rating `1-5` and one or more predefined review tags for an eligible target.
+- [x] Duplicate submissions for the same reviewer, target, and event do not create duplicate records.
+- [x] Written reviews appear in the written tab.
+- [x] Received reviews appear grouped by event.
+- [x] Submitting a personal match review updates target user reputation summary using a clearly documented real-data signal.
+- [x] Submitting a team match review updates target team trust score using a clearly documented real-data signal.
+- [x] Frontend uses v1 shared shell/components/tokens and follows `14 리뷰 최종` design intent.
+- [x] API, DTO, frontend hooks/types, seed/fixtures, scenarios, and tests are synced in the same change set.
 
 ## Step Checklist
 
@@ -755,8 +755,8 @@ Scenario:
 - 2026-06-02: 89-8 frontend UI implementation completed.
 - 2026-06-02: 89-9 existing surface integration completed.
 - 2026-06-03: 89-10 scenario and docs sync completed.
-- Current step: 89-10 complete.
-- Next step pending approval: 89-11 validation.
+- Current step: 89-11 validation follow-up.
+- Next step: complete backend/frontend tests and route smoke/E2E for `V1-14-*`.
 
 ## Ambiguity Log
 
@@ -807,3 +807,8 @@ Scenario:
 - Updated `docs/scenarios/09-payment-review-badge.md` so `REV-001` points to Task 89's match/team-match review contract instead of stale sample-labelled review surfaces.
 - Updated `docs/scenarios/index.md` with Task 89 review scenario status and next validation follow-up.
 - Marked 89-10 complete.
+
+### 2026-06-04
+
+- Reconciled stale Acceptance Criteria checkboxes against implemented review API/UI/data/scenario evidence.
+- Kept 89-11 open because targeted Jest previously timed out and route smoke/E2E has not been completed.

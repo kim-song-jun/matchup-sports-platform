@@ -88,12 +88,11 @@ const teamByMode: Record<TeamDetailViewModel['mode'], (typeof teams)[number]> = 
   mine: teams[3],
 };
 
-const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel['team'], 'description' | 'activity' | 'condition' | 'trustNote' | 'schedule' | 'city' | 'county' | 'level' | 'contact' | 'links' | 'images' | 'membersList'>> = {
+const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel['team'], 'description' | 'activity' | 'condition' | 'schedule' | 'city' | 'county' | 'level' | 'contact' | 'links' | 'membersList'>> = {
   default: {
     description: '성수와 광진권에서 풋살 정기전을 운영하는 팀입니다. 신규 멤버는 2주 체험 후 정식 가입으로 전환합니다.',
     activity: '주 1회 정기전 · 신규 멤버 3명 모집',
     condition: '풋살 초보-중수 · 성동/광진권 활동 가능',
-    trustNote: '검증됨 · 최근 경기 12회 · 신고 0건',
     schedule: '매주 목 21:00 · 성수 풋살파크',
     city: '서울',
     county: '성동구',
@@ -104,23 +103,16 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
       { label: 'Kakao', value: 'https://open.kakao.com/seongsu-runners' },
       { label: 'Website', value: '등록된 링크 없음' },
     ],
-    images: [
-      { title: '로고 이미지', count: 1 },
-      { title: '커버 이미지', count: 1 },
-      { title: '추가 사진', count: 3, max: 10 },
-      { title: '활동 사진', count: 2, example: true },
-    ],
     membersList: [
-      { name: '김도윤', role: '팀장', meta: 'FW · 매너 4.9', status: '관리자' },
-      { name: '박서준', role: '운영진', meta: 'GK · 매너 4.8', status: '관리자' },
-      { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', status: '활동중' },
+      { name: '김도윤', role: '팀장', meta: 'FW', status: '관리자', visibility: '공개' },
+      { name: '박서준', role: '운영진', meta: 'GK', status: '관리자', visibility: '공개' },
+      { name: '이하나', role: '멤버', meta: '최근 4경기', status: '활동중', visibility: '비공개' },
     ],
   },
   pending: {
     description: '가입 신청이 접수된 팀입니다. 운영진이 프로필, 활동 지역, 최근 매치 이력을 검토하고 있습니다.',
     activity: '평일 저녁 정기전 · 운영진 검토 후 가입',
     condition: '풋살 중수 · 평일 저녁 참여 가능',
-    trustNote: '추정 · 최근 경기 8회',
     schedule: '매주 화 20:00 · 강동 풋살파크',
     city: '서울',
     county: '강동구',
@@ -130,21 +122,15 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
       { label: 'Kakao', value: '승인 후 공개' },
       { label: 'Website', value: '등록된 링크 없음' },
     ],
-    images: [
-      { title: '로고 이미지', count: 1 },
-      { title: '커버 이미지', count: 1 },
-      { title: '활동 사진', count: 2, max: 10 },
-    ],
     membersList: [
-      { name: '운영진', role: '관리자', meta: '가입 신청 검토중', status: '검토중' },
-      { name: '나', role: '신청자', meta: '가입 승인 대기', status: '검토중' },
+      { name: '운영진', role: '관리자', meta: '가입 신청 검토중', status: '검토중', visibility: '공개' },
+      { name: '나', role: '신청자', meta: '가입 승인 대기', status: '검토중', visibility: '비공개' },
     ],
   },
   closed: {
     description: '현재 모집이 마감된 축구 팀입니다. 다음 모집이 열리면 알림을 받을 수 있습니다.',
     activity: '주말 11:11 정기전 · 현재 모집 마감',
     condition: '축구 A등급 · 주말 고정 참여',
-    trustNote: '참고 · 공개된 신뢰 점수 없음',
     schedule: '매주 일 09:00 · 상암 보조구장',
     city: '서울',
     county: '마포구',
@@ -154,20 +140,14 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
       { label: 'Instagram', value: 'https://instagram.com/mapo-oneday' },
       { label: 'Kakao', value: '모집 재개 후 공개' },
     ],
-    images: [
-      { title: '로고 이미지', count: 1 },
-      { title: '커버 이미지', count: 1 },
-      { title: '활동 사진', count: 4, max: 10 },
-    ],
     membersList: [
-      { name: '모집 상태', role: '마감', meta: '다음 모집 알림 가능', status: '마감' },
+      { name: '모집 상태', role: '마감', meta: '다음 모집 알림 가능', status: '마감', visibility: '비공개' },
     ],
   },
   mine: {
     description: '내가 관리하는 팀입니다. 팀 정보, 멤버 권한, 가입 신청, 팀매치 생성과 수정 흐름으로 이동할 수 있습니다.',
     activity: '팀매치 운영중 · 가입 신청 3명 검토 필요',
     condition: '풋살 초보-중수 · 구로/영등포권',
-    trustNote: '검증됨 · 최근 경기 10회 · 신고 0건',
     schedule: '매주 금 21:00 · 신도림 풋살파크',
     city: '서울',
     county: '구로구',
@@ -177,15 +157,10 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
       { label: 'Kakao', value: 'https://open.kakao.com/dynamic-fs' },
       { label: 'Website', value: '등록된 링크 없음' },
     ],
-    images: [
-      { title: '로고 이미지', count: 1 },
-      { title: '커버 이미지', count: 1 },
-      { title: '추가 사진', count: 5, max: 10 },
-    ],
     membersList: [
-      { name: '나', role: '팀장', meta: '모든 권한', status: '팀장' },
-      { name: '정하늘', role: '운영진', meta: '가입 승인 가능', status: '관리자' },
-      { name: '문태오', role: '멤버', meta: '최근 3경기', status: '활동중' },
+      { name: '나', role: '팀장', meta: '모든 권한', status: '팀장', visibility: '공개' },
+      { name: '정하늘', role: '운영진', meta: '가입 승인 가능', status: '관리자', visibility: '공개' },
+      { name: '문태오', role: '멤버', meta: '최근 3경기', status: '활동중', visibility: '비공개' },
     ],
   },
 };
@@ -274,9 +249,9 @@ export function getTeamFormViewModel(mode: TeamFormViewModel['mode']): TeamFormV
       activity: mode === 'edit' ? '평일 저녁 · 주 1회' : '',
       capacity: 24,
       contact: mode === 'edit' ? '비공개' : '',
-      logoImage: mode === 'edit' ? '/mock/generated/team-huddle.webp' : '',
-      coverImage: mode === 'edit' ? '/mock/generated/futsal-rooftop.webp' : '',
-      activityImages: mode === 'edit' ? ['/mock/generated/team-huddle.webp'] : [],
+      logoImage: '',
+      coverImage: '',
+      activityImages: [],
       links: [
         { label: 'Instagram', value: mode === 'edit' ? 'https://instagram.com/seongsu-runners' : '' },
         { label: 'Kakao', value: mode === 'edit' ? 'https://open.kakao.com/seongsu-runners' : '' },

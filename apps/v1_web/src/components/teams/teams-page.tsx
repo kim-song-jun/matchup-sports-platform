@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import type { ChangeEvent, PointerEvent, ReactNode } from 'react';
+import type { PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { FilterIcon, PlusIcon, SearchIcon } from '@/components/v1-ui/icons';
-import { cssUrl } from '@/lib/assets';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -117,7 +116,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <Card pad={18} className="tm-team-detail-hero-card">
           <TeamLogo team={team} large />
           <h1 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h1>
-          <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region} · 매너 {team.manner}</div>
+          <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
             <span className="tm-badge tm-badge-grey">{team.members}명</span>
@@ -125,15 +124,14 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         </Card>
         <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
         <Card pad={16}>
-          <InfoRow label="팀명" value={team.name} required />
-          <InfoChips label="종목 (복수 선택 가능)" items={team.sports} required />
+          <InfoRow label="팀명" value={team.name} />
+          <InfoChips label="종목" items={team.sports} />
           <InfoRow label="팀 소개" value={team.description} />
-          <InfoRow label="시/도" value={team.city} required />
+          <InfoRow label="시/도" value={team.city} />
           <InfoRow label="구/군" value={team.county} />
           <InfoRow label="레벨" value={team.level} />
           <InfoRow label="성별 조건" value={team.genderRule} />
           <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
-          <InfoRow label="신뢰 신호" value={team.trustNote} />
           <InfoRow label="정기 일정" value={team.schedule} />
         </Card>
         <SectionTitle title="SNS 및 링크" sub="팀에서 공개한 연락처와 링크입니다." />
@@ -141,10 +139,6 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <InfoRow label="연락처" value={team.contact} />
           {team.links.map((link) => <InfoRow key={link.label} label={link.label} value={link.value} muted={link.value.includes('없음')} />)}
         </Card>
-        <SectionTitle title="이미지" sub="팀 분위기를 확인할 수 있는 사진입니다." />
-        <div className="tm-team-image-grid">
-          {team.images.map((image) => <ImageSlot key={image.title} {...image} />)}
-        </div>
         <Card pad={16} style={{ marginTop: 14 }}>
           <div className="tm-section-row" style={{ marginTop: 0 }}>
             <div>
@@ -153,7 +147,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
             <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
           </div>
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta}`} trailing={member.status} />)}</div>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div>
         </Card>
       </article>
       <div className="tm-fixed-cta"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div><button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={model.onCta}>{model.ctaPending ? '처리 중' : cta}</button></div>
@@ -175,11 +169,12 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
   return (
     <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref="/teams">
       <div className="tm-create-shell">
+        {!edit ? <TeamCreateProgress /> : null}
         <h1 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h1>
         {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
         <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
         <div className="tm-create-field">
-          <div className="tm-text-label">종목 (복수 선택 가능)</div>
+          <div className="tm-text-label">종목</div>
           <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
         </div>
         <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
@@ -193,11 +188,6 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
           next[index] = { ...link, value };
           form?.onFieldChange('links', next);
         }} />)}
-        <div className="tm-team-image-grid" style={{ marginTop: 18 }}>
-          <TeamImageUploadField title="로고 이미지" image={team.logoImage} fallback="/mock/generated/team-huddle.webp" onChange={(value) => form?.onFieldChange('logoImage', value)} />
-          <TeamImageUploadField title="커버 이미지" image={team.coverImage} fallback="/mock/generated/futsal-rooftop.webp" onChange={(value) => form?.onFieldChange('coverImage', value)} />
-          <TeamPhotoUploadField images={team.activityImages} onChange={(value) => form?.onFieldChange('activityImages', value)} />
-        </div>
       </div>
       <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
@@ -402,16 +392,24 @@ function SectionTitle({ title, sub }: { title: string; sub: string }) {
   return <div className="tm-section-title"><div className="tm-text-body-lg">{title}</div><div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div></div>;
 }
 
-function InfoRow({ label, value, required, muted }: { label: string; value: string; required?: boolean; muted?: boolean }) {
-  return <div className="tm-team-info-row"><div className="tm-text-caption" style={{ color: required ? 'var(--text-strong)' : 'var(--text-caption)', fontWeight: required ? 800 : 600 }}>{label}{required ? '*' : ''}</div><div className="tm-text-body" style={{ color: muted ? 'var(--text-muted)' : 'var(--text-strong)' }}>{value}</div></div>;
+function InfoRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return <div className="tm-team-info-row"><div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>{label}</div><div className="tm-text-body" style={{ color: muted ? 'var(--text-muted)' : 'var(--text-strong)' }}>{value}</div></div>;
 }
 
-function InfoChips({ label, items, required }: { label: string; items: string[]; required?: boolean }) {
+function InfoChips({ label, items }: { label: string; items: string[] }) {
   return (
     <div className="tm-team-info-block">
-      <div className="tm-text-caption" style={{ color: required ? 'var(--text-strong)' : 'var(--text-caption)', fontWeight: required ? 800 : 600, marginBottom: 8 }}>{label}{required ? '*' : ''}</div>
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 600, marginBottom: 8 }}>{label}</div>
       <div className="tm-team-form-chip-row">{items.map((item) => <span key={item} className="tm-chip tm-chip-active">{item}</span>)}</div>
-      <div className="tm-text-micro" style={{ color: 'var(--blue500)', marginTop: 8 }}>{items.length}개 종목 선택됨</div>
+    </div>
+  );
+}
+
+function TeamCreateProgress() {
+  return (
+    <div className="tm-create-progress">
+      <div className="tm-text-caption">1단계 / 1단계</div>
+      <div className="tm-create-bars"><span data-active="true" /></div>
     </div>
   );
 }
@@ -459,74 +457,6 @@ function TeamCapacityField({ value, onChange }: { value: number; onChange?: (val
         </select>
         <button className="tm-create-stepper-button" type="button" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
       </div>
-    </div>
-  );
-}
-
-function TeamImageUploadField({ title, image, fallback, onChange }: { title: string; image: string; fallback: string; onChange?: (value: string) => void }) {
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') onChange?.(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <div className="tm-team-image-slot">
-      <div className="tm-text-label">{title}</div>
-      <div className="tm-team-upload-preview" style={{ backgroundImage: cssUrl(image || fallback) }} />
-      <label className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }}>
-        이미지 업로드
-        <input className="sr-only" type="file" accept="image/*" onChange={handleChange} />
-      </label>
-    </div>
-  );
-}
-
-function TeamPhotoUploadField({ images, onChange }: { images: string[]; onChange?: (value: string[]) => void }) {
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    if (!files.length) return;
-    Promise.all(files.map((file) => new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-      reader.readAsDataURL(file);
-    }))).then((nextImages) => onChange?.([...images, ...nextImages.filter(Boolean)].slice(0, 6)));
-  };
-
-  return (
-    <div className="tm-team-image-slot">
-      <div className="tm-text-label">활동 사진</div>
-      {images.length ? (
-        <div className="tm-team-photo-grid">
-          {images.map((image, index) => <div key={`${image}-${index}`} className="tm-team-photo-preview" style={{ backgroundImage: cssUrl(image) }} />)}
-        </div>
-      ) : null}
-      <label className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }}>
-        이미지 업로드
-        <input className="sr-only" type="file" accept="image/*" multiple onChange={handleChange} />
-      </label>
-    </div>
-  );
-}
-
-function ImageSlot({ title, count, max, example }: { title: string; count: number; max?: number; example?: boolean }) {
-  const slots = Array.from({ length: Math.max(count, 1) });
-  return (
-    <div className="tm-team-image-slot">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <div className="tm-text-label">{title}</div>
-        <span className={`tm-badge ${example ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{example ? '활동 사진' : '기존 이미지'}</span>
-      </div>
-      <div className="tm-team-thumb-row">
-        {slots.map((_, index) => <div key={index} className={`tm-team-thumb ${example ? 'tm-team-thumb-example' : ''}`}>{count === 0 ? '업로드 전' : example ? `활동 사진 ${index + 1}` : `업로드된 이미지 ${index + 1}`}</div>)}
-        <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button">추가</button>
-      </div>
-      <div className="tm-text-micro" style={{ marginTop: 8, color: 'var(--text-caption)' }}>{max ? `${count}/${max} · ` : ''}선택된 파일 없음</div>
-      <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{example ? '팀 활동을 보여주는 사진을 추가해 주세요.' : '업로드한 이미지만 저장됩니다.'}</div>
     </div>
   );
 }

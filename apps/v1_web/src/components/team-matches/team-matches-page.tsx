@@ -113,9 +113,10 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode']) {
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
   const { match, mode } = model;
   const locked = mode === 'pending' || mode === 'approved';
-  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인완료' : mode === 'pending' ? '승인중' : '신청하기');
+  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const canRunAction = Boolean(model.onApply);
+  const showChat = mode === 'approved' && Boolean(model.onChat);
   return (
     <AppChrome title="" activeTab="teamMatches" bottomNav={false} topBar={false}>
       <article className="tm-match-detail">
@@ -124,7 +125,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
             <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/team-matches" aria-label="뒤로가기">
               <ChevronLeftIcon size={22} strokeWidth={2.2} />
             </Link>
-            <div style={{ display: 'flex', gap: 4 }}><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유"><ShareIcon size={20} /></button><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림"><BellIcon size={20} /></button></div>
+            <div style={{ display: 'flex', gap: 4 }}><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={model.onShare}><ShareIcon size={20} /></button><button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button></div>
           </div>
           <div className="tm-team-vs-row">
             <div><div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.68)' }}>홈팀</div><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div><div className="tm-text-micro" style={{ color: 'rgba(255,255,255,.72)' }}>매너 {match.manner} · 승 {match.wins}</div></div>
@@ -140,11 +141,11 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           <InfoRow label="참가비" value={`${match.opponentCost.toLocaleString('ko-KR')}원`} sub={match.opponentCost === 0 ? '무료초청 · 실제 청구 없음' : `총 비용 ${match.cost.toLocaleString('ko-KR')}원`} />
           {mode === 'pending' ? <StateCard tone="orange" title="신청 확인을 완료했어요" body="홈팀 검토가 끝나면 알림으로 알려드릴게요." /> : null}
           {mode === 'approved' ? <StateCard tone="green" title="승인완료" body="팀매치 참가가 확정되었습니다. 경기 전 안내를 계속 확인할 수 있습니다." /> : null}
-          <Link className="tm-card tm-pressable tm-team-info-link" href="/teams/team-1"><div className="tm-text-body-lg">팀 정보 보러가기</div><div className="tm-text-caption" style={{ marginTop: 6 }}>팀 상세조회로 이동해 매너, 전적, 멤버 구성을 확인합니다.</div></Link>
-          <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">신청팀</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.applicantTeams.map((team) => <div key={team.name}><ListItem title={team.name} sub={team.meta} trailing={team.status} />{team.onApprove || team.onReject ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}><button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={team.actionPending} onClick={team.onApprove}>승인</button><button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={team.actionPending} onClick={team.onReject}>거절</button></div> : null}</div>)}</div></Card>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={match.hostTeamHref ?? '/teams'} style={{ marginTop: 14 }}>팀 정보 보기</Link>
+          {mode === 'mine' ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">신청팀</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.applicantTeams.map((team) => <div key={team.name}>{team.href ? <Link href={team.href} aria-label={`${team.name} 관리 페이지로 이동`}><ListItem title={team.name} sub={team.meta} trailing={team.status} /></Link> : <ListItem title={team.name} sub={team.meta} trailing={team.status} />}</div>)}</div></Card> : null}
         </div>
       </article>
-      <div className="tm-fixed-cta"><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : locked ? '신청 상태' : '채팅 후 신청 가능'}</span><span className="tm-text-label tab-num">{match.opponentCost.toLocaleString('ko-KR')}원</span></div><div style={{ display: 'grid', gridTemplateColumns: mode === 'mine' ? '1fr' : '104px 1fr', gap: 8 }}>{mode !== 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/chat/room-1">채팅</Link> : null}{mode === 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={`/team-matches/${match.id}/edit`}>{cta}</Link> : <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={model.onApply}>{model.applyPending ? '처리 중' : cta}</button>}</div></div>
+      <div className="tm-fixed-cta"><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}><span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span><span className="tm-text-label">{model.statusLabel ?? `${match.opponentCost.toLocaleString('ko-KR')}원`}</span></div><div style={{ display: 'grid', gridTemplateColumns: showChat ? '104px 1fr' : '1fr', gap: 8 }}>{showChat ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>{model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}</button> : null}{mode === 'mine' ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/team-matches/${match.id}/edit`}>{cta}</Link> : <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={model.onApply}>{model.applyPending ? '처리 중' : cta}</button>}</div></div>
     </AppChrome>
   );
 }
@@ -350,7 +351,7 @@ function TeamMatchCard({ match, index }: { match: TeamMatchModel; index: number 
 }
 
 function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">어떤 팀의 매치인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>팀매치는 선택한 내 팀의 권한, 종목, 팀 정보로 생성됩니다.</p><div style={{ display: 'grid', gap: 10, marginTop: 20 }}>{model.teams.map((team) => <button key={team.name} className={`tm-card tm-pressable ${team.selected ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectTeam(team.name)}><div className="tm-text-body-lg">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.members}명 · {team.role}</div></button>)}</div><Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">권한 기준</div><div className="tm-text-caption" style={{ marginTop: 6 }}>팀장 또는 매치 생성 권한이 있는 관리자만 다음 단계로 이동할 수 있습니다.</div></Card></div>;
+  return <div><h1 className="tm-text-heading">어떤 팀의 매치인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>팀매치는 선택한 내 팀의 권한, 종목, 팀 정보로 생성됩니다.</p>{model.teams.length ? <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>{model.teams.map((team) => <button key={team.name} className={`tm-card tm-pressable ${team.selected ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectTeam(team.name)}><div className="tm-text-body-lg">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.members}명 · {team.role}</div></button>)}</div> : <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="팀장 또는 관리자인 팀에서만 팀매치를 만들 수 있습니다." /> }<Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">권한 기준</div><div className="tm-text-caption" style={{ marginTop: 6 }}>팀장 또는 매치 생성 권한이 있는 관리자만 다음 단계로 이동할 수 있습니다.</div></Card></div>;
 }
 
 function SportStep({ model }: { model: TeamMatchCreateViewModel }) {

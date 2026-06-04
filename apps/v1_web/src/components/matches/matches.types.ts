@@ -69,10 +69,12 @@ export type MatchDetailViewModel = {
     description: string;
     address: string;
     rules: string[];
+    manageHref?: string;
     participants: Array<{
       name: string;
       meta: string;
       status: string;
+      href?: string;
       onApprove?: () => void;
       onReject?: () => void;
       actionPending?: boolean;
@@ -82,6 +84,12 @@ export type MatchDetailViewModel = {
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;
+  statusLabel?: string;
+  chatLabel?: string;
+  chatPending?: boolean;
+  onChat?: () => void;
+  onShare?: () => void;
+  onNotify?: () => void;
 };
 
 export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'complete' | 'edit';

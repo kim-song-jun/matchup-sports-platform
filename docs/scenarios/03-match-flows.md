@@ -80,6 +80,8 @@
 ## Notes
 
 - 이 파일은 가장 먼저 Playwright 자동화로 전개할 대상 중 하나다.
+- 2026-06-04: 매치 상세 UX follow-up에서 공유/알림 버튼을 실제 액션에 연결하고, `deadlineAt` 신청 차단, 호스트 포함 인원 수, 호스트-only 참가자 섹션, 승인 완료 후 채팅 진입 정책을 v1 상세 계약으로 고정했다.
+- 2026-06-04: 매치 생성 UX follow-up에서 지역 선택을 v1 district region 목록 기준으로 초기화하고, 대표 이미지 파일 선택 후 미리보기와 submit payload 상태가 함께 갱신되도록 보강했다.
 - 2026-04-07: `/matches`, `/matches/[id]`, `/my/matches`, `/my/team-matches` Desktop Chrome 스모크는 통과했다.
 - 2026-04-08: `MATCH-001`과 `MATCH-002`를 `e2e/tests/match-join-flow.spec.ts`에 반영했고 Desktop Chrome `13/13`, Mobile Chrome deep-flow `2/2`를 통과했다.
 - 2026-04-08: 실제 실행에서 `/matches/new`가 UI 전용 필드(`customVenue`, `rules`)를 DTO 그대로 POST해 Nest `ValidationPipe(whitelist + forbidNonWhitelisted)`에 막히는 버그를 발견했고, submit payload를 DTO 기준으로 정리해 수정했다.

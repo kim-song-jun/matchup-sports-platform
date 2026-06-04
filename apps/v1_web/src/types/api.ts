@@ -218,6 +218,9 @@ export type V1Match = {
     applicationId: string | null;
     participantId: string | null;
     canApply: boolean;
+    ctaLabel?: string;
+    disabledReason?: string | null;
+    manageRoute?: string | null;
   };
   host?: {
     userId: string;
@@ -886,6 +889,13 @@ export type V1ChatRoomDetail = {
     displayName: string;
     role: string;
   }>;
+};
+
+export type V1ChatRoomResolveResult = {
+  roomId: string;
+  roomType: 'match' | 'team_match';
+  created: boolean;
+  route: string;
 };
 
 export type V1ChatMessageSendResult = {

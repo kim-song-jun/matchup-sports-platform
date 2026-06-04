@@ -3361,7 +3361,7 @@ select.tm-create-input {
 
 .tm-review-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
   border-radius: 15px;
@@ -3376,6 +3376,7 @@ select.tm-create-input {
   color: var(--text-muted);
   font-size: 14px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .tm-review-tab[data-active="true"] {

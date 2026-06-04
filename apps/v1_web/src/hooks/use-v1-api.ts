@@ -15,6 +15,7 @@ import type {
   V1ChatRoomDetail,
   V1ChatRoomLeaveResult,
   V1ChatRoomMeUpdate,
+  V1ChatRoomResolveResult,
   V1DevLoginResponse,
   V1Home,
   V1MasterRegionsResponse,
@@ -757,6 +758,17 @@ export function useV1ChatRoom(roomId: string) {
     queryKey: v1Keys.chatRoom(roomId),
     queryFn: () => v1Get<V1ChatRoomDetail>(`/chat/rooms/${roomId}`),
     enabled: Boolean(roomId),
+  });
+}
+
+export function useV1ResolveChatRoom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { targetType: 'match' | 'team_match'; targetId: string }) =>
+      v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+    },
   });
 }
 

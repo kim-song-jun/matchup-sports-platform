@@ -1,5 +1,6 @@
 import { MatchEditPageClient } from '@/components/matches/matches-create-client';
 
-export default function MatchEditPage({ params }: { params: { id: string } }) {
-  return <MatchEditPageClient matchId={params.id} />;
+export default async function MatchEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <MatchEditPageClient matchId={id} />;
 }

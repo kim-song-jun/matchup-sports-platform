@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import type { ChangeEvent, PointerEvent, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import type { ChangeEvent, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
+import { ActionPanel, Card, EmptyState, ListItem, MetricCard, PageHeader } from '@/components/v1-ui/primitives';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type {
@@ -17,29 +17,60 @@ import type {
 } from './matches.types';
 
 export function MatchListPageView({ model }: { model: MatchListViewModel }) {
+  const filterOpen = Boolean(model.filterSheet?.open);
+
   return (
     <AppChrome
       title="매치"
       activeTab="matches"
       topBar={false}
+      wide
+      modalOpen={filterOpen}
       floatingSlot={<MatchCreateFloatingButton />}
     >
-      <MatchSearchBar query={model.query} filterCount={model.filterCount} search={model.search} filterHref={model.filterHref} />
-      <div className="tm-match-list">
-        <SportSelector sports={model.sports} />
-        <div className="tm-match-summary-row">
-          <div className="tm-text-label">{model.summary.label}</div>
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 마감 {model.summary.urgent}</div>
-        </div>
-        <div className="tm-match-card-stack">
-          {model.matches.length ? (
-            model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)
-          ) : (
-            <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있습니다." />
-          )}
+      <div aria-hidden={filterOpen ? true : undefined} inert={filterOpen ? true : undefined}>
+        <MatchSearchBar query={model.query} filterCount={model.filterCount} search={model.search} filterHref={model.filterHref} />
+        <div className="tm-match-list tm-matches-open-design tm-matches-desktop-workbench" data-testid="matches-open-design">
+          <div className="tm-list-grid">
+            <aside className="tm-filter-rail" aria-label="매치 필터" data-testid="matches-filter-rail">
+              <div className="tm-filter-rail-title">매치 필터</div>
+              <div className="tm-filter-rail-list">
+                {model.sports.map((sport) => (
+                  <FilterRailLink key={sport.label} href={sport.href ?? '/matches'} active={sport.active} count={sport.count}>
+                    {sport.label}
+                  </FilterRailLink>
+                ))}
+                <Link className="tm-btn tm-btn-sm tm-btn-secondary tm-btn-block" href={model.filterHref ?? '/matches?filter=1'}>상세 필터</Link>
+              </div>
+            </aside>
+            <div>
+              <PageHeader
+                eyebrow="개인 매치"
+                title="오늘 참여 가능한 매치"
+                description="종목, 지역, 모집 상태를 비교하고 원하는 매치로 바로 이동합니다."
+                action={<Link className="tm-btn tm-btn-sm tm-btn-primary" href="/matches/new">매치 만들기</Link>}
+              />
+              <div className="tm-responsive-card-grid" style={{ marginTop: 16 }}>
+                <MetricCard label="운영 요약" value={`${model.summary.count}개`} delta={`오늘 ${model.summary.today}개`} tone="up" />
+                <MetricCard label="모집 흐름" value={`${model.summary.urgent}개`} delta="승인제 신청 기준" />
+              </div>
+              <SportSelector sports={model.sports} />
+              <div className="tm-match-summary-row">
+                <div className="tm-text-label">{model.summary.label}</div>
+                <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 마감 {model.summary.urgent}</div>
+              </div>
+              <div className="tm-match-card-stack">
+                {model.matches.length ? (
+                  model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)
+                ) : (
+                  <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있습니다." />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
+      {filterOpen ? <MatchFilterSheet model={model} /> : null}
     </AppChrome>
   );
 }
@@ -47,11 +78,15 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
 export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
   if (model.state === 'filter') return <MatchFilterPageView model={model} />;
   if (model.state === 'participants') return <MatchParticipantsPageView />;
+  const joined = model.state === 'joined';
 
   return (
-    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches">
-      <div className="tm-match-list">
+    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches" wide={joined}>
+      <div className={`tm-match-list tm-match-state-lane ${joined ? 'tm-match-joined-desktop-workbench' : ''}`} data-testid="match-state-open-design">
         <EmptyState title={model.title} sub={model.description} />
+        {model.state === 'empty' ? (
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 14 }}>필터 초기화</Link>
+        ) : null}
         {model.state === 'error' ? (
           <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
             <div className="tm-text-label">목록으로 돌아가 다시 확인해 주세요</div>
@@ -74,7 +109,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
 function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
   return (
     <AppChrome title="필터" activeTab="matches" bottomNav={false} backHref="/matches">
-      <div className="tm-create-shell">
+      <div className="tm-create-shell tm-match-filter-open-design tm-match-create-open-design">
         <section>
           <h1 className="tm-text-heading">매치 조건</h1>
           <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
@@ -94,8 +129,8 @@ function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
           </div>
         </Card>
       </div>
-      <div className="tm-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+      <div className="tm-fixed-cta tm-match-filter-action">
+        <div className="tm-fixed-cta-row tm-fixed-cta-row-weighted">
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches">초기화</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/matches">{model.matches.length}개 결과 보기</Link>
         </div>
@@ -113,7 +148,7 @@ function MatchParticipantsPageView() {
 
   return (
     <AppChrome title="참가자" activeTab="matches" bottomNav={false} backHref="/matches/match-1">
-      <div className="tm-match-list">
+      <div className="tm-match-list tm-match-state-lane" data-testid="match-participants-open-design">
         <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
           <div className="tm-text-body-lg">주말 풋살 한판!</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>승인 완료 2명 · 승인중 1명 · 정원 10명</div>
@@ -124,6 +159,7 @@ function MatchParticipantsPageView() {
         <Card pad={14} style={{ marginTop: 16, background: 'var(--grey50)' }}>
           <div className="tm-text-label">참가자 관리는 상세/수정 플로우에서 연결됩니다</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>참가자 승인 상태와 모집 정원을 한곳에서 확인할 수 있습니다.</div>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches/match-1" style={{ marginTop: 14 }}>상세로 돌아가기</Link>
         </Card>
       </div>
     </AppChrome>
@@ -163,8 +199,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const showChat = mode === 'approved' && Boolean(model.onChat);
 
   return (
-    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
-      <article className="tm-match-detail">
+    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false} wide>
+      <article className="tm-match-detail tm-match-detail-open-design tm-match-detail-desktop-stage" data-testid="match-detail-open-design">
         <div className="tm-match-detail-hero" style={{ backgroundImage: cssUrl(match.image) }}>
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -189,35 +225,47 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           </div>
         </div>
         <div className="tm-match-detail-body">
-          <InfoRow label="날짜와 시간" value={`${match.date} ${match.time}`} />
-          <InfoRow label="장소" value={match.venue} sub={match.address} />
-          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음`} />
-          <InfoRow label="성별 조건" value={match.gender} />
-          {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
-          <Card pad={16} style={{ marginTop: 10 }}>
-            <div className="tm-text-body-lg">참가자</div>
-            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-              {match.participants.map((person) => (
-                <div key={person.name}>
-                  {person.href ? (
-                    <Link href={person.href} aria-label={`${person.name} 관리 페이지로 이동`}>
-                      <ListItem title={person.name} sub={person.meta} trailing={person.status} />
-                    </Link>
-                  ) : (
-                    <ListItem title={person.name} sub={person.meta} trailing={person.status} />
-                  )}
+          <div className="tm-detail-grid">
+            <div>
+              <InfoRow label="날짜와 시간" value={`${match.date} ${match.time}`} />
+              <InfoRow label="장소" value={match.venue} sub={match.address} />
+              <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음`} />
+              <InfoRow label="성별 조건" value={match.gender} />
+              {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
+              <Card pad={16} style={{ marginTop: 10 }}>
+                <div className="tm-text-body-lg">참가자</div>
+                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                  {match.participants.map((person) => (
+                    <div key={person.name}>
+                      {person.href ? (
+                        <Link href={person.href} aria-label={`${person.name} 관리 페이지로 이동`}>
+                          <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                        </Link>
+                      ) : (
+                        <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </Card>
             </div>
-          </Card>
+            <aside>
+              <MetricCard label="모집 현황" value={`${match.current}/${match.capacity}명`} delta={match.actionLabel} tone={match.status === 'open' ? 'up' : 'neutral'} />
+              <ActionPanel
+                title={mode === 'mine' ? '호스트 관리' : '신청 전 확인'}
+                description={mode === 'mine' ? '수정과 참가자 관리는 호스트 권한을 기준으로 열립니다.' : '신청은 승인제 상태를 기준으로 처리됩니다.'}
+                action={<Link className="tm-btn tm-btn-sm tm-btn-secondary" href={mode === 'mine' ? match.manageHref ?? `/matches/${match.id}/edit` : '/matches'}>{mode === 'mine' ? '수정하기' : '목록 보기'}</Link>}
+              />
+            </aside>
+          </div>
         </div>
       </article>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-match-detail-fixed-cta">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
           <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: showChat ? '104px 1fr' : '1fr', gap: 8 }}>
+        <div className="tm-fixed-cta-row tm-fixed-cta-row-chat" data-has-chat={showChat ? 'true' : 'false'}>
           {showChat ? (
             <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>
               {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
@@ -242,9 +290,10 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   const primaryLabel = model.form?.submitLabel ?? (edit ? '변경사항 저장' : model.step === 'confirm' ? '매치 만들기' : '다음');
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
+  const backHref = model.backHref ?? (edit ? '/matches/match-1' : '/matches');
   return (
-    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? '/matches/match-1' : '/matches'}>
-      <div className="tm-create-shell">
+    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={backHref}>
+      <div className="tm-create-shell tm-match-create-open-design tm-match-create-desktop-lane" data-testid="match-create-open-design">
         <CreateProgress step={stepNo} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치입니다" body={model.form.lockedReason} /> : null}
@@ -253,8 +302,8 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
-      <div className="tm-fixed-cta tm-create-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+      <div className="tm-fixed-cta tm-create-fixed-cta tm-match-create-action">
+        <div className="tm-fixed-cta-row tm-fixed-cta-row-weighted tm-match-create-cta-row">
           {secondaryAction ? (
             <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'sport' ? '취소' : '이전'}</button>
           ) : (
@@ -268,7 +317,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{primaryLabel}</Link>
           )}
         </div>
-        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>매치 취소</button> : null}
+        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-match-create-cancel-button" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
     </AppChrome>
   );
@@ -329,13 +378,22 @@ function MatchSearchBar({ query, filterCount, search, filterHref = '/matches?fil
   );
 }
 
+function FilterRailLink({ children, href, active, count }: { children: ReactNode; href: string; active?: boolean; count: number }) {
+  return (
+    <Link className="tm-filter-pill" href={href} data-active={active}>
+      <span>{children}</span>
+      <span className="tm-filter-pill-count">{count}</span>
+    </Link>
+  );
+}
+
 function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
   const sheet = model.filterSheet;
   if (!sheet) return null;
 
   return (
     <>
-      <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
+      <Link className="tm-filter-scrim" href={sheet.closeHref} aria-hidden="true" tabIndex={-1} />
       <DraggableFilterSheet closeHref={sheet.closeHref} ariaLabel="매치 필터">
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
@@ -401,11 +459,17 @@ function DraggableFilterSheet({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const sheetRef = useRef<HTMLElement | null>(null);
   const startYRef = useRef(0);
   const draggingRef = useRef(false);
   const [offsetY, setOffsetY] = useState(0);
 
+  useEffect(() => {
+    sheetRef.current?.focus();
+  }, []);
+
   const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
+    if (event.target instanceof Element && event.target.closest('a,button,input,textarea,select,label')) return;
     startYRef.current = event.clientY;
     draggingRef.current = true;
     setOffsetY(0);
@@ -430,16 +494,45 @@ function DraggableFilterSheet({
     setOffsetY(0);
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+    ).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+    });
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === event.currentTarget)) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div className="tm-filter-layer">
       <section
         className="tm-filter-sheet"
         aria-label={ariaLabel}
+        aria-modal="true"
+        autoFocus
+        onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
+        ref={sheetRef}
+        role="dialog"
         style={{ transform: `translateY(${offsetY}px)` }}
+        tabIndex={-1}
       >
         {children}
       </section>
@@ -469,12 +562,15 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
 }
 
 function MatchCardItem({ match, index }: { match: MatchCardModel; index: number }) {
+  const detailHref = `/matches/${match.id}`;
+  const applyHref = `${detailHref}?intent=apply`;
+
   return (
-    <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
-      <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
+    <article className="tm-match-list-card tm-pressable">
+      <Link className="tm-match-list-media tm-match-list-media-link" href={detailHref} aria-label={`${match.title} 이미지로 상세 보기`} style={{ backgroundImage: cssUrl(match.image) }}>
         <span className="tm-badge tm-badge-blue">{index === 0 ? '추천' : match.sport}</span>
         <span className="tm-match-count-badge tab-num">{match.current}/{match.capacity}</span>
-      </div>
+      </Link>
       <div className="tm-match-list-card-body">
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <span className="tm-badge tm-badge-grey">{match.sport}</span>
@@ -482,14 +578,18 @@ function MatchCardItem({ match, index }: { match: MatchCardModel; index: number 
           <span className="tm-badge tm-badge-grey">{match.gender}</span>
           <span className="tm-badge tm-badge-orange">{match.deadline}</span>
         </div>
-        <div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div>
+        <Link className="tm-match-list-title-link tm-text-body-lg" href={detailHref} style={{ marginTop: 10 }}>{match.title}</Link>
         <div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">
           <span className="tm-text-caption">{match.region} · {match.host}</span>
           <span className="tm-text-label">{match.actionLabel}</span>
         </div>
+        <div className="tm-match-card-actions">
+          <Link href={applyHref} aria-label={`${match.title} 참가 신청`}>참가 신청</Link>
+          <Link href={detailHref} aria-label={`${match.title} 상세 보기`}>상세 보기</Link>
+        </div>
       </div>
-    </Link>
+    </article>
   );
 }
 
@@ -683,7 +783,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
   return (
     <AppChrome title="매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/matches">
-      <div className="tm-create-shell">
+      <div className="tm-create-shell tm-match-complete-open-design tm-match-create-open-design" data-testid="match-complete-open-design">
         <EmptyState title="매치가 만들어졌어요" sub="개인매치도 먼저 내 팀에게 공유해서 팀원 참여 가능 여부를 확인할 수 있습니다." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
           <div className="tm-text-body-lg">FC 발빠른놈들 팀 채팅</div>
@@ -691,7 +791,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         </Card>
         {['내 팀에 공유', '초대 링크 복사', '관심 멤버에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 일정 정보를 공유합니다.</div></Card>)}
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches/match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">내 팀에 공유</button></div></div>
+      <div className="tm-fixed-cta tm-create-fixed-cta tm-match-create-action"><div className="tm-fixed-cta-row tm-fixed-cta-row-weighted"><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches">목록 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled>공유 준비 중</button></div></div>
     </AppChrome>
   );
 }

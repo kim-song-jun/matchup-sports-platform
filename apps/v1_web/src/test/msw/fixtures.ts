@@ -1,7 +1,9 @@
 import type {
   CursorPage,
   V1AdminLog,
+  V1AdminMe,
   V1AdminOverview,
+  V1AdminStatusChangeLog,
   V1ChatMessage,
   V1ChatRoom,
   V1Home,
@@ -577,19 +579,28 @@ export const v1HomeFixture: V1Home = {
 };
 
 export const v1AdminOverviewFixture: V1AdminOverview = {
-  users: 12,
-  matches: 3,
-  teams: 4,
-  teamMatches: 2,
-  pendingActions: 1,
+  users: { active: 12, suspended: 1, blocked: 0, withdrawalPending: 0 },
+  matches: { recruiting: 3, cancelled: 1, completed: 2 },
+  teams: { active: 4, suspended: 0, archived: 0 },
+  teamMatches: { recruiting: 2, matched: 1, cancelled: 0 },
+  recentActions: [{ actionLogId: 'admin-log-1', actionType: 'status_check', targetType: 'system', createdAt: '2026-05-18T09:00:00.000Z' }],
+};
+
+export const v1AdminMeFixture: V1AdminMe = {
+  userId: 'user-1',
+  adminUserId: 'admin-1',
+  adminRole: 'owner',
+  status: 'active',
+  capabilities: ['overview:read', 'status:write', 'logs:read', 'admin:owner'],
+  lastActiveAt: null,
 };
 
 export const v1AdminLogsFixture: CursorPage<V1AdminLog> = {
   items: [
     {
-      id: 'admin-log-1',
-      actorId: 'admin-1',
-      action: 'status_check',
+      actionLogId: 'admin-log-1',
+      adminUserId: 'admin-1',
+      actionType: 'status_check',
       targetType: 'system',
       targetId: 'v1',
       reason: 'smoke',
@@ -597,4 +608,23 @@ export const v1AdminLogsFixture: CursorPage<V1AdminLog> = {
     },
   ],
   nextCursor: null,
+  pageInfo: { nextCursor: null, hasNext: false },
+};
+
+export const v1AdminStatusChangeLogsFixture: CursorPage<V1AdminStatusChangeLog> = {
+  items: [
+    {
+      statusChangeLogId: 'status-log-1',
+      targetType: 'user',
+      targetId: 'user-2',
+      fromStatus: 'active',
+      toStatus: 'suspended',
+      actorUserId: null,
+      adminUserId: 'admin-1',
+      reason: '운영 정책 위반',
+      createdAt: '2026-05-18T09:05:00.000Z',
+    },
+  ],
+  nextCursor: null,
+  pageInfo: { nextCursor: null, hasNext: false },
 };

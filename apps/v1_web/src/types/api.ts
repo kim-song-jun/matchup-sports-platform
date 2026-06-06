@@ -1061,19 +1061,64 @@ export type V1Home = {
 };
 
 export type V1AdminOverview = {
-  users: number;
-  matches: number;
-  teams: number;
-  teamMatches: number;
-  pendingActions: number;
+  users: {
+    active: number;
+    suspended: number;
+    blocked: number;
+    withdrawalPending: number;
+  };
+  matches: {
+    recruiting: number;
+    cancelled: number;
+    completed: number;
+  };
+  teams: {
+    active: number;
+    suspended: number;
+    archived: number;
+  };
+  teamMatches: {
+    recruiting: number;
+    matched: number;
+    cancelled: number;
+  };
+  recentActions: Array<{
+    actionLogId: string;
+    actionType: string;
+    targetType: string;
+    createdAt: string;
+  }>;
+};
+
+export type V1AdminMe = {
+  userId: string;
+  adminUserId: string;
+  adminRole: 'owner' | 'ops' | 'support';
+  status: 'active';
+  capabilities: string[];
+  lastActiveAt: string | null;
 };
 
 export type V1AdminLog = {
-  id: string;
-  actorId: string;
-  action: string;
+  actionLogId: string;
+  adminUserId: string;
+  actionType: string;
   targetType: string;
   targetId: string;
+  reason: string | null;
+  beforeState?: unknown;
+  afterState?: unknown;
+  createdAt: string;
+};
+
+export type V1AdminStatusChangeLog = {
+  statusChangeLogId: string;
+  targetType: string;
+  targetId: string;
+  fromStatus: string;
+  toStatus: string;
+  actorUserId: string | null;
+  adminUserId: string | null;
   reason: string | null;
   createdAt: string;
 };

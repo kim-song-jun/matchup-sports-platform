@@ -102,6 +102,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
 
   const model = buildCreateModel({
     step: 'edit',
+    backHref: `/matches/${matchId}`,
     draft,
     selectedSportId,
     regionId,
@@ -148,6 +149,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
 
 function buildCreateModel({
   step,
+  backHref,
   draft,
   selectedSportId,
   regionId,
@@ -166,6 +168,7 @@ function buildCreateModel({
   submitLabel,
 }: {
   step: MatchCreateStep;
+  backHref?: string;
   draft: MatchDraft;
   selectedSportId: string;
   regionId: string;
@@ -189,6 +192,7 @@ function buildCreateModel({
 
   return {
     ...fallback,
+    backHref,
     selectedSport,
     sports: sportNames,
     draft,

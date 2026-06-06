@@ -119,6 +119,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
 
   const model = buildCreateModel({
     step: 'edit',
+    backHref: `/team-matches/${teamMatchId}`,
     draft,
     selectedTeamId,
     selectedSportId,
@@ -167,6 +168,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
 
 function buildCreateModel({
   step,
+  backHref,
   draft,
   selectedTeamId,
   selectedSportId,
@@ -188,6 +190,7 @@ function buildCreateModel({
   submitLabel,
 }: {
   step: TeamMatchCreateStep;
+  backHref?: string;
   draft: TeamMatchDraft;
   selectedTeamId: string;
   selectedSportId: string;
@@ -214,6 +217,7 @@ function buildCreateModel({
 
   return {
     ...fallback,
+    backHref,
     selectedTeam: selectedTeam?.name ?? fallback.selectedTeam,
     selectedSport: selectedSport?.name ?? fallback.selectedSport,
     teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId })),

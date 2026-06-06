@@ -132,7 +132,8 @@ export function MatchListPageClient() {
 export function MatchDetailPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
   const query = useV1Match(matchId);
-  const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
+  const canQueryEligibility = Boolean(query.data && query.data.viewer && query.data.viewer.state !== 'guest');
+  const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: canQueryEligibility });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
   const applyMatch = useV1ApplyMatch(matchId);
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
@@ -387,6 +388,7 @@ function toDetailMode(viewerState: V1ViewerState, status: V1MatchApiStatus): Mat
 }
 
 function applyLabel(viewerState: V1ViewerState, status: V1MatchApiStatus, message?: string) {
+  if (viewerState === 'guest') return '로그인 후 신청';
   if (viewerState === 'host') return '매치 관리';
   if (viewerState === 'requested') return '신청 취소';
   if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';

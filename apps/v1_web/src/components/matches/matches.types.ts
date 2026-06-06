@@ -96,6 +96,7 @@ export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'com
 
 export type MatchCreateViewModel = {
   step: MatchCreateStep;
+  backHref?: string;
   selectedSport: string;
   sports: string[];
   levels: string[];

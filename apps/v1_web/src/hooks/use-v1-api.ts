@@ -738,10 +738,11 @@ export function useV1SubmitReview() {
   });
 }
 
-export function useV1ChatRooms() {
+export function useV1ChatRooms(options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms'),
+    enabled: options?.enabled,
   });
 }
 

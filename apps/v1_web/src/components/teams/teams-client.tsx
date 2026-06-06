@@ -21,6 +21,7 @@ import {
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
+import { toServiceFacingTeamIntro } from './teams-service-copy';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
 
@@ -184,7 +185,8 @@ export function TeamFilterPageClient() {
 export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   const query = useV1TeamDetail(teamId);
-  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
+  const canQueryEligibility = Boolean(query.data && query.data.viewer.disabledReason !== 'LOGIN_REQUIRED');
+  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: canQueryEligibility });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
   const fallback = getTeamDetailViewModel();
@@ -197,7 +199,12 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
         team: {
           ...fallback.team,
           ...toTeamDetail(query.data, fallback.team),
-          description: query.data.profile.introduction ?? fallback.team.description,
+          description: toServiceFacingTeamIntro({
+            introduction: query.data.profile.introduction,
+            regionName: query.data.region?.name ?? fallback.team.county,
+            sportName: query.data.sport.name,
+            defaultIntro: fallback.team.description,
+          }),
           activity: query.data.profile.activityAreaText ?? fallback.team.activity,
           condition: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.condition,
           genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
@@ -298,7 +305,12 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     trust: toTrustBadge(team.trustState),
     tags: [team.levelLabel ?? team.skillLevelText ?? fallback.tags[0] ?? '전체 레벨', fallback.tags[1] ?? '주 1회', team.genderRule ?? fallback.genderRule],
     genderRule: team.genderRule ?? fallback.genderRule,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀입니다. 가입은 팀 운영 정책에 따라 처리됩니다.`,
+    intro: toServiceFacingTeamIntro({
+      introduction: team.introductionPreview,
+      regionName,
+      sportName,
+      defaultIntro: fallback.intro,
+    }),
   };
 }
 
@@ -393,6 +405,8 @@ function countTeamFilters(
 }
 
 function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
+  const regionName = team.region?.name ?? '지역 미정';
+
   return {
     ...fallback,
     id: team.teamId,
@@ -400,13 +414,18 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     logo: team.name.slice(0, 1),
     sport: team.sport.name,
     sports: [team.sport.name],
-    region: team.region?.name ?? '지역 미정',
+    region: regionName,
     members: team.memberCount,
     status: team.profile.joinPolicy === 'closed' ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
     statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : team.viewer.joinState === 'requested' ? '검토중' : team.viewer.role !== 'none' ? '내 팀' : '모집중',
     trust: toTrustBadge(team.trustState ?? team.trust.trustState),
     genderRule: team.profile.genderRule ?? fallback.genderRule,
-    intro: team.profile.introduction ?? fallback.intro,
+    intro: toServiceFacingTeamIntro({
+      introduction: team.profile.introduction,
+      regionName,
+      sportName: team.sport.name,
+      defaultIntro: fallback.intro,
+    }),
   };
 }
 
@@ -420,6 +439,7 @@ function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {
 function ctaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
   if (team.viewer.role === 'owner' || team.viewer.role === 'manager') return '팀 관리';
   if (team.viewer.role === 'member') return '내 팀';
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED') return '로그인 후 가입';
   if (eligibility?.joinState === 'requested') return '가입 신청 취소';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';

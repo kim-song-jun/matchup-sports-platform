@@ -6,15 +6,16 @@ import { useV1DevLogin } from '@/hooks/use-v1-api';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 
 const personas = [
-  { label: 'Host', email: 'host@teameet.v1' },
-  { label: 'Applicant', email: 'applicant@teameet.v1' },
-  { label: 'Team owner', email: 'owner@teameet.v1' },
+  { label: '호스트', email: 'host@teameet.v1' },
+  { label: '참가자', email: 'applicant@teameet.v1' },
+  { label: '팀 운영자', email: 'owner@teameet.v1' },
+  { label: '운영자', email: 'admin@teameet.v1' },
 ];
 
-export function DevLoginPanel() {
+export function DevLoginPanel({ defaultEmail = personas[0].email }: { readonly defaultEmail?: string } = {}) {
   const router = useRouter();
   const devLogin = useV1DevLogin();
-  const [selectedEmail, setSelectedEmail] = useState(personas[0].email);
+  const [selectedEmail, setSelectedEmail] = useState(defaultEmail);
 
   const submit = () => {
     devLogin.mutate(
@@ -40,7 +41,7 @@ export function DevLoginPanel() {
       >
         {personas.map((persona) => (
           <option key={persona.email} value={persona.email}>
-            {persona.label} - {persona.email}
+            {persona.label}
           </option>
         ))}
       </select>

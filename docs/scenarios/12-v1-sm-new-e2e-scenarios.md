@@ -70,6 +70,21 @@ Source design no: `00`
 
 Design section: `core-shell-sm-final`
 
+Responsive evidence:
+
+- 2026-06-04: v1 responsive execution notes are folded into `.github/tasks/88-v1-responsive-shell-hardening.md`.
+- QA command family: `corepack pnpm --filter v1_web dev:e2e` plus Node contract tests under `scripts/qa/v1-*-responsive*.test.mjs`.
+- Mobile matrix scope includes `320`, `360`, `375`, `390`, `412`, `430`, `480`.
+- Tablet/desktop matrix scope includes `768`, `1024`, `1280`, `1440`.
+- Browser evidence:
+  - `evidence/task-8-chat-input.json`
+  - `evidence/task-8-notification-toast.json`
+  - `evidence/task-9-list-desktop-grid.json`
+  - `evidence/task-9-mobile-regression.json`
+  - `evidence/task-9-detail-desktop.json`
+  - `output/playwright/visual-audit/v1-responsive-task-8/`
+  - `output/playwright/visual-audit/v1-responsive-task-9/`
+
 Primary contracts:
 `GET /notifications`, `PATCH /notifications/:notificationId/read`, domain list/search APIs.
 

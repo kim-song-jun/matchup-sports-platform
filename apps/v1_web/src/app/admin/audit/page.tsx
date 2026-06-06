@@ -1,5 +1,5 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { AdminAuditPageClient } from '@/components/community/admin-api-clients';
 
 export default function AdminAuditPage() {
-  return <FirstDesignPage screen="adminAudit" />;
+  return <AdminAuditPageClient />;
 }

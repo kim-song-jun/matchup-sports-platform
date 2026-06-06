@@ -174,7 +174,7 @@ export function ProfileEditPageClient() {
 
   return (
     <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell" id="v1-profile-edit-form" onSubmit={submit}>
+      <form className="tm-create-shell tm-profile-edit-shell tm-profile-edit-desktop-lane" data-testid="profile-edit-open-design" id="v1-profile-edit-form" onSubmit={submit}>
         <section className="tm-my-profile-head">
           <div className="tm-my-avatar">{initials(displayName)}</div>
           <div>
@@ -204,7 +204,7 @@ export function ProfileEditPageClient() {
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목, 난이도, 활동 지역은 마이페이지의 운동 정보에서 따로 관리합니다.</div>
         </Card>
       </form>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-profile-edit-action">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={update.isPending}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
@@ -266,7 +266,7 @@ export function SportsSettingsPageClient() {
 
   return (
     <AppChrome title="운동 정보" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell" id="v1-sports-settings-form" onSubmit={submit}>
+      <form className="tm-create-shell tm-profile-edit-shell tm-sports-settings-desktop-lane" data-testid="sports-settings-open-design" id="v1-sports-settings-form" onSubmit={submit}>
         <Card pad={16}>
           <div className="tm-text-body-lg">운동 종목</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>추천과 모집 조건에 사용할 종목을 선택합니다.</div>
@@ -321,7 +321,7 @@ export function SportsSettingsPageClient() {
           <div className="tm-text-caption" style={{ marginTop: 5 }}>저장 후 마이페이지의 종목 칩과 추천 기준에 바로 반영됩니다.</div>
         </Card>
       </form>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-sports-settings-action">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-sports-settings-form" disabled={updatePreferences.isPending}>
           {updatePreferences.isPending ? '저장 중' : '운동 정보 저장'}
         </button>
@@ -448,7 +448,7 @@ export function LocationSettingsPageClient() {
 
   return (
     <AppChrome title="위치 및 활동 지역" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-location-settings-desktop-lane" data-testid="location-settings-open-design">
         <Card pad={16}>
           <div className="tm-text-label">현재 활동 지역</div>
           <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
@@ -487,7 +487,7 @@ export function LocationSettingsPageClient() {
           <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
         </Card>
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-location-settings-action">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={!selectedRegionId || updateRegion.isPending} onClick={save}>
           {updateRegion.isPending ? '저장 중' : '활동 지역 저장'}
         </button>
@@ -543,7 +543,7 @@ export function WithdrawalPageClient() {
 
   return (
     <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-withdrawal-desktop-lane" data-testid="withdrawal-open-design">
         <section className="tm-danger-panel">
           <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
           <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
@@ -558,7 +558,7 @@ export function WithdrawalPageClient() {
         </label>
         {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했습니다</div></Card> : null}
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-withdrawal-action">
         <button
           className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
           type="button"

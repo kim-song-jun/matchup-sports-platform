@@ -171,7 +171,9 @@ export function OnboardingPageView({ model }: { model: OnboardingViewModel }) {
 
 export function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction }: { children: ReactNode; topTitle?: string; backHref?: string; skipHref?: string; fixedAction?: ReactNode }) {
   return (
-    <div className="tm-auth-frame">
+    <div className="tm-auth-frame tm-auth-open-design" data-testid="auth-open-design">
+      <AuthDesktopNav />
+      <div className="tm-auth-shell-content">
       {topTitle || backHref || skipHref ? (
         <header className="tm-auth-topbar">
           <div className="tm-auth-topbar-left">
@@ -189,7 +191,25 @@ export function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction 
         {children}
       </main>
       {fixedAction ? <div className="tm-auth-fixed-cta">{fixedAction}</div> : null}
+      </div>
     </div>
+  );
+}
+
+function AuthDesktopNav() {
+  return (
+    <aside className="tm-desktop-nav tm-auth-desktop-nav" aria-label="데스크탑 주요 메뉴">
+      <Link className="tm-desktop-brand" href="/home" aria-label="Teameet 홈">
+        <span className="tm-desktop-brand-mark">T</span>
+        <span>teameet</span>
+      </Link>
+      <div className="tm-desktop-tab-list">
+        <Link className="tm-desktop-tab" href="/home">홈</Link>
+        <Link className="tm-desktop-tab" href="/matches">매치</Link>
+        <Link className="tm-desktop-tab" href="/teams">팀</Link>
+        <Link className="tm-desktop-tab" href="/login" aria-current="page" data-active="true">로그인</Link>
+      </div>
+    </aside>
   );
 }
 

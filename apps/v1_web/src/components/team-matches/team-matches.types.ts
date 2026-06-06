@@ -91,6 +91,7 @@ export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'pla
 
 export type TeamMatchCreateViewModel = {
   step: TeamMatchCreateStep;
+  backHref?: string;
   selectedTeam: string;
   selectedSport: string;
   teams: Array<{ name: string; sport: string; members: number; role: string; selected?: boolean }>;

@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { MetricCard, PageHeader } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
@@ -18,22 +19,49 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
       activeTab="my"
       bottomNav={false}
       backHref="/home"
+      wide
       showNotifications={false}
     >
-      <div className="tm-chat-list">
-        <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect}>{category.label} {category.count}</button>)}</div>
-        {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오는 중입니다" body="잠시만 기다려주세요." /> : null}
-        {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
-        {hasRooms ? (
-          <>
-            <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
-              {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
-            </ChatSection>
-            <ChatSection title={`채팅방 ${model.rooms.length}`}>
-              {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
-            </ChatSection>
-          </>
-        ) : null}
+      <div className="tm-chat-list tm-chat-open-design tm-community-desktop-workbench" data-testid="chat-open-design">
+        <div className="tm-list-grid">
+          <aside className="tm-filter-rail" aria-label="채팅 필터" data-testid="chat-filter-rail">
+            <div className="tm-filter-rail-title">채팅 필터</div>
+            <div className="tm-filter-rail-list">
+              {model.categories.map((category) => (
+                <button key={category.label} className="tm-filter-pill" data-active={category.active} type="button" onClick={category.onSelect}>
+                  <span>{category.label}</span>
+                  <span className="tm-filter-pill-count">{category.count}</span>
+                </button>
+              ))}
+            </div>
+          </aside>
+          <div>
+            <PageHeader
+              eyebrow="커뮤니티"
+              title="채팅"
+              description="개인매치, 팀매치, 팀 채팅만 현재 v1 계약으로 열고 고정/나가기 상태를 명확히 구분합니다."
+              action={<Link className="tm-btn tm-btn-sm tm-btn-secondary" href="/notifications">알림 보기</Link>}
+            />
+            <div className="tm-responsive-card-grid" style={{ marginTop: 16 }}>
+              <MetricCard label="커뮤니티 요약" value={`${model.pinnedRooms.concat(model.rooms).reduce((total, room) => total + room.unread, 0)}개`} delta="읽지 않은 대화" tone="up" />
+              <MetricCard label="토픽 큐" value={`${model.pinnedRooms.length + model.rooms.length}개`} delta={`고정 ${model.pinnedRooms.length}개`} />
+              <MetricCard label="작성 관리" value="채팅" delta="메시지 입력만 지원" />
+            </div>
+            <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect}>{category.label} {category.count}</button>)}</div>
+            {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오는 중입니다" body="잠시만 기다려주세요." /> : null}
+            {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
+            {hasRooms ? (
+              <>
+                <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
+                  {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+                </ChatSection>
+                <ChatSection title={`채팅방 ${model.rooms.length}`}>
+                  {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+                </ChatSection>
+              </>
+            ) : null}
+          </div>
+        </div>
       </div>
       {model.leaveConfirm ? (
         <div className="tm-chat-leave-scrim" role="presentation">
@@ -52,7 +80,7 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
 export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
   return (
     <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat" showNotifications={false}>
-      <div className="tm-chat-room">
+      <div className="tm-chat-room tm-chat-room-open-design" data-testid="chat-room-open-design">
         <div className="tm-chat-context">
           <Link className="tm-card tm-chat-context-card" href={model.context.href}>
             <div className="tm-chat-context-icon"><ChatIcon size={20} strokeWidth={2} /></div>
@@ -84,18 +112,19 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
       bottomNav={false}
       backHref="/home"
       showNotifications={false}
-      topbarActions={(
-        <button
-          className="tm-btn tm-btn-sm tm-btn-ghost"
-          type="button"
-          disabled={allRead || !model.onReadAll || model.readAllPending}
-          onClick={model.onReadAll}
-        >
-          {model.readAllPending ? '처리중' : '모두읽음'}
-        </button>
-      )}
+      wide
     >
-      <div className="tm-notification-list">
+      <div className="tm-notification-list tm-notifications-open-design" data-testid="notifications-open-design">
+        <PageHeader
+          eyebrow="커뮤니티 알림"
+          title="알림"
+          description="읽음 처리는 라우팅보다 먼저 사라지지 않도록 현재 알림 계약으로 처리합니다."
+          action={<ReadAllButton model={model} allRead={allRead} />}
+        />
+        <div className="tm-responsive-card-grid" style={{ marginTop: 16 }}>
+          <MetricCard label="읽지 않음" value={`${model.unreadCount}개`} delta={allRead ? '모두 확인됨' : '확인 필요'} tone={allRead ? 'neutral' : 'up'} />
+          <MetricCard label="알림 묶음" value={`${groups.length}개`} delta="오늘/어제 기준" />
+        </div>
         {groups.map((group) => {
           const items = model.notifications.filter((notification) => notification.group === group);
           if (items.length === 0) return null;
@@ -111,6 +140,19 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
       </div>
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽음 처리했습니다</div> : null}
     </AppChrome>
+  );
+}
+
+function ReadAllButton({ allRead, model }: { allRead: boolean; model: NotificationsViewModel }) {
+  return (
+    <button
+      className="tm-btn tm-btn-sm tm-btn-ghost"
+      type="button"
+      disabled={allRead || !model.onReadAll || model.readAllPending}
+      onClick={model.onReadAll}
+    >
+      {model.readAllPending ? '처리중' : '모두읽음'}
+    </button>
   );
 }
 
@@ -201,7 +243,12 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue">고정</span> : null}</div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>
               <span className="tm-chat-room-type">{room.type}</span>
-              <span className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}>{room.last}</span>
+              <span
+                className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}
+                style={{ overflow: 'visible', textOverflow: 'clip', whiteSpace: 'normal' }}
+              >
+                {room.last}
+              </span>
               {room.unread > 0 ? <span className="tm-chat-inline-unread">{room.unread}</span> : null}
             </div>
           </div>

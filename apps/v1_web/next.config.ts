@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
   output: isProd ? 'standalone' : undefined,
   basePath: basePath || undefined,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  devIndicators: false,
   experimental: {
     optimizePackageImports: ['@tanstack/react-query'],
   },

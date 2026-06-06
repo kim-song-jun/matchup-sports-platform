@@ -144,7 +144,8 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const router = useRouter();
   const query = useV1TeamMatch(teamMatchId);
   const viewerState = query.data ? getViewerState(query.data) : 'none';
-  const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' });
+  const canQueryEligibility = Boolean(query.data && query.data.viewer && query.data.viewer.state !== 'guest' && viewerState !== 'host_team');
+  const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: canQueryEligibility });
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
   const resolveChatRoom = useV1ResolveChatRoom();
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
@@ -373,6 +374,7 @@ function applyLabel(
   status: V1TeamMatchApiStatus,
   team?: { eligible: boolean; reasonCode: string; applicationId: string | null; name: string } | null,
 ) {
+  if (viewerState === 'guest') return '로그인 후 신청';
   if (viewerState === 'host_team') return '매치 관리';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') return '신청 취소';
   if (viewerState === 'approved' || status === 'matched') return '승인 완료';

@@ -9,7 +9,7 @@ import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
   const query = useV1Home();
-  const chatRooms = useV1ChatRooms();
+  const chatRooms = useV1ChatRooms({ enabled: Boolean(query.data?.viewer?.authenticated) });
   const { weather, refreshing: weatherRefreshing, refresh: refreshWeather } = useCurrentLocationWeather();
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;

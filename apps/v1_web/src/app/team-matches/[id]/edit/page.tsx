@@ -1,5 +1,6 @@
 import { TeamMatchEditPageClient } from '@/components/team-matches/team-matches-create-client';
 
-export default function TeamMatchEditPage({ params }: { params: { id: string } }) {
-  return <TeamMatchEditPageClient teamMatchId={params.id} />;
+export default async function TeamMatchEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <TeamMatchEditPageClient teamMatchId={id} />;
 }

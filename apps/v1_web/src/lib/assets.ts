@@ -10,3 +10,15 @@ export function publicAssetPath(path: string) {
 export function cssUrl(path: string) {
   return `url("${publicAssetPath(path).replace(/"/g, '\\"')}")`;
 }
+
+export function safePublicAssetPath(path: string | null | undefined) {
+  const trimmed = path?.trim();
+  if (!trimmed || /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(trimmed)) return null;
+  if (!trimmed.startsWith('/')) return null;
+  return publicAssetPath(trimmed);
+}
+
+export function safeCssUrl(path: string | null | undefined) {
+  const safePath = safePublicAssetPath(path);
+  return safePath ? cssUrl(safePath) : null;
+}

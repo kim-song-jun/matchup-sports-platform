@@ -1,5 +1,5 @@
-import { FirstDesignPage } from '@/components/design/first-design-page';
+import { AdminMinimumPageView } from '@/components/community/admin-page';
 
 export default function AdminAuditPage() {
-  return <FirstDesignPage screen="adminAudit" />;
+  return <AdminMinimumPageView surface="audit" />;
 }

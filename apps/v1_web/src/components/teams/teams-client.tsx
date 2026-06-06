@@ -184,7 +184,8 @@ export function TeamFilterPageClient() {
 export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   const query = useV1TeamDetail(teamId);
-  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
+  const canQueryEligibility = Boolean(query.data && query.data.viewer.disabledReason !== 'LOGIN_REQUIRED');
+  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: canQueryEligibility });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
   const fallback = getTeamDetailViewModel();
@@ -420,6 +421,7 @@ function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {
 function ctaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
   if (team.viewer.role === 'owner' || team.viewer.role === 'manager') return '팀 관리';
   if (team.viewer.role === 'member') return '내 팀';
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED') return '로그인 후 가입';
   if (eligibility?.joinState === 'requested') return '가입 신청 취소';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';

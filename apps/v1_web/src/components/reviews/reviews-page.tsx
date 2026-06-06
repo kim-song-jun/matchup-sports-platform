@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
+import { safeCssUrl } from '@/lib/assets';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import type { V1ReviewDetail, V1ReviewTargetType } from '@/types/api';
@@ -26,9 +27,14 @@ export function ReviewsPageView({
   const isReceivedTab = model.tab === 'received';
 
   return (
-    <AppChrome title="리뷰" activeTab="my" backHref="/my">
-      <div className="tm-review-shell">
+    <AppChrome title="리뷰" activeTab="my" backHref="/my" showSearch={false} wide>
+      <div className="tm-review-shell tm-reviews-open-design tm-reviews-desktop-workbench" data-testid="reviews-open-design">
+        <div className="tm-review-workbench-strip" aria-label="리뷰 데스크탑 작업">
+          <div className="tm-my-section-label">리뷰 큐</div>
+          <div className="tm-my-section-label">제출 관리</div>
+        </div>
         <ReviewTabs active={model.tab} onChange={onTabChange} />
+        <ReviewTrustLegend />
         {isReceivedTab ? (
           <ReviewsReceivedContent
             errorMessage={errorMessage}
@@ -39,7 +45,7 @@ export function ReviewsPageView({
         ) : (
           <>
             <ReviewStats stats={model.stats} />
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div className="tm-review-card-stack">
               {loading ? <ReviewSkeleton count={2} /> : null}
               {!loading && errorMessage ? <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
               {!loading && !errorMessage && model.cards.length === 0 ? <ReviewEmpty title={model.emptyTitle} sub={model.emptySub} /> : null}
@@ -113,7 +119,7 @@ export function ReviewSourcePageView({
 
   return (
     <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews">
-      <div className="tm-review-shell tm-review-compose-shell">
+      <div className="tm-review-shell tm-review-compose-shell tm-review-compose-desktop-lane" data-testid="review-compose-open-design">
         {loading ? <ReviewSkeleton count={3} /> : null}
         {!loading && errorMessage ? <ReviewNotice title="리뷰 대상을 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
         {!loading && !errorMessage && model ? (
@@ -150,7 +156,7 @@ export function ReviewSourcePageView({
           </>
         ) : null}
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-review-compose-action">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!canSubmit || submitting || loading || Boolean(errorMessage)} onClick={onSubmit} type="button">
           {submitting ? '전송 중' : '리뷰 보내기'}
         </button>
@@ -239,6 +245,19 @@ function ReviewStats({ stats }: { stats: Array<{ label: string; value: string }>
   );
 }
 
+function ReviewTrustLegend() {
+  return (
+    <section className="tm-review-trust-panel" aria-labelledby="review-trust-signal-title">
+      <div id="review-trust-signal-title" className="tm-my-section-label">신뢰 신호</div>
+      <div className="tm-review-chip-row" aria-label="리뷰 신뢰 상태">
+        <span className="tm-badge tm-badge-green" data-trust-state="verified">검증됨</span>
+        <span className="tm-badge tm-badge-orange" data-trust-state="estimated">추정</span>
+        <span className="tm-badge tm-badge-grey" data-trust-state="sample">샘플</span>
+      </div>
+    </section>
+  );
+}
+
 function ReviewTargetCard({
   draft,
   onToggleTag,
@@ -317,7 +336,7 @@ function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageMo
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div className="tm-review-received-stack">
         {groups.map((group) => (
           <Card key={`${group.sourceType}:${group.sourceId}`} pad={16}>
             <div className="tm-review-card-head">
@@ -351,8 +370,9 @@ function ReceivedReviewRow({ review }: { review: V1ReviewDetail }) {
 }
 
 function Avatar({ imageUrl, initials, size = 42 }: { imageUrl: string | null | undefined; initials: string; size?: number }) {
-  return imageUrl ? (
-    <div className="tm-review-avatar" style={{ width: size, height: size, backgroundImage: `url(${imageUrl})` }} />
+  const backgroundImage = safeCssUrl(imageUrl);
+  return backgroundImage ? (
+    <div className="tm-review-avatar" style={{ width: size, height: size, backgroundImage }} />
   ) : (
     <div className="tm-review-avatar" style={{ width: size, height: size }}>{initials}</div>
   );

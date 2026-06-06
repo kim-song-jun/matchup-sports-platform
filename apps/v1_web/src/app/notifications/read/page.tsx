@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { NotificationsPageClient } from '@/components/community/community-api-clients';
 
 export default function ReadNotificationsPage() {
-  redirect('/notifications');
+  return <NotificationsPageClient />;
 }

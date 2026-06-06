@@ -24,6 +24,8 @@ export const v1Keys = {
   notificationPreferences: () => [...v1Keys.all, 'notification-preferences'] as const,
   profile: () => [...v1Keys.all, 'me', 'profile'] as const,
   settings: () => [...v1Keys.all, 'me', 'settings'] as const,
+  adminMe: () => [...v1Keys.all, 'admin', 'me'] as const,
   adminOverview: () => [...v1Keys.all, 'admin', 'overview'] as const,
-  adminActionLogs: () => [...v1Keys.all, 'admin', 'action-logs'] as const,
+  adminActionLogs: (filters?: unknown) => [...v1Keys.all, 'admin', 'action-logs', filters ?? {}] as const,
+  adminStatusChangeLogs: (filters?: unknown) => [...v1Keys.all, 'admin', 'status-change-logs', filters ?? {}] as const,
 };

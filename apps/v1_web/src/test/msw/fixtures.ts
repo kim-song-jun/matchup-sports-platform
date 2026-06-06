@@ -1,7 +1,5 @@
 import type {
   CursorPage,
-  V1AdminLog,
-  V1AdminOverview,
   V1ChatMessage,
   V1ChatRoom,
   V1Home,
@@ -574,27 +572,4 @@ export const v1HomeFixture: V1Home = {
   recommendedMatches: v1MatchesFixture,
   recommendedTeamMatches: v1TeamMatchesFixture,
   recommendedTeams: v1TeamsFixture,
-};
-
-export const v1AdminOverviewFixture: V1AdminOverview = {
-  users: 12,
-  matches: 3,
-  teams: 4,
-  teamMatches: 2,
-  pendingActions: 1,
-};
-
-export const v1AdminLogsFixture: CursorPage<V1AdminLog> = {
-  items: [
-    {
-      id: 'admin-log-1',
-      actorId: 'admin-1',
-      action: 'status_check',
-      targetType: 'system',
-      targetId: 'v1',
-      reason: 'smoke',
-      createdAt: '2026-05-18T09:00:00.000Z',
-    },
-  ],
-  nextCursor: null,
 };

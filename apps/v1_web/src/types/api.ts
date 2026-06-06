@@ -1059,21 +1059,3 @@ export type V1Home = {
   recommendedTeamMatches?: V1TeamMatch[];
   recommendedTeams?: V1Team[];
 };
-
-export type V1AdminOverview = {
-  users: number;
-  matches: number;
-  teams: number;
-  teamMatches: number;
-  pendingActions: number;
-};
-
-export type V1AdminLog = {
-  id: string;
-  actorId: string;
-  action: string;
-  targetType: string;
-  targetId: string;
-  reason: string | null;
-  createdAt: string;
-};

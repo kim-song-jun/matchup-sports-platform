@@ -4,7 +4,8 @@ import { pathToFileURL } from 'node:url';
 
 export const REQUIRED_V1_BASE_URL = 'http://localhost:3013';
 export const DEFAULT_OPEN_DESIGN_ROOT = '/Users/sungjun/Library/Application Support/Open Design/namespaces/release-stable/data/projects/dc57a253-6a77-4c01-b76b-6a4d1a9037d7';
-export const DEFAULT_HOST_EMAIL = 'host@teameet.v1';
+// Use V1_QA_AUTH_EMAIL=admin@teameet.v1 for admin route captures.
+export const DEFAULT_HOST_EMAIL = process.env.V1_QA_AUTH_EMAIL ?? 'host@teameet.v1';
 export const OUTPUT_ROOT = path.join('output', 'playwright', 'visual-audit');
 
 const DEFAULT_VIEWPORTS = '375x812,1280x900';

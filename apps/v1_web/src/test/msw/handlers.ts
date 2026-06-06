@@ -1,7 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import {
-  v1AdminLogsFixture,
+  v1AdminActionLogsFixture,
+  v1AdminMeFixture,
   v1AdminOverviewFixture,
+  v1AdminStatusChangeLogsFixture,
+} from './admin-fixtures';
+import {
   v1ChatMessagesByRoomFixture,
   v1ChatMessagesFixture,
   v1ChatRoomsFixture,
@@ -196,8 +200,10 @@ export const v1MswHandlers = [
   http.get(`${api}/notification-preferences`, () => ok(v1SettingsFixture.notifications)),
   http.get(`${api}/me/profile`, () => ok(v1ProfileFixture)),
   http.get(`${api}/me/settings`, () => ok(v1SettingsFixture)),
+  http.get(`${api}/admin/me`, () => ok(v1AdminMeFixture)),
   http.get(`${api}/admin/overview`, () => ok(v1AdminOverviewFixture)),
-  http.get(`${api}/admin/action-logs`, () => ok(v1AdminLogsFixture)),
+  http.get(`${api}/admin/action-logs`, () => ok(v1AdminActionLogsFixture)),
+  http.get(`${api}/admin/status-change-logs`, () => ok(v1AdminStatusChangeLogsFixture)),
 ];
 
 const levelOrder = ['beginner', 'novice', 'intermediate', 'advanced'];

@@ -5,8 +5,6 @@ import { v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   CursorPage,
-  V1AdminLog,
-  V1AdminOverview,
   V1AuthMe,
   V1AuthSessionResponse,
   V1ChatMessage,
@@ -910,19 +908,5 @@ export function useV1WithdrawalRequest() {
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
     },
-  });
-}
-
-export function useV1AdminOverview() {
-  return useQuery({
-    queryKey: v1Keys.adminOverview(),
-    queryFn: () => v1Get<V1AdminOverview>('/admin/overview'),
-  });
-}
-
-export function useV1AdminActionLogs(filters?: ListFilters) {
-  return useQuery({
-    queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
-    queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
   });
 }

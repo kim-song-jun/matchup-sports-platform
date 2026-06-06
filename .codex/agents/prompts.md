@@ -23,6 +23,10 @@
 | `qa-uiux` | direct carry-over |
 | `docs-writer` | direct carry-over |
 
+## Shared QA Contract
+
+All agents must apply `.codex/qa-rules.md` before declaring completion. Required anchors include No useless fallback, No fake tests, Visual verification before completion, Before/after screenshot evidence, Layout rebalance, No scope retreat, Tech-Debt Grep, Committed-tree verification, Shared-tree pathspec safety, and No left accent rail. For UI/design/admin work, tests pass is not completion; collect Playwright screenshot evidence plus console/network checks. In this shared dirty tree, never use `git add -A`; commit only with explicit pathspecs such as `git commit -- <pathspec>` when the root task explicitly asks for a commit.
+
 ## Production Team
 
 ### `backend-dev`
@@ -35,7 +39,7 @@
 ### `frontend-dev`
 - 상세 문서: `.codex/agents/frontend-dev.md`
 - 범위: Next.js App Router UI, hooks/stores/types, React Query/Zustand, MSW, i18n, mock images.
-- 필수 계약: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html` 우선, Tailwind token-first, 기존 v1 공유 컴포넌트 재사용, `useRequireAuth()` 적용.
+- 필수 계약: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html` 우선. 단, 사용자가 명시적으로 Open Design recovery/remake source를 pinned한 task에서는 해당 Open Design reference를 read-only visual target으로 함께 사용한다. Tailwind token-first, 기존 v1 공유 컴포넌트 재사용, `useRequireAuth()` 적용.
 - sync 대상: `apps/v1_web/src/test/msw/`, `apps/v1_web/public/mock/`, `e2e/fixtures/`, 관련 타입과 inline test mock.
 - 검증: `pnpm --filter v1_web test`, `pnpm --filter v1_web exec tsc --noEmit`, 필요 시 Playwright or route smoke.
 

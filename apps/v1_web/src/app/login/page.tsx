@@ -17,7 +17,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const redirect = sanitizeRedirectPath(firstSearchParam(params?.redirect));
   const isAdminRedirect = redirect?.startsWith('/admin') === true;
-  const devLogin = <DevLoginPanel defaultEmail={isAdminRedirect ? 'admin@teameet.v1' : undefined} />;
+  const devLogin = <DevLoginPanel defaultEmail={isAdminRedirect ? 'owner@teameet.v1' : undefined} />;
 
   return (
     <SessionEntryGate mode="login">

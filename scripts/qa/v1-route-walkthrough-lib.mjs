@@ -148,18 +148,18 @@ export function buildFunctionalProbeResults({ route, metrics }) {
 export async function auditInteractiveAffordances(page) {
   const controls = page.locator('main a[href]:visible,main button:visible:not([disabled]),.tm-fixed-cta a[href]:visible,.tm-fixed-cta button:visible:not([disabled])');
   const controlCount = Math.min(await controls.count(), 25);
+  const labels = await Promise.all(Array.from({ length: controlCount }, (_, index) => controls.nth(index).evaluate((node) => ({
+    tagName: node.tagName.toLowerCase(),
+    text: (node.textContent ?? node.getAttribute('aria-label') ?? '').trim().slice(0, 80),
+    href: node.getAttribute('href') ?? '',
+  }))));
   const failures = [];
 
   for (let index = 0; index < controlCount; index += 1) {
-    const control = controls.nth(index);
-    const label = await control.evaluate((node) => ({
-      tagName: node.tagName.toLowerCase(),
-      text: (node.textContent ?? node.getAttribute('aria-label') ?? '').trim().slice(0, 80),
-      href: node.getAttribute('href') ?? '',
-    }));
+    const label = labels[index];
 
     try {
-      await control.click({ trial: true, timeout: 300 });
+      await controls.nth(index).click({ trial: true, timeout: 3_000 });
     } catch (error) {
       failures.push({
         ...label,

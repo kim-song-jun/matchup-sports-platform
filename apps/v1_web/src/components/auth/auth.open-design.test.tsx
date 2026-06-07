@@ -15,14 +15,14 @@ describe('auth Open Design contract', () => {
     expect(screen.getByRole('button', { name: 'Apple' })).toBeDisabled();
   });
 
-  it('renders an admin login entry without guest continuation when redirecting to admin', () => {
+  it('renders an operations login entry without guest continuation when redirecting to admin workspace', () => {
     render(<AdminLoginPageView redirect="/admin/audit" />);
 
     const authPage = screen.getByTestId('auth-open-design');
     expect(authPage.querySelector('.tm-desktop-nav-admin')).toBeInTheDocument();
     expect(authPage.querySelector('.tm-auth-admin-kicker')).toHaveTextContent('Teameet 운영');
-    expect(screen.getByRole('heading', { name: '관리자 로그인' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '이메일로 관리자 로그인' })).toHaveAttribute('href', '/login/email?redirect=%2Fadmin%2Faudit');
+    expect(screen.getByRole('heading', { name: '업체 운영 로그인' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '이메일로 운영 로그인' })).toHaveAttribute('href', '/login/email?redirect=%2Fadmin%2Faudit');
     expect(screen.queryByRole('link', { name: '홈' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '매치' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '팀' })).not.toBeInTheDocument();

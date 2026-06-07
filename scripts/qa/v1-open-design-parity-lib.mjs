@@ -5,7 +5,8 @@ import { pathToFileURL } from 'node:url';
 export const REQUIRED_V1_BASE_URL = 'http://localhost:3013';
 export const DEFAULT_OPEN_DESIGN_ROOT = '/Users/sungjun/Library/Application Support/Open Design/namespaces/release-stable/data/projects/dc57a253-6a77-4c01-b76b-6a4d1a9037d7';
 export const DEFAULT_HOST_EMAIL = 'host@teameet.v1';
-export const DEFAULT_ADMIN_EMAIL = 'admin@teameet.v1';
+export const DEFAULT_OPERATIONS_EMAIL = 'owner@teameet.v1';
+export const DEFAULT_ADMIN_EMAIL = DEFAULT_OPERATIONS_EMAIL;
 export const OUTPUT_ROOT = path.join('output', 'playwright', 'visual-audit');
 
 const DEFAULT_VIEWPORTS = '375x812,1280x900';
@@ -145,7 +146,7 @@ export function isProtectedRoute(route) {
 
 export function emailForRoute(route) {
   const pathname = normalizePathname(route);
-  return pathname === '/admin' || pathname.startsWith('/admin/') ? DEFAULT_ADMIN_EMAIL : DEFAULT_HOST_EMAIL;
+  return pathname === '/admin' || pathname.startsWith('/admin/') ? DEFAULT_OPERATIONS_EMAIL : DEFAULT_HOST_EMAIL;
 }
 
 export async function writeJson(filePath, value) {

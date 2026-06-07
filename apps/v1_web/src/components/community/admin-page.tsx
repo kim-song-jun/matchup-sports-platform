@@ -2,49 +2,62 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, PageHeader } from '@/components/v1-ui/primitives';
-import { AuditLogList, AuditLogTable } from './admin-audit-components';
+import { AdminActivityTable } from './admin-activity-table';
+import { AdminErrorPanel } from './admin-error';
+import { AdminActivityLoading, AdminDashboardLoading } from './admin-loading';
 import type {
-  AdminAuditModel,
-  AdminAuthorityModel,
-  AdminContractModel,
+  AdminActivityModel,
+  AdminActionLinkModel,
   AdminDashboardModel,
-  AdminDomainModel,
   AdminMetricModel,
+  AdminQueueItemModel,
+  AdminTeamModel,
+  AdminWorkItemModel,
 } from './admin.types';
 
-type DashboardViewProps = { readonly model: AdminDashboardModel; readonly onRetry?: () => void; readonly statusMutationPanel?: ReactNode };
-type AuditViewProps = { readonly model: AdminAuditModel; readonly onRetry?: () => void };
+type DashboardViewProps = { readonly model: AdminDashboardModel; readonly onRetry?: () => void };
+type ActivityViewProps = { readonly model: AdminActivityModel; readonly onRetry?: () => void };
 
-export function AdminDashboardPageView({ model, onRetry, statusMutationPanel }: DashboardViewProps) {
+export function AdminDashboardPageView({ model, onRetry }: DashboardViewProps) {
   return (
-    <AdminFrame title="관리자" active="admin" testId="admin-open-design" className="tm-admin-open-design tm-admin-desktop-workbench">
+    <AdminFrame title="운영 ERP" active="admin" testId="admin-open-design" className="tm-admin-open-design tm-admin-desktop-workbench">
       <AdminDomainShell showStrip={model.state !== 'error'}>
         <PageHeader
-          eyebrow="관리자"
-          title="운영 관리"
-          description="서비스 운영 현황을 확인하고 필요한 조치를 안전하게 진행하세요. 아직 준비 중인 업무는 완료된 것처럼 표시하지 않습니다."
-          action={<Link className="tm-btn tm-btn-sm tm-btn-secondary" href="/admin/audit">감사 로그</Link>}
+          eyebrow="오늘의 운영"
+          title="운영 워크스페이스"
+          description="오늘 처리할 신청, 모집, 리뷰, 알림을 우선순위대로 정리했습니다."
+          action={<AdminActionLink action={{ label: '업무 이력', href: '/admin/audit', tone: 'neutral' }} />}
         />
-        {model.state === 'error' ? <AdminError message={model.errorMessage} onRetry={onRetry} /> : (
+        {model.state === 'error' ? <AdminErrorPanel message={model.errorMessage} onRetry={onRetry} /> : model.state === 'loading' ? (
+          <AdminDashboardLoading operatorName={model.operatorName} />
+        ) : (
           <>
-            <section className="tm-admin-kpi-grid" aria-label="운영 요약">
+            <section className="tm-admin-kpi-grid" aria-label="업무 요약">
               {model.metrics.map((metric) => <AdminMetric key={metric.id} metric={metric} />)}
             </section>
             <section className="tm-admin-workspace">
               <div className="tm-admin-main-column">
-                <AdminSection title="서비스 운영 현황" sub="운영자가 바로 확인해야 하는 주요 영역입니다.">
-                  <div className="tm-admin-domain-grid">
-                    {model.domains.map((domain) => <AdminDomainCard key={domain.id} domain={domain} />)}
-                  </div>
+                <AdminSection title="오늘 처리할 업무" sub="가입 요청, 운영 알림, 미작성 리뷰를 서비스 업무 흐름으로 묶었습니다.">
+                  <AdminQueue items={model.queue} emptyTitle="지금 바로 처리할 업무가 없습니다." />
                 </AdminSection>
-                <AdminSection title="최근 감사 로그" sub="운영 활동의 주체, 대상, 사유를 확인합니다.">
-                  <AuditLogList logs={model.recentLogs} state={model.state} compact />
+                <div className="tm-admin-operations-grid">
+                <AdminSection title="개인 매치 현황" sub="내가 만든 매치의 모집 상태와 수정 경로입니다.">
+                    <AdminWorkList items={model.personalMatches} emptyTitle="내가 만든 매치가 없습니다." />
+                  </AdminSection>
+                <AdminSection title="팀매치 현황" sub="내 팀이 주최하거나 신청한 팀매치 흐름입니다.">
+                    <AdminWorkList items={model.teamMatches} emptyTitle="팀매치 운영 내역이 없습니다." />
+                  </AdminSection>
+                </div>
+                <AdminSection title="팀 현황" sub="팀장/운영진 권한이 있는 팀만 표시합니다.">
+                  <AdminTeamGrid teams={model.teams} />
                 </AdminSection>
               </div>
               <aside className="tm-admin-side-column">
-                <AdminAuthorityPanel authority={model.authority} pendingLabel={model.pendingActionsLabel} />
-                {statusMutationPanel}
-                <AdminContracts contracts={model.contracts} />
+                <AdminOperatorPanel model={model} />
+                <AdminQuickActions actions={model.primaryActions} />
+                <AdminSection title="알림 · 리뷰" sub="고객 응대와 경기 후 신뢰 신호를 놓치지 않도록 모았습니다.">
+                  <AdminQueue items={model.communication} emptyTitle="확인할 알림이나 리뷰가 없습니다." />
+                </AdminSection>
               </aside>
             </section>
           </>
@@ -54,31 +67,36 @@ export function AdminDashboardPageView({ model, onRetry, statusMutationPanel }: 
   );
 }
 
-export function AdminAuditPageView({ model, onRetry }: AuditViewProps) {
+export function AdminAuditPageView({ model, onRetry }: ActivityViewProps) {
   return (
-    <AdminFrame title="감사 로그" active="audit" testId="admin-audit-open-design" className="tm-admin-audit-open-design tm-admin-desktop-workbench">
+    <AdminFrame title="업무 이력" active="audit" testId="admin-audit-open-design" className="tm-admin-audit-open-design tm-admin-desktop-workbench">
       <AdminDomainShell showStrip={model.state !== 'error'}>
         <PageHeader
-          eyebrow="관리자"
-          title="감사 로그"
-          description="운영자가 어떤 이유로 어떤 대상을 조회하거나 시도했는지 추적합니다. 실패한 기능은 성공으로 기록하지 않습니다."
-          action={<Link className="tm-btn tm-btn-sm tm-btn-secondary" href="/admin">운영 상태</Link>}
+          eyebrow="운영 기록"
+          title="업무 이력"
+          description="매치, 팀매치, 알림, 리뷰에서 발생한 처리 흐름을 시간순으로 확인합니다."
+          action={<AdminActionLink action={{ label: '워크스페이스', href: '/admin', tone: 'neutral' }} />}
         />
-        {model.state === 'error' ? <AdminError message={model.errorMessage} onRetry={onRetry} /> : (
+        {model.state === 'error' ? <AdminErrorPanel message={model.errorMessage} onRetry={onRetry} /> : model.state === 'loading' ? (
+          <AdminActivityLoading operatorName={model.operatorName} />
+        ) : (
           <section className="tm-admin-audit-layout">
             <Card className="tm-admin-table-card" pad={0}>
               <div className="tm-admin-table-head">
                 <div>
-                  <div className="tm-text-body-lg">관리자 행동 기록</div>
-                  <div className="tm-text-caption">{model.nextCursorLabel}</div>
+                  <div className="tm-text-body-lg">최근 업무 흐름</div>
+                  <div className="tm-text-caption">{model.summaryLabel}</div>
                 </div>
                 {onRetry ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" onClick={onRetry}>새로고침</button> : null}
               </div>
-              <AuditLogTable logs={model.logs} state={model.state} />
+              <AdminActivityTable items={model.items} />
             </Card>
             <aside className="tm-admin-side-column">
-              <AdminAuthorityPanel authority={model.authority} pendingLabel="감사 기록 기준으로 표시" />
-              <AdminBlockedMutationPanel />
+              <Card className="tm-admin-authority-panel" pad={18}>
+                <div className="tm-text-body-lg">운영 담당자</div>
+                <div className="tm-admin-authority-role"><span>{model.operatorName}</span><span>업무 이력 확인</span></div>
+                <p>이 화면은 고객 운영자가 실제 서비스 업무 흐름을 다시 확인하는 용도입니다.</p>
+              </Card>
             </aside>
           </section>
         )}
@@ -101,7 +119,7 @@ function AdminFrame({ title, active, testId, className, children }: {
       adminActiveTab={active}
       bottomNav={false}
       showSearch={false}
-      showNotifications={false}
+      showNotifications
       wide
     >
       <div className={`tm-admin-shell ${className}`} data-testid={testId}>{children}</div>
@@ -114,10 +132,10 @@ function AdminDomainShell({ children, showStrip = true }: { readonly children: R
     <div className="tm-admin-domain" data-testid="admin-desktop-domain">
       {showStrip ? (
         <div className="tm-admin-desktop-workbench-strip" data-testid="admin-desktop-workbench">
-          <span className="tm-my-section-label">운영 요약</span>
-          <span className="tm-my-section-label">관리자 권한</span>
-          <span className="tm-my-section-label">감사 로그</span>
-          <span className="tm-my-section-label">준비 중</span>
+          <span className="tm-my-section-label">오늘 업무</span>
+          <span className="tm-my-section-label">개인 매치</span>
+          <span className="tm-my-section-label">팀</span>
+          <span className="tm-my-section-label">알림 · 리뷰</span>
         </div>
       ) : null}
       {children}
@@ -130,7 +148,7 @@ function AdminMetric({ metric }: { readonly metric: AdminMetricModel }) {
     <Card className="tm-admin-kpi-card" pad={16}>
       <div className="tm-metric-label">{metric.label}</div>
       <div className="tm-metric-value">{metric.value}</div>
-      <div className="tm-metric-delta" data-tone={metric.tone ?? 'neutral'}>{metric.sub}</div>
+      <div className="tm-metric-delta" data-tone={metric.tone}>{metric.sub}</div>
     </Card>
   );
 }
@@ -147,80 +165,97 @@ function AdminSection({ title, sub, children }: { readonly title: string; readon
   );
 }
 
-function AdminDomainCard({ domain }: { readonly domain: AdminDomainModel }) {
-  return (
-    <article className="tm-admin-domain-card" data-status={domain.statusTone}>
-      <div className="tm-admin-domain-topline">
-        <div className="tm-text-label">{domain.title}</div>
-        <span className="tm-admin-status-pill" data-status={domain.statusTone}>{domain.statusLabel}</span>
-      </div>
-      <div className="tm-admin-domain-count">
-        {domain.count}{domain.unit ? <span>{domain.unit}</span> : null}
-      </div>
-      <p>{domain.description}</p>
-      <div className="tm-admin-endpoint">{domain.detailLabel}</div>
-    </article>
-  );
-}
-
-function AdminAuthorityPanel({ authority, pendingLabel }: { readonly authority: AdminAuthorityModel; readonly pendingLabel: string }) {
+function AdminOperatorPanel({ model }: { readonly model: AdminDashboardModel }) {
   return (
     <Card className="tm-admin-authority-panel" pad={18}>
-      <div className="tm-text-body-lg">관리자 권한</div>
-      <div className="tm-admin-authority-role"><span>{authority.roleLabel}</span><span>{authority.statusLabel}</span></div>
-      <p>현재 계정에서 확인하고 처리할 수 있는 운영 업무입니다.</p>
+      <div className="tm-text-body-lg">운영 담당자</div>
+      <div className="tm-admin-authority-role"><span>{model.operatorName}</span><span>{model.workspaceLabel}</span></div>
+      <p>{model.profileMeta}</p>
       <div className="tm-admin-permission-list">
-        <span>운영 계정 확인됨</span>
-        <span>감사 기록 열람 가능</span>
-        <span>검토 상태: {pendingLabel}</span>
-      </div>
-      <div className="tm-admin-capability-list">
-        {authority.capabilityLabels.length > 0 ? authority.capabilityLabels.map((label) => <span key={label}>{label}</span>) : <span>표시할 운영 권한 없음</span>}
+        <span>내가 만들거나 관리 권한을 가진 업무만 표시합니다.</span>
+        <span>신청 승인과 멤버 관리는 실제 운영 화면으로 이동합니다.</span>
       </div>
     </Card>
   );
 }
 
-function AdminContracts({ contracts }: { readonly contracts: readonly AdminContractModel[] }) {
+function AdminQuickActions({ actions }: { readonly actions: readonly AdminActionLinkModel[] }) {
   return (
-    <Card className="tm-admin-contract-panel" pad={18}>
-      <div className="tm-text-body-lg">처리 가능 업무</div>
-      <div className="tm-admin-contract-list">
-        {contracts.map((contract) => (
-          <div key={`${contract.title}:${contract.detailLabel}`} className="tm-admin-contract-row" data-state={contract.state}>
-            <div>
-              <div className="tm-text-label">{contract.title}</div>
-              <div className="tm-admin-endpoint">{contract.detailLabel}</div>
-            </div>
-            <p>{contract.description}</p>
-            {contract.state === 'unavailable' ? (
-              <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>준비 중</button>
-            ) : null}
-          </div>
-        ))}
+    <Card className="tm-admin-quick-panel" pad={18}>
+      <div className="tm-text-body-lg">빠른 생성</div>
+      <div className="tm-admin-action-list">
+        {actions.map((action) => <AdminActionLink key={action.href} action={action} />)}
       </div>
     </Card>
   );
 }
 
-function AdminBlockedMutationPanel() {
+function AdminQueue({ items, emptyTitle }: { readonly items: readonly AdminQueueItemModel[]; readonly emptyTitle: string }) {
+  if (items.length === 0) return <div className="tm-admin-empty">{emptyTitle}</div>;
   return (
-    <Card className="tm-admin-contract-panel" pad={18}>
-      <div className="tm-text-body-lg">준비 중</div>
-      <p>정산과 분쟁 처리는 아직 준비 중입니다. 실제 처리 없이 완료로 표시하지 않습니다.</p>
-      <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>준비 중</button>
-    </Card>
-  );
-}
-
-function AdminError({ message, onRetry }: { readonly message?: string; readonly onRetry?: () => void }) {
-  return (
-    <div className="tm-admin-error" role="alert">
-      <div>
-        <div className="tm-text-body-lg">관리자 정보를 불러오지 못했습니다</div>
-        <div className="tm-text-caption">{message ?? '잠시 후 다시 시도해 주세요. 권한이 없다면 관리자에게 문의해 주세요.'}</div>
-      </div>
-      {onRetry ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" onClick={onRetry}>다시 시도</button> : null}
+    <div className="tm-admin-audit-list">
+      {items.map((item) => (
+        <Link key={item.id} className="tm-admin-audit-row tm-pressable" href={item.href} data-tone={item.tone}>
+          <span>{item.title}</span>
+          <span>{item.body}</span>
+          <span className="tm-admin-endpoint">{item.sourceLabel} · {item.actionLabel}</span>
+        </Link>
+      ))}
     </div>
+  );
+}
+
+function AdminWorkList({ items, emptyTitle }: { readonly items: readonly AdminWorkItemModel[]; readonly emptyTitle: string }) {
+  if (items.length === 0) return <div className="tm-admin-empty">{emptyTitle}</div>;
+  return (
+    <div className="tm-admin-work-list">
+      {items.map((item) => (
+        <article key={item.id} className="tm-admin-work-row" data-state={item.tone === 'warning' ? 'action-required' : 'connected'}>
+          <div className="tm-admin-domain-topline">
+            <div>
+              <div className="tm-text-label">{item.title}</div>
+              <div className="tm-admin-endpoint">{item.statusLabel}</div>
+            </div>
+            <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={item.href}>상세</Link>
+          </div>
+          <p>{item.meta}</p>
+          <AdminActionLink action={item.action} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function AdminTeamGrid({ teams }: { readonly teams: readonly AdminTeamModel[] }) {
+  if (teams.length === 0) return <div className="tm-admin-empty">운영 권한이 있는 팀이 없습니다.</div>;
+  return (
+    <div className="tm-admin-domain-grid">
+      {teams.map((team) => (
+        <article key={team.id} className="tm-admin-domain-card" data-status="ready">
+          <div className="tm-admin-domain-topline">
+            <div className="tm-text-label">{team.name}</div>
+            <span className="tm-admin-status-pill" data-status="ready">{team.roleLabel}</span>
+          </div>
+          <div className="tm-admin-domain-count">{team.memberLabel}</div>
+          <p>{team.meta}</p>
+          <div className="tm-fixed-row-actions">
+            <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={team.href}>팀 홈</Link>
+            <AdminActionLink action={team.action} />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function AdminActionLink({ action }: { readonly action: AdminActionLinkModel }) {
+  return (
+    <Link
+      aria-label={action.ariaLabel}
+      className={`tm-btn tm-btn-sm ${action.tone === 'primary' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+      href={action.href}
+    >
+      {action.label}
+    </Link>
   );
 }

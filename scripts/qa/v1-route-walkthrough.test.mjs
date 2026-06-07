@@ -104,7 +104,7 @@ test('Given protected v1 routes When browser auth is injected Then auth-me prefl
   assert.equal(classifyAuthMode('/team-matches'), 'public');
 });
 
-test('Given admin route targets When walkthrough targets are built Then admin QA uses an admin persona', () => {
+test('Given admin workspace route targets When walkthrough targets are built Then admin QA uses an operations persona', () => {
   const targets = buildWalkthroughTargets({
     evidenceRoot: 'evidence/route-by-route-qa-20260605/routes',
     outDir: 'output/playwright/visual-audit/route-by-route-qa-20260605/test',
@@ -117,7 +117,7 @@ test('Given admin route targets When walkthrough targets are built Then admin QA
   });
 
   assert.deepEqual(targets.map((target) => [target.route, target.persona]), [
-    ['/admin', 'admin@teameet.v1'],
+    ['/admin', 'owner@teameet.v1'],
     ['/my', 'host@teameet.v1'],
   ]);
 });
@@ -180,12 +180,13 @@ test('Given route redirects or slow hydration When browser capture runs Then scr
   assert.match(runner, /auditInteractiveAffordances,/);
   assert.match(lib, /export async function auditInteractiveAffordances\(page\)/);
   assert.match(lib, /main a\[href\]:visible/);
+  assert.match(lib, /Math\.min\(await controls\.count\(\), 25\)/);
+  assert.match(lib, /controls\.nth\(index\)\.click\(\{\s*trial:\s*true,\s*timeout:\s*3_000/s);
   assert.match(runner, /functional-affordance-audit/);
   assert.match(runner, /function-probe/);
   assert.match(runner, /buildFunctionalProbeResults/);
   assert.match(runner, /findWalkthroughFindings/);
   assert.match(runner, /for \(const target of targets\)[\s\S]*chromium\.launch/);
-  assert.match(lib, /click\(\{\s*trial:\s*true/s);
   assert.match(lib, /functional-actionability/);
   assert.match(runner, /document\.querySelector\('\.tm-app-frame'\)/);
   assert.match(runner, /Rendering/);

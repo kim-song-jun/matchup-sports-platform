@@ -47,19 +47,6 @@ export function buildAdminDesktopFindings({ route, viewport, metrics, functionPr
     });
   }
 
-  const disabledUnsupportedButton = (metrics?.buttons ?? []).some((button) => {
-    const label = String(button.text ?? '');
-    return button.disabled === true && /준비 중|처리 불가|미지원|unavailable|not supported/i.test(label);
-  });
-  if (!disabledUnsupportedButton) {
-    findings.push({
-      level: 'blocking',
-      check: 'admin-unsupported-action',
-      viewport: viewport.name,
-      message: 'unsupported admin operation is not exposed as a disabled/explicit action',
-    });
-  }
-
   const hasAdminShellLink = (metrics?.links ?? []).some((link) => {
     const pathname = normalizeHrefPath(link.href);
     return pathname === '/admin' || pathname === '/admin/audit';
@@ -70,6 +57,44 @@ export function buildAdminDesktopFindings({ route, viewport, metrics, functionPr
       check: 'admin-shell-link',
       viewport: viewport.name,
       message: 'admin page has no in-shell admin navigation link',
+    });
+  }
+
+  const hasOperationsWorkflowLink = (metrics?.links ?? []).some((link) => {
+    const pathname = normalizeHrefPath(link.href);
+    return pathname === '/matches/new'
+      || pathname === '/team-matches/new'
+      || pathname === '/teams/new'
+      || pathname === '/notifications'
+      || pathname === '/my/reviews'
+      || pathname.startsWith('/my/teams/')
+      || pathname.startsWith('/team-matches/');
+  });
+  if (route === '/admin' && !hasOperationsWorkflowLink) {
+    findings.push({
+      level: 'blocking',
+      check: 'admin-erp-workflow-link',
+      viewport: viewport.name,
+      message: 'admin workspace has no link into a real customer operations workflow',
+    });
+  }
+
+  const deadManageLinks = (metrics?.links ?? []).filter((link) => /\/(?:team-matches|teams)\/[^/]+\/manage(?:\?|$)/.test(normalizeHrefPath(link.href)));
+  if (deadManageLinks.length > 0) {
+    findings.push({
+      level: 'blocking',
+      check: 'admin-dead-manage-route',
+      viewport: viewport.name,
+      message: deadManageLinks.map((link) => link.href).join(', '),
+    });
+  }
+
+  if (metrics?.internalAdminCopyVisible) {
+    findings.push({
+      level: 'blocking',
+      check: 'admin-internal-copy',
+      viewport: viewport.name,
+      message: 'internal platform/admin/developer copy is visible in the customer operations workspace',
     });
   }
 

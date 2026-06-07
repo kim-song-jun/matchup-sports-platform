@@ -95,9 +95,9 @@ test('Given v1 route paths When protected-route status is checked Then auth-gate
   }
 });
 
-test('Given protected v1 route paths When QA auth email is selected Then admin routes use an admin account', () => {
-  assert.equal(emailForRoute('/admin'), 'admin@teameet.v1');
-  assert.equal(emailForRoute('/admin/audit'), 'admin@teameet.v1');
+test('Given protected v1 route paths When QA auth email is selected Then admin workspace routes use an operations account', () => {
+  assert.equal(emailForRoute('/admin'), 'owner@teameet.v1');
+  assert.equal(emailForRoute('/admin/audit'), 'owner@teameet.v1');
   assert.equal(emailForRoute('/my'), 'host@teameet.v1');
   assert.equal(emailForRoute('/matches/new'), 'host@teameet.v1');
 });

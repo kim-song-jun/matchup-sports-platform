@@ -1,222 +1,227 @@
 import type {
-  AdminAuditLogModel,
-  AdminAuditModel,
-  AdminAuthorityInput,
-  AdminAuthorityModel,
-  AdminContractModel,
+  V1Match,
+  V1MyTeam,
+  V1MyTeamMatch,
+  V1Notification,
+  V1Profile,
+  V1ReviewListItem,
+  V1TeamJoinApplication,
+} from '@/types/api';
+import type {
   AdminDashboardModel,
-  AdminDomainModel,
-  AdminLogsInput,
   AdminLoadState,
-  AdminMetricModel,
-  AdminOverviewInput,
+  AdminQueueItemModel,
+  AdminTeamModel,
+  AdminWorkItemModel,
 } from './admin.types';
 import {
-  actionLabel,
-  actorLabel,
-  arrayOfStrings,
-  asRecord,
-  capabilityLabels,
-  emptyAuthority,
-  formatCount,
+  combinedState,
   formatDateTime,
-  nestedTotal,
-  numberField,
-  pendingLabel,
-  reasonLabel,
-  roleLabel,
+  isRecruitingStatus,
+  metric,
+  runtimeOperationHref,
   serviceErrorMessage,
   statusLabel,
-  stringField,
-  targetLabel,
-} from './admin.view-helpers';
+  sum,
+  teamMatchEditHref,
+} from './admin.view-model-utils';
 
-type DashboardModelInput = {
-  readonly authority: AdminAuthorityInput;
-  readonly overview: AdminOverviewInput;
-  readonly logs: AdminLogsInput;
-  readonly statusLogs?: AdminLogsInput;
-  readonly authorityState: AdminLoadState;
-  readonly overviewState: AdminLoadState;
-  readonly logsState: AdminLoadState;
-  readonly statusLogsState?: AdminLoadState;
+export { adminEmptyActivityModel, toAdminActivityModel } from './admin.activity-view-model';
+
+type AdminDashboardInput = {
+  readonly profile?: V1Profile | null;
+  readonly teams: readonly V1MyTeam[];
+  readonly createdMatches: readonly V1Match[];
+  readonly teamMatches: readonly V1MyTeamMatch[];
+  readonly joinRequests: readonly V1TeamJoinApplication[];
+  readonly notifications: readonly V1Notification[];
+  readonly unreadNotificationCount: number;
+  readonly pendingReviews: readonly V1ReviewListItem[];
+  readonly states: readonly AdminLoadState[];
   readonly errorMessage?: string;
 };
 
-type AuditModelInput = {
-  readonly authority: AdminAuthorityInput;
-  readonly logs: AdminLogsInput;
-  readonly authorityState: AdminLoadState;
-  readonly state: AdminLoadState;
-  readonly nextCursor?: string | null;
-  readonly errorMessage?: string;
-};
-
-type OverviewSummary = {
-  readonly users?: number;
-  readonly matches?: number;
-  readonly teams?: number;
-  readonly teamMatches?: number;
-  readonly pendingActions?: number;
-};
-
-const contracts: readonly AdminContractModel[] = [
-  { title: '관리자 권한', detailLabel: '확인됨', state: 'connected', description: '현재 계정으로 운영 현황과 감사 기록을 확인할 수 있습니다.' },
-  { title: '운영 현황', detailLabel: '열람 가능', state: 'connected', description: '사용자, 개인 매치, 팀, 팀 매치의 주요 상태를 한 화면에서 확인합니다.' },
-  { title: '감사 기록', detailLabel: '열람 가능', state: 'connected', description: '운영 활동의 주체, 대상, 사유, 시간을 추적합니다.' },
-  { title: '상태 변경 기록', detailLabel: '열람 가능', state: 'connected', description: '사용자와 운영자가 남긴 상태 변경 이력을 확인합니다.' },
-  { title: '상태 변경 처리', detailLabel: '확인 필요', state: 'action-required', description: '대상과 사유가 확인된 업무만 처리할 수 있습니다.' },
-  { title: '정산/분쟁', detailLabel: '준비 중', state: 'unavailable', description: '서비스 처리 화면을 준비 중이며 완료 상태로 표시하지 않습니다.' },
-];
-
-export function toAdminDashboardModel(input: DashboardModelInput): AdminDashboardModel {
-  const state = combinedState([input.authorityState, input.overviewState, input.logsState, input.statusLogsState ?? 'ready']);
-  const authority = toAuthority(input.authority, input.authorityState);
-  const overview = toOverviewSummary(input.overview);
+export function toAdminDashboardModel(input: AdminDashboardInput): AdminDashboardModel {
+  const state = combinedState(input.states);
+  const managedTeams = input.teams.filter((team) => team.canManage);
+  const operatorName = input.profile?.profile.displayName ?? input.profile?.displayName ?? '운영자';
+  const reviewRemaining = sum(input.pendingReviews.map((review) => review.remainingCount));
+  const queue = toQueueItems({
+    joinRequests: input.joinRequests,
+    notifications: input.notifications,
+    pendingReviews: input.pendingReviews,
+    primaryTeamId: managedTeams[0]?.teamId ?? null,
+  });
 
   return {
     state,
-    authority,
-    metrics: toMetrics(overview, state),
-    domains: toDomains(overview, state, authority),
-    contracts,
-    recentLogs: [...toAuditLogs(input.logs), ...toAuditLogs(input.statusLogs)].slice(0, 4),
-    pendingActionsLabel: pendingLabel(overview.pendingActions, state),
+    operatorName,
+    workspaceLabel: managedTeams.length > 0 ? `${managedTeams[0].name} 외 ${Math.max(managedTeams.length - 1, 0)}팀` : '개인 운영',
+    profileMeta: profileMeta(input.profile),
+    metrics: [
+      metric('teams', '팀', managedTeams.length, '권한 있는 팀', managedTeams.length > 0 ? 'positive' : 'neutral'),
+      metric('matches', '내 매치', input.createdMatches.length, '내가 만든 개인 매치', input.createdMatches.length > 0 ? 'positive' : 'neutral'),
+      metric('teamMatches', '팀 매치', input.teamMatches.length, '호스트/신청 팀매치', input.teamMatches.length > 0 ? 'positive' : 'neutral'),
+      metric('queue', '오늘 업무', queue.length, '처리할 항목', queue.length > 0 ? 'warning' : 'positive'),
+      metric('reviews', '리뷰 대기', reviewRemaining, '아직 남은 리뷰', reviewRemaining > 0 ? 'warning' : 'positive'),
+    ],
+    primaryActions: [
+      { label: '개인 매치 만들기', href: '/matches/new', tone: 'primary' },
+      { label: '팀 매치 만들기', href: '/team-matches/new', tone: 'neutral' },
+      { label: '팀 만들기', href: '/teams/new', tone: 'neutral' },
+    ],
+    queue,
+    personalMatches: input.createdMatches.slice(0, 4).map(toPersonalMatchItem),
+    teamMatches: input.teamMatches.slice(0, 4).map(toTeamMatchItem),
+    teams: managedTeams.slice(0, 4).map(toTeamModel),
+    communication: toCommunicationItems(input.notifications, input.pendingReviews, input.unreadNotificationCount),
     errorMessage: serviceErrorMessage(input.errorMessage),
   };
 }
 
-export function toAdminAuditModel(input: AuditModelInput): AdminAuditModel {
-  return {
-    state: combinedState([input.authorityState, input.state]),
-    authority: toAuthority(input.authority, input.authorityState),
-    logs: toAuditLogs(input.logs),
-    nextCursorLabel: input.nextCursor ? '다음 로그 있음' : '마지막 페이지',
-    errorMessage: serviceErrorMessage(input.errorMessage),
-  };
+function toQueueItems(input: {
+  readonly joinRequests: readonly V1TeamJoinApplication[];
+  readonly notifications: readonly V1Notification[];
+  readonly pendingReviews: readonly V1ReviewListItem[];
+  readonly primaryTeamId: string | null;
+}): readonly AdminQueueItemModel[] {
+  const teamJoinItems = input.joinRequests.slice(0, 3).map((request) => ({
+    id: `join:${request.applicationId}`,
+    title: `${request.applicant.displayName} 가입 요청`,
+    body: request.message ?? '가입 요청 메시지를 확인하고 승인 여부를 결정하세요.',
+    href: input.primaryTeamId ? `/my/teams/${input.primaryTeamId}/members` : '/my/teams',
+    sourceLabel: '팀',
+    actionLabel: '요청 검토',
+    tone: 'warning' as const,
+  }));
+  const reviewItems = input.pendingReviews.filter((review) => review.remainingCount > 0).slice(0, 2).map((review) => ({
+    id: `review:${review.sourceType}:${review.sourceId}`,
+    title: `${review.title} 리뷰 미작성`,
+    body: `${review.remainingCount.toLocaleString('ko-KR')}개 리뷰가 남아 있습니다.`,
+    href: `/my/reviews/${review.sourceType}/${review.sourceId}`,
+    sourceLabel: '리뷰',
+    actionLabel: '리뷰 작성',
+    tone: 'warning' as const,
+  }));
+  const notificationItems = input.notifications.filter((notice) => notice.status !== 'read').slice(0, 2).map((notice) => ({
+    id: `notification:${notice.notificationId}`,
+    title: notice.title,
+    body: notice.body ?? '새 운영 알림이 도착했습니다.',
+    href: runtimeOperationHref(notice.target.route, '/notifications'),
+    sourceLabel: '알림',
+    actionLabel: '확인',
+    tone: 'neutral' as const,
+  }));
+  return [...teamJoinItems, ...reviewItems, ...notificationItems].slice(0, 6);
 }
 
-function combinedState(states: readonly AdminLoadState[]): AdminLoadState {
-  if (states.includes('error')) return 'error';
-  if (states.includes('loading')) return 'loading';
-  return 'ready';
-}
-
-function toMetrics(overview: OverviewSummary, state: AdminLoadState): readonly AdminMetricModel[] {
+function toCommunicationItems(
+  notifications: readonly V1Notification[],
+  pendingReviews: readonly V1ReviewListItem[],
+  unreadNotificationCount: number,
+): readonly AdminQueueItemModel[] {
+  const unreadText = unreadNotificationCount > 0 ? `${unreadNotificationCount.toLocaleString('ko-KR')}개 안 읽음` : '읽지 않은 알림 없음';
+  const reviewRemaining = sum(pendingReviews.map((review) => review.remainingCount));
   return [
-    { id: 'users', label: '사용자', value: formatCount(overview.users, state), sub: '활성/제재/탈퇴대기 합산' },
-    { id: 'matches', label: '개인 매치', value: formatCount(overview.matches, state), sub: '모집/취소/완료 합산' },
-    { id: 'teams', label: '팀', value: formatCount(overview.teams, state), sub: '활성/정지/보관 합산' },
-    { id: 'teamMatches', label: '팀 매치', value: formatCount(overview.teamMatches, state), sub: '모집/성사/취소 합산' },
     {
-      id: 'pendingActions',
-      label: '검토 큐',
-      value: formatCount(overview.pendingActions, state),
-      sub: '운영 검토 현황',
-      tone: overview.pendingActions && overview.pendingActions > 0 ? 'down' : undefined,
+      id: 'notifications',
+      title: '알림 확인',
+      body: unreadText,
+      href: '/notifications',
+      sourceLabel: '알림',
+      actionLabel: '알림 보기',
+      tone: unreadNotificationCount > 0 ? 'warning' : 'positive',
+    },
+    {
+      id: 'reviews',
+      title: '리뷰 관리',
+      body: reviewRemaining > 0 ? `${reviewRemaining.toLocaleString('ko-KR')}개 리뷰가 남아 있습니다.` : '남은 리뷰가 없습니다.',
+      href: '/my/reviews',
+      sourceLabel: '리뷰',
+      actionLabel: '리뷰 보기',
+      tone: reviewRemaining > 0 ? 'warning' : 'positive',
     },
   ];
 }
 
-function toDomains(overview: OverviewSummary, state: AdminLoadState, authority: AdminAuthorityModel): readonly AdminDomainModel[] {
-  const statusLabel = authority.canWriteStatus ? '처리 가능' : '읽기 전용';
-  const statusTone = state === 'error' ? 'blocked' : authority.canWriteStatus ? 'ready' : 'warning';
-  const detailLabel = authority.canWriteStatus ? '상태 변경에서 처리' : '현황 확인';
-  return [
-    {
-      id: 'users',
-      title: '사용자',
-      count: formatCount(overview.users, state),
-      unit: '명',
-      description: '계정 상태를 확인하고 필요한 조치를 기록합니다.',
-      detailLabel,
-      statusLabel,
-      statusTone,
-    },
-    {
-      id: 'matches',
-      title: '개인 매치',
-      count: formatCount(overview.matches, state),
-      unit: '건',
-      description: '모집, 취소, 완료 흐름을 확인하고 필요한 조치를 기록합니다.',
-      detailLabel,
-      statusLabel,
-      statusTone,
-    },
-    {
-      id: 'teams',
-      title: '팀',
-      count: formatCount(overview.teams, state),
-      unit: '개',
-      description: '팀 운영 상태를 확인하고 필요한 조치를 기록합니다.',
-      detailLabel,
-      statusLabel,
-      statusTone,
-    },
-    {
-      id: 'teamMatches',
-      title: '팀 매치',
-      count: formatCount(overview.teamMatches, state),
-      unit: '건',
-      description: '팀 매치 진행 상태를 확인하고 필요한 조치를 기록합니다.',
-      detailLabel,
-      statusLabel,
-      statusTone,
-    },
-    {
-      id: 'settlementsDisputes',
-      title: '정산/분쟁',
-      count: '준비 중',
-      unit: '',
-      description: '정산과 분쟁 처리는 준비 중입니다. 실제 처리 없이 완료로 표시하지 않습니다.',
-      detailLabel: '기능 준비 중',
-      statusLabel: '준비 중',
-      statusTone: 'blocked',
-    },
-  ];
-}
-
-function toAuthority(input: AdminAuthorityInput, state: AdminLoadState): AdminAuthorityModel {
-  if (state === 'loading') return emptyAuthority('권한 확인 중', '확인 중');
-  if (state === 'error') return emptyAuthority('권한 확인 실패', '확인 필요');
-  const record = asRecord(input);
-  const capabilities = arrayOfStrings(record?.capabilities);
+function toPersonalMatchItem(match: V1Match): AdminWorkItemModel {
+  const id = match.matchId ?? match.id;
   return {
-    roleLabel: roleLabel(stringField(record, 'adminRole')),
-    statusLabel: statusLabel(stringField(record, 'status')),
-    capabilities,
-    capabilityLabels: capabilityLabels(capabilities),
-    canWriteStatus: capabilities.includes('status:write'),
+    id,
+    title: match.title,
+    meta: [match.sport?.name ?? match.sportName, match.region?.name ?? match.regionName, formatDateTime(match.startsAt)].filter(Boolean).join(' · '),
+    statusLabel: statusLabel(match.status),
+    href: `/matches/${id}`,
+    action: { label: '상세/수정', href: `/matches/${id}/edit`, tone: 'neutral' },
+    tone: isRecruitingStatus(match.status) ? 'positive' : 'neutral',
   };
 }
 
-function toOverviewSummary(input: AdminOverviewInput): OverviewSummary {
-  const record = asRecord(input);
+function toTeamMatchItem(match: V1MyTeamMatch): AdminWorkItemModel {
+  const detailHref = runtimeOperationHref(match.detailRoute, `/team-matches/${match.teamMatchId}`);
+  const actionHref = match.relation === 'host_team' ? teamMatchEditHref(match.teamMatchId) : detailHref;
   return {
-    users: numberField(record, 'users') ?? nestedTotal(record, 'users', ['active', 'suspended', 'blocked', 'withdrawalPending']),
-    matches: numberField(record, 'matches') ?? nestedTotal(record, 'matches', ['recruiting', 'cancelled', 'completed']),
-    teams: numberField(record, 'teams') ?? nestedTotal(record, 'teams', ['active', 'suspended', 'archived']),
-    teamMatches: numberField(record, 'teamMatches') ?? nestedTotal(record, 'teamMatches', ['recruiting', 'matched', 'cancelled']),
-    pendingActions: numberField(record, 'pendingActions'),
+    id: match.teamMatchId,
+    title: match.title,
+    meta: [match.teamName, match.sportName, formatDateTime(match.startsAt)].filter(Boolean).join(' · '),
+    statusLabel: statusLabel(match.status),
+    href: detailHref,
+    action: { label: match.relation === 'host_team' ? '팀매치 수정' : '상세 보기', href: actionHref, tone: 'neutral' },
+    tone: match.relation === 'host_team' ? 'positive' : 'neutral',
   };
 }
 
-function toAuditLogs(logs: AdminLogsInput): readonly AdminAuditLogModel[] {
-  const items = Array.isArray(logs) ? logs : asRecord(logs)?.items;
-  if (!Array.isArray(items)) return [];
-  return items.flatMap((item) => {
-    const record = asRecord(item);
-    if (!record) return [];
-    const id = stringField(record, 'id') ?? stringField(record, 'actionLogId') ?? stringField(record, 'statusChangeLogId');
-    const createdAt = stringField(record, 'createdAt');
-    if (!id || !createdAt) return [];
-    return [{
-      id,
-      actorId: actorLabel(record),
-      action: actionLabel(record),
-      target: targetLabel(record),
-      reason: reasonLabel(record),
-      createdAt: formatDateTime(createdAt),
-    }];
-  });
+function toTeamModel(team: V1MyTeam): AdminTeamModel {
+  return {
+    id: team.teamId,
+    name: team.name,
+    meta: [team.sport.name, team.region?.name, trustLabel(team.trust?.trustState)].filter(Boolean).join(' · '),
+    roleLabel: roleLabel(team.role),
+    memberLabel: `${team.memberCount.toLocaleString('ko-KR')}명`,
+    href: `/my/teams/${team.teamId}`,
+    action: { label: '멤버/요청', href: `/my/teams/${team.teamId}/members`, tone: 'neutral' },
+  };
 }
+
+function profileMeta(profile?: V1Profile | null) {
+  if (!profile) return '프로필 확인 중';
+  const sports = profile.sports?.map((sport) => sport.sportName).slice(0, 2).join(', ');
+  return [profile.regionName, sports, trustLabel(profile.reputation.trustState)].filter(Boolean).join(' · ') || '운영 프로필';
+}
+
+function roleLabel(role: V1MyTeam['role']) {
+  if (role === 'owner') return '팀장';
+  if (role === 'manager') return '운영진';
+  return '멤버';
+}
+
+function trustLabel(state?: string) {
+  if (state === 'verified') return '검증됨';
+  if (state === 'estimated') return '추정';
+  if (state === 'sample') return '샘플';
+  return null;
+}
+
+export const adminEmptyDashboardModel: AdminDashboardModel = {
+  state: 'ready',
+  operatorName: '운영자',
+  workspaceLabel: '개인 운영',
+  profileMeta: '표시할 운영 데이터가 없습니다.',
+  metrics: [
+    metric('teams', '팀', 0, '권한 있는 팀', 'neutral'),
+    metric('matches', '내 매치', 0, '내가 만든 개인 매치', 'neutral'),
+    metric('teamMatches', '팀 매치', 0, '호스트/신청 팀매치', 'neutral'),
+    metric('queue', '오늘 업무', 0, '처리할 항목', 'positive'),
+    metric('reviews', '리뷰 대기', 0, '아직 남은 리뷰', 'positive'),
+  ],
+  primaryActions: [
+    { label: '개인 매치 만들기', href: '/matches/new', tone: 'primary' },
+    { label: '팀 매치 만들기', href: '/team-matches/new', tone: 'neutral' },
+    { label: '팀 만들기', href: '/teams/new', tone: 'neutral' },
+  ],
+  queue: [],
+  personalMatches: [],
+  teamMatches: [],
+  teams: [],
+  communication: [],
+};

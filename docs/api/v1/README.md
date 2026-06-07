@@ -28,6 +28,7 @@ Canonical sources:
 - [Teams](./domains/teams.md)
 - [Team Matches](./domains/team-matches.md)
 - [Chat And Notifications](./domains/chat-notifications.md)
+- [Reviews](./domains/reviews.md)
 - [Profile And Settings](./domains/profile-settings.md)
 - [Admin And Audit](./domains/admin-audit.md)
 - [Deferred Boundaries](./domains/deferred-boundaries.md)

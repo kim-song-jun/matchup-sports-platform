@@ -380,6 +380,25 @@ function collectFullResponsiveMetrics() {
   };
   const app = document.querySelector('.tm-app-frame');
   const appRect = app?.getBoundingClientRect();
+  const visibleBodyText = () => {
+    const ignoredTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
+    const isHidden = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width === 0 || rect.height === 0 || style.display === 'none' || style.visibility === 'hidden';
+    };
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const chunks = [];
+    let node = walker.nextNode();
+    while (node) {
+      const parent = node.parentElement;
+      const text = node.textContent?.trim() ?? '';
+      if (parent && text && !ignoredTags.has(parent.tagName) && !isHidden(parent)) chunks.push(text);
+      node = walker.nextNode();
+    }
+    return chunks.join(' ');
+  };
+  const bodyText = visibleBodyText();
   const links = Array.from(document.querySelectorAll('a[href]')).map((node) => ({
     text: (node.textContent ?? node.getAttribute('aria-label') ?? '').trim().slice(0, 80),
     href: node.getAttribute('href') ?? '',
@@ -426,7 +445,8 @@ function collectFullResponsiveMetrics() {
     forms: document.querySelectorAll('form').length,
     actionCount: links.length + buttons.length + inputs.length,
     textClipping,
-    unsupportedSuccessText: /실결제 완료|실환불 완료|관리자 처리 완료|제재 완료/.test(document.body.textContent ?? ''),
+    unsupportedSuccessText: /실결제 완료|실환불 완료|관리자 처리 완료|제재 완료/.test(bodyText),
+    internalAdminCopyVisible: /관리자 권한|감사 로그|상태 변경|정산|분쟁|개발자|root|API|route|contract|mutation|seed|fixture|status:write|overview:read|logs:read|admin:owner|준비 중/.test(bodyText),
   };
 }
 

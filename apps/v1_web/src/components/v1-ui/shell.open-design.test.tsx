@@ -34,19 +34,27 @@ describe('AppChrome Open Design shell contract', () => {
     expect(screen.queryByRole('navigation', { name: '주요 메뉴' })).not.toBeInTheDocument();
   });
 
-  it('renders admin desktop navigation as a dedicated operations shell', () => {
+  it('renders admin desktop navigation as a customer operations workspace', () => {
     render(
-      <AppChrome title="관리자" desktopNav="admin" adminActiveTab="audit" bottomNav={false} showSearch={false} showNotifications={false}>
+      <AppChrome title="운영 ERP" desktopNav="admin" adminActiveTab="teamMatches" bottomNav={false} showSearch={false} showNotifications={false}>
         <div>운영 본문</div>
       </AppChrome>,
     );
 
-    const adminNav = screen.getByLabelText('관리자 메뉴');
+    const adminNav = screen.getByLabelText('운영 워크스페이스 메뉴');
     expect(adminNav).toHaveClass('tm-desktop-nav');
     expect(adminNav).toHaveClass('tm-desktop-nav-admin');
-    expect(within(adminNav).getByText('Teameet 운영')).toBeInTheDocument();
-    expect(within(adminNav).getByRole('link', { name: '감사 로그' })).toHaveAttribute('aria-current', 'page');
+    expect(within(adminNav).getByText('teameet 운영')).toBeInTheDocument();
+    expect(within(adminNav).getByRole('link', { name: '팀매치' })).toHaveAttribute('aria-current', 'page');
+    expect(within(adminNav).getByRole('link', { name: '워크스페이스' })).toHaveAttribute('href', '/admin');
+    expect(within(adminNav).getByRole('link', { name: '개인 매치' })).toHaveAttribute('href', '/admin/matches');
+    expect(within(adminNav).getByRole('link', { name: '팀매치' })).toHaveAttribute('href', '/admin/team-matches');
+    expect(within(adminNav).getByRole('link', { name: '팀 운영' })).toHaveAttribute('href', '/admin/teams');
+    expect(within(adminNav).getByRole('link', { name: '리뷰' })).toHaveAttribute('href', '/admin/reviews');
+    expect(within(adminNav).getByRole('link', { name: '알림' })).toHaveAttribute('href', '/admin/notifications');
+    expect(within(adminNav).getByRole('link', { name: '업무 이력' })).toHaveAttribute('href', '/admin/audit');
     expect(within(adminNav).queryByRole('link', { name: /매치 만들기/ })).not.toBeInTheDocument();
+    expect(within(adminNav).queryByRole('link', { name: /감사 로그/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: '주요 메뉴' })).not.toBeInTheDocument();
   });
 });

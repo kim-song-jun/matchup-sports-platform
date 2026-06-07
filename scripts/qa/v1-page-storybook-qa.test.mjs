@@ -326,7 +326,7 @@ test('Given a console error has a valid screenshot When report is built Then the
   assert.equal(/<img\b/.test(html), true);
 });
 
-test('Given admin desktop metrics When blockers are evaluated Then unsupported or mobile-like admin UI fails', () => {
+test('Given admin desktop metrics When blockers are evaluated Then internal or mobile-like admin UI fails', () => {
   const findings = buildAdminDesktopFindings({
     route: '/admin',
     viewport: { name: '1440x960', width: 1440, height: 960 },
@@ -335,8 +335,9 @@ test('Given admin desktop metrics When blockers are evaluated Then unsupported o
       appWidth: 1200,
       desktopNavVisible: false,
       bottomNavVisible: true,
-      links: [{ text: '매치', href: '/matches' }],
-      buttons: [{ text: '처리 불가', disabled: false }],
+      links: [{ text: '매치', href: '/team-matches/team-match-1/manage' }],
+      buttons: [],
+      internalAdminCopyVisible: true,
       unsupportedSuccessText: true,
       affordanceAudit: { failures: [{ text: '감사 로그', message: 'covered by overlay' }], visibleInteractive: 2 },
     },
@@ -346,22 +347,28 @@ test('Given admin desktop metrics When blockers are evaluated Then unsupported o
   assert.deepEqual(findings.map((finding) => finding.check), [
     'admin-desktop-chrome',
     'admin-desktop-chrome',
-    'admin-unsupported-action',
     'admin-shell-link',
+    'admin-dead-manage-route',
+    'admin-internal-copy',
     'admin-unsupported-success',
     'admin-functional-actionability',
   ]);
 });
 
-test('Given admin unsupported action is disabled as preparing When blockers are evaluated Then service copy is accepted', () => {
+test('Given customer ERP admin workspace metrics When blockers are evaluated Then service operations links are accepted', () => {
   const findings = buildAdminDesktopFindings({
     route: '/admin',
     viewport: { name: '1440x960', width: 1440, height: 960 },
     metrics: {
       desktopNavVisible: true,
       bottomNavVisible: false,
-      links: [{ text: '감사 로그', href: '/admin/audit' }],
-      buttons: [{ text: '준비 중', disabled: true }],
+      links: [
+        { text: '업무 이력', href: '/admin/audit' },
+        { text: '팀 매치 만들기', href: '/team-matches/new' },
+        { text: '멤버/요청', href: '/my/teams/team-1/members' },
+      ],
+      buttons: [],
+      internalAdminCopyVisible: false,
       unsupportedSuccessText: false,
       affordanceAudit: { failures: [], visibleInteractive: 2 },
     },
@@ -413,6 +420,8 @@ test('Given page storybook runner source When inspected Then it reuses live rout
   assert.match(fullRunner, /check:\s*'console-error'/);
   assert.match(fullRunner, /check:\s*'response-error'/);
   assert.match(fullRunner, /check:\s*'request-failed'/);
+  assert.match(fullRunner, /visibleBodyText/);
+  assert.match(fullRunner, /ignoredTags = new Set\(\['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE'\]\)/);
   assert.doesNotMatch(runner, /placeholder|fallbackImage|data:image/);
 });
 
@@ -435,8 +444,12 @@ function adminPassResult(route, viewportName) {
           appWidth: viewport.width,
           desktopNavVisible: true,
           bottomNavVisible: false,
-          links: [{ text: route === '/admin' ? '감사 로그' : '운영 상태', href: route === '/admin' ? '/admin/audit' : '/admin' }],
-          buttons: [{ text: '처리 불가', disabled: true }],
+          links: [
+            { text: route === '/admin' ? '업무 이력' : '워크스페이스', href: route === '/admin' ? '/admin/audit' : '/admin' },
+            { text: '팀 매치 만들기', href: '/team-matches/new' },
+          ],
+          buttons: [],
+          internalAdminCopyVisible: false,
           unsupportedSuccessText: false,
           affordanceAudit: { failures: [], visibleInteractive: 1 },
         },

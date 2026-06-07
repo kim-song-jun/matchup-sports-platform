@@ -476,6 +476,11 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
     create: { teamId: ownerTeam.id, userId: userIds['manager@teameet.v1'], role: V1TeamMembershipRole.manager, status: 'active', joinedAt: new Date('2026-05-18T00:00:00.000Z') },
   });
   await prisma.v1TeamMembership.upsert({
+    where: { teamId_userId: { teamId: ownerTeam.id, userId: userIds['admin@teameet.v1'] } },
+    update: { role: V1TeamMembershipRole.manager, status: 'active', joinedAt: new Date('2026-05-18T00:00:00.000Z'), leftAt: null, removedByUserId: null },
+    create: { teamId: ownerTeam.id, userId: userIds['admin@teameet.v1'], role: V1TeamMembershipRole.manager, status: 'active', joinedAt: new Date('2026-05-18T00:00:00.000Z') },
+  });
+  await prisma.v1TeamMembership.upsert({
     where: { teamId_userId: { teamId: ownerTeam.id, userId: userIds['member@teameet.v1'] } },
     update: { role: V1TeamMembershipRole.member, status: 'active', joinedAt: new Date('2026-05-18T00:00:00.000Z') },
     create: { teamId: ownerTeam.id, userId: userIds['member@teameet.v1'], role: V1TeamMembershipRole.member, status: 'active', joinedAt: new Date('2026-05-18T00:00:00.000Z') },

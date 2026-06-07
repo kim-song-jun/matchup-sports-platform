@@ -13,7 +13,7 @@ import {
 } from './icons';
 
 export type V1NavTab = 'home' | 'matches' | 'teamMatches' | 'teams' | 'my';
-export type V1AdminNavTab = 'admin' | 'audit';
+export type V1AdminNavTab = 'admin' | 'matches' | 'teamMatches' | 'teams' | 'reviews' | 'notifications' | 'audit';
 
 const tabs: Array<{
   id: V1NavTab;
@@ -34,8 +34,13 @@ const adminTabs: Array<{
   href: string;
   Icon: typeof HomeIcon;
 }> = [
-  { id: 'admin', label: '운영 상태', href: '/admin', Icon: TeamMatchIcon },
-  { id: 'audit', label: '감사 로그', href: '/admin/audit', Icon: BellIcon },
+  { id: 'admin', label: '워크스페이스', href: '/admin', Icon: TeamMatchIcon },
+  { id: 'matches', label: '개인 매치', href: '/admin/matches', Icon: MatchIcon },
+  { id: 'teamMatches', label: '팀매치', href: '/admin/team-matches', Icon: TeamMatchIcon },
+  { id: 'teams', label: '팀 운영', href: '/admin/teams', Icon: TeamsIcon },
+  { id: 'reviews', label: '리뷰', href: '/admin/reviews', Icon: MyIcon },
+  { id: 'notifications', label: '알림', href: '/admin/notifications', Icon: BellIcon },
+  { id: 'audit', label: '업무 이력', href: '/admin/audit', Icon: BellIcon },
 ];
 
 type AppChromeProps = {
@@ -142,12 +147,12 @@ function AdminDesktopNav({ activeTab, inert }: { activeTab: V1AdminNavTab; inert
     <aside
       className="tm-desktop-nav tm-desktop-nav-admin"
       aria-hidden={inert ? true : undefined}
-      aria-label="관리자 메뉴"
+      aria-label="운영 워크스페이스 메뉴"
       inert={inert ? true : undefined}
     >
-      <Link className="tm-desktop-brand" href="/admin" aria-label="Teameet 관리자">
+      <Link className="tm-desktop-brand" href="/admin" aria-label="Teameet 운영 홈">
         <span className="tm-desktop-brand-mark">T</span>
-        <span>Teameet 운영</span>
+        <span>teameet 운영</span>
       </Link>
       <div className="tm-desktop-tab-list">
         {adminTabs.map(({ id, label, href, Icon }) => {

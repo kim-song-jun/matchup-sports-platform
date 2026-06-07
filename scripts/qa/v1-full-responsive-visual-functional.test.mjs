@@ -36,7 +36,7 @@ test('Given current Open Design route matrix When full responsive targets are bu
   const config = buildFullResponsiveConfig([]);
   const targets = buildFullResponsiveTargets({ config, rows });
 
-  assert.equal(targets.length, 87);
+  assert.equal(targets.length, 92);
   assert.equal(targets.every((target) => target.viewports.length === 9), true);
   assert.equal(targets.some((target) => target.route === '/matches'), true);
   assert.equal(targets.some((target) => target.route === '/team-matches'), true);
@@ -91,7 +91,7 @@ test('Given CLI list mode When executed Then route manifest is emitted without l
 
   assert.equal(result.status, 0, result.stderr);
   const body = JSON.parse(result.stdout);
-  assert.equal(body.routeCount, 87);
+  assert.equal(body.routeCount, 92);
   assert.deepEqual(body.viewports.map((viewport) => viewport.width), [390, 768, 900, 1023, 1024, 1180, 1280, 1440, 1920]);
 });
 
@@ -132,7 +132,7 @@ test('Given long family browser sweeps When runner is inspected Then each route 
   assert.match(
     runner,
     /const email = emailForRoute\(route\)/,
-    'admin routes should use the admin dev-login account so admin API checks do not fail with host 403s',
+    'authenticated sweeps should pick the route-specific dev-login account; admin workspace routes use an operations account',
   );
   assert.match(
     runner,

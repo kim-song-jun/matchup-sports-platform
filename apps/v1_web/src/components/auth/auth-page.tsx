@@ -213,13 +213,13 @@ export function AuthFrame({
 function AuthDesktopNav({ variant }: { readonly variant: 'service' | 'admin' }) {
   if (variant === 'admin') {
     return (
-      <aside className="tm-desktop-nav tm-auth-desktop-nav tm-desktop-nav-admin" aria-label="관리자 로그인 메뉴">
+      <aside className="tm-desktop-nav tm-auth-desktop-nav tm-desktop-nav-admin" aria-label="운영 로그인 메뉴">
         <Link className="tm-desktop-brand" href="/login?redirect=%2Fadmin" aria-label="Teameet 운영 로그인">
           <span className="tm-desktop-brand-mark">T</span>
           <span>Teameet 운영</span>
         </Link>
         <div className="tm-desktop-tab-list">
-          <Link className="tm-desktop-tab" href="/login?redirect=%2Fadmin" aria-current="page" data-active="true">관리자 로그인</Link>
+          <Link className="tm-desktop-tab" href="/login?redirect=%2Fadmin" aria-current="page" data-active="true">운영 로그인</Link>
           <Link className="tm-desktop-tab" href="/login/email?redirect=%2Fadmin">이메일 로그인</Link>
         </div>
       </aside>

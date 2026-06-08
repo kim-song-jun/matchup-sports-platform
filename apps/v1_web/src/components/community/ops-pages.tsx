@@ -81,7 +81,7 @@ export function OpsOverviewPage({
         <OpsKpi label="지급 실패" value={overview?.queues.payoutFailures ?? 0} tone="danger" />
       </section>
       <Card className="tm-ops-panel" pad={0}>
-        <OpsPanelHeader title="최근 이벤트" sub="case event history" />
+        <OpsPanelHeader title="최근 이벤트" sub="케이스 처리 이력" />
         <OpsEventList events={overview?.recentEvents ?? []} />
       </Card>
     </OpsFrame>
@@ -349,7 +349,7 @@ function OpsTable({ rows, isLoading }: { readonly rows: readonly OpsRow[]; reado
       {rows.map((row) => (
         <div key={row.id} className="tm-ops-table-row" role="row" data-tone={row.tone}>
           <span role="cell"><strong>{row.title}</strong></span>
-          <span role="cell"><span className="tm-ops-status-pill" data-tone={row.tone}>{row.status}</span></span>
+          <span role="cell"><span className="tm-ops-status-pill" data-tone={row.tone}>{statusLabel(row.status)}</span></span>
           <span role="cell">{row.meta}</span>
           <span role="cell" className="tab-num">{row.amount}</span>
         </div>
@@ -522,6 +522,26 @@ function toneLabel(tone: 'ready' | 'warning' | 'danger') {
   if (tone === 'ready') return '정상';
   if (tone === 'warning') return '확인';
   return '주의';
+}
+
+function statusLabel(status: string) {
+  const map: Record<string, string> = {
+    open: '접수',
+    reviewing: '검토 중',
+    reviewed: '검토 완료',
+    resolved: '해결',
+    rejected: '기각',
+    dismissed: '기각',
+    assigned: '배정됨',
+    pending: '대기',
+    approved: '승인',
+    failed: '실패',
+    cancelled: '취소',
+    refunded: '환불',
+    completed: '완료',
+    processing: '처리 중',
+  };
+  return map[status] ?? status;
 }
 
 function actionLabel(action: 'review' | 'approve' | 'hold' | 'fail') {

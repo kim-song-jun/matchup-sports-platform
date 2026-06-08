@@ -98,7 +98,7 @@ function AdminFunctionTable({ title, rows, emptyTitle }: {
   if (rows.length === 0) {
     return (
       <div className="tm-admin-empty tm-admin-empty-table">
-        <span className="tm-admin-empty-icon" aria-hidden="true">—</span>
+        <span className="tm-admin-empty-icon" aria-hidden="true">○</span>
         <p>{emptyTitle}</p>
       </div>
     );

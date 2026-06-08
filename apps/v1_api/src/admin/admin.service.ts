@@ -284,7 +284,7 @@ export class AdminService {
 }
 
 function getCapabilities(role: ActiveAdmin['adminRole']) {
-  if (role === 'owner') return ['overview:read', 'status:write', 'logs:read', 'admin:owner'];
-  if (role === 'ops') return ['overview:read', 'status:write', 'logs:read'];
-  return ['overview:read', 'logs:read'];
+  if (role === 'owner') return ['overview:read', 'status:write', 'logs:read', 'ops:read', 'ops:write', 'admin:owner'];
+  if (role === 'ops') return ['overview:read', 'status:write', 'logs:read', 'ops:read', 'ops:write'];
+  return ['overview:read', 'logs:read', 'ops:read'];
 }

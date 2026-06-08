@@ -207,6 +207,130 @@ enum V1StatusActorType {
   system
 }
 
+enum V1OpsReportStatus {
+  open
+  reviewing
+  resolved
+  dismissed
+}
+
+enum V1OpsReportReason {
+  safety
+  fraud
+  spam
+  inappropriate
+  payment
+  other
+}
+
+enum V1OpsDisputeStatus {
+  open
+  assigned
+  waiting_party
+  resolved
+  rejected
+}
+
+enum V1OpsDisputeReason {
+  match_cancelled
+  no_show
+  payment_refund
+  settlement
+  conduct
+  other
+}
+
+enum V1OpsCaseEventType {
+  report_created
+  report_status_changed
+  dispute_created
+  dispute_status_changed
+  payment_order_created
+  payment_confirmed
+  payment_failed
+  payment_webhook_received
+  refund_requested
+  refund_status_changed
+  settlement_status_changed
+  payout_requested
+  payout_status_changed
+  note
+}
+
+enum V1PaymentProvider {
+  toss
+}
+
+enum V1PaymentOrderStatus {
+  pending
+  confirmed
+  failed
+  cancelled
+  refunded
+  partially_refunded
+  expired
+}
+
+enum V1PaymentTransactionStatus {
+  ready
+  done
+  failed
+  canceled
+  partial_canceled
+}
+
+enum V1RefundStatus {
+  requested
+  reviewing
+  approved
+  rejected
+  processing
+  completed
+  failed
+}
+
+enum V1SettlementSellerStatus {
+  pending
+  verified
+  rejected
+  suspended
+}
+
+enum V1SettlementAccountStatus {
+  pending
+  verified
+  rejected
+  disabled
+}
+
+enum V1SettlementBatchStatus {
+  draft
+  reviewing
+  approved
+  payout_requested
+  partially_paid
+  paid
+  failed
+  held
+}
+
+enum V1SettlementItemStatus {
+  pending
+  approved
+  held
+  paid
+  failed
+}
+
+enum V1PayoutAttemptStatus {
+  requested
+  processing
+  succeeded
+  failed
+  partial
+  cancelled
+}
+
 model V1RuntimeCheck {
   id        String   @id @default(uuid())
   key       String   @unique
@@ -228,35 +352,41 @@ model V1User {
   updatedAt        DateTime           @updatedAt @map("updated_at")
   deletedAt        DateTime?          @map("deleted_at")
 
-  authIdentities         V1AuthIdentity[]
-  profile                V1UserProfile?
-  onboardingProgress     V1UserOnboardingProgress?
-  termsConsents          V1UserTermsConsent[]
-  sportPreferences       V1UserSportPreference[]
-  regions                V1UserRegion[]
-  reputationSummary      V1UserReputationSummary?
-  hostedMatches          V1Match[]                 @relation("V1MatchHost")
-  matchApplications      V1MatchApplication[]      @relation("V1MatchApplicant")
-  reviewedApplications   V1MatchApplication[]      @relation("V1MatchApplicationReviewer")
-  matchParticipants      V1MatchParticipant[]
-  ownedTeams             V1Team[]                  @relation("V1TeamOwner")
-  teamMemberships        V1TeamMembership[]        @relation("V1TeamMember")
-  removedTeamMemberships V1TeamMembership[]        @relation("V1TeamMembershipRemover")
-  teamJoinApplications   V1TeamJoinApplication[]   @relation("V1TeamJoinApplicant")
-  reviewedTeamJoins      V1TeamJoinApplication[]   @relation("V1TeamJoinReviewer")
-  createdTeamMatches     V1TeamMatch[]             @relation("V1TeamMatchCreator")
-  teamMatchApplications  V1TeamMatchApplication[]  @relation("V1TeamMatchApplicantUser")
-  reviewedTeamMatches    V1TeamMatchApplication[]  @relation("V1TeamMatchReviewer")
-  chatParticipations     V1ChatRoomParticipant[]
-  chatMessages           V1ChatMessage[]           @relation("V1ChatMessageSender")
-  notifications          V1Notification[]
-  notificationPreference V1NotificationPreference?
-  searchHistories        V1SearchHistory[]
-  adminUser              V1AdminUser?              @relation("V1AdminUserAccount")
-  grantedAdmins          V1AdminUser[]             @relation("V1AdminGrantor")
-  statusLogs             V1StatusChangeLog[]       @relation("V1StatusActorUser")
-  postEventReviewsWritten      V1PostEventReview[] @relation("V1PostEventReviewReviewer")
-  postEventUserReviewsReceived V1PostEventReview[] @relation("V1PostEventReviewTargetUser")
+  authIdentities               V1AuthIdentity[]
+  profile                      V1UserProfile?
+  onboardingProgress           V1UserOnboardingProgress?
+  termsConsents                V1UserTermsConsent[]
+  sportPreferences             V1UserSportPreference[]
+  regions                      V1UserRegion[]
+  reputationSummary            V1UserReputationSummary?
+  hostedMatches                V1Match[]                 @relation("V1MatchHost")
+  matchApplications            V1MatchApplication[]      @relation("V1MatchApplicant")
+  reviewedApplications         V1MatchApplication[]      @relation("V1MatchApplicationReviewer")
+  matchParticipants            V1MatchParticipant[]
+  ownedTeams                   V1Team[]                  @relation("V1TeamOwner")
+  teamMemberships              V1TeamMembership[]        @relation("V1TeamMember")
+  removedTeamMemberships       V1TeamMembership[]        @relation("V1TeamMembershipRemover")
+  teamJoinApplications         V1TeamJoinApplication[]   @relation("V1TeamJoinApplicant")
+  reviewedTeamJoins            V1TeamJoinApplication[]   @relation("V1TeamJoinReviewer")
+  createdTeamMatches           V1TeamMatch[]             @relation("V1TeamMatchCreator")
+  teamMatchApplications        V1TeamMatchApplication[]  @relation("V1TeamMatchApplicantUser")
+  reviewedTeamMatches          V1TeamMatchApplication[]  @relation("V1TeamMatchReviewer")
+  chatParticipations           V1ChatRoomParticipant[]
+  chatMessages                 V1ChatMessage[]           @relation("V1ChatMessageSender")
+  notifications                V1Notification[]
+  notificationPreference       V1NotificationPreference?
+  searchHistories              V1SearchHistory[]
+  adminUser                    V1AdminUser?              @relation("V1AdminUserAccount")
+  grantedAdmins                V1AdminUser[]             @relation("V1AdminGrantor")
+  statusLogs                   V1StatusChangeLog[]       @relation("V1StatusActorUser")
+  opsReports                   V1OpsReport[]             @relation("V1OpsReportReporter")
+  opsDisputes                  V1OpsDispute[]            @relation("V1OpsDisputeReporter")
+  opsCaseEvents                V1OpsCaseEvent[]          @relation("V1OpsCaseEventUserActor")
+  paymentOrders                V1PaymentOrder[]          @relation("V1PaymentOrderBuyer")
+  requestedRefunds             V1PaymentRefund[]         @relation("V1PaymentRefundRequester")
+  settlementSeller             V1SettlementSeller?       @relation("V1SettlementSellerUser")
+  postEventReviewsWritten      V1PostEventReview[]       @relation("V1PostEventReviewReviewer")
+  postEventUserReviewsReceived V1PostEventReview[]       @relation("V1PostEventReviewTargetUser")
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -523,14 +653,14 @@ model V1Match {
   updatedAt       DateTime      @updatedAt @map("updated_at")
   deletedAt       DateTime?     @map("deleted_at")
 
-  hostUser     V1User               @relation("V1MatchHost", fields: [hostUserId], references: [id], onDelete: Restrict)
-  sport        V1Sport              @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  minSportLevel V1SportLevel?       @relation("V1MatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
-  maxSportLevel V1SportLevel?       @relation("V1MatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
-  region       V1Region?            @relation(fields: [regionId], references: [id], onDelete: Restrict)
-  applications V1MatchApplication[]
-  participants V1MatchParticipant[]
-  chatRoom     V1ChatRoom?
+  hostUser      V1User               @relation("V1MatchHost", fields: [hostUserId], references: [id], onDelete: Restrict)
+  sport         V1Sport              @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  minSportLevel V1SportLevel?        @relation("V1MatchMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
+  maxSportLevel V1SportLevel?        @relation("V1MatchMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
+  region        V1Region?            @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  applications  V1MatchApplication[]
+  participants  V1MatchParticipant[]
+  chatRoom      V1ChatRoom?
 
   @@index([hostUserId])
   @@index([sportId, regionId, status, startAt])
@@ -603,18 +733,18 @@ model V1Team {
   updatedAt    DateTime         @updatedAt @map("updated_at")
   deletedAt    DateTime?        @map("deleted_at")
 
-  ownerUser             V1User                   @relation("V1TeamOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  sport                 V1Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  region                V1Region                 @relation(fields: [regionId], references: [id], onDelete: Restrict)
-  profile               V1TeamProfile?
-  memberships           V1TeamMembership[]
-  joinApplications      V1TeamJoinApplication[]
-  trustScore            V1TeamTrustScore?
-  hostedTeamMatches     V1TeamMatch[]            @relation("V1HostTeamMatches")
-  approvedTeamMatches   V1TeamMatch[]            @relation("V1ApprovedApplicantTeam")
-  teamMatchApplications V1TeamMatchApplication[] @relation("V1TeamMatchApplicantTeam")
-  postEventReviewsWritten      V1PostEventReview[] @relation("V1PostEventReviewReviewerTeam")
-  postEventTeamReviewsReceived V1PostEventReview[] @relation("V1PostEventReviewTargetTeam")
+  ownerUser                    V1User                   @relation("V1TeamOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  sport                        V1Sport                  @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  region                       V1Region                 @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  profile                      V1TeamProfile?
+  memberships                  V1TeamMembership[]
+  joinApplications             V1TeamJoinApplication[]
+  trustScore                   V1TeamTrustScore?
+  hostedTeamMatches            V1TeamMatch[]            @relation("V1HostTeamMatches")
+  approvedTeamMatches          V1TeamMatch[]            @relation("V1ApprovedApplicantTeam")
+  teamMatchApplications        V1TeamMatchApplication[] @relation("V1TeamMatchApplicantTeam")
+  postEventReviewsWritten      V1PostEventReview[]      @relation("V1PostEventReviewReviewerTeam")
+  postEventTeamReviewsReceived V1PostEventReview[]      @relation("V1PostEventReviewTargetTeam")
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -624,21 +754,21 @@ model V1Team {
 }
 
 model V1TeamProfile {
-  id            String    @id @default(uuid())
-  teamId        String    @unique @map("team_id")
-  logoUrl       String?   @map("logo_url")
-  coverImageUrl String?   @map("cover_image_url")
-  description   String?
-  activityNote  String?   @map("activity_note")
-  skillNote     String?   @map("skill_note")
-  minSportLevelId String? @map("min_sport_level_id")
-  maxSportLevelId String? @map("max_sport_level_id")
-  genderRule    String?   @map("gender_rule")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  id              String    @id @default(uuid())
+  teamId          String    @unique @map("team_id")
+  logoUrl         String?   @map("logo_url")
+  coverImageUrl   String?   @map("cover_image_url")
+  description     String?
+  activityNote    String?   @map("activity_note")
+  skillNote       String?   @map("skill_note")
+  minSportLevelId String?   @map("min_sport_level_id")
+  maxSportLevelId String?   @map("max_sport_level_id")
+  genderRule      String?   @map("gender_rule")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
 
-  team V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team          V1Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
   minSportLevel V1SportLevel? @relation("V1TeamProfileMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
   maxSportLevel V1SportLevel? @relation("V1TeamProfileMaxSportLevel", fields: [maxSportLevelId], references: [id], onDelete: SetNull)
 
@@ -726,10 +856,10 @@ model V1PostEventReview {
   createdAt      DateTime                    @default(now()) @map("created_at")
   updatedAt      DateTime                    @updatedAt @map("updated_at")
 
-  reviewerUser V1User  @relation("V1PostEventReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
-  reviewerTeam V1Team? @relation("V1PostEventReviewReviewerTeam", fields: [reviewerTeamId], references: [id], onDelete: Restrict)
-  targetUser   V1User? @relation("V1PostEventReviewTargetUser", fields: [targetUserId], references: [id], onDelete: Restrict)
-  targetTeam   V1Team? @relation("V1PostEventReviewTargetTeam", fields: [targetTeamId], references: [id], onDelete: Restrict)
+  reviewerUser V1User                 @relation("V1PostEventReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+  reviewerTeam V1Team?                @relation("V1PostEventReviewReviewerTeam", fields: [reviewerTeamId], references: [id], onDelete: Restrict)
+  targetUser   V1User?                @relation("V1PostEventReviewTargetUser", fields: [targetUserId], references: [id], onDelete: Restrict)
+  targetTeam   V1Team?                @relation("V1PostEventReviewTargetTeam", fields: [targetTeamId], references: [id], onDelete: Restrict)
   tags         V1PostEventReviewTag[]
 
   @@unique([reviewerUserId, targetUserId, sourceType, sourceId])
@@ -961,10 +1091,19 @@ model V1AdminUser {
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
 
-  user               V1User              @relation("V1AdminUserAccount", fields: [userId], references: [id], onDelete: Cascade)
-  grantedByAdminUser V1User?             @relation("V1AdminGrantor", fields: [grantedByAdminUserId], references: [id], onDelete: SetNull)
-  actionLogs         V1AdminActionLog[]
-  statusLogs         V1StatusChangeLog[] @relation("V1StatusAdminActor")
+  user                      V1User              @relation("V1AdminUserAccount", fields: [userId], references: [id], onDelete: Cascade)
+  grantedByAdminUser        V1User?             @relation("V1AdminGrantor", fields: [grantedByAdminUserId], references: [id], onDelete: SetNull)
+  actionLogs                V1AdminActionLog[]
+  statusLogs                V1StatusChangeLog[] @relation("V1StatusAdminActor")
+  assignedOpsReports        V1OpsReport[]       @relation("V1OpsReportAssigned")
+  resolvedOpsReports        V1OpsReport[]       @relation("V1OpsReportResolved")
+  assignedOpsDisputes       V1OpsDispute[]      @relation("V1OpsDisputeAssigned")
+  resolvedOpsDisputes       V1OpsDispute[]      @relation("V1OpsDisputeResolved")
+  opsCaseEvents             V1OpsCaseEvent[]    @relation("V1OpsCaseEventAdminActor")
+  reviewedRefunds           V1PaymentRefund[]   @relation("V1PaymentRefundReviewer")
+  createdSettlementBatches  V1SettlementBatch[] @relation("V1SettlementBatchCreatedBy")
+  reviewedSettlementBatches V1SettlementBatch[] @relation("V1SettlementBatchReviewedBy")
+  payoutAttempts            V1PayoutAttempt[]   @relation("V1PayoutAttemptRequestedBy")
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])
@@ -987,6 +1126,300 @@ model V1AdminActionLog {
   @@index([adminUserId, createdAt])
   @@index([targetType, targetId, createdAt])
   @@map("v1_admin_action_logs")
+}
+
+model V1OpsReport {
+  id                  String            @id @default(uuid())
+  reporterUserId      String?           @map("reporter_user_id")
+  targetType          String            @map("target_type")
+  targetId            String            @map("target_id")
+  reason              V1OpsReportReason
+  description         String?
+  status              V1OpsReportStatus @default(open)
+  priority            Int               @default(0)
+  assignedAdminUserId String?           @map("assigned_admin_user_id")
+  resolvedAdminUserId String?           @map("resolved_admin_user_id")
+  resolutionNote      String?           @map("resolution_note")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  resolvedAt          DateTime?         @map("resolved_at")
+
+  reporter          V1User?          @relation("V1OpsReportReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  assignedAdminUser V1AdminUser?     @relation("V1OpsReportAssigned", fields: [assignedAdminUserId], references: [id], onDelete: SetNull)
+  resolvedAdminUser V1AdminUser?     @relation("V1OpsReportResolved", fields: [resolvedAdminUserId], references: [id], onDelete: SetNull)
+  events            V1OpsCaseEvent[]
+
+  @@index([status, priority, createdAt])
+  @@index([targetType, targetId])
+  @@index([reporterUserId])
+  @@index([assignedAdminUserId])
+  @@map("v1_ops_reports")
+}
+
+model V1OpsDispute {
+  id                  String             @id @default(uuid())
+  reporterUserId      String?            @map("reporter_user_id")
+  targetType          String             @map("target_type")
+  targetId            String             @map("target_id")
+  reason              V1OpsDisputeReason
+  title               String
+  description         String?
+  status              V1OpsDisputeStatus @default(open)
+  amount              Int?
+  currency            String             @default("KRW")
+  assignedAdminUserId String?            @map("assigned_admin_user_id")
+  resolvedAdminUserId String?            @map("resolved_admin_user_id")
+  resolutionNote      String?            @map("resolution_note")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  resolvedAt          DateTime?          @map("resolved_at")
+
+  reporter          V1User?          @relation("V1OpsDisputeReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  assignedAdminUser V1AdminUser?     @relation("V1OpsDisputeAssigned", fields: [assignedAdminUserId], references: [id], onDelete: SetNull)
+  resolvedAdminUser V1AdminUser?     @relation("V1OpsDisputeResolved", fields: [resolvedAdminUserId], references: [id], onDelete: SetNull)
+  events            V1OpsCaseEvent[]
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+  @@index([reporterUserId])
+  @@index([assignedAdminUserId])
+  @@map("v1_ops_disputes")
+}
+
+model V1PaymentOrder {
+  id                 String               @id @default(uuid())
+  orderId            String               @unique @map("order_id")
+  buyerUserId        String?              @map("buyer_user_id")
+  sourceType         String               @map("source_type")
+  sourceId           String               @map("source_id")
+  amount             Int
+  currency           String               @default("KRW")
+  orderName          String               @map("order_name")
+  status             V1PaymentOrderStatus @default(pending)
+  provider           V1PaymentProvider    @default(toss)
+  providerPaymentKey String?              @unique @map("provider_payment_key")
+  providerOrderId    String?              @map("provider_order_id")
+  requestedAt        DateTime?            @map("requested_at")
+  approvedAt         DateTime?            @map("approved_at")
+  failedAt           DateTime?            @map("failed_at")
+  expiresAt          DateTime?            @map("expires_at")
+  failureCode        String?              @map("failure_code")
+  failureMessage     String?              @map("failure_message")
+  metadataJson       Json?                @map("metadata_json")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  buyer        V1User?                @relation("V1PaymentOrderBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  transactions V1PaymentTransaction[]
+  refunds      V1PaymentRefund[]
+  events       V1OpsCaseEvent[]
+
+  @@index([status, createdAt])
+  @@index([buyerUserId, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("v1_payment_orders")
+}
+
+model V1PaymentTransaction {
+  id                    String                     @id @default(uuid())
+  paymentOrderId        String                     @map("payment_order_id")
+  provider              V1PaymentProvider          @default(toss)
+  providerTransactionId String?                    @map("provider_transaction_id")
+  paymentKey            String?                    @map("payment_key")
+  orderId               String                     @map("order_id")
+  amount                Int
+  status                V1PaymentTransactionStatus
+  rawPayloadJson        Json?                      @map("raw_payload_json")
+  requestedAt           DateTime?                  @map("requested_at")
+  approvedAt            DateTime?                  @map("approved_at")
+  createdAt             DateTime                   @default(now()) @map("created_at")
+
+  paymentOrder V1PaymentOrder @relation(fields: [paymentOrderId], references: [id], onDelete: Cascade)
+
+  @@index([paymentOrderId, createdAt])
+  @@index([paymentKey])
+  @@map("v1_payment_transactions")
+}
+
+model V1PaymentRefund {
+  id                    String         @id @default(uuid())
+  paymentOrderId        String         @map("payment_order_id")
+  requesterUserId       String?        @map("requester_user_id")
+  reviewedByAdminUserId String?        @map("reviewed_by_admin_user_id")
+  providerRefundId      String?        @map("provider_refund_id")
+  amount                Int
+  reason                String
+  status                V1RefundStatus @default(requested)
+  providerStatus        String?        @map("provider_status")
+  failureCode           String?        @map("failure_code")
+  failureMessage        String?        @map("failure_message")
+  requestedAt           DateTime       @default(now()) @map("requested_at")
+  reviewedAt            DateTime?      @map("reviewed_at")
+  completedAt           DateTime?      @map("completed_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+
+  paymentOrder        V1PaymentOrder   @relation(fields: [paymentOrderId], references: [id], onDelete: Cascade)
+  requester           V1User?          @relation("V1PaymentRefundRequester", fields: [requesterUserId], references: [id], onDelete: SetNull)
+  reviewedByAdminUser V1AdminUser?     @relation("V1PaymentRefundReviewer", fields: [reviewedByAdminUserId], references: [id], onDelete: SetNull)
+  events              V1OpsCaseEvent[]
+
+  @@index([paymentOrderId, createdAt])
+  @@index([status, createdAt])
+  @@index([requesterUserId])
+  @@index([reviewedByAdminUserId])
+  @@map("v1_payment_refunds")
+}
+
+model V1SettlementSeller {
+  id               String                   @id @default(uuid())
+  userId           String                   @unique @map("user_id")
+  status           V1SettlementSellerStatus @default(pending)
+  providerSellerId String?                  @unique @map("provider_seller_id")
+  displayName      String                   @map("display_name")
+  businessType     String?                  @map("business_type")
+  email            String?
+  phone            String?
+  kycStatus        String                   @default("pending") @map("kyc_status")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+
+  user     V1User                @relation("V1SettlementSellerUser", fields: [userId], references: [id], onDelete: Cascade)
+  accounts V1SettlementAccount[]
+  items    V1SettlementItem[]
+
+  @@index([status, createdAt])
+  @@map("v1_settlement_sellers")
+}
+
+model V1SettlementAccount {
+  id                String                    @id @default(uuid())
+  sellerId          String                    @map("seller_id")
+  status            V1SettlementAccountStatus @default(pending)
+  bankName          String                    @map("bank_name")
+  accountLast4      String                    @map("account_last4")
+  accountHolderName String                    @map("account_holder_name")
+  providerAccountId String?                   @map("provider_account_id")
+  verifiedAt        DateTime?                 @map("verified_at")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+
+  seller V1SettlementSeller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, status])
+  @@map("v1_settlement_accounts")
+}
+
+model V1SettlementBatch {
+  id                    String                  @id @default(uuid())
+  batchKey              String                  @unique @map("batch_key")
+  status                V1SettlementBatchStatus @default(draft)
+  periodStart           DateTime                @map("period_start")
+  periodEnd             DateTime                @map("period_end")
+  currency              String                  @default("KRW")
+  totalAmount           Int                     @default(0) @map("total_amount")
+  holdReason            String?                 @map("hold_reason")
+  createdByAdminUserId  String?                 @map("created_by_admin_user_id")
+  reviewedByAdminUserId String?                 @map("reviewed_by_admin_user_id")
+  approvedAt            DateTime?               @map("approved_at")
+  payoutRequestedAt     DateTime?               @map("payout_requested_at")
+  completedAt           DateTime?               @map("completed_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime                @updatedAt @map("updated_at")
+
+  createdByAdminUser  V1AdminUser?       @relation("V1SettlementBatchCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  reviewedByAdminUser V1AdminUser?       @relation("V1SettlementBatchReviewedBy", fields: [reviewedByAdminUserId], references: [id], onDelete: SetNull)
+  items               V1SettlementItem[]
+  payoutAttempts      V1PayoutAttempt[]
+  events              V1OpsCaseEvent[]
+
+  @@index([status, createdAt])
+  @@index([reviewedByAdminUserId])
+  @@map("v1_settlement_batches")
+}
+
+model V1SettlementItem {
+  id                String                 @id @default(uuid())
+  settlementBatchId String                 @map("settlement_batch_id")
+  sellerId          String                 @map("seller_id")
+  sourceType        String                 @map("source_type")
+  sourceId          String                 @map("source_id")
+  grossAmount       Int                    @map("gross_amount")
+  feeAmount         Int                    @default(0) @map("fee_amount")
+  netAmount         Int                    @map("net_amount")
+  status            V1SettlementItemStatus @default(pending)
+  holdReason        String?                @map("hold_reason")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  settlementBatch V1SettlementBatch  @relation(fields: [settlementBatchId], references: [id], onDelete: Cascade)
+  seller          V1SettlementSeller @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([settlementBatchId, status])
+  @@index([sellerId, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("v1_settlement_items")
+}
+
+model V1PayoutAttempt {
+  id                     String                @id @default(uuid())
+  settlementBatchId      String                @map("settlement_batch_id")
+  requestedByAdminUserId String                @map("requested_by_admin_user_id")
+  providerPayoutId       String?               @map("provider_payout_id")
+  status                 V1PayoutAttemptStatus @default(requested)
+  amount                 Int
+  requestedAt            DateTime              @default(now()) @map("requested_at")
+  providerConfirmedAt    DateTime?             @map("provider_confirmed_at")
+  failureCode            String?               @map("failure_code")
+  failureMessage         String?               @map("failure_message")
+  rawPayloadJson         Json?                 @map("raw_payload_json")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+
+  settlementBatch      V1SettlementBatch @relation(fields: [settlementBatchId], references: [id], onDelete: Cascade)
+  requestedByAdminUser V1AdminUser       @relation("V1PayoutAttemptRequestedBy", fields: [requestedByAdminUserId], references: [id], onDelete: Restrict)
+  events               V1OpsCaseEvent[]
+
+  @@index([settlementBatchId, createdAt])
+  @@index([requestedByAdminUserId])
+  @@index([status, createdAt])
+  @@map("v1_payout_attempts")
+}
+
+model V1OpsCaseEvent {
+  id                String             @id @default(uuid())
+  eventType         V1OpsCaseEventType @map("event_type")
+  reportId          String?            @map("report_id")
+  disputeId         String?            @map("dispute_id")
+  paymentOrderId    String?            @map("payment_order_id")
+  refundId          String?            @map("refund_id")
+  settlementBatchId String?            @map("settlement_batch_id")
+  payoutAttemptId   String?            @map("payout_attempt_id")
+  actorAdminUserId  String?            @map("actor_admin_user_id")
+  actorUserId       String?            @map("actor_user_id")
+  fromStatus        String?            @map("from_status")
+  toStatus          String?            @map("to_status")
+  reason            String?
+  metadataJson      Json?              @map("metadata_json")
+  createdAt         DateTime           @default(now()) @map("created_at")
+
+  report          V1OpsReport?       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  dispute         V1OpsDispute?      @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  paymentOrder    V1PaymentOrder?    @relation(fields: [paymentOrderId], references: [id], onDelete: Cascade)
+  refund          V1PaymentRefund?   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  settlementBatch V1SettlementBatch? @relation(fields: [settlementBatchId], references: [id], onDelete: Cascade)
+  payoutAttempt   V1PayoutAttempt?   @relation(fields: [payoutAttemptId], references: [id], onDelete: Cascade)
+  actorAdminUser  V1AdminUser?       @relation("V1OpsCaseEventAdminActor", fields: [actorAdminUserId], references: [id], onDelete: SetNull)
+  actorUser       V1User?            @relation("V1OpsCaseEventUserActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([reportId, createdAt])
+  @@index([disputeId, createdAt])
+  @@index([paymentOrderId, createdAt])
+  @@index([refundId, createdAt])
+  @@index([settlementBatchId, createdAt])
+  @@index([payoutAttemptId, createdAt])
+  @@index([actorAdminUserId, createdAt])
+  @@map("v1_ops_case_events")
 }
 
 model V1StatusChangeLog {

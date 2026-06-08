@@ -41,10 +41,10 @@ export function toAdminMatchesPageModel(input: CommonInput & { readonly matches:
     primaryActions: [{ label: '개인 매치 만들기', href: '/matches/new', tone: 'primary' }],
     rows: input.matches.map(matchRow),
     emptyTitle: '개설한 개인 매치가 없습니다.',
-    sideTitle: '개인 매치 바로가기',
+    sideTitle: '개인 매치 후속 작업',
     sideItems: [
-      side('created', '생성한 매치', '내가 만든 매치만 이 화면에서 수정 대상으로 표시합니다.', '/my/matches/created', 'neutral'),
-      side('create', '새 매치 등록', '시간, 장소, 모집 조건을 입력하는 실제 생성 화면으로 이동합니다.', '/matches/new', 'positive'),
+      side('created', '생성한 매치 관리', '내가 만든 매치의 상세와 수정 상태를 확인합니다.', '/my/matches/created', 'neutral'),
+      side('create', '새 매치 등록', '시간, 장소, 모집 조건을 입력합니다.', '/matches/new', 'positive'),
     ],
   });
 }
@@ -69,10 +69,10 @@ export function toAdminTeamMatchesPageModel(input: CommonInput & { readonly team
     primaryActions: [{ label: '팀매치 만들기', href: '/team-matches/new', tone: 'primary' }],
     rows: input.teamMatches.map(teamMatchRow),
     emptyTitle: '확인할 팀매치가 없습니다.',
-    sideTitle: '팀매치 바로가기',
+    sideTitle: '팀매치 후속 작업',
     sideItems: [
-      side('create', '팀매치 등록', '팀 권한을 확인한 뒤 실제 팀매치 생성 화면으로 이동합니다.', '/team-matches/new', 'positive'),
-      side('browse', '팀매치 찾기', '상대팀 모집 목록으로 이동합니다.', '/team-matches', 'neutral'),
+      side('create', '팀매치 등록', '팀 권한을 확인한 뒤 팀매치를 개설합니다.', '/team-matches/new', 'positive'),
+      side('browse', '상대팀 모집 확인', '신청 가능한 팀매치 목록을 확인합니다.', '/team-matches', 'neutral'),
     ],
   });
 }
@@ -125,10 +125,10 @@ export function toAdminReviewsPageModel(input: CommonInput & { readonly pendingR
     primaryActions: [{ label: '리뷰 목록', href: '/my/reviews', tone: 'primary' }],
     rows: input.pendingReviews.map(reviewRow),
     emptyTitle: '작성할 리뷰가 없습니다.',
-    sideTitle: '리뷰 바로가기',
+    sideTitle: '리뷰 후속 작업',
     sideItems: [
-      side('pending', '대기 리뷰', '남은 대상이 있는 경기만 우선 처리합니다.', '/my/reviews', remaining > 0 ? 'warning' : 'positive'),
-      side('received', '받은 리뷰', '내가 받은 평가를 확인합니다.', '/my/reviews/received', 'neutral'),
+      side('pending', '대기 리뷰 처리', '남은 대상이 있는 경기만 우선 처리합니다.', '/my/reviews', remaining > 0 ? 'warning' : 'positive'),
+      side('received', '받은 리뷰 확인', '내가 받은 평가를 확인합니다.', '/my/reviews/received', 'neutral'),
     ],
   });
 }
@@ -153,7 +153,7 @@ export function toAdminNotificationsPageModel(input: CommonInput & { readonly no
     primaryActions: [{ label: '알림 전체 보기', href: '/notifications', tone: 'primary' }],
     rows: input.notifications.map(notificationRow),
     emptyTitle: '확인할 업무 알림이 없습니다.',
-    sideTitle: '연결된 업무 화면',
+    sideTitle: '알림 후속 작업',
     sideItems: [
       side('all', '전체 알림', '알림 전용 화면에서 읽음 상태를 관리합니다.', '/notifications', 'neutral'),
       side('settings', '알림 설정', '활동/마케팅 알림 수신 방식을 조정합니다.', '/my/settings/notifications', 'neutral'),

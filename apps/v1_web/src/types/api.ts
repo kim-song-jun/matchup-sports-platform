@@ -1122,3 +1122,149 @@ export type V1AdminStatusChangeLog = {
   reason: string | null;
   createdAt: string;
 };
+
+export type V1OpsCaseEvent = {
+  caseEventId: string;
+  eventType: string;
+  reportId: string | null;
+  disputeId: string | null;
+  paymentOrderId: string | null;
+  refundId: string | null;
+  settlementBatchId: string | null;
+  payoutAttemptId: string | null;
+  actorAdminUserId: string | null;
+  actorUserId: string | null;
+  fromStatus: string | null;
+  toStatus: string | null;
+  reason: string | null;
+  metadata: unknown;
+  createdAt: string;
+};
+
+export type V1OpsOverview = {
+  queues: {
+    openReports: number;
+    activeDisputes: number;
+    pendingPayments: number;
+    refundRequests: number;
+    settlementReviews: number;
+    payoutFailures: number;
+  };
+  recentEvents: V1OpsCaseEvent[];
+};
+
+export type V1OpsReport = {
+  reportId: string;
+  reporterUserId: string | null;
+  targetType: string;
+  targetId: string;
+  reason: 'safety' | 'fraud' | 'spam' | 'inappropriate' | 'payment' | 'other';
+  description: string | null;
+  status: 'open' | 'reviewing' | 'resolved' | 'dismissed';
+  priority: number;
+  assignedAdminUserId: string | null;
+  resolvedAdminUserId: string | null;
+  resolutionNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+};
+
+export type V1OpsDispute = {
+  disputeId: string;
+  reporterUserId: string | null;
+  targetType: string;
+  targetId: string;
+  reason: 'match_cancelled' | 'no_show' | 'payment_refund' | 'settlement' | 'conduct' | 'other';
+  title: string;
+  description: string | null;
+  status: 'open' | 'assigned' | 'waiting_party' | 'resolved' | 'rejected';
+  amount: number | null;
+  currency: string;
+  assignedAdminUserId: string | null;
+  resolvedAdminUserId: string | null;
+  resolutionNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+};
+
+export type V1PaymentRefund = {
+  refundId: string;
+  paymentOrderId: string;
+  requesterUserId: string | null;
+  reviewedByAdminUserId: string | null;
+  providerRefundId: string | null;
+  amount: number;
+  reason: string;
+  status: 'requested' | 'reviewing' | 'approved' | 'rejected' | 'processing' | 'completed' | 'failed';
+  providerStatus: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  requestedAt: string;
+  reviewedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1PaymentOrder = {
+  paymentOrderId: string;
+  orderId: string;
+  buyerUserId: string | null;
+  sourceType: string;
+  sourceId: string;
+  amount: number;
+  currency: string;
+  orderName: string;
+  status: 'pending' | 'confirmed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded' | 'expired';
+  provider: 'toss';
+  providerPaymentKey: string | null;
+  requestedAt: string | null;
+  approvedAt: string | null;
+  failedAt: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  refunds: V1PaymentRefund[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1PayoutAttempt = {
+  payoutAttemptId: string;
+  settlementBatchId: string;
+  requestedByAdminUserId: string;
+  providerPayoutId: string | null;
+  status: 'requested' | 'processing' | 'succeeded' | 'failed' | 'partial' | 'cancelled';
+  amount: number;
+  requestedAt: string;
+  providerConfirmedAt: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1SettlementBatch = {
+  settlementBatchId: string;
+  batchKey: string;
+  status: 'draft' | 'reviewing' | 'approved' | 'payout_requested' | 'partially_paid' | 'paid' | 'failed' | 'held';
+  periodStart: string;
+  periodEnd: string;
+  currency: string;
+  totalAmount: number;
+  holdReason: string | null;
+  approvedAt: string | null;
+  payoutRequestedAt: string | null;
+  completedAt: string | null;
+  itemCount: number;
+  pendingAmount: number;
+  payoutAttempts: V1PayoutAttempt[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1OpsAudit = {
+  actionLogs: V1AdminLog[];
+  caseEvents: V1OpsCaseEvent[];
+};

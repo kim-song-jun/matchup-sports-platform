@@ -330,3 +330,150 @@ The sections below fill project-specific gaps while preserving curated content a
 - Task 15에서 정한 canonical/compatibility split을 유지한다. `.codex/agents/`만 갱신하고 `.claude/agents/prompts.md`를 방치하는 drift는 허용하지 않는다.
 
 <!-- /codex-init:delta -->
+
+<!-- agent-skill:operational:start -->
+# 팀 매치, 강좌, 대회 등을 제공하는 스포츠 종합 플랫폼.
+
+> Project memory for Codex CLI. Scaffolded by `/codex-init`.
+
+## Stack
+
+javascript (on docker: api, deps, postgres, redis, v1_api, v1_postgres, v1_web, web) - deploys to aws, github actions
+
+## Language
+
+- Interaction language: `ko`
+- If you install the floor bundle, keep `.agent-all.json` `language` aligned with this value.
+
+## Operating Principles
+
+These rules apply to the main Codex agent and every role in `.codex/skills/`:
+
+1. **Brainstorm first.** Invoke `superpowers:brainstorming` before ambiguous or multi-step deliverables unless the user explicitly asks for direct execution.
+2. **Plan before edits.** Use `superpowers:writing-plans` for non-trivial changes and keep plans in `docs/superpowers/plans/`.
+3. **Orchestrate deliberately.** Use `superpowers:dispatching-parallel-agents` or `superpowers:subagent-driven-development` as the planning protocol for multi-role work; preserve Codex sequential skill dispatch when the runtime cannot run parallel agents.
+4. **Verify before completion.** Use `superpowers:verification-before-completion` before claiming success.
+5. **Use context-mode for bulk context.** Route large logs, broad searches, screenshots, and noisy generated output through context-mode or file-backed logs when available.
+6. Use `apply_patch` for manual file edits.
+7. Commit with explicit pathspecs: `git commit -m "message" -- path/one path/two`.
+8. Avoid destructive git, docker, database, or force-push commands without explicit approval.
+9. Do not revert unrelated user or other-agent edits.
+
+## Execution Discipline
+
+1. **No scope retreat.** If the user asks for an exhaustive pass, all files, all pages, or a fixed `N` items, establish the count up front, process every item, and report `processed M/N` before handoff. Stop only for a real blocker, an explicit user scope change, or a documented ambiguity.
+2. **Plan vs execute.** If the request is to fix, build, change, or verify something, finish the file edits and verification. Do not stop at a proposal unless the user asked only for analysis.
+3. **Self-Audit before handoff.** For multi-file changes, long-running task docs, or all-item sweeps, include a concise `Self-Audit` covering requested scope, processed count, unprocessed items, unverified gates, any shortcuts, and next action.
+4. **Tech-Debt Grep.** Before completion, check touched code paths for `TODO`, `FIXME`, `HACK`, and `XXX`. Resolve in-scope debt in the same change; if it is out of scope, state why.
+5. **Decision Matrix.** When two or more reasonable choices remain, or multiple user decisions are needed, present a `Decision Matrix` with option, impact, recommendation, and whether confirmation is required.
+6. **Task-ledger gate.** If a task ledger document is active, do not call the work complete while required sections, in-scope checkboxes, acceptance criteria, or verification evidence are missing.
+
+
+## Subagent Dispatch Contract
+
+Every delegated role prompt must include:
+
+- Working directory.
+- Owned files or line ranges.
+- Forbidden files or areas owned by other active agents.
+- A `DO NOT` list covering destructive commands, unrelated edits, broad staging, and self-commit behavior.
+- Expected output format with a concise `Self-Audit`.
+- Reusable references, files, functions, commands, or task-doc sections.
+
+Do not self-commit from a delegated subagent unless the orchestrator explicitly asks for that. Report changed files and verification evidence back to the orchestrator for pathspec commit review.
+
+## Roles
+
+| Role | When to use | File |
+|------|-------------|------|
+| planner | all planning | `.codex/skills/planner/SKILL.md` |
+| dev | implementation | `.codex/skills/dev/SKILL.md` |
+| reviewer | final review | `.codex/skills/reviewer/SKILL.md` |
+| orchestrator | wave ownership and shared-tree safety | `.codex/skills/orchestrator/SKILL.md` |
+| frontend-dev | frontend UI, client logic, styling | `.codex/skills/frontend-dev/SKILL.md` |
+| backend-dev | backend APIs, services, migrations | `.codex/skills/backend-dev/SKILL.md` |
+| verification-reviewer | tests, typecheck, lint, diff scope | `.codex/skills/verification-reviewer/SKILL.md` |
+| qa-reviewer | user-flow and persona validation | `.codex/skills/qa-reviewer/SKILL.md` |
+| design-reviewer | UI hierarchy and design tokens | `.codex/skills/design-reviewer/SKILL.md` |
+| security-reviewer | authz, secrets, destructive actions | `.codex/skills/security-reviewer/SKILL.md` |
+| data-reviewer | migrations, seeds, fixtures, backfills | `.codex/skills/data-reviewer/SKILL.md` |
+| integration-dev | cross-stack wiring and API contracts | `.codex/skills/integration-dev/SKILL.md` |
+
+
+
+## Operational Profile
+
+This is the heavy operational harness profile.
+
+- `/agent-all` work uses Teameet's canonical `.github/tasks/{NN}-{slug}.md` task docs. `docs/tasks/_template.md` is a generated harness reference only and does not replace `.github/tasks/`.
+- Keep Decision Matrix, Ambiguity Log, Progress Snapshot, and Verification sections current.
+- `AGENTS.md` at the repository root is the index; folder-level `AGENTS.md` files define local scope.
+- Reviewer personas are selected by changed-file classifier and the risk profile of the diff.
+- Use the orchestrator for wave ownership, HOT file detection, shared-tree safety, and repeated failure escalation.
+- The repo-local policy hook lives at `.codex/hooks/agent-policy-hook.mjs`; the generated config snippet points Codex `PreToolUse` for `Bash` at that hook.
+
+## Role Routing
+
+- `orchestrator`: wave ownership, HOT-file detection, shared-tree safety, pathspec commits, and escalation after 3 failed cycles.
+- `planner`: ambiguity control, Decision Matrix updates, task slicing, and plan files before implementation.
+- `frontend-dev` / `backend-dev`: stack-specific implementation after the task doc and ownership boundaries are clear.
+- `dev`: generic implementation fallback for small or ambiguous changes.
+- `integration-dev`: cross-stack wiring, API contracts, and frontend/backend coordination points.
+- `design-reviewer` + `qa-reviewer`: UI hierarchy, visual state, accessibility, and user-flow validation.
+- `security-reviewer` + `data-reviewer`: authz, secrets, destructive actions, migrations, seeds, fixtures, and backfills.
+- `verification-reviewer`: tests, typecheck, lint, diff scope, and completion evidence.
+
+Keep each active task's Progress Snapshot current with owner, files, validation, blockers, and next action.
+
+## Implementation Routing Matrix
+
+| Work type | Primary implementer | Required verification |
+|-----------|---------------------|-----------------------|
+| UI, routes, client state, browser behavior | `frontend-dev` | component/browser/a11y checks + `design-reviewer` when user-visible |
+| API, services, jobs, persistence | `backend-dev` | unit/contract tests + `verification-reviewer` |
+| Frontend plus backend/API contract | `integration-dev` with `frontend-dev` and `backend-dev` serialized on shared files | contract/e2e check + `verification-reviewer` |
+| Generic implementation or small fix | `dev` | task-specific test/lint/typecheck + `verification-reviewer` |
+| Docs or release guidance only | `dev` | docs contract or snapshot test when available |
+
+## Orchestration Contract
+
+- Main Codex thread/coordinator owns task docs, user decisions, HOT-file serialization, final diff review, and pathspec commits.
+- Implementer skills own only their assigned file scope and must return changed files, commands run, verification result, blockers, and Self-Audit.
+- Reviewer skills are independent gates. They inspect the diff and evidence; they do not repair code unless explicitly invoked for a retry.
+- Use superpowers for brainstorm/plan/verification when available, preserve Codex's sequential skill dispatch for floor workflows, and route broad reads or long outputs through context-mode or file-backed logs.
+- If superpowers or context-mode is unavailable, record the degraded fallback in the task ledger before continuing.
+
+## Role Gate Matrix
+
+| Trigger | Required gate | Evidence |
+|---------|---------------|----------|
+| Feature or bug fix | implementer + `verification-reviewer` | tests/typecheck/lint or task-specific verification |
+| UI or user-visible flow | `design-reviewer` + `qa-reviewer` | UX findings plus `QA_AUDIT` |
+| Auth, permissions, secrets, destructive actions | `security-reviewer` | risk review with blocking issues first |
+| Models, migrations, seeds, fixtures, backfills | `data-reviewer` | data safety, rollback, and migration evidence |
+| Frontend + backend/API contract | `integration-dev` + `verification-reviewer` | contract or end-to-end evidence |
+
+## QA Personas
+
+The `qa-reviewer` should evaluate user-flow risk through these configured perspectives:
+- auth
+- player
+- team-manager
+- coach
+- tournament-organizer
+- payments
+- admin-ops
+- notifications
+- cross-device
+
+
+
+
+
+
+
+
+## Special Constraints
+
+별도 규정 제약은 없으며, 반응형 웹과 사용자 사용성을 우선한다. Toss와 플랩 같은 대규모 플랫폼 수준의 UX 품질을 목표로 한다.
+<!-- agent-skill:operational:end -->

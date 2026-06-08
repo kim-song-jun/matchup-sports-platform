@@ -48,9 +48,9 @@ Rebuild `/admin` as a customer-facing operations ERP for the v1 service user who
 
 ## Out Of Scope
 
-- New platform moderation API.
-- New settlement, dispute, payment, venue, marketplace, lesson, or tournament backend contracts.
-- Internal Teameet operator dashboard.
+- New platform moderation API inside the customer `/admin` workspace.
+- New settlement, dispute, payment, venue, marketplace, lesson, or tournament backend contracts inside the customer `/admin` workspace.
+- Internal Teameet operator dashboard inside `/admin`; Task 104 moves that surface to `/ops` with internal `/api/v1/admin/*` contracts.
 
 ## Progress Snapshot
 
@@ -69,6 +69,7 @@ Rebuild `/admin` as a customer-facing operations ERP for the v1 service user who
 - Focused reviewer QA PASS: a separate QA agent reran the API seed contract and `admin@teameet.v1` 2048x900 browser live check, confirming the empty-state copy is absent, the review CTA reaches `/my/reviews/team_match/00000000-0000-4000-8000-000000000304`, and console/request failures are empty. Other review-work lanes timed out and are recorded as inconclusive rather than counted as PASS.
 - 2026-06-07 loading/copy rework: admin function routes now keep KPI/table/side-rail structure during loading instead of replacing the page with a generic card, and `/admin` plus `/admin/audit` no longer leak empty-state copy while customer-operation data is still loading.
 - Function page copy now uses route-specific customer tasks (`개설한 개인 매치`, `팀매치 처리`, `팀 관리`, `리뷰 관리`, `알림 관리`) and removes weak/internal phrases such as `업체 운영`, `운영 기준`, `리뷰 기준`, `서비스 알림`, and `teameet ERP` from production admin UI.
+- 2026-06-08 Task 104 split: `/admin` remains the customer operations ERP. Internal Teameet operator work for reports, disputes, payments, refunds, settlements, payout attempts, status actions, and audit history moves to `/ops`; `/admin` must keep using customer workflow APIs and must not call internal `/api/v1/admin/*` endpoints.
 
 ## Validation Plan
 

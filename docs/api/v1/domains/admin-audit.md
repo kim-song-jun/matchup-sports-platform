@@ -12,6 +12,7 @@
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | active admin | `{ status, reason }` | updated team match status |
 | `GET` | `/api/v1/admin/action-logs` | active admin | `AdminLogsQueryDto` | cursor list |
 | `GET` | `/api/v1/admin/status-change-logs` | active admin | `AdminLogsQueryDto` | cursor list |
+| `GET` | `/api/v1/admin/ops/audit` | active admin | `limit?`, `cursor?` | internal action logs + case events |
 
 ## Status DTOs
 
@@ -33,7 +34,9 @@ Admin mutations must record:
 - `v1_admin_action_logs`;
 - `v1_status_change_logs` for lifecycle state changes.
 
-Admin v1 is intentionally minimum. Task queue, settlement operations, dispute success flows, and broad CRM functionality are deferred.
+`/admin` frontend is customer ERP and must not call these internal APIs. Task 104 introduces `/ops` as the internal console that consumes this namespace.
+
+Task queue, settlement operations, dispute success flows, and payment ledgers now live in the Task 104 `/ops` contract; see `docs/api/v1/domains/admin-ops.md`.
 
 Primary tables:
 
@@ -41,3 +44,4 @@ Primary tables:
 - `v1_admin_action_logs`
 - `v1_status_change_logs`
 - target domain tables
+- `v1_ops_case_events` for `/ops` case/refund/settlement/payout event history

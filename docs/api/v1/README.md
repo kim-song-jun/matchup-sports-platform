@@ -8,7 +8,7 @@ Scope:
 - Runtime prefix: `/api/v1`
 - Runtime web: `apps/v1_web`
 - Database: isolated v1 database with `v1_*` tables and `V1*` Prisma models
-- Existing `apps/api`, `apps/web`, and existing DB are reference-only for v1 completion.
+- Existing `apps/api`, `apps/web`, and legacy DB contracts are not valid runtime sources for v1 completion.
 
 Canonical sources:
 
@@ -31,6 +31,7 @@ Canonical sources:
 - [Reviews](./domains/reviews.md)
 - [Profile And Settings](./domains/profile-settings.md)
 - [Admin And Audit](./domains/admin-audit.md)
+- [Admin Ops](./domains/admin-ops.md)
 - [Deferred Boundaries](./domains/deferred-boundaries.md)
 
 ## Publication Notes
@@ -38,4 +39,5 @@ Canonical sources:
 - These docs describe the v1 implementation contract as of 2026-05-18.
 - The frozen reference checklist used `/api/v1/sm-new` while the implemented Nest app uses `/api/v1`. The implementation prefix wins for runtime and frontend hook work.
 - Terms, OAuth callback, email login, signup, and global search remain frozen in the reference contract but are not yet implemented in `apps/v1_api`; they are marked as pending implementation where relevant.
-- Payment, refund, support/dispute, marketplace, lessons, venue owner/operator, DM, permanent team chat, file attachment, and admin task queue success flows are not v1 APIs.
+- Task 104 adds internal `/ops` APIs for reports, disputes, payments, refunds, settlements, payout attempts, and audit history under `/api/v1/admin/*`; `/admin` remains a customer ERP surface and must not consume those APIs.
+- Marketplace, lessons, venue owner/operator, DM, permanent team chat, and file attachment remain deferred unless a v1 task explicitly implements them.

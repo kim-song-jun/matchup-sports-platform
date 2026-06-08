@@ -1184,6 +1184,262 @@ async function seedAdmin(userIds: Record<string, string>) {
   });
 }
 
+async function seedAdminOps(userIds: Record<string, string>, matchId: string, teamMatchId: string) {
+  const ownerAdmin = await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: userIds['admin@teameet.v1'] } });
+
+  const report = await prisma.v1OpsReport.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001801' },
+    update: {
+      reporterUserId: userIds['applicant@teameet.v1'],
+      targetType: 'match',
+      targetId: matchId,
+      reason: 'safety',
+      description: '경기 장소 안내가 실제 위치와 다릅니다.',
+      status: 'reviewing',
+      priority: 20,
+      assignedAdminUserId: ownerAdmin.id,
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001801',
+      reporterUserId: userIds['applicant@teameet.v1'],
+      targetType: 'match',
+      targetId: matchId,
+      reason: 'safety',
+      description: '경기 장소 안내가 실제 위치와 다릅니다.',
+      status: 'reviewing',
+      priority: 20,
+      assignedAdminUserId: ownerAdmin.id,
+    },
+  });
+
+  const dispute = await prisma.v1OpsDispute.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001811' },
+    update: {
+      reporterUserId: userIds['owner@teameet.v1'],
+      targetType: 'team_match',
+      targetId: teamMatchId,
+      reason: 'payment_refund',
+      title: '팀매치 취소 환불 검토',
+      description: '상대팀 취소 후 환불 책임 분배가 필요합니다.',
+      status: 'assigned',
+      amount: 42000,
+      assignedAdminUserId: ownerAdmin.id,
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001811',
+      reporterUserId: userIds['owner@teameet.v1'],
+      targetType: 'team_match',
+      targetId: teamMatchId,
+      reason: 'payment_refund',
+      title: '팀매치 취소 환불 검토',
+      description: '상대팀 취소 후 환불 책임 분배가 필요합니다.',
+      status: 'assigned',
+      amount: 42000,
+      assignedAdminUserId: ownerAdmin.id,
+    },
+  });
+
+  const paymentOrder = await prisma.v1PaymentOrder.upsert({
+    where: { orderId: 'tm_seed_ops_001' },
+    update: {
+      buyerUserId: userIds['applicant@teameet.v1'],
+      sourceType: 'team_match',
+      sourceId: teamMatchId,
+      amount: 42000,
+      orderName: '팀매치 참가비',
+      status: 'confirmed',
+      providerPaymentKey: 'test_payment_seed_ops_001',
+      providerOrderId: 'tm_seed_ops_001',
+      approvedAt: new Date('2026-05-19T08:20:00.000Z'),
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001821',
+      orderId: 'tm_seed_ops_001',
+      buyerUserId: userIds['applicant@teameet.v1'],
+      sourceType: 'team_match',
+      sourceId: teamMatchId,
+      amount: 42000,
+      orderName: '팀매치 참가비',
+      status: 'confirmed',
+      providerPaymentKey: 'test_payment_seed_ops_001',
+      providerOrderId: 'tm_seed_ops_001',
+      requestedAt: new Date('2026-05-19T08:00:00.000Z'),
+      approvedAt: new Date('2026-05-19T08:20:00.000Z'),
+      metadataJson: { mode: 'test', source: 'seed' },
+    },
+  });
+
+  await prisma.v1PaymentRefund.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001831' },
+    update: {
+      paymentOrderId: paymentOrder.id,
+      requesterUserId: userIds['owner@teameet.v1'],
+      reviewedByAdminUserId: ownerAdmin.id,
+      amount: 12000,
+      reason: '팀매치 취소 책임 분쟁으로 부분 환불 검토',
+      status: 'reviewing',
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001831',
+      paymentOrderId: paymentOrder.id,
+      requesterUserId: userIds['owner@teameet.v1'],
+      reviewedByAdminUserId: ownerAdmin.id,
+      amount: 12000,
+      reason: '팀매치 취소 책임 분쟁으로 부분 환불 검토',
+      status: 'reviewing',
+      reviewedAt: new Date('2026-05-19T09:00:00.000Z'),
+    },
+  });
+
+  const seller = await prisma.v1SettlementSeller.upsert({
+    where: { userId: userIds['owner@teameet.v1'] },
+    update: {
+      status: 'verified',
+      providerSellerId: 'seller_seed_owner_001',
+      displayName: '성수 FC 운영자',
+      kycStatus: 'verified',
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001841',
+      userId: userIds['owner@teameet.v1'],
+      status: 'verified',
+      providerSellerId: 'seller_seed_owner_001',
+      displayName: '성수 FC 운영자',
+      email: 'owner@teameet.v1',
+      kycStatus: 'verified',
+    },
+  });
+
+  await prisma.v1SettlementAccount.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001842' },
+    update: {
+      sellerId: seller.id,
+      status: 'verified',
+      bankName: '토스뱅크',
+      accountLast4: '1234',
+      accountHolderName: '팀장원',
+      verifiedAt: new Date('2026-05-19T07:00:00.000Z'),
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001842',
+      sellerId: seller.id,
+      status: 'verified',
+      bankName: '토스뱅크',
+      accountLast4: '1234',
+      accountHolderName: '팀장원',
+      verifiedAt: new Date('2026-05-19T07:00:00.000Z'),
+    },
+  });
+
+  const settlement = await prisma.v1SettlementBatch.upsert({
+    where: { batchKey: 'settlement_seed_202605' },
+    update: {
+      status: 'approved',
+      totalAmount: 30000,
+      reviewedByAdminUserId: ownerAdmin.id,
+      approvedAt: new Date('2026-05-20T10:00:00.000Z'),
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001851',
+      batchKey: 'settlement_seed_202605',
+      status: 'approved',
+      periodStart: new Date('2026-05-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-05-31T23:59:59.000Z'),
+      totalAmount: 30000,
+      createdByAdminUserId: ownerAdmin.id,
+      reviewedByAdminUserId: ownerAdmin.id,
+      approvedAt: new Date('2026-05-20T10:00:00.000Z'),
+    },
+  });
+
+  await prisma.v1SettlementItem.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001852' },
+    update: {
+      settlementBatchId: settlement.id,
+      sellerId: seller.id,
+      sourceType: 'team_match',
+      sourceId: teamMatchId,
+      grossAmount: 42000,
+      feeAmount: 12000,
+      netAmount: 30000,
+      status: 'approved',
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001852',
+      settlementBatchId: settlement.id,
+      sellerId: seller.id,
+      sourceType: 'team_match',
+      sourceId: teamMatchId,
+      grossAmount: 42000,
+      feeAmount: 12000,
+      netAmount: 30000,
+      status: 'approved',
+    },
+  });
+
+  const payout = await prisma.v1PayoutAttempt.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001861' },
+    update: {
+      settlementBatchId: settlement.id,
+      requestedByAdminUserId: ownerAdmin.id,
+      status: 'failed',
+      amount: 30000,
+      failureCode: 'TOSS_PAYOUT_CONTRACT_REQUIRED',
+      failureMessage: '지급대행 계약 및 JWE 보안 키 준비 전에는 지급 성공을 표시하지 않습니다.',
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000001861',
+      settlementBatchId: settlement.id,
+      requestedByAdminUserId: ownerAdmin.id,
+      status: 'failed',
+      amount: 30000,
+      failureCode: 'TOSS_PAYOUT_CONTRACT_REQUIRED',
+      failureMessage: '지급대행 계약 및 JWE 보안 키 준비 전에는 지급 성공을 표시하지 않습니다.',
+      rawPayloadJson: { source: 'seed', contractReady: false },
+    },
+  });
+
+  const events = [
+    ['00000000-0000-4000-8000-000000001871', 'report_status_changed', report.id, null, null, null, null, null, 'open', 'reviewing', '신고 검토 배정'],
+    ['00000000-0000-4000-8000-000000001872', 'dispute_status_changed', null, dispute.id, null, null, null, null, 'open', 'assigned', '분쟁 담당자 배정'],
+    ['00000000-0000-4000-8000-000000001873', 'payment_confirmed', null, null, paymentOrder.id, null, null, null, 'pending', 'confirmed', 'Toss 테스트 결제 승인'],
+    ['00000000-0000-4000-8000-000000001874', 'payout_status_changed', null, null, null, null, settlement.id, payout.id, 'requested', 'failed', '지급대행 계약 미준비'],
+  ] as const;
+
+  for (const [id, eventType, reportId, disputeId, paymentOrderId, refundId, settlementBatchId, payoutAttemptId, fromStatus, toStatus, reason] of events) {
+    await prisma.v1OpsCaseEvent.upsert({
+      where: { id },
+      update: {
+        eventType,
+        reportId,
+        disputeId,
+        paymentOrderId,
+        refundId,
+        settlementBatchId,
+        payoutAttemptId,
+        actorAdminUserId: ownerAdmin.id,
+        fromStatus,
+        toStatus,
+        reason,
+      },
+      create: {
+        id,
+        eventType,
+        reportId,
+        disputeId,
+        paymentOrderId,
+        refundId,
+        settlementBatchId,
+        payoutAttemptId,
+        actorAdminUserId: ownerAdmin.id,
+        fromStatus,
+        toStatus,
+        reason,
+      },
+    });
+  }
+}
+
 async function upsertCoverageUser(input: {
   id: string;
   email: string;
@@ -2128,6 +2384,7 @@ async function main() {
   await seedChatAndNotifications(userIds, match.id, teamMatch.id);
   await seedHostChatDemoData(userIds, sportIds, regions.seoulSongpa.id, match.id, teamMatch.id, ownerTeam.id);
   await seedAdmin(userIds);
+  await seedAdminOps(userIds, match.id, teamMatch.id);
 
   const coverageUserIds = { ...userIds, ...(await seedCoverageUsers()) };
   await seedCoverageTermsAndNotices();

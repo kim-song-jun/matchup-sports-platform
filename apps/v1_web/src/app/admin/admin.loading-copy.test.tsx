@@ -19,6 +19,9 @@ function expectNoWeakRouteCopy(container: HTMLElement) {
   expect(visibleText).not.toContain('리뷰 기준');
   expect(visibleText).not.toContain('안전한 실제 대상 화면');
   expect(visibleText).not.toContain('서비스 알림');
+  expect(visibleText).not.toContain('운영 담당자');
+  expect(visibleText).not.toContain('빠른 생성');
+  expect(visibleText).not.toContain('바로가기');
 }
 
 describe('admin loading and route copy contract', () => {
@@ -59,7 +62,8 @@ describe('admin loading and route copy contract', () => {
 
     const notificationsPage = screen.getByTestId('admin-notifications-open-design');
     expect(within(notificationsPage).getByText('업무 알림')).toBeInTheDocument();
-    expect(within(notificationsPage).getByText(/연결된 업무 화면/)).toBeInTheDocument();
+    expect(within(notificationsPage).getByText('알림 후속 작업')).toBeInTheDocument();
+    expect(within(notificationsPage).getByRole('link', { name: /전체 알림/ })).toHaveAttribute('href', '/notifications');
     expectNoWeakRouteCopy(notificationsPage);
   });
 });

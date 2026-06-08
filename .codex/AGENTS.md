@@ -54,3 +54,19 @@ Legacy implementations never outrank v1 sources.
 - Tech-Debt Grep and Committed-tree verification: grep touched paths for new debt markers and verify diff scope, untracked import risk, `git diff --check`, and committed-tree readiness.
 - Shared-tree pathspec safety: never use `git add -A` in this shared dirty tree for scoped work; if committing is explicitly requested, use `git commit -- <pathspec>` and verify with `git show --stat` and `git show --name-only`. Sub-agents must not perform sub-agent self-commit without exact root-assigned scope.
 - manual QA evidence must include command/browser scenario, persona or route when relevant, viewport when relevant, observed result, cleanup, and residual risk.
+
+<!-- agent-skill:operational:start -->
+# .codex Local Guide
+
+This folder contains Codex-local skills and hooks for 팀 매치, 강좌, 대회 등을 제공하는 스포츠 종합 플랫폼.
+
+## Scope
+
+- `.codex/skills/*/SKILL.md` files define role behavior for this repository.
+- `.codex/hooks/agent-policy-hook.mjs` is the repo-local policy hook referenced by the generated `~/.codex/config.toml` snippet.
+- Root `AGENTS.md` remains the operational index for project-wide rules and task ledger usage.
+
+## Editing
+
+Use `apply_patch` for changes. Keep role changes narrowly scoped to the relevant skill and verify generated hooks with `node --check`.
+<!-- agent-skill:operational:end -->

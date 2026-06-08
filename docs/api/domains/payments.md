@@ -3,52 +3,58 @@
 ## Domain Overview
 
 - 매치 참가 결제 lifecycle: `prepare -> confirm -> refund`
-- 결제 연동은 `TOSS_SECRET_KEY` 유무에 따라 real/mock mode
-- mock mode에서도 앱 전체 deploy를 막지 않는 계약
+- v1 Task 104 selects Toss Payments for the internal ops payment/refund ledger.
+- Browser code may use only the Toss client key; server code may use only the Toss secret key.
+- Test/live key families must not be mixed.
+- Missing provider credentials fail loudly and must not be rendered as completed payment/refund/payout success.
+- Valid v1 runtime source for the internal payment/refund ledger is `apps/v1_api/src/admin/**` plus `apps/v1_web/src/app/ops/**`.
 
 ## Endpoint Matrix
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/payments/prepare` | JWT | 결제 준비 |
-| POST | `/payments/confirm` | JWT | 결제 승인 |
-| POST | `/payments/:id/refund` | JWT | 환불 요청 |
-| GET | `/payments/me` | JWT | 내 결제 내역 |
-| GET | `/payments/:id` | JWT | 내 결제 상세 |
-| POST | `/payments/webhook` | Internal | Toss webhook |
+| GET | `/api/v1/admin/payments` | active admin | `/ops` payment/refund ledger |
+| POST | `/api/v1/admin/payments/orders` | owner/ops admin | local order creation |
+| POST | `/api/v1/admin/payments/confirm` | owner/ops admin | Toss confirm + ledger update |
+| POST | `/api/v1/admin/payments/:paymentOrderId/refunds` | owner/ops admin | Toss cancel/refund + refund ledger |
+| POST | `/api/v1/admin/payments/webhooks/toss` | provider/internal | Toss webhook reconciliation |
 
 ## Request / Response Details
 
-### POST `/payments/prepare`
+### POST `/api/v1/admin/payments/orders`
 
 Body:
 
 ```json
 {
-  "participantId": "match-participant-id",
-  "amount": 15000,
-  "method": "card"
+  "buyerUserId": "optional-user-id",
+  "sourceType": "team_match",
+  "sourceId": "team-match-id",
+  "amount": 42000,
+  "orderName": "팀매치 참가비"
 }
 ```
 
 제약:
 
-- `participantId`의 owner가 현재 사용자여야 함
-- `amount`는 match fee와 일치해야 함
-- 이미 completed 상태면 재준비 불가
-- 기존 pending payment가 있으면 재사용
+- `owner` 또는 `ops` admin만 호출 가능
+- `amount`는 양수 정수
+- 로컬 order는 `pending`으로 생성되며 provider 성공처럼 표시하지 않는다.
 
 Response `data`:
 
 ```json
 {
-  "paymentId": "payment-id",
-  "orderId": "MU-...",
-  "amount": 15000
+  "order": {
+    "paymentOrderId": "payment-order-id",
+    "orderId": "tm_...",
+    "status": "pending",
+    "amount": 42000
+  }
 }
 ```
 
-### POST `/payments/confirm`
+### POST `/api/v1/admin/payments/confirm`
 
 Body:
 
@@ -63,67 +69,70 @@ Body:
 제약:
 
 - `orderId` 필수
-- `amount` 전달 시 DB amount와 일치해야 함
-- Toss enabled:
-  - 외부 confirm 호출
-  - 실패 시 payment status를 `failed`로 전환
-- Toss disabled:
-  - mock confirm 경로로 `completed` 처리
+- `amount`는 DB amount와 일치해야 함
+- `pending` 상태와 만료 시간을 확인한다.
+- `confirmed` + 동일 `paymentKey`는 idempotent response다.
+- Toss confirm 결과의 `orderId`, amount, provider status가 로컬 order와 일치해야 `confirmed`가 된다.
+- provider 실패 또는 불일치는 `failed`/`expired`와 provider code/message를 기록하며 성공처럼 표시하지 않는다.
 
-### POST `/payments/:id/refund`
+### POST `/api/v1/admin/payments/:paymentOrderId/refunds`
 
 Body:
 
 ```json
 {
-  "reason": "사용자 요청",
-  "note": "상세 메모"
+  "amount": 12000,
+  "reason": "부분 환불"
 }
 ```
 
 제약:
 
-- 본인 결제만 환불 가능
-- `completed` 상태만 환불 가능
-- Toss enabled: real cancel 호출
-- Toss disabled:
-  - `pgProvider=mock`일 때만 mock 환불 허용
-  - 실결제 기록은 `unavailable` 취급으로 환불 차단
+- `owner` 또는 `ops` admin만 호출 가능
+- `confirmed` 또는 `partially_refunded` order만 환불 가능
+- completed refund amount를 초과할 수 없다.
+- Toss cancel 실패는 refund `failed`와 provider error로 남고, UI는 success tone으로 표시하지 않는다.
 
-### GET `/payments/me`, GET `/payments/:id`
-
-- owner scope 강제
-- 프론트 결제 히스토리는 반드시 이 API 결과 기준으로 렌더링
-
-### POST `/payments/webhook`
+### POST `/api/v1/admin/payments/webhooks/toss`
 
 - 내부 수신용 endpoint
-- `TOSS_WEBHOOK_SECRET`가 production에서 없으면 실패
 - 프론트에서 직접 호출하지 않는다.
+- webhook body의 상태를 그대로 신뢰하지 않는다. 서버가 secret key로 Toss 조회 API를 호출해 `paymentKey`/`orderId`/amount/status를 재검증한 뒤 ledger를 업데이트한다.
+- provider 재조회가 불가능하면 `verified: false` case event만 남기고 order 상태를 성공으로 바꾸지 않는다.
 
 ## Frontend Mapping Notes
 
-- `usePreparePayment` -> `PreparedPayment`
-- `useConfirmPayment` -> `Payment`
-- `useRefundPayment` -> `Payment`
-- `usePayment`/`usePayments`는 owner scope 가정
-- 결제/환불 UI copy는 mock mode일 때 `테스트 결제/환불`임을 명시해야 한다.
+- `/ops/payments` uses `useV1OpsPayments()` and `useV1OpsRefundPayment()`.
+- `/ops/settlements` uses `useV1OpsSettlements()` and `useV1OpsRequestPayout()`.
+- Provider failure returned as `providerError` must render as a visible failure, not as success copy.
+- Customer-facing payment routes are outside this Task 104 `/ops` ledger scope unless a separate v1 route/API contract reintroduces them.
 
 ## Mock vs Real Semantics
 
-- Mock mode:
-  - confirm/refund는 내부 상태 전이 중심
-  - 실제 청구/실환불 없음
-- Real mode:
-  - Toss API 실패 시 명시적 에러 반환
-  - confirm 실패는 `failed`, refund 실패는 5xx 계열 가능
+Task 104 `/ops` implementation does not provide a mock-success provider path. Missing keys, mixed test/live keys, provider failure, webhook verification failure, and payout contract gaps are explicit failure states.
+
+## Toss Key And Payout Boundary
+
+- `TOSS_PAYMENTS_CLIENT_KEY`: browser-only.
+- `TOSS_PAYMENTS_SECRET_KEY`: server-only.
+- `TOSS_PAYMENTS_MODE`: `test | live`; client/secret key prefixes must match the same mode.
+- Payment confirm uses `paymentKey`, `orderId`, and `amount` and validates amount/status against the local order.
+- Webhook reconciliation re-queries Toss by `paymentKey` or `orderId`; it does not trust the browser or webhook body status as final state.
+- Toss 지급대행/payout is a separate contracted API. It requires KYC and stronger encryption/JWE setup, so `/ops/settlements` must show payout attempts as failed/pending until provider confirmation exists.
+
+Official references:
+
+- https://docs.tosspayments.com/reference/using-api/api-keys
+- https://docs.tosspayments.com/guides/v2/payment-window/integration-direct
+- https://docs.tosspayments.com/guides/v2/webhook
+- https://docs.tosspayments.com/guides/v2/payouts
 
 ## Edge Cases
 
 - amount mismatch: 400
 - orderId 없음/불일치: 404
 - already processed payment: 400
-- real payment on toss-disabled runtime refund: 400
+- webhook provider verification unavailable: no status transition, `verified: false`
 
 ## Error Example
 
@@ -138,8 +147,9 @@ Body:
 
 ## Source References
 
-- `apps/api/src/payments/payments.controller.ts`
-- `apps/api/src/payments/payments.service.ts`
-- `apps/api/src/payments/dto/*.ts`
-- `apps/api/test/integration/payments.e2e-spec.ts`
-- `apps/web/src/hooks/use-api.ts` (`usePreparePayment`, `useConfirmPayment`, `useRefundPayment`, `usePayments`, `usePayment`)
+- `apps/v1_api/src/admin/admin.controller.ts`
+- `apps/v1_api/src/admin/admin-ops.service.ts`
+- `apps/v1_api/src/admin/toss-payments.service.ts`
+- `apps/v1_api/src/admin/dto/admin.dto.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
+- `apps/v1_web/src/components/community/ops-*`

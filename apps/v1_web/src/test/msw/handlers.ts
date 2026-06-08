@@ -11,6 +11,12 @@ import {
   v1MatchesFixture,
   v1NoticesFixture,
   v1NotificationsFixture,
+  v1OpsAuditFixture,
+  v1OpsDisputesFixture,
+  v1OpsOverviewFixture,
+  v1OpsPaymentsFixture,
+  v1OpsReportsFixture,
+  v1OpsSettlementsFixture,
   v1ProfileFixture,
   v1RecentSearchesFixture,
   v1RegionsFixture,
@@ -202,6 +208,46 @@ export const v1MswHandlers = [
   http.get(`${api}/admin/overview`, () => ok(v1AdminOverviewFixture)),
   http.get(`${api}/admin/action-logs`, () => ok(v1AdminLogsFixture)),
   http.get(`${api}/admin/status-change-logs`, () => ok(v1AdminStatusChangeLogsFixture)),
+  http.get(`${api}/admin/ops/overview`, () => ok(v1OpsOverviewFixture)),
+  http.get(`${api}/admin/reports`, () => ok(v1OpsReportsFixture)),
+  http.post(`${api}/admin/reports/:reportId/actions`, async ({ request }) => {
+    const body = await request.json() as { action?: string; reason?: string };
+    const report = { ...v1OpsReportsFixture.items[0], status: body.action === 'dismiss' ? 'dismissed' : body.action === 'resolve' ? 'resolved' : 'reviewing', resolutionNote: body.reason ?? null };
+    return ok({ report });
+  }),
+  http.get(`${api}/admin/disputes`, () => ok(v1OpsDisputesFixture)),
+  http.post(`${api}/admin/disputes/:disputeId/actions`, async ({ request }) => {
+    const body = await request.json() as { action?: string; reason?: string };
+    const status = body.action === 'reject' ? 'rejected' : body.action === 'resolve' ? 'resolved' : body.action === 'wait' ? 'waiting_party' : 'assigned';
+    return ok({ dispute: { ...v1OpsDisputesFixture.items[0], status, resolutionNote: body.reason ?? null } });
+  }),
+  http.get(`${api}/admin/payments`, () => ok(v1OpsPaymentsFixture)),
+  http.post(`${api}/admin/payments/:paymentOrderId/refunds`, async ({ request }) => {
+    const body = await request.json() as { amount?: number; reason?: string };
+    return ok({
+      refund: {
+        ...v1OpsPaymentsFixture.items[0].refunds[0],
+        amount: body.amount ?? v1OpsPaymentsFixture.items[0].refunds[0].amount,
+        reason: body.reason ?? v1OpsPaymentsFixture.items[0].refunds[0].reason,
+        status: 'failed',
+        failureCode: 'TOSS_PROVIDER_ERROR',
+        failureMessage: '테스트 provider 실패',
+      },
+      providerError: { code: 'TOSS_PROVIDER_ERROR', message: '테스트 provider 실패' },
+    });
+  }),
+  http.get(`${api}/admin/settlements`, () => ok(v1OpsSettlementsFixture)),
+  http.post(`${api}/admin/settlements/:settlementBatchId/actions`, async ({ request }) => {
+    const body = await request.json() as { action?: string; reason?: string };
+    const status = body.action === 'hold' ? 'held' : body.action === 'fail' ? 'failed' : body.action === 'approve' ? 'approved' : 'reviewing';
+    return ok({ settlement: { ...v1OpsSettlementsFixture.items[0], status, holdReason: body.reason ?? null } });
+  }),
+  http.post(`${api}/admin/settlements/:settlementBatchId/payouts`, () => ok({
+    payout: v1OpsSettlementsFixture.items[0].payoutAttempts[0],
+    settlement: { ...v1OpsSettlementsFixture.items[0], status: 'failed' },
+    providerError: { code: 'TOSS_PAYOUT_CONTRACT_REQUIRED', message: '지급대행 계약 및 JWE 보안 키 준비 전에는 지급 성공을 표시하지 않습니다.' },
+  })),
+  http.get(`${api}/admin/ops/audit`, () => ok(v1OpsAuditFixture)),
 ];
 
 const levelOrder = ['beginner', 'novice', 'intermediate', 'advanced'];

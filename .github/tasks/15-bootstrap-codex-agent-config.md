@@ -63,3 +63,13 @@
 | Date | Raised by | Question | Resolution |
 |------|-----------|----------|------------|
 | 2026-04-09 | codex | Codex canonical 경로를 `.agents/` 대신 어디에 둘지 | 저장소 규칙을 따라 `.codex/agents/`를 canonical로 두고 `.claude/agents/prompts.md`를 compatibility entry로 유지 |
+
+## 2026-06-08 Operational Scaffold Extension
+
+- Ran `$harness-builder-codex:codex-init --force` in the operational builder profile.
+- Added repo-local Codex harness skills under `.codex/skills/`, policy hook under `.codex/hooks/`, generated task reference templates under `docs/tasks/`, and folder-level `AGENTS.md` guides.
+- Preserved the existing Teameet root and `.codex` rules by appending generated `agent-skill:operational` sentinel sections instead of replacing curated content.
+- Kept Teameet's canonical task path as `.github/tasks/{NN}-{slug}.md`; generated `docs/tasks/` files are reference templates only.
+- Updated `scripts/agent-task-ledger-check.mjs` to validate `.github/tasks` task docs and use `docs/scenarios/index.md` as the status hub.
+- Cleaned stale global Codex config entries for the unrelated previous `posco-mds` project: removed its trusted project registration and old hook trust state from `~/.codex/config.toml`. Backup: `~/.codex/config.toml.bak-20260608044938`.
+- Validation: `node --check .codex/hooks/agent-policy-hook.mjs`, `node --check scripts/agent-task-ledger-check.mjs`, `node /Users/sungjun/.codex/plugins/cache/agent-skill/harness-builder-codex/0.1.0/bin/doctor.mjs --target=. --platform=codex --profile=builder` (`checks: 22/22`), `git diff --check`, trailing-whitespace grep, and stale generated task-path reference grep.

@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminOpsService } from './admin-ops.service';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
@@ -22,6 +23,24 @@ describe('AdminController', () => {
     actionLogs: jest.fn(),
     statusChangeLogs: jest.fn(),
   };
+  const adminOpsService = {
+    overview: jest.fn(),
+    reports: jest.fn(),
+    reportDetail: jest.fn(),
+    reportAction: jest.fn(),
+    disputes: jest.fn(),
+    disputeDetail: jest.fn(),
+    disputeAction: jest.fn(),
+    payments: jest.fn(),
+    createPaymentOrder: jest.fn(),
+    confirmPayment: jest.fn(),
+    refundPayment: jest.fn(),
+    settlements: jest.fn(),
+    settlementDetail: jest.fn(),
+    settlementAction: jest.fn(),
+    requestPayout: jest.fn(),
+    audit: jest.fn(),
+  };
 
   let controller: AdminController;
 
@@ -31,6 +50,7 @@ describe('AdminController', () => {
       controllers: [AdminController],
       providers: [
         { provide: AdminService, useValue: adminService },
+        { provide: AdminOpsService, useValue: adminOpsService },
         { provide: PrismaService, useValue: {} },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
       ],
@@ -101,6 +121,28 @@ describe('AdminController', () => {
     await expect(controller.statusChangeLogs(user, query)).resolves.toEqual({
       items: [],
       nextCursor: null,
+    });
+  });
+
+  it('returns ops overview', async () => {
+    adminOpsService.overview.mockResolvedValue({ queues: { openReports: 1 } });
+    await expect(controller.opsOverview(user)).resolves.toEqual({ queues: { openReports: 1 } });
+    expect(adminOpsService.overview).toHaveBeenCalledWith(user);
+  });
+
+  it('dispatches report actions to ops service', async () => {
+    const dto = { action: 'resolve' as const, reason: '처리 완료' };
+    adminOpsService.reportAction.mockResolvedValue({ report: { reportId: 'report-1', status: 'resolved' } });
+    await expect(controller.reportAction(user, 'report-1', dto)).resolves.toEqual({
+      report: { reportId: 'report-1', status: 'resolved' },
+    });
+  });
+
+  it('dispatches payment refund actions to ops service', async () => {
+    const dto = { amount: 12000, reason: '부분 환불' };
+    adminOpsService.refundPayment.mockResolvedValue({ refund: { refundId: 'refund-1', status: 'completed' } });
+    await expect(controller.refundPayment(user, 'payment-order-1', dto)).resolves.toEqual({
+      refund: { refundId: 'refund-1', status: 'completed' },
     });
   });
 });

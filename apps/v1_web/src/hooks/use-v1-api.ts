@@ -6,7 +6,15 @@ import { v1Keys } from '@/lib/query-keys';
 import type {
   CursorPage,
   V1AdminLog,
+  V1AdminMe,
   V1AdminOverview,
+  V1OpsAudit,
+  V1OpsDispute,
+  V1OpsOverview,
+  V1OpsReport,
+  V1PaymentOrder,
+  V1PaymentRefund,
+  V1SettlementBatch,
   V1AuthMe,
   V1AuthSessionResponse,
   V1ChatMessage,
@@ -913,6 +921,15 @@ export function useV1WithdrawalRequest() {
   });
 }
 
+export function useV1AdminMe(options?: { enabled?: boolean; retry?: boolean | number }) {
+  return useQuery({
+    queryKey: v1Keys.adminMe(),
+    queryFn: () => v1Get<V1AdminMe>('/admin/me'),
+    enabled: options?.enabled ?? true,
+    retry: options?.retry ?? false,
+  });
+}
+
 export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
@@ -925,4 +942,127 @@ export function useV1AdminActionLogs(filters?: ListFilters) {
     queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
   });
+}
+
+export function useV1OpsOverview(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.opsOverview(),
+    queryFn: () => v1Get<V1OpsOverview>('/admin/ops/overview'),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1OpsReports(filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.opsReports(filters ?? {}),
+    queryFn: () => v1Get<CursorPage<V1OpsReport>>('/admin/reports', filters),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1OpsDisputes(filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.opsDisputes(filters ?? {}),
+    queryFn: () => v1Get<CursorPage<V1OpsDispute>>('/admin/disputes', filters),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1OpsPayments(filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.opsPayments(filters ?? {}),
+    queryFn: () => v1Get<CursorPage<V1PaymentOrder>>('/admin/payments', filters),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1OpsSettlements(filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.opsSettlements(filters ?? {}),
+    queryFn: () => v1Get<CursorPage<V1SettlementBatch>>('/admin/settlements', filters),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1OpsAudit(filters?: ListFilters, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.opsAudit(filters ?? {}),
+    queryFn: () => v1Get<V1OpsAudit>('/admin/ops/audit', filters),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useV1OpsReportAction(reportId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { action: 'assign' | 'review' | 'resolve' | 'dismiss'; reason: string; resolutionNote?: string }) =>
+      v1Post<{ report: V1OpsReport }>(`/admin/reports/${reportId}/actions`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('reports') });
+      queryClient.invalidateQueries({ queryKey: v1Keys.opsOverview() });
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('audit') });
+    },
+  });
+}
+
+export function useV1OpsDisputeAction(disputeId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { action: 'assign' | 'wait' | 'resolve' | 'reject'; reason: string; resolutionNote?: string }) =>
+      v1Post<{ dispute: V1OpsDispute }>(`/admin/disputes/${disputeId}/actions`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('disputes') });
+      queryClient.invalidateQueries({ queryKey: v1Keys.opsOverview() });
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('audit') });
+    },
+  });
+}
+
+export function useV1OpsRefundPayment(paymentOrderId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { amount: number; reason: string }) =>
+      v1Post<{ refund: V1PaymentRefund; order?: V1PaymentOrder; providerError?: { code: string; message: string } }>(
+        `/admin/payments/${paymentOrderId}/refunds`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('payments') });
+      queryClient.invalidateQueries({ queryKey: v1Keys.opsOverview() });
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('audit') });
+    },
+  });
+}
+
+export function useV1OpsSettlementAction(settlementBatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { action: 'review' | 'approve' | 'hold' | 'fail'; reason: string }) =>
+      v1Post<{ settlement: V1SettlementBatch }>(`/admin/settlements/${settlementBatchId}/actions`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('settlements') });
+      queryClient.invalidateQueries({ queryKey: v1Keys.opsOverview() });
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('audit') });
+    },
+  });
+}
+
+export function useV1OpsRequestPayout(settlementBatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { reason: string; amount?: number }) =>
+      v1Post<{ payout: V1SettlementBatch['payoutAttempts'][number]; settlement: V1SettlementBatch; providerError?: { code: string; message: string } }>(
+        `/admin/settlements/${settlementBatchId}/payouts`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('settlements') });
+      queryClient.invalidateQueries({ queryKey: v1Keys.opsOverview() });
+      queryClient.invalidateQueries({ queryKey: opsQueryRoot('audit') });
+    },
+  });
+}
+
+function opsQueryRoot(scope: 'reports' | 'disputes' | 'payments' | 'settlements' | 'audit') {
+  return [...v1Keys.all, 'ops', scope] as const;
 }

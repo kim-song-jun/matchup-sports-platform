@@ -1,5 +1,4 @@
 export { AdminShell } from './admin-shell';
-export type { AdminTab } from './admin-shell';
 export { AdminPageHeader } from './admin-page-header';
 export { AdminKpiCard } from './admin-kpi-card';
 export { AdminBadge } from './admin-badge';

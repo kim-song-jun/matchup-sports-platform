@@ -20,10 +20,10 @@ type ActivityViewProps = { readonly model: AdminActivityModel; readonly onRetry?
 
 export function AdminDashboardPageView({ model, onRetry }: DashboardViewProps) {
   return (
-    <AdminFrame title="운영 ERP" active="admin" testId="admin-open-design" className="tm-admin-open-design tm-admin-desktop-workbench">
+    <AdminFrame title="운영 ERP" active="admin" testId="admin-open-design" className="tm-admin-open-design tm-admin-desktop-workbench tm-operations-template">
       <AdminDomainShell showStrip={model.state !== 'error'}>
         <PageHeader
-          eyebrow="오늘의 운영"
+          eyebrow="업무 현황"
           title="운영 워크스페이스"
           description="오늘 처리할 신청, 모집, 리뷰, 알림을 우선순위대로 정리했습니다."
           action={<AdminActionLink action={{ label: '업무 이력', href: '/admin/audit', tone: 'neutral' }} />}
@@ -35,6 +35,7 @@ export function AdminDashboardPageView({ model, onRetry }: DashboardViewProps) {
             <section className="tm-admin-kpi-grid" aria-label="업무 요약">
               {model.metrics.map((metric) => <AdminMetric key={metric.id} metric={metric} />)}
             </section>
+            <AdminServiceActionBar actions={model.primaryActions} communication={model.communication} />
             <section className="tm-admin-workspace">
               <div className="tm-admin-main-column">
                 <AdminSection title="오늘 처리할 업무" sub="가입 요청, 운영 알림, 미작성 리뷰를 서비스 업무 흐름으로 묶었습니다.">
@@ -52,13 +53,6 @@ export function AdminDashboardPageView({ model, onRetry }: DashboardViewProps) {
                   <AdminTeamGrid teams={model.teams} />
                 </AdminSection>
               </div>
-              <aside className="tm-admin-side-column">
-                <AdminOperatorPanel model={model} />
-                <AdminQuickActions actions={model.primaryActions} />
-                <AdminSection title="알림 · 리뷰" sub="고객 응대와 경기 후 신뢰 신호를 놓치지 않도록 모았습니다.">
-                  <AdminQueue items={model.communication} emptyTitle="확인할 알림이나 리뷰가 없습니다." />
-                </AdminSection>
-              </aside>
             </section>
           </>
         )}
@@ -69,7 +63,7 @@ export function AdminDashboardPageView({ model, onRetry }: DashboardViewProps) {
 
 export function AdminAuditPageView({ model, onRetry }: ActivityViewProps) {
   return (
-    <AdminFrame title="업무 이력" active="audit" testId="admin-audit-open-design" className="tm-admin-audit-open-design tm-admin-desktop-workbench">
+    <AdminFrame title="업무 이력" active="audit" testId="admin-audit-open-design" className="tm-admin-audit-open-design tm-admin-desktop-workbench tm-operations-template">
       <AdminDomainShell showStrip={model.state !== 'error'}>
         <PageHeader
           eyebrow="운영 기록"
@@ -91,13 +85,6 @@ export function AdminAuditPageView({ model, onRetry }: ActivityViewProps) {
               </div>
               <AdminActivityTable items={model.items} />
             </Card>
-            <aside className="tm-admin-side-column">
-              <Card className="tm-admin-authority-panel" pad={18}>
-                <div className="tm-text-body-lg">운영 담당자</div>
-                <div className="tm-admin-authority-role"><span>{model.operatorName}</span><span>업무 이력 확인</span></div>
-                <p>이 화면은 고객 운영자가 실제 서비스 업무 흐름을 다시 확인하는 용도입니다.</p>
-              </Card>
-            </aside>
           </section>
         )}
       </AdminDomainShell>
@@ -131,12 +118,12 @@ function AdminDomainShell({ children, showStrip = true }: { readonly children: R
   return (
     <div className="tm-admin-domain" data-testid="admin-desktop-domain">
       {showStrip ? (
-        <div className="tm-admin-desktop-workbench-strip" data-testid="admin-desktop-workbench">
-          <span className="tm-my-section-label">오늘 업무</span>
-          <span className="tm-my-section-label">개인 매치</span>
-          <span className="tm-my-section-label">팀</span>
-          <span className="tm-my-section-label">알림 · 리뷰</span>
-        </div>
+        <nav className="tm-admin-desktop-workbench-strip" data-testid="admin-desktop-workbench" aria-label="빠른 이동">
+          <Link className="tm-admin-strip-link" href="/admin">워크스페이스</Link>
+          <Link className="tm-admin-strip-link" href="/admin/matches">개인 매치</Link>
+          <Link className="tm-admin-strip-link" href="/admin/teams">팀 운영</Link>
+          <Link className="tm-admin-strip-link" href="/admin/notifications">알림 · 리뷰</Link>
+        </nav>
       ) : null}
       {children}
     </div>
@@ -165,26 +152,32 @@ function AdminSection({ title, sub, children }: { readonly title: string; readon
   );
 }
 
-function AdminOperatorPanel({ model }: { readonly model: AdminDashboardModel }) {
+function AdminServiceActionBar({
+  actions,
+  communication,
+}: {
+  readonly actions: readonly AdminActionLinkModel[];
+  readonly communication: readonly AdminQueueItemModel[];
+}) {
   return (
-    <Card className="tm-admin-authority-panel" pad={18}>
-      <div className="tm-text-body-lg">운영 담당자</div>
-      <div className="tm-admin-authority-role"><span>{model.operatorName}</span><span>{model.workspaceLabel}</span></div>
-      <p>{model.profileMeta}</p>
-      <div className="tm-admin-permission-list">
-        <span>내가 만들거나 관리 권한을 가진 업무만 표시합니다.</span>
-        <span>신청 승인과 멤버 관리는 실제 운영 화면으로 이동합니다.</span>
+    <Card className="tm-admin-service-bar" pad={0}>
+      <div className="tm-admin-service-bar-head">
+        <div>
+          <div className="tm-text-body-lg">업무 실행</div>
+          <div className="tm-text-caption">생성, 알림 확인, 리뷰 처리를 실제 서비스 화면으로 연결합니다.</div>
+        </div>
+        <div className="tm-admin-service-actions">
+          {actions.map((action) => <AdminActionLink key={action.href} action={action} />)}
+        </div>
       </div>
-    </Card>
-  );
-}
-
-function AdminQuickActions({ actions }: { readonly actions: readonly AdminActionLinkModel[] }) {
-  return (
-    <Card className="tm-admin-quick-panel" pad={18}>
-      <div className="tm-text-body-lg">빠른 생성</div>
-      <div className="tm-admin-action-list">
-        {actions.map((action) => <AdminActionLink key={action.href} action={action} />)}
+      <div className="tm-admin-service-queue" aria-label="알림과 리뷰 후속 작업">
+        {communication.map((item) => (
+          <Link key={item.id} className="tm-admin-service-task tm-pressable" href={item.href} data-tone={item.tone}>
+            <span>{item.title}</span>
+            <strong>{item.body}</strong>
+            <em>{item.actionLabel}</em>
+          </Link>
+        ))}
       </div>
     </Card>
   );

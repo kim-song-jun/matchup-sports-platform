@@ -37,10 +37,14 @@ describe('admin customer ERP contract', () => {
     render(<AdminDashboardPageView model={dashboardModel()} />);
 
     const dashboard = screen.getByTestId('admin-open-design');
+    expect(dashboard).toHaveClass('tm-operations-template');
     expect(dashboard).toHaveClass('tm-admin-open-design');
     expect(dashboard).toHaveClass('tm-admin-desktop-workbench');
+    expect(within(dashboard).queryByText('Internal Ops')).not.toBeInTheDocument();
     expect(within(dashboard).getByText('운영 워크스페이스')).toBeInTheDocument();
-    expect(within(dashboard).getByText('운영 담당자')).toBeInTheDocument();
+    expect(within(dashboard).queryByText('운영 담당자')).not.toBeInTheDocument();
+    expect(within(dashboard).queryByText('빠른 생성')).not.toBeInTheDocument();
+    expect(within(dashboard).getByText('업무 실행')).toBeInTheDocument();
     expect(within(dashboard).getByText('오늘 처리할 업무')).toBeInTheDocument();
     expect(within(dashboard).getByText('개인 매치 현황')).toBeInTheDocument();
     expect(within(dashboard).getByText('팀매치 현황')).toBeInTheDocument();
@@ -72,6 +76,7 @@ describe('admin customer ERP contract', () => {
     expect(within(audit).getByText('업무 이력')).toBeInTheDocument();
     expect(within(audit).getByText('최근 업무 흐름')).toBeInTheDocument();
     expect(within(audit).getByRole('table', { name: '업무 이력' })).toBeInTheDocument();
+    expect(within(audit).queryByText('운영 담당자')).not.toBeInTheDocument();
     expect(within(audit).getByRole('link', { name: /마포 FC 상대팀 모집/ })).toHaveAttribute('href', '/team-matches/team-match-1');
     expectCustomerErpCopy(audit);
     expectRuntimeLinksOnly(audit);
@@ -134,6 +139,8 @@ describe('admin customer ERP contract', () => {
     render(<AdminMatchesPageView model={toAdminMatchesPageModel({ profile, matches: createdMatches, states: ['ready'] })} />);
     const matchesPage = screen.getByTestId('admin-matches-open-design');
     expect(within(matchesPage).getByText('개설한 개인 매치')).toBeInTheDocument();
+    expect(within(matchesPage).queryByText(/바로가기/)).not.toBeInTheDocument();
+    expect(within(matchesPage).getByText('개인 매치 후속 작업')).toBeInTheDocument();
     expect(within(matchesPage).getByRole('link', { name: /개인 매치 만들기/ })).toHaveAttribute('href', '/matches/new');
     expect(within(matchesPage).getByRole('link', { name: /성수 풋살장 동네 5:5 상세/ })).toHaveAttribute('href', '/matches/match-1');
     expect(within(matchesPage).getByRole('link', { name: /성수 풋살장 동네 5:5 수정/ })).toHaveAttribute('href', '/matches/match-1/edit');
@@ -144,6 +151,7 @@ describe('admin customer ERP contract', () => {
     render(<AdminTeamMatchesPageView model={toAdminTeamMatchesPageModel({ profile, teamMatches, states: ['ready'] })} />);
     const teamMatchesPage = screen.getByTestId('admin-team-matches-open-design');
     expect(within(teamMatchesPage).getByText('팀매치 처리')).toBeInTheDocument();
+    expect(within(teamMatchesPage).queryByText(/바로가기/)).not.toBeInTheDocument();
     expect(within(teamMatchesPage).getByRole('link', { name: /팀매치 만들기/ })).toHaveAttribute('href', '/team-matches/new');
     expect(within(teamMatchesPage).getByRole('link', { name: /마포 FC 상대팀 모집 상세/ })).toHaveAttribute('href', '/team-matches/team-match-1');
     expect(within(teamMatchesPage).getByRole('link', { name: /마포 FC 상대팀 모집 수정/ })).toHaveAttribute('href', '/team-matches/team-match-1/edit');
@@ -164,6 +172,7 @@ describe('admin customer ERP contract', () => {
     render(<AdminReviewsPageView model={toAdminReviewsPageModel({ profile, pendingReviews, states: ['ready'] })} />);
     const reviewsPage = screen.getByTestId('admin-reviews-open-design');
     expect(within(reviewsPage).getByText('리뷰 관리')).toBeInTheDocument();
+    expect(within(reviewsPage).queryByText(/바로가기/)).not.toBeInTheDocument();
     expect(within(reviewsPage).getByRole('link', { name: /리뷰 목록/ })).toHaveAttribute('href', '/my/reviews');
     expect(within(reviewsPage).getByRole('link', { name: /성수 볼러즈 vs 마포 FC 리뷰 작성/ })).toHaveAttribute('href', '/my/reviews/team_match/team-match-completed-1');
     expectCustomerErpCopy(reviewsPage);
@@ -194,7 +203,9 @@ describe('admin customer ERP contract', () => {
     expect(css).toMatch(/\.tm-admin-operations-grid\s*\{[\s\S]*?display:\s*grid;[\s\S]*?gap:\s*14px;/);
     expect(css).toMatch(/\.tm-admin-domain\s*\{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;/);
     expect(css).toMatch(/\.tm-admin-kpi-grid,[\s\S]*?\.tm-admin-domain-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*220px\),\s*1fr\)\);/);
-    expect(css).toMatch(/@media \(min-width:\s*1181px\)[\s\S]*?\.tm-admin-function-layout\s*\{[\s\S]*?grid-template-columns:\s*minmax\(720px,\s*1fr\)\s*minmax\(300px,\s*380px\);/);
+    expect(css).toMatch(/@media \(min-width:\s*1181px\)[\s\S]*?\.tm-admin-workspace,[\s\S]*?\.tm-admin-audit-layout,[\s\S]*?\.tm-admin-function-layout\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+    expect(css).toMatch(/\.tm-admin-function-layout:has\(\.tm-admin-function-rail\)\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s*minmax\(260px,\s*320px\);/);
+    expect(css).toMatch(/\.tm-admin-service-bar\s*\{[\s\S]*?padding:\s*16px;/);
     expect(css).toMatch(/\.tm-admin-function-table\s*\{[\s\S]*?grid-template-columns:\s*minmax\(220px, 1\.3fr\) minmax\(150px, \.8fr\) minmax\(220px, 1fr\) minmax\(190px, auto\);/);
   });
 });

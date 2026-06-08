@@ -36,7 +36,7 @@ export function AdminNotificationsPageView(props: FunctionViewProps) {
 function AdminFunctionPage({ model, onRetry }: FunctionViewProps) {
   return (
     <AppChrome title={model.title} desktopNav="admin" adminActiveTab={model.activeTab} bottomNav={false} showSearch={false} showNotifications wide>
-      <div className="tm-admin-shell tm-admin-function-shell tm-admin-desktop-workbench" data-testid={model.testId}>
+      <div className="tm-admin-shell tm-admin-function-shell tm-admin-desktop-workbench tm-operations-template" data-testid={model.testId}>
         <div className="tm-admin-domain">
           <PageHeader
             eyebrow={model.eyebrow}
@@ -62,9 +62,11 @@ function AdminFunctionPage({ model, onRetry }: FunctionViewProps) {
                   </div>
                   <AdminFunctionTable title={model.title} rows={model.rows} emptyTitle={model.emptyTitle} />
                 </Card>
-                <aside className="tm-admin-function-rail">
-                  <AdminFunctionSide title={model.sideTitle} items={model.sideItems} />
-                </aside>
+                {model.sideItems.length > 0 ? (
+                  <aside className="tm-admin-function-rail">
+                    <AdminFunctionSide title={model.sideTitle} items={model.sideItems} />
+                  </aside>
+                ) : null}
               </section>
             </>
           )}
@@ -93,11 +95,18 @@ function AdminFunctionTable({ title, rows, emptyTitle }: {
   readonly rows: readonly AdminFunctionRowModel[];
   readonly emptyTitle: string;
 }) {
-  if (rows.length === 0) return <div className="tm-admin-empty">{emptyTitle}</div>;
+  if (rows.length === 0) {
+    return (
+      <div className="tm-admin-empty tm-admin-empty-table">
+        <span className="tm-admin-empty-icon" aria-hidden="true">—</span>
+        <p>{emptyTitle}</p>
+      </div>
+    );
+  }
   return (
     <div className="tm-admin-function-table" role="table" aria-label={`${title} 목록`}>
       <div className="tm-admin-function-table-row tm-admin-function-table-head" role="row">
-        <span role="columnheader">업무</span>
+        <span role="columnheader" aria-sort="none">업무</span>
         <span role="columnheader">상태</span>
         <span role="columnheader">정보</span>
         <span role="columnheader">작업</span>
@@ -124,7 +133,7 @@ function AdminFunctionRow({ row }: { readonly row: AdminFunctionRowModel }) {
 
 function AdminFunctionSide({ title, items }: { readonly title: string; readonly items: readonly AdminFunctionSideItemModel[] }) {
   return (
-    <Card className="tm-admin-authority-panel" pad={18}>
+    <Card className="tm-admin-followup-panel" pad={18}>
       <div className="tm-text-body-lg">{title}</div>
       <div className="tm-admin-audit-list">
         {items.map((item) => (

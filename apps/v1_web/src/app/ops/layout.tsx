@@ -1,0 +1,7 @@
+import type { ReactNode } from 'react';
+import { RequireAuth } from '@/components/auth/require-auth';
+
+export default function OpsLayout({ children }: { readonly children: ReactNode }) {
+  return <RequireAuth>{children}</RequireAuth>;
+}
+

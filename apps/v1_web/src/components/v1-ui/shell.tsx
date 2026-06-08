@@ -3,17 +3,22 @@ import type { ReactNode } from 'react';
 import {
   BellIcon,
   ChevronLeftIcon,
+  ClipboardIcon,
+  GridIcon,
+  HistoryIcon,
   HomeIcon,
   MatchIcon,
   MyIcon,
   PlusIcon,
   SearchIcon,
+  StarIcon,
   TeamMatchIcon,
   TeamsIcon,
 } from './icons';
 
 export type V1NavTab = 'home' | 'matches' | 'teamMatches' | 'teams' | 'my';
 export type V1AdminNavTab = 'admin' | 'matches' | 'teamMatches' | 'teams' | 'reviews' | 'notifications' | 'audit';
+export type V1OpsNavTab = 'overview' | 'reports' | 'disputes' | 'payments' | 'settlements' | 'audit';
 
 const tabs: Array<{
   id: V1NavTab;
@@ -34,13 +39,27 @@ const adminTabs: Array<{
   href: string;
   Icon: typeof HomeIcon;
 }> = [
-  { id: 'admin', label: '워크스페이스', href: '/admin', Icon: TeamMatchIcon },
+  { id: 'admin', label: '워크스페이스', href: '/admin', Icon: GridIcon },
   { id: 'matches', label: '개인 매치', href: '/admin/matches', Icon: MatchIcon },
   { id: 'teamMatches', label: '팀매치', href: '/admin/team-matches', Icon: TeamMatchIcon },
   { id: 'teams', label: '팀 운영', href: '/admin/teams', Icon: TeamsIcon },
-  { id: 'reviews', label: '리뷰', href: '/admin/reviews', Icon: MyIcon },
+  { id: 'reviews', label: '리뷰', href: '/admin/reviews', Icon: StarIcon },
   { id: 'notifications', label: '알림', href: '/admin/notifications', Icon: BellIcon },
-  { id: 'audit', label: '업무 이력', href: '/admin/audit', Icon: BellIcon },
+  { id: 'audit', label: '업무 이력', href: '/admin/audit', Icon: HistoryIcon },
+];
+
+const opsTabs: Array<{
+  id: V1OpsNavTab;
+  label: string;
+  href: string;
+  Icon: typeof HomeIcon;
+}> = [
+  { id: 'overview', label: '상황판', href: '/ops', Icon: TeamMatchIcon },
+  { id: 'reports', label: '신고', href: '/ops/reports', Icon: BellIcon },
+  { id: 'disputes', label: '분쟁', href: '/ops/disputes', Icon: MyIcon },
+  { id: 'payments', label: '결제·환불', href: '/ops/payments', Icon: MatchIcon },
+  { id: 'settlements', label: '정산·지급', href: '/ops/settlements', Icon: TeamsIcon },
+  { id: 'audit', label: '감사 이력', href: '/ops/audit', Icon: BellIcon },
 ];
 
 type AppChromeProps = {
@@ -48,8 +67,9 @@ type AppChromeProps = {
   children: ReactNode;
   floatingSlot?: ReactNode;
   activeTab?: V1NavTab;
-  desktopNav?: 'app' | 'admin';
+  desktopNav?: 'app' | 'admin' | 'ops';
   adminActiveTab?: V1AdminNavTab;
+  opsActiveTab?: V1OpsNavTab;
   showSearch?: boolean;
   showNotifications?: boolean;
   hasNewNotification?: boolean;
@@ -69,6 +89,7 @@ export function AppChrome({
   activeTab = 'home',
   desktopNav = 'app',
   adminActiveTab = 'admin',
+  opsActiveTab = 'overview',
   showSearch,
   showNotifications = true,
   hasNewNotification = false,
@@ -89,7 +110,13 @@ export function AppChrome({
 
   return (
     <div className={frameClassName}>
-      {desktopNav === 'admin' ? <AdminDesktopNav activeTab={adminActiveTab} inert={modalOpen} /> : <DesktopNav activeTab={activeTab} inert={modalOpen} />}
+      {desktopNav === 'admin' ? (
+        <AdminDesktopNav activeTab={adminActiveTab} inert={modalOpen} />
+      ) : desktopNav === 'ops' ? (
+        <OpsDesktopNav activeTab={opsActiveTab} inert={modalOpen} />
+      ) : (
+        <DesktopNav activeTab={activeTab} inert={modalOpen} />
+      )}
       {topBar ? (
         <header
           className={centerTitle ? 'tm-topbar tm-topbar-centered' : 'tm-topbar'}
@@ -145,7 +172,7 @@ export function AppChrome({
 function AdminDesktopNav({ activeTab, inert }: { activeTab: V1AdminNavTab; inert?: boolean }) {
   return (
     <aside
-      className="tm-desktop-nav tm-desktop-nav-admin"
+      className="tm-desktop-nav tm-desktop-nav-operations tm-desktop-nav-admin"
       aria-hidden={inert ? true : undefined}
       aria-label="운영 워크스페이스 메뉴"
       inert={inert ? true : undefined}
@@ -156,6 +183,39 @@ function AdminDesktopNav({ activeTab, inert }: { activeTab: V1AdminNavTab; inert
       </Link>
       <div className="tm-desktop-tab-list">
         {adminTabs.map(({ id, label, href, Icon }) => {
+          const active = id === activeTab;
+          return (
+            <Link key={id} className="tm-desktop-tab" href={href} aria-current={active ? 'page' : undefined} data-active={active}>
+              <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+      </div>
+      <div className="tm-desktop-nav-footer">
+        <Link className="tm-desktop-nav-back-link" href="/home">
+          <HomeIcon size={16} strokeWidth={1.8} />
+          <span>서비스 홈으로</span>
+        </Link>
+      </div>
+    </aside>
+  );
+}
+
+function OpsDesktopNav({ activeTab, inert }: { activeTab: V1OpsNavTab; inert?: boolean }) {
+  return (
+    <aside
+      className="tm-desktop-nav tm-desktop-nav-operations tm-desktop-nav-ops"
+      aria-hidden={inert ? true : undefined}
+      aria-label="내부 운영 콘솔 메뉴"
+      inert={inert ? true : undefined}
+    >
+      <Link className="tm-desktop-brand" href="/ops" aria-label="Teameet 내부 운영 콘솔">
+        <span className="tm-desktop-brand-mark">T</span>
+        <span>teameet ops</span>
+      </Link>
+      <div className="tm-desktop-tab-list">
+        {opsTabs.map(({ id, label, href, Icon }) => {
           const active = id === activeTab;
           return (
             <Link key={id} className="tm-desktop-tab" href={href} aria-current={active ? 'page' : undefined} data-active={active}>

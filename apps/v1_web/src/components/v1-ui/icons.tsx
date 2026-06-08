@@ -145,3 +145,42 @@ export function ChevronRightIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+export function GridIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="14" y="14" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+    </SvgIcon>
+  );
+}
+
+export function StarIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M12 2 L15.09 8.26 L22 9.27 L17 14.14 L18.18 21.02 L12 17.77 L5.82 21.02 L7 14.14 L2 9.27 L8.91 8.26 Z" />
+    </SvgIcon>
+  );
+}
+
+export function HistoryIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7 V12 L15 15" />
+    </SvgIcon>
+  );
+}
+
+export function ClipboardIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M9 5 H7 A2 2 0 0 0 5 7 V19 A2 2 0 0 0 7 21 H17 A2 2 0 0 0 19 19 V7 A2 2 0 0 0 17 5 H15" />
+      <rect x="9" y="3" width="6" height="4" rx="2" />
+      <line x1="9" y1="12" x2="15" y2="12" />
+      <line x1="9" y1="16" x2="13" y2="16" />
+    </SvgIcon>
+  );
+}

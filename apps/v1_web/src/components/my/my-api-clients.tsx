@@ -37,7 +37,7 @@ import {
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
-import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, myTeamsModel, profileEditModel, settingsModel } from './my.view-model';
 
 export function MyHomePageClient() {
@@ -97,6 +97,7 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
 }
 
 export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
+  const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
   const members = useV1TeamMembers(teamId, { limit: 50 });
   const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
@@ -108,8 +109,16 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const items = members.data?.items ?? [];
   const requests = applications.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
+  const viewerRole = team.data?.viewer.role;
+  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canDelegateOwner = viewerRole === 'owner';
   const model = {
     teamName: team.data?.name ?? '팀',
+    activeTab,
+    tabs: [
+      { key: 'members' as const, label: '멤버', count: members.data?.summary.memberCount ?? items.length, onSelect: () => setActiveTab('members') },
+      { key: 'requests' as const, label: '가입 요청', count: requests.length, onSelect: () => setActiveTab('requests') },
+    ],
     summary: [
       { label: '전체', value: members.data?.summary.memberCount ?? items.length, unit: '명' },
       { label: '운영진', value: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0, unit: '명' },
@@ -118,16 +127,19 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
     members: items.map((member) =>
       toMyMember(member, {
         actionPending,
-        promote: () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' }),
-        demote: () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' }),
-        remove: () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' }),
+        canManageMembers,
+        canDelegateOwner,
+        promote: () => confirmAction(`${member.displayName}님을 운영진으로 지정할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
+        delegateOwner: () => confirmAction(`${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 됩니다.`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
+        demote: () => confirmAction(`${member.displayName}님을 멤버로 강등할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+        remove: () => confirmAction(`${member.displayName}님을 팀에서 내보낼까요?`, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
       }),
     ),
     requests: requests.map((application) =>
       toMyJoinRequest(application, {
         actionPending,
-        approve: () => approveApplication.mutate({ applicationId: application.applicationId, note: null }),
-        reject: () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' }),
+        approve: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 승인할까요?`, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
+        reject: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 거절할까요?`, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
       }),
     ),
   };
@@ -657,20 +669,33 @@ function toMyMember(
   member: V1TeamMember,
   actions?: {
     actionPending: boolean;
+    canManageMembers: boolean;
+    canDelegateOwner: boolean;
     promote: () => void;
+    delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
   },
 ): MyMember {
+  const itemActions: MyMember['actions'] = [];
+  if (actions?.canManageMembers && member.canChangeRole && member.role === 'member') {
+    itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
+  }
+  if (actions?.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
+    itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
+    itemActions.push({ label: '멤버 강등', onSelect: actions.demote });
+  }
+  if (actions?.canManageMembers && member.canRemove && member.role !== 'owner') {
+    itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
+  }
+
   return {
     name: member.displayName,
     role: roleLabel(member.role),
     meta: new Date(member.joinedAt).toLocaleDateString('ko-KR'),
     status: member.status === 'active' ? '활동중' : member.status,
     locked: member.role === 'owner',
-    onPromote: actions && member.canChangeRole && member.role === 'member' ? actions.promote : undefined,
-    onDemote: actions && member.canChangeRole && member.role === 'manager' ? actions.demote : undefined,
-    onRemove: actions && member.canRemove ? actions.remove : undefined,
+    actions: itemActions,
     actionPending: actions?.actionPending,
   };
 }
@@ -688,10 +713,17 @@ function toMyJoinRequest(
     role: '가입 요청',
     meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
     status: application.status === 'requested' ? '검토' : application.status,
-    onApprove: actions.approve,
-    onReject: actions.reject,
+    actions: [
+      { label: '승인', onSelect: actions.approve },
+      { label: '거절', tone: 'danger', onSelect: actions.reject },
+    ],
     actionPending: actions.actionPending,
   };
+}
+
+function confirmAction(message: string, action: () => void) {
+  if (typeof window !== 'undefined' && !window.confirm(message)) return;
+  action();
 }
 
 function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatches'][number] {

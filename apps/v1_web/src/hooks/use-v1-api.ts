@@ -465,11 +465,11 @@ export function useV1MyTeams(filters?: ListFilters) {
   });
 }
 
-export function useV1TeamMembers(teamId: string, filters?: ListFilters) {
+export function useV1TeamMembers(teamId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...v1Keys.team(teamId), 'members', filters ?? {}] as const,
     queryFn: () => v1Get<V1TeamMembersPage>(`/teams/${teamId}/members`, filters),
-    enabled: Boolean(teamId),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
   });
 }
 
@@ -545,7 +545,7 @@ export function useV1RejectTeamJoinApplication(teamId: string) {
 export function useV1ChangeTeamMembershipRole(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ membershipId, role }: { membershipId: string; role: 'manager' | 'member' }) =>
+    mutationFn: ({ membershipId, role }: { membershipId: string; role: 'owner' | 'manager' | 'member' }) =>
       v1Patch<V1TeamMembershipMutationResult>(`/team-memberships/${membershipId}/role`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });

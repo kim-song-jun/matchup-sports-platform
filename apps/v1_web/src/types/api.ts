@@ -401,6 +401,8 @@ export type V1TeamDetail = {
   joinPolicy?: 'approval_required' | 'closed';
   trustState?: TrustState | 'none';
   version?: string;
+  membersVisibilityEnabled: boolean;
+  canViewMembers: boolean;
   profile: {
     logoUrl: string | null;
     coverImageUrl: string | null;
@@ -460,6 +462,7 @@ export type V1TeamMutationPayload = {
 
 export type V1TeamUpdatePayload = V1TeamMutationPayload & {
   version: string;
+  membersVisibilityEnabled?: boolean;
 };
 
 export type V1TeamMutationResult = {
@@ -469,6 +472,7 @@ export type V1TeamMutationResult = {
   status?: string;
   updatedAt?: string;
   version?: string;
+  membersVisibilityEnabled?: boolean;
   detailRoute: string;
   manageRoute?: string;
 };
@@ -523,7 +527,7 @@ export type V1TeamJoinApplicationsPage = {
 export type V1TeamMembershipMutationResult = {
   membershipId: string;
   teamId: string;
-  role?: string;
+  role?: 'owner' | 'manager' | 'member' | string;
   status?: string;
   managerCount?: number;
   memberCount?: number;
@@ -550,6 +554,7 @@ export type V1TeamMembersPage = {
     memberCount: number;
   };
   viewerRole: 'owner' | 'manager' | 'member';
+  membersVisibilityEnabled?: boolean;
   pageInfo: {
     nextCursor: string | null;
     hasNext: boolean;

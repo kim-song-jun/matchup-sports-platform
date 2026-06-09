@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class MutateTeamDto {
   @IsUUID()
@@ -64,6 +64,10 @@ export class MutateTeamDto {
 export class UpdateTeamDto extends MutateTeamDto {
   @IsString()
   version!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  membersVisibilityEnabled?: boolean;
 }
 
 export class TeamMembersQueryDto {
@@ -88,8 +92,8 @@ export class TeamMembersQueryDto {
 }
 
 export class ChangeTeamMembershipRoleDto {
-  @IsIn(['manager', 'member'])
-  role!: 'manager' | 'member';
+  @IsIn(['owner', 'manager', 'member'])
+  role!: 'owner' | 'manager' | 'member';
 }
 
 export class RemoveTeamMembershipDto {

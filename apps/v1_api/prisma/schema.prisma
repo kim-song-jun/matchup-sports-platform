@@ -595,9 +595,10 @@ model V1Team {
   sportId      String           @map("sport_id")
   regionId     String           @map("region_id")
   name         String
-  status       V1TeamStatus     @default(active)
-  joinPolicy   V1TeamJoinPolicy @default(approval_required) @map("join_policy")
-  memberCount  Int              @default(1) @map("member_count")
+  status         V1TeamStatus     @default(active)
+  joinPolicy     V1TeamJoinPolicy @default(approval_required) @map("join_policy")
+  membersVisible Boolean          @default(false) @map("members_visible")
+  memberCount    Int              @default(1) @map("member_count")
   managerCount Int              @default(0) @map("manager_count")
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")

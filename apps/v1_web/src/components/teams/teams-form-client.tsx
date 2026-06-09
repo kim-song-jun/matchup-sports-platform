@@ -71,6 +71,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
+  const [membersVisibilityEnabled, setMembersVisibilityEnabled] = useState(false);
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +94,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     setSportId(query.data.sport.sportId);
     setRegionId(query.data.region?.regionId ?? '');
     setJoinPolicy(query.data.profile.joinPolicy === 'closed' ? 'closed' : 'approval_required');
+    setMembersVisibilityEnabled(query.data.membersVisibilityEnabled);
     setVersion(query.data.version ?? '');
   }, [query.data]);
 
@@ -102,6 +104,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     sportId,
     regionId,
     joinPolicy,
+    membersVisibilityEnabled,
     sports: query.data ? [{ id: query.data.sport.sportId, name: query.data.sport.name }] : [],
     regions: query.data?.region ? [{ id: query.data.region.regionId, name: query.data.region.name }] : [],
     error: query.isError ? '팀 정보를 불러오지 못했습니다.' : error,
@@ -110,6 +113,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     setSportId,
     setRegionId,
     setJoinPolicy,
+    setMembersVisibilityEnabled,
     onSubmit: () => {
       setError(null);
       const payload = buildPayload(draft, sportId, regionId, joinPolicy);
@@ -118,7 +122,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
         return;
       }
       updateTeam.mutate(
-        { ...payload, version },
+        { ...payload, version, membersVisibilityEnabled },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/teams/${teamId}`),
           onError: (err) => setError(err instanceof Error ? err.message : '팀을 수정할 수 없습니다.'),
@@ -136,6 +140,7 @@ function buildModel({
   sportId,
   regionId,
   joinPolicy,
+  membersVisibilityEnabled,
   sports,
   regions,
   error,
@@ -144,6 +149,7 @@ function buildModel({
   setSportId,
   setRegionId,
   setJoinPolicy,
+  setMembersVisibilityEnabled,
   onSubmit,
 }: {
   mode: 'create' | 'edit';
@@ -151,6 +157,7 @@ function buildModel({
   sportId: string;
   regionId: string;
   joinPolicy: 'approval_required' | 'closed';
+  membersVisibilityEnabled?: boolean;
   sports: Array<{ id: string; name: string }>;
   regions: Array<{ id: string; name: string }>;
   error: string | null;
@@ -159,6 +166,7 @@ function buildModel({
   setSportId: (sportId: string) => void;
   setRegionId: (regionId: string) => void;
   setJoinPolicy: (joinPolicy: 'approval_required' | 'closed') => void;
+  setMembersVisibilityEnabled?: (enabled: boolean) => void;
   onSubmit: () => void;
 }): TeamFormViewModel {
   return {
@@ -170,6 +178,7 @@ function buildModel({
       regions,
       sports,
       joinPolicy,
+      membersVisibilityEnabled,
       onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
       onSportChange: (nextSportId) => {
         const sport = sports.find((item) => item.id === nextSportId);
@@ -185,6 +194,7 @@ function buildModel({
         }
       },
       onJoinPolicyChange: setJoinPolicy,
+      onMembersVisibilityChange: setMembersVisibilityEnabled,
       onSubmit,
       submitting,
       error,

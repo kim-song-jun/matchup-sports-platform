@@ -200,6 +200,13 @@ export function getTeamDetailViewModel(mode: TeamDetailViewModel['mode'] = 'defa
     team: {
       ...team,
       ...detailByMode[mode],
+      memberAccess: {
+        canView: mode === 'mine',
+        enabled: mode === 'mine',
+        message: mode === 'mine'
+          ? '멤버 현황 조회가 활성화되어 있습니다.'
+          : '팀 멤버만 멤버 현황을 볼 수 있습니다.',
+      },
     },
   };
 }
@@ -226,15 +233,20 @@ export function getTeamFormViewModel(mode: TeamFormViewModel['mode']): TeamFormV
 export function getTeamMembersViewModel(): TeamMembersViewModel {
   return {
     teamName: '성수 러너스 FC',
+    activeTab: 'members',
+    tabs: [
+      { key: 'members', label: '멤버', count: 3, onSelect: () => undefined },
+      { key: 'requests', label: '가입 요청', count: 2, onSelect: () => undefined },
+    ],
     summary: { total: 18, managers: 2, pending: 3 },
     members: [
-      { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', status: '팀장', locked: true },
-      { name: '박서준', role: '운영진', meta: 'GK · 가입 2024.05', status: '관리자' },
-      { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', status: '활동중' },
+      { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
+      { name: '박서준', role: '운영진', meta: 'GK · 가입 2024.05', actions: [] },
+      { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', actions: [] },
     ],
     requests: [
-      { name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', status: '검토중' },
-      { name: '최유진', meta: '초보 · 광진 · 평일 가능', status: '검토중' },
+      { name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', status: '검토중', actions: [] },
+      { name: '최유진', meta: '초보 · 광진 · 평일 가능', status: '검토중', actions: [] },
     ],
   };
 }

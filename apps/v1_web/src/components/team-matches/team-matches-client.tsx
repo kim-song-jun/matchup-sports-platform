@@ -53,9 +53,20 @@ export function TeamMatchListPageClient() {
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  const countFilters = useMemo(() => {
+    const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
+    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
+    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (submittedQuery.trim()) filters.query = submittedQuery.trim();
+    return Object.keys(filters).length ? filters : undefined;
+  }, [selectedGenderRule, selectedLevels, submittedQuery]);
   const filteredQuery = useV1TeamMatches(
     teamMatchFilters,
     { enabled: Boolean(teamMatchFilters) },
+  );
+  const countQuery = useV1TeamMatches(
+    countFilters,
+    { enabled: Boolean(countFilters) },
   );
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
@@ -66,7 +77,7 @@ export function TeamMatchListPageClient() {
   const base = getTeamMatchListViewModel();
   const items = query.data?.items;
   const visibleItems = filterTeamMatchesByLevels(items, selectedLevels);
-  const allItems = allQuery.data?.items ?? items ?? [];
+  const countItems = filterTeamMatchesByLevels((countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? items, selectedLevels);
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
     value: searchValue,
     placeholder: '지역, 팀 이름, 경기조건 검색',
@@ -93,8 +104,9 @@ export function TeamMatchListPageClient() {
         filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
         sports: buildSportChips({
           base,
+          params: searchParams,
           sports: sportsQuery.data,
-          matches: allItems,
+          matches: countItems,
           selectedSportId,
         }),
         matches: visibleItems.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
@@ -109,8 +121,9 @@ export function TeamMatchListPageClient() {
         filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
         sports: buildSportChips({
           base,
+          params: searchParams,
           sports: sportsQuery.data,
-          matches: allItems,
+          matches: countItems,
           selectedSportId,
         }),
       };
@@ -226,11 +239,13 @@ function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchMod
 
 function buildSportChips({
   base,
+  params,
   sports,
   matches,
   selectedSportId,
 }: {
   base: TeamMatchListViewModel;
+  params: URLSearchParams;
   sports?: Array<{ id: string; name: string }>;
   matches: V1TeamMatch[];
   selectedSportId?: string;
@@ -244,7 +259,7 @@ function buildSportChips({
       label: base.sports[0]?.label ?? '전체',
       count: matches.length,
       active: !selectedSportId,
-      href: '/team-matches',
+      href: buildTeamMatchHref(params, { sportId: null, filter: null }),
     },
     ...fixedSports.map((sport) => ({
       label: sport.name,
@@ -253,7 +268,7 @@ function buildSportChips({
         return matchSport?.sportId === sport.id || matchSport?.name === sport.name || match.sportName === sport.name;
       }).length,
       active: selectedSportId === sport.id,
-      href: `/team-matches?sportId=${encodeURIComponent(sport.id)}`,
+      href: buildTeamMatchHref(params, { sportId: sport.id, filter: null }),
     })),
   ];
 }

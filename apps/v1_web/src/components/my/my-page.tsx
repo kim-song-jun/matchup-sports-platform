@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { useState } from 'react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
   MyMatch,
@@ -293,37 +293,6 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
         {members.map((member) => <MyMemberCard key={member.name} member={member} />)}
       </div>
     </section>
-  );
-}
-
-function MyMemberCard({ member }: { member: MyMember }) {
-  const [open, setOpen] = useState(false);
-  const disabled = member.actionPending || member.actions.length === 0;
-
-  return (
-    <Card pad={14}>
-      <ListItem title={member.name} sub={member.meta} trailing={member.role || member.status} />
-      <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
-        관리
-      </button>
-      {open && !disabled ? (
-        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 10 }}>
-          {member.actions.map((action) => (
-            <button
-              key={action.label}
-              className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                action.onSelect();
-              }}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </Card>
   );
 }
 

@@ -85,7 +85,7 @@ export type MyMember = {
   role: string;
   meta: string;
   status: string;
-  actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
+  actions?: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
   actionPending?: boolean;
   locked?: boolean;
 };

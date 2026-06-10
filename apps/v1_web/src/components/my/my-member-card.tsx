@@ -6,7 +6,8 @@ import type { MyMember } from './my.types';
 
 export function MyMemberCard({ member }: { member: MyMember }) {
   const [open, setOpen] = useState(false);
-  const disabled = member.actionPending || member.actions.length === 0;
+  const actions = member.actions ?? [];
+  const disabled = member.actionPending || actions.length === 0;
 
   return (
     <Card pad={14}>
@@ -16,7 +17,7 @@ export function MyMemberCard({ member }: { member: MyMember }) {
       </button>
       {open && !disabled ? (
         <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 10 }}>
-          {member.actions.map((action) => (
+          {actions.map((action) => (
             <button
               key={action.label}
               className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}

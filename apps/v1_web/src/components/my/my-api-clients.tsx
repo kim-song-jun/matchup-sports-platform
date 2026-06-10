@@ -677,7 +677,7 @@ function toMyMember(
     remove: () => void;
   },
 ): MyMember {
-  const itemActions: MyMember['actions'] = [];
+  const itemActions: NonNullable<MyMember['actions']> = [];
   if (actions?.canManageMembers && member.canChangeRole && member.role === 'member') {
     itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
   }

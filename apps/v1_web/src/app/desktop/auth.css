@@ -283,7 +283,7 @@
     align-items: center;
     justify-content: center;
     padding: 48px 40px;
-    color: #ffffff;
+    color: var(--static-white);
     gap: 20px;
   }
 
@@ -296,7 +296,7 @@
     place-items: center;
     font-size: 36px;
     font-weight: 900;
-    color: #ffffff;
+    color: var(--static-white);
     letter-spacing: -1px;
     border: 2px solid rgba(255, 255, 255, 0.32);
   }
@@ -305,7 +305,7 @@
     font-size: 32px;
     font-weight: 900;
     letter-spacing: -1px;
-    color: #ffffff;
+    color: var(--static-white);
     line-height: 1;
   }
 

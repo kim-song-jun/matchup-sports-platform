@@ -131,10 +131,6 @@
     max-width: 800px;
   }
 
-  /* At wide viewports: 2-column grid for notification sections. */
-  .tm-notifications-desktop-2col .tm-notification-stack {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
+  /* .tm-notifications-desktop-2col was defined here but is unused in any JSX.
+     Removed as dead CSS (§6 gate-fix). */
 }

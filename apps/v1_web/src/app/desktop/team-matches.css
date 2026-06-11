@@ -25,23 +25,11 @@
     gap: 8px;
   }
 
-  /* Match list: remove mobile bottom padding (no bottom-nav on desktop) */
-  .tm-match-list {
-    padding: 0 0 40px;
-  }
-
-  /* Summary row: add a little top breathing room */
-  .tm-match-summary-row {
-    margin-top: 12px;
-  }
-
-  /* Card stack: 2-column grid on desktop */
-  .tm-match-card-stack {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 20px;
-  }
+  /* .tm-match-list, .tm-match-summary-row, .tm-match-card-stack:
+     These bare selectors are already defined in matches.css (which loads first
+     via index.css and covers both /matches and /team-matches equally).
+     Redefining them here caused cross-domain bleed — matches.css values win
+     the cascade and apply to both pages identically, so no override is needed. */
 
   /* Team-match card: let the VS panel breathe at larger size */
   .tm-team-match-card {
@@ -54,44 +42,13 @@
     font-size: 1.05em;
   }
 
-  /* Detail page back navigation header (desktop only) */
-  .tm-team-match-desktop-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 28px 0 18px;
-  }
-
-  .tm-team-match-desktop-back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    color: var(--grey700);
-    flex-shrink: 0;
-    text-decoration: none;
-  }
-
-  .tm-team-match-desktop-back:hover {
-    background: var(--grey100);
-    color: var(--grey900);
-  }
-
-  .tm-team-match-desktop-back:focus-visible {
-    outline: 2px solid var(--blue500);
-    outline-offset: 2px;
-  }
+  /* Desktop page-head: use the shared .tm-desktop-page-head + .tm-desktop-back
+     primitives from _shell.css. The JSX uses tm-desktop-page-head/tm-desktop-back
+     directly — no domain-specific class needed here. */
 }
 
-@media (min-width: 1440px) {
-  /* 3-column card grid on wide screens */
-  .tm-match-card-stack {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px;
-  }
-}
+/* .tm-match-card-stack @media (min-width: 1440px):
+   Already defined in matches.css — no override needed here. */
 
 
 /* ─── Detail page (/team-matches/[id]) ───────────────────────────────────── */
@@ -121,12 +78,10 @@
     padding: 16px 20px 20px;
   }
 
-  /* Detail body: remove the mobile horizontal padding (column handles it) */
-  .tm-match-detail {
-    padding-bottom: 0;
-  }
-
-  .tm-match-detail-body {
+  /* .tm-match-detail { padding-bottom: 0 } is already set in matches.css — no override.
+     .tm-match-detail-body scoped to the team-match detail left column to avoid bleeding
+     onto /matches where the same bare class is used. */
+  .tm-team-match-detail-left .tm-match-detail-body {
     padding: 0;
   }
 

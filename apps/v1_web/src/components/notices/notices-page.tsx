@@ -15,8 +15,10 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
           </Link>
           <h1 className="tm-text-heading">공지사항</h1>
         </div>
-        {/* Mobile heading (hidden on desktop by CSS) */}
-        <h1 className="tm-text-heading tm-hide-desktop">공지사항</h1>
+        {/* Mobile heading (hidden on desktop by CSS).
+            aria-hidden: the AppChrome topBar title="공지사항" provides the a11y heading
+            on mobile, so this visual element is decorative in the a11y tree. */}
+        <h1 className="tm-text-heading tm-hide-desktop" aria-hidden="true">공지사항</h1>
         <p className="tm-text-caption tm-notice-lead">홈에 노출되는 고정 공지와 운영 안내를 한곳에서 확인합니다.</p>
         <div className="tm-sport-chip-row tm-notice-filter-row">
           {model.filters.map((filter) => (

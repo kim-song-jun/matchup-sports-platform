@@ -65,7 +65,7 @@
   }
 
   .tm-match-desktop-create-btn:hover {
-    background: var(--blue600, #1a6ee0);
+    background: var(--blue600);
   }
 
   .tm-match-desktop-create-btn:focus-visible {

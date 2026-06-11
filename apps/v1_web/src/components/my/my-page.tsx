@@ -71,7 +71,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
     <AppChrome title="내 매치" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell tm-my-matches-desktop">
         {/* Desktop page head — hidden on mobile via tm-show-desktop */}
-        <div className="tm-my-desktop-page-head tm-show-desktop">
+        <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
@@ -106,7 +106,7 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
     <AppChrome title="내 팀" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell tm-my-teams-desktop">
         {/* Desktop page head */}
-        <div className="tm-my-desktop-page-head tm-show-desktop">
+        <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
@@ -128,7 +128,7 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
     <AppChrome title="팀 정보" activeTab="my" bottomNav={false} backHref="/my/teams">
       <div className="tm-my-shell">
         {/* Desktop page head */}
-        <div className="tm-my-desktop-page-head tm-show-desktop">
+        <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my/teams" aria-label="내 팀 목록으로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
@@ -187,7 +187,7 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
     <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref={backHref}>
       <div className="tm-my-shell tm-my-members-desktop">
         {/* Desktop page head */}
-        <div className="tm-my-desktop-page-head tm-show-desktop">
+        <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href={backHref} aria-label="팀 정보로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
@@ -234,7 +234,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
           {/* Desktop page head */}
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>
@@ -253,7 +253,7 @@ export function NotificationSettingsPageView({ model }: { model: NotificationSet
     <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>
@@ -281,7 +281,7 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
     <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>
@@ -304,7 +304,7 @@ export function WithdrawalPageView() {
     <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <div className="tm-my-withdrawal-desktop">
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>

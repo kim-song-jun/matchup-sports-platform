@@ -126,36 +126,8 @@
     display: grid;
   }
 
-  /* Desktop page heading inside the content area for sub-pages. */
-  .tm-my-desktop-page-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 28px 0 18px;
-  }
-
-  .tm-my-desktop-page-head .tm-desktop-back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    color: var(--grey700);
-    flex-shrink: 0;
-    text-decoration: none;
-  }
-
-  .tm-my-desktop-page-head .tm-desktop-back:hover {
-    background: var(--grey100);
-    color: var(--grey900);
-  }
-
-  .tm-my-desktop-page-head .tm-desktop-back:focus-visible {
-    outline: 2px solid var(--blue500);
-    outline-offset: 2px;
-    border-radius: 10px;
-  }
+  /* Desktop page heading: use the shared .tm-desktop-page-head + .tm-desktop-back
+     primitives from _shell.css. JSX already uses those class names directly. */
 }
 
 /* ─── /my/profile/edit: form centered ~600px ────────────────────────────────

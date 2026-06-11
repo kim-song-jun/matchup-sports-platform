@@ -92,7 +92,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           {/* Weather strip */}
           <div>
             <div style={{ padding: '0 20px 24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
+              <div className="tm-home-weather-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
                 <div className="tm-text-label">현재 위치 날씨</div>
                 <button
                   className="tm-btn tm-btn-icon tm-btn-neutral"
@@ -111,7 +111,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Notices */}
           <div>
-            <div style={{ padding: '20px 20px 24px' }}>
+            {/* .tm-home-sidebar-notices gives the panel a card surface on desktop.
+                The inner div retains the original mobile inline padding. */}
+            <div className="tm-home-sidebar-notices" style={{ padding: '20px 20px 24px' }}>
               <div className="tm-notice-head">
                 <div className="tm-text-body-lg">공지사항</div>
                 <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>

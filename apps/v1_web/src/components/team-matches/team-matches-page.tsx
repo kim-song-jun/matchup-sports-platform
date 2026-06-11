@@ -140,8 +140,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   return (
     <AppChrome title="" activeTab="teamMatches" bottomNav={false} topBar={false}>
       {/* Desktop page header: back link + title (mobile topbar is hidden on desktop) */}
-      <div className="tm-team-match-desktop-head tm-show-desktop">
-        <Link className="tm-team-match-desktop-back" href="/team-matches" aria-label="팀매치 목록으로 돌아가기">
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/team-matches" aria-label="팀매치 목록으로 돌아가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
         <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>

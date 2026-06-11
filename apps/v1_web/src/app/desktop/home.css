@@ -145,33 +145,11 @@
   }
 }
 
-/* ─── Sidebar: stats/KPI card ─────────────────────────────────────────────── */
-@media (min-width: 1024px) {
-  /*
-   * The sidebar stats card wraps the greeting block on desktop (via .tm-show-desktop
-   * wrapper). We give it a card surface so it reads as a panel.
-   */
-  .tm-home-sidebar-stats-card {
-    background: var(--grey50);
-    border: 1px solid var(--grey150);
-    border-radius: 16px;
-    padding: 20px;
-  }
-
-  .tm-home-sidebar-stats-card .tm-home-stats {
-    margin-top: 10px;
-  }
-}
-
 /* ─── Sidebar: quick actions panel ────────────────────────────────────────── */
 @media (min-width: 1024px) {
-  /* Header row for sidebar section */
-  .tm-home-sidebar-section-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
+  /* .tm-home-sidebar-stats-card: no matching DOM in sidebar (greeting+stats live
+     in the left main column). Rule removed as dead CSS (§7 gate-fix).
+     .tm-home-sidebar-section-head: no section-head rows in sidebar. Removed. */
 
   /* Quick-grid keeps its 4-column layout but shrinks icon size to fit 360px */
   .tm-home-sidebar .tm-quick-grid {

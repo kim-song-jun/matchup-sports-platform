@@ -351,7 +351,7 @@ export function ProfileEditPageClient() {
     <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
       <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop" id="v1-profile-edit-form" onSubmit={submit}>
         {/* Desktop page head */}
-        <div className="tm-my-desktop-page-head tm-show-desktop">
+        <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
@@ -544,7 +544,7 @@ export function SportsSettingsPageClient() {
   return (
     <AppChrome title="운동 정보" activeTab="my" bottomNav={false} backHref="/my">
       <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop" id="v1-sports-settings-form" onSubmit={submit}>
-        <div className="tm-my-desktop-page-head tm-show-desktop">
+        <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
@@ -733,7 +733,7 @@ export function LocationSettingsPageClient() {
     <AppChrome title="위치 및 활동 지역" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <div className="tm-my-location-desktop">
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>
@@ -809,7 +809,7 @@ export function NotificationSettingsPageClient() {
     <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <div className="tm-my-settings-desktop">
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>
@@ -844,7 +844,7 @@ export function WithdrawalPageClient() {
     <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
         <div className="tm-my-withdrawal-desktop">
-          <div className="tm-my-desktop-page-head tm-show-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
             <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
             </Link>

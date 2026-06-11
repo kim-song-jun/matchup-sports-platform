@@ -393,6 +393,37 @@
   }
 }
 
+/* ─── prefers-reduced-motion: disable all desktop hover lifts + filter animation ─
+ * Contract §6: all desktop hover transitions and the filter sheet scale-in
+ * animation must be suppressed when the OS reduces motion.
+ * Card classes covered: matches (.tm-match-list-card), teams (.tm-team-card),
+ * notifications (.tm-notification-card), my-page review + match + team cards.
+ * Filter sheet: tm-filter-sheet-scale-in animation.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .tm-match-list-card,
+  .tm-team-card,
+  .tm-notification-card,
+  .tm-review-schedule-card,
+  .tm-my-matches-desktop .tm-my-list-stack .tm-card,
+  .tm-my-teams-desktop .tm-my-team-card {
+    transition: none;
+  }
+
+  .tm-match-list-card:hover,
+  .tm-team-card:hover,
+  .tm-notification-card:hover,
+  .tm-review-schedule-card:hover,
+  .tm-my-matches-desktop .tm-my-list-stack .tm-card:hover,
+  .tm-my-teams-desktop .tm-my-team-card:hover {
+    transform: none;
+  }
+
+  .tm-filter-sheet {
+    animation: none;
+  }
+}
+
 /* Generic desktop content grid. Domains may use these or define bespoke grids.
  * 2-up at >=1024, 3-up at >=1440. Card lists should target ~340-360px columns. */
 @media (min-width: 1024px) {

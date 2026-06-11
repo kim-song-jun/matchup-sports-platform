@@ -88,7 +88,7 @@
   }
 
   .tm-team-desktop-create-btn:hover {
-    background: var(--blue600, #2272eb);
+    background: var(--blue600);
   }
 
   .tm-team-desktop-create-btn:focus-visible {

@@ -4,9 +4,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
+  AdminListFilters,
   CursorPage,
   V1AdminLog,
+  V1AdminMatchDetail,
+  V1AdminMatchRow,
+  V1AdminMe,
   V1AdminOverview,
+  V1AdminStatusChangeLog,
+  V1AdminStatusChangeResult,
+  V1AdminTeamDetail,
+  V1AdminTeamMatchRow,
+  V1AdminTeamRow,
+  V1AdminUserDetail,
+  V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
   V1ChatMessage,
@@ -949,5 +960,132 @@ export function useV1AdminActionLogs(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — Wave-1 hooks
+// ---------------------------------------------------------------------------
+
+export function useV1AdminMe() {
+  return useQuery({
+    queryKey: v1Keys.adminMe(),
+    queryFn: () => v1Get<V1AdminMe>('/admin/me'),
+  });
+}
+
+export function useV1AdminUsers(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminUsers(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminUserRow>>('/admin/users', filters),
+  });
+}
+
+export function useV1AdminUser(userId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminUser(userId),
+    queryFn: () => v1Get<V1AdminUserDetail>(`/admin/users/${userId}`),
+    enabled: !!userId,
+  });
+}
+
+export function useV1AdminMatches(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminMatches(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminMatchRow>>('/admin/matches', filters),
+  });
+}
+
+export function useV1AdminMatch(matchId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminMatch(matchId),
+    queryFn: () => v1Get<V1AdminMatchDetail>(`/admin/matches/${matchId}`),
+    enabled: !!matchId,
+  });
+}
+
+export function useV1AdminTeams(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminTeams(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminTeamRow>>('/admin/teams', filters),
+  });
+}
+
+export function useV1AdminTeam(teamId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTeam(teamId),
+    queryFn: () => v1Get<V1AdminTeamDetail>(`/admin/teams/${teamId}`),
+    enabled: !!teamId,
+  });
+}
+
+export function useV1AdminTeamMatches(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
+  });
+}
+
+export function useV1AdminStatusChangeLogs(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminStatusChangeLogs(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminStatusChangeLog>>('/admin/status-change-logs', filters),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — status-change mutations
+// ---------------------------------------------------------------------------
+
+type StatusChangeMutationVars = { id: string; status: string; reason: string };
+
+export function useV1ChangeUserStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: StatusChangeMutationVars) =>
+      v1Post<V1AdminStatusChangeResult>(`/admin/users/${id}/status`, { status, reason }),
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminUsers() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+export function useV1ChangeMatchStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: StatusChangeMutationVars) =>
+      v1Post<V1AdminStatusChangeResult>(`/admin/matches/${id}/status`, { status, reason }),
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminMatch(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+export function useV1ChangeTeamStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: StatusChangeMutationVars) =>
+      v1Post<V1AdminStatusChangeResult>(`/admin/teams/${id}/status`, { status, reason }),
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeams() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeam(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+export function useV1ChangeTeamMatchStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, reason }: StatusChangeMutationVars) =>
+      v1Post<V1AdminStatusChangeResult>(`/admin/team-matches/${id}/status`, { status, reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
   });
 }

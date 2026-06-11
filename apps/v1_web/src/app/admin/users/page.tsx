@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { ShieldCheck } from 'lucide-react';
 import {
   useV1AdminMe,
-  useV1AdminMatches,
-  useV1ChangeMatchStatus,
+  useV1AdminUsers,
+  useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -22,43 +23,42 @@ import {
   AdminToasts,
 } from '@/components/admin';
 import type { AdminTableColumn } from '@/components/admin';
-import type { V1AdminMatchRow, CursorPage } from '@/types/api';
+import type { V1AdminUserRow, CursorPage } from '@/types/api';
 
 // ── Date formatter ────────────────────────────────────────────────────────────
-function formatDateTime(dateStr: string | null | undefined): string {
+function formatDateCompact(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   try {
     const d = new Date(dateStr);
-    const mo = d.getMonth() + 1;
-    const day = d.getDate();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${mo}/${day} ${hh}:${mm}`;
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}.${mo}.${day}`;
   } catch {
     return dateStr ?? '—';
   }
 }
 
 // ── Status options for moderation modal ──────────────────────────────────────
-const MATCH_STATUS_OPTIONS = (
-  ['recruiting', 'closed', 'cancelled', 'completed', 'archived'] as const
+const USER_STATUS_OPTIONS = (
+  ['active', 'suspended', 'blocked', 'deleted'] as const
 ).map((v) => ({
   value: v,
   label: STATUS_META[v]?.label ?? v,
 }));
 
 // ── Status filter chips ───────────────────────────────────────────────────────
-const MATCH_STATUS_FILTER_OPTIONS = [
+const USER_STATUS_FILTER_OPTIONS = [
   { value: '', label: '전체' },
-  { value: 'recruiting', label: '모집중' },
-  { value: 'closed', label: '마감' },
-  { value: 'cancelled', label: '취소' },
-  { value: 'completed', label: '완료' },
-  { value: 'archived', label: '보관' },
+  { value: 'active', label: '활성' },
+  { value: 'suspended', label: '정지' },
+  { value: 'blocked', label: '차단' },
+  { value: 'withdrawal_pending', label: '탈퇴대기' },
+  { value: 'deleted', label: '삭제' },
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function AdminMatchesPage() {
+export default function AdminUsersPage() {
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 
@@ -67,13 +67,13 @@ export default function AdminMatchesPage() {
   const [activeStatus, setActiveStatus] = useState(initialStatus);
 
   // Accumulated rows across cursor pages
-  const [extraRows, setExtraRows] = useState<V1AdminMatchRow[]>([]);
+  const [extraRows, setExtraRows] = useState<V1AdminUserRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<V1AdminMatchRow | null>(null);
+  const [selectedRow, setSelectedRow] = useState<V1AdminUserRow | null>(null);
 
   const { toasts, showToast } = useAdminToast();
 
@@ -109,7 +109,7 @@ export default function AdminMatchesPage() {
     isError,
     error,
     refetch,
-  } = useV1AdminMatches(filters);
+  } = useV1AdminUsers(filters);
 
   // Sync cursor from first page
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function AdminMatchesPage() {
   }, [firstPage]);
 
   // Mutation
-  const changeStatusMutation = useV1ChangeMatchStatus();
+  const changeStatusMutation = useV1ChangeUserStatus();
 
   // Combined rows: first page + loaded extras
   const firstRows = firstPage?.items ?? [];
@@ -132,7 +132,7 @@ export default function AdminMatchesPage() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await v1Get<CursorPage<V1AdminMatchRow>>('/admin/matches', {
+      const page = await v1Get<CursorPage<V1AdminUserRow>>('/admin/users', {
         ...filters,
         cursor: nextCursor,
       });
@@ -149,7 +149,7 @@ export default function AdminMatchesPage() {
   function handleModalSubmit(status: string, reason: string) {
     if (!selectedRow) return;
     changeStatusMutation.mutate(
-      { id: selectedRow.matchId, status, reason },
+      { id: selectedRow.userId, status, reason },
       {
         onSuccess: () => {
           setModalOpen(false);
@@ -164,85 +164,91 @@ export default function AdminMatchesPage() {
   }
 
   // Table column definitions
-  const columns: AdminTableColumn<V1AdminMatchRow>[] = [
+  const columns: AdminTableColumn<V1AdminUserRow>[] = [
     {
-      key: 'match',
-      header: '매치',
+      key: 'member',
+      header: '회원',
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-semibold text-gray-900 text-[14px]">{row.title}</span>
-          <span className="text-[12px] text-gray-400">{row.placeName}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-gray-900 text-[14px]">
+              {row.nickname ?? row.displayName ?? '(이름 없음)'}
+            </span>
+            {row.adminRole && (
+              <span className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-700 text-[11px] font-semibold px-1.5 py-0.5 rounded-full">
+                <ShieldCheck size={10} aria-hidden="true" />
+                운영자
+              </span>
+            )}
+          </div>
+          {row.email && (
+            <span className="text-[12px] text-gray-400">{row.email}</span>
+          )}
         </div>
-      ),
-    },
-    {
-      key: 'sport',
-      header: '종목',
-      render: (row) => (
-        <span className="text-[13px] text-gray-700">{row.sportName}</span>
-      ),
-    },
-    {
-      key: 'host',
-      header: '호스트',
-      render: (row) => (
-        <span className="text-[13px] text-gray-600">{row.hostName ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'startAt',
-      header: '일시',
-      render: (row) => (
-        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
-          {formatDateTime(row.startAt)}
-        </span>
-      ),
-    },
-    {
-      key: 'participants',
-      header: '인원',
-      align: 'right',
-      render: (row) => (
-        <span className="text-[13px] text-gray-600 tabular-nums">
-          {row.participantCount}/{row.maxParticipants}
-        </span>
       ),
     },
     {
       key: 'status',
       header: '상태',
-      render: (row) => <AdminStatusPill status={row.status} />,
+      render: (row) => <AdminStatusPill status={row.accountStatus} />,
+    },
+    {
+      key: 'activity',
+      header: '활동',
+      render: (row) => (
+        <span className="text-[13px] text-gray-600 tabular-nums">
+          매치 {row.hostedMatchCount} · 팀 {row.ownedTeamCount}
+        </span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: '가입일',
+      render: (row) => (
+        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
+          {formatDateCompact(row.createdAt)}
+        </span>
+      ),
+    },
+    {
+      key: 'lastLoginAt',
+      header: '최근 접속',
+      render: (row) => (
+        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
+          {formatDateCompact(row.lastLoginAt)}
+        </span>
+      ),
     },
   ];
 
   const errorMessage = isError
-    ? extractErrorMessage(error, '매치 목록을 불러오지 못했어요.')
+    ? extractErrorMessage(error, '회원 목록을 불러오지 못했어요.')
     : undefined;
 
   return (
     <>
       <AdminPageHeader
-        title="매치 관리"
-        description="플랫폼 전체 매치의 상태를 검색하고 관리해요."
+        title="회원 관리"
+        description="플랫폼 전체 회원의 상태를 검색하고 관리해요."
       />
 
       <div className="flex flex-col gap-4">
         {/* Filter bar */}
         <AdminFilterBar
-          searchLabel="제목·장소 검색"
-          searchPlaceholder="제목·장소 검색"
+          searchLabel="닉네임·이메일 검색"
+          searchPlaceholder="닉네임·이메일 검색"
           searchValue={search}
           onSearchChange={setSearch}
-          statusOptions={MATCH_STATUS_FILTER_OPTIONS}
+          statusOptions={USER_STATUS_FILTER_OPTIONS}
           activeStatus={activeStatus}
           onStatusChange={(v) => setActiveStatus(v)}
         />
 
         {/* Data table */}
-        <AdminDataTable<V1AdminMatchRow>
+        <AdminDataTable<V1AdminUserRow>
           columns={columns}
           rows={rows}
-          keyExtractor={(row) => row.matchId}
+          keyExtractor={(row) => row.userId}
           actionsHeader="작업"
           renderActions={
             canWrite
@@ -258,7 +264,7 @@ export default function AdminMatchesPage() {
                       'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
-                    aria-label={`${row.title} 상태 변경`}
+                    aria-label={`${row.nickname ?? row.displayName ?? '회원'} 상태 변경`}
                   >
                     상태 변경
                   </button>
@@ -268,7 +274,7 @@ export default function AdminMatchesPage() {
           loading={isPending}
           empty={
             <AdminEmpty
-              title="조건에 맞는 매치가 없어요"
+              title="조건에 맞는 회원이 없어요"
               description="검색어나 상태 필터를 변경해 보세요."
             />
           }
@@ -301,9 +307,9 @@ export default function AdminMatchesPage() {
       {/* Reason modal */}
       <AdminReasonModal
         open={modalOpen}
-        title="매치 상태 변경"
-        currentStatus={selectedRow?.status}
-        statusOptions={MATCH_STATUS_OPTIONS}
+        title="회원 상태 변경"
+        currentStatus={selectedRow?.accountStatus}
+        statusOptions={USER_STATUS_OPTIONS}
         onSubmit={handleModalSubmit}
         onClose={() => {
           if (!changeStatusMutation.isPending) {

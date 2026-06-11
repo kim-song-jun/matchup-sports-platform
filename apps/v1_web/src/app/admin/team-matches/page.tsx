@@ -1,29 +1,29 @@
 'use client';
 
-import Link from 'next/link';
-import { useState } from 'react';
-import { Trophy, Plus, Inbox, Filter } from 'lucide-react';
-import { useV1MyTeamMatches } from '@/hooks/use-v1-api';
+import { useEffect, useState } from 'react';
 import {
-  AdminShell,
+  useV1AdminTeamMatches,
+  useV1AdminMe,
+  useV1ChangeTeamMatchStatus,
+} from '@/hooks/use-v1-api';
+import type { V1AdminTeamMatchRow } from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
+import {
   AdminPageHeader,
-  AdminKpiCard,
-  AdminBadge,
-  AdminRow,
+  AdminDataTable,
+  AdminStatusPill,
+  AdminReasonModal,
   AdminEmpty,
-  AdminListSkeleton,
-  AdminKpiGridSkeleton,
+  AdminTableSkeleton,
+  STATUS_META,
+  useAdminToast,
+  AdminToasts,
 } from '@/components/admin';
+import type { AdminTableColumn } from '@/components/admin';
 
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-    return (err as { message: string }).message;
-  }
-  return fallback;
-}
+// ── Helpers ───────────────────────────────────────────────────────────────
 
-function formatDate(dateStr?: string) {
-  if (!dateStr) return '날짜 미정';
+function formatDateTime(dateStr: string): string {
   try {
     return new Intl.DateTimeFormat('ko-KR', {
       month: 'numeric',
@@ -36,150 +36,242 @@ function formatDate(dateStr?: string) {
   }
 }
 
-type FilterKey = 'all' | 'open' | 'active' | 'done';
+// ── Status filter options ─────────────────────────────────────────────────
 
-const FILTER_LABELS: Record<FilterKey, string> = {
-  all: '전체',
-  open: '모집중',
-  active: '확정됨',
-  done: '종료',
-};
+const STATUS_OPTIONS = [
+  { value: '', label: '전체' },
+  { value: 'recruiting', label: '모집중' },
+  { value: 'matched', label: '매칭됨' },
+  { value: 'cancelled', label: '취소' },
+  { value: 'completed', label: '완료' },
+  { value: 'archived', label: '보관' },
+];
+
+const REASON_MODAL_STATUS_OPTIONS = [
+  { value: 'recruiting', label: STATUS_META['recruiting']?.label ?? '모집중' },
+  { value: 'matched', label: STATUS_META['matched']?.label ?? '매칭됨' },
+  { value: 'cancelled', label: STATUS_META['cancelled']?.label ?? '취소됨' },
+  { value: 'completed', label: STATUS_META['completed']?.label ?? '완료' },
+  { value: 'archived', label: STATUS_META['archived']?.label ?? '보관' },
+];
+
+// ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamMatchesPage() {
-  const [filter, setFilter] = useState<FilterKey>('all');
-  const { data, isPending, isError, error, refetch } = useV1MyTeamMatches({ limit: 50 });
+  // ── Admin capabilities ─────────────────────────────────────────────
+  const { data: adminMe } = useV1AdminMe();
+  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  const items = data?.items ?? [];
+  // ── Filter state (no search — backend has no q for team-matches) ───
+  const [activeStatus, setActiveStatus] = useState('');
 
-  const getStatus = (m: (typeof items)[0]) =>
-    (m as unknown as { displayState?: string }).displayState ?? m.status ?? '';
+  // URL searchParam pre-selection on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get('status') ?? '';
+    if (s) setActiveStatus(s);
+  }, []);
 
-  const filtered = (() => {
-    if (filter === 'all') return items;
-    if (filter === 'open') return items.filter((m) => getStatus(m) === 'recruiting');
-    if (filter === 'active') return items.filter((m) => getStatus(m) === 'matched');
-    return items.filter((m) => ['cancelled', 'completed', 'expired'].includes(getStatus(m)));
-  })();
-
-  const stats = {
-    all: items.length,
-    open: items.filter((m) => getStatus(m) === 'recruiting').length,
-    active: items.filter((m) => getStatus(m) === 'matched').length,
-    done: items.filter((m) => ['cancelled', 'completed', 'expired'].includes(getStatus(m))).length,
+  const handleStatusChange = (value: string) => {
+    setActiveStatus(value);
+    setAccumulatedRows([]);
+    setCursor(null);
   };
 
+  // ── Cursor pagination ──────────────────────────────────────────────
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamMatchRow[]>([]);
+
+  const filters = {
+    ...(activeStatus ? { status: activeStatus } : {}),
+    ...(cursor ? { cursor } : {}),
+    limit: 20,
+  };
+
+  const { data, isPending, isError, error, refetch } = useV1AdminTeamMatches(filters);
+
+  // Accumulate rows as pages load
+  useEffect(() => {
+    if (!data?.items) return;
+    if (!cursor) {
+      setAccumulatedRows(data.items);
+    } else {
+      setAccumulatedRows((prev) => [...prev, ...data.items]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const nextCursor = data?.nextCursor ?? data?.pageInfo?.nextCursor ?? null;
+  const hasMore = !!nextCursor;
+
+  const handleLoadMore = () => {
+    if (nextCursor) setCursor(nextCursor);
+  };
+
+  // ── Moderation modal ───────────────────────────────────────────────
+  const [modalRow, setModalRow] = useState<V1AdminTeamMatchRow | null>(null);
+  const mutation = useV1ChangeTeamMatchStatus();
+
+  // ── Toast ──────────────────────────────────────────────────────────
+  const { toasts, showToast } = useAdminToast();
+
+  const handleModalSubmit = (status: string, reason: string) => {
+    if (!modalRow) return;
+    mutation.mutate(
+      { id: modalRow.teamMatchId, status, reason },
+      {
+        onSuccess: () => {
+          setModalRow(null);
+          showToast('처리했어요.', 'success');
+          setAccumulatedRows([]);
+          setCursor(null);
+        },
+        onError: (err) => {
+          showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
+        },
+      },
+    );
+  };
+
+  // ── Table columns ──────────────────────────────────────────────────
+  const columns: AdminTableColumn<V1AdminTeamMatchRow>[] = [
+    {
+      key: 'title',
+      header: '팀매치',
+      render: (row) => (
+        <span className="font-medium text-gray-900">{row.title}</span>
+      ),
+    },
+    {
+      key: 'hostTeamName',
+      header: '호스트팀',
+      render: (row) => (
+        <span className="text-gray-600">{row.hostTeamName}</span>
+      ),
+    },
+    {
+      key: 'sportName',
+      header: '종목',
+      render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+    },
+    {
+      key: 'startAt',
+      header: '일시',
+      render: (row) => (
+        <span className="text-gray-600 tabular-nums">{formatDateTime(row.startAt)}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: '상태',
+      render: (row) => <AdminStatusPill status={row.status} />,
+    },
+  ];
+
+  // ── Loading / error for initial load ───────────────────────────────
+  const isInitialLoad = isPending && accumulatedRows.length === 0;
+
   return (
-    <AdminShell>
+    <>
       <AdminPageHeader
-        eyebrow="팀매치 관리"
-        title="팀 매치"
-        description="팀 대 팀 경기를 관리하세요."
-        action={
-          <Link
-            href="/team-matches/new"
-            className="bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold rounded-xl px-4 h-10 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            <Plus size={15} aria-hidden="true" />
-            팀매치 만들기
-          </Link>
-        }
+        eyebrow="플랫폼 관리"
+        title="팀매치 관리"
+        description="플랫폼 내 모든 팀매치의 상태를 필터링하고 관리해요."
       />
 
-      {isPending ? (
-        <AdminKpiGridSkeleton />
+      {/* Status chip filter — no search box (backend has no q for team-matches) */}
+      <div className="mb-4">
+        <div role="group" aria-label="상태 필터" className="flex items-center gap-1.5 flex-wrap">
+          {STATUS_OPTIONS.map((opt) => {
+            const active = activeStatus === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleStatusChange(opt.value)}
+                aria-pressed={active}
+                className={[
+                  'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                  active
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Data table */}
+      {isInitialLoad ? (
+        <AdminTableSkeleton />
+      ) : isError && accumulatedRows.length === 0 ? (
+        <AdminDataTable<V1AdminTeamMatchRow>
+          columns={columns}
+          rows={[]}
+          keyExtractor={(r) => r.teamMatchId}
+          error={extractErrorMessage(error, '팀매치 목록을 불러오지 못했어요.')}
+          onRetry={() => void refetch()}
+        />
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <AdminKpiCard label="전체" value={stats.all} />
-          <AdminKpiCard label="모집중" value={stats.open} tone="positive" />
-          <AdminKpiCard label="확정됨" value={stats.active} tone="warning" />
-          <AdminKpiCard label="종료" value={stats.done} />
+        <AdminDataTable<V1AdminTeamMatchRow>
+          columns={columns}
+          rows={accumulatedRows}
+          keyExtractor={(r) => r.teamMatchId}
+          actionsHeader="작업"
+          renderActions={
+            canWrite
+              ? (row) => (
+                  <button
+                    type="button"
+                    onClick={() => setModalRow(row)}
+                    aria-label={`${row.title} 상태 변경`}
+                    className="inline-flex items-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap min-w-[80px] justify-center"
+                  >
+                    상태 변경
+                  </button>
+                )
+              : undefined
+          }
+          empty={
+            <AdminEmpty
+              title="검색 결과가 없어요"
+              description="필터를 변경해 보세요."
+            />
+          }
+        />
+      )}
+
+      {/* Load more */}
+      {hasMore && !isInitialLoad && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={isPending}
+            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[14px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            {isPending ? '불러오는 중…' : '더 보기'}
+          </button>
         </div>
       )}
 
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 md:pb-0 md:overflow-x-visible md:flex-wrap">
-        {(Object.entries(FILTER_LABELS) as [FilterKey, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setFilter(key)}
-            aria-pressed={filter === key}
-            className={`px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors flex-shrink-0 min-h-[36px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
-              filter === key
-                ? 'bg-blue-500 text-white'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-            }`}
-          >
-            {label}
-            {key !== 'all' && stats[key] > 0 && (
-              <span className={`ml-1.5 text-[11px] font-bold ${filter === key ? 'text-blue-100' : 'text-gray-400'}`}>
-                {stats[key]}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* Moderation modal */}
+      <AdminReasonModal
+        open={!!modalRow}
+        title="팀매치 상태 변경"
+        currentStatus={modalRow?.status}
+        statusOptions={REASON_MODAL_STATUS_OPTIONS}
+        onSubmit={handleModalSubmit}
+        onClose={() => setModalRow(null)}
+        pending={mutation.isPending}
+      />
 
-      <div className="bg-white rounded-2xl border border-gray-100">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-          <div className="flex items-center gap-2">
-            <Trophy size={16} className="text-gray-400" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-gray-900">팀매치 목록</span>
-          </div>
-          <span className="text-[13px] text-gray-400">{filtered.length}개</span>
-        </div>
-
-        {isError ? (
-          <div className="px-5 py-10 text-center">
-            <p className="text-[14px] text-gray-500 mb-3">
-              {getErrorMessage(error, '팀매치 목록을 불러오지 못했어요.')}
-            </p>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="text-[14px] text-blue-500 font-medium focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-            >
-              다시 시도
-            </button>
-          </div>
-        ) : isPending ? (
-          <AdminListSkeleton rows={5} />
-        ) : filtered.length === 0 ? (
-          filter === 'all' ? (
-            <AdminEmpty
-              icon={<Inbox size={36} />}
-              title="만든 팀매치가 없어요"
-              description="첫 번째 팀매치를 만들어보세요."
-              action={
-                <Link href="/team-matches/new" className="text-[14px] text-blue-500 font-medium">
-                  팀매치 만들기
-                </Link>
-              }
-            />
-          ) : (
-            <AdminEmpty
-              icon={<Filter size={36} />}
-              title="해당하는 팀매치가 없어요"
-              description={`${FILTER_LABELS[filter]} 상태의 팀매치가 없어요.`}
-            />
-          )
-        ) : (
-          filtered.map((m) => {
-            const id =
-              (m as unknown as { teamMatchId?: string }).teamMatchId ??
-              (m as unknown as { id?: string }).id ??
-              (m as unknown as { matchId?: string }).matchId;
-            return (
-              <AdminRow
-                key={id}
-                title={m.title}
-                meta={`${formatDate(m.startsAt)} · ${m.teamName ?? m.teamId ?? ''}`}
-                badge={<AdminBadge status={getStatus(m)} />}
-                href={`/team-matches/${id}`}
-              />
-            );
-          })
-        )}
-      </div>
-    </AdminShell>
+      {/* Toasts */}
+      <AdminToasts toasts={toasts} />
+    </>
   );
 }

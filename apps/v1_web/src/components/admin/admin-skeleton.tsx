@@ -1,8 +1,8 @@
-export function AdminKpiGridSkeleton() {
+export function AdminKpiGridSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
           <div className="h-3 bg-gray-100 rounded-lg w-16 mb-3" />
           <div className="h-8 bg-gray-100 rounded-lg w-12" />
         </div>
@@ -30,6 +30,30 @@ export function AdminListSkeleton({ rows = 5 }: { rows?: number }) {
   );
 }
 
+export function AdminTableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+      {/* Fake thead */}
+      <div className="flex gap-4 px-4 py-3 border-b border-gray-100 bg-gray-50">
+        {Array.from({ length: cols }).map((_, i) => (
+          <div key={i} className="h-3 bg-gray-200 rounded-lg flex-1" />
+        ))}
+      </div>
+      {/* Fake rows */}
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="flex gap-4 px-4 py-3.5 border-b border-gray-50 last:border-0"
+        >
+          {Array.from({ length: cols }).map((_, j) => (
+            <div key={j} className="h-4 bg-gray-100 rounded-lg flex-1" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AdminPageSkeleton() {
   return (
     <div className="animate-pulse">
@@ -44,17 +68,7 @@ export function AdminPageSkeleton() {
         <div className="h-10 bg-gray-100 rounded-xl w-28" />
         <div className="h-10 bg-gray-100 rounded-xl w-24" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-              <div className="h-4 bg-gray-100 rounded-lg w-20" />
-              <div className="h-3 bg-gray-100 rounded-lg w-12" />
-            </div>
-            <AdminListSkeleton rows={3} />
-          </div>
-        ))}
-      </div>
+      <AdminTableSkeleton rows={5} cols={4} />
     </div>
   );
 }

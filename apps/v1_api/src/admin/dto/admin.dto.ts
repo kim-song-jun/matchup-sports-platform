@@ -1,6 +1,95 @@
 import { Type } from 'class-transformer';
 import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
+// ─── List query DTOs ──────────────────────────────────────────────────────────
+
+export class AdminUserListQueryDto {
+  @IsOptional()
+  @IsIn(['active', 'suspended', 'blocked', 'withdrawal_pending', 'deleted'])
+  status?: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class AdminMatchListQueryDto {
+  @IsOptional()
+  @IsIn(['recruiting', 'closed', 'cancelled', 'completed', 'archived'])
+  status?: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived';
+
+  @IsOptional()
+  @IsUUID()
+  sportId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class AdminTeamListQueryDto {
+  @IsOptional()
+  @IsIn(['active', 'suspended', 'archived'])
+  status?: 'active' | 'suspended' | 'archived';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class AdminTeamMatchListQueryDto {
+  @IsOptional()
+  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'archived'])
+  status?: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
 export class AdminOverviewQueryDto {
   @IsOptional()
   @IsDateString()

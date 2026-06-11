@@ -577,22 +577,26 @@ export const v1HomeFixture: V1Home = {
 };
 
 export const v1AdminOverviewFixture: V1AdminOverview = {
-  users: 12,
-  matches: 3,
-  teams: 4,
-  teamMatches: 2,
-  pendingActions: 1,
+  users: { active: 10, suspended: 1, blocked: 1, withdrawalPending: 0 },
+  matches: { recruiting: 2, cancelled: 0, completed: 1 },
+  teams: { active: 4, suspended: 0, archived: 0 },
+  teamMatches: { recruiting: 1, matched: 1, cancelled: 0 },
+  recentActions: [
+    { actionLogId: 'alog-1', actionType: 'status_change', targetType: 'user', createdAt: '2026-05-18T09:00:00.000Z' },
+  ],
 };
 
 export const v1AdminLogsFixture: CursorPage<V1AdminLog> = {
   items: [
     {
-      id: 'admin-log-1',
-      actorId: 'admin-1',
-      action: 'status_check',
-      targetType: 'system',
-      targetId: 'v1',
-      reason: 'smoke',
+      actionLogId: 'admin-log-1',
+      adminUserId: 'admin-1',
+      actionType: 'status_change',
+      targetType: 'user',
+      targetId: 'user-1',
+      reason: 'smoke test',
+      beforeState: null,
+      afterState: null,
       createdAt: '2026-05-18T09:00:00.000Z',
     },
   ],

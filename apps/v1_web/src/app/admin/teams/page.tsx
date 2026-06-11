@@ -1,226 +1,288 @@
 'use client';
 
-import Link from 'next/link';
-import { Users, Plus, UserCheck, Inbox } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  useV1MyTeams,
-  useV1TeamJoinApplications,
-  useV1ApproveTeamJoinApplication,
-  useV1RejectTeamJoinApplication,
+  useV1AdminTeams,
+  useV1AdminMe,
+  useV1ChangeTeamStatus,
 } from '@/hooks/use-v1-api';
+import type { V1AdminTeamRow } from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
 import {
-  AdminShell,
   AdminPageHeader,
-  AdminKpiCard,
-  AdminBadge,
-  AdminRow,
+  AdminDataTable,
+  AdminFilterBar,
+  AdminStatusPill,
+  AdminReasonModal,
   AdminEmpty,
-  AdminListSkeleton,
+  AdminTableSkeleton,
+  STATUS_META,
+  useAdminToast,
+  AdminToasts,
 } from '@/components/admin';
+import type { AdminTableColumn } from '@/components/admin';
 
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-    return (err as { message: string }).message;
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
   }
-  return fallback;
 }
 
-function roleLabel(role: string) {
-  if (role === 'owner') return '팀장';
-  if (role === 'manager') return '운영진';
-  return '멤버';
-}
+// ── Status filter options ─────────────────────────────────────────────────
 
-// Sub-component: handles one team's join applications
-// (hooks must be called per-component, NOT in a loop)
-function TeamApplicationsSection({ teamId, teamName }: { teamId: string; teamName: string }) {
-  const { data, refetch } = useV1TeamJoinApplications(
-    teamId,
-    { status: 'pending' },
-    { enabled: true },
-  );
-  const approveMutation = useV1ApproveTeamJoinApplication(teamId);
-  const rejectMutation = useV1RejectTeamJoinApplication(teamId);
-  const apps = data?.items ?? [];
+const STATUS_OPTIONS = [
+  { value: '', label: '전체' },
+  { value: 'active', label: '활성' },
+  { value: 'suspended', label: '정지' },
+  { value: 'archived', label: '보관' },
+];
 
-  if (apps.length === 0) return null;
+const REASON_MODAL_STATUS_OPTIONS = [
+  { value: 'active', label: STATUS_META['active']?.label ?? '활성' },
+  { value: 'suspended', label: STATUS_META['suspended']?.label ?? '정지' },
+  { value: 'archived', label: STATUS_META['archived']?.label ?? '보관' },
+];
 
-  const handleApprove = async (applicationId: string) => {
-    try {
-      await approveMutation.mutateAsync({ applicationId });
-      void refetch();
-    } catch (err) {
-      alert(getErrorMessage(err, '수락 처리에 실패했어요.'));
-    }
-  };
-
-  const handleReject = async (applicationId: string) => {
-    try {
-      await rejectMutation.mutateAsync({ applicationId });
-      void refetch();
-    } catch (err) {
-      alert(getErrorMessage(err, '거절 처리에 실패했어요.'));
-    }
-  };
-
-  return (
-    <>
-      <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-100">
-        <span className="text-[12px] font-semibold text-gray-500">{teamName}</span>
-      </div>
-      {apps.map((app) => (
-        <div
-          key={app.applicationId}
-          className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-0 min-h-[56px]"
-        >
-          <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-semibold text-gray-900 truncate">
-              {app.applicant.displayName}
-            </p>
-            <p className="text-[13px] text-gray-400 mt-0.5">{teamName} 가입 신청</p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => void handleApprove(app.applicationId)}
-              disabled={approveMutation.isPending || rejectMutation.isPending}
-              className="bg-blue-500 hover:bg-blue-600 text-white text-[13px] font-semibold rounded-lg px-3.5 min-h-[44px] md:min-h-[36px] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              수락
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleReject(app.applicationId)}
-              disabled={approveMutation.isPending || rejectMutation.isPending}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-[13px] font-medium rounded-lg px-3.5 min-h-[44px] md:min-h-[36px] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              거절
-            </button>
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
-// We pre-render up to N manager teams; React hooks require fixed call count at component level.
-// Strategy: render fixed-size slots (up to 10), show nothing for unused slots.
-function ApplicationsPanel({ managerTeams }: { managerTeams: { teamId: string; name: string }[] }) {
-  // Render all at once — each TeamApplicationsSection self-hides if empty
-  return (
-    <>
-      {managerTeams.map((t) => (
-        <TeamApplicationsSection key={t.teamId} teamId={t.teamId} teamName={t.name} />
-      ))}
-    </>
-  );
-}
+// ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamsPage() {
-  const { data: teamsData, isPending, isError, error, refetch } = useV1MyTeams();
-  const teams = teamsData?.items ?? [];
+  // ── Admin capabilities ─────────────────────────────────────────────
+  const { data: adminMe } = useV1AdminMe();
+  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
 
-  const managerTeams = teams.filter((t) => t.role === 'owner' || t.role === 'manager');
+  // ── Filter state ───────────────────────────────────────────────────
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const [activeStatus, setActiveStatus] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // URL searchParam pre-selection on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const s = params.get('status') ?? '';
+    if (s) setActiveStatus(s);
+  }, []);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQ(value);
+      setAccumulatedRows([]);
+      setCursor(null);
+    }, 300);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setActiveStatus(value);
+    setAccumulatedRows([]);
+    setCursor(null);
+  };
+
+  // ── Cursor pagination ──────────────────────────────────────────────
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamRow[]>([]);
+
+  const filters = {
+    ...(debouncedQ ? { q: debouncedQ } : {}),
+    ...(activeStatus ? { status: activeStatus } : {}),
+    ...(cursor ? { cursor } : {}),
+    limit: 20,
+  };
+
+  const { data, isPending, isError, error, refetch } = useV1AdminTeams(filters);
+
+  // Accumulate rows as pages load
+  useEffect(() => {
+    if (!data?.items) return;
+    if (!cursor) {
+      // First page (filters changed) — replace
+      setAccumulatedRows(data.items);
+    } else {
+      // Subsequent pages — append
+      setAccumulatedRows((prev) => [...prev, ...data.items]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const nextCursor = data?.nextCursor ?? data?.pageInfo?.nextCursor ?? null;
+  const hasMore = !!nextCursor;
+
+  const handleLoadMore = () => {
+    if (nextCursor) setCursor(nextCursor);
+  };
+
+  // ── Moderation modal ───────────────────────────────────────────────
+  const [modalRow, setModalRow] = useState<V1AdminTeamRow | null>(null);
+  const mutation = useV1ChangeTeamStatus();
+
+  // ── Toast ──────────────────────────────────────────────────────────
+  const { toasts, showToast } = useAdminToast();
+
+  const handleModalSubmit = (status: string, reason: string) => {
+    if (!modalRow) return;
+    mutation.mutate(
+      { id: modalRow.teamId, status, reason },
+      {
+        onSuccess: () => {
+          setModalRow(null);
+          showToast('처리했어요.', 'success');
+          // Reset to first page so updated row is re-fetched
+          setAccumulatedRows([]);
+          setCursor(null);
+        },
+        onError: (err) => {
+          showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
+        },
+      },
+    );
+  };
+
+  // ── Table columns ──────────────────────────────────────────────────
+  const columns: AdminTableColumn<V1AdminTeamRow>[] = [
+    {
+      key: 'name',
+      header: '팀',
+      render: (row) => (
+        <span className="font-medium text-gray-900">{row.name}</span>
+      ),
+    },
+    {
+      key: 'sportName',
+      header: '종목',
+      render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+    },
+    {
+      key: 'ownerName',
+      header: '소유자',
+      render: (row) => (
+        <span className="text-gray-600">{row.ownerName ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'members',
+      header: '인원',
+      align: 'right',
+      className: 'tabular-nums',
+      render: (row) => (
+        <span className="text-gray-600">
+          멤버 {row.memberCount} · 운영 {row.managerCount}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: '상태',
+      render: (row) => <AdminStatusPill status={row.status} />,
+    },
+    {
+      key: 'createdAt',
+      header: '생성일',
+      render: (row) => (
+        <span className="text-gray-500 text-[13px]">{formatDate(row.createdAt)}</span>
+      ),
+    },
+  ];
+
+  // ── Loading / error for initial load ───────────────────────────────
+  const isInitialLoad = isPending && accumulatedRows.length === 0;
 
   return (
-    <AdminShell>
+    <>
       <AdminPageHeader
-        eyebrow="팀 운영"
-        title="내 팀"
-        description="소속 팀과 가입 신청을 관리하세요."
-        action={
-          <Link
-            href="/teams/new"
-            className="bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold rounded-xl px-4 h-10 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            <Plus size={15} aria-hidden="true" />
-            팀 만들기
-          </Link>
-        }
+        eyebrow="플랫폼 관리"
+        title="팀 관리"
+        description="플랫폼 내 모든 팀의 상태를 검색하고 관리해요."
       />
 
-      {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <AdminKpiCard label="소속 팀" value={teams.length} icon={<Users size={16} />} />
-        <AdminKpiCard
-          label="관리 중인 팀"
-          value={managerTeams.length}
-          icon={<UserCheck size={16} />}
-          tone="positive"
+      {/* Filter bar */}
+      <div className="mb-4">
+        <AdminFilterBar
+          searchLabel="팀명 검색"
+          searchPlaceholder="팀명 검색"
+          searchValue={searchInput}
+          onSearchChange={handleSearchChange}
+          statusOptions={STATUS_OPTIONS}
+          activeStatus={activeStatus}
+          onStatusChange={handleStatusChange}
         />
       </div>
 
-      {/* Pending applications — only for manager/owner teams */}
-      {!isPending && managerTeams.length > 0 && (
-        <div className="bg-white rounded-2xl border border-amber-100 mb-4">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
-            <UserCheck size={16} className="text-amber-500" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-gray-900">가입 신청</span>
-            <span className="text-[12px] text-amber-600 font-medium ml-auto">관리자만 볼 수 있어요</span>
-          </div>
-          <ApplicationsPanel managerTeams={managerTeams} />
-          {/* Fallback: shown if ApplicationsPanel renders nothing */}
-          <div id="no-apps-fallback" className="hidden last:block px-5 py-8 text-center text-[14px] text-gray-400">
-            대기 중인 가입 신청이 없어요.
-          </div>
+      {/* Data table */}
+      {isInitialLoad ? (
+        <AdminTableSkeleton />
+      ) : isError && accumulatedRows.length === 0 ? (
+        <AdminDataTable<V1AdminTeamRow>
+          columns={columns}
+          rows={[]}
+          keyExtractor={(r) => r.teamId}
+          error={extractErrorMessage(error, '팀 목록을 불러오지 못했어요.')}
+          onRetry={() => void refetch()}
+        />
+      ) : (
+        <AdminDataTable<V1AdminTeamRow>
+          columns={columns}
+          rows={accumulatedRows}
+          keyExtractor={(r) => r.teamId}
+          actionsHeader="작업"
+          renderActions={
+            canWrite
+              ? (row) => (
+                  <button
+                    type="button"
+                    onClick={() => setModalRow(row)}
+                    aria-label={`${row.name} 상태 변경`}
+                    className="inline-flex items-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap min-w-[80px] justify-center"
+                  >
+                    상태 변경
+                  </button>
+                )
+              : undefined
+          }
+          empty={
+            <AdminEmpty
+              title="검색 결과가 없어요"
+              description="검색어나 필터를 변경해 보세요."
+            />
+          }
+        />
+      )}
+
+      {/* Load more */}
+      {hasMore && !isInitialLoad && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={isPending}
+            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[14px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            {isPending ? '불러오는 중…' : '더 보기'}
+          </button>
         </div>
       )}
 
-      {/* Teams list */}
-      <div className="bg-white rounded-2xl border border-gray-100">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-gray-400" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-gray-900">소속 팀 목록</span>
-          </div>
-          <span className="text-[13px] text-gray-400">{teams.length}개</span>
-        </div>
+      {/* Moderation modal */}
+      <AdminReasonModal
+        open={!!modalRow}
+        title="팀 상태 변경"
+        currentStatus={modalRow?.status}
+        statusOptions={REASON_MODAL_STATUS_OPTIONS}
+        onSubmit={handleModalSubmit}
+        onClose={() => setModalRow(null)}
+        pending={mutation.isPending}
+      />
 
-        {isPending ? (
-          <AdminListSkeleton />
-        ) : isError ? (
-          <div className="px-5 py-10 text-center">
-            <p className="text-[14px] text-gray-500 mb-3">
-              {getErrorMessage(error, '팀 목록을 불러오지 못했어요.')}
-            </p>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="text-[14px] text-blue-500 font-medium"
-            >
-              다시 시도
-            </button>
-          </div>
-        ) : teams.length === 0 ? (
-          <AdminEmpty
-            icon={<Inbox size={36} />}
-            title="소속된 팀이 없어요"
-            description="새 팀을 만들거나 기존 팀에 가입해보세요."
-            action={
-              <Link href="/teams/new" className="text-[14px] text-blue-500 font-medium">
-                팀 만들기
-              </Link>
-            }
-          />
-        ) : (
-          teams.map((team) => (
-            <AdminRow
-              key={team.teamId}
-              title={team.name}
-              meta={`${team.sport.name} · ${team.memberCount}명`}
-              badge={<AdminBadge status={team.role} label={roleLabel(team.role)} />}
-              actions={
-                <Link
-                  href={team.detailRoute}
-                  className="text-[13px] text-blue-500 font-medium hover:text-blue-600 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-                >
-                  팀 홈 →
-                </Link>
-              }
-            />
-          ))
-        )}
-      </div>
-    </AdminShell>
+      {/* Toasts */}
+      <AdminToasts toasts={toasts} />
+    </>
   );
 }

@@ -1,288 +1,208 @@
 'use client';
 
 import Link from 'next/link';
-import { Swords, Users, Bell, Star, Plus, ArrowRight, TrendingUp, BarChart3, Zap } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useV1AdminOverview } from '@/hooks/use-v1-api';
 import {
-  useV1MyMatches,
-  useV1MyTeams,
-  useV1Notifications,
-  useV1Profile,
-  useV1Reviews,
-  useV1MyActivitySummary,
-} from '@/hooks/use-v1-api';
-import {
-  AdminEmpty,
   AdminKpiCard,
-  AdminListSkeleton,
+  AdminKpiGridSkeleton,
   AdminPageHeader,
-  AdminRow,
-  AdminShell,
-  AdminBadge,
+  AdminStatusPill,
 } from '@/components/admin';
+import { adminActionLabel } from '@/lib/admin-labels';
 
-function roleLabel(role: string) {
-  if (role === 'owner') return '팀장';
-  if (role === 'manager') return '운영진';
-  return '멤버';
-}
-
-function formatDate(dateStr?: string) {
-  if (!dateStr) return '날짜 미정';
+// ── Date helpers ──────────────────────────────────────────────────────────
+function formatRelativeTime(dateStr: string): string {
   try {
-    const d = new Date(dateStr);
-    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60_000);
+    if (minutes < 1) return '방금 전';
+    if (minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(hours / 24);
+    return `${days}일 전`;
   } catch {
     return dateStr;
   }
 }
 
-export default function AdminPage() {
-  const profileQ = useV1Profile();
-  const matchesQ = useV1MyMatches({ limit: 5 });
-  const teamsQ = useV1MyTeams();
-  const notificationsQ = useV1Notifications({ limit: 5 });
-  const reviewsQ = useV1Reviews({ limit: 10 });
-  const activityQ = useV1MyActivitySummary();
+function targetTypeLabel(targetType: string): string {
+  const map: Record<string, string> = {
+    user: '회원',
+    match: '매치',
+    team: '팀',
+    team_match: '팀매치',
+  };
+  return map[targetType] ?? targetType;
+}
 
-  const profile = profileQ.data;
-  const matches = matchesQ.data;
-  const teams = teamsQ.data;
-  const notifications = notificationsQ.data;
-  const reviews = reviewsQ.data;
-  const activity = activityQ.data;
+// ── Warning card ──────────────────────────────────────────────────────────
+interface WarningCardProps {
+  label: string;
+  value: number;
+  tone: 'warning' | 'danger';
+  href: string;
+}
 
-  const displayName =
-    profile?.profile?.displayName ??
-    (profile as unknown as { displayName?: string })?.displayName ??
-    '운영자';
-  const pendingReviews = reviews?.items.filter((r) => r.state === 'ready').length ?? 0;
-  const unreadCount = notifications?.unreadCount ?? 0;
+function WarningCard({ label, value, tone, href }: WarningCardProps) {
+  return (
+    <AdminKpiCard
+      label={label}
+      value={value}
+      tone={value > 0 ? tone : 'neutral'}
+      href={href}
+      ariaLabel={`${label}: ${value}건`}
+    />
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────
+export default function AdminOverviewPage() {
+  const { data: overview, isPending, isError, refetch } = useV1AdminOverview();
+
+  // Warning items require attention
+  const warningSuspendedBlocked =
+    (overview?.users.suspended ?? 0) + (overview?.users.blocked ?? 0);
+  const warningWithdrawalPending = overview?.users.withdrawalPending ?? 0;
+  const warningCancelledMatches = overview?.matches.cancelled ?? 0;
+  const totalWarnings = warningSuspendedBlocked + warningWithdrawalPending + warningCancelledMatches;
 
   return (
-    <AdminShell>
-      {/* Page greeting */}
-      <div className="mb-6 md:mb-7">
-        <h1 className="text-[22px] md:text-[24px] font-bold text-gray-900 mb-1">
-          안녕하세요, {displayName}님
-        </h1>
-        <p className="text-[13px] md:text-[14px] text-gray-500">오늘의 운영 현황을 정리했어요.</p>
-      </div>
+    <>
+      <AdminPageHeader
+        eyebrow="운영 대시보드"
+        title="운영 개요"
+        description="플랫폼 현황을 한눈에 확인해요."
+      />
 
-      {/* KPI row — 4-up on md+ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <AdminKpiCard label="내 매치" value={matches?.items.length ?? 0} icon={<Swords size={16} />} href="/admin/matches" />
-        <AdminKpiCard label="내 팀" value={teams?.items.length ?? 0} icon={<Users size={16} />} href="/admin/teams" />
-        <AdminKpiCard
-          label="읽지 않은 알림"
-          value={unreadCount}
-          tone={unreadCount > 0 ? 'warning' : 'neutral'}
-          icon={<Bell size={16} />}
-          href="/admin/notifications"
-        />
-        <AdminKpiCard
-          label="미작성 리뷰"
-          value={pendingReviews}
-          tone={pendingReviews > 0 ? 'warning' : 'neutral'}
-          icon={<Star size={16} />}
-          href="/admin/reviews"
-        />
-      </div>
-
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <Link
-          href="/matches/new"
-          className="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white text-[14px] font-semibold rounded-xl px-5 h-11 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          <Plus size={16} aria-hidden="true" />
-          매치 만들기
-        </Link>
-        <Link
-          href="/team-matches/new"
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-[14px] font-medium rounded-xl px-4 h-11 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          <Zap size={15} aria-hidden="true" />
-          팀매치 만들기
-        </Link>
-        <Link
-          href="/teams/new"
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-[14px] font-medium rounded-xl px-4 h-11 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          <Users size={15} aria-hidden="true" />
-          팀 만들기
-        </Link>
-      </div>
-
-      {/* Activity summary — inline with lists on xl screens */}
-      {activity && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 size={17} className="text-blue-500" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-gray-900">이번 달 활동</span>
-          </div>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-            <div className="text-center md:col-span-1">
-              <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{activity.monthly.matchCount}</p>
-              <p className="text-[12px] text-gray-500 mt-0.5">매치 참여</p>
-            </div>
-            <div className="text-center md:col-span-1">
-              <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">
-                {activity.monthly.mannerScore != null ? activity.monthly.mannerScore.toFixed(1) : '—'}
-              </p>
-              <p className="text-[12px] text-gray-500 mt-0.5">매너 점수</p>
-            </div>
-            <div className="text-center md:col-span-1">
-              <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">
-                {activity.monthly.winRate != null ? `${Math.round(activity.monthly.winRate * 100)}%` : '—'}
-              </p>
-              <p className="text-[12px] text-gray-500 mt-0.5">승률</p>
-            </div>
-            {/* Totals — shown inline on md+ */}
-            <div className="hidden md:block text-center col-span-1">
-              <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{activity.totals.activityCount}</p>
-              <p className="text-[12px] text-gray-500 mt-0.5">누적 활동</p>
-            </div>
-            <div className="hidden md:block text-center col-span-1">
-              <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{activity.totals.teamCount}</p>
-              <p className="text-[12px] text-gray-500 mt-0.5">팀 활동</p>
-            </div>
-            <div className="hidden md:block text-center col-span-1">
-              <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">
-                {activity.totals.mannerScore != null ? activity.totals.mannerScore.toFixed(1) : '—'}
-              </p>
-              <p className="text-[12px] text-gray-500 mt-0.5">누적 매너</p>
-            </div>
-          </div>
+      {/* ── Primary KPIs ─────────────────────────────────────────────── */}
+      {isPending ? (
+        <AdminKpiGridSkeleton count={4} />
+      ) : isError ? (
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3">
+          <p className="text-sm text-red-600 flex-1">현황 데이터를 불러오지 못했어요.</p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-sm text-red-600 font-semibold underline underline-offset-2 min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <AdminKpiCard
+            label="활성 회원"
+            value={overview?.users.active ?? 0}
+            tone="neutral"
+            href="/admin/users?status=active"
+            ariaLabel={`활성 회원: ${overview?.users.active ?? 0}명`}
+          />
+          <AdminKpiCard
+            label="활성 매치"
+            value={overview?.matches.recruiting ?? 0}
+            tone="neutral"
+            href="/admin/matches?status=recruiting"
+            ariaLabel={`활성 매치: ${overview?.matches.recruiting ?? 0}건`}
+          />
+          <AdminKpiCard
+            label="활성 팀"
+            value={overview?.teams.active ?? 0}
+            tone="neutral"
+            href="/admin/teams?status=active"
+            ariaLabel={`활성 팀: ${overview?.teams.active ?? 0}개`}
+          />
+          <AdminKpiCard
+            label="모집중 팀매치"
+            value={overview?.teamMatches.recruiting ?? 0}
+            tone="neutral"
+            href="/admin/team-matches?status=recruiting"
+            ariaLabel={`모집중 팀매치: ${overview?.teamMatches.recruiting ?? 0}건`}
+          />
         </div>
       )}
 
-      {/* Recent lists — 2-column side-by-side on md+ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-gray-100">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <div className="flex items-center gap-2">
-              <Swords size={16} className="text-gray-400" aria-hidden="true" />
-              <span className="text-[15px] font-bold text-gray-900">최근 매치</span>
+      {/* ── Warning section ───────────────────────────────────────────── */}
+      {!isPending && !isError && (
+        <section aria-label="주의 필요 항목" className="mb-6">
+          <h2 className="text-[14px] font-semibold text-gray-700 mb-3">주의 필요</h2>
+          {totalWarnings === 0 ? (
+            <div className="flex items-center gap-2.5 p-4 bg-green-50 border border-green-100 rounded-xl">
+              <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
+              <p className="text-[14px] text-green-700">지금은 조치가 필요한 항목이 없어요.</p>
             </div>
-            <Link
-              href="/admin/matches"
-              className="flex items-center gap-0.5 text-[13px] text-blue-500 font-medium hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-            >
-              전체 보기 <ArrowRight size={13} aria-hidden="true" />
-            </Link>
-          </div>
-          {matchesQ.isPending ? (
-            <AdminListSkeleton rows={3} />
-          ) : !matches?.items.length ? (
-            <AdminEmpty icon={<Swords size={32} />} title="만든 매치가 없어요"
-              action={<Link href="/matches/new" className="text-[13px] text-blue-500 font-medium">매치 만들기</Link>} />
           ) : (
-            matches.items.slice(0, 5).map((m) => {
-              const id = (m as unknown as { id?: string; matchId?: string }).id ?? (m as unknown as { matchId?: string }).matchId;
-              return (
-                <AdminRow
-                  key={id ?? m.title}
-                  title={m.title}
-                  meta={`${formatDate(m.startsAt)} · ${m.participantCount ?? 0}/${m.capacity ?? '?'}명`}
-                  badge={<AdminBadge status={m.status} />}
-                  href={`/matches/${id}`}
-                />
-              );
-            })
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <div className="flex items-center gap-2">
-              <Users size={16} className="text-gray-400" aria-hidden="true" />
-              <span className="text-[15px] font-bold text-gray-900">내 팀</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <WarningCard
+                label="정지·차단 회원"
+                value={warningSuspendedBlocked}
+                tone="danger"
+                href="/admin/users?status=suspended"
+              />
+              <WarningCard
+                label="탈퇴 대기"
+                value={warningWithdrawalPending}
+                tone="warning"
+                href="/admin/users?status=withdrawal_pending"
+              />
+              <WarningCard
+                label="취소 매치"
+                value={warningCancelledMatches}
+                tone="warning"
+                href="/admin/matches?status=cancelled"
+              />
             </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Recent actions panel ──────────────────────────────────────── */}
+      {!isPending && !isError && (
+        <section aria-label="최근 운영 활동" className="bg-white rounded-2xl border border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+            <h2 className="text-[15px] font-bold text-gray-900">최근 운영 활동</h2>
             <Link
-              href="/admin/teams"
-              className="flex items-center gap-0.5 text-[13px] text-blue-500 font-medium hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+              href="/admin/audit"
+              className="flex items-center gap-0.5 text-[13px] text-blue-500 font-medium hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
             >
-              전체 보기 <ArrowRight size={13} aria-hidden="true" />
+              전체 보기
+              <ArrowRight size={13} aria-hidden="true" />
             </Link>
           </div>
-          {teamsQ.isPending ? (
-            <AdminListSkeleton rows={3} />
-          ) : !teams?.items.length ? (
-            <AdminEmpty icon={<Users size={32} />} title="소속된 팀이 없어요"
-              action={<Link href="/teams/new" className="text-[13px] text-blue-500 font-medium">팀 만들기</Link>} />
+
+          {!overview?.recentActions?.length ? (
+            <div className="py-10 text-center">
+              <p className="text-[14px] text-gray-400">최근 운영 활동이 없어요.</p>
+            </div>
           ) : (
-            teams.items.slice(0, 5).map((t) => (
-              <AdminRow
-                key={t.teamId}
-                title={t.name}
-                meta={`${t.sport.name} · ${t.memberCount}명`}
-                badge={<AdminBadge status={t.role} label={roleLabel(t.role)} />}
-                href={t.detailRoute}
-              />
-            ))
+            <ul role="list">
+              {overview.recentActions.map((action) => (
+                <li
+                  key={action.actionLogId}
+                  className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-50 last:border-0"
+                >
+                  {/* Status pill for targetType */}
+                  <AdminStatusPill status={action.targetType} label={targetTypeLabel(action.targetType)} />
+
+                  {/* Action description */}
+                  <span className="flex-1 text-[13px] text-gray-700 truncate">
+                    {adminActionLabel(action.actionType)}
+                  </span>
+
+                  {/* Relative time */}
+                  <time
+                    dateTime={action.createdAt}
+                    className="text-[12px] text-gray-400 shrink-0 tabular-nums"
+                  >
+                    {formatRelativeTime(action.createdAt)}
+                  </time>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
-      </div>
-
-      {/* Unread notifications — full-width strip */}
-      {unreadCount > 0 && notifications && (
-        <div className="bg-white rounded-2xl border border-blue-100 mt-4">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <div className="flex items-center gap-2">
-              <Bell size={16} className="text-blue-500" aria-hidden="true" />
-              <span className="text-[15px] font-bold text-gray-900">읽지 않은 알림</span>
-              <span className="bg-blue-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5" aria-label={`${unreadCount}개 안 읽음`}>
-                {unreadCount}
-              </span>
-            </div>
-            <Link
-              href="/admin/notifications"
-              className="flex items-center gap-0.5 text-[13px] text-blue-500 font-medium focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-            >
-              전체 보기 <ArrowRight size={13} aria-hidden="true" />
-            </Link>
-          </div>
-          {notifications.items
-            .filter((n) => n.status === 'created')
-            .slice(0, 3)
-            .map((n) => (
-              <AdminRow
-                key={n.notificationId}
-                title={n.title}
-                meta={n.body ?? undefined}
-                badge={<AdminBadge status="created" label="새 알림" />}
-                href={n.target.route ?? undefined}
-                leftIcon={<span className="w-2 h-2 bg-blue-500 rounded-full block" aria-hidden="true" />}
-              />
-            ))}
-        </div>
+        </section>
       )}
-
-      {/* Totals — mobile-only (collapsed on md+ into activity panel) */}
-      {activity && (
-        <div className="bg-white rounded-2xl border border-gray-100 mt-4 p-5 md:hidden">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={17} className="text-green-500" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-gray-900">누적 활동</span>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">{activity.totals.activityCount}</p>
-              <p className="text-[12px] text-gray-500 mt-0.5">총 활동</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">{activity.totals.teamCount}</p>
-              <p className="text-[12px] text-gray-500 mt-0.5">팀 활동</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">
-                {activity.totals.mannerScore != null ? activity.totals.mannerScore.toFixed(1) : '—'}
-              </p>
-              <p className="text-[12px] text-gray-500 mt-0.5">매너 점수</p>
-            </div>
-          </div>
-        </div>
-      )}
-    </AdminShell>
+    </>
   );
 }

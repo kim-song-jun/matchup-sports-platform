@@ -4,7 +4,11 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AdminLogsQueryDto,
+  AdminMatchListQueryDto,
   AdminOverviewQueryDto,
+  AdminTeamListQueryDto,
+  AdminTeamMatchListQueryDto,
+  AdminUserListQueryDto,
   ChangeMatchStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
@@ -71,5 +75,48 @@ export class AdminController {
   @Get('status-change-logs')
   statusChangeLogs(@CurrentUser() user: V1AuthUser, @Query() query: AdminLogsQueryDto) {
     return this.adminService.statusChangeLogs(user, query);
+  }
+
+  // ─── Users ────────────────────────────────────────────────────────────────
+
+  @Get('users')
+  listUsers(@CurrentUser() user: V1AuthUser, @Query() query: AdminUserListQueryDto) {
+    return this.adminService.listUsers(user, query);
+  }
+
+  @Get('users/:userId')
+  getUser(@CurrentUser() user: V1AuthUser, @Param('userId') userId: string) {
+    return this.adminService.getUser(user, userId);
+  }
+
+  // ─── Matches ──────────────────────────────────────────────────────────────
+
+  @Get('matches')
+  listMatches(@CurrentUser() user: V1AuthUser, @Query() query: AdminMatchListQueryDto) {
+    return this.adminService.listMatches(user, query);
+  }
+
+  @Get('matches/:matchId')
+  getMatch(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.adminService.getMatch(user, matchId);
+  }
+
+  // ─── Teams ────────────────────────────────────────────────────────────────
+
+  @Get('teams')
+  listTeams(@CurrentUser() user: V1AuthUser, @Query() query: AdminTeamListQueryDto) {
+    return this.adminService.listTeams(user, query);
+  }
+
+  @Get('teams/:teamId')
+  getTeam(@CurrentUser() user: V1AuthUser, @Param('teamId') teamId: string) {
+    return this.adminService.getTeam(user, teamId);
+  }
+
+  // ─── Team Matches ─────────────────────────────────────────────────────────
+
+  @Get('team-matches')
+  listTeamMatches(@CurrentUser() user: V1AuthUser, @Query() query: AdminTeamMatchListQueryDto) {
+    return this.adminService.listTeamMatches(user, query);
   }
 }

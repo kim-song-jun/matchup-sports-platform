@@ -1069,19 +1069,140 @@ export type V1Home = {
 };
 
 export type V1AdminOverview = {
-  users: number;
-  matches: number;
-  teams: number;
-  teamMatches: number;
-  pendingActions: number;
+  users: { active: number; suspended: number; blocked: number; withdrawalPending: number };
+  matches: { recruiting: number; cancelled: number; completed: number };
+  teams: { active: number; suspended: number; archived: number };
+  teamMatches: { recruiting: number; matched: number; cancelled: number };
+  recentActions: { actionLogId: string; actionType: string; targetType: string; createdAt: string }[];
 };
 
 export type V1AdminLog = {
-  id: string;
-  actorId: string;
-  action: string;
+  actionLogId: string;
+  adminUserId: string;
+  actionType: string;
   targetType: string;
   targetId: string;
   reason: string | null;
+  beforeState: unknown;
+  afterState: unknown;
   createdAt: string;
+};
+
+export type V1AdminStatusChangeLog = {
+  statusChangeLogId: string;
+  targetType: string;
+  targetId: string;
+  fromStatus: string;
+  toStatus: string;
+  actorUserId: string | null;
+  adminUserId: string | null;
+  reason: string | null;
+  createdAt: string;
+};
+
+export type V1AdminMe = {
+  userId: string;
+  adminUserId: string;
+  adminRole: 'owner' | 'ops' | 'support';
+  status: 'active';
+  capabilities: string[];
+  lastActiveAt: string | null;
+};
+
+export type V1AdminUserRow = {
+  userId: string;
+  nickname: string | null;
+  displayName: string | null;
+  email: string | null;
+  accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
+  onboardingStatus: string;
+  lastLoginAt: string | null;
+  createdAt: string;
+  hostedMatchCount: number;
+  ownedTeamCount: number;
+  membershipCount: number;
+  adminRole: 'owner' | 'ops' | 'support' | null;
+};
+
+export type V1AdminUserDetail = V1AdminUserRow & {
+  reputationSummary: {
+    trustState: string;
+    mannerScore: string | null;
+    reviewCount: number;
+    calculatedAt: string | null;
+  } | null;
+  hostedMatches: { matchId: string; title: string; status: string; startAt: string }[];
+  ownedTeams: { teamId: string; name: string; status: string; memberCount: number }[];
+};
+
+export type V1AdminMatchRow = {
+  matchId: string;
+  title: string;
+  sportName: string;
+  sportCode: string;
+  hostUserId: string;
+  hostName: string | null;
+  placeName: string;
+  startAt: string;
+  status: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived';
+  participantCount: number;
+  maxParticipants: number;
+  createdAt: string;
+};
+
+export type V1AdminMatchDetail = V1AdminMatchRow & {
+  description: string | null;
+  regionName: string | null;
+  deadlineAt: string | null;
+  applicationCount: number;
+};
+
+export type V1AdminTeamRow = {
+  teamId: string;
+  name: string;
+  sportName: string;
+  ownerUserId: string;
+  ownerName: string | null;
+  memberCount: number;
+  managerCount: number;
+  status: 'active' | 'suspended' | 'archived';
+  createdAt: string;
+};
+
+export type V1AdminTeamDetail = V1AdminTeamRow & {
+  regionName: string;
+  trustScore: {
+    trustState: string;
+    mannerScore: string | null;
+    matchCount: number;
+    calculatedAt: string | null;
+  } | null;
+  recentHostedTeamMatches: { teamMatchId: string; title: string; status: string; startAt: string }[];
+};
+
+export type V1AdminTeamMatchRow = {
+  teamMatchId: string;
+  title: string;
+  hostTeamId: string;
+  hostTeamName: string;
+  sportName: string;
+  startAt: string;
+  status: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+  createdAt: string;
+};
+
+export type V1AdminStatusChangeResult = {
+  previousStatus: string;
+  status: string;
+  actionLogId: string;
+  statusChangeLogId: string;
+};
+
+export type AdminListFilters = {
+  status?: string;
+  q?: string;
+  sportId?: string;
+  targetType?: string;
+  cursor?: string;
+  limit?: number;
 };

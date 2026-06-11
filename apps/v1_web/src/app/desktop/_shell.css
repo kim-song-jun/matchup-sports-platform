@@ -1,0 +1,334 @@
+/*
+ * Foundation: desktop shell + shared chrome responsive overrides.
+ * All rules here are behind @media (min-width:768px) or @media (min-width:1024px).
+ * Mobile (<768) is UNCHANGED — do not add mobile rules here.
+ */
+
+/* ─── Tablet (768–1023): widen the mobile frame from 480px → 600px ───────── */
+@media (min-width: 768px) {
+  :root {
+    --v1-app-chrome-frame-width: 600px;
+  }
+
+  /* Fixed chrome must follow the wider frame */
+  .tm-fixed-cta {
+    width: min(100%, 600px);
+  }
+
+  .tm-filter-scrim {
+    width: min(100%, 600px);
+  }
+
+  .tm-filter-layer {
+    width: min(100%, 600px);
+  }
+}
+
+/* ─── Desktop (≥1024): full desktop shell ──────────────────────────────────── */
+@media (min-width: 1024px) {
+  /*
+   * 1. Un-pin the html/body overflow so the page can scroll naturally.
+   *    The :has(.tm-app-frame) rule in globals.css sets overflow:hidden — we
+   *    override it here so desktop uses document-flow scroll.
+   */
+  html:has(.tm-app-frame),
+  body:has(.tm-app-frame) {
+    height: auto;
+    overflow: visible;
+  }
+
+  /*
+   * 2. Un-pin the app frame: full width, natural height, no overflow:hidden.
+   *    The mobile 480px fixed-height column becomes a normal block container.
+   */
+  .tm-app-frame {
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    position: static;
+    /* Add top padding for the sticky desktop nav (64px) */
+    padding-top: 64px;
+  }
+
+  /*
+   * 3. Hide the mobile topbar and bottom-nav on desktop.
+   *    They remain in the DOM for mobile — CSS controls visibility only.
+   */
+  .tm-topbar {
+    display: none;
+  }
+
+  .tm-bottom-nav {
+    display: none;
+  }
+
+  /*
+   * 4. Un-pin the scroll area: stop being a fixed inset box; become normal flow.
+   */
+  .tm-scroll-area {
+    position: static;
+    overflow: visible;
+    width: 100%;
+    min-height: 0;
+    /* Center content at max 1120px with comfortable horizontal padding */
+    max-width: 1120px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-bottom: 48px !important;
+  }
+
+  /* Variants that adjusted top/bottom on mobile — reset on desktop */
+  .tm-app-frame-no-topbar .tm-scroll-area,
+  .tm-app-frame-no-bottom .tm-scroll-area {
+    position: static;
+  }
+
+  /*
+   * 5. Re-scope .tm-fixed-cta to the 1120px content column (not 480px / full-bleed).
+   */
+  .tm-fixed-cta {
+    width: min(100%, 1120px);
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  /*
+   * 6. Re-scope filter overlay to the content column as a centered modal panel.
+   *    Bottom sheet becomes a centered panel (max ~440px) instead of a
+   *    480px-pinned bottom sheet.
+   */
+  .tm-filter-scrim {
+    top: 64px; /* below the desktop nav */
+    bottom: 0;
+    width: 100%;
+    /* Dim the full viewport but keep z-index behind the centered sheet */
+  }
+
+  .tm-filter-layer {
+    top: 64px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tm-filter-sheet {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: min(100%, 440px);
+    border-radius: 16px;
+    border-top: none;
+    box-shadow: var(--shadow-2);
+    animation: tm-filter-sheet-scale-in 0.2s ease-out;
+  }
+
+  /*
+   * 7. Re-scope .tm-floating-fab: position relative to the 1120px content column
+   *    bottom-right, not the 480px frame.
+   */
+  .tm-floating-fab {
+    position: fixed;
+    right: max(24px, calc((100vw - 1120px) / 2 + 24px));
+    bottom: 32px;
+  }
+}
+
+/* ─── Wide (≥1440): increase horizontal padding ───────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-scroll-area {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  .tm-fixed-cta {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+}
+
+/* ─── Desktop top navigation bar ──────────────────────────────────────────── */
+/*
+ * .tm-desktop-nav is always rendered (hidden on mobile via display:none below).
+ * On desktop it becomes the sticky full-viewport-width top bar.
+ */
+.tm-desktop-nav {
+  display: none; /* hidden on mobile/tablet — enabled at ≥1024 */
+}
+
+@media (min-width: 1024px) {
+  .tm-desktop-nav {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--grey150);
+    padding: 0 24px;
+    gap: 0;
+  }
+
+  /* Brand / logo */
+  .tm-desktop-nav-brand {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--blue500);
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    text-decoration: none;
+    margin-right: 32px;
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
+  .tm-desktop-nav-brand:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Primary tab group — grows to fill remaining space */
+  .tm-desktop-nav-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .tm-desktop-nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--grey700);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.12s, color 0.12s;
+    min-width: 44px; /* 44px touch target */
+    justify-content: center;
+  }
+
+  .tm-desktop-nav-tab:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+
+  .tm-desktop-nav-tab[aria-current="page"] {
+    color: var(--blue500);
+    font-weight: 700;
+    background: var(--blue50);
+  }
+
+  .tm-desktop-nav-tab:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+  }
+
+  /* Right-side actions */
+  .tm-desktop-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .tm-desktop-nav-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    color: var(--grey700);
+    text-decoration: none;
+    position: relative;
+    transition: background-color 0.12s, color 0.12s;
+  }
+
+  .tm-desktop-nav-action:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+
+  .tm-desktop-nav-action:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  /* Unread notification dot on the bell icon */
+  .tm-desktop-nav-dot {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--red500);
+    border: 1.5px solid var(--bg);
+  }
+}
+
+/* ─── Auth frame: card layout on desktop ──────────────────────────────────── */
+@media (min-width: 1024px) {
+  html:has(.tm-auth-frame),
+  body:has(.tm-auth-frame) {
+    height: auto;
+    overflow: visible;
+    background: var(--grey50);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tm-auth-frame {
+    width: min(100%, 420px);
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    position: static;
+    margin: auto;
+    border-radius: 16px;
+    box-shadow: var(--shadow-2);
+    background: var(--bg);
+    /* Vertical centering via parent flex (body above) */
+    align-self: center;
+    /* Add some breathing room so card doesn't sit at very top */
+    margin-top: 48px;
+    margin-bottom: 48px;
+  }
+}
+
+/* ─── Scale-in animation for desktop filter sheet ─────────────────────────── */
+@keyframes tm-filter-sheet-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

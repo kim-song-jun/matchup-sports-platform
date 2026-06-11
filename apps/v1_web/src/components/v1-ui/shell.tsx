@@ -63,6 +63,7 @@ export function AppChrome({
 
   return (
     <div className={frameClassName}>
+      <DesktopNav activeTab={activeTab} hasNewNotification={hasNewNotification} />
       {topBar ? (
         <header className={centerTitle ? 'tm-topbar tm-topbar-centered' : 'tm-topbar'}>
           <div className="tm-topbar-title">
@@ -113,6 +114,51 @@ function BottomNav({ activeTab }: { activeTab: V1NavTab }) {
           </Link>
         );
       })}
+    </nav>
+  );
+}
+
+// Persistent desktop top navigation. Always rendered; CSS hides it below 1024px
+// (`.tm-desktop-nav` in src/app/desktop/_shell.css). It is the primary nav on
+// desktop, replacing the mobile topbar + bottom-nav.
+function DesktopNav({
+  activeTab,
+  hasNewNotification,
+}: {
+  activeTab: V1NavTab;
+  hasNewNotification: boolean;
+}) {
+  return (
+    <nav className="tm-desktop-nav" aria-label="데스크톱 주요 메뉴">
+      <Link className="tm-desktop-nav-brand" href="/home">
+        teameet
+      </Link>
+      <div className="tm-desktop-nav-tabs">
+        {tabs.map(({ id, label, href, Icon }) => {
+          const active = id === activeTab;
+          return (
+            <Link
+              key={id}
+              className="tm-desktop-nav-tab"
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              data-active={active}
+            >
+              <Icon size={18} strokeWidth={active ? 2.2 : 1.7} />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+      </div>
+      <div className="tm-desktop-nav-actions">
+        <Link className="tm-desktop-nav-action" href="/search" aria-label="검색">
+          <SearchIcon size={20} strokeWidth={2} />
+        </Link>
+        <Link className="tm-desktop-nav-action" href="/notifications" aria-label="알림">
+          <BellIcon size={20} strokeWidth={2} />
+          {hasNewNotification ? <span className="tm-desktop-nav-dot" /> : null}
+        </Link>
+      </div>
     </nav>
   );
 }

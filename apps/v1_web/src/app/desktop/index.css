@@ -1,0 +1,18 @@
+/*
+ * Desktop responsive layer.
+ * Each domain owns its own file; add bespoke `@media (min-width:1024px)` rules there.
+ * Foundation owns _shell.css.
+ */
+@import "./_shell.css";
+@import "./home.css";
+@import "./matches.css";
+@import "./team-matches.css";
+@import "./teams.css";
+@import "./my.css";
+@import "./auth.css";
+@import "./onboarding.css";
+@import "./search.css";
+@import "./chat.css";
+@import "./notifications.css";
+@import "./notices.css";
+@import "./landing.css";

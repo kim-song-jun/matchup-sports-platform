@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
@@ -6,9 +6,29 @@ export class UpdateProfileDto {
   @MaxLength(40)
   displayName!: string;
 
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  nickname!: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(320)
+  email!: string;
+
   @IsOptional()
   @IsString()
   profileImageUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{11}$/)
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{8}$/)
+  birthDate?: string | null;
 
   @IsOptional()
   @IsString()

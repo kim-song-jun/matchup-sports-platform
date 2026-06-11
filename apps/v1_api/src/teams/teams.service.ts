@@ -236,6 +236,7 @@ export class TeamsService {
           },
         ],
       });
+      await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, 'team_created_owner_joined');
 
       return { team, membership };
     });
@@ -635,6 +636,14 @@ export class TeamsService {
           reason: dto.reason ?? 'team_membership_removed',
         },
       });
+      await this.leaveTeamChatParticipant(
+        tx,
+        target.teamId,
+        target.userId,
+        user.id,
+        removedAt,
+        dto.reason ?? 'team_membership_removed',
+      );
 
       return { updated, team };
     });
@@ -904,6 +913,13 @@ export class TeamsService {
           },
         ],
       });
+      await this.ensureTeamChatParticipant(
+        tx,
+        application.teamId,
+        application.applicantUserId,
+        user.id,
+        'team_join_application_approved',
+      );
 
       return { updatedApplication, membership, team };
     });
@@ -978,6 +994,92 @@ export class TeamsService {
     }
 
     return team;
+  }
+
+  private async ensureTeamChatParticipant(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    userId: string,
+    actorUserId: string,
+    reason: string,
+  ) {
+    const existingRoom = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
+    const room = existingRoom
+      ? await tx.v1ChatRoom.update({
+          where: { id: existingRoom.id },
+          data: { status: 'active' },
+          select: { id: true },
+        })
+      : await tx.v1ChatRoom.create({
+          data: { teamId, status: 'active' },
+          select: { id: true },
+        });
+    const existingParticipant = await tx.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+      select: { id: true, status: true },
+    });
+    const participant = existingParticipant
+      ? await tx.v1ChatRoomParticipant.update({
+          where: { id: existingParticipant.id },
+          data: { status: 'active', leftAt: null },
+          select: { id: true },
+        })
+      : await tx.v1ChatRoomParticipant.create({
+          data: { chatRoomId: room.id, userId, status: 'active' },
+          select: { id: true },
+        });
+
+    if (!existingParticipant || existingParticipant.status !== 'active') {
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'chat_room_participant',
+          targetId: participant.id,
+          fromStatus: existingParticipant?.status ?? null,
+          toStatus: 'active',
+          actorType: 'user',
+          actorUserId,
+          reason,
+        },
+      });
+    }
+
+    return { room, participant };
+  }
+
+  private async leaveTeamChatParticipant(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    userId: string,
+    actorUserId: string,
+    leftAt: Date,
+    reason: string,
+  ) {
+    const room = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
+    if (!room) return null;
+    const participant = await tx.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+      select: { id: true, status: true },
+    });
+    if (!participant || participant.status === 'left') return participant;
+
+    const updated = await tx.v1ChatRoomParticipant.update({
+      where: { id: participant.id },
+      data: { status: 'left', leftAt },
+      select: { id: true },
+    });
+    await tx.v1StatusChangeLog.create({
+      data: {
+        targetType: 'chat_room_participant',
+        targetId: participant.id,
+        fromStatus: participant.status,
+        toStatus: 'left',
+        actorType: 'user',
+        actorUserId,
+        reason,
+      },
+    });
+
+    return updated;
   }
 
   private async getActiveTeamMembership(user: V1AuthUser, teamId: string) {

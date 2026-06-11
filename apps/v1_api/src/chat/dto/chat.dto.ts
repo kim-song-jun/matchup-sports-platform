@@ -3,8 +3,8 @@ import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max
 
 export class ChatRoomsQueryDto {
   @IsOptional()
-  @IsIn(['match', 'team_match'])
-  roomType?: 'match' | 'team_match';
+  @IsIn(['match', 'team', 'team_match'])
+  roomType?: 'match' | 'team' | 'team_match';
 
   @IsOptional()
   @IsIn(['active', 'archived'])
@@ -23,8 +23,8 @@ export class ChatRoomsQueryDto {
 }
 
 export class ResolveChatRoomDto {
-  @IsIn(['match', 'team_match'])
-  targetType!: 'match' | 'team_match';
+  @IsIn(['match', 'team', 'team_match'])
+  targetType!: 'match' | 'team' | 'team_match';
 
   @IsUUID()
   targetId!: string;

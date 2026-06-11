@@ -233,6 +233,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           join: () => join.mutate({ message: null }),
           withdraw: () => withdraw.mutate({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
+        onShare: () => shareTeam(query.data),
       }
     : fallback;
 
@@ -511,6 +512,19 @@ function toMemberModel(
     actions: itemActions,
     actionPending: actions.actionPending,
   };
+}
+
+async function shareTeam(team: V1TeamDetail) {
+  const title = team.name;
+  const path = `/teams/${team.teamId}`;
+  const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
+
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    await navigator.share({ title, url });
+    return;
+  }
+
+  await navigator.clipboard?.writeText(url);
 }
 
 function toRequestModel(

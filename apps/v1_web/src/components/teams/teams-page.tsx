@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { FilterIcon, PlusIcon, SearchIcon } from '@/components/v1-ui/icons';
+import { FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -113,7 +113,16 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   return (
     <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
       <article className="tm-team-detail-body">
-        <Card pad={18} className="tm-team-detail-hero-card">
+        <Card pad={18} className="tm-team-detail-hero-card" style={{ position: 'relative' }}>
+          <button
+            className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
+            type="button"
+            aria-label="공유"
+            onClick={model.onShare}
+            style={{ position: 'absolute', top: 14, right: 14 }}
+          >
+            <ShareIcon size={20} />
+          </button>
           <TeamLogo team={team} large />
           <h1 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h1>
           <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region}</div>

@@ -37,4 +37,4 @@ Canonical sources:
 - These docs describe the v1 implementation contract as of 2026-05-18.
 - The frozen reference checklist used `/api/v1/sm-new` while the implemented Nest app uses `/api/v1`. The implementation prefix wins for runtime and frontend hook work.
 - Terms, OAuth callback, email login, signup, and global search remain frozen in the reference contract but are not yet implemented in `apps/v1_api`; they are marked as pending implementation where relevant.
-- Payment, refund, support/dispute, marketplace, lessons, venue owner/operator, DM, permanent team chat, file attachment, and admin task queue success flows are not v1 APIs.
+- Payment, refund, support/dispute, marketplace, lessons, venue owner/operator, DM, file attachment, and admin task queue success flows are not v1 APIs.

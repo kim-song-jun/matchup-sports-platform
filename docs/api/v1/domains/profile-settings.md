@@ -12,15 +12,37 @@
 | `PATCH` | `/api/v1/me/settings` | user | `UpdateSettingsDto` | updated settings |
 | `POST` | `/api/v1/auth/logout` | user | empty body | no-op logout result |
 | `POST` | `/api/v1/me/withdrawal-request` | user | `{ reason?: string | null }` | withdrawal pending result |
+| `POST` | `/api/v1/auth/register` | public | `RegisterDto` | email signup session |
 
 ## DTO Highlights
+
+`RegisterDto`:
+
+- Required: `nickname`, `email`, `password`, `gender`, `requiredTermsAccepted`
+- Optional: `displayName?: string`, `phone?: string`, `birthDate?: string`, `profileImageUrl?: string`
+- `phone` is stored as 11 digits only. Signup UI may display `010-0000-0000`, but API payload must be digits.
+- `birthDate` is stored as 8 digits `YYYYMMDD`; API rejects invalid calendar dates.
+- `displayName` is saved to `v1_user_profiles.display_name`; blank values fall back to nickname.
+- `profileImageUrl` is saved to `v1_user_profiles.profile_image_url`. Current signup uses a single selected image preview value because authenticated upload is not available before account creation.
+
+`SocialProfileDto`:
+
+- Required: `nickname`, `gender`
+- Optional fields match `RegisterDto`: `displayName`, `phone`, `birthDate`, `profileImageUrl`
+- `phone` duplicate checks exclude the current pending social user and return `PHONE_CONFLICT` when another account already owns it.
 
 `UpdateProfileDto`:
 
 - `displayName: string`, max 40
+- `nickname: string`, min 2, max 40
+- `email: string`, max 320; duplicate email returns `EMAIL_CONFLICT`
 - `profileImageUrl?: string | null`
+- `phone?: string | null`; when present, 11 digits only; duplicate phone returns `PHONE_CONFLICT`
+- `birthDate?: string | null`; when present, 8 digit `YYYYMMDD` and a valid calendar date
 - `bio?: string | null`, max 500
 - `visibilityStatus: "public" | "members_only" | "private"`
+
+Profile edit UI must keep the same duplicate-check behavior as signup for changed `nickname` and `email`. Unchanged values do not require another duplicate check.
 
 `UpdateSettingsDto`:
 

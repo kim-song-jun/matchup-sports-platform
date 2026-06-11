@@ -79,6 +79,7 @@ export type TeamDetailViewModel = {
   ctaLabel?: string;
   ctaPending?: boolean;
   onCta?: () => void;
+  onShare?: () => void | Promise<void>;
 };
 
 export type TeamFormMode = 'create' | 'edit';

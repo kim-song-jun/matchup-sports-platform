@@ -134,6 +134,10 @@ describe('AuthController', () => {
       email: 'user@example.com',
       password: 'password123',
       gender: 'male' as const,
+      displayName: '김민수',
+      phone: '01012345678',
+      birthDate: '19900102',
+      profileImageUrl: 'data:image/png;base64,profile',
       requiredTermsAccepted: true,
     };
 
@@ -243,6 +247,10 @@ describe('AuthController', () => {
     const dto = {
       nickname: '카카오러너',
       gender: 'female' as const,
+      displayName: '카카오 러너',
+      phone: '01087654321',
+      birthDate: '19950203',
+      profileImageUrl: 'data:image/png;base64,social',
     };
 
     await expect(controller.completeSocialProfile(user, dto)).resolves.toEqual({

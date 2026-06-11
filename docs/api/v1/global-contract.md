@@ -90,4 +90,4 @@ The frozen v1 checklist requires idempotency for duplicate mutations. Current co
 
 ## Deferred Boundaries
 
-V1 intentionally has no payment, refund, dispute, support ticket, DM, permanent team chat, file attachment, venue operator, lesson, marketplace, or tournament success API. UI must not simulate successful transactions or support outcomes for these surfaces.
+V1 intentionally has no payment, refund, dispute, support ticket, DM, file attachment, venue operator, lesson, marketplace, or tournament success API. UI must not simulate successful transactions or support outcomes for these surfaces.

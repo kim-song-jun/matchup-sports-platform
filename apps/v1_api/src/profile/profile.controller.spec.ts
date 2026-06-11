@@ -49,7 +49,16 @@ describe('ProfileController', () => {
   });
 
   it('updates my profile', async () => {
-    const dto = { displayName: '민수', visibilityStatus: 'public' as const };
+    const dto = {
+      displayName: '김민수',
+      nickname: '민수',
+      email: 'user@teameet.v1',
+      profileImageUrl: null,
+      phone: '01012345678',
+      birthDate: '19900102',
+      bio: '풋살을 좋아합니다.',
+      visibilityStatus: 'public' as const,
+    };
     profileService.updateMe.mockResolvedValue({ profile: dto });
     await expect(controller.updateMe(user, dto)).resolves.toEqual({ profile: dto });
   });

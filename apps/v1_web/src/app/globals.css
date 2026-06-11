@@ -457,6 +457,13 @@ button:disabled {
   color: var(--green500);
 }
 
+.tm-auth-optional {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .tm-auth-field-with-action {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 92px;
@@ -486,6 +493,46 @@ button:disabled {
   background: var(--bg);
   color: var(--blue500);
   box-shadow: var(--sh-1);
+}
+
+.tm-auth-profile-upload {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+.tm-auth-profile-preview {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--grey100);
+  background-position: center;
+  background-size: cover;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.tm-auth-profile-upload-body {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.tm-auth-profile-upload-body .tm-text-caption {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-auth-link-row {

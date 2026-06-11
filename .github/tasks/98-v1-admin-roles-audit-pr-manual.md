@@ -1,7 +1,10 @@
 # Task 98 — v1 Admin 운영자 권한 관리 + 전체 검수 + PR + 사용설명서
 
-> 상태: IN PROGRESS · 브랜치 `feat/v1-admin-redesign-toss`(공유 워크트리 안전상 기존 브랜치 유지) · 선행: Task 96(데스크탑), 97(admin 플랫폼)
+> 상태: **COMPLETE ✅** · 브랜치 `feat/v1-admin-redesign-toss`(공유 워크트리 안전상 기존 브랜치 유지) · 선행: Task 96(데스크탑), 97(admin 플랫폼)
 > 파이프라인: `/agent-all` ultracode (최대 철저도)
+>
+> **산출물**: PR [#19](https://github.com/kim-song-jun/matchup-sports-platform/pull/19) (제목·본문 전체 스코프 갱신) · 사용설명서 PDF `docs/manual/teameet-admin-console-manual.pdf` (8섹션, 스크린샷 임베드) · 커밋 `c92d2995`
+> **검증**: v1_web tsc0/7테스트 · v1_api tsc0/72 admin테스트 · frontend-review 2건 PASS · 라이브 QA(owner/ops/support 역할 + 소비자 데스크탑 10화면, 검색 nav Critical 수정)
 
 ## Context (사용자 요청 원문)
 "나머지 기능,(최고운영자 외 그냥 운영자) 페이지도 모두 만들어주고, 이어서 mobile 페이지 기반으로 desktop을 만들었는데 그것도 전체 검수 + api 기능들, 버튼들 동작이 모두 다 올바르게 하는지 까지해주고 pr 내용도 적절하게 적어주면서 branch 네이밍이나 그런것도 잘 해줘 .그리고 모두 끝나면, 스크린샷을 가지고 사용설명서 보고서를 pdf로 만들어줘. ultracode"
@@ -52,14 +55,14 @@
 - **Wave H** (PDF): 스크린샷 기반 사용설명서 보고서.
 
 ## Acceptance Criteria
-- [ ] owner가 운영자(ops)·지원(support) 부여·역할변경·회수 가능, 자기/마지막owner 가드 동작
-- [ ] support(활성) 로그인 시 읽기전용(변이 버튼 비노출), ops 변이 가능 — 라이브 확인
-- [ ] "관리자" nav가 owner에게만 노출
-- [ ] 데스크탑 소비자 전 도메인 검수 완료, 발견 이슈 수정
-- [ ] 핵심 API·버튼 동작 라이브 검증
-- [ ] PR 생성(적절 제목·본문)
-- [ ] 사용설명서 PDF 산출
-- [ ] tsc 0 (both apps), 신규/영향 테스트 통과, frontend-review 통과
+- [x] owner가 운영자(ops)·지원(support) 부여·역할변경·회수 가능, 자기/마지막owner 가드 동작
+- [x] support(활성) 로그인 시 읽기전용(변이 버튼 비노출), ops 변이 가능 — 라이브 확인
+- [x] "관리자" nav가 owner에게만 노출
+- [x] 데스크탑 소비자 전 도메인 검수 완료, 발견 이슈 수정
+- [x] 핵심 API·버튼 동작 라이브 검증
+- [x] PR 생성(적절 제목·본문)
+- [x] 사용설명서 PDF 산출
+- [x] tsc 0 (both apps), 신규/영향 테스트 통과, frontend-review 통과
 
 ## Security Notes
 - admin-mgmt 전 엔드포인트 `getOwnerAdmin` 게이트(owner만). 권한 상승 방지: ops/support는 부여 불가.

@@ -1,1 +1,297 @@
-/* Desktop overrides for matches — owned by the matches wave. Add @media (min-width:1024px) rules here. */
+/* Desktop overrides for matches — owned by the matches wave. */
+/* Mobile (<768) is byte-identical — only @media (min-width:1024px|1440px) blocks here. */
+
+/* ─── List /matches ──────────────────────────────────────────────────────────
+ * Kill the stretched single-column. Convert .tm-match-card-stack to a 2-up
+ * card grid at ≥1024 and 3-up at ≥1440. Sport-chip row stays full width.
+ */
+
+@media (min-width: 1024px) {
+  /* Remove mobile padding from the list wrapper — the scroll area already
+     provides 24px horizontal padding on desktop. */
+  .tm-match-list {
+    padding: 0 0 48px;
+  }
+
+  /* Sport chip filter row: unwrap from horizontal scroll, allow wrapping,
+     gap increased for breathing room. */
+  .tm-sport-chip-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 8px;
+    padding: 12px 0 16px;
+  }
+
+  /* Summary row: slightly taller, more padding. */
+  .tm-match-summary-row {
+    margin-top: 4px;
+    padding: 0 16px;
+  }
+
+  /* Desktop-only top header inside the list: "매치 만들기" CTA button
+     lives in .tm-match-desktop-top-action (show-desktop element). */
+  .tm-match-desktop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 28px 0 4px;
+  }
+
+  .tm-match-desktop-header-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--grey900);
+    letter-spacing: -0.5px;
+    margin: 0;
+  }
+
+  /* "매치 만들기" inline CTA on desktop (visible only on desktop via tm-show-desktop). */
+  .tm-match-desktop-create-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: var(--blue500);
+    color: var(--static-white);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.12s;
+    flex-shrink: 0;
+  }
+
+  .tm-match-desktop-create-btn:hover {
+    background: var(--blue600, #1a6ee0);
+  }
+
+  .tm-match-desktop-create-btn:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
+  /* Search bar: full width on desktop with max-width to prevent over-stretch. */
+  .tm-list-searchbar {
+    gap: 10px;
+    padding: 0;
+    margin-bottom: 16px;
+  }
+
+  .tm-list-search-input {
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  /* Convert the vertical card stack → 2-up grid. */
+  .tm-match-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  /* Each card gets a hover lift. */
+  .tm-match-list-card {
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+
+  .tm-match-list-card:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+  }
+
+  /* Taller card media on desktop for visual weight. */
+  .tm-match-list-media {
+    height: 172px;
+  }
+}
+
+@media (min-width: 1440px) {
+  /* 3-up grid at ≥1440. */
+  .tm-match-card-stack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+/* ─── State pages (empty / error / joined / participants / filter) ───────────
+ * Fill the desktop content column gracefully.
+ */
+
+@media (min-width: 1024px) {
+  /* Joined state: reuse the card grid in the state page context. */
+  .tm-match-list .tm-match-card-stack {
+    margin-top: 20px;
+  }
+
+  /* Filter page inside the create-shell layout. */
+  .tm-create-shell .tm-sport-chip-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+}
+
+/* ─── Detail /matches/[id] ───────────────────────────────────────────────────
+ * 2-column body: LEFT = info + description + participants; RIGHT = sticky CTA card.
+ * Full-bleed hero constrained + rounded corners within the 1120px column.
+ */
+
+@media (min-width: 1024px) {
+  /* Remove the large bottom padding that existed for the fixed CTA. */
+  .tm-match-detail {
+    padding-bottom: 0;
+  }
+
+  /* Constrain the hero to the content column width; add rounded top corners. */
+  .tm-match-detail-hero {
+    height: 280px;
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+  }
+
+  /* Detail page desktop page-head: back link + match title. */
+  .tm-match-detail-desktop-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 0 12px;
+  }
+
+  /* Two-column layout for the detail body + sticky right card. */
+  .tm-match-detail-desktop-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 32px;
+    align-items: start;
+    padding-top: 0;
+  }
+
+  /* Left column body content inside the matches desktop layout only.
+     The selector scopes via .tm-match-detail-desktop-layout which is match-specific. */
+  .tm-match-detail-desktop-layout .tm-match-detail-body {
+    padding: 0;
+  }
+
+  /* Sticky right panel containing the CTA (replaces .tm-fixed-cta on desktop). */
+  .tm-match-detail-desktop-cta {
+    position: sticky;
+    top: 80px; /* 64px nav + 16px breathing */
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-1);
+  }
+
+  .tm-match-detail-desktop-cta-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--grey100);
+  }
+
+  .tm-match-detail-desktop-cta-actions {
+    display: grid;
+    gap: 8px;
+  }
+
+  /* The fixed bottom CTA on detail page is hidden on desktop via .tm-hide-desktop in JSX;
+     the right sticky card replaces it. No CSS selector needed here. */
+}
+
+@media (min-width: 1440px) {
+  /* Wider right column at max width. */
+  .tm-match-detail-desktop-layout {
+    grid-template-columns: 1fr 400px;
+    gap: 40px;
+  }
+
+  .tm-match-detail-hero {
+    height: 320px;
+  }
+}
+
+/* ─── New wizard + Edit /matches/new/* and /matches/[id]/edit ────────────────
+ * Center the form column at ~560px — don't stretch inputs to 1120px.
+ */
+
+@media (min-width: 1024px) {
+  /* Scope centering to matches pages only via .tm-match-create-shell
+     (added in JSX alongside .tm-create-shell). Does not affect teams/my. */
+  .tm-match-create-shell {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 120px;
+  }
+
+  /* Desktop CTA for the wizard: stay inside the centered 600px column.
+     .tm-create-fixed-cta is only used on match creation/edit pages so
+     this global override is safe within the matches domain. */
+  .tm-create-fixed-cta {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Sport grid: 3-up on desktop so all sports fit in fewer rows. */
+  .tm-match-create-shell .tm-create-sport-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  /* Two-col layout inside match forms. */
+  .tm-match-create-shell .tm-create-two-col {
+    gap: 14px;
+  }
+
+  /* Progress bars look better with a bit more top padding. */
+  .tm-match-create-shell .tm-create-progress {
+    padding-top: 20px;
+  }
+}
+
+/* ─── Info rows in detail view — wider labels on desktop ─────────────────── */
+
+@media (min-width: 1024px) {
+  .tm-info-row {
+    min-height: 52px;
+    padding: 4px 0;
+  }
+
+  /* Label column: a fixed min-width so values align vertically. */
+  .tm-info-row > div:first-child {
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+}
+
+/* ─── Filter overlay on desktop: centered panel (handled in _shell.css).
+ *    Extra tweaks: sheet scroll if content overflows viewport height.
+ */
+
+@media (min-width: 1024px) {
+  .tm-filter-sheet {
+    max-height: calc(100dvh - 128px);
+    overflow-y: auto;
+  }
+}
+
+/* ─── Floating FAB: hidden on desktop (we show inline "매치 만들기" button). ─ */
+
+@media (min-width: 1024px) {
+  /* We keep the FAB in DOM for mobile; hide it on desktop.
+     The inline desktop button provides the same action. */
+  .tm-floating-fab {
+    display: none;
+  }
+}

@@ -1,1 +1,281 @@
-/* Desktop overrides for team-matches — owned by the team-matches wave. Add @media (min-width:1024px) rules here. */
+/* ============================================================
+ * Desktop overrides — team-matches domain
+ * Owner: team-matches wave agent
+ * ALL rules are behind @media (min-width:1024px) or @media (min-width:1440px).
+ * Mobile (<768) is NEVER modified here.
+ * ============================================================ */
+
+/* ─── List page (/team-matches) ──────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  /* Search bar: un-stick from mobile top, widen padding to match content column */
+  .tm-list-searchbar {
+    position: static;
+    padding: 16px 0 12px;
+    border-bottom: none;
+    background: transparent;
+    gap: 12px;
+  }
+
+  /* Sport chips: allow wrapping on desktop instead of horizontal scroll */
+  .tm-sport-chip-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+    gap: 8px;
+  }
+
+  /* Match list: remove mobile bottom padding (no bottom-nav on desktop) */
+  .tm-match-list {
+    padding: 0 0 40px;
+  }
+
+  /* Summary row: add a little top breathing room */
+  .tm-match-summary-row {
+    margin-top: 12px;
+  }
+
+  /* Card stack: 2-column grid on desktop */
+  .tm-match-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  /* Team-match card: let the VS panel breathe at larger size */
+  .tm-team-match-card {
+    height: 100%;
+  }
+
+  .tm-team-match-vs {
+    min-height: 148px;
+    padding: 20px;
+    font-size: 1.05em;
+  }
+
+  /* Detail page back navigation header (desktop only) */
+  .tm-team-match-desktop-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 0 18px;
+  }
+
+  .tm-team-match-desktop-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    color: var(--grey700);
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+
+  .tm-team-match-desktop-back:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+
+  .tm-team-match-desktop-back:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+  }
+}
+
+@media (min-width: 1440px) {
+  /* 3-column card grid on wide screens */
+  .tm-match-card-stack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+
+/* ─── Detail page (/team-matches/[id]) ───────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  /* The whole detail article uses a 2-column layout:
+   * LEFT (~60%) : VS hero + info rows + description + host team link + applicant teams
+   * RIGHT (~40%): sticky apply/CTA card
+   * The desktop layout wrapper is .tm-team-match-detail-desktop */
+  .tm-team-match-detail-desktop {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+    padding-top: 0;
+  }
+
+  /* Left column: the article content */
+  .tm-team-match-detail-left {
+    min-width: 0;
+  }
+
+  /* VS hero: round the corners since it's now inside the content column */
+  .tm-team-vs-hero {
+    border-radius: 16px;
+    min-height: 200px;
+    padding: 16px 20px 20px;
+  }
+
+  /* Detail body: remove the mobile horizontal padding (column handles it) */
+  .tm-match-detail {
+    padding-bottom: 0;
+  }
+
+  .tm-match-detail-body {
+    padding: 0;
+  }
+
+  /* Right column: sticky CTA card */
+  .tm-team-match-detail-right {
+    position: sticky;
+    top: 88px; /* 64px nav + 24px breathing */
+    min-width: 0;
+  }
+
+  /* Desktop-only hero actions row (share + notify) */
+  .tm-team-match-hero-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  /* Desktop CTA card that replaces the mobile .tm-fixed-cta on desktop */
+  .tm-team-match-cta-card {
+    background: var(--bg);
+    border: 1px solid var(--grey150, var(--grey100));
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tm-team-match-cta-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .tm-team-match-cta-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tm-team-match-cta-actions .tm-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Info rows on desktop: restore horizontal layout (tablet collapsed them) */
+  .tm-team-match-detail-left .tm-info-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 0;
+  }
+
+  .tm-team-match-detail-left .tm-info-row > div:last-child {
+    text-align: right !important;
+    width: auto;
+  }
+
+  /* Hide the mobile fixed CTA on desktop */
+  .tm-team-match-mobile-cta {
+    display: none;
+  }
+}
+
+
+/* ─── Create wizard + edit (/team-matches/new/*, /team-matches/[id]/edit) ── */
+
+@media (min-width: 1024px) {
+  /* Center the create shell form column, ~560px wide */
+  .tm-create-shell {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Progress bar: full width within the centered shell */
+  .tm-create-progress {
+    width: 100%;
+  }
+
+  /* Two-column fields (cost / time): restore grid — tablet collapses them to 1 col */
+  .tm-create-two-col {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Sport grid: 2-up on desktop */
+  .tm-create-sport-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Fixed CTA for create steps: replace with a contained footer bar */
+  .tm-create-fixed-cta {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* The outer fixed CTA on create is already handled by the shell's re-scope,
+   * but we center the inner content to the form column. */
+  .tm-fixed-cta.tm-create-fixed-cta > div {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+
+/* ─── Filter page (/team-matches/filter) ─────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  /* Filter page uses tm-create-shell wrapper — center it */
+  .tm-filter-page-shell {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Filter actions button row: restore 2-column layout inside the filter sheet */
+  .tm-filter-actions {
+    grid-template-columns: 1fr 2fr;
+  }
+}
+
+
+/* ─── Empty / error states ───────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  /* State page: center the empty/error content with comfortable max-width */
+  .tm-match-list .tm-empty-state,
+  .tm-match-list .tm-error-state {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 48px;
+  }
+}
+
+
+/* ─── Wide (≥1440): density bumps ────────────────────────────────────────── */
+
+@media (min-width: 1440px) {
+  .tm-team-match-detail-desktop {
+    gap: 40px;
+  }
+
+  .tm-team-vs-hero {
+    min-height: 220px;
+    padding: 20px 24px 24px;
+  }
+}

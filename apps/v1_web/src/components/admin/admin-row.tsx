@@ -18,7 +18,7 @@ export function AdminRow({ title, meta, badge, actions, href, leftIcon, onClick,
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0 transition-colors min-h-[52px] ${
+      className={`flex items-center gap-3 px-4 md:px-5 py-3 md:py-3.5 border-b border-gray-50 last:border-0 transition-colors min-h-[52px] ${
         onClick || href ? 'hover:bg-gray-50 cursor-pointer' : ''
       }`}
       onClick={onClick}
@@ -41,7 +41,7 @@ export function AdminRow({ title, meta, badge, actions, href, leftIcon, onClick,
         {href ? (
           <Link
             href={href}
-            className="text-[15px] font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1 block"
+            className="text-[15px] font-semibold text-gray-900 hover:text-blue-600 transition-colors line-clamp-1 block focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             {title}
           </Link>

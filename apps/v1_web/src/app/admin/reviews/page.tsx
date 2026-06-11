@@ -57,7 +57,7 @@ export default function AdminReviewsPage() {
       />
 
       {/* KPI */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-3 md:grid-cols-3 gap-3 mb-5">
         <AdminKpiCard
           label="미작성"
           value={pending.length}
@@ -75,7 +75,8 @@ export default function AdminReviewsPage() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-4 h-9 rounded-xl text-[14px] font-medium transition-colors ${
+            aria-pressed={tab === key}
+            className={`flex items-center gap-1.5 px-4 min-h-[44px] md:min-h-[36px] rounded-xl text-[14px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
               tab === key
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -100,7 +101,7 @@ export default function AdminReviewsPage() {
         <>
           <div className="bg-white rounded-2xl border border-gray-100">
             <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
-              <Star size={16} className="text-amber-400" />
+              <Star size={16} className="text-amber-400" aria-hidden="true" />
               <span className="text-[15px] font-bold text-gray-900">작성할 리뷰</span>
               {pending.length > 0 && (
                 <span className="bg-amber-50 text-amber-600 text-[11px] font-bold rounded-full px-2 py-0.5 ml-auto">
@@ -115,7 +116,11 @@ export default function AdminReviewsPage() {
                 <p className="text-[14px] text-gray-500 mb-2">
                   {getErrorMessage(reviewsQ.error, '리뷰 목록을 불러오지 못했어요.')}
                 </p>
-                <button type="button" onClick={() => void reviewsQ.refetch()} className="text-[14px] text-blue-500 font-medium">
+                <button
+                  type="button"
+                  onClick={() => void reviewsQ.refetch()}
+                  className="text-[14px] text-blue-500 font-medium focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                >
                   다시 시도
                 </button>
               </div>

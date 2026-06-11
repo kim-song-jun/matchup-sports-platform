@@ -47,9 +47,9 @@ export default function AdminNotificationsPage() {
               type="button"
               onClick={() => void handleReadAll()}
               disabled={readAll.isPending}
-              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[14px] font-medium rounded-xl px-4 h-10 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[14px] font-medium rounded-xl px-4 h-10 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
-              <CheckCheck size={15} />
+              <CheckCheck size={15} aria-hidden="true" />
               모두 읽음
             </button>
           ) : undefined
@@ -57,7 +57,7 @@ export default function AdminNotificationsPage() {
       />
 
       {/* KPI */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <AdminKpiCard
           label="읽지 않은 알림"
           value={unreadCount}
@@ -77,7 +77,8 @@ export default function AdminNotificationsPage() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-4 h-9 rounded-xl text-[14px] font-medium transition-colors ${
+            aria-pressed={tab === key}
+            className={`flex items-center gap-1.5 px-4 min-h-[44px] md:min-h-[36px] rounded-xl text-[14px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
               tab === key
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -123,7 +124,11 @@ export default function AdminNotificationsPage() {
             <p className="text-[14px] text-gray-500 mb-2">
               {error instanceof Error ? error.message : '알림을 불러오지 못했어요.'}
             </p>
-            <button type="button" onClick={() => void refetch()} className="text-[14px] text-blue-500 font-medium">
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="text-[14px] text-blue-500 font-medium focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            >
               다시 시도
             </button>
           </div>

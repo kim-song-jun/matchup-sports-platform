@@ -43,11 +43,12 @@ export function AdminShell({ children }: AdminShellProps) {
 
   return (
     <div className="min-h-screen bg-[#F7F8FA] flex flex-col md:flex-row">
-      {/* Mobile top bar */}
-      <div className="flex md:hidden items-center gap-1 px-4 py-3 bg-white border-b border-gray-100 sticky top-0 z-20">
+      {/* Mobile top bar — 49px fixed height */}
+      <div className="flex md:hidden items-center gap-1 px-4 h-[49px] bg-white border-b border-gray-100 sticky top-0 z-20">
         <Link
           href="/home"
-          className="flex items-center gap-1 text-[13px] text-gray-500 hover:text-gray-700 transition-colors min-w-[60px]"
+          aria-label="서비스로 돌아가기"
+          className="flex items-center gap-1 text-[13px] text-gray-500 hover:text-gray-700 transition-colors min-w-[60px] min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={15} />
           서비스
@@ -56,47 +57,61 @@ export function AdminShell({ children }: AdminShellProps) {
         <div className="min-w-[60px]" />
       </div>
 
-      {/* Mobile scrollable tab strip */}
-      <div className="flex md:hidden overflow-x-auto bg-white border-b border-gray-100 sticky top-[49px] z-10 scrollbar-hide">
+      {/* Mobile scrollable tab strip — sticky below top bar */}
+      <div
+        className="flex md:hidden overflow-x-auto bg-white border-b border-gray-100 sticky top-[49px] z-10 scrollbar-hide"
+        role="tablist"
+        aria-label="운영 센터 메뉴"
+      >
         {NAV_ITEMS.map((item) => {
           const active = isActive(item);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2.5 whitespace-nowrap flex-shrink-0 text-[11px] transition-colors border-b-2 ${
+              role="tab"
+              aria-current={active ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center gap-0.5 px-4 min-h-[44px] whitespace-nowrap flex-shrink-0 text-[11px] transition-colors border-b-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px] ${
                 active
                   ? 'border-blue-500 text-blue-600 font-semibold'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <span className={active ? 'text-blue-600' : 'text-gray-400'}>{item.icon}</span>
+              <span className={active ? 'text-blue-600' : 'text-gray-400'} aria-hidden="true">
+                {item.icon}
+              </span>
               <span>{item.label}</span>
             </Link>
           );
         })}
       </div>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-[220px] min-h-screen bg-white border-r border-gray-100 flex-col sticky top-0 h-screen overflow-y-auto shrink-0">
+      {/* Desktop sidebar — 220px, sticky full-height */}
+      <aside
+        className="hidden md:flex w-[220px] min-h-screen bg-white border-r border-gray-100 flex-col sticky top-0 h-screen overflow-y-auto shrink-0"
+        aria-label="운영 센터 탐색"
+      >
         <div className="px-5 py-5 border-b border-gray-50 flex items-center gap-2">
-          <LayoutDashboard size={18} className="text-blue-500 shrink-0" />
+          <LayoutDashboard size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
           <span className="text-[16px] font-bold text-gray-900">운영 센터</span>
         </div>
-        <nav className="flex-1 py-1.5">
+        <nav className="flex-1 py-1.5" aria-label="주 메뉴">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-2.5 text-[14px] transition-colors border-l-2 ${
+                aria-current={active ? 'page' : undefined}
+                className={`flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-[14px] transition-colors border-l-2 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px] ${
                   active
                     ? 'border-blue-500 bg-blue-50/60 text-blue-600 font-semibold'
                     : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
-                <span className={active ? 'text-blue-500' : 'text-gray-400'}>{item.icon}</span>
+                <span className={active ? 'text-blue-500' : 'text-gray-400'} aria-hidden="true">
+                  {item.icon}
+                </span>
                 <span>{item.label}</span>
               </Link>
             );
@@ -105,17 +120,17 @@ export function AdminShell({ children }: AdminShellProps) {
         <div className="px-4 py-4 border-t border-gray-100">
           <Link
             href="/home"
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-gray-600 transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기
           </Link>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto px-4 md:px-6 py-5 md:py-7">
-        <div className="max-w-[900px] mx-auto w-full">{children}</div>
+      {/* Main content — wider on large screens */}
+      <main className="flex-1 min-w-0 overflow-y-auto px-4 md:px-6 lg:px-8 py-5 md:py-7 lg:py-8">
+        <div className="max-w-[900px] xl:max-w-[1100px] mx-auto w-full">{children}</div>
       </main>
     </div>
   );

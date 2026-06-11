@@ -62,6 +62,9 @@ export default function AdminAuditPage() {
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+  const matchItems = items.filter((i) => i.category === '매치');
+  const teamMatchItems = items.filter((i) => i.category === '팀매치');
+
   return (
     <AdminShell>
       <AdminPageHeader
@@ -94,22 +97,22 @@ export default function AdminAuditPage() {
 
           <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <ClipboardList size={16} className="text-blue-500" />
+              <ClipboardList size={16} className="text-blue-500" aria-hidden="true" />
               <span className="text-[14px] font-bold text-gray-900">이번 달 요약</span>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
-                <p className="text-xl font-bold text-gray-900 tabular-nums">{activity.monthly.matchCount}</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900 tabular-nums">{activity.monthly.matchCount}</p>
                 <p className="text-[12px] text-gray-500 mt-0.5">매치 참여</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-gray-900 tabular-nums">
+                <p className="text-xl md:text-2xl font-bold text-gray-900 tabular-nums">
                   {activity.monthly.mannerScore != null ? activity.monthly.mannerScore.toFixed(1) : '—'}
                 </p>
                 <p className="text-[12px] text-gray-500 mt-0.5">매너 점수</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-gray-900 tabular-nums">
+                <p className="text-xl md:text-2xl font-bold text-gray-900 tabular-nums">
                   {activity.monthly.winRate != null ? `${Math.round(activity.monthly.winRate * 100)}%` : '—'}
                 </p>
                 <p className="text-[12px] text-gray-500 mt-0.5">승률</p>
@@ -119,45 +122,69 @@ export default function AdminAuditPage() {
         </>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100">
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
-          <History size={16} className="text-gray-400" />
-          <span className="text-[15px] font-bold text-gray-900">최근 활동</span>
-          {!isLoading && items.length > 0 && (
-            <span className="text-[12px] text-gray-400 ml-auto">{items.length}건</span>
+      {/* On desktop: split into 2 columns (matches | team-matches) for better density */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Matches column */}
+        <div className="bg-white rounded-2xl border border-gray-100">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
+            <History size={16} className="text-gray-400" aria-hidden="true" />
+            <span className="text-[15px] font-bold text-gray-900">매치 활동</span>
+            {!isLoading && matchItems.length > 0 && (
+              <span className="text-[12px] text-gray-400 ml-auto">{matchItems.length}건</span>
+            )}
+          </div>
+          {isLoading ? (
+            <AdminListSkeleton rows={5} />
+          ) : matchItems.length === 0 ? (
+            <AdminEmpty
+              icon={<History size={36} />}
+              title="매치 기록이 없어요"
+              description="매치에 참여하면 여기에 기록이 남아요."
+            />
+          ) : (
+            matchItems.map((item) => (
+              <AdminRow
+                key={`match-${item.id}`}
+                title={item.title}
+                meta={formatDateTime(item.date)}
+                leftIcon={<History size={15} aria-hidden="true" />}
+                badge={<AdminBadge status={item.status} />}
+                href={`/matches/${item.id}`}
+              />
+            ))
           )}
         </div>
-        {isLoading ? (
-          <AdminListSkeleton rows={8} />
-        ) : items.length === 0 ? (
-          <AdminEmpty
-            icon={<History size={36} />}
-            title="활동 기록이 없어요"
-            description="매치나 팀매치에 참여하면 여기에 기록이 남아요."
-          />
-        ) : (
-          items.map((item) => (
-            <AdminRow
-              key={`${item.category}-${item.id}`}
-              title={item.title}
-              meta={formatDateTime(item.date)}
-              leftIcon={<History size={15} />}
-              badge={
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={`text-[10px] font-bold rounded-full px-2 py-0.5 ${
-                      item.category === '팀매치' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'
-                    }`}
-                  >
-                    {item.category}
-                  </span>
-                  <AdminBadge status={item.status} />
-                </div>
-              }
-              href={item.category === '매치' ? `/matches/${item.id}` : `/team-matches/${item.id}`}
+
+        {/* Team-matches column */}
+        <div className="bg-white rounded-2xl border border-gray-100">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
+            <History size={16} className="text-gray-400" aria-hidden="true" />
+            <span className="text-[15px] font-bold text-gray-900">팀매치 활동</span>
+            {!isLoading && teamMatchItems.length > 0 && (
+              <span className="text-[12px] text-gray-400 ml-auto">{teamMatchItems.length}건</span>
+            )}
+          </div>
+          {isLoading ? (
+            <AdminListSkeleton rows={5} />
+          ) : teamMatchItems.length === 0 ? (
+            <AdminEmpty
+              icon={<History size={36} />}
+              title="팀매치 기록이 없어요"
+              description="팀매치에 참여하면 여기에 기록이 남아요."
             />
-          ))
-        )}
+          ) : (
+            teamMatchItems.map((item) => (
+              <AdminRow
+                key={`team-match-${item.id}`}
+                title={item.title}
+                meta={formatDateTime(item.date)}
+                leftIcon={<History size={15} aria-hidden="true" />}
+                badge={<AdminBadge status={item.status} />}
+                href={`/team-matches/${item.id}`}
+              />
+            ))
+          )}
+        </div>
       </div>
     </AdminShell>
   );

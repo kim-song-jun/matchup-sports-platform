@@ -65,8 +65,11 @@ export default function AdminMatchesPage() {
         title="내 매치"
         description="내가 만든 매치를 관리하세요."
         action={
-          <Link href="/matches/new" className="bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold rounded-xl px-4 h-10 inline-flex items-center gap-2 transition-colors">
-            <Plus size={15} />매치 만들기
+          <Link
+            href="/matches/new"
+            className="bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold rounded-xl px-4 h-10 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Plus size={15} aria-hidden="true" />매치 만들기
           </Link>
         }
       />
@@ -80,15 +83,22 @@ export default function AdminMatchesPage() {
         </div>
       )}
 
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 md:pb-0 md:overflow-x-visible md:flex-wrap">
         {(Object.entries(FILTER_LABELS) as [FilterKey, string][]).map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setFilter(key)}
-            className={`px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+          <button
+            key={key}
+            type="button"
+            onClick={() => setFilter(key)}
+            aria-pressed={filter === key}
+            className={`px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors flex-shrink-0 min-h-[36px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 ${
               filter === key ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-            }`}>
+            }`}
+          >
             {label}
             {key !== 'all' && stats[key] > 0 && (
-              <span className={`ml-1.5 text-[11px] font-bold ${filter === key ? 'text-blue-100' : 'text-gray-400'}`}>{stats[key]}</span>
+              <span className={`ml-1.5 text-[11px] font-bold ${filter === key ? 'text-blue-100' : 'text-gray-400'}`}>
+                {stats[key]}
+              </span>
             )}
           </button>
         ))}
@@ -97,7 +107,7 @@ export default function AdminMatchesPage() {
       <div className="bg-white rounded-2xl border border-gray-100">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
           <div className="flex items-center gap-2">
-            <Swords size={16} className="text-gray-400" />
+            <Swords size={16} className="text-gray-400" aria-hidden="true" />
             <span className="text-[15px] font-bold text-gray-900">매치 목록</span>
           </div>
           <span className="text-[13px] text-gray-400">{filtered.length}개</span>
@@ -105,7 +115,13 @@ export default function AdminMatchesPage() {
         {isError ? (
           <div className="px-5 py-10 text-center">
             <p className="text-[14px] text-gray-500 mb-3">{getErrorMessage(error, '매치 목록을 불러오지 못했어요.')}</p>
-            <button type="button" onClick={() => void refetch()} className="text-[14px] text-blue-500 font-medium">다시 시도</button>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="text-[14px] text-blue-500 font-medium focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            >
+              다시 시도
+            </button>
           </div>
         ) : isPending ? <AdminListSkeleton rows={5} />
         : filtered.length === 0 ? (
@@ -117,9 +133,13 @@ export default function AdminMatchesPage() {
           filtered.map((m) => {
             const id = (m as unknown as { id?: string; matchId?: string }).id ?? (m as unknown as { matchId?: string }).matchId;
             return (
-              <AdminRow key={id} title={m.title}
+              <AdminRow
+                key={id}
+                title={m.title}
                 meta={`${formatDate(m.startsAt)} · ${m.participantCount ?? 0}/${m.capacity ?? '?'}명`}
-                badge={<AdminBadge status={m.status} />} href={`/matches/${id}`} />
+                badge={<AdminBadge status={m.status} />}
+                href={`/matches/${id}`}
+              />
             );
           })
         )}

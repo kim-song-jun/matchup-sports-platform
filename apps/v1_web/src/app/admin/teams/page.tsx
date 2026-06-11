@@ -84,7 +84,7 @@ function TeamApplicationsSection({ teamId, teamName }: { teamId: string; teamNam
               type="button"
               onClick={() => void handleApprove(app.applicationId)}
               disabled={approveMutation.isPending || rejectMutation.isPending}
-              className="bg-blue-500 hover:bg-blue-600 text-white text-[13px] font-semibold rounded-lg px-3.5 h-9 transition-colors disabled:opacity-50"
+              className="bg-blue-500 hover:bg-blue-600 text-white text-[13px] font-semibold rounded-lg px-3.5 min-h-[44px] md:min-h-[36px] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               수락
             </button>
@@ -92,7 +92,7 @@ function TeamApplicationsSection({ teamId, teamName }: { teamId: string; teamNam
               type="button"
               onClick={() => void handleReject(app.applicationId)}
               disabled={approveMutation.isPending || rejectMutation.isPending}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-[13px] font-medium rounded-lg px-3.5 h-9 transition-colors disabled:opacity-50"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-[13px] font-medium rounded-lg px-3.5 min-h-[44px] md:min-h-[36px] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               거절
             </button>
@@ -131,16 +131,16 @@ export default function AdminTeamsPage() {
         action={
           <Link
             href="/teams/new"
-            className="bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold rounded-xl px-4 h-10 inline-flex items-center gap-2 transition-colors"
+            className="bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold rounded-xl px-4 h-10 inline-flex items-center gap-2 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
-            <Plus size={15} />
+            <Plus size={15} aria-hidden="true" />
             팀 만들기
           </Link>
         }
       />
 
       {/* KPI */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <AdminKpiCard label="소속 팀" value={teams.length} icon={<Users size={16} />} />
         <AdminKpiCard
           label="관리 중인 팀"
@@ -154,7 +154,7 @@ export default function AdminTeamsPage() {
       {!isPending && managerTeams.length > 0 && (
         <div className="bg-white rounded-2xl border border-amber-100 mb-4">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-50">
-            <UserCheck size={16} className="text-amber-500" />
+            <UserCheck size={16} className="text-amber-500" aria-hidden="true" />
             <span className="text-[15px] font-bold text-gray-900">가입 신청</span>
             <span className="text-[12px] text-amber-600 font-medium ml-auto">관리자만 볼 수 있어요</span>
           </div>
@@ -170,7 +170,7 @@ export default function AdminTeamsPage() {
       <div className="bg-white rounded-2xl border border-gray-100">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
           <div className="flex items-center gap-2">
-            <Users size={16} className="text-gray-400" />
+            <Users size={16} className="text-gray-400" aria-hidden="true" />
             <span className="text-[15px] font-bold text-gray-900">소속 팀 목록</span>
           </div>
           <span className="text-[13px] text-gray-400">{teams.length}개</span>
@@ -212,7 +212,7 @@ export default function AdminTeamsPage() {
               actions={
                 <Link
                   href={team.detailRoute}
-                  className="text-[13px] text-blue-500 font-medium hover:text-blue-600 whitespace-nowrap"
+                  className="text-[13px] text-blue-500 font-medium hover:text-blue-600 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
                 >
                   팀 홈 →
                 </Link>

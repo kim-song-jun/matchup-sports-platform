@@ -332,3 +332,84 @@
     transform: scale(1) translateY(0);
   }
 }
+
+/* ─── Shared desktop layout primitives (used by every domain desktop layer) ──
+ * These give the per-domain desktop/<domain>.css files consistent building
+ * blocks so all ~90 pages share one desktop language. Mobile (<768) untouched.
+ */
+
+/* Hide an element on desktop — e.g. mobile-only chrome a domain still renders. */
+@media (min-width: 1024px) {
+  .tm-hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Show an element only on desktop (default block). Domains needing flex/grid
+ * add their own display rule for the same element in desktop/<domain>.css. */
+.tm-show-desktop {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .tm-show-desktop {
+    display: block;
+  }
+}
+
+/* Desktop in-content page header for detail / back pages. The mobile .tm-topbar
+ * (back arrow + title) is hidden on desktop, so detail pages render this header
+ * at the top of the content column to preserve back navigation + page title.
+ * Markup contract:
+ *   <div class="tm-desktop-page-head tm-show-desktop">
+ *     <a class="tm-desktop-back" href="..." aria-label="뒤로가기"><ChevronLeftIcon/></a>
+ *     <h1 class="tm-text-heading">제목</h1>
+ *   </div>
+ */
+@media (min-width: 1024px) {
+  .tm-desktop-page-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 0 18px;
+  }
+  .tm-desktop-page-head .tm-desktop-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    color: var(--grey700);
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  .tm-desktop-page-head .tm-desktop-back:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+  .tm-desktop-page-head .tm-desktop-back:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+  }
+}
+
+/* Generic desktop content grid. Domains may use these or define bespoke grids.
+ * 2-up at >=1024, 3-up at >=1440. Card lists should target ~340-360px columns. */
+@media (min-width: 1024px) {
+  .tm-desktop-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .tm-desktop-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+@media (min-width: 1440px) {
+  .tm-desktop-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+}

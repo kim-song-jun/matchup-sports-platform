@@ -154,11 +154,42 @@ secrets. Admin remains behind existing guards. No `dangerouslySetInnerHTML` intr
 - Consumer desktop nav (sidebar vs top-nav) → **decided** top-nav (orchestrator);
   open to `ux-manager` refinement in the gate.
 
+## Desktop Design Contract (every domain wave MUST follow)
+
+Foundation (`apps/v1_web/src/app/desktop/_shell.css`, committed `9f256c24`) already
+provides: desktop top-nav, frame un-pin, **content centered at `max-width:1120px`**
+(via `.tm-scroll-area`), and shared primitives. Domain agents build WITHIN this.
+
+1. **Breakpoints**: art-direct desktop at `@media (min-width:1024px)`; bump density
+   at `@media (min-width:1440px)`. **Mobile (<768) MUST stay byte-for-byte visually
+   unchanged** — never edit existing mobile rules; only add desktop `@media` blocks
+   in your `desktop/<domain>.css` (+ optional desktop-only JSX gated by
+   `.tm-show-desktop`/`.tm-hide-desktop`).
+2. **Where desktop CSS lives**: ONLY your `apps/v1_web/src/app/desktop/<domain>.css`.
+   Do NOT edit `globals.css`, `_shell.css`, `shell.tsx`, other domains' files, or
+   admin. Page-component JSX edits are allowed only in YOUR domain's components.
+3. **Kill the stretched column**: the #1 fix. A single mobile column stretched to
+   1120px looks broken (huge gaps). Use real desktop composition: card lists →
+   `.tm-desktop-grid-3` (2-up ≥1024, 3-up ≥1440) or bespoke grids; horizontal
+   mobile rails (`.tm-match-rail`) → wrapped grids on desktop; KPI/stat strips →
+   wider; forms → constrain to ~520–640px (don't stretch inputs full 1120px).
+4. **Detail / back pages**: the mobile `.tm-topbar` (back + title) is hidden on
+   desktop. Render the shared `.tm-desktop-page-head tm-show-desktop` header (back
+   link + `.tm-text-heading` title) at the top of content. Re-scope any
+   domain-specific full-bleed hero/CTA to the 1120px column.
+5. **Tokens only**: `--blue500`, `--grey50…900`, `.tm-text-*`, `.tm-card`,
+   `--shadow-1/2`, `.tm-badge-*`, `.tm-btn-*`. No hardcoded hex/px-color.
+6. **A11y**: WCAG AA contrast, 44px touch targets, visible focus rings
+   (`outline:2px solid var(--blue500); outline-offset:2px`), `aria-label` on icon
+   links, `aria-current="page"` on active nav. Color never the sole signal.
+7. **Verify**: `cd apps/v1_web && pnpm exec tsc --noEmit` clean before reporting
+   DONE. Do not self-commit.
+
 ## Progress Snapshot
 
 - [x] main merged (911036b3)
 - [x] codebase mapped, live shell identified, decisions locked
-- [ ] Wave 0 Foundation
+- [x] Wave 0 Foundation (committed 9f256c24) — desktop nav + frame un-pin verified
 - [ ] Domain waves
 - [ ] Gate
 - [ ] Live verify (backend+seed)

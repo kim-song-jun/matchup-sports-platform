@@ -185,11 +185,29 @@ provides: desktop top-nav, frame un-pin, **content centered at `max-width:1120px
 7. **Verify**: `cd apps/v1_web && pnpm exec tsc --noEmit` clean before reporting
    DONE. Do not self-commit.
 
-## Progress Snapshot
+## Progress Snapshot — COMPLETE
 
 - [x] main merged (911036b3)
 - [x] codebase mapped, live shell identified, decisions locked
-- [x] Wave 0 Foundation (committed 9f256c24) — desktop nav + frame un-pin verified
-- [ ] Domain waves
-- [ ] Gate
-- [ ] Live verify (backend+seed)
+- [x] Wave 0 Foundation (9f256c24) + primitives/contract (b50c00dd)
+- [x] Domain waves — all 12 domains: home/matches/team-matches (d3059776),
+      admin (d9f3fd01), teams/my/auth (cbe6d279), onboarding/search/chat/
+      notifications/notices/landing (ce5fa7bd)
+- [x] Gate — vitest 7/7; frontend-review VERIFICATION_AUDIT passed; ui-manager
+      coherence pass; findings fixed (4d3c2342)
+- [x] Live verify (backend+seed) — Postgres + v1_api seeded; Playwright QA with
+      real data at 1280/390 across home, matches list+detail, team-match
+      list+detail, teams detail, my, admin, landing, create-wizard; mobile
+      regression clean.
+
+### Deferred (known minor follow-ups — non-blocking, reviewer-noted)
+- Type-scale: a few desktop headers use raw px (26px section heads, landing
+  hero 44/52px) outside the `.tm-text-*` token scale — acceptable display sizes;
+  consider a `.tm-text-display` token later.
+- `search.css` uses `!important` to override JSX inline `style=` on
+  `.tm-search-frame`; works, but the mobile inline positioning could move into a
+  class to drop the overrides.
+- Sticky-sidebar `top` 80px vs 88px split is intentional but undocumented;
+  could become tokens.
+- Dead `.v1-*` prototype shell (`components/domain/v1-*.tsx`) still present —
+  separate cleanup task.

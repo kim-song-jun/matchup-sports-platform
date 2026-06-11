@@ -6,7 +6,9 @@ import { v1Keys } from '@/lib/query-keys';
 import type {
   AdminListFilters,
   CursorPage,
+  V1AdminGrantResult,
   V1AdminLog,
+  V1AdminRow,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -1085,6 +1087,41 @@ export function useV1ChangeTeamMatchStatus() {
       v1Post<V1AdminStatusChangeResult>(`/admin/team-matches/${id}/status`, { status, reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — admin-management (owner-only)
+// ---------------------------------------------------------------------------
+
+export function useV1AdminAdmins(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminAdmins(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminRow>>('/admin/admins', filters),
+  });
+}
+
+export function useV1GrantAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId: string; adminRole: 'ops' | 'support'; reason: string }) =>
+      v1Post<V1AdminGrantResult>('/admin/admins', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminAdmins() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+export function useV1UpdateAdminRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, ...body }: { userId: string; adminRole?: 'ops' | 'support' | 'owner'; status?: 'active' | 'revoked'; reason: string }) =>
+      v1Patch<V1AdminGrantResult>(`/admin/admins/${userId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminAdmins() });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
     },
   });

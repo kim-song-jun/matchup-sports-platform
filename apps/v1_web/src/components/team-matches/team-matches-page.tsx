@@ -118,6 +118,20 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const canRunAction = Boolean(model.onApply);
   const showChat = mode === 'approved' && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
+  const [heroMessage, setHeroMessage] = useState('');
+
+  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+    if (!action) return;
+    void Promise.resolve(action())
+      .then(() => {
+        setHeroMessage(successMessage);
+        window.setTimeout(() => setHeroMessage(''), 1800);
+      })
+      .catch(() => {
+        setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        window.setTimeout(() => setHeroMessage(''), 1800);
+      });
+  };
 
   /* Shared CTA buttons — rendered in both mobile fixed bar and desktop sticky card */
   const ctaButtons = (
@@ -130,7 +144,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       {mode === 'mine' ? (
         <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/team-matches/${match.id}/edit`}>{cta}</Link>
       ) : (
-        <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={model.onApply}>
+        <button className={`tm-btn tm-btn-lg ${ctaTone}`} disabled={!canRunAction || model.applyPending} type="button" onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
           {model.applyPending ? '처리 중' : cta}
         </button>
       )}
@@ -159,13 +173,13 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <ChevronLeftIcon size={22} strokeWidth={2.2} />
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={model.onShare}><ShareIcon size={20} /></button>
+                  <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}><ShareIcon size={20} /></button>
                   <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
                 </div>
               </div>
               {/* Desktop-only share + notify actions inside hero */}
               <div className="tm-team-match-hero-actions tm-show-desktop">
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={model.onShare}><ShareIcon size={20} /></button>
+                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}><ShareIcon size={20} /></button>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
               </div>
               <div className="tm-team-vs-row">
@@ -181,6 +195,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-micro" style={{ color: 'rgba(255,255,255,.72)' }}>{teamMatchOpponentSub(mode)}</div>
                 </div>
               </div>
+              {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'rgba(255,255,255,.86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
             <div className="tm-match-detail-body">
               <InfoRow label="지역" value={match.region} />

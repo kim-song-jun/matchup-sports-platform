@@ -28,6 +28,9 @@ describe('AdminController', () => {
     listTeams: jest.fn(),
     getTeam: jest.fn(),
     listTeamMatches: jest.fn(),
+    listAdmins: jest.fn(),
+    grantAdmin: jest.fn(),
+    updateAdmin: jest.fn(),
   };
 
   let controller: AdminController;
@@ -281,5 +284,69 @@ describe('AdminController', () => {
     adminService.listTeamMatches.mockResolvedValue(payload);
     await expect(controller.listTeamMatches(user, query)).resolves.toEqual(payload);
     expect(adminService.listTeamMatches).toHaveBeenCalledWith(user, query);
+  });
+
+  // ─── Admin management (owner-only) ────────────────────────────────────────
+
+  it('lists admins and returns items + pageInfo', async () => {
+    const query = { status: 'active' as const };
+    const payload = {
+      items: [
+        {
+          adminUserId: 'au-1',
+          userId: 'u-1',
+          nickname: '어드민',
+          displayName: '어드민',
+          email: 'admin@teameet.v1',
+          adminRole: 'owner',
+          status: 'active',
+          grantedByAdminUserId: null,
+          grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+          revokedAt: null,
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    adminService.listAdmins.mockResolvedValue(payload);
+    await expect(controller.listAdmins(user, query)).resolves.toEqual(payload);
+    expect(adminService.listAdmins).toHaveBeenCalledWith(user, query);
+  });
+
+  it('grants admin and returns the created row', async () => {
+    const dto = { userId: 'u-2', adminRole: 'ops' as const, reason: '운영팀 합류' };
+    const payload = {
+      adminUserId: 'au-2',
+      userId: 'u-2',
+      nickname: '운영자1',
+      displayName: '운영자1',
+      email: 'ops@teameet.v1',
+      adminRole: 'ops',
+      status: 'active',
+      grantedByAdminUserId: 'u-owner',
+      grantedAt: new Date('2026-06-12T00:00:00.000Z'),
+      revokedAt: null,
+    };
+    adminService.grantAdmin.mockResolvedValue(payload);
+    await expect(controller.grantAdmin(user, dto)).resolves.toEqual(payload);
+    expect(adminService.grantAdmin).toHaveBeenCalledWith(user, dto);
+  });
+
+  it('updates admin role and returns the updated row', async () => {
+    const dto = { adminRole: 'support' as const, reason: '역할 조정' };
+    const payload = {
+      adminUserId: 'au-2',
+      userId: 'u-2',
+      nickname: '운영자1',
+      displayName: '운영자1',
+      email: 'ops@teameet.v1',
+      adminRole: 'support',
+      status: 'active',
+      grantedByAdminUserId: 'u-owner',
+      grantedAt: new Date('2026-06-12T00:00:00.000Z'),
+      revokedAt: null,
+    };
+    adminService.updateAdmin.mockResolvedValue(payload);
+    await expect(controller.updateAdmin(user, 'u-2', dto)).resolves.toEqual(payload);
+    expect(adminService.updateAdmin).toHaveBeenCalledWith(user, 'u-2', dto);
   });
 });

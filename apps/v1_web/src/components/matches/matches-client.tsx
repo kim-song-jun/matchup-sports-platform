@@ -186,8 +186,8 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           viewerState,
           eligible: eligibility.data?.eligible,
           applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
-          apply: () => applyMatch.mutate({ message: null }),
-          withdraw: () => withdrawMatch.mutate({ reason: 'applicant_withdrawn_from_v1_web' }),
+          apply: () => applyMatch.mutateAsync({ message: null }),
+          withdraw: () => withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }),
         }),
       }
     : fallback;
@@ -481,9 +481,9 @@ function getApplyAction({
   viewerState: V1ViewerState;
   eligible?: boolean;
   applicationId?: string | null;
-  apply: () => void;
-  withdraw: () => void;
-}) {
+  apply: () => Promise<unknown>;
+  withdraw: () => Promise<unknown>;
+}): (() => Promise<unknown>) | undefined {
   if (viewerState === 'requested' && applicationId) return withdraw;
   if (eligible) return apply;
   return undefined;

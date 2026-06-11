@@ -10,6 +10,7 @@ import {
   UsersRound,
   Trophy,
   ClipboardList,
+  ShieldCheck,
   ChevronLeft,
   Menu,
   X,
@@ -23,7 +24,7 @@ interface NavItem {
   exact?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const BASE_NAV_ITEMS: NavItem[] = [
   { label: '개요', href: '/admin', icon: <LayoutDashboard size={18} />, exact: true },
   { label: '회원', href: '/admin/users', icon: <Users size={18} /> },
   { label: '매치', href: '/admin/matches', icon: <Swords size={18} /> },
@@ -32,6 +33,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: '감사로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
 ];
 
+const OWNER_NAV_ITEM: NavItem = {
+  label: '관리자',
+  href: '/admin/admins',
+  icon: <ShieldCheck size={18} />,
+};
+
 // ── Props ─────────────────────────────────────────────────────────────────
 interface AdminShellProps {
   children: ReactNode;
@@ -39,6 +46,11 @@ interface AdminShellProps {
   adminName?: string;
   /** Role label shown next to brand e.g. "owner" | "ops" | "support" */
   adminRoleLabel?: string;
+  /**
+   * When true the "관리자" nav item (/admin/admins) is rendered.
+   * Should be set to `true` only for `adminRole === 'owner'`.
+   */
+  canManageAdmins?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -47,9 +59,15 @@ function useIsActive(pathname: string) {
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
+/** Builds the nav list, optionally appending the owner-only item */
+function buildNavItems(canManageAdmins: boolean): NavItem[] {
+  return canManageAdmins ? [...BASE_NAV_ITEMS, OWNER_NAV_ITEM] : BASE_NAV_ITEMS;
+}
+
 /** Current section label derived from pathname (for mobile appbar title) */
-function useSectionLabel(pathname: string): string {
-  const match = NAV_ITEMS.find((item) =>
+function useSectionLabel(pathname: string, canManageAdmins: boolean): string {
+  const items = buildNavItems(canManageAdmins);
+  const match = items.find((item) =>
     item.exact ? pathname === item.href : pathname.startsWith(item.href),
   );
   return match?.label ?? '관리';
@@ -84,10 +102,12 @@ interface DrawerProps {
   adminName?: string;
   adminRoleLabel?: string;
   pathname: string;
+  canManageAdmins: boolean;
 }
 
-function Drawer({ open, onClose, adminName, adminRoleLabel, pathname }: DrawerProps) {
+function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageAdmins }: DrawerProps) {
   const isActive = useIsActive(pathname);
+  const navItems = buildNavItems(canManageAdmins);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -204,7 +224,7 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname }: DrawerPr
 
         {/* Nav */}
         <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = isActive(item);
             return (
               <Link
@@ -249,10 +269,11 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname }: DrawerPr
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────
-export function AdminShell({ children, adminName, adminRoleLabel }: AdminShellProps) {
+export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmins = false }: AdminShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
-  const sectionLabel = useSectionLabel(pathname);
+  const navItems = buildNavItems(canManageAdmins);
+  const sectionLabel = useSectionLabel(pathname, canManageAdmins);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
@@ -285,7 +306,7 @@ export function AdminShell({ children, adminName, adminRoleLabel }: AdminShellPr
 
         {/* Nav */}
         <nav className="flex-1 py-1.5" aria-label="주 메뉴">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <SidebarLink key={item.href} item={item} active={isActive(item)} />
           ))}
         </nav>
@@ -313,6 +334,7 @@ export function AdminShell({ children, adminName, adminRoleLabel }: AdminShellPr
           adminName={adminName}
           adminRoleLabel={adminRoleLabel}
           pathname={pathname}
+          canManageAdmins={canManageAdmins}
         />
       </div>
 

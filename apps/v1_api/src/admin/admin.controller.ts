@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
+  AdminListQueryDto,
   AdminLogsQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
@@ -13,6 +14,8 @@ import {
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  GrantAdminDto,
+  UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
 
@@ -118,5 +121,26 @@ export class AdminController {
   @Get('team-matches')
   listTeamMatches(@CurrentUser() user: V1AuthUser, @Query() query: AdminTeamMatchListQueryDto) {
     return this.adminService.listTeamMatches(user, query);
+  }
+
+  // ─── Admin management (owner-only) ────────────────────────────────────────
+
+  @Get('admins')
+  listAdmins(@CurrentUser() user: V1AuthUser, @Query() query: AdminListQueryDto) {
+    return this.adminService.listAdmins(user, query);
+  }
+
+  @Post('admins')
+  grantAdmin(@CurrentUser() user: V1AuthUser, @Body() dto: GrantAdminDto) {
+    return this.adminService.grantAdmin(user, dto);
+  }
+
+  @Patch('admins/:userId')
+  updateAdmin(
+    @CurrentUser() user: V1AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateAdminDto,
+  ) {
+    return this.adminService.updateAdmin(user, userId, dto);
   }
 }

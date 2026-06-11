@@ -41,6 +41,7 @@ export type ChatRoomViewModel = {
   emptyBody?: string;
   draft?: string;
   sending?: boolean;
+  sendError?: boolean;
   onDraftChange?: (value: string) => void;
   onSend?: () => void;
   onRetry?: () => void;

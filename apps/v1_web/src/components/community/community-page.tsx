@@ -84,6 +84,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           {model.status !== 'loading' && model.messages.length === 0 ? <ChatEmptyState title={model.emptyTitle ?? '아직 메시지가 없어요'} body={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있습니다.'} onRetry={model.onRetry} /> : null}
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
+        {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 추가" disabled={model.status === 'error'}><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
       </div>
     </AppChrome>

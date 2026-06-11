@@ -35,4 +35,5 @@ export const v1Keys = {
   adminTeam: (id: string) => [...v1Keys.all, 'admin', 'teams', id] as const,
   adminTeamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'team-matches', filters ?? {}] as const,
   adminStatusChangeLogs: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'status-change-logs', filters ?? {}] as const,
+  adminAdmins: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'admins', filters ?? {}] as const,
 };

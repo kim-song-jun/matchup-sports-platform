@@ -1206,3 +1206,18 @@ export type AdminListFilters = {
   cursor?: string;
   limit?: number;
 };
+
+export type V1AdminRow = {
+  adminUserId: string;
+  userId: string;
+  nickname: string | null;
+  displayName: string | null;
+  email: string | null;
+  adminRole: 'owner' | 'ops' | 'support';
+  status: 'active' | 'revoked' | 'suspended';
+  grantedByAdminUserId: string | null;
+  grantedAt: string;
+  revokedAt: string | null;
+};
+
+export type V1AdminGrantResult = V1AdminRow;

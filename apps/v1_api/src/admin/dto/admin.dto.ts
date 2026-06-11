@@ -136,6 +136,51 @@ export class ChangeTeamMatchStatusDto {
   reason!: string;
 }
 
+// ─── Admin-management DTOs ────────────────────────────────────────────────────
+
+export class AdminListQueryDto {
+  @IsOptional()
+  @IsIn(['active', 'revoked'])
+  status?: 'active' | 'revoked';
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class GrantAdminDto {
+  @IsUUID()
+  userId!: string;
+
+  @IsIn(['ops', 'support'])
+  adminRole!: 'ops' | 'support';
+
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class UpdateAdminDto {
+  @IsOptional()
+  @IsIn(['ops', 'support', 'owner'])
+  adminRole?: 'ops' | 'support' | 'owner';
+
+  @IsOptional()
+  @IsIn(['active', 'revoked'])
+  status?: 'active' | 'revoked';
+
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
 export class AdminLogsQueryDto {
   @IsOptional()
   @IsUUID()

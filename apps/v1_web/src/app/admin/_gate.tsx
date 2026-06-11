@@ -70,7 +70,11 @@ export function AdminGate({ children }: AdminGateProps) {
   const adminName = `${roleLabel} (${data.adminUserId.slice(0, 8)})`;
 
   return (
-    <AdminShell adminName={adminName} adminRoleLabel={roleLabel}>
+    <AdminShell
+      adminName={adminName}
+      adminRoleLabel={roleLabel}
+      canManageAdmins={data.adminRole === 'owner'}
+    >
       {children}
     </AdminShell>
   );

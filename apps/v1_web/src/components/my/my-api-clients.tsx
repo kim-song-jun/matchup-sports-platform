@@ -110,7 +110,8 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
 export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
-  const members = useV1TeamMembers(teamId, { limit: 50 });
+  const canViewMembers = Boolean(team.data?.canViewMembers);
+  const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
   const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
   const changeRole = useV1ChangeTeamMembershipRole(teamId);
@@ -791,6 +792,7 @@ export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
   const notifications = settings.data?.notifications;
+  const [toggleError, setToggleError] = useState(false);
   const items = [
     { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
     { key: 'teamEnabled', label: '팀 가입 요청', sub: '내가 운영하는 팀에 요청이 들어올 때' },
@@ -802,7 +804,16 @@ export function NotificationSettingsPageClient() {
 
   const toggle = (key: keyof V1Settings['notifications']) => {
     if (!notifications) return;
-    update.mutate({ notifications: { [key]: !notifications[key] } });
+    setToggleError(false);
+    update.mutate(
+      { notifications: { [key]: !notifications[key] } },
+      {
+        onError: () => {
+          setToggleError(true);
+          window.setTimeout(() => setToggleError(false), 3000);
+        },
+      },
+    );
   };
 
   return (
@@ -815,6 +826,12 @@ export function NotificationSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
+          {toggleError ? (
+            <div className="tm-card" style={{ padding: 14, background: 'rgba(254,152,0,.10)', marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </div>
+          ) : null}
           {items.map((setting) => {
             const enabled = Boolean(notifications?.[setting.key]);
             return (

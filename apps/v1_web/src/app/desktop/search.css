@@ -12,7 +12,8 @@
  * ============================================================ */
 
 /* ─── 1. Un-pin the search frame ──────────────────────────────────────────────
- * On mobile, .tm-search-frame is a fixed 100dvh column with overflow:hidden.
+ * On mobile, .tm-search-frame fills its parent (.tm-scroll-area) with
+ * height:100% + overflow:hidden for an internal-scroll column layout.
  * The AppChrome's .tm-scroll-area already handles centering/scroll on desktop,
  * so we convert the frame to a normal block that fills available space.
  * Inline styles on the element use style= attributes with lower specificity

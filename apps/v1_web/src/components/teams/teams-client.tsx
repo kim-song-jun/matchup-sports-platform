@@ -230,8 +230,8 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           eligibility: eligibility.data,
           manage: () => router.push(`/teams/${teamId}/members`),
           myTeam: () => router.push(`/my/teams/${teamId}`),
-          join: () => join.mutate({ message: null }),
-          withdraw: () => withdraw.mutate({ reason: 'team_join_withdrawn_from_v1_web' }),
+          join: () => join.mutateAsync({ message: null }),
+          withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
         onShare: () => shareTeam(query.data),
       }
@@ -464,9 +464,9 @@ function ctaAction({
   eligibility?: { eligible: boolean; joinState: string };
   manage: () => void;
   myTeam: () => void;
-  join: () => void;
-  withdraw: () => void;
-}) {
+  join: () => Promise<unknown>;
+  withdraw: () => Promise<unknown>;
+}): (() => void | Promise<unknown>) | undefined {
   if (team.viewer.role === 'owner' || team.viewer.role === 'manager') return manage;
   if (team.viewer.role === 'member') return myTeam;
   if (eligibility?.joinState === 'requested') return withdraw;
@@ -520,7 +520,13 @@ async function shareTeam(team: V1TeamDetail) {
   const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
 
   if (typeof navigator !== 'undefined' && navigator.share) {
-    await navigator.share({ title, url });
+    try {
+      await navigator.share({ title, url });
+    } catch (err) {
+      // AbortError: user dismissed the native share sheet — not an error
+      if (err instanceof Error && err.name === 'AbortError') return;
+      throw err;
+    }
     return;
   }
 

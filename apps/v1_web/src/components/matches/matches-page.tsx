@@ -289,7 +289,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               {mode === 'mine' ? (
                 <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
               ) : (
-                <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={model.onApply}>
+                <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
                   {model.applyPending ? '처리 중' : cta}
                 </button>
               )}
@@ -343,7 +343,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {mode === 'mine' ? (
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
           ) : (
-            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={model.onApply}>
+            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
               {model.applyPending ? '처리 중' : cta}
             </button>
           )}

@@ -111,6 +111,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     emptyBody: isError ? '네트워크 상태를 확인하고 다시 시도해 주세요.' : messages.data && items.length === 0 ? '첫 메시지를 보내 대화를 시작할 수 있습니다.' : undefined,
     draft,
     sending: send.isPending,
+    sendError: send.isError,
     onDraftChange: setDraft,
     onSend: () => {
       const content = draft.trim();

@@ -132,6 +132,21 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const locked = mode === 'pending' || mode === 'closed';
   const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
+  const [heroMessage, setHeroMessage] = useState('');
+
+  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+    if (!action) return;
+    void Promise.resolve(action())
+      .then(() => {
+        setHeroMessage(successMessage);
+        window.setTimeout(() => setHeroMessage(''), 1800);
+      })
+      .catch(() => {
+        setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        window.setTimeout(() => setHeroMessage(''), 1800);
+      });
+  };
+
   return (
     <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
       {/* Desktop back header */}
@@ -151,7 +166,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
               type="button"
               aria-label="공유"
-              onClick={model.onShare}
+              onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}
               style={{ position: 'absolute', top: 14, right: 14 }}
             >
               <ShareIcon size={20} />
@@ -206,12 +221,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
             {locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}
           </div>
+          {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
             <button
               className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
               type="button"
               disabled={!model.onCta || model.ctaPending}
-              onClick={model.onCta}
+              onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}
             >
               {model.ctaPending ? '처리 중' : cta}
             </button>
@@ -226,7 +242,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
             type="button"
             aria-label="공유"
-            onClick={model.onShare}
+            onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}
             style={{ position: 'absolute', top: 14, right: 14 }}
           >
             <ShareIcon size={20} />
@@ -263,7 +279,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀에 소속되어 있고 멤버 현황 조회가 활성화된 경우에만 목록을 볼 수 있습니다.</div>}
         </Card>
       </article>
-      <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div><button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={model.onCta}>{model.ctaPending ? '처리 중' : cta}</button></div>
+      <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
     </AppChrome>
   );
 }

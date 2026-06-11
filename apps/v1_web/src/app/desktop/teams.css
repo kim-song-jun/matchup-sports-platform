@@ -1,1 +1,333 @@
-/* Desktop overrides for teams — owned by the teams wave. Add @media (min-width:1024px) rules here. */
+/* ============================================================
+ * Desktop overrides — teams domain
+ * Owner: teams wave agent
+ * ALL rules are behind @media (min-width:1024px) or @media (min-width:1440px).
+ * Mobile (<768) is NEVER modified here.
+ * ============================================================ */
+
+/* ─── List /teams ─────────────────────────────────────────────────────────────
+ * Sport-chip row wraps instead of scrolling horizontally.
+ * Summary bar becomes a single line.
+ * .tm-team-card-stack → 2-up card grid (3-up at ≥1440).
+ * Floating FAB hidden; inline "팀 만들기" CTA appears in the page header.
+ */
+
+@media (min-width: 1024px) {
+  /* Remove mobile padding from the list wrapper */
+  .tm-team-list {
+    padding: 0 0 48px;
+  }
+
+  /* Sport chip row: unwrap from horizontal scroll */
+  .tm-team-list .tm-sport-chip-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 8px;
+    padding: 12px 0 16px;
+  }
+
+  /* Search bar: full-width, no extra padding (scroll area already has 24px) */
+  .tm-team-list ~ .tm-list-searchbar,
+  .tm-team-list .tm-list-searchbar,
+  .tm-list-searchbar {
+    gap: 10px;
+    padding: 0;
+    margin-bottom: 4px;
+    position: static;
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .tm-list-search-input {
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  /* Summary bar: keep single row */
+  .tm-team-summary-bar {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    margin-top: 4px;
+  }
+
+  /* Desktop page header: title + inline "팀 만들기" CTA */
+  .tm-team-desktop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 28px 0 4px;
+  }
+
+  .tm-team-desktop-header-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--grey900);
+    letter-spacing: -0.5px;
+    margin: 0;
+  }
+
+  /* Inline "팀 만들기" button (desktop-only, shown via .tm-show-desktop) */
+  .tm-team-desktop-create-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: var(--blue500);
+    color: var(--static-white);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.12s;
+    flex-shrink: 0;
+  }
+
+  .tm-team-desktop-create-btn:hover {
+    background: var(--blue600, #2272eb);
+  }
+
+  .tm-team-desktop-create-btn:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
+  /* Convert vertical card stack → 2-up grid */
+  .tm-team-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  /* Hover lift for each card */
+  .tm-team-card {
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+
+  .tm-team-card:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+  }
+
+  /* Hide floating FAB — inline button provides the same action */
+  .tm-floating-fab {
+    display: none;
+  }
+}
+
+@media (min-width: 1440px) {
+  /* 3-up grid at ≥1440 */
+  .tm-team-card-stack {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+/* ─── State pages: search / empty / error ─────────────────────────────────────
+ * Fill the desktop content column gracefully.
+ * Error card centered inside the column.
+ */
+
+@media (min-width: 1024px) {
+  /* In search state the card stack reuses the grid rules above.
+     No extra selector needed — .tm-team-card-stack already covered. */
+
+  /* Error guidance card: don't stretch full width */
+  .tm-team-state-error-card {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 24px;
+  }
+}
+
+/* ─── Filter page /teams/filter ────────────────────────────────────────────────
+ * Center the filter form content at ~600px.
+ * Sport chips wrap; filter overlay sheet becomes a centered modal
+ * (handled by _shell.css already, no extra override needed here).
+ */
+
+@media (min-width: 1024px) {
+  /* Scope to teams filter via .tm-team-filter-shell */
+  .tm-team-filter-shell {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 120px;
+  }
+
+  .tm-team-filter-shell .tm-sport-chip-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  /* Fixed CTA inside teams filter: stay in the centered 600px column */
+  .tm-team-filter-shell ~ .tm-fixed-cta,
+  .tm-team-filter-cta {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* ─── Detail /teams/[id] ──────────────────────────────────────────────────────
+ * 2-column body:
+ *   LEFT  (flex 1): hero identity card + intro/info rows + member card
+ *   RIGHT (~360px sticky): recruiting status + member count + join/apply CTA
+ * The .tm-fixed-cta (mobile join CTA) is hidden on desktop via .tm-hide-desktop
+ * on the wrapper; a sticky right panel replaces it.
+ */
+
+@media (min-width: 1024px) {
+  /* Remove large bottom padding that existed for the mobile fixed CTA */
+  .tm-team-detail-body {
+    padding: 0;
+  }
+
+  /* Two-column layout container */
+  .tm-team-detail-desktop-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 32px;
+    align-items: start;
+    padding-top: 0;
+  }
+
+  /* LEFT: main content column */
+  .tm-team-detail-desktop-main {
+    min-width: 0;
+  }
+
+  /* Hero card: keep dark background, constrain to column */
+  .tm-team-detail-hero-card {
+    border-radius: 20px;
+  }
+
+  /* Info rows: wider label column on desktop */
+  .tm-team-detail-desktop-main .tm-team-info-row {
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  /* RIGHT: sticky sidebar card */
+  .tm-team-detail-desktop-sidebar {
+    position: sticky;
+    top: 80px; /* 64px nav + 16px breathing room */
+    background: var(--bg);
+    border: 1px solid var(--grey150);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow-1);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Sidebar logo + team name area */
+  .tm-team-detail-sidebar-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* Status + member count row in sidebar */
+  .tm-team-detail-sidebar-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* Divider inside sidebar */
+  .tm-team-detail-sidebar-divider {
+    height: 1px;
+    background: var(--grey100);
+    margin: 0;
+  }
+
+  /* CTA button in sidebar */
+  .tm-team-detail-sidebar-cta {
+    display: grid;
+    gap: 8px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-team-detail-desktop-layout {
+    grid-template-columns: 1fr 400px;
+    gap: 40px;
+  }
+}
+
+/* ─── Members /teams/[id]/members ─────────────────────────────────────────────
+ * Stat KPI grid: 3 side-by-side cards (already 1fr 1fr 1fr in JS inline grid).
+ * Member cards: 2-column grid so the list is less tall on desktop.
+ * Request cards: 2-column grid.
+ */
+
+@media (min-width: 1024px) {
+  /* Remove mobile list padding */
+  .tm-team-list.tm-team-members-list {
+    padding: 0 0 48px;
+  }
+
+  /* Stat grid: restore 3-up (overrides the narrow-screen 1-col from globals.css) */
+  .tm-team-members-list .tm-team-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+
+  /* Desktop section wrapping tabs and member lists */
+  .tm-team-members-desktop-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-team-members-desktop-layout {
+    gap: 18px;
+  }
+}
+
+/* ─── new/edit forms /teams/new  /teams/[id]/edit ─────────────────────────────
+ * Center the form column at ~600px — don't stretch inputs full 1120px.
+ * Chip rows wrap (no horizontal scroll).
+ */
+
+@media (min-width: 1024px) {
+  /* Scope via .tm-team-form-shell (added to .tm-create-shell in JSX) */
+  .tm-team-form-shell {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 120px;
+  }
+
+  /* Chip rows inside the form: allow wrapping */
+  .tm-team-form-shell .tm-sport-chip-row,
+  .tm-team-form-shell .tm-team-form-chip-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  /* Fixed CTA stays within the centered 600px column */
+  .tm-team-form-cta {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Two-col layout inside the form looks fine at desktop, no adjustment needed */
+  .tm-team-form-shell .tm-create-two-col {
+    gap: 14px;
+  }
+}

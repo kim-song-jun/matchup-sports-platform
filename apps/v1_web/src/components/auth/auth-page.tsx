@@ -5,7 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import type { AuthAction, AuthExceptionViewModel, EmailLoginViewModel, LoginProvider, LoginViewModel, OnboardingOption, OnboardingViewModel, SignupCompleteViewModel, SignupField, SignupFormViewModel, TermsViewModel } from './auth.types';
 
 export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devLogin?: ReactNode }) {
-  return (
+  const card = (
     <AuthFrame>
       <div className="tm-auth-login">
         <div>
@@ -33,6 +33,26 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
         </div>
       </div>
     </AuthFrame>
+  );
+
+  return (
+    <div className="tm-auth-login-split">
+      {/* Brand panel — hidden on mobile (display:none), shown as left pane on desktop */}
+      <div className="tm-auth-split-brand" aria-hidden="true">
+        <div className="tm-auth-split-brand-logo">T</div>
+        <div className="tm-auth-split-brand-wordmark">teameet</div>
+        <p className="tm-auth-split-brand-tagline">생활체육 동호인을 위한 AI 스포츠 매칭 플랫폼</p>
+        <ul className="tm-auth-split-brand-features" role="list">
+          <li className="tm-auth-split-brand-feature">풋살 · 농구 · 배드민턴 등 11개 종목</li>
+          <li className="tm-auth-split-brand-feature">AI 기반 실력 · 지역 · 시간 매칭</li>
+          <li className="tm-auth-split-brand-feature">팀 매칭 · 용병 · 강좌 · 장터</li>
+        </ul>
+      </div>
+      {/* Card side — on mobile this is the entire page; on desktop it's the right pane */}
+      <div className="tm-auth-split-card-side">
+        {card}
+      </div>
+    </div>
   );
 }
 

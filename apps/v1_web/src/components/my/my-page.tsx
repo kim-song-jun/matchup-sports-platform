@@ -3,6 +3,7 @@ import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
   MyMatch,
@@ -130,8 +131,14 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
         </div>
-        <MemberGroup title="멤버" members={model.members} />
-        <MemberGroup title="가입 요청" members={model.requests} review />
+        <div className="tm-team-form-chip-row" style={{ marginTop: 14 }}>
+          {model.tabs.map((tab) => (
+            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect}>
+              {tab.label} <span className="tab-num">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+        {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 요청" members={model.requests} />}
       </div>
     </AppChrome>
   );
@@ -278,29 +285,12 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   );
 }
 
-function MemberGroup({ title, members, review }: { title: string; members: MyMember[]; review?: boolean }) {
+function MemberGroup({ title, members }: { title: string; members: MyMember[] }) {
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
       <div className="tm-my-list-stack">
-        {members.map((member) => (
-          <Card key={member.name} pad={14}>
-            <div className="tm-my-card-head">
-              <ListItem title={member.name} sub={`${member.role} · ${member.meta}`} trailing={member.status} />
-              {review ? (
-                <div className="tm-member-actions">
-                  <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={!member.onApprove || member.actionPending} onClick={member.onApprove}>승인</button>
-                  <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={!member.onReject || member.actionPending} onClick={member.onReject}>거절</button>
-                </div>
-              ) : (
-                <div className="tm-member-actions">
-                  <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={member.locked || member.actionPending || (!member.onPromote && !member.onDemote)} onClick={member.onPromote ?? member.onDemote}>{member.locked ? '권한 고정' : member.onDemote ? '멤버로 변경' : '운영진 지정'}</button>
-                  <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={member.locked || !member.onRemove || member.actionPending} onClick={member.onRemove}>내보내기</button>
-                </div>
-              )}
-            </div>
-          </Card>
-        ))}
+        {members.map((member) => <MyMemberCard key={member.name} member={member} />)}
       </div>
     </section>
   );

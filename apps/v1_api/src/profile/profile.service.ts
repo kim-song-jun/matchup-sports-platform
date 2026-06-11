@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -103,23 +104,98 @@ export class ProfileService {
 
   async updateMe(user: V1AuthUser, dto: UpdateProfileDto) {
     this.assertMutableAccount(user);
-    const profile = await this.prisma.v1UserProfile.upsert({
-      where: { userId: user.id },
-      update: {
-        displayName: dto.displayName,
-        nickname: dto.displayName,
-        profileImageUrl: dto.profileImageUrl ?? null,
-        bio: dto.bio ?? null,
-        visibility: dto.visibilityStatus,
-      },
-      create: {
-        userId: user.id,
-        displayName: dto.displayName,
-        nickname: dto.displayName,
-        profileImageUrl: dto.profileImageUrl ?? null,
-        bio: dto.bio ?? null,
-        visibility: dto.visibilityStatus,
-      },
+    const displayName = dto.displayName.trim();
+    const nickname = dto.nickname.trim();
+    const email = normalizeEmail(dto.email);
+    const phone = dto.phone?.trim() || null;
+    const birthDate = dto.birthDate?.trim() || null;
+    const profileImageUrl = dto.profileImageUrl?.trim() || null;
+
+    if (!displayName || !nickname || !email) {
+      throw validationError('displayName, nickname, and email are required', 'profile');
+    }
+
+    if (birthDate && !isValidBirthDate(birthDate)) {
+      throw validationError('Birth date must be a valid YYYYMMDD value', 'birthDate');
+    }
+
+    const [existingEmail, existingEmailIdentity, existingPhone, existingNickname] = await Promise.all([
+      this.prisma.v1User.findFirst({
+        where: { email, id: { not: user.id } },
+        select: { id: true },
+      }),
+      this.prisma.v1AuthIdentity.findFirst({
+        where: {
+          provider: V1AuthProvider.email,
+          providerUserKey: email,
+          userId: { not: user.id },
+        },
+        select: { id: true },
+      }),
+      phone
+        ? this.prisma.v1User.findFirst({
+            where: { phone, id: { not: user.id } },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.v1UserProfile.findFirst({
+        where: { nickname, deletedAt: null, userId: { not: user.id } },
+        select: { id: true },
+      }),
+    ]);
+
+    if (existingEmail || existingEmailIdentity) {
+      throw new ConflictException({
+        code: 'EMAIL_CONFLICT',
+        message: 'Email is already registered',
+      });
+    }
+
+    if (existingPhone) {
+      throw new ConflictException({
+        code: 'PHONE_CONFLICT',
+        message: 'Phone is already registered',
+      });
+    }
+
+    if (existingNickname) {
+      throw new ConflictException({
+        code: 'NICKNAME_CONFLICT',
+        message: 'Nickname is already registered',
+      });
+    }
+
+    const profile = await this.prisma.$transaction(async (tx) => {
+      await tx.v1User.update({
+        where: { id: user.id },
+        data: { email, phone },
+      });
+
+      await tx.v1AuthIdentity.updateMany({
+        where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
+        data: { email, providerUserKey: email },
+      });
+
+      return tx.v1UserProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          displayName,
+          nickname,
+          profileImageUrl,
+          birthDate,
+          bio: dto.bio ?? null,
+          visibility: dto.visibilityStatus,
+        },
+        create: {
+          userId: user.id,
+          displayName,
+          nickname,
+          profileImageUrl,
+          birthDate,
+          bio: dto.bio ?? null,
+          visibility: dto.visibilityStatus,
+        },
+      });
     });
 
     return {
@@ -466,6 +542,19 @@ function validationError(message: string, field: string) {
   });
 }
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function isValidBirthDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 function formatRegionName(region: { name: string; parent: { name: string } | null }) {
   return region.parent?.name ? `${region.parent.name} ${region.name}` : region.name;
 }
@@ -475,6 +564,7 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
     userId: user.id,
     accountStatus: user.accountStatus,
     email: user.email,
+    phone: user.phone,
     authProvider: user.authIdentities[0]?.provider ?? null,
     onboardingStatus: user.onboardingStatus,
     regionName: formatPrimaryRegion(user.regions),
@@ -512,12 +602,15 @@ function toProfilePayload(profile: {
   nickname: string;
   displayName: string | null;
   profileImageUrl: string | null;
+  birthDate: string | null;
   bio: string | null;
   visibility: string;
 } | null) {
   return {
     displayName: profile?.displayName ?? profile?.nickname ?? '사용자',
+    nickname: profile?.nickname ?? null,
     profileImageUrl: profile?.profileImageUrl ?? null,
+    birthDate: profile?.birthDate ?? null,
     bio: profile?.bio ?? null,
     visibilityStatus: normalizeVisibility(profile?.visibility),
   };

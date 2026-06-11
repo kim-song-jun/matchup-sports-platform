@@ -111,7 +111,17 @@ export function useV1EmailLogin() {
 export function useV1Register() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { nickname: string; email: string; password: string; gender: 'male' | 'female'; requiredTermsAccepted: boolean }) =>
+    mutationFn: (body: {
+      nickname: string;
+      email: string;
+      password: string;
+      gender: 'male' | 'female';
+      displayName?: string;
+      phone?: string;
+      birthDate?: string;
+      profileImageUrl?: string;
+      requiredTermsAccepted: boolean;
+    }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
@@ -120,7 +130,14 @@ export function useV1Register() {
 export function useV1CompleteSocialProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { nickname: string; gender: 'male' | 'female' }) =>
+    mutationFn: (body: {
+      nickname: string;
+      gender: 'male' | 'female';
+      displayName?: string;
+      phone?: string;
+      birthDate?: string;
+      profileImageUrl?: string;
+    }) =>
       v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
@@ -465,11 +482,11 @@ export function useV1MyTeams(filters?: ListFilters) {
   });
 }
 
-export function useV1TeamMembers(teamId: string, filters?: ListFilters) {
+export function useV1TeamMembers(teamId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...v1Keys.team(teamId), 'members', filters ?? {}] as const,
     queryFn: () => v1Get<V1TeamMembersPage>(`/teams/${teamId}/members`, filters),
-    enabled: Boolean(teamId),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
   });
 }
 
@@ -545,7 +562,7 @@ export function useV1RejectTeamJoinApplication(teamId: string) {
 export function useV1ChangeTeamMembershipRole(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ membershipId, role }: { membershipId: string; role: 'manager' | 'member' }) =>
+    mutationFn: ({ membershipId, role }: { membershipId: string; role: 'owner' | 'manager' | 'member' }) =>
       v1Patch<V1TeamMembershipMutationResult>(`/team-memberships/${membershipId}/role`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
@@ -764,7 +781,7 @@ export function useV1ChatRoom(roomId: string) {
 export function useV1ResolveChatRoom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { targetType: 'match' | 'team_match'; targetId: string }) =>
+    mutationFn: (body: { targetType: 'match' | 'team' | 'team_match'; targetId: string }) =>
       v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
@@ -868,7 +885,16 @@ export function useV1MyActivitySummary() {
 export function useV1UpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { displayName: string; profileImageUrl?: string | null; bio?: string | null; visibilityStatus: 'public' | 'members_only' | 'private' }) =>
+    mutationFn: (body: {
+      displayName: string;
+      nickname: string;
+      email: string;
+      profileImageUrl?: string | null;
+      phone?: string | null;
+      birthDate?: string | null;
+      bio?: string | null;
+      visibilityStatus: 'public' | 'members_only' | 'private';
+    }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.profile() });

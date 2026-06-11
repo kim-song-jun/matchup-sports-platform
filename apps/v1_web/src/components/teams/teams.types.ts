@@ -69,11 +69,17 @@ export type TeamDetailViewModel = {
     level: string;
     genderRule: string;
     membersList: Array<{ name: string; role: string; meta: string; status: string; visibility: '공개' | '비공개' }>;
+    memberAccess: {
+      canView: boolean;
+      enabled: boolean;
+      message: string;
+    };
   };
   mode: 'default' | 'pending' | 'mine' | 'closed';
   ctaLabel?: string;
   ctaPending?: boolean;
   onCta?: () => void;
+  onShare?: () => void | Promise<void>;
 };
 
 export type TeamFormMode = 'create' | 'edit';
@@ -99,10 +105,12 @@ export type TeamFormViewModel = {
     regions: Array<{ id: string; name: string }>;
     sports: Array<{ id: string; name: string }>;
     joinPolicy: 'approval_required' | 'closed';
+    membersVisibilityEnabled?: boolean;
     onFieldChange: (field: keyof TeamFormViewModel['team'], value: TeamFormViewModel['team'][keyof TeamFormViewModel['team']]) => void;
     onSportChange: (sportId: string) => void;
     onRegionChange: (regionId: string) => void;
     onJoinPolicyChange: (joinPolicy: 'approval_required' | 'closed') => void;
+    onMembersVisibilityChange?: (enabled: boolean) => void;
     onSubmit: () => void;
     submitting?: boolean;
     error?: string | null;
@@ -111,24 +119,23 @@ export type TeamFormViewModel = {
 
 export type TeamMembersViewModel = {
   teamName: string;
+  activeTab: 'members' | 'requests';
+  tabs: Array<{ key: 'members' | 'requests'; label: string; count: number; onSelect: () => void }>;
   summary: { total: number; managers: number; pending: number };
   members: Array<{
     name: string;
     role: string;
     meta: string;
-    status: string;
+    manageLabel?: string;
     locked?: boolean;
-    onPromote?: () => void;
-    onDemote?: () => void;
-    onRemove?: () => void;
+    actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
   }>;
   requests: Array<{
     name: string;
     meta: string;
     status: string;
-    onApprove?: () => void;
-    onReject?: () => void;
+    actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
   }>;
 };

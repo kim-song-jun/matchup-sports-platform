@@ -111,6 +111,11 @@ export function getMyTeamDetailModel(teamId = 'team-1'): MyTeamDetailViewModel {
 
 export const myTeamMembersModel: MyTeamMembersViewModel = {
   teamName: 'FC 발빠른놈들',
+  activeTab: 'members',
+  tabs: [
+    { key: 'members', label: '멤버', count: 3, onSelect: () => undefined },
+    { key: 'requests', label: '가입 요청', count: 2, onSelect: () => undefined },
+  ],
   summary: [
     { label: '전체', value: 18, unit: '명' },
     { label: '운영진', value: 3, unit: '명' },

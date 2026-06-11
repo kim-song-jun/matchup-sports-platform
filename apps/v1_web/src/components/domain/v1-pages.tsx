@@ -492,7 +492,7 @@ function toChatRoom(room: V1ChatRoom | MockChatRoom): MockChatRoom {
     return {
       id: room.roomId,
       title: room.title,
-      target: room.roomType === 'match' ? '개인 매치' : '팀매치',
+      target: room.roomType === 'match' ? '개인 매치' : room.roomType === 'team' ? '팀' : '팀매치',
       preview: room.lastMessage?.contentPreview ?? '아직 메시지가 없습니다.',
       time: formatShortDate(room.lastMessage?.sentAt ?? ''),
       unread: room.unreadCount,

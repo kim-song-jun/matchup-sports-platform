@@ -290,6 +290,7 @@ model V1UserProfile {
   userId          String    @unique @map("user_id")
   nickname        String
   gender          String?
+  birthDate       String?   @map("birth_date")
   profileImageUrl String?   @map("profile_image_url")
   bio             String?
   visibility      String    @default("public")
@@ -595,9 +596,10 @@ model V1Team {
   sportId      String           @map("sport_id")
   regionId     String           @map("region_id")
   name         String
-  status       V1TeamStatus     @default(active)
-  joinPolicy   V1TeamJoinPolicy @default(approval_required) @map("join_policy")
-  memberCount  Int              @default(1) @map("member_count")
+  status         V1TeamStatus     @default(active)
+  joinPolicy     V1TeamJoinPolicy @default(approval_required) @map("join_policy")
+  membersVisible Boolean          @default(false) @map("members_visible")
+  memberCount    Int              @default(1) @map("member_count")
   managerCount Int              @default(0) @map("manager_count")
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
@@ -613,6 +615,7 @@ model V1Team {
   hostedTeamMatches     V1TeamMatch[]            @relation("V1HostTeamMatches")
   approvedTeamMatches   V1TeamMatch[]            @relation("V1ApprovedApplicantTeam")
   teamMatchApplications V1TeamMatchApplication[] @relation("V1TeamMatchApplicantTeam")
+  chatRoom              V1ChatRoom?
   postEventReviewsWritten      V1PostEventReview[] @relation("V1PostEventReviewReviewerTeam")
   postEventTeamReviewsReceived V1PostEventReview[] @relation("V1PostEventReviewTargetTeam")
 
@@ -835,6 +838,7 @@ model V1TeamMatchApplication {
 model V1ChatRoom {
   id            String           @id @default(uuid())
   matchId       String?          @unique @map("match_id")
+  teamId        String?          @unique @map("team_id")
   teamMatchId   String?          @unique @map("team_match_id")
   status        V1ChatRoomStatus @default(active)
   lastMessageAt DateTime?        @map("last_message_at")
@@ -842,6 +846,7 @@ model V1ChatRoom {
   updatedAt     DateTime         @updatedAt @map("updated_at")
 
   match        V1Match?                @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team         V1Team?                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
   teamMatch    V1TeamMatch?            @relation(fields: [teamMatchId], references: [id], onDelete: Cascade)
   participants V1ChatRoomParticipant[]
   messages     V1ChatMessage[]

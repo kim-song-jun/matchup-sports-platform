@@ -1,11 +1,13 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
 import {
   useV1ApproveTeamJoinApplication,
+  useV1CheckEmail,
+  useV1CheckNickname,
   useV1ChangeTeamMembershipRole,
   useV1MyActivitySummary,
   useV1MyTeams,
@@ -28,6 +30,7 @@ import {
   useV1UpdateSettings,
   useV1WithdrawalRequest,
 } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
@@ -37,8 +40,14 @@ import {
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
-import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, myTeamsModel, profileEditModel, settingsModel } from './my.view-model';
+
+type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'profileImage' | 'form', string>>;
+type DuplicateCheckState = {
+  status: 'idle' | 'available' | 'taken' | 'error';
+  value: string;
+};
 
 export function MyHomePageClient() {
   const profile = useV1Profile();
@@ -97,6 +106,7 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
 }
 
 export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
+  const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
   const members = useV1TeamMembers(teamId, { limit: 50 });
   const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
@@ -108,8 +118,16 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const items = members.data?.items ?? [];
   const requests = applications.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
+  const viewerRole = team.data?.viewer.role;
+  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canDelegateOwner = viewerRole === 'owner';
   const model = {
     teamName: team.data?.name ?? '팀',
+    activeTab,
+    tabs: [
+      { key: 'members' as const, label: '멤버', count: members.data?.summary.memberCount ?? items.length, onSelect: () => setActiveTab('members') },
+      { key: 'requests' as const, label: '가입 요청', count: requests.length, onSelect: () => setActiveTab('requests') },
+    ],
     summary: [
       { label: '전체', value: members.data?.summary.memberCount ?? items.length, unit: '명' },
       { label: '운영진', value: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0, unit: '명' },
@@ -118,16 +136,19 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
     members: items.map((member) =>
       toMyMember(member, {
         actionPending,
-        promote: () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' }),
-        demote: () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' }),
-        remove: () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' }),
+        canManageMembers,
+        canDelegateOwner,
+        promote: () => confirmAction(`${member.displayName}님을 운영진으로 지정할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
+        delegateOwner: () => confirmAction(`${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 됩니다.`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
+        demote: () => confirmAction(`${member.displayName}님을 멤버로 강등할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+        remove: () => confirmAction(`${member.displayName}님을 팀에서 내보낼까요?`, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
       }),
     ),
     requests: requests.map((application) =>
       toMyJoinRequest(application, {
         actionPending,
-        approve: () => approveApplication.mutate({ applicationId: application.applicationId, note: null }),
-        reject: () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' }),
+        approve: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 승인할까요?`, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
+        reject: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 거절할까요?`, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
       }),
     ),
   };
@@ -139,36 +160,188 @@ export function ProfileEditPageClient() {
   const router = useRouter();
   const profile = useV1Profile();
   const update = useV1UpdateProfile();
+  const checkEmail = useV1CheckEmail();
+  const checkNickname = useV1CheckNickname();
   const [displayName, setDisplayName] = useState(profileEditModel.user.name);
+  const [nickname, setNickname] = useState(profileEditModel.user.name);
+  const [email, setEmail] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [birthDateDigits, setBirthDateDigits] = useState('');
+  const [profileImageUrl, setProfileImageUrl] = useState('');
+  const [profileImageName, setProfileImageName] = useState('');
   const [bio, setBio] = useState(profileEditModel.user.intro);
   const [visibilityStatus, setVisibilityStatus] = useState<'public' | 'members_only' | 'private'>('public');
-  const [message, setMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
+  const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
+  const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
 
   useEffect(() => {
     if (!profile.data) return;
     setDisplayName(profile.data.profile.displayName);
+    setNickname(profile.data.profile.nickname ?? profile.data.profile.displayName);
+    setEmail(profile.data.email ?? '');
+    setPhoneDigits(profile.data.phone ?? '');
+    setBirthDateDigits(profile.data.profile.birthDate ?? '');
+    setProfileImageUrl(profile.data.profile.profileImageUrl ?? '');
+    setProfileImageName('');
     setBio(profile.data.profile.bio ?? '');
     setVisibilityStatus(profile.data.profile.visibilityStatus);
+    setNicknameCheck({ status: 'idle', value: '' });
+    setEmailCheck({ status: 'idle', value: '' });
   }, [profile.data]);
+
+  const originalNickname = profile.data?.profile.nickname ?? profile.data?.profile.displayName ?? '';
+  const originalEmail = profile.data?.email ?? '';
+  const normalizedNickname = nickname.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+  const nicknameChanged = normalizedNickname !== originalNickname;
+  const emailChanged = normalizedEmail !== originalEmail;
+  const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
+  const emailVerified = !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
+  const isBlocked = update.isPending || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified;
+
+  const runNicknameCheck = () => {
+    setFieldErrors((current) => ({ ...current, nickname: undefined, form: undefined }));
+    if (!nicknameChanged) {
+      setNicknameCheck({ status: 'available', value: normalizedNickname });
+      return;
+    }
+    if (normalizedNickname.length < 2) {
+      setFieldErrors((current) => ({ ...current, nickname: '닉네임은 2자 이상 입력해 주세요.' }));
+      setNicknameCheck({ status: 'idle', value: '' });
+      return;
+    }
+
+    checkNickname.mutate(normalizedNickname, {
+      onSuccess: (result) => {
+        setNicknameCheck({ status: result.available ? 'available' : 'taken', value: normalizedNickname });
+        setFieldErrors((current) => ({ ...current, nickname: result.available ? undefined : '이미 사용 중인 닉네임이에요.' }));
+      },
+      onError: () => {
+        setNicknameCheck({ status: 'error', value: normalizedNickname });
+        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+      },
+    });
+  };
+
+  const runEmailCheck = () => {
+    setFieldErrors((current) => ({ ...current, email: undefined, form: undefined }));
+    if (!emailChanged) {
+      setEmailCheck({ status: 'available', value: normalizedEmail });
+      return;
+    }
+    if (!normalizedEmail.includes('@')) {
+      setFieldErrors((current) => ({ ...current, email: '이메일 형식을 확인해 주세요.' }));
+      setEmailCheck({ status: 'idle', value: '' });
+      return;
+    }
+
+    checkEmail.mutate(normalizedEmail, {
+      onSuccess: (result) => {
+        setEmailCheck({ status: result.available ? 'available' : 'taken', value: normalizedEmail });
+        setFieldErrors((current) => ({ ...current, email: result.available ? undefined : '이미 가입된 이메일이에요.' }));
+      },
+      onError: () => {
+        setEmailCheck({ status: 'error', value: normalizedEmail });
+        setFieldErrors((current) => ({ ...current, email: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+      },
+    });
+  };
+
+  const selectProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setFieldErrors((current) => ({ ...current, profileImage: undefined, form: undefined }));
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있습니다.' }));
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setFieldErrors((current) => ({ ...current, profileImage: '프로필 사진은 2MB 이하 이미지만 선택해 주세요.' }));
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setProfileImageUrl(reader.result);
+        setProfileImageName(file.name);
+      }
+    };
+    reader.onerror = () => {
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했습니다. 다시 선택해 주세요.' }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage(null);
+    setFieldErrors({});
     if (!displayName.trim()) {
-      setMessage('닉네임을 입력해 주세요.');
+      setFieldErrors({ displayName: '이름을 입력해 주세요.' });
+      return;
+    }
+
+    if (normalizedNickname.length < 2) {
+      setFieldErrors({ nickname: '닉네임은 2자 이상 입력해 주세요.' });
+      return;
+    }
+
+    if (!normalizedEmail.includes('@')) {
+      setFieldErrors({ email: '이메일 형식을 확인해 주세요.' });
+      return;
+    }
+
+    if (!nicknameVerified) {
+      setFieldErrors({ nickname: '닉네임 중복 확인이 필요합니다.' });
+      return;
+    }
+
+    if (!emailVerified) {
+      setFieldErrors({ email: '이메일 중복 확인이 필요합니다.' });
+      return;
+    }
+
+    if (phoneDigits && phoneDigits.length !== 11) {
+      setFieldErrors({ phone: '휴대폰 번호는 숫자 11자리로 입력해 주세요.' });
+      return;
+    }
+
+    if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
+      setFieldErrors({ birthDate: '생년월일은 YYYYMMDD 형식의 유효한 날짜로 입력해 주세요.' });
       return;
     }
 
     try {
       await update.mutateAsync({
         displayName: displayName.trim(),
+        nickname: normalizedNickname,
+        email: normalizedEmail,
         bio,
-        profileImageUrl: profile.data?.profile.profileImageUrl ?? null,
+        profileImageUrl: profileImageUrl || null,
+        phone: phoneDigits || null,
+        birthDate: birthDateDigits || null,
         visibilityStatus,
       });
       router.replace('/my');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '프로필 저장에 실패했습니다.');
+    } catch (nextError) {
+      if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
+        const duplicateField = nextError.code === 'NICKNAME_CONFLICT' ? 'nickname' : nextError.code === 'PHONE_CONFLICT' ? 'phone' : 'email';
+        setFieldErrors({
+          [duplicateField]: duplicateField === 'nickname'
+            ? '이미 사용 중인 닉네임이에요.'
+            : duplicateField === 'phone'
+              ? '이미 가입된 휴대폰 번호예요.'
+              : '이미 가입된 이메일이에요.',
+          form: '이미 가입된 정보가 있어요. 다른 정보를 사용해 주세요.',
+        });
+        return;
+      }
+      setFieldErrors({ form: nextError instanceof Error ? nextError.message : '프로필 저장에 실패했습니다.' });
     }
   };
 
@@ -176,15 +349,109 @@ export function ProfileEditPageClient() {
     <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
       <form className="tm-create-shell tm-profile-edit-shell" id="v1-profile-edit-form" onSubmit={submit}>
         <section className="tm-my-profile-head">
-          <div className="tm-my-avatar">{initials(displayName)}</div>
+          <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: `url(${profileImageUrl})` } : undefined}>
+            {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName)}</span>}
+          </div>
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>목록과 신청 화면에 함께 표시됩니다.</div>
+            <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+              <label className="tm-btn tm-btn-md tm-btn-neutral">
+                {profileImageUrl ? '사진 변경' : '사진 선택'}
+                <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} />
+              </label>
+              {profileImageUrl ? (
+                <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" onClick={() => { setProfileImageUrl(''); setProfileImageName(''); }}>
+                  제거
+                </button>
+              ) : null}
+              <span className="tm-text-caption">{profileImageName || '이미지 1장, 2MB 이하'}</span>
+            </div>
+            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 6 }}>{fieldErrors.profileImage}</div> : null}
           </div>
         </section>
         <label className="tm-create-field">
+          <span className="tm-text-label">이름</span>
+          <input className={`tm-input ${fieldErrors.displayName ? 'tm-auth-input-error' : ''}`} value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={40} required />
+          {fieldErrors.displayName ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.displayName}</span> : null}
+        </label>
+        <label className="tm-create-field">
           <span className="tm-text-label">닉네임</span>
-          <input className="tm-input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={40} required />
+          <span className="tm-auth-field-with-action">
+            <input
+              className={`tm-input ${fieldErrors.nickname ? 'tm-auth-input-error' : nicknameVerified && nicknameChanged ? 'tm-auth-input-success' : ''}`}
+              value={nickname}
+              onChange={(event) => {
+                setNickname(event.target.value);
+                setNicknameCheck({ status: 'idle', value: '' });
+                setFieldErrors((current) => ({ ...current, nickname: undefined }));
+              }}
+              maxLength={40}
+              required
+            />
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || !nicknameChanged || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button">
+              {checkNickname.isPending ? '확인중' : nicknameChanged ? '중복확인' : '변경 없음'}
+            </button>
+          </span>
+          {fieldErrors.nickname || (nicknameVerified && nicknameChanged) ? (
+            <span className={`tm-text-caption ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+              {fieldErrors.nickname ?? '사용 가능한 닉네임이에요.'}
+            </span>
+          ) : null}
+        </label>
+        <label className="tm-create-field">
+          <span className="tm-text-label">이메일</span>
+          <span className="tm-auth-field-with-action">
+            <input
+              className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setEmailCheck({ status: 'idle', value: '' });
+                setFieldErrors((current) => ({ ...current, email: undefined }));
+              }}
+              type="email"
+              required
+            />
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button">
+              {checkEmail.isPending ? '확인중' : emailChanged ? '중복확인' : '변경 없음'}
+            </button>
+          </span>
+          {fieldErrors.email || (emailVerified && emailChanged) ? (
+            <span className={`tm-text-caption ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+              {fieldErrors.email ?? '사용 가능한 이메일이에요.'}
+            </span>
+          ) : null}
+        </label>
+        <label className="tm-create-field">
+          <span className="tm-text-label">휴대폰 번호</span>
+          <input
+            className={`tm-input ${fieldErrors.phone ? 'tm-auth-input-error' : ''}`}
+            inputMode="numeric"
+            maxLength={13}
+            placeholder="010-0000-0000"
+            value={formatPhone(phoneDigits)}
+            onChange={(event) => {
+              setPhoneDigits(toDigits(event.target.value, 11));
+              setFieldErrors((current) => ({ ...current, phone: undefined }));
+            }}
+          />
+          {fieldErrors.phone ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.phone}</span> : null}
+        </label>
+        <label className="tm-create-field">
+          <span className="tm-text-label">생년월일</span>
+          <input
+            className={`tm-input ${fieldErrors.birthDate ? 'tm-auth-input-error' : ''}`}
+            inputMode="numeric"
+            maxLength={10}
+            placeholder="YYYY-MM-DD"
+            value={formatBirthDate(birthDateDigits)}
+            onChange={(event) => {
+              setBirthDateDigits(toDigits(event.target.value, 8));
+              setFieldErrors((current) => ({ ...current, birthDate: undefined }));
+            }}
+          />
+          {fieldErrors.birthDate ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.birthDate}</span> : null}
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">소개</span>
@@ -199,15 +466,16 @@ export function ProfileEditPageClient() {
           </select>
         </label>
 
-        <Card pad={14} style={{ marginTop: 14, background: message ? 'var(--red50)' : 'var(--blue50)' }}>
-          <div className="tm-text-label">{message ?? '프로필만 저장합니다.'}</div>
+        <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
+          <div className="tm-text-label">{fieldErrors.form ?? '프로필만 저장합니다.'}</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목, 난이도, 활동 지역은 마이페이지의 운동 정보에서 따로 관리합니다.</div>
         </Card>
       </form>
       <div className="tm-fixed-cta">
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={update.isPending}>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
+        {isBlocked && (nicknameChanged || emailChanged) ? <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있습니다.</div> : null}
       </div>
     </AppChrome>
   );
@@ -657,20 +925,33 @@ function toMyMember(
   member: V1TeamMember,
   actions?: {
     actionPending: boolean;
+    canManageMembers: boolean;
+    canDelegateOwner: boolean;
     promote: () => void;
+    delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
   },
 ): MyMember {
+  const itemActions: NonNullable<MyMember['actions']> = [];
+  if (actions?.canManageMembers && member.canChangeRole && member.role === 'member') {
+    itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
+  }
+  if (actions?.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
+    itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
+    itemActions.push({ label: '멤버 강등', onSelect: actions.demote });
+  }
+  if (actions?.canManageMembers && member.canRemove && member.role !== 'owner') {
+    itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
+  }
+
   return {
     name: member.displayName,
     role: roleLabel(member.role),
     meta: new Date(member.joinedAt).toLocaleDateString('ko-KR'),
     status: member.status === 'active' ? '활동중' : member.status,
     locked: member.role === 'owner',
-    onPromote: actions && member.canChangeRole && member.role === 'member' ? actions.promote : undefined,
-    onDemote: actions && member.canChangeRole && member.role === 'manager' ? actions.demote : undefined,
-    onRemove: actions && member.canRemove ? actions.remove : undefined,
+    actions: itemActions,
     actionPending: actions?.actionPending,
   };
 }
@@ -688,10 +969,17 @@ function toMyJoinRequest(
     role: '가입 요청',
     meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
     status: application.status === 'requested' ? '검토' : application.status,
-    onApprove: actions.approve,
-    onReject: actions.reject,
+    actions: [
+      { label: '승인', onSelect: actions.approve },
+      { label: '거절', tone: 'danger', onSelect: actions.reject },
+    ],
     actionPending: actions.actionPending,
   };
+}
+
+function confirmAction(message: string, action: () => void) {
+  if (typeof window !== 'undefined' && !window.confirm(message)) return;
+  action();
 }
 
 function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatches'][number] {
@@ -767,6 +1055,31 @@ function authProviderLabel(provider: V1Profile['authProvider']) {
   if (provider === 'kakao') return '카카오 로그인';
   if (provider === 'naver') return '네이버 로그인';
   return '소셜 로그인';
+}
+
+function toDigits(value: string, maxLength: number) {
+  return value.replace(/\D/g, '').slice(0, maxLength);
+}
+
+function formatPhone(value: string) {
+  if (value.length <= 3) return value;
+  if (value.length <= 7) return `${value.slice(0, 3)}-${value.slice(3)}`;
+  return `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
+}
+
+function formatBirthDate(value: string) {
+  if (value.length <= 4) return value;
+  if (value.length <= 6) return `${value.slice(0, 4)}-${value.slice(4)}`;
+  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
+}
+
+function isValidBirthDateDigits(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 function initials(value: string) {

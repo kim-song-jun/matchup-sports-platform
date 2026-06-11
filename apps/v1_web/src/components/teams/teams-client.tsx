@@ -93,7 +93,7 @@ export function TeamListPageClient() {
         search: searchModel,
         filterHref: buildTeamHref(searchParams, { filter: '1' }),
         filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
-        chips: buildTeamSportChips(countItems, base, selectedSportId, sports.data),
+        chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
         teams: visibleTeams,
         summary: {
           ...base.summary,
@@ -108,7 +108,7 @@ export function TeamListPageClient() {
         search: searchModel,
         filterHref: buildTeamHref(searchParams, { filter: '1' }),
         filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
-        chips: buildTeamSportChips(countItems, base, selectedSportId, sports.data),
+        chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
       };
 
   return <TeamListPageView model={model} />;
@@ -212,6 +212,15 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
             visibility: member.role === 'owner' || member.role === 'manager' ? '공개' : '비공개',
           })),
+          memberAccess: {
+            canView: query.data.canViewMembers,
+            enabled: query.data.membersVisibilityEnabled,
+            message: query.data.canViewMembers
+              ? '멤버 현황 조회가 활성화되어 있습니다.'
+              : query.data.viewer.role === 'member'
+                ? '팀 운영진이 멤버 현황 조회를 비활성화했습니다.'
+                : '팀에 소속된 사용자만 멤버 현황을 볼 수 있습니다.',
+          },
         },
         mode: toDetailMode(query.data),
         ctaLabel: ctaLabel(query.data, eligibility.data),
@@ -224,6 +233,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           join: () => join.mutate({ message: null }),
           withdraw: () => withdraw.mutate({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
+        onShare: () => shareTeam(query.data),
       }
     : fallback;
 
@@ -231,8 +241,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
 }
 
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
+  const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
-  const members = useV1TeamMembers(teamId, { limit: 50 });
+  const canViewMembers = Boolean(team.data?.canViewMembers);
+  const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
   const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
   const changeRole = useV1ChangeTeamMembershipRole(teamId);
@@ -244,9 +256,17 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
+  const viewerRole = team.data?.viewer.role;
+  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canDelegateOwner = viewerRole === 'owner';
 
   const model: TeamMembersViewModel = {
     ...fallback,
+    activeTab,
+    tabs: [
+      { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
+      { key: 'requests', label: '가입 요청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
+    ],
     teamName: team.data?.name ?? fallback.teamName,
     summary: {
       total: members.data?.summary.memberCount ?? memberItems.length,
@@ -257,22 +277,25 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
       ? memberItems.map((member) =>
           toMemberModel(member, {
             actionPending,
-            promote: () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' }),
-            demote: () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' }),
-            remove: () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' }),
+            canManageMembers,
+            canDelegateOwner,
+            promote: () => confirmAction(`${member.displayName}님을 운영진으로 지정할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
+            delegateOwner: () => confirmAction(`${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 됩니다.`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
+            demote: () => confirmAction(`${member.displayName}님을 멤버로 강등할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+            remove: () => confirmAction(`${member.displayName}님을 팀에서 내보낼까요?`, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
           }),
         )
       : fallback.members,
     requests: requestItems.map((application) =>
       toRequestModel(application, {
         actionPending,
-        approve: () => approveApplication.mutate({ applicationId: application.applicationId, note: null }),
-        reject: () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' }),
+        approve: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 승인할까요?`, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
+        reject: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 거절할까요?`, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' })),
       }),
     ),
   };
 
-  if (team.isError || members.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
+  if (team.isError || members.isError || (team.data && !team.data.canViewMembers)) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
   return <TeamMembersPageView model={model} />;
 }
@@ -300,13 +323,19 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
   };
 }
 
-function buildTeamSportChips(items: V1Team[], fallback: TeamListViewModel, selectedSportId?: string, masterSports?: Array<{ id: string; name: string }>) {
+function buildTeamSportChips(
+  items: V1Team[],
+  fallback: TeamListViewModel,
+  params: URLSearchParams,
+  selectedSportId?: string,
+  masterSports?: Array<{ id: string; name: string }>,
+) {
   const fixedSports = masterSports?.length
     ? masterSports.slice(0, 4)
     : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
 
   return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: '/teams' },
+    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
     ...fixedSports.map((sport) => ({
       label: sport.name,
       count: items.filter((team) => {
@@ -314,7 +343,7 @@ function buildTeamSportChips(items: V1Team[], fallback: TeamListViewModel, selec
         return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
       }).length,
       active: selectedSportId === sport.id,
-      href: `/teams?sportId=${encodeURIComponent(sport.id)}`,
+      href: buildTeamHref(params, { sportId: sport.id }),
     })),
   ];
 }
@@ -455,22 +484,47 @@ function toMemberModel(
   member: V1TeamMember,
   actions: {
     actionPending: boolean;
+    canManageMembers: boolean;
+    canDelegateOwner: boolean;
     promote: () => void;
+    delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
   },
 ): TeamMembersViewModel['members'][number] {
+  const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
+  if (actions.canManageMembers && member.canChangeRole && member.role === 'member') {
+    itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
+  }
+  if (actions.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
+    itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
+    itemActions.push({ label: '멤버 강등', onSelect: actions.demote });
+  }
+  if (actions.canManageMembers && member.canRemove && member.role !== 'owner') {
+    itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
+  }
+
   return {
     name: member.displayName,
     role: roleLabel(member.role),
     meta: `가입 ${formatDate(member.joinedAt)}`,
-    status: member.status === 'active' ? '활동중' : member.status,
     locked: member.role === 'owner',
-    onPromote: member.canChangeRole && member.role === 'member' ? actions.promote : undefined,
-    onDemote: member.canChangeRole && member.role === 'manager' ? actions.demote : undefined,
-    onRemove: member.canRemove ? actions.remove : undefined,
+    actions: itemActions,
     actionPending: actions.actionPending,
   };
+}
+
+async function shareTeam(team: V1TeamDetail) {
+  const title = team.name;
+  const path = `/teams/${team.teamId}`;
+  const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
+
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    await navigator.share({ title, url });
+    return;
+  }
+
+  await navigator.clipboard?.writeText(url);
 }
 
 function toRequestModel(
@@ -485,10 +539,17 @@ function toRequestModel(
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
     status: application.status === 'requested' ? '검토중' : application.status,
-    onApprove: actions.approve,
-    onReject: actions.reject,
+    actions: [
+      { label: '승인', onSelect: actions.approve },
+      { label: '거절', tone: 'danger', onSelect: actions.reject },
+    ],
     actionPending: actions.actionPending,
   };
+}
+
+function confirmAction(message: string, action: () => void) {
+  if (typeof window !== 'undefined' && !window.confirm(message)) return;
+  action();
 }
 
 function formatDate(value: string) {

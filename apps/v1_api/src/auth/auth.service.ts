@@ -31,6 +31,18 @@ export class AuthService {
 
     const email = normalizeEmail(dto.email);
     const nickname = dto.nickname.trim();
+    const displayName = dto.displayName?.trim() || nickname;
+    const phone = dto.phone?.trim() || null;
+    const birthDate = dto.birthDate?.trim() || null;
+    const profileImageUrl = dto.profileImageUrl?.trim() || null;
+
+    if (birthDate && !isValidBirthDate(birthDate)) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Birth date must be a valid YYYYMMDD value',
+      });
+    }
+
     const existing = await this.prisma.v1User.findUnique({
       where: { email },
       select: { id: true },
@@ -55,6 +67,20 @@ export class AuthService {
       });
     }
 
+    if (phone) {
+      const existingPhone = await this.prisma.v1User.findUnique({
+        where: { phone },
+        select: { id: true },
+      });
+
+      if (existingPhone) {
+        throw new ConflictException({
+          code: 'PHONE_CONFLICT',
+          message: 'Phone is already registered',
+        });
+      }
+    }
+
     const requiredTerms = await this.prisma.v1TermsDocument.findMany({
       where: { isRequired: true, status: 'published' },
       select: { id: true },
@@ -71,6 +97,7 @@ export class AuthService {
     const user = await this.prisma.v1User.create({
       data: {
         email,
+        phone,
         accountStatus: 'active',
         onboardingStatus: 'signup_done',
         lastLoginAt: new Date(),
@@ -87,8 +114,10 @@ export class AuthService {
         profile: {
           create: {
             nickname,
-            displayName: nickname,
+            displayName,
             gender: dto.gender,
+            birthDate,
+            profileImageUrl,
             visibility: 'public',
           },
         },
@@ -420,6 +449,18 @@ export class AuthService {
 
   async completeSocialProfile(userId: string, dto: SocialProfileDto) {
     const nickname = dto.nickname.trim();
+    const displayName = dto.displayName?.trim() || nickname;
+    const phone = dto.phone?.trim() || null;
+    const birthDate = dto.birthDate?.trim() || null;
+    const profileImageUrl = dto.profileImageUrl?.trim() || null;
+
+    if (birthDate && !isValidBirthDate(birthDate)) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Birth date must be a valid YYYYMMDD value',
+      });
+    }
+
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },
       select: {
@@ -491,26 +532,47 @@ export class AuthService {
       });
     }
 
+    if (phone) {
+      const existingPhone = await this.prisma.v1User.findFirst({
+        where: {
+          phone,
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+
+      if (existingPhone) {
+        throw new ConflictException({
+          code: 'PHONE_CONFLICT',
+          message: 'Phone is already registered',
+        });
+      }
+    }
+
     await this.prisma.$transaction([
       this.prisma.v1UserProfile.upsert({
         where: { userId },
         update: {
           nickname,
-          displayName: nickname,
+          displayName,
           gender: dto.gender,
+          birthDate,
+          profileImageUrl,
           visibility: 'public',
         },
         create: {
           userId,
           nickname,
-          displayName: nickname,
+          displayName,
           gender: dto.gender,
+          birthDate,
+          profileImageUrl,
           visibility: 'public',
         },
       }),
       this.prisma.v1User.update({
         where: { id: userId },
-        data: { onboardingStatus: 'signup_done' },
+        data: { onboardingStatus: 'signup_done', phone },
       }),
       this.prisma.v1UserOnboardingProgress.upsert({
         where: { userId },
@@ -755,6 +817,19 @@ export class AuthService {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function isValidBirthDate(value: string) {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 function getAuthNextRoute(onboarding: { status: string; missing: string[]; currentStep: string }, options?: { social?: boolean }) {

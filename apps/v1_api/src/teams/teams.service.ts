@@ -103,6 +103,7 @@ export class TeamsService {
   async detail(user: V1AuthUser | null, teamId: string) {
     const team = await this.getPublicTeam(teamId, user);
     const viewer = this.getViewer(team, user);
+    const canViewMembers = this.canViewMembers(team, viewer);
 
     return {
       id: team.id,
@@ -135,12 +136,14 @@ export class TeamsService {
         displayName: team.ownerUser.profile?.displayName ?? team.ownerUser.profile?.nickname ?? '팀장',
         profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
       },
-      membersPreview: team.memberships.slice(0, 8).map((membership) => ({
+      membersVisibilityEnabled: team.membersVisible,
+      canViewMembers,
+      membersPreview: canViewMembers ? team.memberships.slice(0, 8).map((membership) => ({
         membershipId: membership.id,
         userId: membership.userId,
         displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
         role: membership.role,
-      })),
+      })) : [],
       memberCount: team.memberCount,
       managerCount: team.managerCount,
       trust: {
@@ -233,6 +236,7 @@ export class TeamsService {
           },
         ],
       });
+      await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, 'team_created_owner_joined');
 
       return { team, membership };
     });
@@ -265,6 +269,7 @@ export class TeamsService {
           regionId: dto.regionId,
           name: dto.name,
           joinPolicy: dto.joinPolicy,
+          membersVisible: dto.membersVisibilityEnabled ?? team.membersVisible,
         },
       });
 
@@ -306,6 +311,19 @@ export class TeamsService {
           },
         });
       }
+      if (team.membersVisible !== (dto.membersVisibilityEnabled ?? team.membersVisible)) {
+        await tx.v1StatusChangeLog.create({
+          data: {
+            targetType: 'team',
+            targetId: team.id,
+            fromStatus: team.membersVisible ? 'members_visible' : 'members_hidden',
+            toStatus: dto.membersVisibilityEnabled ? 'members_visible' : 'members_hidden',
+            actorType: 'user',
+            actorUserId: user.id,
+            reason: `members_visibility_changed_by_${membership.role}`,
+          },
+        });
+      }
 
       return nextTeam;
     });
@@ -314,12 +332,20 @@ export class TeamsService {
       teamId: updated.id,
       updatedAt: updated.updatedAt,
       version: updated.updatedAt.toISOString(),
+      membersVisibilityEnabled: updated.membersVisible,
       detailRoute: `/teams/${updated.id}`,
     };
   }
 
   async members(user: V1AuthUser, teamId: string, query: TeamMembersQueryDto) {
     const { team, membership: viewerMembership } = await this.getActiveTeamMembership(user, teamId);
+    if (!team.membersVisible && viewerMembership.role !== 'owner' && viewerMembership.role !== 'manager') {
+      throw new ForbiddenException({
+        code: 'MEMBERS_VISIBILITY_DISABLED',
+        message: 'Team member status is disabled by team managers',
+      });
+    }
+
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
     const status = query.status ?? 'active';
     const memberships = await this.prisma.v1TeamMembership.findMany({
@@ -361,6 +387,8 @@ export class TeamsService {
         managerCount: team.managerCount,
         memberCount: team.memberCount,
       },
+      viewerRole: viewerMembership.role,
+      membersVisibilityEnabled: team.membersVisible,
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
         hasNext,
@@ -441,9 +469,6 @@ export class TeamsService {
     if (target.status !== 'active') {
       throw stateConflict('Only active memberships can change role');
     }
-    if (target.role === 'owner') {
-      throw stateConflict('Owner role cannot be changed by this API');
-    }
     if (target.role === dto.role) {
       return {
         membershipId: target.id,
@@ -451,6 +476,79 @@ export class TeamsService {
         role: target.role,
         managerCount: target.team.managerCount,
       };
+    }
+    if (dto.role === 'owner') {
+      if (target.role !== 'manager') {
+        throw stateConflict('Owner can only be delegated to a manager', 'OWNER_DELEGATION_TARGET_MUST_BE_MANAGER');
+      }
+      const currentOwner = await this.prisma.v1TeamMembership.findFirst({
+        where: { teamId: target.teamId, userId: user.id, role: 'owner', status: 'active' },
+      });
+      if (!currentOwner) {
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: 'Only the current team owner can delegate ownership',
+        });
+      }
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        const delegatedOwner = await tx.v1TeamMembership.update({
+          where: { id: target.id },
+          data: { role: 'owner' },
+        });
+        await tx.v1TeamMembership.update({
+          where: { id: currentOwner.id },
+          data: { role: 'manager' },
+        });
+        const team = await tx.v1Team.update({
+          where: { id: target.teamId },
+          data: { ownerUserId: target.userId },
+        });
+
+        await tx.v1StatusChangeLog.createMany({
+          data: [
+            {
+              targetType: 'team_membership',
+              targetId: target.id,
+              fromStatus: target.role,
+              toStatus: 'owner',
+              actorType: 'user',
+              actorUserId: user.id,
+              reason: 'team_owner_delegated',
+            },
+            {
+              targetType: 'team_membership',
+              targetId: currentOwner.id,
+              fromStatus: 'owner',
+              toStatus: 'manager',
+              actorType: 'user',
+              actorUserId: user.id,
+              reason: 'team_owner_delegated_previous_owner_demoted',
+            },
+            {
+              targetType: 'team',
+              targetId: target.teamId,
+              fromStatus: currentOwner.userId,
+              toStatus: target.userId,
+              actorType: 'user',
+              actorUserId: user.id,
+              reason: 'team_owner_user_changed',
+            },
+          ],
+        });
+
+        return { delegatedOwner, team };
+      });
+
+      return {
+        membershipId: result.delegatedOwner.id,
+        teamId: result.delegatedOwner.teamId,
+        role: result.delegatedOwner.role,
+        managerCount: result.team.managerCount,
+      };
+    }
+    if (target.role === 'owner') {
+      throw stateConflict('Owner role cannot be changed by this API');
     }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
       throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
@@ -538,6 +636,14 @@ export class TeamsService {
           reason: dto.reason ?? 'team_membership_removed',
         },
       });
+      await this.leaveTeamChatParticipant(
+        tx,
+        target.teamId,
+        target.userId,
+        user.id,
+        removedAt,
+        dto.reason ?? 'team_membership_removed',
+      );
 
       return { updated, team };
     });
@@ -807,6 +913,13 @@ export class TeamsService {
           },
         ],
       });
+      await this.ensureTeamChatParticipant(
+        tx,
+        application.teamId,
+        application.applicantUserId,
+        user.id,
+        'team_join_application_approved',
+      );
 
       return { updatedApplication, membership, team };
     });
@@ -881,6 +994,92 @@ export class TeamsService {
     }
 
     return team;
+  }
+
+  private async ensureTeamChatParticipant(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    userId: string,
+    actorUserId: string,
+    reason: string,
+  ) {
+    const existingRoom = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
+    const room = existingRoom
+      ? await tx.v1ChatRoom.update({
+          where: { id: existingRoom.id },
+          data: { status: 'active' },
+          select: { id: true },
+        })
+      : await tx.v1ChatRoom.create({
+          data: { teamId, status: 'active' },
+          select: { id: true },
+        });
+    const existingParticipant = await tx.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+      select: { id: true, status: true },
+    });
+    const participant = existingParticipant
+      ? await tx.v1ChatRoomParticipant.update({
+          where: { id: existingParticipant.id },
+          data: { status: 'active', leftAt: null },
+          select: { id: true },
+        })
+      : await tx.v1ChatRoomParticipant.create({
+          data: { chatRoomId: room.id, userId, status: 'active' },
+          select: { id: true },
+        });
+
+    if (!existingParticipant || existingParticipant.status !== 'active') {
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'chat_room_participant',
+          targetId: participant.id,
+          fromStatus: existingParticipant?.status ?? null,
+          toStatus: 'active',
+          actorType: 'user',
+          actorUserId,
+          reason,
+        },
+      });
+    }
+
+    return { room, participant };
+  }
+
+  private async leaveTeamChatParticipant(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    userId: string,
+    actorUserId: string,
+    leftAt: Date,
+    reason: string,
+  ) {
+    const room = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
+    if (!room) return null;
+    const participant = await tx.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+      select: { id: true, status: true },
+    });
+    if (!participant || participant.status === 'left') return participant;
+
+    const updated = await tx.v1ChatRoomParticipant.update({
+      where: { id: participant.id },
+      data: { status: 'left', leftAt },
+      select: { id: true },
+    });
+    await tx.v1StatusChangeLog.create({
+      data: {
+        targetType: 'chat_room_participant',
+        targetId: participant.id,
+        fromStatus: participant.status,
+        toStatus: 'left',
+        actorType: 'user',
+        actorUserId,
+        reason,
+      },
+    });
+
+    return updated;
   }
 
   private async getActiveTeamMembership(user: V1AuthUser, teamId: string) {
@@ -1138,6 +1337,14 @@ export class TeamsService {
       disabledReason: team.joinPolicy === 'approval_required' ? null : 'JOIN_CLOSED',
       manageRoute: null,
     };
+  }
+
+  private canViewMembers(
+    team: TeamWithRelations,
+    viewer: ReturnType<TeamsService['getViewer']>,
+  ) {
+    if (viewer.role === 'owner' || viewer.role === 'manager') return true;
+    return viewer.role === 'member' && team.membersVisible;
   }
 }
 

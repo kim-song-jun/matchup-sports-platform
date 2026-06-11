@@ -39,6 +39,53 @@ function page<T>(items: T[]) {
   return { items, nextCursor: null };
 }
 
+function teamDetail(teamId: string) {
+  const team = v1TeamsFixture.find((item) => item.id === teamId) ?? v1TeamsFixture[0];
+  return {
+    ...team,
+    teamId: team.id,
+    status: 'active',
+    visibility: 'public',
+    membersVisibilityEnabled: false,
+    canViewMembers: false,
+    version: '2026-05-18T00:00:00.000Z',
+    sport: team.sport ?? { sportId: 'sport-badminton', name: team.sportName },
+    region: team.region ?? { regionId: 'region-seoul-gangdong', name: team.regionName },
+    profile: {
+      logoUrl: team.logoUrl ?? null,
+      coverImageUrl: team.coverImageUrl ?? null,
+      introduction: team.introductionPreview ?? null,
+      activityAreaText: null,
+      skillLevelText: team.skillLevelText ?? team.levelLabel ?? null,
+      levelLabel: team.levelLabel ?? null,
+      minLevel: team.minLevel ?? null,
+      maxLevel: team.maxLevel ?? null,
+      genderRule: team.genderRule ?? null,
+      joinPolicy: team.joinPolicy,
+      memberGoalCount: null,
+    },
+    owner: {
+      userId: 'user-1',
+      displayName: '팀장',
+      profileImageUrl: null,
+    },
+    membersPreview: [],
+    managerCount: 0,
+    trust: {
+      trustState: team.trustState === 'none' ? 'sample' : team.trustState,
+      score: null,
+    },
+    viewer: {
+      role: 'none',
+      membershipId: null,
+      joinState: 'none',
+      canRequestJoin: team.joinPolicy === 'approval_required',
+      disabledReason: null,
+      manageRoute: null,
+    },
+  };
+}
+
 export const v1MswHandlers = [
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/dev-login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
@@ -82,7 +129,7 @@ export const v1MswHandlers = [
       : teamsBySport;
     return ok(page(teams));
   }),
-  http.get(`${api}/teams/:teamId`, ({ params }) => ok(v1TeamsFixture.find((item) => item.id === params.teamId) ?? v1TeamsFixture[0])),
+  http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
   http.get(`${api}/team-matches`, ({ request }) => {
     const sportId = new URL(request.url).searchParams.get('sportId');

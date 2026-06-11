@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { FilterIcon, PlusIcon, SearchIcon } from '@/components/v1-ui/icons';
+import { FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -113,7 +113,16 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   return (
     <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
       <article className="tm-team-detail-body">
-        <Card pad={18} className="tm-team-detail-hero-card">
+        <Card pad={18} className="tm-team-detail-hero-card" style={{ position: 'relative' }}>
+          <button
+            className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
+            type="button"
+            aria-label="공유"
+            onClick={model.onShare}
+            style={{ position: 'absolute', top: 14, right: 14 }}
+          >
+            <ShareIcon size={20} />
+          </button>
           <TeamLogo team={team} large />
           <h1 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h1>
           <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
@@ -135,15 +144,15 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
           <InfoRow label="정기 일정" value={team.schedule} />
         </Card>
-        <Card pad={16} style={{ marginTop: 14 }}>
+        <Card pad={16} style={{ marginTop: 14, opacity: team.memberAccess.canView ? 1 : 0.72 }}>
           <div className="tm-section-row" style={{ marginTop: 0 }}>
             <div>
               <div className="tm-text-body-lg">주요 멤버</div>
-              <div className="tm-text-caption" style={{ marginTop: 2 }}>팀장/운영진과 최근 활동 멤버</div>
+              <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
             </div>
-            <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
+            {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비활성</button>}
           </div>
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div>
+          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀에 소속되어 있고 멤버 현황 조회가 활성화된 경우에만 목록을 볼 수 있습니다.</div>}
         </Card>
       </article>
       <div className="tm-fixed-cta"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div><button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={model.onCta}>{model.ctaPending ? '처리 중' : cta}</button></div>
@@ -165,6 +174,24 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
   return (
     <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref="/teams">
       <div className="tm-create-shell">
+        {edit ? (
+          <Card pad={16}>
+            <div className="tm-my-toggle-row">
+              <div>
+                <div className="tm-text-body-lg">멤버 현황 조회</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                  활성화하면 팀 멤버가 팀 상세에서 멤버 현황을 볼 수 있습니다. 비멤버는 항상 조회할 수 없습니다.
+                </div>
+              </div>
+              <button
+                aria-pressed={Boolean(form?.membersVisibilityEnabled)}
+                className={`tm-toggle ${form?.membersVisibilityEnabled ? 'tm-toggle-on' : ''}`}
+                onClick={() => form?.onMembersVisibilityChange?.(!form.membersVisibilityEnabled)}
+                type="button"
+              />
+            </div>
+          </Card>
+        ) : null}
         <h1 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h1>
         {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
         <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
@@ -195,14 +222,24 @@ export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) 
         </div>
         <Card pad={14} style={{ background: 'var(--grey50)', marginTop: 14 }}>
           <div className="tm-text-label">권한 규칙</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>팀장과 관리자는 일반 멤버 권한을 변경할 수 있습니다. 팀장 위임은 별도 플로우가 필요합니다.</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버는 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 가능합니다. 모든 최종 동작은 확인 후 처리됩니다.</div>
         </Card>
-        <MemberSection title="팀 멤버" sub="이미 팀에 속한 멤버의 역할과 권한을 관리합니다.">
-          {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={`${member.role} · ${member.meta}`} status={member.status} locked={member.locked} onPromote={member.onPromote} onDemote={member.onDemote} onRemove={member.onRemove} actionPending={member.actionPending} />)}
-        </MemberSection>
-        <MemberSection title="가입 신청" sub="아직 팀원이 아닌 신청자는 별도 그룹에서 승인/거절합니다.">
-          {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} status={request.status} pending onApprove={request.onApprove} onReject={request.onReject} actionPending={request.actionPending} />)}
-        </MemberSection>
+        <div className="tm-team-form-chip-row" style={{ marginTop: 14 }}>
+          {model.tabs.map((tab) => (
+            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect}>
+              {tab.label} <span className="tab-num">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+        {model.activeTab === 'members' ? (
+          <MemberSection title="팀 멤버" sub="이미 팀에 속한 멤버의 역할과 권한을 관리합니다.">
+            {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
+          </MemberSection>
+        ) : (
+          <MemberSection title="가입 요청" sub="아직 팀원이 아닌 신청자는 승인 또는 거절로 처리합니다.">
+            {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
+          </MemberSection>
+        )}
       </div>
     </AppChrome>
   );
@@ -449,14 +486,45 @@ function MemberSection({ title, sub, children }: { title: string; sub: string; c
   return <section className="tm-member-section"><div className="tm-text-label">{title}</div><div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div><div style={{ display: 'grid', gap: 10, marginTop: 10 }}>{children}</div></section>;
 }
 
-function MemberCard({ title, sub, status, pending, locked, onPromote, onDemote, onRemove, onApprove, onReject, actionPending }: { title: string; sub: string; status: string; pending?: boolean; locked?: boolean; onPromote?: () => void; onDemote?: () => void; onRemove?: () => void; onApprove?: () => void; onReject?: () => void; actionPending?: boolean }) {
+function MemberCard({
+  title,
+  sub,
+  role,
+  actions,
+  actionPending,
+}: {
+  title: string;
+  sub: string;
+  role: string;
+  actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
+  actionPending?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const disabled = actionPending || actions.length === 0;
+
   return (
     <Card pad={14}>
-      <ListItem title={title} sub={sub} trailing={status} />
-      <div className="tm-member-actions">
-        {pending ? <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" disabled={!onApprove || actionPending} onClick={onApprove}>승인</button> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={locked || actionPending || (!onPromote && !onDemote)} onClick={onPromote ?? onDemote}>{locked ? '권한 고정' : onDemote ? '멤버로 변경' : '운영진 지정'}</button>}
-        {pending ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={!onReject || actionPending} onClick={onReject}>거절</button> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled={locked || !onRemove || actionPending} onClick={onRemove}>내보내기</button>}
-      </div>
+      <ListItem title={title} sub={sub} trailing={role} />
+      <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
+        관리
+      </button>
+      {open && !disabled ? (
+        <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 10 }}>
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              className={`tm-btn tm-btn-sm ${action.tone === 'danger' ? 'tm-btn-danger' : 'tm-btn-neutral'} tm-btn-block`}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                action.onSelect();
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </Card>
   );
 }

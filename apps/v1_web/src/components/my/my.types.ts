@@ -85,17 +85,15 @@ export type MyMember = {
   role: string;
   meta: string;
   status: string;
-  onPromote?: () => void;
-  onDemote?: () => void;
-  onRemove?: () => void;
-  onApprove?: () => void;
-  onReject?: () => void;
+  actions?: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
   actionPending?: boolean;
   locked?: boolean;
 };
 
 export type MyTeamMembersViewModel = {
   teamName: string;
+  activeTab: 'members' | 'requests';
+  tabs: Array<{ key: 'members' | 'requests'; label: string; count: number; onSelect: () => void }>;
   summary: Array<{ label: string; value: number; unit: string }>;
   members: MyMember[];
   requests: MyMember[];

@@ -20,6 +20,7 @@ import {
 type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
   include: {
     match: { select: { id: true; title: true } };
+    team: { select: { id: true; name: true } };
     teamMatch: { select: { id: true; title: true } };
     participants: {
       include: {
@@ -40,6 +41,7 @@ export class ChatService {
       where: {
         status: query.status ?? 'active',
         ...(query.roomType === 'match' ? { matchId: { not: null } } : {}),
+        ...(query.roomType === 'team' ? { teamId: { not: null } } : {}),
         ...(query.roomType === 'team_match' ? { teamMatchId: { not: null } } : {}),
         participants: { some: { userId: user.id, status: 'active' } },
       },
@@ -61,6 +63,10 @@ export class ChatService {
     if (dto.targetType === 'match') {
       await this.assertCanUseMatchChat(user.id, dto.targetId);
       return this.resolveMatchRoom(user.id, dto.targetId);
+    }
+    if (dto.targetType === 'team') {
+      await this.assertCanUseTeamChat(user.id, dto.targetId);
+      return this.resolveTeamRoom(user.id, dto.targetId);
     }
     await this.assertCanUseTeamMatchChat(user.id, dto.targetId);
     return this.resolveTeamMatchRoom(user.id, dto.targetId);
@@ -221,6 +227,17 @@ export class ChatService {
     return { roomId: room.id, roomType: 'match', created: !existing, route: `/chat/rooms/${room.id}` };
   }
 
+  private async resolveTeamRoom(userId: string, teamId: string) {
+    const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamId } });
+    const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamId, status: 'active' } }));
+    await this.prisma.v1ChatRoomParticipant.upsert({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+      update: { status: 'active', leftAt: null },
+      create: { chatRoomId: room.id, userId, status: 'active' },
+    });
+    return { roomId: room.id, roomType: 'team', created: !existing, route: `/chat/rooms/${room.id}` };
+  }
+
   private async resolveTeamMatchRoom(userId: string, teamMatchId: string) {
     const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamMatchId } });
     const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamMatchId, status: 'active' } }));
@@ -238,6 +255,19 @@ export class ChatService {
       select: { id: true },
     });
     if (!participant) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires active participation' });
+  }
+
+  private async assertCanUseTeamChat(userId: string, teamId: string) {
+    const membership = await this.prisma.v1TeamMembership.findFirst({
+      where: {
+        teamId,
+        userId,
+        status: 'active',
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { id: true },
+    });
+    if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Team chat requires active team membership' });
   }
 
   private async assertCanUseTeamMatchChat(userId: string, teamMatchId: string) {
@@ -289,6 +319,7 @@ export class ChatService {
   private roomInclude(_userId: string) {
     return {
       match: { select: { id: true, title: true } },
+      team: { select: { id: true, name: true } },
       teamMatch: { select: { id: true, title: true } },
       participants: {
         include: {
@@ -340,21 +371,26 @@ export class ChatService {
   }
 }
 
-function getRoomType(room: { matchId: string | null; teamMatchId: string | null }) {
-  return room.matchId ? 'match' : 'team_match';
+function getRoomType(room: { matchId: string | null; teamId: string | null; teamMatchId: string | null }) {
+  if (room.matchId) return 'match';
+  if (room.teamId) return 'team';
+  return 'team_match';
 }
 
-function getRoomTitle(room: { match: { title: string } | null; teamMatch: { title: string } | null }) {
-  return room.match?.title ?? room.teamMatch?.title ?? '채팅';
+function getRoomTitle(room: { match: { title: string } | null; team: { name: string } | null; teamMatch: { title: string } | null }) {
+  return room.match?.title ?? room.team?.name ?? room.teamMatch?.title ?? '채팅';
 }
 
 function getLinkedTarget(room: {
   matchId: string | null;
+  teamId: string | null;
   teamMatchId: string | null;
   match: { id: string; title: string } | null;
+  team: { id: string; name: string } | null;
   teamMatch: { id: string; title: string } | null;
 }) {
   if (room.match) return { type: 'match', id: room.match.id, title: room.match.title, route: `/matches/${room.match.id}` };
+  if (room.team) return { type: 'team', id: room.team.id, title: room.team.name, route: `/teams/${room.team.id}` };
   if (room.teamMatch) return { type: 'team_match', id: room.teamMatch.id, title: room.teamMatch.title, route: `/team-matches/${room.teamMatch.id}` };
   return { type: null, id: null, title: '채팅', route: null };
 }

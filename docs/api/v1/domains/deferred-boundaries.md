@@ -12,7 +12,6 @@ These areas must not expose a fake successful flow in v1:
 - venue owner/operator self-service;
 - tournament operations beyond future planning;
 - DM;
-- permanent team chat;
 - chat file attachment;
 - upload/file management as a v1 core API;
 - admin task queue and broad operations workflow.

@@ -50,7 +50,15 @@ export function MatchListPageClient() {
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  const countFilters = useMemo(() => {
+    const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
+    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
+    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (submittedQuery.trim()) filters.query = submittedQuery.trim();
+    return Object.keys(filters).length ? filters : undefined;
+  }, [selectedGenderRule, selectedLevels, submittedQuery]);
   const filteredMatches = useV1Matches(matchFilters, { enabled: Boolean(matchFilters) });
+  const countMatches = useV1Matches(countFilters, { enabled: Boolean(countFilters) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const sports = useV1MasterSports();
@@ -61,7 +69,7 @@ export function MatchListPageClient() {
   const base = getMatchListViewModel();
   const items = query.data?.items;
   const visibleItems = filterMatchesByLevels(items, selectedLevels);
-  const countItems = allMatches.data?.items ?? items ?? [];
+  const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,
     placeholder: '지역, 시간, 매치명 검색',
@@ -87,7 +95,7 @@ export function MatchListPageClient() {
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
         matches: visibleItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
-        sports: buildSportSummary(countItems, base, selectedSportId, sports.data),
+        sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
         summary: {
           ...base.summary,
           count: visibleItems.length,
@@ -102,6 +110,7 @@ export function MatchListPageClient() {
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
       };
 
   return <MatchListPageView model={model} />;
@@ -235,7 +244,7 @@ function toParticipants(
   }));
 }
 
-function buildSportSummary(items: V1Match[], fallback: MatchListViewModel, selectedSportId?: string, masterSports?: V1Sport[]) {
+function buildSportSummary(params: URLSearchParams, items: V1Match[], fallback: MatchListViewModel, selectedSportId?: string, masterSports?: V1Sport[]) {
   const counts = new Map<string, number>();
   items.forEach((item) => {
     const name = item.sport?.name ?? item.sportName ?? '기타';
@@ -248,12 +257,12 @@ function buildSportSummary(items: V1Match[], fallback: MatchListViewModel, selec
       label: name,
       count: counts.get(name) ?? 0,
       active: sport?.id === selectedSportId,
-      href: sport?.id ? `/matches?sportId=${sport.id}` : '/matches',
+      href: sport?.id ? buildMatchHref(params, { sportId: sport.id, filter: null }) : buildMatchHref(params, { sportId: null, filter: null }),
     };
   });
 
   return [
-    { label: fallback.sports[0]?.label ?? '전체', count: items.length, active: !selectedSportId, href: '/matches' },
+    { label: fallback.sports[0]?.label ?? '전체', count: items.length, active: !selectedSportId, href: buildMatchHref(params, { sportId: null, filter: null }) },
     ...fixedSports,
   ];
 }

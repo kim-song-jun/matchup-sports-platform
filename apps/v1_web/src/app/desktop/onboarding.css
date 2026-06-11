@@ -1,1 +1,237 @@
-/* Desktop overrides for onboarding — owned by the onboarding wave. Add @media (min-width:1024px) rules here. */
+/*
+ * Desktop overrides for onboarding wizard — owned by the onboarding wave.
+ *
+ * Foundation (_shell.css) already converts .tm-auth-frame into a centered
+ * 420px card on a var(--grey50) background at ≥1024.
+ * auth.css already un-pins .tm-auth-scroll, hides .tm-auth-topbar, and makes
+ * .tm-auth-fixed-cta sticky inside the card.
+ *
+ * This file upgrades the ONBOARDING wizard specifically:
+ *  - Wider card (~560px) — the wizard has richer grids vs. narrow login forms.
+ *  - Sport grid: 2→3 columns inside the wider card.
+ *  - Level cards: chips wrap with more horizontal space.
+ *  - Region section: comfortable breathing room for chip cloud.
+ *  - In-card back navigation row replaces the hidden mobile topbar.
+ *  - Confirm panel: two-column summary cards.
+ *  - Resume panel: summary cards side-by-side.
+ *  - Consistent 44px touch targets and focus rings throughout.
+ *
+ * Mobile (<768) is NEVER touched here — only @media (min-width:1024px) blocks.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 1. Widen the auth frame for the onboarding wizard.
+ *    The login card is 420px; the wizard has more content (sport grid, chip
+ *    cloud, level cards) and benefits from ~560px.
+ *    Only applies when the frame contains onboarding content.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* Target the auth frame when onboarding content is inside it.
+   * .tm-onboarding-frame is added to .tm-auth-frame by the JSX below. */
+  .tm-auth-frame.tm-onboarding-frame {
+    width: min(100%, 560px);
+    /* More comfortable vertical margin on the page */
+    margin-top: 40px;
+    margin-bottom: 40px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 2. In-card back navigation row.
+ *    The mobile .tm-auth-topbar (with back arrow + title) is hidden by auth.css.
+ *    On desktop the onboarding wizard renders .tm-onboarding-desktop-nav inside
+ *    the card to restore navigation context for multi-step progression.
+ *    This element is wrapped in .tm-show-desktop so it is invisible on mobile.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-desktop-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 28px 0;
+  }
+
+  .tm-onboarding-desktop-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    color: var(--grey700);
+    text-decoration: none;
+    flex-shrink: 0;
+    /* No border — Toss-style ghost target */
+  }
+
+  .tm-onboarding-desktop-back:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+
+  .tm-onboarding-desktop-back:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
+  .tm-onboarding-desktop-nav-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--grey800);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 3. Auth body: increased horizontal padding inside the wider card.
+ *    auth.css already sets 32px 28px 24px — override to match 560px width.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-body {
+    padding: 28px 32px 24px;
+  }
+
+  .tm-onboarding-frame .tm-auth-heading {
+    margin-top: 14px;
+  }
+
+  .tm-onboarding-frame .tm-auth-sub {
+    margin-top: 8px;
+    margin-bottom: 0;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 4. Progress header — tighten for the wider card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-progress {
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .tm-onboarding-frame .tm-auth-progress-bars {
+    gap: 6px;
+  }
+
+  .tm-onboarding-frame .tm-auth-progress-bars span {
+    height: 5px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 5. Sport selection grid — 3 columns inside the 560px card.
+ *    Each card ≈ (560 - 32*2 - 12*2) / 3 ≈ 154px — comfortable tap target.
+ *    auth.css already sets gap:12px, margin-top:28px — keep those.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-sport-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .tm-onboarding-frame .tm-auth-option-card {
+    min-height: 76px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 6. Level selection — stack of sport level cards.
+ *    The chip row inside each card benefits from the extra width.
+ *    No structural change needed — chips already flex-wrap; just tighten rhythm.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-stack {
+    margin-top: 20px;
+    gap: 10px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 7. Region chip cloud — more breathing room in the wider card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-chip-wrap {
+    gap: 8px;
+    margin-top: 18px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 8. Confirm step summary — two-column card grid for sport+region at a glance.
+ *    Mobile: single-column stack.
+ *    Desktop: 2 columns in .tm-auth-stack inside the wider card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* .tm-auth-stack is the mobile base; .tm-onboarding-confirm-grid promotes it
+     to a 2-column grid inside the wider wizard card on desktop. */
+  .tm-onboarding-frame .tm-auth-stack.tm-onboarding-confirm-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  /* The notice card (green "완료 상태") spans full width */
+  .tm-onboarding-frame .tm-auth-stack.tm-onboarding-confirm-grid > .tm-auth-notice {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+
+  /* Location card: full width */
+  .tm-onboarding-frame .tm-onboarding-confirm-full {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 9. Fixed CTA zone — already handled by auth.css (sticky, rounded corners).
+ *    Onboarding has two-button CTAs ("저장 중" + skip row); give them a bit more
+ *    padding inside the wider card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-fixed-cta {
+    padding: 16px 32px 28px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 10. Notice cards — no extra margin-top when inside the wider body.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-auth-notice {
+    margin-top: 16px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 11. Touch targets — ensure chips and option cards meet 44px minimum.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-onboarding-frame .tm-chip {
+    min-height: 44px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 12. Wide (≥1440) — slightly more padding inside the card; card stays 560px.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-onboarding-frame .tm-auth-body {
+    padding: 32px 36px 28px;
+  }
+
+  .tm-onboarding-frame .tm-auth-fixed-cta {
+    padding: 18px 36px 32px;
+  }
+
+  .tm-onboarding-frame .tm-onboarding-desktop-nav {
+    padding: 24px 36px 0;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 13. Prefers-reduced-motion: no transitions added to onboarding wizard.
+ * ───────────────────────────────────────────────────────────────────────────── */

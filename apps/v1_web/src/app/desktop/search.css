@@ -1,1 +1,239 @@
-/* Desktop overrides for search — owned by the search wave. Add @media (min-width:1024px) rules here. */
+/* ============================================================
+ * Desktop overrides for /search — owned by the search wave.
+ * ALL rules are behind @media (min-width:1024px) or (min-width:1440px).
+ * Mobile (<768) is UNCHANGED — never edit existing mobile rules here.
+ *
+ * Routes covered:
+ *   /search          results state
+ *   /search/new      empty-query state
+ *   /search/empty    no-results state
+ *   /search/error    error state
+ *   /search/stale    loading/stale state
+ * ============================================================ */
+
+/* ─── 1. Un-pin the search frame ──────────────────────────────────────────────
+ * On mobile, .tm-search-frame is a fixed 100dvh column with overflow:hidden.
+ * The AppChrome's .tm-scroll-area already handles centering/scroll on desktop,
+ * so we convert the frame to a normal block that fills available space.
+ * Inline styles on the element use style= attributes with lower specificity
+ * than .tm-search-frame in a @media block — so !important is required to
+ * override inline height / overflow / position / width.
+ */
+@media (min-width: 1024px) {
+  .tm-search-frame {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0;
+    /* Add top padding so the sticky search bar sits below the fixed desktop nav
+       (64px) + the .tm-scroll-area's own padding-top is already applied). */
+    padding-top: 8px;
+  }
+}
+
+/* ─── 2. Search form bar — centered, prominent, sticky ────────────────────────
+ * On mobile: a flush topbar-height row spanning the 480px frame.
+ * On desktop: a centered pill bar (max-width 640px) that sticks at the top
+ * of the content column (below the 64px desktop nav).
+ */
+@media (min-width: 1024px) {
+  .tm-search-form-bar {
+    /* Override inline flex + minHeight */
+    position: sticky !important;
+    top: 72px !important; /* 64px nav + 8px breathing room */
+    z-index: 20;
+    /* Remove the mobile left/right edge-to-edge style */
+    padding: 12px 0 16px !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    /* Center content */
+    display: flex !important;
+    justify-content: center;
+    flex-shrink: 0 !important;
+  }
+
+  /* The input wrapper becomes a prominent centered search input */
+  .tm-search-input-wrap {
+    max-width: 640px !important;
+    width: 100% !important;
+    min-height: 52px !important;
+    border-radius: 18px !important;
+    box-shadow: var(--shadow-1);
+    background: var(--bg) !important;
+    border: 1.5px solid var(--grey200) !important;
+    padding: 0 10px 0 18px !important;
+    flex: 1;
+  }
+
+  /* Tighten hover/focus state on the desktop search bar */
+  .tm-search-input-wrap:focus-within {
+    border-color: var(--blue500) !important;
+    box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.12);
+  }
+}
+
+/* ─── 3. Search body — normal flow, no internal scroll ────────────────────────
+ * On mobile: flex:1, overflow:auto (internal scroll within the fixed frame).
+ * On desktop: the shell's tm-scroll-area handles document scroll.
+ */
+@media (min-width: 1024px) {
+  .tm-search-body {
+    flex: 1 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
+
+/* ─── 4. Desktop two-column search panel layout ───────────────────────────────
+ * .tm-search-panel wraps both the panel column (recent + quick filters) and
+ * the results column. On desktop these sit side-by-side:
+ *   LEFT  panel col  — fixed ~280px sidebar (recent searches + quick filters)
+ *   RIGHT results col — fills remaining width
+ */
+.tm-search-panel {
+  /* Mobile: transparent to layout — children flow naturally */
+  display: contents;
+}
+
+.tm-search-panel-col,
+.tm-search-results-col {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  .tm-search-panel {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 0 32px;
+    align-items: start;
+    padding-top: 8px;
+  }
+
+  .tm-search-panel-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    /* Stick to viewport when results scroll long */
+    position: sticky;
+    top: 148px; /* 64px nav + 52px search bar + 32px spacing */
+    max-height: calc(100dvh - 160px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: var(--grey50);
+    border: 1px solid var(--grey150);
+    border-radius: 16px;
+    padding: 20px;
+  }
+
+  .tm-search-panel-col::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tm-search-results-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+}
+
+/* ─── 5. Quick filters grid — 4-up on desktop ─────────────────────────────────
+ * On mobile: 2-column grid (from .tm-search-quick-grid inline style).
+ * On desktop: 2-column to keep each card readable within the 280px panel.
+ * The tablet breakpoint in globals.css forces 1-col; override it back to 2-col.
+ */
+@media (min-width: 1024px) {
+  .tm-search-quick-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+}
+
+/* ─── 6. Results list — multi-column grid ─────────────────────────────────────
+ * On mobile: single-column flex stack.
+ * On desktop: 2-up grid; 3-up at 1440+ so the wider canvas is used well.
+ */
+@media (min-width: 1024px) {
+  .tm-search-results-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    flex-direction: unset !important;
+  }
+
+  /* Result cards: ensure equal height within grid rows */
+  .tm-search-result-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between;
+    height: 100%;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-search-results-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+  }
+}
+
+/* ─── 7. Results header (label + meta line) ───────────────────────────────────
+ * On desktop give the results section header a bit of bottom spacing before
+ * the grid starts.
+ */
+@media (min-width: 1024px) {
+  .tm-search-results-header {
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--grey100);
+    margin-bottom: 4px;
+  }
+}
+
+/* ─── 8. State messages — fill the column gracefully ─────────────────────────
+ * Empty / error / stale states must not be a tiny centered card floating in a
+ * large empty canvas on desktop.
+ */
+@media (min-width: 1024px) {
+  .tm-search-state-msg {
+    margin-top: 0 !important;
+    min-height: 280px;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--grey100);
+    border-radius: 16px;
+    padding: 40px 24px;
+    background: var(--grey50);
+    text-align: center !important;
+  }
+}
+
+/* ─── 9. Error toast — re-scope to content column ─────────────────────────────
+ * On mobile: absolute-positioned at the bottom of the fixed 480px frame.
+ * On desktop: fixed to the bottom of the viewport, centered to the 1120px
+ * content column max-width.
+ */
+@media (min-width: 1024px) {
+  .tm-search-error-toast {
+    position: fixed !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: 32px !important;
+    transform: translateX(-50%);
+    width: min(calc(100vw - 48px), 560px) !important;
+    border-radius: 14px !important;
+  }
+}
+
+/* ─── 10. Recent chips section — tighten on desktop panel ─────────────────────
+ * Within the 280px panel the chip row doesn't need a full 10px top margin.
+ */
+@media (min-width: 1024px) {
+  .tm-search-recent-chips {
+    margin-top: 8px !important;
+  }
+}

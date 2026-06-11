@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { BellIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Card } from '@/components/v1-ui/primitives';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 
@@ -8,7 +8,15 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
   return (
     <AppChrome title="공지사항" activeTab="home" bottomNav={false} backHref="/home">
       <div className="tm-notice-page">
-        <h1 className="tm-text-heading">공지사항</h1>
+        {/* Desktop: inline page heading replaces hidden mobile topbar */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.2} />
+          </Link>
+          <h1 className="tm-text-heading">공지사항</h1>
+        </div>
+        {/* Mobile heading (hidden on desktop by CSS) */}
+        <h1 className="tm-text-heading tm-hide-desktop">공지사항</h1>
         <p className="tm-text-caption tm-notice-lead">홈에 노출되는 고정 공지와 운영 안내를 한곳에서 확인합니다.</p>
         <div className="tm-sport-chip-row tm-notice-filter-row">
           {model.filters.map((filter) => (
@@ -41,6 +49,13 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
   return (
     <AppChrome title="공지 상세" activeTab="home" bottomNav={false} backHref="/notices">
       <article className="tm-notice-page">
+        {/* Desktop: inline page heading replaces hidden mobile topbar */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/notices" aria-label="공지사항 목록으로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.2} />
+          </Link>
+          <h2 className="tm-text-heading">공지 상세</h2>
+        </div>
         <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
         <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
         <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>

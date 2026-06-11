@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
-import { Pin, Send, X } from 'lucide-react';
+import { ChevronLeft, Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState } from '@/components/v1-ui/primitives';
 import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
@@ -21,20 +21,23 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
       backHref="/home"
       showNotifications={false}
     >
-      <div className="tm-chat-list">
-        <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect}>{category.label} {category.count}</button>)}</div>
-        {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오는 중입니다" body="잠시만 기다려주세요." /> : null}
-        {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
-        {hasRooms ? (
-          <>
-            <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
-              {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
-            </ChatSection>
-            <ChatSection title={`채팅방 ${model.rooms.length}`}>
-              {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
-            </ChatSection>
-          </>
-        ) : null}
+      {/* Desktop column wrapper — display:contents on mobile, block column on desktop */}
+      <div className="tm-chat-desktop-wrap">
+        <div className="tm-chat-list">
+          <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect}>{category.label} {category.count}</button>)}</div>
+          {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오는 중입니다" body="잠시만 기다려주세요." /> : null}
+          {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
+          {hasRooms ? (
+            <>
+              <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
+                {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+              </ChatSection>
+              <ChatSection title={`채팅방 ${model.rooms.length}`}>
+                {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+              </ChatSection>
+            </>
+          ) : null}
+        </div>
       </div>
       {model.leaveConfirm ? (
         <div className="tm-chat-leave-scrim" role="presentation">
@@ -53,6 +56,18 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
 export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
   return (
     <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat" showNotifications={false}>
+      {/*
+       * Desktop page head: back link + room title.
+       * The mobile .tm-topbar (rendered inside AppChrome) is hidden on desktop,
+       * so we need this in-content header to preserve navigation.
+       * display:contents on mobile → no layout impact; block flex on desktop.
+       */}
+      <div className="tm-chat-room-desktop-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/chat" aria-label="채팅 목록으로 돌아가기">
+          <ChevronLeft size={22} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+      </div>
       <div className="tm-chat-room">
         <div className="tm-chat-context">
           <Link className="tm-card tm-chat-context-card" href={model.context.href}>
@@ -69,8 +84,8 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           {model.status !== 'loading' && model.messages.length === 0 ? <ChatEmptyState title={model.emptyTitle ?? '아직 메시지가 없어요'} body={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있습니다.'} onRetry={model.onRetry} /> : null}
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
+        <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 추가" disabled={model.status === 'error'}><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
       </div>
-      <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 추가" disabled={model.status === 'error'}><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
     </AppChrome>
   );
 }
@@ -96,22 +111,53 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
         </button>
       )}
     >
-      <div className="tm-notification-list">
-        {model.notifications.length === 0 ? (
-          <EmptyState title="알림이 없어요" sub="매치, 팀매치, 채팅 알림이 생기면 이곳에 모아 보여드릴게요." />
-        ) : null}
-        {groups.map((group) => {
-          const items = model.notifications.filter((notification) => notification.group === group);
-          if (items.length === 0) return null;
-          return (
-            <section key={group} className="tm-notification-section">
-              <div className="tm-text-label">{group}</div>
-              <div className="tm-notification-stack">
-                {items.map((notification) => <NotificationCard key={notification.id} notification={notification} onOpen={model.onOpen} />)}
-              </div>
-            </section>
-          );
-        })}
+      {/*
+       * Desktop column wrapper — display:contents on mobile, centered block on desktop.
+       * Also provides the desktop page head (back + title + read-all action)
+       * since the mobile topbar is hidden at ≥1024px.
+       */}
+      <div className="tm-notifications-desktop-wrap">
+        {/* Desktop page head: only visible on desktop (tm-show-desktop) */}
+        <div className="tm-notifications-desktop-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
+            <ChevronLeft size={22} strokeWidth={2.2} aria-hidden="true" />
+          </Link>
+          <div className="tm-notifications-desktop-head-title">
+            <h1 className="tm-text-heading" style={{ margin: 0 }}>
+              알림{' '}
+              <span className={`tm-notification-count ${allRead ? 'tm-notification-count-muted' : ''}`}>
+                {model.unreadCount}
+              </span>
+            </h1>
+          </div>
+          <div className="tm-notifications-desktop-head-actions">
+            <button
+              className="tm-btn tm-btn-sm tm-btn-ghost"
+              type="button"
+              disabled={allRead || !model.onReadAll || model.readAllPending}
+              onClick={model.onReadAll}
+            >
+              {model.readAllPending ? '처리중' : '모두읽음'}
+            </button>
+          </div>
+        </div>
+        <div className="tm-notification-list">
+          {model.notifications.length === 0 ? (
+            <EmptyState title="알림이 없어요" sub="매치, 팀매치, 채팅 알림이 생기면 이곳에 모아 보여드릴게요." />
+          ) : null}
+          {groups.map((group) => {
+            const items = model.notifications.filter((notification) => notification.group === group);
+            if (items.length === 0) return null;
+            return (
+              <section key={group} className="tm-notification-section">
+                <div className="tm-text-label">{group}</div>
+                <div className="tm-notification-stack">
+                  {items.map((notification) => <NotificationCard key={notification.id} notification={notification} onOpen={model.onOpen} />)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽음 처리했습니다</div> : null}
     </AppChrome>

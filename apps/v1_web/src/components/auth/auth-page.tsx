@@ -189,9 +189,9 @@ export function OnboardingPageView({ model }: { model: OnboardingViewModel }) {
   );
 }
 
-export function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction }: { children: ReactNode; topTitle?: string; backHref?: string; skipHref?: string; fixedAction?: ReactNode }) {
+export function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction, className }: { children: ReactNode; topTitle?: string; backHref?: string; skipHref?: string; fixedAction?: ReactNode; className?: string }) {
   return (
-    <div className="tm-auth-frame">
+    <div className={`tm-auth-frame${className ? ` ${className}` : ''}`}>
       {topTitle || backHref || skipHref ? (
         <header className="tm-auth-topbar">
           <div className="tm-auth-topbar-left">

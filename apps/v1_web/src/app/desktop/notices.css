@@ -1,1 +1,102 @@
 /* Desktop overrides for notices — owned by the notices wave. Add @media (min-width:1024px) rules here. */
+
+/* ─── Notices list (/notices) ─────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /*
+   * Constrain the list to a readable ~760px column.
+   * The .tm-scroll-area already centers at 1120px max-width;
+   * the .tm-notice-page inner wrapper further narrows for readability.
+   */
+  .tm-notice-page {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 0 64px;
+  }
+
+  /* Filter row: top margin tightened on desktop */
+  .tm-notice-filter-row {
+    margin-top: 14px;
+  }
+
+  /* Notice stack: 1-col constrained column on desktop (list is already narrow) */
+  .tm-notice-stack {
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  /* Rows: slightly more padding on desktop */
+  .tm-notice-row {
+    padding: 16px 18px;
+    border-radius: 12px;
+    transition: background-color 0.1s;
+  }
+
+  .tm-notice-row:hover {
+    background: var(--grey50);
+  }
+
+  .tm-notice-row-active:hover {
+    background: var(--blue50);
+  }
+}
+
+/* ─── Notice detail (/notices/[id]) ──────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /*
+   * Detail: a centered ARTICLE reading column ~720px.
+   * Long text across 1120px breaks readability — constrain deliberately.
+   */
+  article.tm-notice-page {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 0 80px;
+  }
+
+  /* Title: comfortable top breathing room */
+  .tm-notice-title {
+    margin-top: 14px;
+    font-size: 22px;
+    line-height: 1.4;
+  }
+
+  /* Lead text: slightly more breathing room */
+  .tm-notice-lead {
+    margin-top: 8px;
+  }
+
+  /* Summary card */
+  .tm-notice-summary-card {
+    margin-top: 20px;
+    padding: 20px;
+  }
+
+  /* Body paragraphs: generous line-height for reading */
+  .tm-notice-body {
+    margin-top: 26px;
+    gap: 18px;
+  }
+
+  .tm-notice-body p {
+    line-height: 1.85;
+  }
+
+  /* Related link card */
+  .tm-notice-related {
+    margin-top: 28px;
+    padding: 18px 20px;
+    border-radius: 12px;
+  }
+}
+
+/* ─── Wide (≥1440): bump reading width slightly ───────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-notice-page {
+    max-width: 800px;
+  }
+
+  article.tm-notice-page {
+    max-width: 760px;
+  }
+}

@@ -133,12 +133,21 @@ export default function AdminOverviewPage() {
               <p className="text-[14px] text-green-700">지금은 조치가 필요한 항목이 없어요.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Split 정지/차단 into separate cards so each value matches its
+                  status filter link (a combined card linked only to ?status=suspended
+                  would undercount blocked users). */}
               <WarningCard
-                label="정지·차단 회원"
-                value={warningSuspendedBlocked}
+                label="정지 회원"
+                value={overview?.users.suspended ?? 0}
                 tone="danger"
                 href="/admin/users?status=suspended"
+              />
+              <WarningCard
+                label="차단 회원"
+                value={overview?.users.blocked ?? 0}
+                tone="danger"
+                href="/admin/users?status=blocked"
               />
               <WarningCard
                 label="탈퇴 대기"

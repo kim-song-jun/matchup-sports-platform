@@ -78,3 +78,25 @@
 ## Ambiguity Log
 - "나머지 기능(운영자 페이지)" → Admin Management(부여/회수) 신설로 해석(유일한 명확한 미구현 + 역할 직결). 추측 날조 아님.
 - branch naming → 공유 워크트리 Critical 안전상 신규 브랜치 생성 대신 기존 feature 브랜치 사용, PR 본문으로 스코프 충실 반영.
+
+---
+
+## 추가 사이클 (98-B) — 사용설명서 전면 재작성 + 라이브 재검수
+
+> 트리거(원문): "admin 사용설명서가 모든 기능에 대한 설명이 들어가있지도 않으니 처음부터 만든다고 생각하고(모든 기능에 대해서 플로우별로 상세하게 다 나와야함) 그리고 desktop webpage 설명서도 마찬가지로(apps) 상세하게 모두 다 준비되어야해."
+
+### 산출물
+- **사용설명서 PDF 2종 (처음부터 재작성, 전 기능 플로우별)**
+  - `docs/manual/teameet-admin-console-manual.pdf` — 18p, 11개 장(접속·개요·회원·매치·팀·팀매치·감사로그·운영자권한관리·역할차이·모바일). 14화면 임베드 + 목차 + 콜아웃.
+  - `docs/manual/teameet-desktop-web-manual.pdf` — 34p, 15개 장(랜딩·로그인·가입·온보딩·홈·매치·팀매치·팀·채팅·검색·알림·공지·마이페이지·설정). 36화면 임베드 + 목차.
+- **공통 PDF 엔진** `scripts/manual_common.py` (ManualBuilder — 표지·자동 목차(afterFlowable TOCEntry)·플로우 단계·콜아웃·역할표·이미지 헬퍼). 두 콘텐츠 스크립트가 공유.
+- **라이브 캡처 50화면** `docs/visual-qa/manual-v2/{admin,desktop}/` — owner/ops/support 3역할 + host 소비자 페르소나, 결정론적 재시드 데이터, 1440px 데스크탑(+admin 390px 드로어).
+
+### 라이브 재검수 중 발견·수정한 실제 버그
+- **팀 멤버 목록 비공개(403 `MEMBERS_VISIBILITY_DISABLED`) UX**: 프론트가 이를 일반 "팀 목록을 불러오지 못했어요 / 다시 시도" 에러로 표시(재시도 무의미) → 전용 `restricted` 상태("멤버 목록이 비공개예요 — 팀 운영진만 열람 가능") 신설. `teams.types.ts`/`teams.view-model.ts`/`teams-client.tsx`/`teams-page.tsx` 4파일. 비공개 상태에서 무의미한 팀 검색바도 제거. 정상 멤버 페이지(owner) 회귀 확인.
+- **`my/reviews` PageProps 타입 위반**: Next 16에서 `searchParams`/`params`는 항상 Promise인데 `Promise<...> | {...}` union이 생성 타입 제약을 위반(tsc 1 에러) → Promise 단일 타입으로 정정. `my/reviews/page.tsx` + `my/reviews/[sourceType]/[sourceId]/page.tsx`.
+
+### 검증
+- v1_web **tsc 0** (위 union 정정으로 복원) · **7/7 테스트 통과**
+- 라이브 QA: admin 14플로우(역할 게이팅 — ops nav에 관리자 없음 / support 상태변경 버튼 0개 / owner 전용 페이지 접근 차단 모두 확인) + 소비자 36플로우 전수 캡처
+- PDF 2종 렌더 검증(목차 페이지번호·한글 폰트·스크린샷 임베드·콜아웃) — 누락 이미지 0, 미사용 캡처 0

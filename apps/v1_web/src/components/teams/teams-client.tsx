@@ -295,7 +295,9 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     ),
   };
 
-  if (team.isError || members.isError || (team.data && !team.data.canViewMembers)) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
+  if (team.isError || members.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
+  // 멤버 목록 비공개는 일시적 오류가 아니므로 '다시 시도' 대신 전용 안내 상태로 분기한다.
+  if (team.data && !team.data.canViewMembers) return <TeamStatePageView model={getTeamStateViewModel('restricted')} />;
 
   return <TeamMembersPageView model={model} />;
 }

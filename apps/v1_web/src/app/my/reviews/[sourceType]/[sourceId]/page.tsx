@@ -2,8 +2,9 @@ import { ReviewSourcePageClient } from '@/components/reviews/reviews-api-clients
 import type { V1ReviewSourceType } from '@/types/api';
 
 type ReviewSourceRouteProps = {
-  params: Promise<{ sourceType: string; sourceId: string }> | { sourceType: string; sourceId: string };
-  searchParams?: Promise<{ complete?: string }> | { complete?: string };
+  // Next 16 App Router always passes params/searchParams as Promises; the prior unions violated PageProps.
+  params: Promise<{ sourceType: string; sourceId: string }>;
+  searchParams?: Promise<{ complete?: string }>;
 };
 
 export default async function ReviewSourceRoute({ params, searchParams }: ReviewSourceRouteProps) {

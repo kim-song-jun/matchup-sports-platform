@@ -58,7 +58,7 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
         </Link>
         <h1 className="tm-text-heading">{model.title}</h1>
       </div>
-      <TeamSearchBar model={model} />
+      {model.state === 'restricted' ? null : <TeamSearchBar model={model} />}
       <div className="tm-team-list">
         {model.state === 'search' ? (
           <>

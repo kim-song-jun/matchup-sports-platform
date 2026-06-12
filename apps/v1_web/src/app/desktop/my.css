@@ -51,6 +51,20 @@
     gap: 18px;
   }
 
+  /*
+   * Constraint wrappers are single grid children of .tm-my-shell. Without an
+   * explicit width they shrink to content width (~277px) instead of filling the
+   * grid track and centering via max-width + auto margins. width:100% lets the
+   * max-width cap + auto margins produce the intended centered column.
+   */
+  .tm-my-settings-desktop,
+  .tm-my-sports-desktop,
+  .tm-my-location-desktop,
+  .tm-my-withdrawal-desktop,
+  .tm-my-members-desktop {
+    width: 100%;
+  }
+
   /* Desktop 2-column wrapper for the my home page.
    * On mobile this wrapper had display:contents — override to real grid here. */
   .tm-my-desktop-layout {

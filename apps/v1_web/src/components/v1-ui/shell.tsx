@@ -134,7 +134,7 @@ function DesktopNav({
         teameet
       </Link>
       <div className="tm-desktop-nav-tabs">
-        {tabs.map(({ id, label, href, Icon }) => {
+        {tabs.map(({ id, label, href }) => {
           const active = id === activeTab;
           return (
             <Link
@@ -144,8 +144,7 @@ function DesktopNav({
               aria-current={active ? 'page' : undefined}
               data-active={active}
             >
-              <Icon size={18} strokeWidth={active ? 2.2 : 1.7} />
-              <span>{label}</span>
+              {label}
             </Link>
           );
         })}

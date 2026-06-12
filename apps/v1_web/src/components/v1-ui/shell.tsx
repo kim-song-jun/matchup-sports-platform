@@ -116,7 +116,7 @@ function DesktopFooter() {
           <span className="tm-desktop-footer-wordmark">teameet</span>
           <span className="tm-desktop-footer-tagline">같이 뛸 사람을 한 번에</span>
         </div>
-        <nav className="tm-desktop-footer-links" aria-label="footer">
+        <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
           <Link href="/notices">공지사항</Link>
           <Link href="/terms">이용약관</Link>
           <Link href="/my/settings/legal">개인정보·정책</Link>

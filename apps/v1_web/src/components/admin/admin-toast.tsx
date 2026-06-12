@@ -53,7 +53,8 @@ export function useAdminToast() {
 /**
  * AdminToasts — fixed bottom-center toast stack.
  *
- * Renders accessible, dismissible toast notifications.
+ * Renders accessible toast notifications that auto-dismiss after AUTO_DISMISS_MS
+ * (no manual close affordance by design — they are transient status messages).
  * Pass `toasts` from `useAdminToast()`.
  */
 export function AdminToasts({ toasts }: { toasts: AdminToastItem[] }) {

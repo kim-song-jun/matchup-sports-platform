@@ -154,6 +154,10 @@ export default function AdminMatchesPage() {
         onSuccess: () => {
           setModalOpen(false);
           setSelectedRow(null);
+          // Reset to first page so the updated row (incl. page2+ extras) is
+          // re-fetched fresh instead of left stale in extraRows.
+          setExtraRows([]);
+          setNextCursor(null);
           showToast('처리했어요.', 'success');
         },
         onError: (err) => {

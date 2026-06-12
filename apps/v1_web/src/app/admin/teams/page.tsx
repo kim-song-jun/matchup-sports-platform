@@ -64,6 +64,13 @@ export default function AdminTeamsPage() {
   const [activeStatus, setActiveStatus] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Clear any pending debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   // URL searchParam pre-selection on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

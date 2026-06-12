@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -26,13 +26,23 @@ const AUTO_DISMISS_MS = 3500;
 export function useAdminToast() {
   const [toasts, setToasts] = useState<AdminToastItem[]>([]);
   const counterRef = useRef(0);
+  const timerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Clear any pending auto-dismiss timers on unmount
+  useEffect(() => {
+    return () => {
+      timerRefs.current.forEach(clearTimeout);
+    };
+  }, []);
 
   function showToast(message: string, variant: AdminToastVariant = 'success') {
     const id = ++counterRef.current;
     setToasts((prev) => [...prev, { id, message, variant }]);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
+      timerRefs.current = timerRefs.current.filter((t) => t !== timer);
     }, AUTO_DISMISS_MS);
+    timerRefs.current.push(timer);
   }
 
   return { toasts, showToast };

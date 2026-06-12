@@ -54,7 +54,8 @@ const HIDE = `nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-ind
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
   });
-  // Set header-based dev auth before any page script runs.
+  // Seed dev auth via localStorage before any page script runs; the app reads
+  // these keys and forwards them as x-v1-user-* request headers.
   await ctx.addInitScript(([id, email]) => {
     localStorage.setItem('teameet.v1.userId', id);
     localStorage.setItem('teameet.v1.userEmail', email);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useV1AdminTeams,
   useV1AdminMe,
@@ -62,14 +62,10 @@ export default function AdminTeamsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear any pending debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
+  // ── Cursor pagination ──────────────────────────────────────────────
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamRow[]>([]);
 
   // URL searchParam pre-selection on mount
   useEffect(() => {
@@ -78,25 +74,22 @@ export default function AdminTeamsPage() {
     if (s) setActiveStatus(s);
   }, []);
 
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedQ(value);
-      setAccumulatedRows([]);
-      setCursor(null);
-    }, 300);
-  };
+  // Debounce search input ~300ms. The effect cleanup clears the pending timer on
+  // every keystroke and on unmount, so a queued callback can never fire after the
+  // status filter changes (mirrors the users/matches admin pages' debounce).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const handleStatusChange = (value: string) => {
-    setActiveStatus(value);
+  // Reset pagination whenever an applied filter (debounced query or status) changes.
+  useEffect(() => {
     setAccumulatedRows([]);
     setCursor(null);
-  };
+  }, [debouncedQ, activeStatus]);
 
-  // ── Cursor pagination ──────────────────────────────────────────────
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamRow[]>([]);
+  const handleSearchChange = (value: string) => setSearchInput(value);
+  const handleStatusChange = (value: string) => setActiveStatus(value);
 
   const filters = {
     ...(debouncedQ ? { q: debouncedQ } : {}),

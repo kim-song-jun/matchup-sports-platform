@@ -464,7 +464,13 @@ async function shareMatch(match: V1Match) {
   const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
 
   if (navigator.share) {
-    await navigator.share({ title, url });
+    try {
+      await navigator.share({ title, url });
+    } catch (err) {
+      // AbortError: user dismissed the native share sheet — not an error
+      if (err instanceof Error && err.name === 'AbortError') return;
+      throw err;
+    }
     return;
   }
 

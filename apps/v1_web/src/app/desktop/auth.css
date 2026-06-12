@@ -271,6 +271,9 @@
     flex-direction: row;
     align-items: stretch;
     justify-content: flex-start;
+    /* Reset the 40px padding-block from _shell.css `body:has(.tm-auth-frame)`
+     * so the split layout is fully full-bleed (min-height:100dvh, no grey bands). */
+    padding-block: 0;
   }
 
   /* Left brand panel */

@@ -339,8 +339,10 @@ export default function AdminAuditPage() {
           return (
             <button
               key={tab.key}
+              id={`audit-tab-${tab.key}`}
               role="tab"
               aria-selected={isActive}
+              aria-controls={`audit-panel-${tab.key}`}
               type="button"
               onClick={() => handleTabChange(tab.key)}
               className={[
@@ -386,16 +388,21 @@ export default function AdminAuditPage() {
       </div>
 
       {/* ── Tab panels ───────────────────────────────────────────── */}
-      <div
-        role="tabpanel"
-        aria-label={activeTab === 'action' ? '관리자 액션 로그' : '상태 변경 로그'}
-      >
-        {activeTab === 'action' ? (
-          <ActionLogPanel targetType={targetType} />
-        ) : (
-          <StatusLogPanel targetType={targetType} />
-        )}
-      </div>
+      {TABS.map((tab) => (
+        <div
+          key={tab.key}
+          id={`audit-panel-${tab.key}`}
+          role="tabpanel"
+          aria-labelledby={`audit-tab-${tab.key}`}
+          hidden={activeTab !== tab.key}
+        >
+          {tab.key === 'action' ? (
+            <ActionLogPanel targetType={targetType} />
+          ) : (
+            <StatusLogPanel targetType={targetType} />
+          )}
+        </div>
+      ))}
     </>
   );
 }

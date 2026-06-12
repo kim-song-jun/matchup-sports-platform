@@ -44,10 +44,10 @@ export class V1AuthGuard implements CanActivate {
       });
     }
 
-    if (user.accountStatus === 'deleted') {
+    if (['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Deleted account cannot access v1 API',
+        message: '이용이 제한된 계정이에요.',
       });
     }
 

@@ -98,17 +98,32 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-    const updated = await this.prisma.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'user.status.update',
-      targetType: 'user',
-      targetId: userId,
-      previousStatus: target.accountStatus,
-      status: updated.accountStatus,
-      reason: dto.reason,
-      beforeState: { accountStatus: target.accountStatus },
-      afterState: { accountStatus: updated.accountStatus },
-      responseIdKey: 'userId',
+
+    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
+    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '운영자 계정의 상태는 owner만 변경할 수 있어요.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'user.status.update',
+          targetType: 'user',
+          targetId: userId,
+          previousStatus: target.accountStatus,
+          status: updated.accountStatus,
+          reason: dto.reason,
+          beforeState: { accountStatus: target.accountStatus },
+          afterState: { accountStatus: updated.accountStatus },
+          responseIdKey: 'userId',
+        },
+        tx,
+      );
     });
   }
 
@@ -116,17 +131,23 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1Match.findUnique({ where: { id: matchId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
-    const updated = await this.prisma.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'match.status.update',
-      targetType: 'match',
-      targetId: matchId,
-      previousStatus: target.status,
-      status: updated.status,
-      reason: dto.reason,
-      beforeState: { status: target.status },
-      afterState: { status: updated.status },
-      responseIdKey: 'matchId',
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'match.status.update',
+          targetType: 'match',
+          targetId: matchId,
+          previousStatus: target.status,
+          status: updated.status,
+          reason: dto.reason,
+          beforeState: { status: target.status },
+          afterState: { status: updated.status },
+          responseIdKey: 'matchId',
+        },
+        tx,
+      );
     });
   }
 
@@ -134,17 +155,23 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1Team.findUnique({ where: { id: teamId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
-    const updated = await this.prisma.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'team.status.update',
-      targetType: 'team',
-      targetId: teamId,
-      previousStatus: target.status,
-      status: updated.status,
-      reason: dto.reason,
-      beforeState: { status: target.status },
-      afterState: { status: updated.status },
-      responseIdKey: 'teamId',
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'team.status.update',
+          targetType: 'team',
+          targetId: teamId,
+          previousStatus: target.status,
+          status: updated.status,
+          reason: dto.reason,
+          beforeState: { status: target.status },
+          afterState: { status: updated.status },
+          responseIdKey: 'teamId',
+        },
+        tx,
+      );
     });
   }
 
@@ -152,17 +179,23 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
-    const updated = await this.prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'team_match.status.update',
-      targetType: 'team_match',
-      targetId: teamMatchId,
-      previousStatus: target.status,
-      status: updated.status,
-      reason: dto.reason,
-      beforeState: { status: target.status },
-      afterState: { status: updated.status },
-      responseIdKey: 'teamMatchId',
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'team_match.status.update',
+          targetType: 'team_match',
+          targetId: teamMatchId,
+          previousStatus: target.status,
+          status: updated.status,
+          reason: dto.reason,
+          beforeState: { status: target.status },
+          afterState: { status: updated.status },
+          responseIdKey: 'teamMatchId',
+        },
+        tx,
+      );
     });
   }
 
@@ -858,39 +891,38 @@ export class AdminService {
       afterState: Record<string, string>;
       responseIdKey: string;
     },
+    tx?: Prisma.TransactionClient,
   ) {
-    const logs = await this.prisma.$transaction(async (tx) => {
-      const actionLog = await tx.v1AdminActionLog.create({
-        data: {
-          adminUserId: admin.id,
-          action: input.action,
-          targetType: input.targetType,
-          targetId: input.targetId,
-          reason: input.reason,
-          beforeJson: input.beforeState as Prisma.InputJsonValue,
-          afterJson: input.afterState as Prisma.InputJsonValue,
-        },
-      });
-      const statusChangeLog = await tx.v1StatusChangeLog.create({
-        data: {
-          targetType: input.targetType,
-          targetId: input.targetId,
-          fromStatus: input.previousStatus,
-          toStatus: input.status,
-          actorType: 'admin',
-          adminUserId: admin.id,
-          reason: input.reason,
-        },
-      });
-      return { actionLog, statusChangeLog };
+    const client = tx ?? this.prisma;
+    const actionLog = await client.v1AdminActionLog.create({
+      data: {
+        adminUserId: admin.id,
+        action: input.action,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        reason: input.reason,
+        beforeJson: input.beforeState as Prisma.InputJsonValue,
+        afterJson: input.afterState as Prisma.InputJsonValue,
+      },
+    });
+    const statusChangeLog = await client.v1StatusChangeLog.create({
+      data: {
+        targetType: input.targetType,
+        targetId: input.targetId,
+        fromStatus: input.previousStatus,
+        toStatus: input.status,
+        actorType: 'admin',
+        adminUserId: admin.id,
+        reason: input.reason,
+      },
     });
 
     return {
       [input.responseIdKey]: input.targetId,
       previousStatus: input.previousStatus,
       status: input.status,
-      actionLogId: logs.actionLog.id,
-      statusChangeLogId: logs.statusChangeLog.id,
+      actionLogId: actionLog.id,
+      statusChangeLogId: statusChangeLog.id,
     };
   }
 }

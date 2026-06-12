@@ -103,20 +103,36 @@ interface DrawerProps {
   adminRoleLabel?: string;
   pathname: string;
   canManageAdmins: boolean;
+  /** Ref to the hamburger button — focus is restored here when the drawer closes (WCAG 2.4.3) */
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
-function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageAdmins }: DrawerProps) {
+function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageAdmins, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
   const navItems = buildNavItems(canManageAdmins);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Focus the close button when the drawer opens
+  // Focus the close button when the drawer opens; restore focus to the trigger when it closes (WCAG 2.4.3)
   useEffect(() => {
     if (open) {
       // Slight delay to ensure CSS transition has started
       const id = setTimeout(() => closeButtonRef.current?.focus(), 50);
       return () => clearTimeout(id);
+    } else {
+      // Return focus to the element that opened the drawer
+      triggerRef.current?.focus();
+    }
+  }, [open, triggerRef]);
+
+  // Apply/remove the `inert` attribute via DOM ref to avoid JSX type conflicts (WCAG 2.1.1)
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (open) {
+      panel.removeAttribute('inert');
+    } else {
+      panel.setAttribute('inert', '');
     }
   }, [open]);
 
@@ -187,13 +203,14 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageA
         ].join(' ')}
       />
 
-      {/* Panel */}
+      {/* Panel — hidden from AT and keyboard when closed (WCAG 2.1.1 / 2.4.3) */}
       <div
         ref={panelRef}
         id="admin-drawer"
         role="dialog"
         aria-modal="true"
         aria-label="관리자 메뉴"
+        aria-hidden={!open}
         className={[
           'fixed inset-y-0 left-0 z-50 w-[280px] bg-white flex flex-col',
           'shadow-[4px_0_24px_rgba(20,28,45,0.12)]',
@@ -275,6 +292,8 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
   const navItems = buildNavItems(canManageAdmins);
   const sectionLabel = useSectionLabel(pathname, canManageAdmins);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /** Ref for the hamburger button so focus can be restored when the drawer closes (WCAG 2.4.3) */
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
@@ -335,6 +354,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           adminRoleLabel={adminRoleLabel}
           pathname={pathname}
           canManageAdmins={canManageAdmins}
+          triggerRef={hamburgerRef}
         />
       </div>
 
@@ -343,6 +363,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         {/* Mobile sticky appbar (<lg) */}
         <header className="lg:hidden sticky top-0 z-20 bg-white border-b border-gray-100 h-[52px] flex items-center px-2">
           <button
+            ref={hamburgerRef}
             onClick={openDrawer}
             aria-label="메뉴 열기"
             aria-expanded={drawerOpen}

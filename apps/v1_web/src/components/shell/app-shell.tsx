@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               tab.href === '/home' ? pathname === '/home' || pathname === '/' : pathname.startsWith(tab.href);
 
             return (
-              <Link key={tab.href} href={tab.href} className={active ? 'v1-tab v1-tab-active' : 'v1-tab'}>
+              <Link key={tab.href} href={tab.href} className={active ? 'v1-tab v1-tab-active' : 'v1-tab'} aria-current={active ? 'page' : undefined}>
                 <Icon size={22} />
                 <span>{tab.label}</span>
               </Link>

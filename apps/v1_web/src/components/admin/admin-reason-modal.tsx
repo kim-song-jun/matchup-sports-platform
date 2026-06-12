@@ -39,6 +39,8 @@ export function AdminReasonModal({
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstFocusableRef = useRef<HTMLSelectElement>(null);
+  /** Saved reference to the element that was focused before the modal opened (for focus restore on close) */
+  const previousFocusRef = useRef<Element | null>(null);
 
   // Reset form whenever the modal opens
   useEffect(() => {
@@ -47,6 +49,19 @@ export function AdminReasonModal({
       setReason('');
     }
   }, [open, currentStatus, statusOptions]);
+
+  // Save focus on open; restore it on close via every path (ESC / backdrop / Cancel / submit) (WCAG 2.4.3)
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement;
+    } else {
+      const el = previousFocusRef.current;
+      if (el && typeof (el as HTMLElement).focus === 'function') {
+        (el as HTMLElement).focus();
+      }
+      previousFocusRef.current = null;
+    }
+  }, [open]);
 
   // Focus the first control on open
   useEffect(() => {

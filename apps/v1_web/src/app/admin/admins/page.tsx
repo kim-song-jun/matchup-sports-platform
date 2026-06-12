@@ -84,14 +84,19 @@ interface GrantModalProps {
   onGrantSuccess: () => void;
 }
 
+const SEARCH_MENU_ID = 'grant-user-search-menu';
+
 function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<V1AdminUserRow | null>(null);
   const [role, setRole] = useState<'ops' | 'support'>('ops');
   const [reason, setReason] = useState('');
+  /** Keyboard-highlighted index in the search result menu (-1 = none) */
+  const [menuHighlightIdx, setMenuHighlightIdx] = useState(-1);
   const panelRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const grantMutation = useV1GrantAdmin();
   const { toasts, showToast } = useAdminToast();
@@ -114,10 +119,16 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
       setSelectedUser(null);
       setRole('ops');
       setReason('');
+      setMenuHighlightIdx(-1);
       const t = setTimeout(() => firstInputRef.current?.focus(), 60);
       return () => clearTimeout(t);
     }
   }, [open]);
+
+  // Reset menu highlight when debounced search changes (new results)
+  useEffect(() => {
+    setMenuHighlightIdx(-1);
+  }, [debouncedSearch]);
 
   // ESC
   useEffect(() => {
@@ -263,6 +274,34 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="닉네임 또는 이메일 검색"
                     disabled={grantMutation.isPending}
+                    aria-haspopup="menu"
+                    aria-expanded={!!(debouncedSearch && !usersPending && userResults.length > 0)}
+                    aria-controls={debouncedSearch ? SEARCH_MENU_ID : undefined}
+                    onKeyDown={(e) => {
+                      if (!debouncedSearch || userResults.length === 0) return;
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setMenuHighlightIdx((prev) =>
+                          prev < userResults.length - 1 ? prev + 1 : 0,
+                        );
+                        // Move DOM focus into the menu
+                        const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+                        const nextIdx = menuHighlightIdx < userResults.length - 1 ? menuHighlightIdx + 1 : 0;
+                        items?.[nextIdx]?.focus();
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setMenuHighlightIdx((prev) =>
+                          prev > 0 ? prev - 1 : userResults.length - 1,
+                        );
+                        const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+                        const nextIdx = menuHighlightIdx > 0 ? menuHighlightIdx - 1 : userResults.length - 1;
+                        items?.[nextIdx]?.focus();
+                      } else if (e.key === 'Escape') {
+                        setSearch('');
+                        setDebouncedSearch('');
+                        setMenuHighlightIdx(-1);
+                      }
+                    }}
                     className={[
                       'w-full h-[44px] pl-9 pr-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
                       'placeholder:text-gray-400',
@@ -271,45 +310,72 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                     ].join(' ')}
                     autoComplete="off"
                   />
-                  {/* Search results dropdown */}
+                  {/* Search results dropdown — role=menu/menuitem (WCAG H4: valid ARIA nesting) */}
                   {debouncedSearch && (
-                    <div className="absolute left-0 right-0 top-[48px] bg-white border border-gray-200 rounded-xl shadow-md z-10 overflow-hidden max-h-[240px] overflow-y-auto">
+                    <div
+                      ref={menuRef}
+                      id={SEARCH_MENU_ID}
+                      className="absolute left-0 right-0 top-[48px] bg-white border border-gray-200 rounded-xl shadow-md z-10 overflow-hidden max-h-[240px] overflow-y-auto"
+                    >
                       {usersPending ? (
                         <p className="px-4 py-3 text-[13px] text-gray-400">검색 중…</p>
                       ) : userResults.length === 0 ? (
                         <p className="px-4 py-3 text-[13px] text-gray-400">결과가 없어요.</p>
                       ) : (
-                        <ul role="listbox" aria-label="회원 검색 결과">
-                          {userResults.map((user) => (
-                            <li key={user.userId} role="option" aria-selected={false}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedUser(user);
+                        <div role="menu" aria-label="회원 검색 결과">
+                          {userResults.map((user, idx) => (
+                            <button
+                              key={user.userId}
+                              type="button"
+                              role="menuitem"
+                              tabIndex={menuHighlightIdx === idx ? 0 : -1}
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setSearch('');
+                                setDebouncedSearch('');
+                                setMenuHighlightIdx(-1);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'ArrowDown') {
+                                  e.preventDefault();
+                                  const next = idx < userResults.length - 1 ? idx + 1 : 0;
+                                  setMenuHighlightIdx(next);
+                                  const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+                                  items?.[next]?.focus();
+                                } else if (e.key === 'ArrowUp') {
+                                  e.preventDefault();
+                                  const prev = idx > 0 ? idx - 1 : userResults.length - 1;
+                                  setMenuHighlightIdx(prev);
+                                  const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+                                  items?.[prev]?.focus();
+                                } else if (e.key === 'Escape') {
                                   setSearch('');
                                   setDebouncedSearch('');
-                                }}
-                                className={[
-                                  'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left',
-                                  'hover:bg-blue-50 transition-colors',
-                                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
-                                ].join(' ')}
-                              >
-                                <span className="text-[13px] font-semibold text-gray-900">
-                                  {user.nickname ?? user.displayName ?? '(이름 없음)'}
-                                  {user.adminRole && (
-                                    <span className="ml-1.5 text-[11px] text-blue-600 font-medium">
-                                      (이미 운영자)
-                                    </span>
-                                  )}
-                                </span>
-                                {user.email && (
-                                  <span className="text-[12px] text-gray-400">{user.email}</span>
+                                  setMenuHighlightIdx(-1);
+                                  firstInputRef.current?.focus();
+                                }
+                              }}
+                              className={[
+                                'w-full flex flex-col items-start px-4 py-2.5 min-h-[44px] text-left',
+                                'hover:bg-blue-50 transition-colors',
+                                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
+                                menuHighlightIdx === idx ? 'bg-blue-50' : '',
+                              ].join(' ')}
+                            >
+                              <span className="text-[13px] font-semibold text-gray-900">
+                                {user.nickname ?? user.displayName ?? '(이름 없음)'}
+                                {user.adminRole && (
+                                  <span className="ml-1.5 text-[11px] text-blue-600 font-medium">
+                                    (이미 운영자)
+                                  </span>
                                 )}
-                              </button>
-                            </li>
+                              </span>
+                              {user.email && (
+                                <span className="text-[12px] text-gray-400">{user.email}</span>
+                              )}
+                            </button>
                           ))}
-                        </ul>
+                        </div>
                       )}
                     </div>
                   )}

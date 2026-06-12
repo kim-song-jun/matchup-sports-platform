@@ -20,6 +20,8 @@ describe('HomePage', () => {
     expect(screen.getAllByText('teameet').length).toBeGreaterThan(0);
     expect(screen.getByText('안녕하세요, 정민님')).toBeInTheDocument();
     expect(screen.getByText('오늘의 추천')).toBeInTheDocument();
-    expect(screen.getByText('공지사항')).toBeInTheDocument();
+    // '공지사항' appears in both the home notices section and the desktop footer link —
+    // assert at least one match (mirrors the 'teameet' getAllByText pattern above).
+    expect(screen.getAllByText('공지사항').length).toBeGreaterThan(0);
   });
 });

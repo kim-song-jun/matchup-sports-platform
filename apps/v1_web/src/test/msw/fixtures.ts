@@ -582,7 +582,7 @@ export const v1AdminOverviewFixture: V1AdminOverview = {
   teams: { active: 4, suspended: 0, archived: 0 },
   teamMatches: { recruiting: 1, matched: 1, cancelled: 0 },
   recentActions: [
-    { actionLogId: 'alog-1', actionType: 'status_change', targetType: 'user', createdAt: '2026-05-18T09:00:00.000Z' },
+    { actionLogId: 'alog-1', actionType: 'user.status.update', targetType: 'user', createdAt: '2026-05-18T09:00:00.000Z' },
   ],
 };
 
@@ -591,7 +591,7 @@ export const v1AdminLogsFixture: CursorPage<V1AdminLog> = {
     {
       actionLogId: 'admin-log-1',
       adminUserId: 'admin-1',
-      actionType: 'status_change',
+      actionType: 'user.status.update',
       targetType: 'user',
       targetId: 'user-1',
       reason: 'smoke test',

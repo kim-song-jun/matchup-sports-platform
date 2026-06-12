@@ -53,7 +53,7 @@ async function shot(page, name) {
     await p.locator('button.tm-auth-option-card', { hasText: '축구' }).first().click().catch(() => {});
     await p.waitForTimeout(300);
     await p.locator('button', { hasText: '실력 입력하기' }).first().click().catch(() => {});
-    await p.waitForForURL?.('**/onboarding/level', { timeout: 4000 }).catch(() => {});
+    await p.waitForURL('**/onboarding/level', { timeout: 4000 }).catch(() => {});
     await p.waitForTimeout(900);
     await shot(p, 'web-06-onboarding-level');
     // select level then advance to region

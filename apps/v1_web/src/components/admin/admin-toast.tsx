@@ -62,7 +62,7 @@ export function AdminToasts({ toasts }: { toasts: AdminToastItem[] }) {
           className={[
             'flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold shadow-lg pointer-events-auto',
             'min-w-[200px] max-w-[90vw] sm:max-w-[400px]',
-            '@media (prefers-reduced-motion: no-preference) animate-[fade-in_0.15s_ease-out]',
+            'motion-safe:animate-[fade-in_0.15s_ease-out]',
             t.variant === 'error' ? 'bg-red-500 text-white' : 'bg-gray-900 text-white',
           ].join(' ')}
         >

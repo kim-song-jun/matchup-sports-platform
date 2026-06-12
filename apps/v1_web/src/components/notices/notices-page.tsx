@@ -56,7 +56,8 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
           <Link className="tm-desktop-back" href="/notices" aria-label="공지사항 목록으로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.2} />
           </Link>
-          <h2 className="tm-text-heading">공지 상세</h2>
+          {/* breadcrumb-style label, not a section heading — keep the notice title as the sole h1 */}
+          <p className="tm-text-heading" aria-hidden="true">공지 상세</p>
         </div>
         <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
         <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>

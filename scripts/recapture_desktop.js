@@ -79,7 +79,7 @@ const HIDE = `nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-ind
       ok++;
       console.log('OK', name);
     } catch (e) {
-      console.log('FAIL', name, e.message.slice(0, 80));
+      console.log('FAIL', name, (e instanceof Error ? e.message : String(e)).slice(0, 80));
     }
   }
   await browser.close();

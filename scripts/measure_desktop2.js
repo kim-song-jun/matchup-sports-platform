@@ -27,7 +27,7 @@ const T = [
         return o;
       }, sels);
       console.log(name, JSON.stringify(d));
-    } catch (e) { console.log(name, 'ERR', e.message.slice(0, 70)); }
+    } catch (e) { console.log(name, 'ERR', (e instanceof Error ? e.message : String(e)).slice(0, 70)); }
     await ctx.close();
   }
   await browser.close();

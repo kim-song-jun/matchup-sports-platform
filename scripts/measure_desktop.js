@@ -40,7 +40,7 @@ const TARGETS = [
       }, sels);
       console.log(name, JSON.stringify(data));
     } catch (e) {
-      console.log(name, 'ERR', e.message.slice(0, 80));
+      console.log(name, 'ERR', (e instanceof Error ? e.message : String(e)).slice(0, 80));
     }
   }
   await browser.close();

@@ -23,7 +23,6 @@ interface AdminDataTableProps<T> {
   /** Trailing column with per-row action buttons */
   actionsHeader?: string;
   renderActions?: (row: T) => ReactNode;
-  onRowClick?: (row: T) => void;
   loading?: boolean;
   /** Custom empty node; defaults to AdminEmpty */
   empty?: ReactNode;
@@ -47,7 +46,6 @@ export function AdminDataTable<T>({
   keyExtractor,
   actionsHeader,
   renderActions,
-  onRowClick,
   loading = false,
   empty,
   error,
@@ -127,25 +125,7 @@ export function AdminDataTable<T>({
               {rows.map((row) => (
                 <tr
                   key={keyExtractor(row)}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  role={onRowClick ? 'button' : undefined}
-                  onKeyDown={
-                    onRowClick
-                      ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onRowClick(row);
-                          }
-                        }
-                      : undefined
-                  }
-                  className={[
-                    'transition-colors',
-                    onRowClick
-                      ? 'hover:bg-blue-50/40 cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]'
-                      : 'hover:bg-gray-50/60',
-                  ].join(' ')}
+                  className="transition-colors hover:bg-gray-50/60"
                 >
                   {columns.map((col) => (
                     <td
@@ -178,25 +158,7 @@ export function AdminDataTable<T>({
         {rows.map((row) => (
           <li
             key={keyExtractor(row)}
-            onClick={onRowClick ? () => onRowClick(row) : undefined}
-            tabIndex={onRowClick ? 0 : undefined}
-            role={onRowClick ? 'button' : undefined}
-            onKeyDown={
-              onRowClick
-                ? (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onRowClick(row);
-                    }
-                  }
-                : undefined
-            }
-            className={[
-              'bg-white rounded-xl border border-gray-100 px-4 py-3',
-              onRowClick
-                ? 'cursor-pointer hover:border-blue-200 active:bg-blue-50/40 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2'
-                : '',
-            ].join(' ')}
+            className="bg-white rounded-xl border border-gray-100 px-4 py-3"
           >
             <dl className="flex flex-col gap-1.5">
               {columns.map((col) => (

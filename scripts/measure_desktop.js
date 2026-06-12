@@ -3,7 +3,6 @@
 const { chromium } = require('@playwright/test');
 const BASE = 'http://localhost:3013';
 const HOST = ['0cf89db6-3e53-406c-b896-89ade09add9a', 'host@teameet.v1'];
-const ONB = ['00000000-0000-4000-8000-000000000006' /*placeholder*/, 'coverage-not-started@teameet.v1'];
 const M = '00000000-0000-4000-8000-000000000202';
 const TMATCH = '00000000-0000-4000-8000-000000001406';
 const CHAT = '5c6a8892-0405-4594-98b8-92e70d49b869';

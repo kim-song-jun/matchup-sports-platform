@@ -140,8 +140,13 @@ export class ChangeTeamMatchStatusDto {
 
 export class AdminListQueryDto {
   @IsOptional()
-  @IsIn(['active', 'revoked'])
-  status?: 'active' | 'revoked';
+  // Read filter only — aligns with all displayed admin states (V1AdminStatus
+  // includes `suspended`, shown as 정지 with a 재부여 action). The write DTO
+  // (UpdateAdminDto) intentionally excludes `suspended`: owners grant/revoke/
+  // re-grant, there is no owner "suspend" action, and allowing it would need
+  // last-owner lockout-guard coverage first.
+  @IsIn(['active', 'suspended', 'revoked'])
+  status?: 'active' | 'suspended' | 'revoked';
 
   @IsOptional()
   @IsString()

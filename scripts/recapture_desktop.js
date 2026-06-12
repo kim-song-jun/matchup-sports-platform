@@ -2,8 +2,10 @@
 // Reflects the new desktop GNB + settings width fix. Run: cd e2e && node ../scripts/recapture_desktop.js
 const { chromium } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs');
 
 const OUT = path.resolve(__dirname, '../docs/visual-qa/manual-v2/desktop');
+fs.mkdirSync(OUT, { recursive: true }); // robust on fresh/cleaned workspaces
 const BASE = 'http://localhost:3013';
 const HOST_ID = '0cf89db6-3e53-406c-b896-89ade09add9a';
 const HOST_EMAIL = 'host@teameet.v1';

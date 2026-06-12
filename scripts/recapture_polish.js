@@ -2,7 +2,9 @@
 // vertical-centering polish. Run: cd e2e && node ../scripts/recapture_polish.js
 const { chromium } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs');
 const OUT = path.resolve(__dirname, '../docs/visual-qa/manual-v2/desktop');
+fs.mkdirSync(OUT, { recursive: true }); // robust on fresh/cleaned workspaces
 const BASE = 'http://localhost:3013';
 const HOST = ['0cf89db6-3e53-406c-b896-89ade09add9a', 'host@teameet.v1'];
 const ONB = ['00000000-0000-4000-8000-000000001006', 'coverage-not-started@teameet.v1'];

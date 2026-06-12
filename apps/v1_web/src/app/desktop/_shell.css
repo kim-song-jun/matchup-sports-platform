@@ -314,6 +314,10 @@
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
+    /* `safe center` vertically centers the card when it fits, but falls back to
+     * top-alignment (no clipping) when the form is taller than the viewport. */
+    justify-content: safe center;
+    padding-block: 40px;
   }
 
   .tm-auth-frame {
@@ -322,15 +326,11 @@
     min-height: auto;
     overflow: visible;
     position: static;
-    margin: auto;
+    margin: 0 auto;
     border-radius: 16px;
     box-shadow: var(--shadow-2);
     background: var(--bg);
-    /* Vertical centering via parent flex (body above) */
     align-self: center;
-    /* Add some breathing room so card doesn't sit at very top */
-    margin-top: 48px;
-    margin-bottom: 48px;
   }
 }
 

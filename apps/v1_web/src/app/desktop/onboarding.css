@@ -30,9 +30,9 @@
    * .tm-onboarding-frame is added to .tm-auth-frame by the JSX below. */
   .tm-auth-frame.tm-onboarding-frame {
     width: min(100%, 560px);
-    /* More comfortable vertical margin on the page */
-    margin-top: 40px;
-    margin-bottom: 40px;
+    /* Vertical placement is handled by the parent's `justify-content: safe center`
+     * (see _shell.css) — keep margins horizontal-only so the wizard card centers. */
+    margin-block: 0;
   }
 }
 
